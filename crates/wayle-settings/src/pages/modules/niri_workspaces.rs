@@ -6,7 +6,7 @@ use crate::{
     editors::{
         color_value::color_value,
         enum_select::enum_select,
-        number::{number_u8, scale, spacing},
+        number::{scale, spacing},
         text::{text, text_like},
         toggle::toggle,
         toml_editor::toml_editor,
@@ -31,7 +31,6 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![
-                        number_u8(&module.min_workspace_count),
                         toggle(&module.monitor_specific),
                         toggle(&module.hide_trailing_empty),
                     ],
