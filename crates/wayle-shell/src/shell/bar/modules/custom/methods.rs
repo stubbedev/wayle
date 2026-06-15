@@ -127,6 +127,18 @@ impl CustomModule {
         self.bar_button.emit(BarButtonInput::SetTooltip(tooltip));
         root.set_visible(is_visible);
 
+        // Per-state color cycling: only override the reactive color properties
+        // when a color-map is configured, so modules without it keep the
+        // static colors applied in apply_visual_properties.
+        if self.definition.color_map.is_some() {
+            let colors = helpers::resolve_colors(&self.definition, &parsed);
+            self.icon_color.set(colors.icon_color);
+            self.icon_bg_color.set(colors.icon_bg_color);
+            self.label_color.set(colors.label_color);
+            self.button_bg_color.set(colors.button_bg_color);
+            self.border_color.set(colors.border_color);
+        }
+
         for old_class in &self.dynamic_classes {
             if !new_classes.contains(old_class) {
                 root.remove_css_class(old_class);

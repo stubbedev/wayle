@@ -1,6 +1,9 @@
 use serde::Deserialize;
 use serde_json::Value;
-use wayle_config::schemas::modules::CustomModuleDefinition;
+use wayle_config::schemas::{
+    modules::{CustomModuleDefinition, StateColors},
+    styling::ColorValue,
+};
 
 const MAX_JSON_PARSE_BYTES: usize = 64 * 1024;
 
@@ -173,6 +176,66 @@ fn resolve_from_default(definition: &CustomModuleDefinition) -> Option<String> {
         .and_then(|m| m.get("default").cloned())
 }
 
+/// Effective colors for the current state after applying `color-map` overrides.
+pub struct ResolvedColors {
+    pub icon_color: ColorValue,
+    pub icon_bg_color: ColorValue,
+    pub label_color: ColorValue,
+    pub button_bg_color: ColorValue,
+    pub border_color: ColorValue,
+}
+
+/// Resolves per-state colors from `color-map`, mirroring [`resolve_icon`].
+///
+/// The `alt` value selects a `StateColors` entry (falling back to the
+/// `"default"` key). Each color the matched state leaves unset falls back to
+/// the module's corresponding static color.
+pub fn resolve_colors(
+    definition: &CustomModuleDefinition,
+    parsed: &ParsedOutput,
+) -> ResolvedColors {
+    let state = resolve_state_colors(definition, parsed);
+    let pick = |selected: Option<&ColorValue>, fallback: &ColorValue| {
+        selected.cloned().unwrap_or_else(|| fallback.clone())
+    };
+
+    ResolvedColors {
+        icon_color: pick(
+            state.as_ref().and_then(|s| s.icon_color.as_ref()),
+            &definition.icon_color,
+        ),
+        icon_bg_color: pick(
+            state.as_ref().and_then(|s| s.icon_bg_color.as_ref()),
+            &definition.icon_bg_color,
+        ),
+        label_color: pick(
+            state.as_ref().and_then(|s| s.label_color.as_ref()),
+            &definition.label_color,
+        ),
+        button_bg_color: pick(
+            state.as_ref().and_then(|s| s.button_bg_color.as_ref()),
+            &definition.button_bg_color,
+        ),
+        border_color: pick(
+            state.as_ref().and_then(|s| s.border_color.as_ref()),
+            &definition.border_color,
+        ),
+    }
+}
+
+fn resolve_state_colors(
+    definition: &CustomModuleDefinition,
+    parsed: &ParsedOutput,
+) -> Option<StateColors> {
+    let map = definition.color_map.as_ref()?;
+    if let Some(alt) = parsed.alt.as_ref()
+        && let Some(state) = map.get(alt)
+    {
+        return Some(state.clone());
+    }
+    map.get("default").cloned()
+}
+
 /// Resolves dynamic CSS classes from class-format and parsed output.
 pub fn resolve_classes(definition: &CustomModuleDefinition, parsed: &ParsedOutput) -> Vec<String> {
     let mut classes = parsed.class.clone();
@@ -341,6 +404,57 @@ mod tests {
     }
 
     #[test]
+    fn resolve_colors_cycles_by_alt_state() {
+        use wayle_config::schemas::styling::CssToken;
+
+        let warning = ColorValue::Token(CssToken::StatusWarning);
+        let mut color_map = std::collections::BTreeMap::new();
+        color_map.insert(
+            "muted".to_string(),
+            StateColors {
+                icon_color: Some(warning.clone()),
+                ..Default::default()
+            },
+        );
+        color_map.insert(
+            "default".to_string(),
+            StateColors {
+                icon_color: Some(ColorValue::Token(CssToken::StatusError)),
+                ..Default::default()
+            },
+        );
+
+        let definition = CustomModuleDefinition {
+            id: "test".to_string(),
+            color_map: Some(color_map),
+            ..default_definition()
+        };
+
+        // alt match overrides the icon color; unset fields keep the static color
+        let output = ParsedOutput::parse(r#"{"alt": "muted"}"#);
+        let colors = resolve_colors(&definition, &output);
+        assert_eq!(colors.icon_color, warning);
+        assert_eq!(colors.label_color, definition.label_color);
+
+        // unknown alt falls back to the "default" state entry
+        let output = ParsedOutput::parse(r#"{"alt": "unknown"}"#);
+        let colors = resolve_colors(&definition, &output);
+        assert_eq!(colors.icon_color, ColorValue::Token(CssToken::StatusError));
+    }
+
+    #[test]
+    fn resolve_colors_without_map_uses_static_colors() {
+        let definition = CustomModuleDefinition {
+            id: "test".to_string(),
+            ..default_definition()
+        };
+        let output = ParsedOutput::parse(r#"{"alt": "muted"}"#);
+        let colors = resolve_colors(&definition, &output);
+        assert_eq!(colors.icon_color, definition.icon_color);
+        assert_eq!(colors.border_color, definition.border_color);
+    }
+
+    #[test]
     fn resolve_icon_alt_overrides_percentage() {
         let mut icon_map = std::collections::BTreeMap::new();
         icon_map.insert("muted".to_string(), "muted-icon".to_string());
@@ -385,6 +499,7 @@ mod tests {
             icon_name: String::new(),
             icon_names: None,
             icon_map: None,
+            color_map: None,
             class_format: None,
             icon_show: true,
             icon_color: ColorValue::Auto,

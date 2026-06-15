@@ -40,7 +40,7 @@ pub use cava::{
 };
 pub use clock::{ClockConfig, WeekStart};
 pub use cpu::CpuConfig;
-pub use custom::{CustomModuleDefinition, ExecutionMode, RestartDelay, RestartPolicy};
+pub use custom::{CustomModuleDefinition, ExecutionMode, RestartDelay, RestartPolicy, StateColors};
 pub use dashboard::DashboardConfig;
 pub use hyprland_workspaces::{
     ActiveIndicator, DisplayMode, HyprlandWorkspacesConfig, Numbering, UrgentMode, WorkspaceStyle,

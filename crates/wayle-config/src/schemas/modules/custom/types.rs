@@ -5,6 +5,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use tracing::warn;
 use wayle_derive::wayle_enum;
 
+use crate::schemas::styling::ColorValue;
+
 /// Execution mode for custom module commands.
 #[wayle_enum(default)]
 pub enum ExecutionMode {
@@ -93,6 +95,35 @@ impl<'de> Deserialize<'de> for RestartDelay {
         }
         Ok(Self::new(raw))
     }
+}
+
+/// Per-state color overrides for a custom module.
+///
+/// Values are keyed in `color-map` by the JSON output's `alt` field, mirroring
+/// `icon-map`. Any field left unset falls back to the module's static color of
+/// the same name. Use the `"default"` key as a fallback state.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub struct StateColors {
+    /// Icon foreground color for this state.
+    #[serde(default)]
+    pub icon_color: Option<ColorValue>,
+
+    /// Icon container background color for this state.
+    #[serde(default)]
+    pub icon_bg_color: Option<ColorValue>,
+
+    /// Label text color for this state.
+    #[serde(default)]
+    pub label_color: Option<ColorValue>,
+
+    /// Button background color for this state.
+    #[serde(default)]
+    pub button_bg_color: Option<ColorValue>,
+
+    /// Border color for this state.
+    #[serde(default)]
+    pub border_color: Option<ColorValue>,
 }
 
 #[cfg(test)]

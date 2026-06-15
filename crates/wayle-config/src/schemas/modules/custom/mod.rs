@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 
-pub use self::types::{ExecutionMode, RestartDelay, RestartPolicy};
+pub use self::types::{ExecutionMode, RestartDelay, RestartPolicy, StateColors};
 use crate::{
     ClickAction,
     docs::{ConfigGroup, ModuleInfo, ModuleInfoProvider},
@@ -256,6 +256,27 @@ pub struct CustomModuleDefinition {
     /// Border color.
     #[serde(rename = "border-color", default = "default_auto_color")]
     pub border_color: ColorValue,
+
+    /// Map of per-state color overrides keyed by the `alt` field value.
+    ///
+    /// Mirrors `icon-map`: the `alt` value from JSON output is looked up in
+    /// this map and the colors set for that state override the module's
+    /// static colors, letting a single widget cycle its colors alongside its
+    /// icon as its state changes. Use `"default"` as a fallback key. Any
+    /// color left unset for the matched state falls back to the module's
+    /// static color of the same name.
+    ///
+    /// ## Example
+    ///
+    /// ```toml
+    /// icon-map = { muted = "audio-volume-muted-symbolic" }
+    /// color-map = { muted = { icon-color = "red" }, default = { icon-color = "green" } }
+    ///
+    /// # Output: {"percentage": 50, "alt": "muted"}
+    /// # Result: muted icon rendered in red
+    /// ```
+    #[serde(rename = "color-map", default)]
+    pub color_map: Option<BTreeMap<String, StateColors>>,
 
     /// Action performed on left click.
     ///
