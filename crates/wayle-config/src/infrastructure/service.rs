@@ -11,7 +11,7 @@ use tracing::{info, instrument, warn};
 
 use super::{
     error::{Error, InvalidFieldReason, IoOperation},
-    paths::ConfigPaths,
+    paths::{ConfigPaths, discover_main_config},
     secrets, toml_path,
     watcher::FileWatcher,
 };
@@ -48,7 +48,7 @@ impl ConfigService {
         }
 
         let config = Config::default();
-        let config_path = ConfigPaths::main_config();
+        let config_path = discover_main_config();
 
         let config_result =
             tokio::task::spawn_blocking(move || Config::load_toml_with_imports(&config_path))

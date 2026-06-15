@@ -61,6 +61,24 @@ pub enum Error {
         source: toml::de::Error,
     },
 
+    /// YAML parsing failed.
+    #[error("{source}\n  --> {}", path.display())]
+    YamlParse {
+        /// Location of YAML being parsed.
+        path: PathBuf,
+        /// The underlying YAML parse error.
+        #[source]
+        source: serde_yaml::Error,
+    },
+
+    /// YAML parsing failed for inline content.
+    #[error("{source}")]
+    YamlParseInline {
+        /// The underlying YAML parse error.
+        #[source]
+        source: serde_yaml::Error,
+    },
+
     /// Import operation failed.
     #[error("cannot import '{}'", path.display())]
     Import {

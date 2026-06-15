@@ -73,6 +73,7 @@ schemars = { version = "1.0.4", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["preserve_order"] }
 serde_json_path = "0.7"
+serde_yaml = "0.9"
 smithay-client-toolkit = "0.20"
 sourceview5 = "0.11"
 sysinfo = { version = "0.33", default-features = false, features = [

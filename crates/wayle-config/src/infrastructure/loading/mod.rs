@@ -59,17 +59,40 @@ impl Config {
         detector.push_to_chain(path);
 
         let main_config_content = fs::read_to_string(path)?;
-        let import_paths = Self::extract_import_paths(&main_config_content)?;
+        let import_paths = Self::extract_import_paths(&main_config_content, path)?;
         let imported_configs = Self::load_all_imports(import_base, &import_paths, detector)?;
 
-        let main_config: Value =
-            toml::from_str(&main_config_content).map_err(|source| Error::TomlParse {
-                path: path.to_path_buf(),
-                source,
-            })?;
+        let main_config = Self::parse_config_str(&main_config_content, path)?;
 
         detector.pop_from_chain();
         Ok(merge_toml_configs(imported_configs, main_config))
+    }
+
+    /// Returns `true` if `path` should be parsed as YAML (`.yaml`/`.yml`),
+    /// otherwise it is treated as TOML.
+    fn is_yaml_path(path: &Path) -> bool {
+        matches!(
+            path.extension().and_then(|ext| ext.to_str()),
+            Some("yaml" | "yml")
+        )
+    }
+
+    /// Parses config file contents into a [`toml::Value`], selecting the
+    /// format from the file extension. YAML configs are deserialized into the
+    /// same value model as TOML so the rest of the merge/import pipeline is
+    /// format-agnostic.
+    fn parse_config_str(content: &str, path: &Path) -> Result<Value, Error> {
+        if Self::is_yaml_path(path) {
+            serde_yaml::from_str(content).map_err(|source| Error::YamlParse {
+                path: path.to_path_buf(),
+                source,
+            })
+        } else {
+            toml::from_str(content).map_err(|source| Error::TomlParse {
+                path: path.to_path_buf(),
+                source,
+            })
+        }
     }
 
     fn load_all_imports(
@@ -122,20 +145,21 @@ impl Config {
                 source,
             }),
         })?;
-        let import_paths = Self::extract_import_paths(&content)?;
+        let import_paths = Self::extract_import_paths(&content, path)?;
         let imported_configs = Self::load_all_imports(path, &import_paths, detector)?;
 
-        let main_value: Value = toml::from_str(&content).map_err(|source| Error::TomlParse {
-            path: path.to_path_buf(),
-            source,
-        })?;
+        let main_value = Self::parse_config_str(&content, path)?;
 
         Ok(merge_toml_configs(imported_configs, main_value))
     }
 
-    fn extract_import_paths(config_content: &str) -> Result<Vec<String>, Error> {
-        let value =
-            toml::from_str(config_content).map_err(|source| Error::TomlParseInline { source })?;
+    fn extract_import_paths(config_content: &str, path: &Path) -> Result<Vec<String>, Error> {
+        let value = if Self::is_yaml_path(path) {
+            serde_yaml::from_str(config_content)
+                .map_err(|source| Error::YamlParseInline { source })?
+        } else {
+            toml::from_str(config_content).map_err(|source| Error::TomlParseInline { source })?
+        };
 
         let import_paths = if let Value::Table(table) = value {
             if let Some(Value::Array(imports)) = table.get("imports") {
@@ -159,12 +183,79 @@ impl Config {
             path: base_path.to_path_buf(),
         })?;
 
-        let mut import_path_buf = PathBuf::from(import_path);
-        if import_path_buf.extension().is_none() {
-            import_path_buf.set_extension("toml");
+        let import_path_buf = PathBuf::from(import_path);
+        if import_path_buf.extension().is_some() {
+            return Ok(parent_dir.join(import_path_buf));
         }
 
-        let resolved_path = parent_dir.join(import_path_buf);
-        Ok(resolved_path)
+        // No extension given: prefer an existing YAML sibling, then YML, and
+        // fall back to TOML (the historical default) so bare imports keep
+        // working regardless of the importing file's format.
+        for ext in ["yaml", "yml", "toml"] {
+            let candidate = parent_dir.join(import_path_buf.with_extension(ext));
+            if candidate.exists() {
+                return Ok(candidate);
+            }
+        }
+
+        Ok(parent_dir.join(import_path_buf.with_extension("toml")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use crate::Config;
+
+    #[test]
+    fn detects_yaml_by_extension() {
+        assert!(Config::is_yaml_path(Path::new("config.yaml")));
+        assert!(Config::is_yaml_path(Path::new("config.yml")));
+        assert!(!Config::is_yaml_path(Path::new("config.toml")));
+        assert!(!Config::is_yaml_path(Path::new("config")));
+    }
+
+    #[test]
+    fn yaml_and_toml_parse_to_equal_values() {
+        let toml_src = "\
+a = 1
+b = \"hi\"
+
+[section]
+nested = true
+list = [1, 2, 3]
+";
+        let yaml_src = "\
+a: 1
+b: hi
+section:
+  nested: true
+  list:
+    - 1
+    - 2
+    - 3
+";
+        let from_toml = Config::parse_config_str(toml_src, Path::new("config.toml")).unwrap();
+        let from_yaml = Config::parse_config_str(yaml_src, Path::new("config.yaml")).unwrap();
+        assert_eq!(from_toml, from_yaml);
+    }
+
+    #[test]
+    fn extracts_imports_from_yaml() {
+        let yaml_src = "\
+imports:
+  - bar.yaml
+  - baz
+";
+        let imports = Config::extract_import_paths(yaml_src, Path::new("config.yaml")).unwrap();
+        assert_eq!(imports, vec!["bar.yaml".to_string(), "baz".to_string()]);
+    }
+
+    #[test]
+    fn yaml_parse_error_is_reported() {
+        let bad_yaml = "a: : :\n  - broken";
+        let err = Config::parse_config_str(bad_yaml, Path::new("config.yaml"));
+        assert!(err.is_err());
     }
 }

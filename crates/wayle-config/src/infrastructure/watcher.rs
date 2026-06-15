@@ -10,7 +10,12 @@ use notify::{
 use tokio::sync::{mpsc, watch};
 use tracing::{debug, error, info, instrument};
 
-use super::{error::Error, paths::ConfigPaths, secrets, service::ConfigService};
+use super::{
+    error::Error,
+    paths::{ConfigPaths, discover_main_config},
+    secrets,
+    service::ConfigService,
+};
 use crate::{
     ApplyConfigLayer, ApplyRuntimeLayer, CommitConfigReload, Config, ResetConfigLayer,
     ResetRuntimeLayer, infrastructure::themes::utils::load_themes,
@@ -81,7 +86,7 @@ impl FileWatcher {
     /// Also watch the real parent directory when the main config file is a
     /// symlink, so edits applied through the link target are still observed.
     fn watch_canonical_dir(watcher: &mut RecommendedWatcher, config_dir: &Path) {
-        let config_path = ConfigPaths::main_config();
+        let config_path = discover_main_config();
         if let Ok(canonical_path) = config_path.canonicalize()
             && let Some(canonical_dir) = canonical_path.parent()
             && canonical_dir != config_dir
@@ -139,7 +144,7 @@ impl FileWatcher {
     async fn reload_main_config(&self) -> Result<(), Error> {
         let config = self.config_service.config();
 
-        let config_path = ConfigPaths::main_config();
+        let config_path = discover_main_config();
         let toml_value =
             tokio::task::spawn_blocking(move || Config::load_toml_with_imports(&config_path))
                 .await
