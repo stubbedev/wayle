@@ -1,4 +1,8 @@
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use notify::{
     Event, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher, event::EventKind,
@@ -61,6 +65,22 @@ impl FileWatcher {
 
         info!(?config_dir, "Config directory watcher started");
 
+        Self::watch_canonical_dir(&mut watcher, &config_dir);
+
+        let file_watcher = Self {
+            config_service,
+            secrets_tx,
+            _watcher: Arc::new(watcher),
+        };
+
+        tokio::spawn(run_debounced_event_loop(file_watcher.clone(), rx));
+
+        Ok(file_watcher)
+    }
+
+    /// Also watch the real parent directory when the main config file is a
+    /// symlink, so edits applied through the link target are still observed.
+    fn watch_canonical_dir(watcher: &mut RecommendedWatcher, config_dir: &Path) {
         let config_path = ConfigPaths::main_config();
         if let Ok(canonical_path) = config_path.canonicalize()
             && let Some(canonical_dir) = canonical_path.parent()
@@ -72,16 +92,6 @@ impl FileWatcher {
                 info!(?canonical_dir, "Canonical config folder watcher started");
             }
         }
-
-        let file_watcher = Self {
-            config_service,
-            secrets_tx,
-            _watcher: Arc::new(watcher),
-        };
-
-        tokio::spawn(run_debounced_event_loop(file_watcher.clone(), rx));
-
-        Ok(file_watcher)
     }
 
     fn should_reload(event: &Event) -> bool {
