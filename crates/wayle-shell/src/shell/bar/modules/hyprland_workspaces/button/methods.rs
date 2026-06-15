@@ -102,36 +102,31 @@ impl WorkspaceButton {
     }
 
     pub(super) fn populate_identity(&self, container: &gtk::Box) {
-        match self.display_mode {
-            DisplayMode::Label => {
-                let label_text = self.label_text();
-                let label = gtk::Label::builder()
-                    .label(&label_text)
-                    .css_classes([WORKSPACE_LABEL_CSS])
-                    .valign(gtk::Align::Center)
-                    .build();
-                container.append(&label);
-            }
-            DisplayMode::Icon => {
-                let Some(ref icon_name) = self.mapped_icon else {
-                    let label_text = self.label_text();
-                    let label = gtk::Label::builder()
-                        .label(&label_text)
-                        .css_classes([WORKSPACE_LABEL_CSS])
-                        .valign(gtk::Align::Center)
-                        .build();
-                    container.append(&label);
-                    return;
-                };
-                let image = gtk::Image::builder()
-                    .icon_name(icon_name)
-                    .css_classes([WORKSPACE_CUSTOM_ICON_CSS])
-                    .valign(gtk::Align::Center)
-                    .build();
-                container.append(&image);
-            }
-            DisplayMode::None => {}
+        if matches!(self.display_mode, DisplayMode::None) {
+            return;
         }
+
+        // A per-workspace mapped icon takes priority over the label in any
+        // display mode, so workspaces with an icon render as [icon] even when
+        // the module is otherwise showing labels. This allows mixed
+        // [icon][label][icon] workspace rows.
+        if let Some(ref icon_name) = self.mapped_icon {
+            let image = gtk::Image::builder()
+                .icon_name(icon_name)
+                .css_classes([WORKSPACE_CUSTOM_ICON_CSS])
+                .valign(gtk::Align::Center)
+                .build();
+            container.append(&image);
+            return;
+        }
+
+        let label_text = self.label_text();
+        let label = gtk::Label::builder()
+            .label(&label_text)
+            .css_classes([WORKSPACE_LABEL_CSS])
+            .valign(gtk::Align::Center)
+            .build();
+        container.append(&label);
     }
 
     pub(super) fn populate_app_icons(

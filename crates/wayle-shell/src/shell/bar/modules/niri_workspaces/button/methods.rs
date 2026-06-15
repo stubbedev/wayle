@@ -14,19 +14,20 @@ const WORKSPACE_ICON_EMPTY_CSS: &str = "workspace-icon-empty";
 
 impl NiriWorkspaceButton {
     pub(super) fn show_label(&self) -> bool {
-        let has_label = self.label.as_deref().is_some_and(|label| !label.is_empty());
-        if !has_label {
+        // A per-workspace mapped icon takes priority over the label in any
+        // display mode, so workspaces with an icon render as [icon] even when
+        // the module is otherwise showing labels.
+        if self.icon.is_some() {
             return false;
         }
-        match self.display_mode {
-            DisplayMode::Label => true,
-            DisplayMode::Icon => self.icon.is_none(),
-            DisplayMode::None => false,
-        }
+        let has_label = self.label.as_deref().is_some_and(|label| !label.is_empty());
+        has_label && !matches!(self.display_mode, DisplayMode::None)
     }
 
     pub(super) fn show_icon(&self) -> bool {
-        matches!(self.display_mode, DisplayMode::Icon) && self.icon.is_some()
+        // Show the mapped icon whenever one is set, regardless of display mode
+        // (except None). This allows mixed [icon][label][icon] workspace rows.
+        self.icon.is_some() && !matches!(self.display_mode, DisplayMode::None)
     }
 
     pub(super) fn label_text(&self) -> &str {
