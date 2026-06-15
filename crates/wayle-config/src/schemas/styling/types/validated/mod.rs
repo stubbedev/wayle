@@ -4,10 +4,12 @@ mod hex_color;
 mod normalized;
 mod percentage;
 mod scale;
+mod size;
 mod spacing;
 
 pub use hex_color::{HexColor, InvalidHexColor};
 pub use normalized::NormalizedF64;
 pub use percentage::Percentage;
 pub use scale::ScaleFactor;
+pub use size::Size;
 pub use spacing::Spacing;

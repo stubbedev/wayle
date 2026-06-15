@@ -5,10 +5,21 @@ use wayle_config::{
     schemas::{
         modules::{PopupMonitor, StorageMountPoint, WorkspaceClickAction},
         osd::OsdMonitor,
+        styling::Size,
     },
 };
 
 use super::TextLike;
+
+impl TextLike for Size {
+    fn to_entry_text(&self) -> String {
+        self.to_string()
+    }
+
+    fn from_entry_text(text: &str) -> Self {
+        Size::parse(text).unwrap_or_default()
+    }
+}
 
 impl TextLike for String {
     fn to_entry_text(&self) -> String {

@@ -6,8 +6,9 @@ use crate::{
     editors::{
         color_value::color_value,
         enum_select::enum_select,
-        number::{number_u8, scale, spacing},
+        number::{number_u8, spacing},
         slider::percentage,
+        text::text_like,
     },
     pages::{
         nav::LeafEntry,
@@ -32,23 +33,23 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         percentage(&bar.button_opacity),
                         percentage(&bar.button_bg_opacity),
                         enum_select(&bar.button_rounding),
-                        scale(&bar.button_gap),
+                        text_like(&bar.button_gap),
                         enum_select(&bar.button_icon_position),
                     ],
                 },
                 SectionSpec {
                     title_key: "settings-section-icons",
                     items: vec![
-                        scale(&bar.button_icon_size),
-                        scale(&bar.button_icon_padding),
+                        text_like(&bar.button_icon_size),
+                        text_like(&bar.button_icon_padding),
                     ],
                 },
                 SectionSpec {
                     title_key: "settings-section-labels",
                     items: vec![
-                        scale(&bar.button_label_size),
+                        text_like(&bar.button_label_size),
                         enum_select(&bar.button_label_weight),
-                        scale(&bar.button_label_padding),
+                        text_like(&bar.button_label_padding),
                     ],
                 },
                 SectionSpec {

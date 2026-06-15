@@ -15,7 +15,8 @@ use crate::{
     schemas::{
         general::Layer,
         styling::{
-            ColorValue, CssToken, FontWeightClass, Percentage, RoundingLevel, ScaleFactor, Spacing,
+            ColorValue, CssToken, FontWeightClass, Percentage, RoundingLevel, ScaleFactor, Size,
+            Spacing,
         },
     },
 };
@@ -141,40 +142,41 @@ pub struct BarConfig {
     #[default(Percentage::new(100))]
     pub button_bg_opacity: ConfigProperty<Percentage>,
 
-    /// Button icon size.
+    /// Button icon size. Accepts a scale multiplier or pixels (e.g. `"24px"`).
     #[serde(rename = "button-icon-size")]
-    #[default(ScaleFactor::new(1.0))]
-    pub button_icon_size: ConfigProperty<ScaleFactor>,
+    #[default(Size::Scale(1.0))]
+    pub button_icon_size: ConfigProperty<Size>,
 
     /// Button icon container padding. Only applies to `block-prefix` and `icon-square` variants.
+    /// Accepts a scale multiplier or pixels (e.g. `"8px"`).
     #[serde(rename = "button-icon-padding")]
-    #[default(ScaleFactor::new(1.0))]
-    pub button_icon_padding: ConfigProperty<ScaleFactor>,
+    #[default(Size::Scale(1.0))]
+    pub button_icon_padding: ConfigProperty<Size>,
 
-    /// Button label text size.
+    /// Button label text size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
     #[serde(rename = "button-label-size")]
-    #[default(ScaleFactor::new(1.0))]
-    pub button_label_size: ConfigProperty<ScaleFactor>,
+    #[default(Size::Scale(1.0))]
+    pub button_label_size: ConfigProperty<Size>,
 
     /// Button label font weight.
     #[serde(rename = "button-label-weight")]
     #[default(FontWeightClass::Semibold)]
     pub button_label_weight: ConfigProperty<FontWeightClass>,
 
-    /// Button label container padding.
+    /// Button label container padding. Accepts a scale multiplier or pixels (e.g. `"8px"`).
     #[serde(rename = "button-label-padding")]
-    #[default(ScaleFactor::new(1.0))]
-    pub button_label_padding: ConfigProperty<ScaleFactor>,
+    #[default(Size::Scale(1.0))]
+    pub button_label_padding: ConfigProperty<Size>,
 
     /// Corner rounding level for the buttons in the bar.
     #[serde(rename = "button-rounding")]
     #[default(RoundingLevel::default())]
     pub button_rounding: ConfigProperty<RoundingLevel>,
 
-    /// Gap between button icon and label.
+    /// Gap between button icon and label. Accepts a scale multiplier or pixels (e.g. `"4px"`).
     #[serde(rename = "button-gap")]
-    #[default(ScaleFactor::new(1.0))]
-    pub button_gap: ConfigProperty<ScaleFactor>,
+    #[default(Size::Scale(1.0))]
+    pub button_gap: ConfigProperty<Size>,
 
     /// Icon position relative to label in bar buttons.
     #[serde(rename = "button-icon-position")]

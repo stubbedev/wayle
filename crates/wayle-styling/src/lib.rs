@@ -20,9 +20,20 @@ use wayle_config::{
     schemas::{
         bar::BarConfig,
         general::GeneralConfig,
-        styling::{StylingConfig, ThemeProvider},
+        styling::{Size, StylingConfig, ThemeProvider},
     },
 };
+
+/// Builds a CSS custom-property override declaration for a pixel [`Size`].
+///
+/// Scale sizes return an empty string so the SCSS `calc()` fallback applies;
+/// pixel sizes return `<name>: <n>px;` so the override wins.
+fn px_override(name: &str, size: Size) -> String {
+    match size.px_value() {
+        Some(px) => format!("    {name}: {px}px;\n"),
+        None => String::new(),
+    }
+}
 
 /// Static CSS compiled at build time.
 pub const STATIC_CSS: &str = include_str!(concat!(env!("OUT_DIR"), "/style.css"));
@@ -59,6 +70,31 @@ pub fn theme_css(
     let dropdown_opacity = (bar.dropdown_opacity.get().value() as f32) / 100.0;
     let dropdown_surface = hex_to_rgba(&resolved.surface, dropdown_opacity);
 
+    // Bar button sizes accept a scale multiplier or absolute pixels. The scale
+    // var feeds the `calc(base * bar-scale * scale)` in tokens SCSS; a pixel
+    // size instead emits a `*-override` var that the SCSS prefers via
+    // `var(--…-override, calc(…))`, so pixels bypass the scale entirely.
+    let btn_icon_size = bar.button_icon_size.get();
+    let btn_icon_padding = bar.button_icon_padding.get();
+    let btn_label_size = bar.button_label_size.get();
+    let btn_label_padding = bar.button_label_padding.get();
+    let btn_gap = bar.button_gap.get();
+
+    let btn_icon_scale = btn_icon_size.scale_value().unwrap_or(1.0);
+    let btn_icon_padding_scale = btn_icon_padding.scale_value().unwrap_or(1.0);
+    let btn_label_scale = btn_label_size.scale_value().unwrap_or(1.0);
+    let btn_label_padding_scale = btn_label_padding.scale_value().unwrap_or(1.0);
+    let btn_gap_scale = btn_gap.scale_value().unwrap_or(1.0);
+
+    let size_overrides = format!(
+        "{}{}{}{}{}",
+        px_override("--bar-btn-icon-size-override", btn_icon_size),
+        px_override("--bar-btn-icon-padding-override", btn_icon_padding),
+        px_override("--bar-btn-label-size-override", btn_label_size),
+        px_override("--bar-btn-label-padding-override", btn_label_padding),
+        px_override("--bar-btn-gap-override", btn_gap),
+    );
+
     format!(
         r#":root {{
     --palette-bg: {bg};
@@ -83,7 +119,7 @@ pub fn theme_css(
     --bar-btn-label-scale: {btn_label_scale};
     --bar-btn-label-padding-scale: {btn_label_padding_scale};
     --bar-btn-gap-scale: {btn_gap_scale};
-
+{size_overrides}
     --cfg-rounding-element: {rounding_element};
     --cfg-rounding-container: {rounding_container};
     --cfg-bar-rounding-element: {bar_rounding_element};
@@ -105,11 +141,6 @@ pub fn theme_css(
         font_mono = general.font_mono.get(),
         global_scale = styling.scale.get(),
         bar_scale = bar.scale.get(),
-        btn_icon_scale = bar.button_icon_size.get(),
-        btn_icon_padding_scale = bar.button_icon_padding.get(),
-        btn_label_scale = bar.button_label_size.get(),
-        btn_label_padding_scale = bar.button_label_padding.get(),
-        btn_gap_scale = bar.button_gap.get(),
         rounding_element = global.element,
         rounding_container = global.container,
         bar_rounding_element = bar_values.element,

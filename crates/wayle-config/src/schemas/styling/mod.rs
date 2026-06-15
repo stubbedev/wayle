@@ -6,7 +6,7 @@ use schemars::schema_for;
 pub use types::{
     ColorValue, CssToken, FontWeightClass, GapClass, HexColor, IconSizeClass, InvalidCssToken,
     InvalidHexColor, MatugenScheme, NormalizedF64, PaddingClass, Percentage, PywalContrast,
-    RadiusClass, RoundingLevel, ScaleFactor, SignedNormalizedF64, Spacing, TextSizeClass,
+    RadiusClass, RoundingLevel, ScaleFactor, SignedNormalizedF64, Size, Spacing, TextSizeClass,
     ThemeEntry, ThemeProvider, ThresholdColors, ThresholdEntry, WallustBackend, WallustColorspace,
     WallustPalette, evaluate_thresholds,
 };
