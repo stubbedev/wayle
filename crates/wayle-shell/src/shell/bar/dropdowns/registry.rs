@@ -398,7 +398,6 @@ impl Drop for DropdownInstance {
 
 struct DropdownStyle {
     margins: DropdownMargins,
-    opacity: f64,
     shadow_enabled: bool,
     autohide: bool,
     freeze_label: bool,
@@ -591,7 +590,6 @@ fn dropdown_style(registry: &DropdownRegistry) -> DropdownStyle {
     let scale = bar.scale.get().value();
     DropdownStyle {
         margins: DropdownMargins::new(scale, bar.location.get()),
-        opacity: f64::from(bar.dropdown_opacity.get().value()) / 100.0,
         shadow_enabled: bar.dropdown_shadow.get(),
         autohide: bar.dropdown_autohide.get(),
         freeze_label: bar.dropdown_freeze_label.get(),
