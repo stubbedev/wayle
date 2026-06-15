@@ -16,7 +16,6 @@ use crate::{
         general::Layer,
         styling::{
             ColorValue, CssToken, FontWeightClass, Percentage, RoundingLevel, ScaleFactor, Size,
-            Spacing,
         },
     },
 };
@@ -53,33 +52,33 @@ pub struct BarConfig {
     ///
     /// - **Orientation**: Distance from top (horizontal bar) or left (vertical bar)
     #[serde(rename = "inset-edge")]
-    #[default(Spacing::new(0.0))]
-    pub inset_edge: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.0))]
+    pub inset_edge: ConfigProperty<Size>,
 
     /// Gap at the bar's ends.
     ///
     /// - **Orientation**: Left/right (horizontal bar), top/bottom (vertical bar)
     #[serde(rename = "inset-ends")]
-    #[default(Spacing::new(0.0))]
-    pub inset_ends: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.0))]
+    pub inset_ends: ConfigProperty<Size>,
 
     /// Internal spacing along bar thickness.
     ///
     /// - **Orientation**: Top/bottom (horizontal bar), left/right (vertical bar)
-    #[default(Spacing::new(0.35))]
-    pub padding: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.35))]
+    pub padding: ConfigProperty<Size>,
 
     /// Internal spacing at bar ends.
     ///
     /// - **Orientation**: Left/right (horizontal bar), top/bottom (vertical bar)
     #[serde(rename = "padding-ends")]
-    #[default(Spacing::new(0.5))]
-    pub padding_ends: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.5))]
+    pub padding_ends: ConfigProperty<Size>,
 
     /// Gap between modules and groups on the bar.
     #[serde(rename = "module-gap")]
-    #[default(Spacing::new(0.5))]
-    pub module_gap: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.5))]
+    pub module_gap: ConfigProperty<Size>,
 
     /// Bar position on screen edge.
     #[default(Location::Top)]
@@ -205,13 +204,13 @@ pub struct BarConfig {
 
     /// Internal padding for button groups.
     #[serde(rename = "button-group-padding")]
-    #[default(Spacing::new(0.0))]
-    pub button_group_padding: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.0))]
+    pub button_group_padding: ConfigProperty<Size>,
 
     /// Gap between modules within a group.
     #[serde(rename = "button-group-module-gap")]
-    #[default(Spacing::new(0.25))]
-    pub button_group_module_gap: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.25))]
+    pub button_group_module_gap: ConfigProperty<Size>,
 
     /// Background color for button groups.
     #[serde(rename = "button-group-background")]

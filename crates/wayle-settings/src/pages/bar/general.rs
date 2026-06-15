@@ -7,8 +7,9 @@ use crate::{
         bar_layout::bar_layout,
         color_value::color_value,
         enum_select::enum_select,
-        number::{number_u8, scale, spacing},
+        number::{number_u8, scale},
         slider::percentage,
+        text::text_like,
         toggle::toggle,
     },
     pages::{
@@ -49,11 +50,11 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-spacing",
                     items: vec![
-                        spacing(&bar.inset_edge),
-                        spacing(&bar.inset_ends),
-                        spacing(&bar.padding),
-                        spacing(&bar.padding_ends),
-                        spacing(&bar.module_gap),
+                        text_like(&bar.inset_edge),
+                        text_like(&bar.inset_ends),
+                        text_like(&bar.padding),
+                        text_like(&bar.padding_ends),
+                        text_like(&bar.module_gap),
                     ],
                 },
                 SectionSpec {

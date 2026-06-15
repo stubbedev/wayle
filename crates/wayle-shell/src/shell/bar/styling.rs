@@ -6,7 +6,10 @@ use relm4::{ComponentSender, gtk};
 use tokio::sync::mpsc;
 use wayle_config::{
     SubscribeChanges,
-    schemas::{bar::BorderLocation, styling::ThemeProvider},
+    schemas::{
+        bar::BorderLocation,
+        styling::{Size, ThemeProvider},
+    },
 };
 use wayle_widgets::styling::{InlineStyling, resolve_color};
 
@@ -19,6 +22,12 @@ const REM_BASE: f32 = 16.0;
 /// little workaround.
 fn rem_to_px_rounded(rem: f32, scale: f32) -> i32 {
     (rem * scale * REM_BASE).round() as i32
+}
+
+/// Resolves a [`Size`] to rounded pixels: scale multipliers use the rem base
+/// and bar scale, pixel values are taken literally (ignoring scale).
+fn size_to_px_rounded(size: Size, scale: f32) -> i32 {
+    size.resolve_px(REM_BASE, scale).round() as i32
 }
 
 impl InlineStyling for Bar {
@@ -111,15 +120,18 @@ impl InlineStyling for Bar {
         };
 
         let scale = bar.scale.get().value();
-        let inset_edge_px = rem_to_px_rounded(bar.inset_edge.get().value(), scale);
-        let inset_ends_px = rem_to_px_rounded(bar.inset_ends.get().value(), scale);
-        let padding_px = rem_to_px_rounded(bar.padding.get().value(), scale);
-        let padding_ends_px = rem_to_px_rounded(bar.padding_ends.get().value(), scale);
-        let module_gap_px = rem_to_px_rounded(bar.module_gap.get().value(), scale);
-        let group_module_gap_px =
-            rem_to_px_rounded(bar.button_group_module_gap.get().value(), scale);
-        let group_padding_px =
-            rem_to_px_rounded(bar.button_group_padding.get().value() * 0.25, scale);
+        let inset_edge_px = size_to_px_rounded(bar.inset_edge.get(), scale);
+        let inset_ends_px = size_to_px_rounded(bar.inset_ends.get(), scale);
+        let padding_px = size_to_px_rounded(bar.padding.get(), scale);
+        let padding_ends_px = size_to_px_rounded(bar.padding_ends.get(), scale);
+        let module_gap_px = size_to_px_rounded(bar.module_gap.get(), scale);
+        let group_module_gap_px = size_to_px_rounded(bar.button_group_module_gap.get(), scale);
+        let group_padding_px = match bar.button_group_padding.get() {
+            // Scale keeps the historical 0.25 rem fine-tuning factor; pixels are
+            // taken literally.
+            Size::Scale(value) => rem_to_px_rounded(value * 0.25, scale),
+            Size::Px(value) => value.round() as i32,
+        };
         let group_bg = resolve_color(&bar.button_group_background, is_wayle);
         let group_opacity = bar.button_group_opacity.get().value();
         let group_border_color = resolve_color(&bar.button_group_border_color, is_wayle);

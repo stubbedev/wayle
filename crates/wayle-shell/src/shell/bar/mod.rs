@@ -92,9 +92,8 @@ impl Component for Bar {
     ) -> ComponentParts<Self> {
         let config = init.services.config.config();
         let location = config.bar.location.get();
-        let inset_edge = config.bar.inset_edge.get().value();
-        let inset_ends = config.bar.inset_ends.get().value();
-        let is_floating = inset_edge > 0.0 || inset_ends > 0.0;
+        let is_floating =
+            !config.bar.inset_edge.get().is_zero() || !config.bar.inset_ends.get().is_zero();
 
         let monitor_name = init.monitor.connector().map(|s| s.to_string());
 

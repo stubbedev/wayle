@@ -59,6 +59,14 @@ impl Size {
         }
     }
 
+    /// Returns `true` when this size is zero in either form.
+    #[must_use]
+    pub fn is_zero(self) -> bool {
+        match self {
+            Self::Scale(value) | Self::Px(value) => value == 0.0,
+        }
+    }
+
     /// Resolves to a concrete pixel length.
     ///
     /// For [`Size::Px`] the value is returned as-is. For [`Size::Scale`] the

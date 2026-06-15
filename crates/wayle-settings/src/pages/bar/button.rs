@@ -4,10 +4,7 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        color_value::color_value,
-        enum_select::enum_select,
-        number::{number_u8, spacing},
-        slider::percentage,
+        color_value::color_value, enum_select::enum_select, number::number_u8, slider::percentage,
         text::text_like,
     },
     pages::{
@@ -64,8 +61,8 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         percentage(&bar.button_group_opacity),
                         enum_select(&bar.button_group_rounding),
-                        spacing(&bar.button_group_padding),
-                        spacing(&bar.button_group_module_gap),
+                        text_like(&bar.button_group_padding),
+                        text_like(&bar.button_group_module_gap),
                         color_value(&bar.button_group_background),
                         enum_select(&bar.button_group_border_location),
                         number_u8(&bar.button_group_border_width),
