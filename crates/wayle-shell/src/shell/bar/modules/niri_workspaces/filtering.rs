@@ -1,10 +1,10 @@
 //! Filter and order the workspace list for display.
 //!
-//! Empty workspaces (no windows, not active) are hidden by default.
-//! `min-workspace-count` raises a numeric-name ceiling: a hidden
-//! workspace is included if its name parses to an integer at or below
-//! that ceiling. Workspaces with non-numeric names are unaffected. No
-//! placeholder workspaces are ever fabricated.
+//! All workspaces are shown by default, including empty ones, matching
+//! niri's dynamic workspace model. `hide-trailing-empty` drops the
+//! trailing run of empty workspaces per output; ignore patterns and
+//! monitor scoping filter the rest. No placeholder workspaces are ever
+//! fabricated.
 
 use std::collections::HashMap;
 
@@ -184,14 +184,14 @@ mod tests {
     }
 
     #[test]
-    fn hides_empty_workspaces_by_default() {
+    fn shows_empty_workspaces_when_hide_trailing_disabled() {
         let snapshots = vec![
             occupied(1, 1, "DP-1"),
             empty(2, 2, "DP-1"),
             named_empty(3, 3, "DP-1", "web"),
         ];
         let displayed = collect_displayed(snapshots, &ctx_default());
-        assert_eq!(ids(&displayed), vec![1]);
+        assert_eq!(ids(&displayed), vec![1, 2, 3]);
     }
 
     #[test]
