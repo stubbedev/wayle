@@ -9,13 +9,11 @@ mod system_stats;
 mod user_session;
 mod watchers;
 
-use std::{
-    process::{Command, Stdio},
-    thread,
-};
-
 use gtk::prelude::*;
-use relm4::{gtk, prelude::*};
+use relm4::{
+    gtk::{self, gdk, gio},
+    prelude::*,
+};
 use wayle_widgets::prelude::*;
 
 pub(super) use self::factory::Factory;
@@ -33,21 +31,33 @@ use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
 
 const BASE_WIDTH: f32 = 380.0;
 
+/// Launches the settings app on the active workspace.
+///
+/// Launching through GDK's [`AppLaunchContext`](gdk::AppLaunchContext) gives the
+/// child a fresh `XDG_ACTIVATION_TOKEN` instead of the stale startup id the shell
+/// inherited at login, which would otherwise pin the window to workspace 1.
 fn spawn_settings_app() {
-    match Command::new("wayle-settings")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-    {
-        Ok(mut child) => {
-            thread::spawn(move || {
-                let _ = child.wait();
-            });
-        }
+    let Some(display) = gdk::Display::default() else {
+        tracing::warn!("no default display; cannot launch wayle-settings");
+        return;
+    };
+
+    let context = display.app_launch_context();
+
+    let app_info = match gio::AppInfo::create_from_commandline(
+        "wayle-settings",
+        Some("Wayle Settings"),
+        gio::AppInfoCreateFlags::NONE,
+    ) {
+        Ok(info) => info,
         Err(err) => {
-            tracing::warn!(error = %err, "failed to spawn wayle-settings");
+            tracing::warn!(error = %err, "failed to build wayle-settings launcher");
+            return;
         }
+    };
+
+    if let Err(err) = app_info.launch(&[], Some(&context)) {
+        tracing::warn!(error = %err, "failed to launch wayle-settings");
     }
 }
 
@@ -113,23 +123,36 @@ impl Component for DashboardDropdown {
                 DropdownContent {
                     set_vexpand: true,
 
-                    #[local_ref]
-                    quick_actions_widget -> gtk::Box {},
+                    gtk::ScrolledWindow {
+                        set_hscrollbar_policy: gtk::PolicyType::Never,
+                        set_vexpand: true,
+                        set_propagate_natural_height: true,
+                        add_css_class: "dashboard-scroll",
 
-                    #[local_ref]
-                    controls_widget -> gtk::Box {},
+                        #[wrap(Some)]
+                        set_child = &gtk::Box {
+                            add_css_class: "dashboard-content-box",
+                            set_orientation: gtk::Orientation::Vertical,
 
-                    #[local_ref]
-                    media_widget -> gtk::Box {},
+                            #[local_ref]
+                            quick_actions_widget -> gtk::Box {},
 
-                    #[local_ref]
-                    info_row_widget -> gtk::Box {},
+                            #[local_ref]
+                            controls_widget -> gtk::Box {},
 
-                    #[local_ref]
-                    system_stats_widget -> gtk::Box {},
+                            #[local_ref]
+                            media_widget -> gtk::Box {},
 
-                    #[local_ref]
-                    user_session_widget -> gtk::Box {},
+                            #[local_ref]
+                            info_row_widget -> gtk::Box {},
+
+                            #[local_ref]
+                            system_stats_widget -> gtk::Box {},
+
+                            #[local_ref]
+                            user_session_widget -> gtk::Box {},
+                        },
+                    },
                 },
             },
         }
@@ -262,8 +285,9 @@ impl Component for DashboardDropdown {
                 self.media.emit(MediaSectionInput::SetActive(visible));
             }
             DashboardDropdownMsg::OpenSettings => {
-                root.popdown();
+                // Launch before popdown so the activation token anchors to the focused surface.
                 spawn_settings_app();
+                root.popdown();
             }
         }
     }

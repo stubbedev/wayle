@@ -112,6 +112,13 @@ pub struct StylingConfig {
     /// Active color palette.
     pub palette: PaletteConfig,
 
+    /// Currently active theme preset name, and/or the base for the
+    /// palette when the palette has been modified. Persisted backing
+    /// state for the theme selector; not a labeled setting of its own.
+    #[i18n(skip)]
+    #[default(String::new())]
+    pub palette_base_theme: ConfigProperty<String>,
+
     /// Discovered themes (runtime-populated).
     #[serde(skip)]
     #[schemars(skip)]
