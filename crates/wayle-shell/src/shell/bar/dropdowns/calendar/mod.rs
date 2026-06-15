@@ -3,7 +3,7 @@ mod helpers;
 mod messages;
 mod watchers;
 
-use chrono::{Datelike, Local, NaiveDate};
+use chrono::{Datelike, Local, NaiveDate, Weekday};
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
 use wayle_widgets::{
@@ -16,8 +16,6 @@ use self::{
     helpers::{day_names_array, format_date_rest, months_array, weekdays_array},
     messages::{CalendarDropdownCmd, CalendarDropdownInit},
 };
-use chrono::Weekday;
-
 use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
 
 const BASE_WIDTH: f32 = 340.0;
@@ -165,8 +163,7 @@ impl Component for CalendarDropdown {
         let format_str = clock_config.format.get();
         let use_12h = helpers::is_12h_format(&format_str);
         let show_seconds = clock_config.dropdown_show_seconds.get();
-        let week_start =
-            watchers::week_start_to_weekday(clock_config.calendar_weekday_start.get());
+        let week_start = watchers::week_start_to_weekday(clock_config.calendar_weekday_start.get());
 
         let months = months_array();
 
@@ -255,7 +252,8 @@ impl Component for CalendarDropdown {
 
             CalendarDropdownCmd::WeekStartChanged(week_start) => {
                 self.week_start = week_start;
-                self.calendar.emit(CalendarInput::UpdateWeekStart(week_start));
+                self.calendar
+                    .emit(CalendarInput::UpdateWeekStart(week_start));
             }
         }
     }

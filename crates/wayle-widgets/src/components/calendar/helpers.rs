@@ -116,7 +116,12 @@ mod tests {
     #[test]
     fn selected_day_is_marked() {
         let selected = date(2026, 3, 20);
-        let grid = build_month_grid(date(2026, 3, 1), date(2026, 3, 5), Some(selected), Weekday::Sun);
+        let grid = build_month_grid(
+            date(2026, 3, 1),
+            date(2026, 3, 5),
+            Some(selected),
+            Weekday::Sun,
+        );
         let march_20 = grid.iter().find(|c| c.date == selected).unwrap();
         assert!(march_20.is_selected);
     }
@@ -195,8 +200,7 @@ mod tests {
         ];
         for &(start, expected_last_col) in cases {
             for month in 1..=12 {
-                let grid =
-                    build_month_grid(date(2026, month, 1), date(2026, 1, 1), None, start);
+                let grid = build_month_grid(date(2026, month, 1), date(2026, 1, 1), None, start);
                 assert_eq!(
                     grid[0].date.weekday(),
                     start,

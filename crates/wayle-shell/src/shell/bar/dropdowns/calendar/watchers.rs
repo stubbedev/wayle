@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
-use relm4::ComponentSender;
 use chrono::Weekday;
+use relm4::ComponentSender;
 use wayle_config::{ConfigService, schemas::modules::WeekStart};
 use wayle_widgets::watch;
 
