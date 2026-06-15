@@ -43,3 +43,6 @@ settings-modules-dashboard-dropdown-reboot-command = Reboot Command
 
 settings-modules-dashboard-dropdown-poweroff-command = Power Off Command
     .description = Shell command for the power-off button
+
+settings-modules-dashboard-user-session-actions = Session Actions
+    .description = Session actions shown in the dashboard (lock, log-out, reboot, power-off)
