@@ -32,7 +32,7 @@ use wayle_wallpaper::WallpaperService;
 use zbus::{Connection, fdo::DBusProxy};
 
 use crate::{
-    services::{IdleInhibitService, ShellIpcService, WidgetBus, widget_ipc},
+    services::{IdleInhibitService, ShellIpcService, ToastBus, WidgetBus, widget_ipc},
     shell::ShellServices,
     startup::StartupTimer,
     watchers::build_extractor_config,
@@ -153,7 +153,7 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
         }
     };
 
-    let widget_bus = init_widget_bus().await;
+    let (widget_bus, toast_bus) = init_widget_socket().await;
 
     timer.mark_services_done();
 
@@ -177,21 +177,23 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
         weather,
         shell_ipc,
         widget_bus,
+        toast_bus,
     };
 
     Ok((timer, services))
 }
 
-/// Creates the widget update bus and starts its unix-socket listener.
+/// Creates the widget + toast buses and starts the shared unix-socket listener.
 ///
-/// A socket failure is logged but non-fatal: the bus still exists so widgets
-/// subscribe cleanly; only external updates are unavailable.
-async fn init_widget_bus() -> WidgetBus {
+/// A socket failure is logged but non-fatal: the buses still exist so widgets
+/// and the OSD subscribe cleanly; only external updates are unavailable.
+async fn init_widget_socket() -> (WidgetBus, ToastBus) {
     let widget_bus = WidgetBus::new();
-    if let Err(err) = widget_ipc::start(widget_bus.clone()).await {
-        warn!(error = %err, "Widget socket unavailable; external widget updates disabled");
+    let toast_bus = ToastBus::new();
+    if let Err(err) = widget_ipc::start(widget_bus.clone(), toast_bus.clone()).await {
+        warn!(error = %err, "Widget socket unavailable; external widget/toast updates disabled");
     }
-    widget_bus
+    (widget_bus, toast_bus)
 }
 
 async fn init_core_services(

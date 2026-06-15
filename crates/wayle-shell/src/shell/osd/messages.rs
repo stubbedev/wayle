@@ -11,6 +11,7 @@ pub(crate) struct OsdInit {
     pub(crate) config: Arc<ConfigService>,
     pub(crate) audio: Option<Arc<AudioService>>,
     pub(crate) brightness: Option<Arc<BrightnessService>>,
+    pub(crate) toast_bus: crate::services::ToastBus,
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +28,15 @@ pub(crate) enum OsdEvent {
         icon: String,
         active: bool,
     },
+
+    /// A user-defined toast pushed over the socket. Shows a progress bar when
+    /// `percentage` is set, otherwise an icon + label.
+    Custom {
+        label: String,
+        icon: Option<String>,
+        percentage: Option<f64>,
+        duration_ms: Option<u32>,
+    },
 }
 
 #[derive(Debug)]
@@ -41,6 +51,7 @@ pub(crate) enum OsdCmd {
     BrightnessDeviceChanged(Option<Arc<BacklightDevice>>),
     BrightnessChanged,
     ToggleChanged(ToggleEvent),
+    ShowToast(crate::services::widget_ipc::ToastRequest),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -51,6 +51,12 @@ fn main() {
             Commands::Wallpaper { command } => cli::wallpaper::execute(command).await,
             Commands::Idle { command } => cli::idle::execute(command).await,
             Commands::Widget { command } => cli::widget::execute(command).await,
+            Commands::Toast {
+                label,
+                icon,
+                percentage,
+                duration,
+            } => cli::toast::execute(&label, icon.as_deref(), percentage, duration).await,
             Commands::Shell | Commands::Completions { .. } => unreachable!(),
         }
     });

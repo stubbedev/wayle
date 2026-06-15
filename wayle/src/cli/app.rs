@@ -104,6 +104,20 @@ pub enum Commands {
         #[command(subcommand)]
         command: WidgetCommands,
     },
+    /// Show a custom on-screen toast
+    Toast {
+        /// Toast text.
+        label: String,
+        /// Icon name shown beside the text.
+        #[arg(long)]
+        icon: Option<String>,
+        /// Progress percentage (0-100); shows a progress bar when set.
+        #[arg(long)]
+        percentage: Option<f64>,
+        /// Auto-dismiss duration in milliseconds (OSD default when unset).
+        #[arg(long)]
+        duration: Option<u32>,
+    },
     /// Run the desktop shell in the foreground
     Shell,
     /// Generate shell completions

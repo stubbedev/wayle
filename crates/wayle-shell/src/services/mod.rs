@@ -6,4 +6,4 @@ pub mod widget_ipc;
 
 pub use idle_inhibit::IdleInhibitService;
 pub use shell_ipc::ShellIpcService;
-pub use widget_ipc::WidgetBus;
+pub use widget_ipc::{ToastBus, WidgetBus};

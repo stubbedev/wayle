@@ -17,6 +17,9 @@ use tokio::{
 /// JSON-RPC method that updates a widget's output by id.
 pub const METHOD_WIDGET_UPDATE: &str = "widget.update";
 
+/// JSON-RPC method that shows a custom on-screen toast.
+pub const METHOD_TOAST_SHOW: &str = "toast.show";
+
 /// Resolves the widget socket path: `$XDG_RUNTIME_DIR/wayle/widget.sock`,
 /// falling back to `/tmp/wayle-widget.sock` when the runtime dir is unset.
 #[must_use]
@@ -35,6 +38,25 @@ pub struct WidgetUpdateParams {
     /// Output payload, interpreted exactly like the widget's command output
     /// (plain text, or JSON with `text`/`alt`/`percentage`/`class`/`tooltip`).
     pub output: String,
+}
+
+/// Parameters for [`METHOD_TOAST_SHOW`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToastShowParams {
+    /// Toast text.
+    pub label: String,
+    /// Optional icon name shown beside the text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Optional progress percentage (0-100). When set, the toast shows a
+    /// progress bar like the volume/brightness OSD; otherwise it renders as a
+    /// plain icon + label toast.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub percentage: Option<f64>,
+    /// Optional auto-dismiss duration in milliseconds; falls back to the OSD
+    /// config duration when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u32>,
 }
 
 /// A JSON-RPC 2.0 request.
@@ -63,6 +85,30 @@ impl Request {
         Self {
             jsonrpc: String::from("2.0"),
             method: String::from(METHOD_WIDGET_UPDATE),
+            params,
+            id: 1,
+        }
+    }
+
+    /// Builds a [`METHOD_TOAST_SHOW`] request.
+    #[must_use]
+    pub fn toast_show(
+        label: &str,
+        icon: Option<&str>,
+        percentage: Option<f64>,
+        duration_ms: Option<u32>,
+    ) -> Self {
+        let params = serde_json::to_value(ToastShowParams {
+            label: label.to_owned(),
+            icon: icon.map(str::to_owned),
+            percentage,
+            duration_ms,
+        })
+        .unwrap_or(serde_json::Value::Null);
+
+        Self {
+            jsonrpc: String::from("2.0"),
+            method: String::from(METHOD_TOAST_SHOW),
             params,
             id: 1,
         }
@@ -152,6 +198,26 @@ pub enum ClientError {
 /// Returns [`ClientError`] when the socket is unreachable, the I/O fails, the
 /// payload cannot be (de)serialized, or the server rejects the request.
 pub async fn send_widget_update(id: &str, output: &str) -> Result<(), ClientError> {
+    send_request(Request::widget_update(id, output)).await
+}
+
+/// Shows a custom on-screen toast and awaits the response.
+///
+/// # Errors
+///
+/// Returns [`ClientError`] when the socket is unreachable, the I/O fails, the
+/// payload cannot be (de)serialized, or the server rejects the request.
+pub async fn send_toast(
+    label: &str,
+    icon: Option<&str>,
+    percentage: Option<f64>,
+    duration_ms: Option<u32>,
+) -> Result<(), ClientError> {
+    send_request(Request::toast_show(label, icon, percentage, duration_ms)).await
+}
+
+/// Sends a single request over the widget socket and awaits the response.
+async fn send_request(request: Request) -> Result<(), ClientError> {
     let path = socket_path();
     let stream = UnixStream::connect(&path)
         .await
@@ -160,7 +226,6 @@ pub async fn send_widget_update(id: &str, output: &str) -> Result<(), ClientErro
             source,
         })?;
 
-    let request = Request::widget_update(id, output);
     let mut line = serde_json::to_string(&request)?;
     line.push('\n');
 

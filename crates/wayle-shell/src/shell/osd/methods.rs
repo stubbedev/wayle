@@ -30,13 +30,36 @@ impl Osd {
             return;
         }
 
+        let duration_override = match &event {
+            OsdEvent::Custom { duration_ms, .. } => *duration_ms,
+            _ => None,
+        };
+
         self.current_event = Some(event);
         self.dismiss_id = self.dismiss_id.wrapping_add(1);
 
         root.set_visible(true);
 
-        let duration = self.config.config().osd.duration.get();
+        let duration = duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
         Self::schedule_dismiss(sender, duration, self.dismiss_id);
+    }
+
+    pub(super) fn handle_show_toast(
+        &mut self,
+        toast: crate::services::widget_ipc::ToastRequest,
+        sender: &ComponentSender<Self>,
+        root: &gtk::Window,
+    ) {
+        self.show_event(
+            OsdEvent::Custom {
+                label: toast.label,
+                icon: toast.icon,
+                percentage: toast.percentage,
+                duration_ms: toast.duration_ms,
+            },
+            sender,
+            root,
+        );
     }
 
     pub(super) fn handle_device_changed(
@@ -322,15 +345,29 @@ pub(super) fn osd_classes(model: &Osd) -> Vec<&'static str> {
 }
 
 pub(super) fn is_slider(event: &Option<OsdEvent>) -> bool {
-    event
-        .as_ref()
-        .is_some_and(|event| matches!(event, OsdEvent::Slider { .. }))
+    event.as_ref().is_some_and(|event| {
+        matches!(
+            event,
+            OsdEvent::Slider { .. }
+                | OsdEvent::Custom {
+                    percentage: Some(_),
+                    ..
+                }
+        )
+    })
 }
 
 pub(super) fn is_toggle(event: &Option<OsdEvent>) -> bool {
-    event
-        .as_ref()
-        .is_some_and(|event| matches!(event, OsdEvent::Toggle { .. }))
+    event.as_ref().is_some_and(|event| {
+        matches!(
+            event,
+            OsdEvent::Toggle { .. }
+                | OsdEvent::Custom {
+                    percentage: None,
+                    ..
+                }
+        )
+    })
 }
 
 pub(super) fn event_icon(event: &Option<OsdEvent>) -> Option<&str> {
@@ -338,13 +375,19 @@ pub(super) fn event_icon(event: &Option<OsdEvent>) -> Option<&str> {
         Some(OsdEvent::Slider { icon, .. }) | Some(OsdEvent::Toggle { icon, .. }) => {
             Some(icon.as_str())
         }
+        Some(OsdEvent::Custom { icon, .. }) => icon.as_deref(),
         None => None,
     }
 }
 
 pub(super) fn event_slider_label(event: &Option<OsdEvent>) -> String {
     match event {
-        Some(OsdEvent::Slider { label, .. }) => label.clone(),
+        Some(OsdEvent::Slider { label, .. })
+        | Some(OsdEvent::Custom {
+            label,
+            percentage: Some(_),
+            ..
+        }) => label.clone(),
         _ => String::new(),
     }
 }
@@ -365,20 +408,34 @@ pub(super) fn event_label(event: &Option<OsdEvent>) -> String {
             ..
         }) => t!("osd-toggle-off", label = label.clone()),
 
-        None => String::new(),
+        Some(OsdEvent::Custom {
+            label,
+            percentage: None,
+            ..
+        }) => label.clone(),
+
+        _ => String::new(),
     }
 }
 
 pub(super) fn event_value(event: &Option<OsdEvent>) -> String {
     match event {
-        Some(OsdEvent::Slider { percentage, .. }) => format!("{}%", percentage.round() as u32),
+        Some(OsdEvent::Slider { percentage, .. })
+        | Some(OsdEvent::Custom {
+            percentage: Some(percentage),
+            ..
+        }) => format!("{}%", percentage.round() as u32),
         _ => String::new(),
     }
 }
 
 pub(super) fn event_fraction(event: &Option<OsdEvent>) -> f64 {
     match event {
-        Some(OsdEvent::Slider { percentage, .. }) => (*percentage / 100.0).clamp(0.0, 1.0),
+        Some(OsdEvent::Slider { percentage, .. })
+        | Some(OsdEvent::Custom {
+            percentage: Some(percentage),
+            ..
+        }) => (*percentage / 100.0).clamp(0.0, 1.0),
         _ => 0.0,
     }
 }

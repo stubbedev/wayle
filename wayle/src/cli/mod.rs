@@ -21,6 +21,8 @@ pub mod power;
 pub mod style;
 /// System tray commands
 pub mod systray;
+/// Custom toast command
+pub mod toast;
 /// Wallpaper control commands
 pub mod wallpaper;
 /// Widget control commands

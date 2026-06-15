@@ -16,8 +16,29 @@ use super::{
     messages::{OsdCmd, ToggleEvent},
     toggles,
 };
+use crate::services::ToastBus;
 
 const VOLUME_THROTTLE: Duration = Duration::from_millis(30);
+
+/// Subscribes to the toast bus and forwards each request as an OSD command.
+pub(super) fn spawn_toast(sender: &ComponentSender<Osd>, toast_bus: &ToastBus) {
+    let mut receiver = toast_bus.subscribe();
+
+    sender.command(move |out, shutdown| async move {
+        loop {
+            tokio::select! {
+                () = shutdown.clone().wait() => return,
+                result = receiver.recv() => match result {
+                    Ok(toast) => {
+                        let _ = out.send(OsdCmd::ShowToast(toast));
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                },
+            }
+        }
+    });
+}
 
 pub(super) fn spawn(
     sender: &ComponentSender<Osd>,

@@ -12,7 +12,8 @@ use tokio::{
 };
 use tracing::{info, warn};
 use wayle_ipc::widget_socket::{
-    METHOD_WIDGET_UPDATE, Request, Response, WidgetUpdateParams, socket_path,
+    METHOD_TOAST_SHOW, METHOD_WIDGET_UPDATE, Request, Response, ToastShowParams,
+    WidgetUpdateParams, socket_path,
 };
 
 /// Broadcast backlog before lagging receivers drop the oldest updates.
@@ -59,6 +60,58 @@ impl Default for WidgetBus {
     }
 }
 
+/// A custom on-screen toast request pushed over the socket.
+#[derive(Debug, Clone)]
+pub struct ToastRequest {
+    /// Toast text.
+    pub label: String,
+    /// Optional icon name.
+    pub icon: Option<String>,
+    /// Optional progress percentage (0-100); shows a progress bar when set.
+    pub percentage: Option<f64>,
+    /// Optional auto-dismiss duration in milliseconds (OSD default when `None`).
+    pub duration_ms: Option<u32>,
+}
+
+/// In-process broadcast bus carrying toast requests from the socket to the OSD.
+#[derive(Clone)]
+pub struct ToastBus {
+    tx: broadcast::Sender<ToastRequest>,
+}
+
+impl ToastBus {
+    /// Creates an empty bus.
+    #[must_use]
+    pub fn new() -> Self {
+        let (tx, _) = broadcast::channel(CHANNEL_CAPACITY);
+        Self { tx }
+    }
+
+    /// Subscribes a new receiver. The OSD calls this to observe toast requests.
+    #[must_use]
+    pub fn subscribe(&self) -> broadcast::Receiver<ToastRequest> {
+        self.tx.subscribe()
+    }
+
+    /// Publishes a toast (no-op when no subscribers are listening).
+    fn publish(&self, toast: ToastRequest) {
+        let _ = self.tx.send(toast);
+    }
+}
+
+impl Default for ToastBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The set of in-process buses the socket dispatches requests onto.
+#[derive(Clone)]
+struct Buses {
+    widget: WidgetBus,
+    toast: ToastBus,
+}
+
 /// Errors raised when starting the widget socket listener.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -80,7 +133,7 @@ pub enum Error {
 /// # Errors
 ///
 /// Returns [`Error::Bind`] when the socket cannot be bound.
-pub async fn start(bus: WidgetBus) -> Result<(), Error> {
+pub async fn start(widget_bus: WidgetBus, toast_bus: ToastBus) -> Result<(), Error> {
     let path = socket_path();
 
     if let Some(parent) = path.parent() {
@@ -96,12 +149,16 @@ pub async fn start(bus: WidgetBus) -> Result<(), Error> {
 
     info!("Widget socket listening at {}", path.display());
 
+    let buses = Buses {
+        widget: widget_bus,
+        toast: toast_bus,
+    };
+
     tokio::spawn(async move {
         loop {
             match listener.accept().await {
                 Ok((stream, _addr)) => {
-                    let bus = bus.clone();
-                    tokio::spawn(handle_connection(stream, bus));
+                    tokio::spawn(handle_connection(stream, buses.clone()));
                 }
                 Err(err) => warn!(error = %err, "widget socket accept failed"),
             }
@@ -112,7 +169,7 @@ pub async fn start(bus: WidgetBus) -> Result<(), Error> {
 }
 
 /// Serves newline-delimited JSON-RPC requests on a single connection.
-async fn handle_connection(stream: UnixStream, bus: WidgetBus) {
+async fn handle_connection(stream: UnixStream, buses: Buses) {
     let (read_half, mut write_half) = stream.into_split();
     let mut reader = BufReader::new(read_half);
     let mut line = String::new();
@@ -122,7 +179,7 @@ async fn handle_connection(stream: UnixStream, bus: WidgetBus) {
         match reader.read_line(&mut line).await {
             Ok(0) => break,
             Ok(_) => {
-                let response = process_request(line.trim(), &bus);
+                let response = process_request(line.trim(), &buses);
                 let Ok(mut encoded) = serde_json::to_string(&response) else {
                     break;
                 };
@@ -140,7 +197,7 @@ async fn handle_connection(stream: UnixStream, bus: WidgetBus) {
 }
 
 /// Parses and dispatches a single JSON-RPC request line.
-fn process_request(line: &str, bus: &WidgetBus) -> Response {
+fn process_request(line: &str, buses: &Buses) -> Response {
     let request: Request = match serde_json::from_str(line) {
         Ok(request) => request,
         Err(err) => return Response::err(0, -32700, format!("parse error: {err}")),
@@ -150,7 +207,7 @@ fn process_request(line: &str, bus: &WidgetBus) -> Response {
         METHOD_WIDGET_UPDATE => {
             match serde_json::from_value::<WidgetUpdateParams>(request.params) {
                 Ok(params) => {
-                    bus.publish(WidgetUpdate {
+                    buses.widget.publish(WidgetUpdate {
                         id: params.id,
                         output: params.output,
                     });
@@ -159,6 +216,18 @@ fn process_request(line: &str, bus: &WidgetBus) -> Response {
                 Err(err) => Response::err(request.id, -32602, format!("invalid params: {err}")),
             }
         }
+        METHOD_TOAST_SHOW => match serde_json::from_value::<ToastShowParams>(request.params) {
+            Ok(params) => {
+                buses.toast.publish(ToastRequest {
+                    label: params.label,
+                    icon: params.icon,
+                    percentage: params.percentage,
+                    duration_ms: params.duration_ms,
+                });
+                Response::ok(request.id)
+            }
+            Err(err) => Response::err(request.id, -32602, format!("invalid params: {err}")),
+        },
         other => Response::err(request.id, -32601, format!("unknown method: {other}")),
     }
 }
@@ -167,13 +236,20 @@ fn process_request(line: &str, bus: &WidgetBus) -> Response {
 mod tests {
     use super::*;
 
+    fn test_buses() -> Buses {
+        Buses {
+            widget: WidgetBus::new(),
+            toast: ToastBus::new(),
+        }
+    }
+
     #[test]
     fn valid_update_publishes_and_acks() {
-        let bus = WidgetBus::new();
-        let mut rx = bus.subscribe();
+        let buses = test_buses();
+        let mut rx = buses.widget.subscribe();
 
         let line = r#"{"jsonrpc":"2.0","method":"widget.update","params":{"id":"gpu","output":"42"},"id":7}"#;
-        let response = process_request(line, &bus);
+        let response = process_request(line, &buses);
 
         assert!(response.error.is_none());
         assert_eq!(response.id, 7);
@@ -183,25 +259,41 @@ mod tests {
     }
 
     #[test]
+    fn valid_toast_publishes_and_acks() {
+        let buses = test_buses();
+        let mut rx = buses.toast.subscribe();
+
+        let line = r#"{"jsonrpc":"2.0","method":"toast.show","params":{"label":"hi","icon":"ld-bell-symbolic"},"id":9}"#;
+        let response = process_request(line, &buses);
+
+        assert!(response.error.is_none());
+        assert_eq!(response.id, 9);
+        let toast = rx.try_recv().expect("toast published");
+        assert_eq!(toast.label, "hi");
+        assert_eq!(toast.icon.as_deref(), Some("ld-bell-symbolic"));
+        assert_eq!(toast.duration_ms, None);
+    }
+
+    #[test]
     fn unknown_method_errors() {
-        let bus = WidgetBus::new();
+        let buses = test_buses();
         let line = r#"{"jsonrpc":"2.0","method":"widget.nope","params":{},"id":1}"#;
-        let response = process_request(line, &bus);
+        let response = process_request(line, &buses);
         assert!(response.error.is_some());
     }
 
     #[test]
     fn invalid_params_error() {
-        let bus = WidgetBus::new();
+        let buses = test_buses();
         let line = r#"{"jsonrpc":"2.0","method":"widget.update","params":{"id":"gpu"},"id":1}"#;
-        let response = process_request(line, &bus);
+        let response = process_request(line, &buses);
         assert!(response.error.is_some());
     }
 
     #[test]
     fn malformed_json_errors() {
-        let bus = WidgetBus::new();
-        let response = process_request("not json", &bus);
+        let buses = test_buses();
+        let response = process_request("not json", &buses);
         assert!(response.error.is_some());
     }
 }

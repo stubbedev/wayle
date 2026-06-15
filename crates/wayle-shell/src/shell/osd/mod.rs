@@ -177,6 +177,7 @@ impl Component for Osd {
         let widgets = view_output!();
 
         watchers::spawn(&sender, &init.config, &init.audio, &init.brightness);
+        watchers::spawn_toast(&sender, &init.toast_bus);
 
         ComponentParts { model, widgets }
     }
@@ -225,6 +226,10 @@ impl Component for Osd {
 
             OsdCmd::ToggleChanged(toggle) => {
                 self.handle_toggle_changed(toggle, &sender, root);
+            }
+
+            OsdCmd::ShowToast(toast) => {
+                self.handle_show_toast(toast, &sender, root);
             }
         }
     }

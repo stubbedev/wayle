@@ -18,7 +18,7 @@ use wayle_systray::SystemTrayService;
 use wayle_wallpaper::WallpaperService;
 use wayle_weather::WeatherService;
 
-use crate::services::{IdleInhibitService, ShellIpcService, WidgetBus};
+use crate::services::{IdleInhibitService, ShellIpcService, ToastBus, WidgetBus};
 
 /// Container for services used by shell components.
 ///
@@ -45,4 +45,5 @@ pub(crate) struct ShellServices {
     pub weather: Arc<WeatherService>,
     pub shell_ipc: Arc<ShellIpcService>,
     pub widget_bus: WidgetBus,
+    pub toast_bus: ToastBus,
 }
