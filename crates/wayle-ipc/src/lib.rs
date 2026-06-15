@@ -8,3 +8,6 @@ pub mod idle_inhibit;
 
 /// Shell IPC D-Bus client proxy.
 pub mod shell_ipc;
+
+/// Unix-socket JSON-RPC protocol for runtime widget updates.
+pub mod widget_socket;

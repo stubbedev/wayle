@@ -4792,6 +4792,10 @@ dependencies = [
 name = "wayle-ipc"
 version = "0.6.0"
 dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
  "zbus",
 ]
 

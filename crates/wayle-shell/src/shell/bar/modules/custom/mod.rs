@@ -129,6 +129,7 @@ impl Component for CustomModule {
             }
         }
         watchers::spawn_config_watcher(&sender, custom_modules, definition.id.clone());
+        watchers::spawn_external_watcher(&sender, &init.widget_bus, definition.id.clone());
 
         let model = Self {
             bar_button,
@@ -218,7 +219,9 @@ impl Component for CustomModule {
                 }
             }
             CustomCmd::CommandCancelled => {}
-            CustomCmd::CommandOutput(output) | CustomCmd::WatchOutput(output) => {
+            CustomCmd::CommandOutput(output)
+            | CustomCmd::WatchOutput(output)
+            | CustomCmd::ExternalOutput(output) => {
                 self.apply_output(&output, root);
                 force_window_resize(root);
             }

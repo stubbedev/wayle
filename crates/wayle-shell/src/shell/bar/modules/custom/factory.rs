@@ -31,6 +31,7 @@ impl Factory {
             config: services.config.clone(),
             definition: definition.clone(),
             dropdowns: dropdowns.clone(),
+            widget_bus: services.widget_bus.clone(),
         };
         let controller = dynamic_controller(CustomModule::builder().launch(init).detach());
         Some(ModuleInstance { controller, class })

@@ -32,7 +32,7 @@ use wayle_wallpaper::WallpaperService;
 use zbus::{Connection, fdo::DBusProxy};
 
 use crate::{
-    services::{IdleInhibitService, ShellIpcService},
+    services::{IdleInhibitService, ShellIpcService, WidgetBus, widget_ipc},
     shell::ShellServices,
     startup::StartupTimer,
     watchers::build_extractor_config,
@@ -153,6 +153,8 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
         }
     };
 
+    let widget_bus = init_widget_bus().await;
+
     timer.mark_services_done();
 
     let services = ShellServices {
@@ -174,9 +176,22 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
         wallpaper: core.wallpaper,
         weather,
         shell_ipc,
+        widget_bus,
     };
 
     Ok((timer, services))
+}
+
+/// Creates the widget update bus and starts its unix-socket listener.
+///
+/// A socket failure is logged but non-fatal: the bus still exists so widgets
+/// subscribe cleanly; only external updates are unavailable.
+async fn init_widget_bus() -> WidgetBus {
+    let widget_bus = WidgetBus::new();
+    if let Err(err) = widget_ipc::start(widget_bus.clone()).await {
+        warn!(error = %err, "Widget socket unavailable; external widget updates disabled");
+    }
+    widget_bus
 }
 
 async fn init_core_services(

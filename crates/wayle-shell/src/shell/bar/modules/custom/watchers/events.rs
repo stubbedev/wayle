@@ -1,13 +1,17 @@
 use std::time::Duration;
 
 use relm4::ComponentSender;
-use tokio::time::{Instant, MissedTickBehavior, interval_at};
+use tokio::{
+    sync::broadcast::error::RecvError,
+    time::{Instant, MissedTickBehavior, interval_at},
+};
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::sync::CancellationToken;
 use wayle_config::{ConfigProperty, schemas::modules::CustomModuleDefinition};
 use wayle_widgets::{watch, watch_cancellable};
 
 use super::super::{CustomModule, helpers, messages::CustomCmd};
+use crate::services::WidgetBus;
 
 const SCROLL_DEBOUNCE: Duration = Duration::from_millis(50);
 
@@ -43,6 +47,33 @@ pub(crate) fn spawn_config_watcher(
             let _ = out.send(CustomCmd::DefinitionChanged(Box::new(definition)));
         } else {
             let _ = out.send(CustomCmd::DefinitionRemoved);
+        }
+    });
+}
+
+/// Subscribes to the widget bus and forwards external updates addressed to
+/// this module's id, applying them like ordinary command output.
+pub(crate) fn spawn_external_watcher(
+    sender: &ComponentSender<CustomModule>,
+    bus: &WidgetBus,
+    module_id: String,
+) {
+    let mut receiver = bus.subscribe();
+
+    sender.command(move |out, shutdown| async move {
+        loop {
+            tokio::select! {
+                () = shutdown.clone().wait() => return,
+                result = receiver.recv() => match result {
+                    Ok(update) => {
+                        if update.id == module_id {
+                            let _ = out.send(CustomCmd::ExternalOutput(update.output));
+                        }
+                    }
+                    Err(RecvError::Closed) => return,
+                    Err(RecvError::Lagged(_)) => {}
+                },
+            }
         }
     });
 }
