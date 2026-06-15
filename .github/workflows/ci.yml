@@ -114,6 +114,47 @@ jobs:
             - name: Run tests
               run: cargo test --workspace --no-fail-fast
 
+    schema:
+        name: Config schema
+        needs: changes
+        if: needs.changes.outputs.code == 'true'
+        runs-on: ubuntu-latest
+        container:
+            image: archlinux:base-devel
+        steps:
+            - name: Install dependencies
+              run: |
+                  pacman --noconfirm --needed -Syu \
+                    git \
+                    rustup \
+                    clang \
+                    gtk4 \
+                    gtk4-layer-shell \
+                    gtksourceview5 \
+                    libpulse \
+                    fftw \
+                    libpipewire \
+                    systemd-libs \
+                    jq
+
+            - name: Setup Rust
+              run: rustup default stable
+
+            - uses: actions/checkout@v6
+              with:
+                  submodules: recursive
+
+            - uses: Swatinem/rust-cache@v2
+
+            - name: Check config schema is up to date
+              run: |
+                  cargo run -q -p wayle -- config schema --stdout | jq -S . > /tmp/wayle-config.schema.json
+                  if ! diff -u schema/wayle-config.schema.json /tmp/wayle-config.schema.json; then
+                    echo "::error::Config schema is out of date. Regenerate with:"
+                    echo "  cargo run -p wayle -- config schema --stdout | jq -S . > schema/wayle-config.schema.json"
+                    exit 1
+                  fi
+
     build:
         name: Build
         needs: changes
