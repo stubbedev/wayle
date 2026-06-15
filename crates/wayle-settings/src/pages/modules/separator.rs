@@ -3,10 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{
-        color_value::color_value,
-        number::{number_u32, spacing},
-    },
+    editors::{color_value::color_value, number::number_u32, text::text_like},
     pages::{
         nav::LeafEntry,
         spec::{SectionSpec, page_spec},
@@ -25,7 +22,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
             vec![
                 SectionSpec {
                     title_key: "settings-section-general",
-                    items: vec![number_u32(&module.size), spacing(&module.length)],
+                    items: vec![number_u32(&module.size), text_like(&module.length)],
                 },
                 SectionSpec {
                     title_key: "settings-section-colors",

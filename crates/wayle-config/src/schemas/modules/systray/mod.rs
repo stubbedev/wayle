@@ -5,29 +5,29 @@ use wayle_derive::wayle_config;
 use crate::{
     ConfigProperty,
     docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-    schemas::styling::{ColorValue, CssToken, ScaleFactor, Spacing},
+    schemas::styling::{ColorValue, CssToken, Size},
 };
 
 /// System tray icons via the StatusNotifierItem protocol.
 #[wayle_config(bar_container, i18n_prefix = "settings-modules-systray")]
 pub struct SystrayConfig {
-    /// Scale multiplier for tray item icons.
+    /// Tray item icon size. Accepts a scale multiplier or pixels (e.g. `"20px"`).
     #[serde(rename = "icon-scale")]
-    #[default(ScaleFactor::new(1.0))]
-    pub icon_scale: ConfigProperty<ScaleFactor>,
+    #[default(Size::Scale(1.0))]
+    pub icon_scale: ConfigProperty<Size>,
 
-    /// Gap between tray items.
+    /// Gap between tray items. Accepts a scale multiplier or pixels (e.g. `"4px"`).
     #[serde(rename = "item-gap")]
-    #[default(Spacing::new(0.25))]
-    pub item_gap: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.25))]
+    pub item_gap: ConfigProperty<Size>,
 
-    /// Padding at the ends of the container.
+    /// Padding at the ends of the container. Accepts a scale multiplier or pixels (e.g. `"8px"`).
     ///
     /// Applies to left/right edges for horizontal bars, or top/bottom edges
     /// for vertical bars.
     #[serde(rename = "internal-padding")]
-    #[default(Spacing::new(0.5))]
-    pub internal_padding: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.5))]
+    pub internal_padding: ConfigProperty<Size>,
 
     /// Glob patterns for tray items to hide.
     ///

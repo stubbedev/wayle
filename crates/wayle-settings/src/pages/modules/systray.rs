@@ -4,10 +4,7 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        color_value::color_value,
-        number::{scale, spacing},
-        toggle::toggle,
-        toml_editor::toml_editor,
+        color_value::color_value, text::text_like, toggle::toggle, toml_editor::toml_editor,
     },
     pages::{
         nav::LeafEntry,
@@ -28,9 +25,9 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![
-                        scale(&module.icon_scale),
-                        spacing(&module.item_gap),
-                        spacing(&module.internal_padding),
+                        text_like(&module.icon_scale),
+                        text_like(&module.item_gap),
+                        text_like(&module.internal_padding),
                         toml_editor(&module.blacklist, "blacklist", &config.styling.palette.bg),
                         toml_editor(&module.overrides, "overrides", &config.styling.palette.bg),
                     ],

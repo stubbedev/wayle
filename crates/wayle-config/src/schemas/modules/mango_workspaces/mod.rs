@@ -15,7 +15,7 @@ use super::{ActiveIndicator, DisplayMode, UrgentMode, WorkspaceClickAction, Work
 use crate::{
     ConfigProperty,
     docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-    schemas::styling::{ColorValue, CssToken, ScaleFactor, Spacing},
+    schemas::styling::{ColorValue, CssToken, Size},
 };
 
 /// MangoWM tag switcher module configuration.
@@ -81,23 +81,23 @@ pub struct MangoWorkspacesConfig {
 
     /// Padding around each tag button, in rem.
     #[serde(rename = "tag-padding")]
-    #[default(Spacing::new(0.5))]
-    pub tag_padding: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.5))]
+    pub tag_padding: ConfigProperty<Size>,
 
-    /// Spacing between application icons, in rem.
+    /// Spacing between application icons. Accepts a scale multiplier or pixels (e.g. `"4px"`).
     #[serde(rename = "icon-gap")]
-    #[default(Spacing::new(0.3))]
-    pub icon_gap: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.3))]
+    pub icon_gap: ConfigProperty<Size>,
 
-    /// Scale factor applied to application icons.
+    /// Application icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
     #[serde(rename = "icon-size")]
-    #[default(ScaleFactor::default())]
-    pub icon_size: ConfigProperty<ScaleFactor>,
+    #[default(Size::default())]
+    pub icon_size: ConfigProperty<Size>,
 
-    /// Scale factor applied to the tag label text.
+    /// Tag label text size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
     #[serde(rename = "label-size")]
-    #[default(ScaleFactor::default())]
-    pub label_size: ConfigProperty<ScaleFactor>,
+    #[default(Size::default())]
+    pub label_size: ConfigProperty<Size>,
 
     /// Color of the active tag.
     #[serde(rename = "active-color")]

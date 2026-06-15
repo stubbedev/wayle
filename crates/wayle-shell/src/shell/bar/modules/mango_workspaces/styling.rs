@@ -3,7 +3,10 @@
 use std::sync::Arc;
 
 use relm4::gtk;
-use wayle_config::{ConfigService, schemas::styling::ThemeProvider};
+use wayle_config::{
+    ConfigService,
+    schemas::styling::{Size, ThemeProvider},
+};
 use wayle_widgets::{prelude::BarSettings, styling::resolve_color};
 
 use super::helpers;
@@ -14,6 +17,15 @@ const LABEL_BASE_REM: f32 = 1.1;
 
 fn rem_to_px_rounded(rem: f32, scale: f32) -> i32 {
     (rem * scale * REM_BASE).round() as i32
+}
+
+/// Resolves a [`Size`] to rounded pixels at `base_rem`: scale multipliers use
+/// the rem base and bar scale, pixel values are taken literally.
+fn size_to_px_rounded(size: Size, base_rem: f32, scale: f32) -> i32 {
+    match size {
+        Size::Scale(value) => rem_to_px_rounded(base_rem * value, scale),
+        Size::Px(value) => value.round() as i32,
+    }
 }
 
 /// CSS class for a tag-map key, or `None` when the key is not a tag index.
@@ -39,13 +51,11 @@ pub(super) fn apply_styling(
     let border_width = settings.border_width.get();
 
     let bar_scale = config.bar.scale.get().value();
-    let icon_scale = tags_config.icon_size.get().value();
-    let label_scale = tags_config.label_size.get().value();
     let is_vertical = settings.is_vertical.get();
 
-    let icon_size_px = rem_to_px_rounded(ICON_BASE_REM * icon_scale, bar_scale);
-    let label_size_px = rem_to_px_rounded(LABEL_BASE_REM * label_scale, bar_scale);
-    let tag_padding_px = rem_to_px_rounded(tags_config.tag_padding.get().value(), bar_scale);
+    let icon_size_px = size_to_px_rounded(tags_config.icon_size.get(), ICON_BASE_REM, bar_scale);
+    let label_size_px = size_to_px_rounded(tags_config.label_size.get(), LABEL_BASE_REM, bar_scale);
+    let tag_padding_px = size_to_px_rounded(tags_config.tag_padding.get(), 1.0, bar_scale);
 
     let (margin_vertical_px, margin_horizontal_px) = if is_vertical {
         (tag_padding_px, 0)

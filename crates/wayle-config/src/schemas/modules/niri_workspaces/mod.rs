@@ -10,7 +10,7 @@ use super::{ActiveIndicator, DisplayMode, UrgentMode, WorkspaceStyle};
 use crate::{
     ConfigProperty,
     docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-    schemas::styling::{ColorValue, CssToken, ScaleFactor, Spacing},
+    schemas::styling::{ColorValue, CssToken, Size},
 };
 
 /// What identifies each workspace's label.
@@ -236,28 +236,27 @@ pub struct NiriWorkspacesConfig {
     #[default(String::from("tb-minus-symbolic"))]
     pub app_icons_empty: ConfigProperty<String>,
 
-    /// Gap between app icons within a workspace button.
+    /// Gap between app icons within a workspace button. Accepts a scale multiplier or pixels (e.g. `"4px"`).
     #[serde(rename = "icon-gap")]
-    #[default(Spacing::new(0.3))]
-    pub icon_gap: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.3))]
+    pub icon_gap: ConfigProperty<Size>,
 
-    /// Padding for workspace content along the bar direction.
+    /// Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`).
     #[serde(rename = "workspace-padding")]
-    #[default(Spacing::new(0.5))]
-    pub workspace_padding: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.5))]
+    pub workspace_padding: ConfigProperty<Size>,
 
-    /// Scale multiplier for workspace icons.
+    /// Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
     ///
     /// Applies to identity icons and custom icons from `workspace-map`.
-    /// Range: 0.25-3.0.
     #[serde(rename = "icon-size")]
-    #[default(ScaleFactor::default())]
-    pub icon_size: ConfigProperty<ScaleFactor>,
+    #[default(Size::default())]
+    pub icon_size: ConfigProperty<Size>,
 
-    /// Scale multiplier for workspace labels and dividers. Range: 0.25-3.0.
+    /// Workspace label and divider size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
     #[serde(rename = "label-size")]
-    #[default(ScaleFactor::default())]
-    pub label_size: ConfigProperty<ScaleFactor>,
+    #[default(Size::default())]
+    pub label_size: ConfigProperty<Size>,
 
     /// Workspaces to hide from the display.
     ///

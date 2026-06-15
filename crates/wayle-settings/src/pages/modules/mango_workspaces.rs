@@ -6,7 +6,7 @@ use crate::{
     editors::{
         color_value::color_value,
         enum_select::enum_select,
-        number::{number_u8, scale, spacing},
+        number::number_u8,
         text::{text, text_like},
         toggle::toggle,
         toml_editor::toml_editor,
@@ -48,10 +48,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-sizing",
                     items: vec![
-                        spacing(&module.tag_padding),
-                        spacing(&module.icon_gap),
-                        scale(&module.icon_size),
-                        scale(&module.label_size),
+                        text_like(&module.tag_padding),
+                        text_like(&module.icon_gap),
+                        text_like(&module.icon_size),
+                        text_like(&module.label_size),
                     ],
                 },
                 SectionSpec {

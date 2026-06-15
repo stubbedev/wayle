@@ -17,6 +17,7 @@ use wayle_config::{
             ActiveIndicator, DisplayMode, LabelStrategy, NiriWorkspaceMap, UrgentMode,
             WorkspaceClickAction,
         },
+        styling::Size,
     },
 };
 use wayle_niri::{Action, WorkspaceReferenceArg, core::Window};
@@ -89,7 +90,10 @@ impl NiriWorkspaces {
             is_vertical: self.is_vertical(),
             app_icons_show: ws_config.app_icons_show.get(),
             divider: ws_config.divider.get(),
-            icon_gap_px: (ws_config.icon_gap.get().value() * REM_BASE_PX).round() as i32,
+            icon_gap_px: match ws_config.icon_gap.get() {
+                Size::Scale(value) => (value * REM_BASE_PX).round() as i32,
+                Size::Px(value) => value.round() as i32,
+            },
             empty_icon: ws_config.app_icons_empty.get(),
             app_icons_dedupe: ws_config.app_icons_dedupe.get(),
             app_icons_fallback: ws_config.app_icons_fallback.get(),

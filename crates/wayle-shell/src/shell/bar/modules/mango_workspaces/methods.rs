@@ -12,6 +12,7 @@ use wayle_config::{
     schemas::{
         bar::BorderLocation,
         modules::{ActiveIndicator, DisplayMode, UrgentMode, WorkspaceClickAction, WorkspaceStyle},
+        styling::Size,
     },
 };
 use wayle_mango::{Client, Monitor, Tag, TagId};
@@ -79,7 +80,10 @@ impl MangoWorkspaces {
             app_icons_dedupe: tags_config.app_icons_dedupe.get(),
             app_icons_fallback: tags_config.app_icons_fallback.get(),
             app_icons_empty: tags_config.app_icons_empty.get(),
-            icon_gap_px: (tags_config.icon_gap.get().value() * REM_BASE_PX).round() as i32,
+            icon_gap_px: match tags_config.icon_gap.get() {
+                Size::Scale(value) => (value * REM_BASE_PX).round() as i32,
+                Size::Px(value) => value.round() as i32,
+            },
             app_icon_map: tags_config.app_icon_map.get(),
             tag_map: tags_config.tag_map.get(),
             blink_on: self.blink_on,

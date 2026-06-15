@@ -7,7 +7,7 @@ use wayle_derive::{wayle_config, wayle_enum};
 use crate::{
     ConfigProperty,
     docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-    schemas::styling::{ColorValue, CssToken, ScaleFactor, Spacing},
+    schemas::styling::{ColorValue, CssToken, Size},
 };
 
 /// What identifies a workspace in the UI.
@@ -290,32 +290,30 @@ pub struct HyprlandWorkspacesConfig {
     ///
     /// Only applies to spacing between app icons.
     #[serde(rename = "icon-gap")]
-    #[default(Spacing::new(0.3))]
-    pub icon_gap: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.3))]
+    pub icon_gap: ConfigProperty<Size>,
 
-    /// Padding for workspace content along the bar direction.
+    /// Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`).
     ///
     /// For horizontal bars, controls horizontal (left/right) padding.
     /// For vertical bars, controls vertical (top/bottom) padding.
     #[serde(rename = "workspace-padding")]
-    #[default(Spacing::new(0.5))]
-    pub workspace_padding: ConfigProperty<Spacing>,
+    #[default(Size::Scale(0.5))]
+    pub workspace_padding: ConfigProperty<Size>,
 
-    /// Scale multiplier for workspace icons.
+    /// Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
     ///
     /// Applies to workspace identity icons and custom icons from `workspace-map`.
-    /// Range: 0.25-3.0.
     #[serde(rename = "icon-size")]
-    #[default(ScaleFactor::default())]
-    pub icon_size: ConfigProperty<ScaleFactor>,
+    #[default(Size::default())]
+    pub icon_size: ConfigProperty<Size>,
 
-    /// Scale multiplier for workspace labels and dividers.
+    /// Workspace label and divider size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
     ///
     /// Applies to workspace number/name labels and the divider text.
-    /// Range: 0.25-3.0.
     #[serde(rename = "label-size")]
-    #[default(ScaleFactor::default())]
-    pub label_size: ConfigProperty<ScaleFactor>,
+    #[default(Size::default())]
+    pub label_size: ConfigProperty<Size>,
 
     /// Workspaces to hide from the display.
     ///

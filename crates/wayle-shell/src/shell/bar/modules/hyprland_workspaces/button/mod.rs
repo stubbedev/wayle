@@ -4,7 +4,10 @@ use std::{collections::HashSet, mem, sync::Arc};
 
 use gtk::prelude::*;
 use relm4::{factory::FactoryComponent, prelude::*};
-use wayle_config::schemas::modules::{ActiveIndicator, DisplayMode, HyprlandWorkspacesConfig};
+use wayle_config::schemas::{
+    modules::{ActiveIndicator, DisplayMode, HyprlandWorkspacesConfig},
+    styling::Size,
+};
 use wayle_hyprland::{Address, Client, WorkspaceId};
 
 use crate::shell::bar::modules::hyprland_workspaces::helpers::{
@@ -290,7 +293,10 @@ pub(crate) fn build_button_init(
         Vec::new()
     };
 
-    let icon_gap_px = (config.icon_gap.get().value() * 16.0).round() as i32;
+    let icon_gap_px = match config.icon_gap.get() {
+        Size::Scale(value) => (value * 16.0).round() as i32,
+        Size::Px(value) => value.round() as i32,
+    };
 
     WorkspaceButtonInit {
         id: ctx.id,

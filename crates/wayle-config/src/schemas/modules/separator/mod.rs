@@ -4,7 +4,7 @@ use wayle_derive::wayle_config;
 use crate::{
     ConfigProperty,
     docs::{ModuleInfo, ModuleInfoProvider},
-    schemas::styling::{ColorValue, CssToken, Spacing},
+    schemas::styling::{ColorValue, CssToken, Size},
 };
 
 /// A vertical rule between bar modules.
@@ -15,10 +15,10 @@ pub struct SeparatorConfig {
     #[default(1)]
     pub size: ConfigProperty<u32>,
 
-    /// Length of the separator line.
+    /// Length of the separator line. Accepts a scale multiplier or pixels (e.g. `"24px"`).
     #[serde(rename = "length")]
-    #[default(Spacing::new(1.5))]
-    pub length: ConfigProperty<Spacing>,
+    #[default(Size::Scale(1.5))]
+    pub length: ConfigProperty<Size>,
 
     /// Color of the separator line.
     #[serde(rename = "color")]
