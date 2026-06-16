@@ -74,7 +74,8 @@ jobs:
                     libpulse \
                     fftw \
                     libpipewire \
-                    systemd-libs
+                    systemd-libs \
+                    gstreamer
 
             - name: Setup Rust
               run: rustup default stable
@@ -127,6 +128,7 @@ jobs:
                     gh \
                     git \
                     libfftw3-dev \
+                    libgstreamer1.0-dev \
                     libgtk-4-dev \
                     libgtk4-layer-shell-dev \
                     libgtksourceview-5-dev \
@@ -188,6 +190,7 @@ jobs:
                     gtk4-devel \
                     gtk4-layer-shell-devel \
                     gtksourceview5-devel \
+                    gstreamer1-devel \
                     libxkbcommon-devel \
                     make \
                     pipewire-devel \

@@ -15,6 +15,8 @@ jobs:
     deploy:
         name: Build and deploy to Cloudflare Pages
         runs-on: ubuntu-latest
+        # Cloudflare secrets only exist on the upstream repo; skip on forks.
+        if: github.repository == 'wayle-rs/wayle'
         steps:
             - uses: actions/checkout@v6
 
