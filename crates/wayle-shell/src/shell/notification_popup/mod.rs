@@ -25,6 +25,9 @@ pub(crate) struct NotificationPopupHost {
         gtk::Revealer,
     )>,
     card_container: gtk::Box,
+    /// Bumped each time a window hide is scheduled or cancelled, so a stale
+    /// deferred hide can't unmap the window after a new popup re-shows it.
+    hide_gen: u32,
 }
 
 #[relm4::component(pub(crate))]
@@ -72,6 +75,7 @@ impl Component for NotificationPopupHost {
             config: init.config.clone(),
             cards: Vec::new(),
             card_container: gtk::Box::default(),
+            hide_gen: 0,
         };
 
         model.apply_position(&root);
@@ -86,10 +90,18 @@ impl Component for NotificationPopupHost {
         ComponentParts { model, widgets }
     }
 
-    fn update_cmd(&mut self, msg: PopupHostCmd, _sender: ComponentSender<Self>, root: &Self::Root) {
+    fn update_cmd(&mut self, msg: PopupHostCmd, sender: ComponentSender<Self>, root: &Self::Root) {
         match msg {
             PopupHostCmd::PopupsChanged(popups) => {
-                self.reconcile(popups, root);
+                self.reconcile(popups, root, &sender);
+            }
+
+            PopupHostCmd::HideWindow(generation) => {
+                // Only hide if no popup re-showed the window since this hide was
+                // scheduled, and nothing is on screen.
+                if generation == self.hide_gen && self.cards.is_empty() {
+                    root.set_visible(false);
+                }
             }
 
             PopupHostCmd::ConfigChanged => {
@@ -106,7 +118,7 @@ impl Component for NotificationPopupHost {
                     .set_popup_duration(notif_config.popup_duration.get());
 
                 let popups = self.notification.popups.get();
-                self.reconcile(popups, root);
+                self.reconcile(popups, root, &sender);
             }
         }
     }

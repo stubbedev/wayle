@@ -14,4 +14,7 @@ pub(crate) struct PopupHostInit {
 pub(crate) enum PopupHostCmd {
     PopupsChanged(Vec<Arc<Notification>>),
     ConfigChanged,
+    /// Hide the window once the last card's exit animation has finished.
+    /// Carries the hide generation so a popup that arrives mid-fade cancels it.
+    HideWindow(u32),
 }

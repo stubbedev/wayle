@@ -13,6 +13,7 @@ use wayle_notification::core::notification::Notification;
 use super::{
     NotificationPopupHost,
     card::{CardInit, NotificationPopupCard},
+    messages::PopupHostCmd,
 };
 use crate::shell::helpers::layer_shell::{
     apply_layer as apply_window_layer, apply_monitor_by_connector, apply_primary_monitor,
@@ -21,7 +22,12 @@ use crate::shell::helpers::layer_shell::{
 
 impl NotificationPopupHost {
     /// Reconciles the card list with the current popup state.
-    pub(super) fn reconcile(&mut self, popups: Vec<Arc<Notification>>, root: &gtk::Window) {
+    pub(super) fn reconcile(
+        &mut self,
+        popups: Vec<Arc<Notification>>,
+        root: &gtk::Window,
+        sender: &relm4::ComponentSender<Self>,
+    ) {
         let max_visible = self
             .config
             .config()
@@ -41,7 +47,27 @@ impl NotificationPopupHost {
 
         debug!(cards = self.cards.len(), "popup reconcile complete");
 
-        root.set_visible(!visible_popups.is_empty());
+        if visible_popups.is_empty() {
+            // Keep the window mapped while the last card animates out, then hide
+            // it once the transition finishes. Hiding now would unmap the window
+            // mid-fade and skip the exit animation. The generation guard lets a
+            // popup arriving during the fade cancel this pending hide.
+            self.hide_gen = self.hide_gen.wrapping_add(1);
+            let generation = self.hide_gen;
+            let (duration, _) = self.animation();
+            if duration == 0 {
+                root.set_visible(false);
+            } else {
+                sender.oneshot_command(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(u64::from(duration))).await;
+                    PopupHostCmd::HideWindow(generation)
+                });
+            }
+        } else {
+            // Cancel any pending hide and ensure the window is mapped.
+            self.hide_gen = self.hide_gen.wrapping_add(1);
+            root.set_visible(true);
+        }
     }
 
     fn remove_stale_cards(&mut self, active_popups: &[Arc<Notification>]) {
