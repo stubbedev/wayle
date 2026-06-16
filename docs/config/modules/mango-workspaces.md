@@ -32,10 +32,10 @@ right = ["mango-workspaces"]
 | `urgent-show` | bool | `true` | Highlight tags whose clients requested attention. |
 | `urgent-mode` | [`UrgentMode`](/config/types#urgent-mode) | `"workspace"` | Whether urgency is tracked per tag or per application. |
 | `active-indicator` | [`ActiveIndicator`](/config/types#active-indicator) | `"background"` | How the active tag is marked. |
-| `tag-padding` | [`Spacing`](/config/types#spacing) | `0.5` | Padding around each tag button, in rem. |
-| `icon-gap` | [`Spacing`](/config/types#spacing) | `0.3` | Spacing between application icons, in rem. |
-| `icon-size` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Scale factor applied to application icons. |
-| `label-size` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Scale factor applied to the tag label text. |
+| `tag-padding` | [`Size`](/config/types#size) | `0.5` | Padding around each tag button, in rem. |
+| `icon-gap` | [`Size`](/config/types#size) | `0.3` | Spacing between application icons. Accepts a scale multiplier or pixels (e.g. `"4px"`). |
+| `icon-size` | [`Size`](/config/types#size) | `1` | Application icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
+| `label-size` | [`Size`](/config/types#size) | `1` | Tag label text size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
 | `active-color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Color of the active tag. |
 | `occupied-color` | [`ColorValue`](/config/types#color-value) | `"fg-muted"` | Color of tags that hold clients but are not active. |
 | `empty-color` | [`ColorValue`](/config/types#color-value) | `"fg-subtle"` | Color of empty tags. |

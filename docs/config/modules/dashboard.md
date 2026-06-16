@@ -23,6 +23,7 @@ right = ["dashboard"]
 |---|---|---|---|
 | `icon-override` | string | `""` | Override the auto-detected distro icon. |
 | `border-show` | bool | `false` | Display border around button. |
+| `user-session` | [`UserSessionConfig`](/config/types#user-session-config) | `{...}` | User session configuration |
 
 ## Colors
 
@@ -69,6 +70,14 @@ dropdown-lock-command = "loginctl lock-session"
 dropdown-logout-command = "loginctl terminate-session $XDG_SESSION_ID"
 dropdown-reboot-command = "systemctl reboot"
 dropdown-poweroff-command = "systemctl poweroff"
+
+[modules.dashboard.user-session]
+actions = [
+    "lock",
+    "log-out",
+    "reboot",
+    "power-off",
+]
 ```
 
 

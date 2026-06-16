@@ -21,7 +21,6 @@ right = ["niri-workspaces"]
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `min-workspace-count` | u8 | `0` | Always-visible ceiling for numerically-named workspaces. |
 | `monitor-specific` | bool | `true` | Show only workspaces on this bar's monitor. |
 | `hide-trailing-empty` | bool | `true` | Hide niri's auto-allocated trailing empty workspace. |
 | `display-mode` | [`DisplayMode`](/config/types#display-mode) | `"label"` | What identifies each workspace button. |
@@ -34,10 +33,10 @@ right = ["niri-workspaces"]
 | `app-icons-dedupe` | bool | `true` | Deduplicate application icons within a workspace. |
 | `app-icons-fallback` | string | `"ld-app-window-symbolic"` | Fallback icon for applications not matched by `app-icon-map`. |
 | `app-icons-empty` | string | `"tb-minus-symbolic"` | Icon shown when a workspace has no application windows. |
-| `icon-gap` | [`Spacing`](/config/types#spacing) | `0.3` | Gap between app icons within a workspace button. |
-| `workspace-padding` | [`Spacing`](/config/types#spacing) | `0.5` | Padding for workspace content along the bar direction. |
-| `icon-size` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Scale multiplier for workspace icons. |
-| `label-size` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Scale multiplier for workspace labels and dividers. Range: 0.25-3.0. |
+| `icon-gap` | [`Size`](/config/types#size) | `0.3` | Gap between app icons within a workspace button. Accepts a scale multiplier or pixels (e.g. `"4px"`). |
+| `workspace-padding` | [`Size`](/config/types#size) | `0.5` | Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
+| `icon-size` | [`Size`](/config/types#size) | `1` | Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
+| `label-size` | [`Size`](/config/types#size) | `1` | Workspace label and divider size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
 | `workspace-ignore` | array of string | `[]` | Workspaces to hide from the display. |
 | `active-color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Color for the active (visible on its output) workspace. |
 | `occupied-color` | [`ColorValue`](/config/types#color-value) | `"fg-muted"` | Color for occupied workspaces (have windows but not active). |
@@ -52,16 +51,6 @@ right = ["niri-workspaces"]
 | `right-click` | [`WorkspaceClickAction`](/config/types#workspace-click-action) | `""` | Action on right click. |
 | `scroll-up` | [`WorkspaceClickAction`](/config/types#workspace-click-action) | `"focus:previous"` | Action on scroll up. |
 | `scroll-down` | [`WorkspaceClickAction`](/config/types#workspace-click-action) | `"focus:next"` | Action on scroll down. |
-
-::: details More about `min-workspace-count`
-
-Workspaces whose name parses to an integer at or below this value
-stay visible even when empty. Workspaces with non-numeric names
-and those above the ceiling follow the normal empty/occupied
-filtering. When `0` (default), no extra workspaces are forced
-visible.
-
-:::
 
 ::: details More about `monitor-specific`
 
@@ -112,7 +101,6 @@ per window.
 ::: details More about `icon-size`
 
 Applies to identity icons and custom icons from `workspace-map`.
-Range: 0.25-3.0.
 
 :::
 
@@ -164,7 +152,6 @@ Maps window `app_id` or title to symbolic icon names. Supports:
 
 ```toml
 [modules.niri-workspaces]
-min-workspace-count = 0
 monitor-specific = true
 hide-trailing-empty = true
 display-mode = "label"

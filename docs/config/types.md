@@ -601,6 +601,17 @@ Number in `[0.25, 3.0]`.
 
 Serialises as `float`.
 
+## SessionAction {#session-action}
+
+One action the dashboard session actions
+
+| Value | Meaning |
+|---|---|
+| `"lock"` | Lock the session |
+| `"log-out"` | Logout of the current session |
+| `"reboot"` | Reboot the machine |
+| `"power-off"` | Power off the machine |
+
 ## ShadowPreset {#shadow-preset}
 
 Shadow style for the bar.
@@ -619,6 +630,14 @@ Number in `[-1.0, 1.0]`.
 
 Serialises as `double`.
 
+## Size {#size}
+
+Size as a scale multiplier (number) or absolute pixels (e.g. "24px")
+
+Number `>= 0.0`.
+
+String matching `^[0-9]+(\.[0-9]+)?px$`.
+
 ## Spacing {#spacing}
 
 Non-negative spacing value (clamped at 0).
@@ -635,6 +654,30 @@ Order in which popups are stacked on screen.
 |---|---|
 | `"newest-first"` | Newest notifications appear closest to the configured position. |
 | `"oldest-first"` | Oldest notifications appear closest to the configured position. |
+
+## StateColors {#state-colors}
+
+Per-state color overrides for a custom module.
+
+Values are keyed in `color-map` by the JSON output's `alt` field, mirroring
+`icon-map`. Any field left unset falls back to the module's static color of
+the same name. Use the `"default"` key as a fallback state.
+
+| Field | Description |
+|---|---|
+| `icon-color` | Icon foreground color for this state. |
+| `icon-bg-color` | Icon container background color for this state. |
+| `label-color` | Label text color for this state. |
+| `button-bg-color` | Button background color for this state. |
+| `border-color` | Border color for this state. |
+
+## StorageMountPoint {#storage-mount-point}
+
+Storage mount targets accepted by `mount-point`.
+
+Supports a single string for backwards compatibility or an array of paths.
+
+String.
 
 ## TemperatureUnit {#temperature-unit}
 
@@ -770,6 +813,20 @@ Where the urgent pulse animation is applied.
 
 Falls back to `workspace` when app icons are disabled. |
 
+## UserSessionConfig {#user-session-config}
+
+Settings for user session the in dashboard
+### Examples
+
+```toml
+[modules.dashboard.user-session]
+actions = [ "lock", "log-out", "reboot", "power-off" ]
+```
+
+| Field | Description |
+|---|---|
+| `actions` | Session actions to show on dashboard |
+
 ## WallustBackend {#wallust-backend}
 
 Wallust image sampling backend.
@@ -834,6 +891,20 @@ Weather data provider selection.
 | `"visual-crossing"` | Visual Crossing (requires API key). |
 | `"weather-api"` | WeatherAPI.com (requires API key). |
 
+## WeekStart {#week-start}
+
+Which day appears in the first column of the calendar dropdown.
+
+| Value | Meaning |
+|---|---|
+| `"monday"` | Week starts on Monday. |
+| `"tuesday"` | Week starts on Tuesday. |
+| `"wednesday"` | Week starts on Wednesday. |
+| `"thursday"` | Week starts on Thursday. |
+| `"friday"` | Week starts on Friday. |
+| `"saturday"` | Week starts on Saturday. |
+| `"sunday"` | Week starts on Sunday (default). |
+
 ## WorkspaceClickAction {#workspace-click-action}
 
 Click/scroll action: focus:this | focus:next | focus:previous | focus:last | dropdown:NAME | shell command | empty for none
@@ -875,7 +946,7 @@ Per-workspace styling override.
 
 | Field | Description |
 |---|---|
-| `icon` | Custom icon for this workspace. |
+| `icon` | Custom icon for this workspace. When set, the icon is shown regardless |
 | `color` | Custom background color for this workspace when active. |
 | `label` | Text shown instead of the workspace's name or index. |
 

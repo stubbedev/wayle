@@ -21,9 +21,9 @@ right = ["systray"]
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `icon-scale` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Scale multiplier for tray item icons. |
-| `item-gap` | [`Spacing`](/config/types#spacing) | `0.25` | Gap between tray items. |
-| `internal-padding` | [`Spacing`](/config/types#spacing) | `0.5` | Padding at the ends of the container. |
+| `icon-scale` | [`Size`](/config/types#size) | `1` | Tray item icon size. Accepts a scale multiplier or pixels (e.g. `"20px"`). |
+| `item-gap` | [`Size`](/config/types#size) | `0.25` | Gap between tray items. Accepts a scale multiplier or pixels (e.g. `"4px"`). |
+| `internal-padding` | [`Size`](/config/types#size) | `0.5` | Padding at the ends of the container. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
 | `blacklist` | array of string | `[]` | Glob patterns for tray items to hide. |
 | `overrides` | array of [`TrayItemOverride`](/config/types#tray-item-override) | `[]` | Custom icon and color overrides. |
 | `border-show` | bool | `false` | Display border around container. |

@@ -22,7 +22,7 @@ right = ["separator"]
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `size` | u32 | `1` | Thickness of the separator line in pixels. |
-| `length` | [`Spacing`](/config/types#spacing) | `1.5` | Length of the separator line. |
+| `length` | [`Size`](/config/types#size) | `1.5` | Length of the separator line. Accepts a scale multiplier or pixels (e.g. `"24px"`). |
 | `color` | [`ColorValue`](/config/types#color-value) | `"fg-subtle"` | Color of the separator line. |
 
 ## Default configuration

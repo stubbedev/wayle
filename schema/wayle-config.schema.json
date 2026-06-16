@@ -6127,7 +6127,7 @@
           "description": "Custom background color for this workspace when active."
         },
         "icon": {
-          "description": "Custom icon for this workspace.",
+          "description": "Custom icon for this workspace. When set, the icon is shown regardless\nof the module's `display-mode`, so a row can mix labelled workspaces\nwith icon-only ones (e.g. `[1][2][icon]`).",
           "type": [
             "string",
             "null"

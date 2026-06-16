@@ -34,6 +34,7 @@ right = ["custom-<id>"]
 | `label-show` | bool | `true` | Display text label. |
 | `label-max-length` | u32 | `0` | Maximum label length in characters before truncation. |
 | `border-show` | bool | `false` | Display border around button. |
+| `color-map` | unknown | `null` | Map of per-state color overrides keyed by the `alt` field value. |
 | `on-action` | unknown | `null` | Shell command to run after any click/scroll action completes. |
 
 ::: details More about `id`
@@ -157,6 +158,27 @@ class-format = "volume-{{ alt }}"
 ::: details More about `label-max-length`
 
 When exceeded, label is truncated with ellipsis. Set to `0` to disable.
+
+:::
+
+::: details More about `color-map`
+
+Mirrors `icon-map`: the `alt` value from JSON output is looked up in
+this map and the colors set for that state override the module's
+static colors, letting a single widget cycle its colors alongside its
+icon as its state changes. Use `"default"` as a fallback key. Any
+color left unset for the matched state falls back to the module's
+static color of the same name.
+
+#### Example
+
+```toml
+icon-map = { muted = "audio-volume-muted-symbolic" }
+color-map = { muted = { icon-color = "red" }, default = { icon-color = "green" } }
+
+# Output: {"percentage": 50, "alt": "muted"}
+# Result: muted icon rendered in red
+```
 
 :::
 

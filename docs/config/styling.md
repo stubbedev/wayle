@@ -16,6 +16,7 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 | `scale` | [`ScaleFactor`](/config/types#scale-factor) | `1.01` | Scale multiplier for dropdowns, popovers, and dialogs. |
 | `rounding` | [`RoundingLevel`](/config/types#rounding-level) | `"sm"` | Corner rounding for dropdowns, popovers, and dialogs. |
 | `theming-monitor` | string | `""` | Monitor whose wallpaper drives color extraction. Empty uses the first available. |
+| `palette_base_theme` | string | `""` | Currently active theme preset name, and/or the base for the palette when the palette has been modified. Persisted backing state for the theme selector; not a labeled setting of its own. |
 
 ## Theme provider
 
@@ -80,6 +81,7 @@ pywal-saturation = 0.05
 pywal-contrast = 3.0
 pywal-light = false
 pywal-apply-globally = true
+palette_base_theme = ""
 
 [styling.palette]
 bg = "#141420"

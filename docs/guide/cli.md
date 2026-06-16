@@ -26,6 +26,24 @@ wayle media play-pause
 wayle idle toggle
 ```
 
+Push a runtime update to a custom module by its `id`. The payload is parsed
+exactly like the module's own command output, so it drives the label, icon, and
+colors (see [custom modules](/guide/custom-modules)):
+
+```sh
+wayle widget update gpu '{"text":"72°C","alt":"hot","percentage":90}'
+```
+
+Show a custom on-screen toast. It reuses the OSD styling and position; add
+`--percentage` for a progress bar, `--icon` for a leading icon, and `--duration`
+to override the OSD dismiss time:
+
+```sh
+wayle toast "Build finished"
+wayle toast "Volume" --icon audio-volume-high-symbolic --percentage 65
+wayle toast "Syncing…" --duration 5000
+```
+
 Shell completions for bash, fish, and zsh:
 
 ```sh

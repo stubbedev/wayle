@@ -24,7 +24,6 @@ right = ["hyprland-workspaces"]
 | `min-workspace-count` | u8 | `0` | Minimum number of workspace buttons to display. |
 | `monitor-specific` | bool | `true` | Show only workspaces belonging to the bar's monitor. |
 | `show-special` | bool | `true` | Include special workspaces (scratchpads) in the display. |
-| `highlight-active-on-other-monitor` | bool | `true` | Highlight workspace active on current moinitor and workspaces on other monitors with a different color. |
 | `urgent-show` | bool | `true` | Pulse animation on workspaces with urgent windows. |
 | `urgent-mode` | [`UrgentMode`](/config/types#urgent-mode) | `"workspace"` | Where the urgent pulse is applied. |
 | `display-mode` | [`DisplayMode`](/config/types#display-mode) | `"label"` | What identifies each workspace button. |
@@ -35,19 +34,20 @@ right = ["hyprland-workspaces"]
 | `app-icons-dedupe` | bool | `true` | Deduplicate application icons within a workspace. |
 | `app-icons-fallback` | string | `"ld-app-window-symbolic"` | Fallback icon for applications not matched by `app-icon-map`. |
 | `app-icons-empty` | string | `"tb-minus-symbolic"` | Icon shown for empty workspaces when `app-icons-show` is enabled. |
-| `icon-gap` | [`Spacing`](/config/types#spacing) | `0.3` | Gap between app icons within a workspace button. |
-| `workspace-padding` | [`Spacing`](/config/types#spacing) | `0.5` | Padding for workspace content along the bar direction. |
-| `icon-size` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Scale multiplier for workspace icons. |
-| `label-size` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Scale multiplier for workspace labels and dividers. |
+| `icon-gap` | [`Size`](/config/types#size) | `0.3` | Gap between app icons within a workspace button. |
+| `workspace-padding` | [`Size`](/config/types#size) | `0.5` | Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
+| `icon-size` | [`Size`](/config/types#size) | `1` | Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
+| `label-size` | [`Size`](/config/types#size) | `1` | Workspace label and divider size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
 | `workspace-ignore` | array of string | `[]` | Workspaces to hide from the display. |
 | `active-indicator` | [`ActiveIndicator`](/config/types#active-indicator) | `"background"` | Visual indicator for the active workspace. |
+| `highlight-active-on-other-monitor` | bool | `true` | Highlight workspaces active on other monitors with a different color. |
 | `active-color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Color for the active (focused) workspace. |
-| `active-on-other-monitor-color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Color for workspaces active (focused) on different monitors. |
 | `occupied-color` | [`ColorValue`](/config/types#color-value) | `"fg-muted"` | Color for occupied workspaces (has windows but not focused). |
 | `empty-color` | [`ColorValue`](/config/types#color-value) | `"fg-subtle"` | Color for empty workspaces. |
 | `container-bg-color` | [`ColorValue`](/config/types#color-value) | `"bg-surface-elevated"` | Background color for the workspaces container. |
 | `border-show` | bool | `false` | Display border around the workspaces container. |
 | `border-color` | [`ColorValue`](/config/types#color-value) | `"border-default"` | Border color for the workspaces container. |
+| `active-on-other-monitor-color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Active on other minitor indicator color. |
 | `workspace-map` | [`WorkspaceMap`](/config/types#workspace-map) | `{}` | Per-workspace icon and color overrides. |
 | `app-icon-map` | map of string | `{}` | Application icon mapping with glob pattern support. |
 
@@ -71,14 +71,6 @@ When false, all workspaces from all monitors are shown.
 Special workspaces have negative IDs in Hyprland.
 
 :::
-
-::: details More about `highlight-active-on-other-monitor`
-
-This option only has an effect when `monitor-specific` is false.
-- When false, the currently active workspace is highlighted with `active-color` on all monitors.
-- When true, the workspace active on the current monitor is indicated with `active-color`, but all workspaces active on different monitors are indicated with `active-on-other-monitor-color`.
-There will be no visual indication for the global active workspace.
-
 
 ::: details More about `urgent-show`
 
@@ -163,14 +155,12 @@ For vertical bars, controls vertical (top/bottom) padding.
 ::: details More about `icon-size`
 
 Applies to workspace identity icons and custom icons from `workspace-map`.
-Range: 0.25-3.0.
 
 :::
 
 ::: details More about `label-size`
 
 Applies to workspace number/name labels and the divider text.
-Range: 0.25-3.0.
 
 :::
 
@@ -182,18 +172,19 @@ Glob patterns matching workspace IDs. Examples:
 
 :::
 
+::: details More about `highlight-active-on-other-monitor`
+
+When true, workspaces active on a different monior are highlicted differently.
+When false, workspaces active on a another monitor are not specially highlighted.
+
+This setting only makes sense when `monitor-specific` is false.
+
+:::
+
 ::: details More about `active-color`
 
 Applied to icons and labels. In `background` indicator mode,
 also used as the button background.
-
-:::
-
-::: details More about `active-on-other-monitor-color`
-
-Applied to icons and labels. In `background` indicator mode,
-also used as the button background.
-Only makes a difference when `highlight-active-on-other-monitor` is true.
 
 :::
 
@@ -206,6 +197,12 @@ Applied to icons and labels.
 ::: details More about `empty-color`
 
 Applied to the empty placeholder icon and labels.
+
+:::
+
+::: details More about `active-on-other-monitor-color`
+
+Only applies when `highlight-active-on-other-monitor` is `true`.
 
 :::
 
@@ -265,12 +262,14 @@ icon-size = 1.0
 label-size = 1.0
 workspace-ignore = []
 active-indicator = "background"
+highlight-active-on-other-monitor = true
 active-color = "accent"
 occupied-color = "fg-muted"
 empty-color = "fg-subtle"
 container-bg-color = "bg-surface-elevated"
 border-show = false
 border-color = "border-default"
+active-on-other-monitor-color = "accent"
 
 [modules.hyprland-workspaces.workspace-map]
 

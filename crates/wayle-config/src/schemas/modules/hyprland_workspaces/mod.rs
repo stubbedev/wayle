@@ -94,7 +94,9 @@ impl ActiveIndicator {
 /// Per-workspace styling override.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct WorkspaceStyle {
-    /// Custom icon for this workspace.
+    /// Custom icon for this workspace. When set, the icon is shown regardless
+    /// of the module's `display-mode`, so a row can mix labelled workspaces
+    /// with icon-only ones (e.g. `[1][2][icon]`).
     pub icon: Option<String>,
     /// Custom background color for this workspace when active.
     pub color: Option<ColorValue>,

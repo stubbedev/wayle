@@ -15,11 +15,11 @@ Bar chrome: per-monitor layout, spacing, colors, and button styling.
 |---|---|---|---|
 | `layout` | array of [`BarLayout`](/config/types#bar-layout) | `[...]` | Per-monitor bar layouts. Each entry targets a monitor by connector name (e.g., `"DP-1"`) or `"*"` for all monitors. See [`BarLayout`] for the full shape, including layout inheritance via `extends`. |
 | `scale` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Bar-specific scale multiplier for spacing, radius, and other bar elements. |
-| `inset-edge` | [`Spacing`](/config/types#spacing) | `0` | Gap between bar and its attached screen edge. |
-| `inset-ends` | [`Spacing`](/config/types#spacing) | `0` | Gap at the bar's ends. |
-| `padding` | [`Spacing`](/config/types#spacing) | `0.35` | Internal spacing along bar thickness. |
-| `padding-ends` | [`Spacing`](/config/types#spacing) | `0.5` | Internal spacing at bar ends. |
-| `module-gap` | [`Spacing`](/config/types#spacing) | `0.5` | Gap between modules and groups on the bar. |
+| `inset-edge` | [`Size`](/config/types#size) | `0` | Gap between bar and its attached screen edge. |
+| `inset-ends` | [`Size`](/config/types#size) | `0` | Gap at the bar's ends. |
+| `padding` | [`Size`](/config/types#size) | `0.35` | Internal spacing along bar thickness. |
+| `padding-ends` | [`Size`](/config/types#size) | `0.5` | Internal spacing at bar ends. |
+| `module-gap` | [`Size`](/config/types#size) | `0.5` | Gap between modules and groups on the bar. |
 | `location` | [`Location`](/config/types#location) | `"top"` | Bar position on screen edge. |
 | `exclusive` | bool | `true` | Reserve screen space for the bar. |
 | `layer` | [`Layer`](/config/types#layer) | `"top"` | Layer-shell layer the bar is placed on. |
@@ -94,20 +94,20 @@ When disabled, windows may overlap the bar and the bar draws over them.
 | `button-variant` | [`BarButtonVariant`](/config/types#bar-button-variant) | `"block-prefix"` | Visual style variant for bar buttons. |
 | `button-opacity` | [`Percentage`](/config/types#percentage) | `100` | Button opacity (0-100). |
 | `button-bg-opacity` | [`Percentage`](/config/types#percentage) | `100` | Button background opacity (0-100). |
-| `button-icon-size` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Button icon size. |
-| `button-icon-padding` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Button icon container padding. Only applies to `block-prefix` and `icon-square` variants. |
-| `button-label-size` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Button label text size. |
+| `button-icon-size` | [`Size`](/config/types#size) | `1` | Button icon size. Accepts a scale multiplier or pixels (e.g. `"24px"`). |
+| `button-icon-padding` | [`Size`](/config/types#size) | `1` | Button icon container padding. Only applies to `block-prefix` and `icon-square` variants. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
+| `button-label-size` | [`Size`](/config/types#size) | `1` | Button label text size. Accepts a scale multiplier or pixels (e.g. `"16px"`). |
 | `button-label-weight` | [`FontWeightClass`](/config/types#font-weight-class) | `"semibold"` | Button label font weight. |
-| `button-label-padding` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Button label container padding. |
+| `button-label-padding` | [`Size`](/config/types#size) | `1` | Button label container padding. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
 | `button-rounding` | [`RoundingLevel`](/config/types#rounding-level) | `"sm"` | Corner rounding level for the buttons in the bar. |
-| `button-gap` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Gap between button icon and label. |
+| `button-gap` | [`Size`](/config/types#size) | `1` | Gap between button icon and label. Accepts a scale multiplier or pixels (e.g. `"4px"`). |
 | `button-icon-position` | [`IconPosition`](/config/types#icon-position) | `"start"` | Icon position relative to label in bar buttons. |
 | `button-border-location` | [`BorderLocation`](/config/types#border-location) | `"all"` | Border placement for bar buttons. |
 | `button-border-width` | u8 | `1` | Border width for bar buttons (pixels). |
 | `button-group-border-location` | [`BorderLocation`](/config/types#border-location) | `"none"` | Border placement for button groups. |
 | `button-group-border-width` | u8 | `1` | Border width for button groups (pixels). |
-| `button-group-padding` | [`Spacing`](/config/types#spacing) | `0` | Internal padding for button groups. |
-| `button-group-module-gap` | [`Spacing`](/config/types#spacing) | `0.25` | Gap between modules within a group. |
+| `button-group-padding` | [`Size`](/config/types#size) | `0` | Internal padding for button groups. |
+| `button-group-module-gap` | [`Size`](/config/types#size) | `0.25` | Gap between modules within a group. |
 | `button-group-opacity` | [`Percentage`](/config/types#percentage) | `100` | Button group opacity (0-100). |
 | `button-group-rounding` | [`RoundingLevel`](/config/types#rounding-level) | `"sm"` | Corner rounding level for button groups. |
 

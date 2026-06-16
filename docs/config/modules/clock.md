@@ -7,7 +7,7 @@ outline: [2, 3]
 
 <div v-pre>
 
-Time display with a calendar dropdown.
+Clock module configuration.
 
 Add it to your layout with `clock`:
 
@@ -27,6 +27,7 @@ right = ["clock"]
 | `icon-show` | bool | `true` | Display module icon. |
 | `label-show` | bool | `true` | Display text label. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
+| `calendar-weekday-start` | [`WeekStart`](/config/types#week-start) | `"sunday"` | First day of the week in the calendar dropdown. |
 
 ::: details More about `format`
 
@@ -99,6 +100,7 @@ middle-click = ""
 scroll-up = ""
 scroll-down = ""
 dropdown-show-seconds = false
+calendar-weekday-start = "sunday"
 ```
 
 

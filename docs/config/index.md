@@ -33,10 +33,11 @@ Modules appear inside `[[bar.layout]]` arrays. Each row links to the full refere
 | [`bluetooth`](/config/modules/bluetooth) | Bluetooth connection status with a dropdown for pairing and managing devices. |
 | [`brightness`](/config/modules/brightness) | Backlight control bar module. |
 | [`cava`](/config/modules/cava) | Audio frequency bars visualising the output stream. |
-| [`clock`](/config/modules/clock) | Time display with a calendar dropdown. |
+| [`clock`](/config/modules/clock) | Clock module configuration. |
 | [`cpu`](/config/modules/cpu) | CPU usage, frequency, and temperature. |
 | [`custom`](/config/modules/custom) | User-defined module that runs a shell command and renders the output in the bar. |
 | [`dashboard`](/config/modules/dashboard) | Quick-access button with a distro icon; opens the dashboard dropdown. |
+| [`dropdown-dashboard-user-session`](/config/modules/dropdown-dashboard-user-session) | Settings for user session the in dashboard |
 | [`hyprland-workspaces`](/config/modules/hyprland-workspaces) | Hyprland workspace indicators with click-to-switch. |
 | [`hyprsunset`](/config/modules/hyprsunset) | Toggle for Hyprland's blue-light filter. |
 | [`idle-inhibit`](/config/modules/idle-inhibit) | Toggle that prevents screen dim, lock, and suspend while active. |

@@ -63,7 +63,7 @@ A handful of top-level JSON keys are reserved:
 | `text`       | Overrides `format` entirely for this run             |
 | `tooltip`    | Overrides `tooltip-format` for this run              |
 | `percentage` | Integer 0-100 used to pick from `icon-names`         |
-| `alt`        | Key used to pick from `icon-map`, beats `percentage` |
+| `alt`        | Key used to pick from `icon-map` and `color-map`, beats `percentage` |
 | `class`      | Whitespace-separated CSS classes added to the widget |
 
 ## Format templates
@@ -91,6 +91,17 @@ Three fields control the icon. In priority order:
 
 Set `icon-show = false` to hide the icon entirely.
 
+## State colors
+
+`color-map` cycles the module's colors by state, mirroring `icon-map`. It is keyed by the JSON `alt` value; the matched state's colors override the module's static colors, and any color left unset falls back to the static value. Use `"default"` as a fallback key.
+
+```toml
+icon-map = { muted = "ld-volume-x-symbolic" }
+color-map = { muted = { icon-color = "red" }, default = { icon-color = "green" } }
+```
+
+Each state entry accepts `icon-color`, `icon-bg-color`, `label-color`, `button-bg-color`, and `border-color`. With `alt` driving both `icon-map` and `color-map`, one widget swaps its icon *and* its colors as its state changes.
+
 ## Click and scroll
 
 Each event has its own shell command: `left-click`, `right-click`, `middle-click`, `scroll-up`, `scroll-down`. Scroll events are debounced over 50ms so a fast scroll coalesces into one action.
@@ -102,6 +113,16 @@ If `on-action` is set, it runs after a click or scroll command finishes, and its
 ## Hiding the module
 
 With `hide-if-empty = true`, the module and its gap in the layout disappear when the output is an empty string, `"0"`, or `"false"` (case-insensitive). Useful for notification-count badges and VPN indicators that should vanish when there is nothing to show.
+
+## Pushing updates over the socket
+
+A module does not have to poll or watch a command — any external program can push an output to it by `id` over the running shell's socket:
+
+```sh
+wayle widget update gpu '{"text":"72°C","alt":"hot","percentage":90}'
+```
+
+The payload is interpreted exactly like command output (plain text or the same reserved JSON fields), so it drives the label, icon, percentage, and state colors immediately. This is ideal for event-driven sources that already have their own daemon: have it call `wayle widget update <id> …` instead of running under Wayle's poll/watch supervisor. A module can mix both — a `watch` command for the common case and socket pushes for out-of-band updates.
 
 ## Examples
 

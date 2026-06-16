@@ -12,7 +12,19 @@
 
 A Wayland desktop shell with the bar, notifications, OSD, wallpaper, and device controls built in. Written in Rust with GTK4 and Relm4.
 
-Configure it in `config.toml`, through the `wayle-settings` GUI, or with the `wayle config` CLI.
+Configure it in `config.toml` or `config.yaml`, through the `wayle-settings` GUI, or with the `wayle config` CLI.
+
+## Features
+
+- **Bar** with per-monitor layouts, groups, and CSS classes.
+- **Built-in modules** — clock, battery, bluetooth, network, audio/volume, brightness, power profiles, system tray, storage, CPU/RAM, notifications, weather, world clock, idle inhibit, and Hyprland / Niri / Mango workspaces.
+- **Custom modules** — back any bar widget with a shell command (poll or watch), with [icon and color cycling by state](https://wayle.app/guide/custom-modules) (`icon-map` / `color-map` keyed on the output's `alt`).
+- **Per-workspace icons** — give individual workspaces their own icon, shown even in label mode.
+- **Notifications, OSD, and custom toasts** — `wayle toast "…"` shows an on-screen toast (icon + label, or a progress bar) reusing the OSD styling.
+- **Pixel or scale sizing** — every size accepts a scale multiplier or absolute pixels (`"24px"`), HiDPI-correct.
+- **TOML or YAML config** with imports, live reload, and a published [JSON schema](schema/wayle-config.schema.json) for editor autocomplete.
+- **Scriptable** — a JSON-RPC unix socket and CLI push live updates to any widget by id (`wayle widget update <id> …`).
+- **Wallpaper and dynamic theming** — Matugen, Pywal, and Wallust palette extraction.
 
 <p align="center">
   <img src="assets/wayle-preview.png" alt="Wayle desktop shell">

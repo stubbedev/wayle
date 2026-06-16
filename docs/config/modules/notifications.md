@@ -21,6 +21,7 @@ right = ["notifications"]
 
 | Field | Type | Default | Description |
 |---|---|---|---|
+| `enabled` | bool | `true` | Enable the notifications service and module. |
 | `icon-name` | string | `"ld-bell-symbolic"` | Icon shown when no notifications and DND is off. |
 | `icon-unread` | string | `"ld-bell-dot-symbolic"` | Icon shown when notifications exist. |
 | `icon-dnd` | string | `"ld-bell-off-symbolic"` | Icon shown when Do Not Disturb is active. |
@@ -123,6 +124,7 @@ label-color = "status-error"
 
 ```toml
 [modules.notifications]
+enabled = true
 icon-name = "ld-bell-symbolic"
 icon-unread = "ld-bell-dot-symbolic"
 icon-dnd = "ld-bell-off-symbolic"
