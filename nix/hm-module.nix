@@ -8,6 +8,19 @@ self:
 let
   cfg = config.programs.wayle;
   tomlFormat = pkgs.formats.toml { };
+
+  pkgIfPresent = name: lib.optional (builtins.hasAttr name pkgs) (builtins.getAttr name pkgs);
+
+  # Soft dependencies wayle shells out to, selected from the config. Theme
+  # providers are spawned for wallpaper-driven color extraction; wl-clipboard
+  # and xdg-utils back copy / open-link actions. Missing packages are skipped.
+  themeProvider = cfg.settings.styling.theme-provider or "wayle";
+  softDeps =
+    pkgIfPresent "wl-clipboard"
+    ++ pkgIfPresent "xdg-utils"
+    ++ lib.optionals (themeProvider == "matugen") (pkgIfPresent "matugen")
+    ++ lib.optionals (themeProvider == "wallust") (pkgIfPresent "wallust")
+    ++ lib.optionals (themeProvider == "pywal") (pkgIfPresent "pywal");
 in
 {
   options.programs.wayle = {
@@ -18,6 +31,18 @@ in
       default = self.packages.${pkgs.stdenv.hostPlatform.system}.wayle;
       defaultText = lib.literalExpression "wayle.packages.\${system}.wayle";
       description = "The wayle package to install.";
+    };
+
+    autoInstallDependencies = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Install the user-space soft dependencies wayle's config implies
+        (theme-provider tools like matugen/wallust/pywal, plus wl-clipboard and
+        xdg-utils). System-level dependencies (NetworkManager, bluez, upower,
+        power-profiles-daemon, pipewire/wireplumber) are not installed by
+        home-manager — enable those at the NixOS level.
+      '';
     };
 
     settings = lib.mkOption {
@@ -62,7 +87,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = [ cfg.package ];
+    home.packages = [ cfg.package ] ++ lib.optionals cfg.autoInstallDependencies softDeps;
 
     xdg.configFile."wayle/config.toml" = lib.mkIf (cfg.settings != { }) {
       source = tomlFormat.generate "wayle-config.toml" cfg.settings;

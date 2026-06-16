@@ -19,6 +19,18 @@ in
       description = "The wayle package to install.";
     };
 
+    autoInstallDependencies = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable the backing system services wayle integrates with: UPower
+        (battery) and BlueZ (bluetooth), plus wl-clipboard and xdg-utils. Set
+        with `mkDefault` so your own settings win. Networking
+        (NetworkManager), power-profiles-daemon, and PipeWire are intentionally
+        left out — enable those deliberately to avoid clashing with your setup.
+      '';
+    };
+
     systemd = {
       enable = lib.mkEnableOption ''
         a systemd user service that runs `wayle shell` in the graphical session.
@@ -32,20 +44,30 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    environment.systemPackages = [ cfg.package ];
+  config = lib.mkIf cfg.enable (lib.mkMerge [
+    {
+      environment.systemPackages = [ cfg.package ];
 
-    systemd.user.services.wayle = lib.mkIf cfg.systemd.enable {
-      description = "Wayle desktop shell";
-      partOf = [ cfg.systemd.target ];
-      after = [ cfg.systemd.target ];
-      wantedBy = [ cfg.systemd.target ];
-      serviceConfig = {
-        ExecStart = "${lib.getExe cfg.package} shell";
-        Restart = "on-failure";
-        RestartSec = 3;
-        Slice = "session.slice";
+      systemd.user.services.wayle = lib.mkIf cfg.systemd.enable {
+        description = "Wayle desktop shell";
+        partOf = [ cfg.systemd.target ];
+        after = [ cfg.systemd.target ];
+        wantedBy = [ cfg.systemd.target ];
+        serviceConfig = {
+          ExecStart = "${lib.getExe cfg.package} shell";
+          Restart = "on-failure";
+          RestartSec = 3;
+          Slice = "session.slice";
+        };
       };
-    };
-  };
+    }
+
+    (lib.mkIf cfg.autoInstallDependencies {
+      services.upower.enable = lib.mkDefault true;
+      hardware.bluetooth.enable = lib.mkDefault true;
+      environment.systemPackages =
+        lib.optional (pkgs ? wl-clipboard) pkgs.wl-clipboard
+        ++ lib.optional (pkgs ? xdg-utils) pkgs.xdg-utils;
+    })
+  ]);
 }

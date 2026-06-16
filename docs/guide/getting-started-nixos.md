@@ -27,6 +27,8 @@ NixOS:
   programs.wayle.enable = true;
   # optional: run `wayle shell` as a user service in the graphical session
   programs.wayle.systemd.enable = true;
+  # optional: enable backing services (UPower, BlueZ) + wl-clipboard/xdg-utils
+  programs.wayle.autoInstallDependencies = true;
 }
 ```
 
@@ -38,6 +40,9 @@ home-manager:
   imports = [ inputs.wayle.homeManagerModules.default ];
   programs.wayle = {
     enable = true; # installs wayle + wayle-settings, runs it as a user service
+    # install user-space soft deps implied by the config (theme-provider tool,
+    # wl-clipboard, xdg-utils)
+    autoInstallDependencies = true;
     settings = {
       # written to ~/.config/wayle/config.toml
       bar.layout = [
