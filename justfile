@@ -1,5 +1,10 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+# Run cargo inside the flake devShell so the GTK/clang build env is always
+# present — no need to `nix develop` first. The Rust toolchain still comes from
+# your PATH (rustup); the flake only supplies the native libraries + pkg-config.
+cargo := "nix develop --command cargo"
+
 # Default — list recipes.
 default:
     @just --list --unsorted
@@ -8,35 +13,35 @@ default:
 
 # Build the release binary.
 build:
-    cargo build --release --locked
+    {{cargo}} build --release --locked
 
 # Run the wayle binary (debug). Extra args pass through: `just run -- --help`.
 run *args:
-    cargo run --bin wayle -- {{args}}
+    {{cargo}} run --bin wayle -- {{args}}
 
 # Remove target/ build artifacts.
 clean:
-    cargo clean
+    {{cargo}} clean
 
 # ─────────────────────────── Format & Lint ───────────────────────────
 
 # Format the workspace in place.
 fmt:
-    cargo fmt --all
+    {{cargo}} fmt --all
 
 # Format, then lint with clippy (warnings are errors).
 lint: fmt
-    cargo clippy --workspace --all-targets -- -D warnings
+    {{cargo}} clippy --workspace --all-targets -- -D warnings
 
 # Strict read-only check — same logic CI runs, for local pre-push.
 # Fails if formatting would change or any lint fires.
 lint-check:
-    cargo fmt --all --check
-    cargo clippy --workspace --all-targets -- -D warnings
+    {{cargo}} fmt --all --check
+    {{cargo}} clippy --workspace --all-targets -- -D warnings
 
 # Run the test suite.
 test:
-    cargo test --workspace --no-fail-fast
+    {{cargo}} test --workspace --no-fail-fast
 
 # Format, lint and test. Run before every release.
 check: lint test
@@ -45,7 +50,7 @@ check: lint test
 
 # Update Cargo.lock to the latest semver-compatible versions.
 update:
-    cargo update --workspace
+    {{cargo}} update --workspace
 
 # ─────────────────────────── Release ───────────────────────────
 
