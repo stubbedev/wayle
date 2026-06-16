@@ -13,8 +13,8 @@ use wayle_widgets::{
     primitives::progress_bar::{ProgressBar, ProgressBarClass},
 };
 
-pub(crate) use self::messages::BatterySectionInit;
 use self::messages::BatterySectionCmd;
+pub(crate) use self::messages::BatterySectionInit;
 use crate::i18n::t;
 
 const PERCENTAGE_DIVISOR: f64 = 100.0;

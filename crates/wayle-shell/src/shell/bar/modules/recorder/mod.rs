@@ -114,12 +114,7 @@ impl Component for RecorderModule {
         dropdowns::dispatch_click(&action, &self.dropdowns, &self.bar_button);
     }
 
-    fn update_cmd(
-        &mut self,
-        msg: RecorderCmd,
-        _sender: ComponentSender<Self>,
-        _root: &Self::Root,
-    ) {
+    fn update_cmd(&mut self, msg: RecorderCmd, _sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             RecorderCmd::ConfigChanged | RecorderCmd::StateChanged => {
                 let config = &self.config.config().modules.recorder;

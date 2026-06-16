@@ -18,9 +18,7 @@ use wayle_systray::SystemTrayService;
 use wayle_wallpaper::WallpaperService;
 use wayle_weather::WeatherService;
 
-use crate::services::{
-    IdleInhibitService, RecorderService, ShellIpcService, ToastBus, WidgetBus,
-};
+use crate::services::{IdleInhibitService, RecorderService, ShellIpcService, ToastBus, WidgetBus};
 
 /// Container for services used by shell components.
 ///

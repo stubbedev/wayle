@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
-use wayle_config::ConfigService;
+use wayle_config::{ConfigService, schemas::styling::Size};
 use wayle_notification::NotificationService;
 use wayle_widgets::prelude::*;
 
@@ -22,8 +22,6 @@ use self::{
         messages::{NotificationGroupInput, NotificationGroupOutput},
     },
 };
-use wayle_config::schemas::styling::Size;
-
 use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 425.0;

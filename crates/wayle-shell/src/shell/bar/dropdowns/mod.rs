@@ -11,12 +11,12 @@ mod recorder;
 mod registry;
 mod weather;
 
+use wayle_config::schemas::styling::Size;
+
 pub(crate) use self::registry::{
     DropdownFactory, DropdownInstance, DropdownRegistry, dispatch_click, dispatch_click_widget,
     require_service,
 };
-use wayle_config::schemas::styling::Size;
-
 use crate::shell::services::ShellServices;
 
 /// Resolves a dropdown width/height override to a pixel request.

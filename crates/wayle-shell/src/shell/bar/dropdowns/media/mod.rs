@@ -7,6 +7,7 @@ mod watchers;
 
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
+use wayle_config::schemas::styling::Size;
 use wayle_widgets::prelude::*;
 
 pub(super) use self::factory::Factory;
@@ -15,8 +16,6 @@ use self::{
     player_view::{PlayerView, PlayerViewInit, PlayerViewInput, PlayerViewOutput},
     source_picker::{SourcePicker, SourcePickerInit, SourcePickerOutput},
 };
-use wayle_config::schemas::styling::Size;
-
 use crate::shell::bar::dropdowns::resolve_dimension;
 
 const BASE_WIDTH: f32 = 380.0;

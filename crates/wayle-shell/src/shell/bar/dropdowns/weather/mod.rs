@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use gtk::{pango, prelude::*};
 use relm4::{gtk, prelude::*};
-use wayle_config::ConfigService;
+use wayle_config::{ConfigService, schemas::styling::Size};
 use wayle_weather::{WeatherErrorKind, WeatherService, WeatherStatus};
 use wayle_widgets::prelude::*;
 
@@ -25,8 +25,6 @@ use self::{
     sun_times::{SunTimes, SunTimesInit},
     weather_header::{WeatherHeader, WeatherHeaderInit},
 };
-use wayle_config::schemas::styling::Size;
-
 use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 395.0;

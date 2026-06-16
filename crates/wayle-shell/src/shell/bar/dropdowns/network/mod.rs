@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
+use wayle_config::schemas::styling::Size;
 use wayle_network::NetworkService;
 use wayle_widgets::{WatcherToken, prelude::*};
 
@@ -22,8 +23,6 @@ use self::{
     },
     messages::{NetworkDropdownCmd, NetworkDropdownInit, NetworkDropdownMsg},
 };
-use wayle_config::schemas::styling::Size;
-
 use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 382.0;

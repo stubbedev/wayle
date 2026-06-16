@@ -188,8 +188,7 @@ impl StylingConfig {
         if !theme.is_empty()
             && let Some(variant) =
                 crate::infrastructure::themes::palettes::appearance_variant(&theme, want_light)
-            && let Some(palette) =
-                crate::infrastructure::themes::palettes::palette_by_name(variant)
+            && let Some(palette) = crate::infrastructure::themes::palettes::palette_by_name(variant)
         {
             return palette;
         }

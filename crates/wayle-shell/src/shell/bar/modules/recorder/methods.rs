@@ -7,10 +7,7 @@ use super::{
 };
 
 impl RecorderModule {
-    pub(super) fn update_display(
-        &self,
-        config: &wayle_config::schemas::modules::RecorderConfig,
-    ) {
+    pub(super) fn update_display(&self, config: &wayle_config::schemas::modules::RecorderConfig) {
         let active = self.state.active.get();
         let paused = self.state.paused.get();
 

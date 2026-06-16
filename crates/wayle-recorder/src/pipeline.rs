@@ -31,7 +31,8 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
     let mut desc = String::new();
 
     if let Some(cam) = &opts.webcam {
-        let cam_w = (f64::from(screen_w) * f64::from(cam.size_percent.clamp(1, 100)) / 100.0) as i32;
+        let cam_w =
+            (f64::from(screen_w) * f64::from(cam.size_percent.clamp(1, 100)) / 100.0) as i32;
         let cam_w = cam_w.max(80);
         let cam_h = (cam_w * 9 / 16).max(60);
         let (xpos, ypos) = webcam_xy(cam.position, screen_w, screen_h, cam_w, cam_h);
@@ -75,7 +76,9 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
             "audiomixer name=amix ! audioconvert ! audioresample ! {audio_encoder} ! queue ! mux. "
         ));
         for source in &audio_sources {
-            desc.push_str(&format!("{source} ! queue ! audioconvert ! audioresample ! amix. "));
+            desc.push_str(&format!(
+                "{source} ! queue ! audioconvert ! audioresample ! amix. "
+            ));
         }
     } else {
         // One encoded track per source -> separate, individually editable tracks.

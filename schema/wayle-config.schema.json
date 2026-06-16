@@ -50,9 +50,54 @@
         }
       ]
     },
+    "AnimationType2": {
+      "description": "Enter/exit transition style for transient surfaces (OSD, toasts,\nnotifications). Maps onto GTK's revealer transitions.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No transition; surfaces appear and disappear instantly.",
+          "type": "string"
+        },
+        {
+          "const": "fade",
+          "description": "Cross-fade opacity in and out.",
+          "type": "string"
+        },
+        {
+          "const": "slide-up",
+          "description": "Slide in from / out to the top edge.",
+          "type": "string"
+        },
+        {
+          "const": "slide-down",
+          "description": "Slide in from / out to the bottom edge.",
+          "type": "string"
+        },
+        {
+          "const": "slide-left",
+          "description": "Slide in from / out to the left edge.",
+          "type": "string"
+        },
+        {
+          "const": "slide-right",
+          "description": "Slide in from / out to the right edge.",
+          "type": "string"
+        }
+      ]
+    },
     "AnimationsConfig": {
       "description": "Enter/exit and change animations for transient surfaces.",
       "properties": {
+        "dropdown": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for bar widget dropdown foldouts."
+        },
         "duration": {
           "$ref": "#/$defs/uint32",
           "default": 200,
@@ -63,10 +108,60 @@
           "default": true,
           "description": "Enable enter/exit animations (OSD, toasts, notifications) and\nicon-change crossfades. When disabled, surfaces appear instantly."
         },
+        "enter": {
+          "$ref": "#/$defs/Nullable_AnimationType",
+          "default": null,
+          "description": "Global enter transition. Unset → `transition`."
+        },
+        "enter-duration": {
+          "$ref": "#/$defs/Nullable_uint32",
+          "default": null,
+          "description": "Global enter duration in ms. Unset → `duration`."
+        },
+        "exit": {
+          "$ref": "#/$defs/Nullable_AnimationType",
+          "default": null,
+          "description": "Global exit transition. Unset → `transition`."
+        },
+        "exit-duration": {
+          "$ref": "#/$defs/Nullable_uint32",
+          "default": null,
+          "description": "Global exit duration in ms. Unset → `duration`."
+        },
+        "notifications": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for notification popup cards."
+        },
+        "osd": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for the OSD (volume/brightness/toggle)."
+        },
+        "toast": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for toasts (`wayle toast`)."
+        },
         "transition": {
           "$ref": "#/$defs/AnimationType",
           "default": "fade",
-          "description": "Transition style used for enter/exit of the OSD, toasts, and\nnotification cards."
+          "description": "Transition style used for enter/exit of the OSD, toasts, and\nnotification cards. Base fallback for every surface and direction."
         }
       },
       "type": "object"
@@ -82,6 +177,26 @@
         {
           "const": "native",
           "description": "Native application icons reported by PulseAudio.",
+          "type": "string"
+        }
+      ]
+    },
+    "Appearance": {
+      "description": "Light/dark appearance mode.\n\n`Auto` keeps each provider's own light setting and the configured static\npalette as-is. `Light`/`Dark` force the mode: dynamic providers switch their\nlight flag, and the static palette swaps to its built-in light/dark variant\nwhen one exists.",
+      "oneOf": [
+        {
+          "const": "auto",
+          "description": "Follow each provider's own setting / the configured palette.",
+          "type": "string"
+        },
+        {
+          "const": "light",
+          "description": "Force the light variant.",
+          "type": "string"
+        },
+        {
+          "const": "dark",
+          "description": "Force the dark variant.",
           "type": "string"
         }
       ]
@@ -507,6 +622,7 @@
             "notifications",
             "power",
             "ram",
+            "recorder",
             "separator",
             "storage",
             "systray",
@@ -1695,6 +1811,16 @@
     "DashboardConfig": {
       "description": "Quick-access button with a distro icon; opens the dashboard dropdown.",
       "properties": {
+        "battery-critical": {
+          "$ref": "#/$defs/float",
+          "default": 15.0,
+          "description": "Battery percent at or below which the dashboard battery shows critical."
+        },
+        "battery-warning": {
+          "$ref": "#/$defs/float",
+          "default": 30.0,
+          "description": "Battery percent at or below which the dashboard battery shows warning."
+        },
         "border-color": {
           "$ref": "#/$defs/ColorValue",
           "default": "yellow",
@@ -1765,6 +1891,26 @@
           "default": "",
           "description": "Action on scroll up."
         },
+        "temp-error": {
+          "$ref": "#/$defs/float",
+          "default": 85.0,
+          "description": "CPU temperature (°C) at which the dashboard temp ring turns error."
+        },
+        "temp-warning": {
+          "$ref": "#/$defs/float",
+          "default": 65.0,
+          "description": "CPU temperature (°C) at which the dashboard temp ring turns warning."
+        },
+        "usage-error": {
+          "$ref": "#/$defs/float",
+          "default": 85.0,
+          "description": "CPU/RAM/disk usage percent at which the dashboard rings turn error."
+        },
+        "usage-warning": {
+          "$ref": "#/$defs/float",
+          "default": 60.0,
+          "description": "CPU/RAM/disk usage percent at which the dashboard rings turn warning."
+        },
         "user-session": {
           "$ref": "#/$defs/UserSessionConfig",
           "default": {
@@ -1796,6 +1942,142 @@
         {
           "const": "none",
           "description": "Show nothing - only app icons visible.",
+          "type": "string"
+        }
+      ]
+    },
+    "DropdownSize": {
+      "description": "Size override for a dropdown foldout panel.\n\nEach field is optional: when unset the dropdown keeps its built-in default\nsize (scaled by the global scale). A [`Size`] may be a scale multiplier of\nthe built-in base (e.g. `1.5`) or an absolute pixel length (e.g. `\"480px\"`).",
+      "properties": {
+        "height": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Size"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Panel height override. Unset uses the built-in default height. Has no\neffect on dropdowns whose height grows to fit their content."
+        },
+        "width": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Size"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Panel width override. Unset uses the built-in default width."
+        }
+      },
+      "type": "object"
+    },
+    "DropdownsConfig": {
+      "description": "Per-dropdown foldout panel sizing.\n\nEach field overrides the size of one bar widget dropdown. Unset fields keep\nthe built-in default (scaled by the global scale).",
+      "properties": {
+        "audio": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Audio dropdown panel size."
+        },
+        "battery": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Battery dropdown panel size."
+        },
+        "bluetooth": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Bluetooth dropdown panel size."
+        },
+        "brightness": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Brightness dropdown panel size. Height grows to fit content."
+        },
+        "calendar": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Calendar dropdown panel size. Height grows to fit content."
+        },
+        "dashboard": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Dashboard dropdown panel size. Height grows to fit content."
+        },
+        "media": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Media dropdown panel size."
+        },
+        "network": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Network dropdown panel size."
+        },
+        "notification": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Notification dropdown panel size."
+        },
+        "weather": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Weather dropdown panel size."
+        }
+      },
+      "type": "object"
+    },
+    "EncoderPreset": {
+      "description": "Encoder speed/quality trade-off. Slower presets produce smaller files at\nthe same bitrate, using more CPU.",
+      "oneOf": [
+        {
+          "const": "speed",
+          "description": "Fastest, lowest CPU, largest files.",
+          "type": "string"
+        },
+        {
+          "const": "balanced",
+          "description": "Balanced size and CPU (default).",
+          "type": "string"
+        },
+        {
+          "const": "quality",
+          "description": "Slowest, best compression / smallest files.",
           "type": "string"
         }
       ]
@@ -3167,6 +3449,8 @@
         "dashboard": {
           "$ref": "#/$defs/DashboardConfig",
           "default": {
+            "battery-critical": 15.0,
+            "battery-warning": 30.0,
             "border-color": "yellow",
             "border-show": false,
             "dropdown-lock-command": "loginctl lock-session",
@@ -3181,6 +3465,10 @@
             "right-click": "",
             "scroll-down": "",
             "scroll-up": "",
+            "temp-error": 85.0,
+            "temp-warning": 65.0,
+            "usage-error": 85.0,
+            "usage-warning": 60.0,
             "user-session": {
               "actions": [
                 "lock",
@@ -3578,6 +3866,45 @@
             "thresholds": []
           },
           "description": "RAM usage module."
+        },
+        "recorder": {
+          "$ref": "#/$defs/RecorderConfig",
+          "default": {
+            "audio-bitrate-kbps": 128,
+            "bitrate-kbps": 8000,
+            "border-color": "red",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "encoder-preset": "balanced",
+            "format": "{{ elapsed }}",
+            "framerate": 30,
+            "icon-bg-color": "red",
+            "icon-color": "auto",
+            "icon-idle": "ld-video-symbolic",
+            "icon-paused": "ld-circle-pause-symbolic",
+            "icon-recording": "ld-circle-dot-symbolic",
+            "icon-show": true,
+            "label-color": "red",
+            "label-max-length": 0,
+            "label-show": true,
+            "left-click": "wayle recorder toggle",
+            "microphone": false,
+            "microphone-device": "",
+            "middle-click": "",
+            "output-directory": "",
+            "output-format": "mp4",
+            "right-click": "dropdown:recorder",
+            "scroll-down": "",
+            "scroll-up": "",
+            "separate-audio-tracks": true,
+            "show-cursor": true,
+            "system-audio": true,
+            "webcam-device": "",
+            "webcam-enabled": false,
+            "webcam-position": "bottom-right",
+            "webcam-size": 20
+          },
+          "description": "Screen recorder module."
         },
         "separator": {
           "$ref": "#/$defs/SeparatorConfig",
@@ -4312,9 +4639,27 @@
       },
       "type": "object"
     },
+    "Nullable_AnimationType": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AnimationType2"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "Nullable_string": {
       "type": [
         "string",
+        "null"
+      ]
+    },
+    "Nullable_uint32": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
         "null"
       ]
     },
@@ -4370,6 +4715,11 @@
           "$ref": "#/$defs/OsdPosition",
           "default": "bottom",
           "description": "Screen anchor position."
+        },
+        "text-align": {
+          "$ref": "#/$defs/OsdTextAlign",
+          "default": "center",
+          "description": "Horizontal alignment of toast and toggle overlay content. Sliders\n(volume/brightness) keep their own label+value layout."
         }
       },
       "type": "object"
@@ -4420,6 +4770,26 @@
         {
           "const": "left",
           "description": "Left-center edge.",
+          "type": "string"
+        }
+      ]
+    },
+    "OsdTextAlign": {
+      "description": "Horizontal alignment of OSD toast/toggle content.",
+      "oneOf": [
+        {
+          "const": "start",
+          "description": "Align content to the start (left in LTR layouts).",
+          "type": "string"
+        },
+        {
+          "const": "center",
+          "description": "Center content horizontally.",
+          "type": "string"
+        },
+        {
+          "const": "end",
+          "description": "Align content to the end (right in LTR layouts).",
           "type": "string"
         }
       ]
@@ -4710,6 +5080,197 @@
         }
       },
       "type": "object"
+    },
+    "RecorderConfig": {
+      "description": "Native screen recorder backed by a GStreamer pipeline.\n\nClick the bar button to start/stop; the dropdown exposes the recording\noptions below. Controllable from the CLI / RPC socket:\n`wayle recorder start|stop|toggle|pause|status`.",
+      "properties": {
+        "audio-bitrate-kbps": {
+          "$ref": "#/$defs/uint32",
+          "default": 128,
+          "description": "Audio bitrate per track in kilobits per second."
+        },
+        "bitrate-kbps": {
+          "$ref": "#/$defs/uint32",
+          "default": 8000,
+          "description": "Video bitrate in kilobits per second."
+        },
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "red",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "encoder-preset": {
+          "$ref": "#/$defs/EncoderPreset",
+          "default": "balanced",
+          "description": "Encoder speed/quality trade-off (smaller files vs less CPU)."
+        },
+        "format": {
+          "$ref": "#/$defs/string",
+          "default": "{{ elapsed }}",
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ state }}` - Recorder state text (Idle, Recording, Paused)\n- `{{ elapsed }}` - Elapsed recording time (e.g., \"01:23\", \"--\" when idle)"
+        },
+        "framerate": {
+          "$ref": "#/$defs/uint32",
+          "default": 30,
+          "description": "Capture framerate in frames per second."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "red",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast."
+        },
+        "icon-idle": {
+          "$ref": "#/$defs/string",
+          "default": "ld-video-symbolic",
+          "description": "Icon when idle (not recording)."
+        },
+        "icon-paused": {
+          "$ref": "#/$defs/string",
+          "default": "ld-circle-pause-symbolic",
+          "description": "Icon while recording is paused."
+        },
+        "icon-recording": {
+          "$ref": "#/$defs/string",
+          "default": "ld-circle-dot-symbolic",
+          "description": "Icon while recording."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "red",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display label."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "wayle recorder toggle",
+          "description": "Action on left click. Default toggles recording."
+        },
+        "microphone": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Capture the microphone in the recording."
+        },
+        "microphone-device": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Microphone PipeWire/PulseAudio source name. Empty uses the default source."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "output-directory": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Output directory for recordings. Empty uses the XDG Videos directory."
+        },
+        "output-format": {
+          "$ref": "#/$defs/RecorderFormat",
+          "default": "mp4",
+          "description": "Container format / codec preset."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "dropdown:recorder",
+          "description": "Action on right click. Default opens the recorder dropdown."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        },
+        "separate-audio-tracks": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Keep microphone and system audio as separate, individually editable\ntracks instead of mixing them into one."
+        },
+        "show-cursor": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Draw the mouse cursor in the recording."
+        },
+        "system-audio": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Capture desktop (system) audio in the recording."
+        },
+        "webcam-device": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Webcam V4L2 device path. Empty auto-selects the first camera."
+        },
+        "webcam-enabled": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Overlay a webcam picture-in-picture frame into the recording."
+        },
+        "webcam-position": {
+          "$ref": "#/$defs/WebcamPosition",
+          "default": "bottom-right",
+          "description": "Corner the webcam frame is anchored to."
+        },
+        "webcam-size": {
+          "$ref": "#/$defs/Percentage",
+          "default": 20,
+          "description": "Webcam frame width as a percentage of the recording width."
+        }
+      },
+      "type": "object"
+    },
+    "RecorderFormat": {
+      "description": "Container format / codec preset for recordings.",
+      "oneOf": [
+        {
+          "const": "mp4",
+          "description": "H.264 in an MP4 container.",
+          "type": "string"
+        },
+        {
+          "const": "mkv",
+          "description": "H.264 in a Matroska container (resilient to crashes).",
+          "type": "string"
+        },
+        {
+          "const": "webm",
+          "description": "VP9 in a WebM container.",
+          "type": "string"
+        }
+      ]
     },
     "RestartDelay": {
       "description": "Restart delay in milliseconds, clamped to >= 1.",
@@ -5067,6 +5628,11 @@
     "StylingConfig": {
       "description": "Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet.",
       "properties": {
+        "appearance": {
+          "$ref": "#/$defs/Appearance",
+          "default": "auto",
+          "description": "Light/dark appearance mode. `Auto` follows each provider / the configured\npalette; `Light`/`Dark` force the mode (static palettes swap to their\nbuilt-in light/dark variant when one exists)."
+        },
         "matugen-contrast": {
           "$ref": "#/$defs/SignedNormalizedF64",
           "default": 0.0,
@@ -5177,6 +5743,56 @@
           "$ref": "#/$defs/Percentage",
           "default": 0,
           "description": "Wallust saturation boost (0-100, 0 disables)."
+        }
+      },
+      "type": "object"
+    },
+    "SurfaceAnimation": {
+      "description": "Per-surface enter/exit animation override. Any field left unset falls back\nto the global `[animations]` enter/exit, then to `transition`/`duration`.",
+      "properties": {
+        "enter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationType2"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enter transition for this surface. Unset → global `enter`, then `transition`."
+        },
+        "enter-duration": {
+          "default": null,
+          "description": "Enter duration in ms. Unset → global `enter-duration`, then `duration`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "exit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationType2"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Exit transition for this surface. Unset → global `exit`, then `transition`."
+        },
+        "exit-duration": {
+          "default": null,
+          "description": "Exit duration in ms. Unset → global `exit-duration`, then `duration`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "type": "object"
@@ -6023,6 +6639,31 @@
         }
       ]
     },
+    "WebcamPosition": {
+      "description": "Corner the webcam picture-in-picture frame is anchored to in the recording.",
+      "oneOf": [
+        {
+          "const": "top-left",
+          "description": "Top-left corner.",
+          "type": "string"
+        },
+        {
+          "const": "top-right",
+          "description": "Top-right corner.",
+          "type": "string"
+        },
+        {
+          "const": "bottom-left",
+          "description": "Bottom-left corner.",
+          "type": "string"
+        },
+        {
+          "const": "bottom-right",
+          "description": "Bottom-right corner.",
+          "type": "string"
+        }
+      ]
+    },
     "WeekStart": {
       "description": "Which day appears in the first column of the calendar dropdown.",
       "oneOf": [
@@ -6292,6 +6933,10 @@
       "format": "double",
       "type": "number"
     },
+    "float": {
+      "format": "float",
+      "type": "number"
+    },
     "string": {
       "type": "string"
     },
@@ -6312,15 +6957,43 @@
       "type": "integer"
     }
   },
-  "$id": "wayle-config-0.7.0",
+  "$id": "wayle-config-0.7.2",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for Wayle.\n\nRepresents the complete configuration schema that can be loaded\nfrom TOML files. All fields have sensible defaults.",
   "properties": {
     "animations": {
       "$ref": "#/$defs/AnimationsConfig",
       "default": {
+        "dropdown": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
         "duration": 200,
         "enabled": true,
+        "enter": null,
+        "enter-duration": null,
+        "exit": null,
+        "exit-duration": null,
+        "notifications": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
+        "osd": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
+        "toast": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
         "transition": "fade"
       },
       "description": "Animation settings."
@@ -6391,6 +7064,52 @@
         "shadow": "none"
       },
       "description": "Bar layout and module placement."
+    },
+    "dropdowns": {
+      "$ref": "#/$defs/DropdownsConfig",
+      "default": {
+        "audio": {
+          "height": null,
+          "width": null
+        },
+        "battery": {
+          "height": null,
+          "width": null
+        },
+        "bluetooth": {
+          "height": null,
+          "width": null
+        },
+        "brightness": {
+          "height": null,
+          "width": null
+        },
+        "calendar": {
+          "height": null,
+          "width": null
+        },
+        "dashboard": {
+          "height": null,
+          "width": null
+        },
+        "media": {
+          "height": null,
+          "width": null
+        },
+        "network": {
+          "height": null,
+          "width": null
+        },
+        "notification": {
+          "height": null,
+          "width": null
+        },
+        "weather": {
+          "height": null,
+          "width": null
+        }
+      },
+      "description": "Dropdown foldout panel sizing."
     },
     "general": {
       "$ref": "#/$defs/GeneralConfig",
@@ -6554,6 +7273,8 @@
         },
         "custom": [],
         "dashboard": {
+          "battery-critical": 15.0,
+          "battery-warning": 30.0,
           "border-color": "yellow",
           "border-show": false,
           "dropdown-lock-command": "loginctl lock-session",
@@ -6568,6 +7289,10 @@
           "right-click": "",
           "scroll-down": "",
           "scroll-up": "",
+          "temp-error": 85.0,
+          "temp-warning": 65.0,
+          "usage-error": 85.0,
+          "usage-warning": 60.0,
           "user-session": {
             "actions": [
               "lock",
@@ -6908,6 +7633,41 @@
           "scroll-up": "",
           "thresholds": []
         },
+        "recorder": {
+          "audio-bitrate-kbps": 128,
+          "bitrate-kbps": 8000,
+          "border-color": "red",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "encoder-preset": "balanced",
+          "format": "{{ elapsed }}",
+          "framerate": 30,
+          "icon-bg-color": "red",
+          "icon-color": "auto",
+          "icon-idle": "ld-video-symbolic",
+          "icon-paused": "ld-circle-pause-symbolic",
+          "icon-recording": "ld-circle-dot-symbolic",
+          "icon-show": true,
+          "label-color": "red",
+          "label-max-length": 0,
+          "label-show": true,
+          "left-click": "wayle recorder toggle",
+          "microphone": false,
+          "microphone-device": "",
+          "middle-click": "",
+          "output-directory": "",
+          "output-format": "mp4",
+          "right-click": "dropdown:recorder",
+          "scroll-down": "",
+          "scroll-up": "",
+          "separate-audio-tracks": true,
+          "show-cursor": true,
+          "system-audio": true,
+          "webcam-device": "",
+          "webcam-enabled": false,
+          "webcam-position": "bottom-right",
+          "webcam-size": 20
+        },
         "separator": {
           "color": "fg-subtle",
           "length": 1.5,
@@ -7043,13 +7803,15 @@
         "layer": "overlay",
         "margin": 150.0,
         "monitor": "primary",
-        "position": "bottom"
+        "position": "bottom",
+        "text-align": "center"
       },
       "description": "On-screen display settings."
     },
     "styling": {
       "$ref": "#/$defs/StylingConfig",
       "default": {
+        "appearance": "auto",
         "matugen-contrast": 0.0,
         "matugen-light": false,
         "matugen-scheme": "tonal-spot",

@@ -145,7 +145,10 @@ impl RecorderState {
     fn start_timer(&self) {
         let token = CancellationToken::new();
         {
-            let mut guard = self.timer_token.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut guard = self
+                .timer_token
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             *guard = token.clone();
         }
 
@@ -171,7 +174,10 @@ impl RecorderState {
     }
 
     fn cancel_timer(&self) {
-        let guard = self.timer_token.lock().unwrap_or_else(PoisonError::into_inner);
+        let guard = self
+            .timer_token
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         guard.cancel();
     }
 }

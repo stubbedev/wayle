@@ -6,6 +6,7 @@ mod watchers;
 use chrono::{Datelike, Local, NaiveDate, Weekday};
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
+use wayle_config::schemas::styling::Size;
 use wayle_widgets::{
     components::calendar::{Calendar, CalendarInit, CalendarInput, CalendarLabels},
     prelude::*,
@@ -16,8 +17,6 @@ use self::{
     helpers::{day_names_array, format_date_rest, months_array, weekdays_array},
     messages::{CalendarDropdownCmd, CalendarDropdownInit},
 };
-use wayle_config::schemas::styling::Size;
-
 use crate::{
     i18n::t,
     shell::bar::dropdowns::{resolve_content_height, resolve_dimension},

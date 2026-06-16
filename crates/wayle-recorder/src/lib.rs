@@ -14,8 +14,8 @@ use std::{
     time::Duration,
 };
 
-use gstreamer as gst;
 use gst::prelude::*;
+use gstreamer as gst;
 pub use options::{
     AudioOptions, EncoderPreset, OutputFormat, RecordOptions, WebcamOptions, WebcamPosition,
 };

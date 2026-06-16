@@ -14,6 +14,7 @@ use relm4::{
     gtk::{self, gdk, gio},
     prelude::*,
 };
+use wayle_config::schemas::styling::Size;
 use wayle_widgets::prelude::*;
 
 pub(super) use self::factory::Factory;
@@ -27,8 +28,6 @@ use self::{
     system_stats::{SystemStatsInit, SystemStatsInput, SystemStatsSection},
     user_session::{UserSessionInit, UserSessionSection},
 };
-use wayle_config::schemas::styling::Size;
-
 use crate::{
     i18n::t,
     shell::bar::dropdowns::{resolve_content_height, resolve_dimension},
