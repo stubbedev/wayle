@@ -12,3 +12,6 @@ dropdown-recorder-system-audio = System Audio
 dropdown-recorder-webcam = Webcam Frame
 dropdown-recorder-position = Webcam Position
 dropdown-recorder-bitrate = Bitrate (kbps)
+dropdown-recorder-audio-bitrate = Audio Bitrate (kbps)
+dropdown-recorder-separate-tracks = Separate Audio Tracks
+dropdown-recorder-preset = Quality Preset

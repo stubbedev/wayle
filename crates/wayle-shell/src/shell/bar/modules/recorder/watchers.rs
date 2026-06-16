@@ -11,11 +11,17 @@ pub(super) fn spawn_config_watchers(
 ) {
     let icon_idle = config.icon_idle.clone();
     let icon_recording = config.icon_recording.clone();
+    let icon_paused = config.icon_paused.clone();
     let format = config.format.clone();
 
     watch!(
         sender,
-        [icon_idle.watch(), icon_recording.watch(), format.watch()],
+        [
+            icon_idle.watch(),
+            icon_recording.watch(),
+            icon_paused.watch(),
+            format.watch()
+        ],
         |out| {
             let _ = out.send(RecorderCmd::ConfigChanged);
         }

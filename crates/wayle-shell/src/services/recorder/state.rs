@@ -12,12 +12,12 @@ use tokio_util::sync::CancellationToken;
 use tracing::warn;
 use wayle_config::{
     ConfigService,
-    schemas::modules::{RecorderFormat, WebcamPosition},
+    schemas::modules::{EncoderPreset, RecorderFormat, WebcamPosition},
 };
 use wayle_core::Property;
 use wayle_recorder::{
-    AudioOptions, OutputFormat, RecordOptions, Recorder, WebcamOptions,
-    WebcamPosition as EngineWebcamPosition,
+    AudioOptions, EncoderPreset as EngineEncoderPreset, OutputFormat, RecordOptions, Recorder,
+    WebcamOptions, WebcamPosition as EngineWebcamPosition,
 };
 
 /// Reactive recorder state shared between the D-Bus daemon and the bar module.
@@ -129,11 +129,14 @@ impl RecorderState {
             format,
             framerate: rec.framerate.get(),
             bitrate_kbps: rec.bitrate_kbps.get(),
+            preset: map_preset(rec.encoder_preset.get()),
             show_cursor: rec.show_cursor.get(),
             audio: AudioOptions {
                 microphone: rec.microphone.get(),
                 microphone_device: rec.microphone_device.get(),
                 system_audio: rec.system_audio.get(),
+                bitrate_kbps: rec.audio_bitrate_kbps.get(),
+                separate_tracks: rec.separate_audio_tracks.get(),
             },
             webcam,
         }
@@ -170,6 +173,14 @@ impl RecorderState {
     fn cancel_timer(&self) {
         let guard = self.timer_token.lock().unwrap_or_else(PoisonError::into_inner);
         guard.cancel();
+    }
+}
+
+fn map_preset(preset: EncoderPreset) -> EngineEncoderPreset {
+    match preset {
+        EncoderPreset::Speed => EngineEncoderPreset::Speed,
+        EncoderPreset::Balanced => EngineEncoderPreset::Balanced,
+        EncoderPreset::Quality => EngineEncoderPreset::Quality,
     }
 }
 

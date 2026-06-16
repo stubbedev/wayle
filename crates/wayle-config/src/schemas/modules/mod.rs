@@ -64,7 +64,7 @@ pub use notification::{
 };
 pub use power::PowerConfig;
 pub use ram::RamConfig;
-pub use recorder::{RecorderConfig, RecorderFormat, WebcamPosition};
+pub use recorder::{EncoderPreset, RecorderConfig, RecorderFormat, WebcamPosition};
 pub use separator::SeparatorConfig;
 pub use storage::{StorageConfig, StorageMountPoint};
 pub use systray::{SystrayConfig, TrayItemOverride};

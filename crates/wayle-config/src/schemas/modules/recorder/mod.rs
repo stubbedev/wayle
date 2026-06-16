@@ -1,7 +1,7 @@
 mod types;
 
 use schemars::schema_for;
-pub use types::{RecorderFormat, WebcamPosition};
+pub use types::{EncoderPreset, RecorderFormat, WebcamPosition};
 use wayle_derive::wayle_config;
 
 use crate::{
@@ -26,6 +26,11 @@ pub struct RecorderConfig {
     #[serde(rename = "icon-recording")]
     #[default(String::from("ld-circle-dot-symbolic"))]
     pub icon_recording: ConfigProperty<String>,
+
+    /// Icon while recording is paused.
+    #[serde(rename = "icon-paused")]
+    #[default(String::from("ld-circle-pause-symbolic"))]
+    pub icon_paused: ConfigProperty<String>,
 
     /// Format string for the label.
     ///
@@ -52,10 +57,26 @@ pub struct RecorderConfig {
     #[default(true)]
     pub system_audio: ConfigProperty<bool>,
 
+    /// Audio bitrate per track in kilobits per second.
+    #[serde(rename = "audio-bitrate-kbps")]
+    #[default(128u32)]
+    pub audio_bitrate_kbps: ConfigProperty<u32>,
+
+    /// Keep microphone and system audio as separate, individually editable
+    /// tracks instead of mixing them into one.
+    #[serde(rename = "separate-audio-tracks")]
+    #[default(true)]
+    pub separate_audio_tracks: ConfigProperty<bool>,
+
     /// Video bitrate in kilobits per second.
     #[serde(rename = "bitrate-kbps")]
     #[default(8000u32)]
     pub bitrate_kbps: ConfigProperty<u32>,
+
+    /// Encoder speed/quality trade-off (smaller files vs less CPU).
+    #[serde(rename = "encoder-preset")]
+    #[default(EncoderPreset::default())]
+    pub encoder_preset: ConfigProperty<EncoderPreset>,
 
     /// Capture framerate in frames per second.
     #[serde(rename = "framerate")]

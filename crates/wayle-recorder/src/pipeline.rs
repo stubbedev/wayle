@@ -15,9 +15,8 @@ const FALLBACK_SIZE: (i32, i32) = (1920, 1080);
 /// Builds a pipeline description string for [`gstreamer::parse::launch`].
 ///
 /// The screen comes from `pipewiresrc` (portal node), optionally composited
-/// with a `v4l2src` webcam picture-in-picture, encoded, and muxed to the output
-/// file. Audio sources are mixed, encoded, and muxed into the same file.
-///
+/// with a letterboxed `v4l2src` webcam picture-in-picture, encoded, and muxed.
+/// Each audio source becomes its own track unless mixing is requested.
 pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
     let fd = cast.fd.as_raw_fd();
     let node = cast.node_id;
@@ -25,7 +24,9 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
     let (screen_w, screen_h) = cast.size.unwrap_or(FALLBACK_SIZE);
     let path = &opts.output_path;
 
-    let (video_encoder, audio_encoder, muxer) = codecs(opts.format, opts.bitrate_kbps);
+    let video_encoder = video_encoder(opts.format, opts.bitrate_kbps, opts.preset, fps);
+    let audio_encoder = format!("opusenc bitrate={}", opts.audio.bitrate_kbps.max(16) * 1000);
+    let muxer = muxer(opts.format);
 
     let mut desc = String::new();
 
@@ -40,17 +41,19 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
             format!(" device={}", cam.device)
         };
 
+        // `add-borders=true` letterboxes the webcam into the box, so a camera
+        // that isn't 16:9 keeps its aspect instead of being stretched.
         desc.push_str(&format!(
             "compositor name=comp background=black \
              sink_1::xpos={xpos} sink_1::ypos={ypos} sink_1::width={cam_w} sink_1::height={cam_h} \
-             ! videoconvert ! {video_encoder} ! queue ! {muxer} name=mux ! filesink location=\"{path}\" \
-             pipewiresrc fd={fd} path={node} do-timestamp=true ! videorate ! video/x-raw,framerate={fps}/1 ! videoconvert ! comp.sink_0 \
-             v4l2src{device} ! videoconvert ! videoscale ! video/x-raw,width={cam_w},height={cam_h} ! comp.sink_1 "
+             ! videoconvert ! queue ! {video_encoder} ! queue ! {muxer} name=mux ! filesink location=\"{path}\" \
+             pipewiresrc fd={fd} path={node} do-timestamp=true ! videorate ! video/x-raw,framerate={fps}/1 ! videoconvert ! queue ! comp.sink_0 \
+             v4l2src{device} ! videorate ! videoconvert ! videoscale add-borders=true ! video/x-raw,width={cam_w},height={cam_h},framerate={fps}/1 ! queue ! comp.sink_1 "
         ));
     } else {
         desc.push_str(&format!(
             "pipewiresrc fd={fd} path={node} do-timestamp=true ! videorate ! video/x-raw,framerate={fps}/1 \
-             ! videoconvert ! {video_encoder} ! queue ! {muxer} name=mux ! filesink location=\"{path}\" "
+             ! videoconvert ! queue ! {video_encoder} ! queue ! {muxer} name=mux ! filesink location=\"{path}\" "
         ));
     }
 
@@ -66,37 +69,55 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
         }
     }
 
-    if !audio_sources.is_empty() {
+    let mix = !opts.audio.separate_tracks && audio_sources.len() > 1;
+    if mix {
         desc.push_str(&format!(
             "audiomixer name=amix ! audioconvert ! audioresample ! {audio_encoder} ! queue ! mux. "
         ));
         for source in &audio_sources {
-            desc.push_str(&format!("{source} ! queue ! audioconvert ! amix. "));
+            desc.push_str(&format!("{source} ! queue ! audioconvert ! audioresample ! amix. "));
+        }
+    } else {
+        // One encoded track per source -> separate, individually editable tracks.
+        for source in &audio_sources {
+            desc.push_str(&format!(
+                "{source} ! queue ! audioconvert ! audioresample ! {audio_encoder} ! queue ! mux. "
+            ));
         }
     }
 
     desc.trim_end().to_owned()
 }
 
-/// Returns `(video_encoder, audio_encoder, muxer)` for a format.
-fn codecs(format: OutputFormat, bitrate_kbps: u32) -> (String, &'static str, &'static str) {
+/// Builds the video encoder element for a format.
+fn video_encoder(
+    format: OutputFormat,
+    bitrate_kbps: u32,
+    preset: crate::options::EncoderPreset,
+    fps: u32,
+) -> String {
     let bitrate = bitrate_kbps.max(500);
+    // Keyframe every ~2s keeps files seekable without inflating size.
+    let keyint = fps.saturating_mul(2).max(1);
     match format {
-        OutputFormat::Mp4 => (
-            format!("x264enc bitrate={bitrate} speed-preset=veryfast tune=zerolatency"),
-            "opusenc",
-            "mp4mux",
+        OutputFormat::Mp4 | OutputFormat::Mkv => format!(
+            "x264enc bitrate={bitrate} speed-preset={} key-int-max={keyint}",
+            preset.x264()
         ),
-        OutputFormat::Mkv => (
-            format!("x264enc bitrate={bitrate} speed-preset=veryfast tune=zerolatency"),
-            "opusenc",
-            "matroskamux",
+        OutputFormat::Webm => format!(
+            "vp9enc target-bitrate={} cpu-used={} deadline=good keyframe-max-dist={keyint}",
+            bitrate.saturating_mul(1000),
+            preset.vp9_cpu_used()
         ),
-        OutputFormat::Webm => (
-            format!("vp9enc target-bitrate={}", bitrate.saturating_mul(1000)),
-            "opusenc",
-            "webmmux",
-        ),
+    }
+}
+
+/// Returns the muxer element for a format.
+fn muxer(format: OutputFormat) -> &'static str {
+    match format {
+        OutputFormat::Mp4 => "mp4mux",
+        OutputFormat::Mkv => "matroskamux",
+        OutputFormat::Webm => "webmmux",
     }
 }
 

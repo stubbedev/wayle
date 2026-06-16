@@ -41,12 +41,20 @@ pub(super) fn build_label(format: &str, ctx: &LabelContext) -> String {
     crate::template::render(format, template_ctx).unwrap_or_default()
 }
 
-/// Selects the icon based on whether a recording is active.
-pub(super) fn select_icon(active: bool, icon_idle: &str, icon_recording: &str) -> String {
-    if active {
-        icon_recording.to_string()
-    } else {
+/// Selects the icon for the current recorder state.
+pub(super) fn select_icon(
+    active: bool,
+    paused: bool,
+    icon_idle: &str,
+    icon_recording: &str,
+    icon_paused: &str,
+) -> String {
+    if !active {
         icon_idle.to_string()
+    } else if paused {
+        icon_paused.to_string()
+    } else {
+        icon_recording.to_string()
     }
 }
 
@@ -81,7 +89,8 @@ mod tests {
 
     #[test]
     fn select_icon_switches() {
-        assert_eq!(select_icon(false, "idle", "rec"), "idle");
-        assert_eq!(select_icon(true, "idle", "rec"), "rec");
+        assert_eq!(select_icon(false, false, "idle", "rec", "pause"), "idle");
+        assert_eq!(select_icon(true, false, "idle", "rec", "pause"), "rec");
+        assert_eq!(select_icon(true, true, "idle", "rec", "pause"), "pause");
     }
 }

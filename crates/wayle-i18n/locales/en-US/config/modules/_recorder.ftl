@@ -8,6 +8,9 @@ settings-modules-recorder-icon-idle = Idle Icon
 settings-modules-recorder-icon-recording = Recording Icon
     .description = Icon while recording
 
+settings-modules-recorder-icon-paused = Paused Icon
+    .description = Icon while recording is paused
+
 settings-modules-recorder-format = Format
     .description = Format string using placeholders: {"{{ state }}"}, {"{{ elapsed }}"}
 
@@ -22,6 +25,15 @@ settings-modules-recorder-system-audio = System Audio
 
 settings-modules-recorder-bitrate-kbps = Bitrate
     .description = Video bitrate in kilobits per second
+
+settings-modules-recorder-audio-bitrate-kbps = Audio Bitrate
+    .description = Audio bitrate per track in kilobits per second
+
+settings-modules-recorder-separate-audio-tracks = Separate Audio Tracks
+    .description = Keep microphone and system audio as separate, editable tracks
+
+settings-modules-recorder-encoder-preset = Encoder Preset
+    .description = Speed/quality trade-off; slower presets produce smaller files
 
 settings-modules-recorder-framerate = Framerate
     .description = Capture framerate in frames per second
@@ -95,6 +107,11 @@ enum-webcam-position-top-left = Top Left
 enum-webcam-position-top-right = Top Right
 enum-webcam-position-bottom-left = Bottom Left
 enum-webcam-position-bottom-right = Bottom Right
+
+## EncoderPreset variants
+enum-encoder-preset-speed = Speed
+enum-encoder-preset-balanced = Balanced
+enum-encoder-preset-quality = Quality
 
 ## RecorderFormat variants
 enum-recorder-format-mp4 = MP4

@@ -23,6 +23,40 @@ impl OutputFormat {
     }
 }
 
+/// Encoder speed/quality trade-off.
+///
+/// Slower presets compress better (smaller files at the same bitrate) at the
+/// cost of more CPU.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EncoderPreset {
+    /// Fastest, lowest CPU, largest files.
+    Speed,
+    /// Sensible default balance of size and CPU.
+    Balanced,
+    /// Slowest, best compression / smallest files.
+    Quality,
+}
+
+impl EncoderPreset {
+    /// `x264enc speed-preset` value.
+    pub(crate) fn x264(self) -> &'static str {
+        match self {
+            Self::Speed => "veryfast",
+            Self::Balanced => "medium",
+            Self::Quality => "slow",
+        }
+    }
+
+    /// `vp9enc cpu-used` value (lower is slower / better).
+    pub(crate) fn vp9_cpu_used(self) -> u32 {
+        match self {
+            Self::Speed => 5,
+            Self::Balanced => 2,
+            Self::Quality => 1,
+        }
+    }
+}
+
 /// Corner the webcam picture-in-picture frame is anchored to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WebcamPosition {
@@ -56,6 +90,11 @@ pub struct AudioOptions {
     pub microphone_device: String,
     /// Capture desktop (system) audio via the default sink monitor.
     pub system_audio: bool,
+    /// Opus audio bitrate per track, in kilobits per second.
+    pub bitrate_kbps: u32,
+    /// Keep microphone and system audio as separate tracks (editable) rather
+    /// than mixing them into one.
+    pub separate_tracks: bool,
 }
 
 /// Full set of options for a recording session.
@@ -69,6 +108,8 @@ pub struct RecordOptions {
     pub framerate: u32,
     /// Video bitrate in kilobits per second.
     pub bitrate_kbps: u32,
+    /// Encoder speed/quality trade-off.
+    pub preset: EncoderPreset,
     /// Draw the mouse cursor in the recording.
     pub show_cursor: bool,
     /// Audio capture options.

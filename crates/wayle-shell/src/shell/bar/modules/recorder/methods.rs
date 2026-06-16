@@ -12,11 +12,14 @@ impl RecorderModule {
         config: &wayle_config::schemas::modules::RecorderConfig,
     ) {
         let active = self.state.active.get();
+        let paused = self.state.paused.get();
 
         let icon = helpers::select_icon(
             active,
+            paused,
             &config.icon_idle.get(),
             &config.icon_recording.get(),
+            &config.icon_paused.get(),
         );
         self.bar_button.emit(BarButtonInput::SetIcon(icon));
 
@@ -24,7 +27,7 @@ impl RecorderModule {
             &config.format.get(),
             &LabelContext {
                 active,
-                paused: self.state.paused.get(),
+                paused,
                 elapsed_secs: self.state.elapsed_secs.get(),
             },
         );

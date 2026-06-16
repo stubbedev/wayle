@@ -16,7 +16,9 @@ use std::{
 
 use gstreamer as gst;
 use gst::prelude::*;
-pub use options::{AudioOptions, OutputFormat, RecordOptions, WebcamOptions, WebcamPosition};
+pub use options::{
+    AudioOptions, EncoderPreset, OutputFormat, RecordOptions, WebcamOptions, WebcamPosition,
+};
 use tracing::{info, warn};
 
 /// How long to wait for the muxer to finalize on stop.
