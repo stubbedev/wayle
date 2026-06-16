@@ -71,7 +71,13 @@ pub(crate) fn spawn_external_watcher(
                         }
                     }
                     Err(RecvError::Closed) => return,
-                    Err(RecvError::Lagged(_)) => {}
+                    Err(RecvError::Lagged(skipped)) => {
+                        tracing::warn!(
+                            module_id = %module_id,
+                            skipped,
+                            "widget update bus lagged; dropped updates"
+                        );
+                    }
                 },
             }
         }

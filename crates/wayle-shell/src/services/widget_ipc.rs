@@ -147,6 +147,16 @@ pub async fn start(widget_bus: WidgetBus, toast_bus: ToastBus) -> Result<(), Err
         source,
     })?;
 
+    // Restrict the socket to the owner. It lives under the user-private
+    // $XDG_RUNTIME_DIR, but tightening to 0600 makes the intent explicit and
+    // guards setups that fall back to a world-readable /tmp path.
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(err) = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)) {
+            warn!(error = %err, "could not restrict widget socket permissions");
+        }
+    }
+
     info!("Widget socket listening at {}", path.display());
 
     let buses = Buses {
@@ -295,5 +305,41 @@ mod tests {
         let buses = test_buses();
         let response = process_request("not json", &buses);
         assert!(response.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn socket_round_trip_publishes_and_responds() {
+        let dir = std::env::temp_dir().join(format!("wayle-widget-test-{}", std::process::id()));
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+        let path = dir.join("widget.sock");
+        let _ = tokio::fs::remove_file(&path).await;
+
+        let listener = UnixListener::bind(&path).unwrap();
+        let buses = test_buses();
+        let mut rx = buses.widget.subscribe();
+        let serve_buses = buses.clone();
+        tokio::spawn(async move {
+            if let Ok((stream, _)) = listener.accept().await {
+                handle_connection(stream, serve_buses).await;
+            }
+        });
+
+        let stream = UnixStream::connect(&path).await.unwrap();
+        let (read_half, mut write_half) = stream.into_split();
+        let mut line = serde_json::to_string(&Request::widget_update("gpu", "42")).unwrap();
+        line.push('\n');
+        write_half.write_all(line.as_bytes()).await.unwrap();
+
+        let mut reader = BufReader::new(read_half);
+        let mut response_line = String::new();
+        reader.read_line(&mut response_line).await.unwrap();
+        let response: Response = serde_json::from_str(response_line.trim()).unwrap();
+        assert!(response.error.is_none());
+
+        let update = rx.recv().await.unwrap();
+        assert_eq!(update.id, "gpu");
+        assert_eq!(update.output, "42");
+
+        let _ = tokio::fs::remove_dir_all(&dir).await;
     }
 }

@@ -33,7 +33,9 @@ pub(super) fn spawn_toast(sender: &ComponentSender<Osd>, toast_bus: &ToastBus) {
                         let _ = out.send(OsdCmd::ShowToast(toast));
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!(skipped, "toast bus lagged; dropped toasts");
+                    }
                 },
             }
         }
