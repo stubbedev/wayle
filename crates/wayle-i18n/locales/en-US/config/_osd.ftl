@@ -21,6 +21,9 @@ settings-osd-border = Border
 settings-osd-layer = Layer
     .description = Layer-shell layer the OSD is placed on. Tearing mode demotes overlay to top.
 
+settings-osd-text-align = Text Alignment
+    .description = Horizontal alignment of OSD toast/toggle content
+
 
 ## OsdPosition variants
 enum-osd-position-top-left = Top Left
@@ -31,3 +34,9 @@ enum-osd-position-bottom-right = Bottom Right
 enum-osd-position-bottom = Bottom
 enum-osd-position-bottom-left = Bottom Left
 enum-osd-position-left = Left
+
+
+## OsdTextAlign variants
+enum-osd-text-align-start = Start
+enum-osd-text-align-center = Center
+enum-osd-text-align-end = End
