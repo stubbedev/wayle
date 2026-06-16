@@ -4,7 +4,10 @@ use gtk::prelude::*;
 use gtk4_layer_shell::{Edge, LayerShell};
 use relm4::{Component, ComponentController, gtk};
 use tracing::debug;
-use wayle_config::schemas::modules::notification::{PopupMonitor, PopupPosition, StackingOrder};
+use wayle_config::schemas::{
+    animations::AnimationType,
+    modules::notification::{PopupMonitor, PopupPosition, StackingOrder},
+};
 use wayle_notification::core::notification::Notification;
 
 use super::{
@@ -32,7 +35,7 @@ impl NotificationPopupHost {
 
         self.remove_stale_cards(&visible_popups);
 
-        let existing_ids: Vec<u32> = self.cards.iter().map(|(notif, _)| notif.id).collect();
+        let existing_ids: Vec<u32> = self.cards.iter().map(|(notif, _, _)| notif.id).collect();
 
         self.insert_new_cards(&visible_popups, &existing_ids);
 
@@ -42,17 +45,54 @@ impl NotificationPopupHost {
     }
 
     fn remove_stale_cards(&mut self, active_popups: &[Arc<Notification>]) {
-        let container = &self.card_container;
-        self.cards.retain(|(stored_notif, controller)| {
+        let (duration, _) = self.animation();
+        let mut kept = Vec::with_capacity(self.cards.len());
+
+        for (stored_notif, controller, revealer) in std::mem::take(&mut self.cards) {
             let still_active = active_popups
                 .iter()
                 .any(|popup| popup.id == stored_notif.id);
 
-            if !still_active {
-                container.remove(controller.widget());
+            if still_active {
+                kept.push((stored_notif, controller, revealer));
+                continue;
             }
-            still_active
-        });
+
+            // Animate out, then remove the widget once the transition finishes.
+            // The closure runs on the main thread, so it can touch GTK widgets,
+            // and it owns the controller + revealer to keep them alive (and the
+            // card visible) for the duration of the fade.
+            revealer.set_reveal_child(false);
+            let container = self.card_container.clone();
+            gtk::glib::timeout_add_local_once(
+                std::time::Duration::from_millis(u64::from(duration)),
+                move || {
+                    container.remove(&revealer);
+                    drop(controller);
+                },
+            );
+        }
+
+        self.cards = kept;
+    }
+
+    /// Animation `(duration_ms, transition)` from the animations config.
+    /// Disabled animations collapse to an instant `(0, None)` transition.
+    fn animation(&self) -> (u32, gtk::RevealerTransitionType) {
+        let config = self.config.config();
+        let animations = &config.animations;
+        if !animations.enabled.get() {
+            return (0, gtk::RevealerTransitionType::None);
+        }
+        let transition = match animations.transition.get() {
+            AnimationType::None => gtk::RevealerTransitionType::None,
+            AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
+            AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
+            AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
+            AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
+            AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
+        };
+        (animations.duration.get(), transition)
     }
 
     fn insert_new_cards(&mut self, popups: &[Arc<Notification>], existing_ids: &[u32]) {
@@ -85,12 +125,23 @@ impl NotificationPopupHost {
                 })
                 .detach();
 
+            let (duration, transition) = self.animation();
+            let revealer = gtk::Revealer::new();
+            revealer.set_transition_type(transition);
+            revealer.set_transition_duration(duration);
+            revealer.set_child(Some(controller.widget()));
+            // Start collapsed, then reveal on the next main-loop tick so the
+            // transition actually plays (a same-tick false→true does not animate).
+            revealer.set_reveal_child(false);
+            let reveal_target = revealer.clone();
+            gtk::glib::idle_add_local_once(move || reveal_target.set_reveal_child(true));
+
             if use_prepend {
-                self.card_container.prepend(controller.widget());
-                self.cards.insert(0, (notif.clone(), controller));
+                self.card_container.prepend(&revealer);
+                self.cards.insert(0, (notif.clone(), controller, revealer));
             } else {
-                self.card_container.append(controller.widget());
-                self.cards.push((notif.clone(), controller));
+                self.card_container.append(&revealer);
+                self.cards.push((notif.clone(), controller, revealer));
             }
         }
     }

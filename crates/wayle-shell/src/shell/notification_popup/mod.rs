@@ -19,7 +19,11 @@ use self::{card::NotificationPopupCard, messages::PopupHostCmd};
 pub(crate) struct NotificationPopupHost {
     notification: Arc<NotificationService>,
     config: Arc<ConfigService>,
-    cards: Vec<(Arc<Notification>, Controller<NotificationPopupCard>)>,
+    cards: Vec<(
+        Arc<Notification>,
+        Controller<NotificationPopupCard>,
+        gtk::Revealer,
+    )>,
     card_container: gtk::Box,
 }
 
