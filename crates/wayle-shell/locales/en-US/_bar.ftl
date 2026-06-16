@@ -27,6 +27,11 @@ bar-window-title-empty = Desktop
 bar-idle-inhibit-on = On
 bar-idle-inhibit-off = Off
 
+## Recorder
+bar-recorder-idle = Idle
+bar-recorder-recording = Recording
+bar-recorder-paused = Paused
+
 ## Keybind Mode
 bar-keybind-mode-default = default
 

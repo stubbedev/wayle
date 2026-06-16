@@ -17,6 +17,8 @@ pub mod notify;
 pub mod panel;
 /// Power profile commands
 pub mod power;
+/// Screen recorder control commands
+pub mod recorder;
 /// ANSI styling for help output
 pub mod style;
 /// System tray commands

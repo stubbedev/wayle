@@ -32,7 +32,9 @@ use wayle_wallpaper::WallpaperService;
 use zbus::{Connection, fdo::DBusProxy};
 
 use crate::{
-    services::{IdleInhibitService, ShellIpcService, ToastBus, WidgetBus, widget_ipc},
+    services::{
+        IdleInhibitService, RecorderService, ShellIpcService, ToastBus, WidgetBus, widget_ipc,
+    },
     shell::ShellServices,
     startup::StartupTimer,
     watchers::build_extractor_config,
@@ -155,6 +157,8 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 
     let (widget_bus, toast_bus) = init_widget_socket().await;
 
+    let recorder = init_recorder(config_service.clone()).await;
+
     timer.mark_services_done();
 
     let services = ShellServices {
@@ -166,6 +170,7 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
         hyprland: optional.hyprland,
         power_profiles,
         idle_inhibit: core.idle_inhibit,
+        recorder,
         mango: optional.mango,
         media: daemons.media,
         niri: optional.niri,
@@ -181,6 +186,18 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
     };
 
     Ok((timer, services))
+}
+
+/// Initializes the recorder service, returning `None` (non-fatal) if GStreamer
+/// or the D-Bus registration is unavailable.
+async fn init_recorder(config: Arc<ConfigService>) -> Option<Arc<RecorderService>> {
+    match RecorderService::new(config).await {
+        Ok(service) => Some(Arc::new(service)),
+        Err(err) => {
+            warn!(error = %err, "Recorder service unavailable");
+            None
+        }
+    }
 }
 
 /// Creates the widget + toast buses and starts the shared unix-socket listener.

@@ -10,8 +10,9 @@ use crate::cli::{
     audio::commands::AudioCommands, config::commands::ConfigCommands,
     icons::commands::IconsCommands, idle::commands::IdleCommands, media::commands::MediaCommands,
     notify::commands::NotifyCommands, panel::commands::PanelCommands,
-    power::commands::PowerCommands, systray::commands::SystrayCommands,
-    wallpaper::commands::WallpaperCommands, widget::commands::WidgetCommands,
+    power::commands::PowerCommands, recorder::commands::RecorderCommands,
+    systray::commands::SystrayCommands, wallpaper::commands::WallpaperCommands,
+    widget::commands::WidgetCommands,
 };
 
 fn get_styles() -> Styles {
@@ -97,6 +98,12 @@ pub enum Commands {
         /// Idle subcommand to execute.
         #[command(subcommand)]
         command: IdleCommands,
+    },
+    /// Screen recorder control commands
+    Recorder {
+        /// Recorder subcommand to execute.
+        #[command(subcommand)]
+        command: RecorderCommands,
     },
     /// Widget control commands
     Widget {

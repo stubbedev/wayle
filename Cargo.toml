@@ -7,6 +7,7 @@ members = [
 	"crates/wayle-icons",
 	"crates/wayle-idle-inhibit",
 	"crates/wayle-ipc",
+	"crates/wayle-recorder",
 	"crates/wayle-settings",
 	"crates/wayle-shell",
 	"crates/wayle-styling",
@@ -41,6 +42,11 @@ gdk4 = "0.11"
 glib = "0.22"
 glob = "0.3.2"
 grass = "0.13.4"
+gstreamer = "0.25"
+ashpd = { version = "0.13", default-features = false, features = [
+	"tokio",
+	"screencast",
+] }
 gtk4 = { version = "0.11", features = ["v4_12"] }
 gtk4-layer-shell = "0.8"
 i18n-embed = { version = "0.16", features = [
@@ -121,6 +127,7 @@ wayle-i18n = { path = "crates/wayle-i18n" }
 wayle-icons = { path = "crates/wayle-icons" }
 wayle-idle-inhibit = { path = "crates/wayle-idle-inhibit" }
 wayle-ipc = { path = "crates/wayle-ipc" }
+wayle-recorder = { path = "crates/wayle-recorder" }
 wayle-shell = { path = "crates/wayle-shell" }
 wayle-styling = { path = "crates/wayle-styling" }
 wayle-widgets = { path = "crates/wayle-widgets" }

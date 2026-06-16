@@ -32,6 +32,15 @@
             pipewire
             fftw
             systemd # provides libudev
+            # GStreamer: the recorder builds against gstreamer-1.0 and loads
+            # these plugins at runtime (pipewiresrc, v4l2src, x264enc, opusenc,
+            # mp4/matroska/webm mux, compositor).
+            gst_all_1.gstreamer
+            gst_all_1.gst-plugins-base
+            gst_all_1.gst-plugins-good
+            gst_all_1.gst-plugins-bad
+            gst_all_1.gst-plugins-ugly
+            gst_all_1.gst-libav
           ];
         in
         {

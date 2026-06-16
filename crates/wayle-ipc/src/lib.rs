@@ -6,6 +6,9 @@ pub mod shell;
 /// Idle inhibit D-Bus client proxy.
 pub mod idle_inhibit;
 
+/// Screen recorder D-Bus client proxy.
+pub mod recorder;
+
 /// Shell IPC D-Bus client proxy.
 pub mod shell_ipc;
 

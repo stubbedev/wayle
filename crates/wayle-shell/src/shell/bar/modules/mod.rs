@@ -21,6 +21,7 @@ mod niri_workspaces;
 mod notification;
 mod power;
 mod ram;
+mod recorder;
 mod registry;
 mod separator;
 mod storage;
@@ -81,6 +82,7 @@ register_modules! {
     Notifications => notification::Factory,
     Power => power::Factory,
     Ram => ram::Factory,
+    Recorder => recorder::Factory,
     Separator => separator::Factory,
     Storage => storage::Factory,
     Systray => systray::Factory,

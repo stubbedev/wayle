@@ -7,6 +7,7 @@ mod dashboard;
 mod media;
 mod network;
 mod notification;
+mod recorder;
 mod registry;
 mod weather;
 
@@ -72,5 +73,6 @@ register_dropdowns! {
     "media" => media::Factory,
     "network" => network::Factory,
     "notification" => notification::Factory,
+    "recorder" => recorder::Factory,
     "weather" => weather::Factory,
 }

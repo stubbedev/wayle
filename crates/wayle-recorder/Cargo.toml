@@ -1,0 +1,30 @@
+[package]
+name = "wayle-recorder"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "GStreamer-backed screen recorder with optional webcam picture-in-picture"
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+ashpd.workspace = true
+gstreamer.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints.clippy]
+cognitive_complexity = "warn"
+expect_used = "deny"
+inefficient_to_string = "warn"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+needless_pass_by_value = "warn"
+semicolon_if_nothing_returned = "warn"
+unnecessary_wraps = "warn"
+unused_async = "warn"
+unused_self = "warn"
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "allow"

@@ -142,14 +142,14 @@ pub struct RecorderConfig {
     #[default(ColorValue::Token(CssToken::BgSurfaceElevated))]
     pub button_bg_color: ConfigProperty<ColorValue>,
 
-    /// Action on left click. Default opens the recorder dropdown.
+    /// Action on left click. Default toggles recording.
     #[serde(rename = "left-click")]
-    #[default(ClickAction::Dropdown(String::from("recorder")))]
+    #[default(ClickAction::Shell(String::from("wayle recorder toggle")))]
     pub left_click: ConfigProperty<ClickAction>,
 
-    /// Action on right click. Default toggles recording.
+    /// Action on right click. Default opens the recorder dropdown.
     #[serde(rename = "right-click")]
-    #[default(ClickAction::Shell(String::from("wayle recorder toggle")))]
+    #[default(ClickAction::Dropdown(String::from("recorder")))]
     pub right_click: ConfigProperty<ClickAction>,
 
     /// Action on middle click.
