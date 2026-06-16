@@ -6,6 +6,60 @@ title: Getting started on NixOS
 
 Requires NixOS unstable or 25.11. Note that Wayle was added only recently, so update to the latest version before trying to install it.
 
+## Install from this flake
+
+To run this repository's build (for unreleased features) instead of the nixpkgs
+package, add the flake as an input and use the modules it exports.
+
+```nix
+# flake.nix
+{
+  inputs.wayle.url = "github:stubbedev/wayle";
+}
+```
+
+NixOS:
+
+```nix
+{ inputs, ... }:
+{
+  imports = [ inputs.wayle.nixosModules.default ];
+  programs.wayle.enable = true;
+  # optional: run `wayle shell` as a user service in the graphical session
+  programs.wayle.systemd.enable = true;
+}
+```
+
+home-manager:
+
+```nix
+{ inputs, ... }:
+{
+  imports = [ inputs.wayle.homeManagerModules.default ];
+  programs.wayle = {
+    enable = true; # installs wayle + wayle-settings, runs it as a user service
+    settings = {
+      # written to ~/.config/wayle/config.toml
+      bar.layout = [
+        {
+          monitor = "*";
+          center = [ "clock" ];
+          right = [ "battery" "volume" "systray" ];
+        }
+      ];
+    };
+  };
+}
+```
+
+You can also use the package directly
+(`inputs.wayle.packages.${system}.default`) or apply
+`inputs.wayle.overlays.default` to get `pkgs.wayle`.
+
+> Soft dependencies (NetworkManager, bluez, upower, power-profiles-daemon,
+> pipewire/wireplumber, and theming tools like wallust/matugen) are not pulled
+> in automatically — enable the ones your config uses.
+
 ## Install package
 
 Wayle is available as `pkgs.wayle` package, but if you use home-manager there is a module so you don't have to install the package manually.

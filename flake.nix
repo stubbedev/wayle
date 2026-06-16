@@ -14,6 +14,22 @@
         f: nixpkgs.lib.genAttrs systems (system: f (import nixpkgs { inherit system; }));
     in
     {
+      packages = forAllSystems (pkgs: rec {
+        wayle = pkgs.callPackage ./nix/package.nix { };
+        default = wayle;
+      });
+
+      # Adds `wayle` to a nixpkgs instance: `nixpkgs.overlays = [ wayle.overlays.default ];`
+      overlays.default = _final: prev: {
+        wayle = prev.callPackage ./nix/package.nix { };
+      };
+
+      # NixOS: `imports = [ wayle.nixosModules.default ]; programs.wayle.enable = true;`
+      nixosModules.default = import ./nix/nixos-module.nix self;
+
+      # home-manager: `imports = [ wayle.homeManagerModules.default ]; programs.wayle.enable = true;`
+      homeManagerModules.default = import ./nix/hm-module.nix self;
+
       devShells = forAllSystems (
         pkgs:
         let
@@ -44,32 +60,33 @@
           ];
         in
         {
-        # `nix develop` provides every native dependency `cargo build`,
-        # `just check`, and the `release-*` recipes need. The Rust toolchain
-        # is intentionally NOT pinned here — Cargo.toml's rust-version is ahead
-        # of nixpkgs, so use your own rustup toolchain from PATH.
-        default = pkgs.mkShell {
-          # Build tools. pkg-config + each buildInput below populate
-          # PKG_CONFIG_PATH automatically, so `just release-patch` works
-          # straight out of `nix develop` with no manual env setup.
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-            cmake
-            clang
-          ];
+          # `nix develop` provides every native dependency `cargo build`,
+          # `just check`, and the `release-*` recipes need. The Rust toolchain
+          # is intentionally NOT pinned here — Cargo.toml's rust-version is ahead
+          # of nixpkgs, so use your own rustup toolchain from PATH.
+          default = pkgs.mkShell {
+            # Build tools. pkg-config + each buildInput below populate
+            # PKG_CONFIG_PATH automatically, so `just release-patch` works
+            # straight out of `nix develop` with no manual env setup.
+            nativeBuildInputs = with pkgs; [
+              pkg-config
+              cmake
+              clang
+            ];
 
-          # System libraries linked by the workspace and its -sys crates
-          # (gtk4 + layer-shell, gtksourceview5, audio, cava/fftw, udev, …).
-          buildInputs = libs;
+            # System libraries linked by the workspace and its -sys crates
+            # (gtk4 + layer-shell, gtksourceview5, audio, cava/fftw, udev, …).
+            buildInputs = libs;
 
-          # bindgen (via the cava build script) needs libclang at runtime.
-          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+            # bindgen (via the cava build script) needs libclang at runtime.
+            LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
 
-          # The compiled binaries dlopen GTK/glib/etc. at runtime, so `just
-          # test` and `just run` need these on the loader path — linking alone
-          # (via pkg-config) is not enough.
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libs;
-        };
-      });
+            # The compiled binaries dlopen GTK/glib/etc. at runtime, so `just
+            # test` and `just run` need these on the loader path — linking alone
+            # (via pkg-config) is not enough.
+            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libs;
+          };
+        }
+      );
     };
 }
