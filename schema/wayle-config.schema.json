@@ -1485,7 +1485,7 @@
       "type": "object"
     },
     "CustomModuleDefinition": {
-      "description": "User-defined module that runs a shell command and renders the output in the bar.\n\nFull walkthrough with examples at <https://wayle.app/guide/custom-modules>.",
+      "description": "User-defined module that runs a shell command and renders the output in the bar.\n\nFull walkthrough with examples in `docs/guide/custom-modules.md`.",
       "properties": {
         "border-color": {
           "$ref": "#/$defs/ColorValue",

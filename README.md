@@ -5,12 +5,13 @@
 # Wayle
 
 <p align="center">
-  <a href="https://github.com/wayle-rs/wayle/actions"><img src="https://img.shields.io/github/actions/workflow/status/wayle-rs/wayle/ci.yml?branch=master&style=for-the-badge" alt="CI"></a>
-  <a href="https://github.com/wayle-rs/wayle/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License"></a>
-  <a href="https://wayle.app"><img src="https://img.shields.io/badge/Wiki-wayle.app-7aa2f7?style=for-the-badge" alt="Wiki"></a>
+  <a href="https://github.com/stubbedev/wayle/actions"><img src="https://img.shields.io/github/actions/workflow/status/stubbedev/wayle/ci.yml?branch=master&style=for-the-badge" alt="CI"></a>
+  <a href="https://github.com/stubbedev/wayle/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License"></a>
 </p>
 
 A Wayland desktop shell with the bar, notifications, OSD, wallpaper, and device controls built in. Written in Rust with GTK4 and Relm4.
+
+This is a standalone fork of [wayle-rs/wayle](https://github.com/wayle-rs/wayle) with additional features (YAML config, pixel sizing, per-state icon/color cycling, per-workspace icons, custom toasts, a JSON-RPC widget socket, and animations).
 
 Configure it in `config.toml` or `config.yaml`, through the `wayle-settings` GUI, or with the `wayle config` CLI.
 
@@ -18,7 +19,7 @@ Configure it in `config.toml` or `config.yaml`, through the `wayle-settings` GUI
 
 - **Bar** with per-monitor layouts, groups, and CSS classes.
 - **Built-in modules** — clock, battery, bluetooth, network, audio/volume, brightness, power profiles, system tray, storage, CPU/RAM, notifications, weather, world clock, idle inhibit, and Hyprland / Niri / Mango workspaces.
-- **Custom modules** — back any bar widget with a shell command (poll or watch), with [icon and color cycling by state](https://wayle.app/guide/custom-modules) (`icon-map` / `color-map` keyed on the output's `alt`).
+- **Custom modules** — back any bar widget with a shell command (poll or watch), with [icon and color cycling by state](docs/guide/custom-modules.md) (`icon-map` / `color-map` keyed on the output's `alt`).
 - **Per-workspace icons** — give individual workspaces their own icon, shown even in label mode.
 - **Notifications, OSD, and custom toasts** — `wayle toast "…"` shows an on-screen toast (icon + label, or a progress bar) reusing the OSD styling.
 - **Animations** — configurable enter/exit transitions (fade / slide) for the OSD, toasts, and notification cards via `[animations]`.
@@ -37,24 +38,20 @@ Configure it in `config.toml` or `config.yaml`, through the `wayle-settings` GUI
 
 ## Documentation
 
-Full guides, reference, and walkthroughs are at **[wayle.app](https://wayle.app)**.
+Guides and reference live in [`docs/`](docs/):
 
-- [Getting started](https://wayle.app/guide/getting-started) - Installation instructions
-- [Editing config](https://wayle.app/guide/editing-config) - File layout, live reload, imports, CLI editing
-- [Bars and layouts](https://wayle.app/guide/bars-and-layouts) - Per monitor layouts, groups, classes
-- [Themes](https://wayle.app/guide/themes) - Color tokens, theme files
-- [Custom icons](https://wayle.app/guide/custom-icons) - Installing icons, icon sources
-- [Custom modules](https://wayle.app/guide/custom-modules) - Shell-backed bar modules
-- [CLI](https://wayle.app/guide/cli) - Every subcommand
-- [Config reference](https://wayle.app/config/) - Full config documentation
+- [Getting started](docs/guide/getting-started.md) - Installation instructions
+- [Editing config](docs/guide/editing-config.md) - File layout, live reload, imports, CLI editing
+- [Bars and layouts](docs/guide/bars-and-layouts.md) - Per monitor layouts, groups, classes
+- [Themes](docs/guide/themes.md) - Color tokens, theme files
+- [Custom icons](docs/guide/custom-icons.md) - Installing icons, icon sources
+- [Custom modules](docs/guide/custom-modules.md) - Shell-backed bar modules
+- [CLI](docs/guide/cli.md) - Every subcommand
+- [Config reference](docs/config/) - Full config documentation
 
 ## Install
 
-Arch Linux binary:
-
-```sh
-yay -S wayle-bin
-```
+Build from source (no prebuilt packages are published for this fork).
 
 <details>
 <summary><b>Arch (from source)</b></summary>
@@ -125,7 +122,7 @@ sudo systemctl enable --now bluetooth NetworkManager upower power-profiles-daemo
 ### Build and launch:
 
 ```sh
-git clone https://github.com/wayle-rs/wayle
+git clone https://github.com/stubbedev/wayle
 cd wayle
 cargo install --path wayle
 cargo install --path crates/wayle-settings
@@ -133,11 +130,7 @@ wayle icons setup
 wayle panel start
 ```
 
-On a different distro? See [wayle.app/guide/getting-started](https://wayle.app/guide/getting-started) for the library-version reference.
-
-<a href="https://repology.org/project/wayle/versions">
-    <img src="https://repology.org/badge/vertical-allrepos/wayle.svg" alt="Packaging status">
-</a>
+On a different distro? See [docs/guide/getting-started.md](docs/guide/getting-started.md) for the library-version reference.
 
 ## Configuration
 
@@ -158,7 +151,7 @@ right = ["volume", "network", "bluetooth", "battery"]
 format = "%H:%M"
 ```
 
-Every field is documented at [wayle.app/config](https://wayle.app/config/).
+Every field is documented in the [config reference](docs/config/).
 
 ## Requirements
 

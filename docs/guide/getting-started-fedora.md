@@ -27,7 +27,7 @@ sudo systemctl enable --now bluetooth NetworkManager upower power-profiles-daemo
 ## Build
 
 ```sh
-git clone https://github.com/wayle-rs/wayle
+git clone https://github.com/stubbedev/wayle
 cd wayle
 cargo install --path wayle
 cargo install --path crates/wayle-settings

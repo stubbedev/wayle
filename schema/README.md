@@ -21,7 +21,7 @@ inline docs, and validation in editors that speak the Language Server Protocol.
 Add a `yaml-language-server` modeline at the top of the file:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/wayle-rs/wayle/master/schema/wayle-config.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/stubbedev/wayle/master/schema/wayle-config.schema.json
 ```
 
 Or point at a local checkout:
@@ -37,5 +37,5 @@ Wayle already writes a `tombi.toml` into the config directory that associates
 Editors using Taplo can instead add a directive at the top of the file:
 
 ```toml
-#:schema https://raw.githubusercontent.com/wayle-rs/wayle/master/schema/wayle-config.schema.json
+#:schema https://raw.githubusercontent.com/stubbedev/wayle/master/schema/wayle-config.schema.json
 ```

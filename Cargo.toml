@@ -19,7 +19,7 @@ exclude = ["sandbox"]
 version = "0.7.0"
 edition = "2024"
 rust-version = "1.93"
-repository = "https://github.com/wayle-rs/wayle"
+repository = "https://github.com/stubbedev/wayle"
 license = "MIT"
 
 [workspace.dependencies]

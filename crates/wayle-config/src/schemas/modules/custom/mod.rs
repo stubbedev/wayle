@@ -14,7 +14,7 @@ use crate::{
 
 /// User-defined module that runs a shell command and renders the output in the bar.
 ///
-/// Full walkthrough with examples at <https://wayle.app/guide/custom-modules>.
+/// Full walkthrough with examples in `docs/guide/custom-modules.md`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct CustomModuleDefinition {

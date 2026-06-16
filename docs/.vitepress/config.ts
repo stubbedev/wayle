@@ -114,7 +114,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/wayle-rs/wayle' },
+      { icon: 'github', link: 'https://github.com/stubbedev/wayle' },
       { icon: 'discord', link: 'https://discord.gg/GYRGnNMf2c' },
     ],
 
@@ -124,7 +124,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/wayle-rs/wayle/edit/master/docs/:path',
+      pattern: 'https://github.com/stubbedev/wayle/edit/master/docs/:path',
       text: 'Edit this page on GitHub',
     },
 

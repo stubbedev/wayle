@@ -49,6 +49,7 @@ button-gap = 1.5            # scale multiplier (default form)
 ```
 
 Pixel values are logical pixels: GTK scales them for HiDPI displays automatically, so `"20px"` renders at the correct physical size on a 2× monitor while ignoring the configurable `global-scale`.
+
 ## Imports
 
 `config.toml` may declare a top-level `imports` array to load additional TOML files. Files referenced through `imports` may themselves declare `imports`, forming a chain:
@@ -70,10 +71,10 @@ On startup, Wayle writes a JSON Schema for the configuration to `~/.config/wayle
 
 [Tombi](https://tombi-toml.github.io/tombi/) is one such server. The Tombi extension is available in the VS Code marketplace; the `tombi` LSP binary runs under Neovim, Helix, and Zed. Configure the server to associate `~/.config/wayle/schema.json` with `config.toml`.
 
-The same schema is published in the repository at [`schema/wayle-config.schema.json`](https://github.com/wayle-rs/wayle/blob/master/schema/wayle-config.schema.json) and works for YAML too. Add a modeline at the top of `config.yaml` so any `yaml-language-server` gives completion and validation:
+The same schema is published in the repository at [`schema/wayle-config.schema.json`](https://github.com/stubbedev/wayle/blob/master/schema/wayle-config.schema.json) and works for YAML too. Add a modeline at the top of `config.yaml` so any `yaml-language-server` gives completion and validation:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/wayle-rs/wayle/master/schema/wayle-config.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/stubbedev/wayle/master/schema/wayle-config.schema.json
 ```
 
 You can regenerate the schema for the exact version you run with `wayle config schema --stdout`.
