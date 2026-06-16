@@ -24,6 +24,8 @@ pub use property::{
 
 /// Configuration schema definitions.
 pub mod schemas {
+    /// Animation configuration.
+    pub mod animations;
     /// Bar layout configuration.
     pub mod bar;
     /// General Wayle configuration.
@@ -72,8 +74,8 @@ pub use infrastructure::{
     watcher::FileWatcher,
 };
 use schemas::{
-    bar::BarConfig, modules::ModulesConfig, osd::OsdConfig, styling::StylingConfig,
-    wallpaper::WallpaperConfig,
+    animations::AnimationsConfig, bar::BarConfig, modules::ModulesConfig, osd::OsdConfig,
+    styling::StylingConfig, wallpaper::WallpaperConfig,
 };
 use wayle_derive::wayle_config;
 
@@ -111,6 +113,9 @@ pub struct Config {
 
     /// On-screen display settings.
     pub osd: OsdConfig,
+
+    /// Animation settings.
+    pub animations: AnimationsConfig,
 
     /// Wallpaper service settings.
     pub wallpaper: WallpaperConfig,

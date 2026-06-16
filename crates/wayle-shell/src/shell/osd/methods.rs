@@ -1,10 +1,13 @@
 use std::{sync::Arc, time::Duration};
 
 use gtk4_layer_shell::{Edge, LayerShell};
-use relm4::{ComponentSender, gtk, gtk::prelude::*};
+use relm4::{ComponentSender, gtk};
 use wayle_audio::core::device::{input::InputDevice, output::OutputDevice};
 use wayle_brightness::BacklightDevice;
-use wayle_config::schemas::osd::{OsdMonitor, OsdPosition};
+use wayle_config::schemas::{
+    animations::AnimationType,
+    osd::{OsdMonitor, OsdPosition},
+};
 
 use super::{
     BRIGHTNESS_ICON, Osd, messages,
@@ -38,10 +41,36 @@ impl Osd {
         self.current_event = Some(event);
         self.dismiss_id = self.dismiss_id.wrapping_add(1);
 
-        root.set_visible(true);
+        // Map the window, then reveal the child so the revealer animates it in.
+        // Both are model-driven; the view applies them via `#[watch]`.
+        self.visible = true;
+        self.revealed = true;
+        let _ = root;
 
         let duration = duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
         Self::schedule_dismiss(sender, duration, self.dismiss_id);
+    }
+
+    /// Begins the exit animation for `dismiss_id`, then schedules the window to
+    /// hide once the animation has finished.
+    pub(super) fn begin_dismiss(&mut self, dismiss_id: u32, sender: &ComponentSender<Self>) {
+        if dismiss_id != self.dismiss_id {
+            return;
+        }
+        self.revealed = false;
+        let hide_after = anim_duration(self);
+        sender.oneshot_command(async move {
+            tokio::time::sleep(Duration::from_millis(u64::from(hide_after))).await;
+            OsdCmd::Hide(dismiss_id)
+        });
+    }
+
+    /// Unmaps the window after the exit animation, unless a newer event has
+    /// re-shown the OSD in the meantime.
+    pub(super) fn finish_hide(&mut self, dismiss_id: u32) {
+        if dismiss_id == self.dismiss_id {
+            self.visible = false;
+        }
     }
 
     pub(super) fn handle_show_toast(
@@ -315,6 +344,33 @@ impl Osd {
             tokio::time::sleep(Duration::from_millis(duration_ms as u64)).await;
             OsdCmd::Dismiss(dismiss_id)
         });
+    }
+}
+
+/// Revealer transition derived from the animations config. Disabled animations
+/// collapse to no transition (instant show/hide).
+pub(super) fn anim_transition(model: &Osd) -> gtk::RevealerTransitionType {
+    let animations = &model.config.config().animations;
+    if !animations.enabled.get() {
+        return gtk::RevealerTransitionType::None;
+    }
+    match animations.transition.get() {
+        AnimationType::None => gtk::RevealerTransitionType::None,
+        AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
+        AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
+        AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
+        AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
+        AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
+    }
+}
+
+/// Animation duration in milliseconds, or `0` when animations are disabled.
+pub(super) fn anim_duration(model: &Osd) -> u32 {
+    let animations = &model.config.config().animations;
+    if animations.enabled.get() {
+        animations.duration.get()
+    } else {
+        0
     }
 }
 

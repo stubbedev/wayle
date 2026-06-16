@@ -52,6 +52,7 @@ pub(crate) enum OsdCmd {
     BrightnessChanged,
     ToggleChanged(ToggleEvent),
     ShowToast(crate::services::widget_ipc::ToastRequest),
+    Hide(u32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

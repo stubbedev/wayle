@@ -18,6 +18,20 @@ Visual indicator style for the active workspace.
 | `"background"` | Entire button gets a colored background. |
 | `"underline"` | Small colored bar under the workspace button. |
 
+## AnimationType {#animation-type}
+
+Enter/exit transition style for transient surfaces (OSD, toasts,
+notifications). Maps onto GTK's revealer transitions.
+
+| Value | Meaning |
+|---|---|
+| `"none"` | No transition; surfaces appear and disappear instantly. |
+| `"fade"` | Cross-fade opacity in and out. |
+| `"slide-up"` | Slide in from / out to the top edge. |
+| `"slide-down"` | Slide in from / out to the bottom edge. |
+| `"slide-left"` | Slide in from / out to the left edge. |
+| `"slide-right"` | Slide in from / out to the right edge. |
+
 ## AppIconSource {#app-icon-source}
 
 Icon source for app volume entries in the dropdown.

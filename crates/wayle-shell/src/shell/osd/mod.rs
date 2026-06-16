@@ -8,7 +8,6 @@ use std::{sync::Arc, time::Duration};
 use gtk::{pango::EllipsizeMode, prelude::*};
 use gtk4_layer_shell::{KeyboardMode, LayerShell};
 use relm4::{gtk, prelude::*};
-use tracing::debug;
 use wayle_audio::AudioService;
 use wayle_brightness::BrightnessService;
 use wayle_config::ConfigService;
@@ -18,8 +17,8 @@ pub(crate) use self::messages::OsdInit;
 use self::{
     messages::{OsdCmd, OsdEvent},
     methods::{
-        event_fraction, event_icon, event_label, event_slider_label, event_value, is_slider,
-        is_toggle, osd_classes,
+        anim_duration, anim_transition, event_fraction, event_icon, event_label,
+        event_slider_label, event_value, is_slider, is_toggle, osd_classes,
     },
 };
 
@@ -39,6 +38,11 @@ pub(crate) struct Osd {
     last_volume: Option<(u32, bool)>,
     last_input_volume: Option<(u32, bool)>,
     last_brightness: Option<u32>,
+
+    /// Whether the OSD window is mapped (driven through the revealer).
+    visible: bool,
+    /// Whether the revealer is showing its child (animates enter/exit).
+    revealed: bool,
 }
 
 #[allow(clippy::needless_borrow)]
@@ -55,7 +59,17 @@ impl Component for Osd {
             set_decorated: false,
             add_css_class: "osd-host",
             set_default_size: (1, 1),
-            set_visible: false,
+            #[watch]
+            set_visible: model.visible,
+
+            #[name = "revealer"]
+            gtk::Revealer {
+                #[watch]
+                set_reveal_child: model.revealed,
+                #[watch]
+                set_transition_type: anim_transition(&model),
+                #[watch]
+                set_transition_duration: anim_duration(&model),
 
             #[name = "osd_container"]
             gtk::Box {
@@ -139,6 +153,7 @@ impl Component for Osd {
                     set_visible: is_slider(&model.current_event),
                 },
             },
+            },
         }
     }
 
@@ -164,6 +179,8 @@ impl Component for Osd {
             last_volume: None,
             last_input_volume: None,
             last_brightness: None,
+            visible: false,
+            revealed: false,
         };
 
         model.apply_position(&root);
@@ -189,10 +206,11 @@ impl Component for Osd {
             }
 
             OsdCmd::Dismiss(dismiss_id) => {
-                if dismiss_id == self.dismiss_id {
-                    root.set_visible(false);
-                    debug!("OSD dismissed");
-                }
+                self.begin_dismiss(dismiss_id, &sender);
+            }
+
+            OsdCmd::Hide(dismiss_id) => {
+                self.finish_hide(dismiss_id);
             }
 
             OsdCmd::ConfigChanged => {

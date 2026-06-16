@@ -17,6 +17,7 @@ Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visuals
 
 | Section | What it controls |
 |---|---|
+| [`animations`](/config/animations) | Enter/exit and change animations for transient surfaces. |
 | [`bar`](/config/bar) | Bar chrome: per-monitor layout, spacing, colors, and button styling. |
 | [`general`](/config/general) | Shell-wide settings that don't belong to any specific module. |
 | [`osd`](/config/osd) | On-screen display overlay for transient events like volume and brightness. |

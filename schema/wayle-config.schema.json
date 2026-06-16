@@ -15,6 +15,62 @@
         }
       ]
     },
+    "AnimationType": {
+      "description": "Enter/exit transition style for transient surfaces (OSD, toasts,\nnotifications). Maps onto GTK's revealer transitions.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No transition; surfaces appear and disappear instantly.",
+          "type": "string"
+        },
+        {
+          "const": "fade",
+          "description": "Cross-fade opacity in and out.",
+          "type": "string"
+        },
+        {
+          "const": "slide-up",
+          "description": "Slide in from / out to the top edge.",
+          "type": "string"
+        },
+        {
+          "const": "slide-down",
+          "description": "Slide in from / out to the bottom edge.",
+          "type": "string"
+        },
+        {
+          "const": "slide-left",
+          "description": "Slide in from / out to the left edge.",
+          "type": "string"
+        },
+        {
+          "const": "slide-right",
+          "description": "Slide in from / out to the right edge.",
+          "type": "string"
+        }
+      ]
+    },
+    "AnimationsConfig": {
+      "description": "Enter/exit and change animations for transient surfaces.",
+      "properties": {
+        "duration": {
+          "$ref": "#/$defs/uint32",
+          "default": 200,
+          "description": "Animation duration in milliseconds."
+        },
+        "enabled": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Enable enter/exit animations (OSD, toasts, notifications) and\nicon-change crossfades. When disabled, surfaces appear instantly."
+        },
+        "transition": {
+          "$ref": "#/$defs/AnimationType",
+          "default": "fade",
+          "description": "Transition style used for enter/exit of the OSD, toasts, and\nnotification cards."
+        }
+      },
+      "type": "object"
+    },
     "AppIconSource": {
       "description": "Icon source for app volume entries in the dropdown.",
       "oneOf": [
@@ -6260,6 +6316,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for Wayle.\n\nRepresents the complete configuration schema that can be loaded\nfrom TOML files. All fields have sensible defaults.",
   "properties": {
+    "animations": {
+      "$ref": "#/$defs/AnimationsConfig",
+      "default": {
+        "duration": 200,
+        "enabled": true,
+        "transition": "fade"
+      },
+      "description": "Animation settings."
+    },
     "bar": {
       "$ref": "#/$defs/BarConfig",
       "default": {
