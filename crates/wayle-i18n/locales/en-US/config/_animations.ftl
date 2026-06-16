@@ -7,6 +7,27 @@ settings-animations-duration = Duration
 settings-animations-transition = Transition
     .description = Enter/exit style for the OSD, toasts, and notification cards
 
+settings-animations-enter = Enter Transition
+    .description = Transition used when surfaces appear. Unset falls back to Transition
+
+settings-animations-exit = Exit Transition
+    .description = Transition used when surfaces disappear. Unset falls back to Transition
+
+settings-animations-enter-duration = Enter Duration
+    .description = Enter animation length in milliseconds. Unset falls back to Duration
+
+settings-animations-exit-duration = Exit Duration
+    .description = Exit animation length in milliseconds. Unset falls back to Duration
+
+settings-animations-notifications = Notifications
+    .description = Per-surface animation override for notification popup cards
+
+settings-animations-osd = OSD
+    .description = Per-surface animation override for the OSD (volume/brightness/toggle)
+
+settings-animations-toast = Toast
+    .description = Per-surface animation override for toasts
+
 
 ## AnimationType variants
 enum-animation-type-none = None

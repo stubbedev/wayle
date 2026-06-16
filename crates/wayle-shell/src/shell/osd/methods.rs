@@ -5,7 +5,7 @@ use relm4::{ComponentSender, gtk};
 use wayle_audio::core::device::{input::InputDevice, output::OutputDevice};
 use wayle_brightness::BacklightDevice;
 use wayle_config::schemas::{
-    animations::AnimationType,
+    animations::{AnimSurface, AnimationType},
     osd::{OsdMonitor, OsdPosition, OsdTextAlign},
 };
 
@@ -347,14 +347,17 @@ impl Osd {
     }
 }
 
-/// Revealer transition derived from the animations config. Disabled animations
-/// collapse to no transition (instant show/hide).
-pub(super) fn anim_transition(model: &Osd) -> gtk::RevealerTransitionType {
-    let animations = &model.config.config().animations;
-    if !animations.enabled.get() {
-        return gtk::RevealerTransitionType::None;
+/// The animation surface for the current event: toasts (`Custom`) resolve
+/// against `[animations.toast]`, everything else against `[animations.osd]`.
+fn anim_surface(model: &Osd) -> AnimSurface {
+    match model.current_event {
+        Some(OsdEvent::Custom { .. }) => AnimSurface::Toast,
+        _ => AnimSurface::Osd,
     }
-    match animations.transition.get() {
+}
+
+fn revealer_transition(anim: AnimationType) -> gtk::RevealerTransitionType {
+    match anim {
         AnimationType::None => gtk::RevealerTransitionType::None,
         AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
         AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
@@ -364,14 +367,24 @@ pub(super) fn anim_transition(model: &Osd) -> gtk::RevealerTransitionType {
     }
 }
 
-/// Animation duration in milliseconds, or `0` when animations are disabled.
+/// Revealer transition for the current direction. `revealed` means entering;
+/// otherwise exiting. Resolved per-surface with the global fallback cascade.
+pub(super) fn anim_transition(model: &Osd) -> gtk::RevealerTransitionType {
+    let anim = model
+        .config
+        .config()
+        .animations
+        .transition_for(anim_surface(model), !model.revealed);
+    revealer_transition(anim)
+}
+
+/// Animation duration in ms for the current direction (`0` when disabled).
 pub(super) fn anim_duration(model: &Osd) -> u32 {
-    let animations = &model.config.config().animations;
-    if animations.enabled.get() {
-        animations.duration.get()
-    } else {
-        0
-    }
+    model
+        .config
+        .config()
+        .animations
+        .duration_for(anim_surface(model), !model.revealed)
 }
 
 pub(super) fn osd_classes(model: &Osd) -> Vec<&'static str> {

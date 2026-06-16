@@ -64,12 +64,15 @@ impl Component for Osd {
 
             #[name = "revealer"]
             gtk::Revealer {
-                #[watch]
-                set_reveal_child: model.revealed,
+                // Set transition type + duration before toggling reveal_child so
+                // the correct per-direction (enter/exit) animation is in effect
+                // when the reveal flips.
                 #[watch]
                 set_transition_type: anim_transition(&model),
                 #[watch]
                 set_transition_duration: anim_duration(&model),
+                #[watch]
+                set_reveal_child: model.revealed,
 
             #[name = "osd_container"]
             gtk::Box {

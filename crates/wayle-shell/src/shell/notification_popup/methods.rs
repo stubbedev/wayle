@@ -5,7 +5,7 @@ use gtk4_layer_shell::{Edge, LayerShell};
 use relm4::{Component, ComponentController, gtk};
 use tracing::debug;
 use wayle_config::schemas::{
-    animations::AnimationType,
+    animations::{AnimSurface, AnimationType},
     modules::notification::{PopupMonitor, PopupPosition, StackingOrder},
 };
 use wayle_notification::core::notification::Notification;
@@ -54,7 +54,7 @@ impl NotificationPopupHost {
             // popup arriving during the fade cancel this pending hide.
             self.hide_gen = self.hide_gen.wrapping_add(1);
             let generation = self.hide_gen;
-            let (duration, _) = self.animation();
+            let (duration, _) = self.animation(true);
             if duration == 0 {
                 root.set_visible(false);
             } else {
@@ -71,7 +71,7 @@ impl NotificationPopupHost {
     }
 
     fn remove_stale_cards(&mut self, active_popups: &[Arc<Notification>]) {
-        let (duration, _) = self.animation();
+        let (duration, transition) = self.animation(true);
         let mut kept = Vec::with_capacity(self.cards.len());
 
         for (stored_notif, controller, revealer) in std::mem::take(&mut self.cards) {
@@ -87,7 +87,10 @@ impl NotificationPopupHost {
             // Animate out, then remove the widget once the transition finishes.
             // The closure runs on the main thread, so it can touch GTK widgets,
             // and it owns the controller + revealer to keep them alive (and the
-            // card visible) for the duration of the fade.
+            // card visible) for the duration of the fade. Apply the exit
+            // transition/duration first (the card was created with the enter one).
+            revealer.set_transition_type(transition);
+            revealer.set_transition_duration(duration);
             revealer.set_reveal_child(false);
             let container = self.card_container.clone();
             gtk::glib::timeout_add_local_once(
@@ -102,15 +105,12 @@ impl NotificationPopupHost {
         self.cards = kept;
     }
 
-    /// Animation `(duration_ms, transition)` from the animations config.
-    /// Disabled animations collapse to an instant `(0, None)` transition.
-    fn animation(&self) -> (u32, gtk::RevealerTransitionType) {
-        let config = self.config.config();
-        let animations = &config.animations;
-        if !animations.enabled.get() {
-            return (0, gtk::RevealerTransitionType::None);
-        }
-        let transition = match animations.transition.get() {
+    /// Notification-card animation `(duration_ms, transition)` for the given
+    /// direction (`exiting` = removal). Resolved per-surface with the global
+    /// fallback cascade; disabled animations collapse to `(0, None)`.
+    fn animation(&self, exiting: bool) -> (u32, gtk::RevealerTransitionType) {
+        let animations = &self.config.config().animations;
+        let transition = match animations.transition_for(AnimSurface::Notifications, exiting) {
             AnimationType::None => gtk::RevealerTransitionType::None,
             AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
             AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
@@ -118,7 +118,10 @@ impl NotificationPopupHost {
             AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
             AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
         };
-        (animations.duration.get(), transition)
+        (
+            animations.duration_for(AnimSurface::Notifications, exiting),
+            transition,
+        )
     }
 
     fn insert_new_cards(&mut self, popups: &[Arc<Notification>], existing_ids: &[u32]) {
@@ -151,7 +154,7 @@ impl NotificationPopupHost {
                 })
                 .detach();
 
-            let (duration, transition) = self.animation();
+            let (duration, transition) = self.animation(false);
             let revealer = gtk::Revealer::new();
             revealer.set_transition_type(transition);
             revealer.set_transition_duration(duration);
