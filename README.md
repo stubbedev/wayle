@@ -21,6 +21,7 @@ Configure it in `config.toml` or `config.yaml`, through the `wayle-settings` GUI
 - **Custom modules** — back any bar widget with a shell command (poll or watch), with [icon and color cycling by state](https://wayle.app/guide/custom-modules) (`icon-map` / `color-map` keyed on the output's `alt`).
 - **Per-workspace icons** — give individual workspaces their own icon, shown even in label mode.
 - **Notifications, OSD, and custom toasts** — `wayle toast "…"` shows an on-screen toast (icon + label, or a progress bar) reusing the OSD styling.
+- **Animations** — configurable enter/exit transitions (fade / slide) for the OSD, toasts, and notification cards via `[animations]`.
 - **Pixel or scale sizing** — every size accepts a scale multiplier or absolute pixels (`"24px"`), HiDPI-correct.
 - **TOML or YAML config** with imports, live reload, and a published [JSON schema](schema/wayle-config.schema.json) for editor autocomplete.
 - **Scriptable** — a JSON-RPC unix socket and CLI push live updates to any widget by id (`wayle widget update <id> …`).
