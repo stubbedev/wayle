@@ -143,8 +143,12 @@ impl Component for BarButton {
                 gtk::Box {
                     add_css_class: "label-container",
 
+                    // Hide the label container when there is no label to show.
+                    // The icon-label gap is a margin on the label inside this
+                    // container, so hiding it removes the phantom gap whenever
+                    // the label is empty — universally, for every bar widget.
                     #[watch]
-                    set_visible: model.behavior.show_label.get(),
+                    set_visible: model.has_label(),
 
                     #[watch]
                     set_hexpand: model.settings.is_vertical.get(),
@@ -324,8 +328,15 @@ impl BarButton {
         if max > 0 { max as i32 } else { -1 }
     }
 
+    /// Whether a label should render: the module asks for it AND the text is
+    /// non-empty. Hiding the container for an empty label drops its gap margin,
+    /// so no icon-label gap is rendered when the label is empty.
+    fn has_label(&self) -> bool {
+        self.behavior.show_label.get() && !self.label.trim().is_empty()
+    }
+
     fn is_icon_only(&self) -> bool {
-        !self.behavior.show_label.get()
+        !self.has_label()
     }
 
     fn icon_should_center(&self) -> bool {

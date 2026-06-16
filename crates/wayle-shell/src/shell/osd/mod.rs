@@ -18,7 +18,7 @@ use self::{
     messages::{OsdCmd, OsdEvent},
     methods::{
         anim_duration, anim_transition, event_fraction, event_icon, event_label,
-        event_slider_label, event_value, is_slider, is_toggle, osd_classes,
+        event_slider_label, event_value, is_slider, is_toggle, osd_classes, toast_align,
     },
 };
 
@@ -119,6 +119,10 @@ impl Component for Osd {
                 #[name = "toggle_header"]
                 gtk::Box {
                     add_css_class: "osd-header",
+                    // Align the icon+label group within the OSD's wide min-width
+                    // per `osd.text-align` (sliders keep their own layout).
+                    #[watch]
+                    set_halign: toast_align(&model),
 
                     #[watch]
                     set_visible: is_toggle(&model.current_event),

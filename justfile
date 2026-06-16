@@ -1,0 +1,120 @@
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# Default — list recipes.
+default:
+    @just --list --unsorted
+
+# ─────────────────────────── Build & Run ───────────────────────────
+
+# Build the release binary.
+build:
+    cargo build --release --locked
+
+# Run the wayle binary (debug). Extra args pass through: `just run -- --help`.
+run *args:
+    cargo run --bin wayle -- {{args}}
+
+# Remove target/ build artifacts.
+clean:
+    cargo clean
+
+# ─────────────────────────── Format & Lint ───────────────────────────
+
+# Format the workspace in place.
+fmt:
+    cargo fmt --all
+
+# Format, then lint with clippy (warnings are errors).
+lint: fmt
+    cargo clippy --workspace --all-targets -- -D warnings
+
+# Strict read-only check — same logic CI runs, for local pre-push.
+# Fails if formatting would change or any lint fires.
+lint-check:
+    cargo fmt --all --check
+    cargo clippy --workspace --all-targets -- -D warnings
+
+# Run the test suite.
+test:
+    cargo test --workspace --no-fail-fast
+
+# Format, lint and test. Run before every release.
+check: lint test
+
+# ─────────────────────────── Dependencies ───────────────────────────
+
+# Update Cargo.lock to the latest semver-compatible versions.
+update:
+    cargo update --workspace
+
+# ─────────────────────────── Release ───────────────────────────
+
+release-preview:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CURRENT_TAG=$(git tag -l 'v*.*.*' --sort=-v:refname | head -1)
+    CURRENT_TAG=${CURRENT_TAG:-v0.0.0}
+    CURRENT_VERSION=${CURRENT_TAG#v}
+    MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+    MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+    PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+    echo "Current tag: $CURRENT_TAG"
+    echo "  release-major: v$((MAJOR + 1)).0.0"
+    echo "  release-minor: v${MAJOR}.$((MINOR + 1)).0"
+    echo "  release-patch: v${MAJOR}.${MINOR}.$((PATCH + 1))"
+
+_release-checks:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    DEFAULT_BRANCH=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null | sed 's|^origin/||' || true)
+    if [ -z "${DEFAULT_BRANCH:-}" ]; then
+        DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || echo master)
+    fi
+    if [ "$BRANCH" != "$DEFAULT_BRANCH" ]; then
+        echo "Error: not on default branch '$DEFAULT_BRANCH' (currently '$BRANCH')." >&2
+        exit 1
+    fi
+    just check
+    if [ -n "$(git status --porcelain)" ]; then
+        echo "Formatting/lint produced changes — staging + committing."
+        git add -A
+        git commit -m "chore: format code for release"
+    fi
+
+_release bump:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just _release-checks
+    CURRENT_TAG=$(git tag -l 'v*.*.*' --sort=-v:refname | head -1)
+    CURRENT_TAG=${CURRENT_TAG:-v0.0.0}
+    CURRENT_VERSION=${CURRENT_TAG#v}
+    MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+    MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+    PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+    case "{{bump}}" in
+        major) NEW="$((MAJOR + 1)).0.0" ;;
+        minor) NEW="${MAJOR}.$((MINOR + 1)).0" ;;
+        patch) NEW="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+        *) echo "unknown bump kind: {{bump}}"; exit 1 ;;
+    esac
+    # Bump the workspace version BEFORE tagging. The release workflow
+    # verifies the tag matches [workspace.package].version in Cargo.toml
+    # and refuses to publish on a mismatch, so this must land first.
+    sed -i -E '/\[workspace\.package\]/,/^\[/{s|^(version = )"[^"]*"|\1"'"$NEW"'"|}' Cargo.toml
+    # Refresh Cargo.lock so `cargo build --locked` in CI sees the new version.
+    cargo update --workspace
+    if [ -n "$(git status --porcelain Cargo.toml Cargo.lock)" ]; then
+        git add Cargo.toml Cargo.lock
+        git commit -m "chore: release v${NEW}"
+    fi
+    git tag -a "v${NEW}" -m "v${NEW}"
+    git push origin HEAD
+    git push origin "v${NEW}"
+    echo
+    echo "Tagged v${NEW}."
+    echo "Watch the release build: gh run watch || open https://github.com/stubbedev/wayle/actions"
+
+release-patch: (_release "patch")
+release-minor: (_release "minor")
+release-major: (_release "major")

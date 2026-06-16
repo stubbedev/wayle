@@ -1,7 +1,7 @@
 mod types;
 
 use schemars::schema_for;
-pub use types::{OsdMonitor, OsdPosition};
+pub use types::{OsdMonitor, OsdPosition, OsdTextAlign};
 use wayle_derive::wayle_config;
 
 use crate::{
@@ -20,6 +20,12 @@ pub struct OsdConfig {
     /// Screen anchor position.
     #[default(OsdPosition::default())]
     pub position: ConfigProperty<OsdPosition>,
+
+    /// Horizontal alignment of toast and toggle overlay content. Sliders
+    /// (volume/brightness) keep their own label+value layout.
+    #[serde(rename = "text-align")]
+    #[default(OsdTextAlign::default())]
+    pub text_align: ConfigProperty<OsdTextAlign>,
 
     /// Auto-dismiss delay in milliseconds.
     #[default(2500u32)]

@@ -6,7 +6,7 @@ use wayle_audio::core::device::{input::InputDevice, output::OutputDevice};
 use wayle_brightness::BacklightDevice;
 use wayle_config::schemas::{
     animations::AnimationType,
-    osd::{OsdMonitor, OsdPosition},
+    osd::{OsdMonitor, OsdPosition, OsdTextAlign},
 };
 
 use super::{
@@ -424,6 +424,15 @@ pub(super) fn is_toggle(event: &Option<OsdEvent>) -> bool {
                 }
         )
     })
+}
+
+/// Horizontal alignment for the toast/toggle header, from `osd.text-align`.
+pub(super) fn toast_align(model: &Osd) -> gtk::Align {
+    match model.config.config().osd.text_align.get() {
+        OsdTextAlign::Start => gtk::Align::Start,
+        OsdTextAlign::Center => gtk::Align::Center,
+        OsdTextAlign::End => gtk::Align::End,
+    }
 }
 
 pub(super) fn event_icon(event: &Option<OsdEvent>) -> Option<&str> {

@@ -26,6 +26,18 @@ pub enum OsdPosition {
     Left,
 }
 
+/// Horizontal alignment of OSD toast/toggle content.
+#[wayle_enum(default)]
+pub enum OsdTextAlign {
+    /// Align content to the start (left in LTR layouts).
+    Start,
+    /// Center content horizontally.
+    #[default]
+    Center,
+    /// Align content to the end (right in LTR layouts).
+    End,
+}
+
 /// Target monitor for the OSD overlay.
 ///
 /// Accepts `"primary"` or a connector name like `"DP-1"`.
