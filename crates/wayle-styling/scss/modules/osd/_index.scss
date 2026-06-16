@@ -9,7 +9,7 @@ window.background.osd-host {
     background: var(--bg-elevated);
     border-radius: var(--rounding-element);
     box-shadow: 0 calc(0.25rem * var(--global-scale)) calc(1rem * var(--global-scale))
-        rgba(0, 0, 0, 0.3);
+        var(--shadow-color-soft);
     margin: var(--space-md);
     padding: var(--space-md);
     min-width: calc(var(--space-lg) * 12);

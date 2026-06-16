@@ -28,6 +28,8 @@ pub mod schemas {
     pub mod animations;
     /// Bar layout configuration.
     pub mod bar;
+    /// Dropdown foldout panel sizing.
+    pub mod dropdowns;
     /// General Wayle configuration.
     pub mod general;
     /// Module-specific configurations.
@@ -74,8 +76,8 @@ pub use infrastructure::{
     watcher::FileWatcher,
 };
 use schemas::{
-    animations::AnimationsConfig, bar::BarConfig, modules::ModulesConfig, osd::OsdConfig,
-    styling::StylingConfig, wallpaper::WallpaperConfig,
+    animations::AnimationsConfig, bar::BarConfig, dropdowns::DropdownsConfig,
+    modules::ModulesConfig, osd::OsdConfig, styling::StylingConfig, wallpaper::WallpaperConfig,
 };
 use wayle_derive::wayle_config;
 
@@ -104,6 +106,9 @@ pub struct Config {
 
     /// Bar layout and module placement.
     pub bar: BarConfig,
+
+    /// Dropdown foldout panel sizing.
+    pub dropdowns: DropdownsConfig,
 
     /// Styling configuration (theme, fonts, scale).
     pub styling: StylingConfig,

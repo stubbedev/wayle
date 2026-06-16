@@ -146,11 +146,16 @@ $base-btn-gap: 0.5rem;
     --bar-button-rounding-element: var(--cfg-bar-button-rounding-element);
     --bar-group-rounding-element: var(--cfg-bar-group-rounding-element);
 
+    // Shadow colors (overridable per theme / appearance mode)
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --shadow-color-soft: rgba(0, 0, 0, 0.3);
+    --shadow-ring: rgba(255, 255, 255, 0.04);
+
     // Shadows
-    --shadow-xs: 0 2px 4px rgba(0, 0, 0, 0.5);
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
-    --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.5);
+    --shadow-xs: 0 2px 4px var(--shadow-color);
+    --shadow-sm: 0 2px 8px var(--shadow-color);
+    --shadow: 0 8px 32px var(--shadow-color);
+    --shadow-lg: 0 12px 48px var(--shadow-color);
 
     // Focus
     --focus-ring-width: 2px;

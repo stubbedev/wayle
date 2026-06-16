@@ -83,6 +83,36 @@ pub struct DashboardConfig {
     #[default(String::from("systemctl poweroff"))]
     pub dropdown_poweroff_command: ConfigProperty<String>,
 
+    /// CPU/RAM/disk usage percent at which the dashboard rings turn warning.
+    #[serde(rename = "usage-warning")]
+    #[default(60.0f32)]
+    pub usage_warning: ConfigProperty<f32>,
+
+    /// CPU/RAM/disk usage percent at which the dashboard rings turn error.
+    #[serde(rename = "usage-error")]
+    #[default(85.0f32)]
+    pub usage_error: ConfigProperty<f32>,
+
+    /// CPU temperature (°C) at which the dashboard temp ring turns warning.
+    #[serde(rename = "temp-warning")]
+    #[default(65.0f32)]
+    pub temp_warning: ConfigProperty<f32>,
+
+    /// CPU temperature (°C) at which the dashboard temp ring turns error.
+    #[serde(rename = "temp-error")]
+    #[default(85.0f32)]
+    pub temp_error: ConfigProperty<f32>,
+
+    /// Battery percent at or below which the dashboard battery shows warning.
+    #[serde(rename = "battery-warning")]
+    #[default(30.0f32)]
+    pub battery_warning: ConfigProperty<f32>,
+
+    /// Battery percent at or below which the dashboard battery shows critical.
+    #[serde(rename = "battery-critical")]
+    #[default(15.0f32)]
+    pub battery_critical: ConfigProperty<f32>,
+
     /// User session configuration
     #[serde(rename = "user-session")]
     pub user_session: UserSessionConfig,

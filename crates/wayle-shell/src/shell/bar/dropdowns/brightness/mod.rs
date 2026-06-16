@@ -17,7 +17,12 @@ use self::{
     device_item::{BrightnessDeviceItem, messages::BrightnessDeviceItemOutput},
     messages::{BrightnessDropdownCmd, BrightnessDropdownInit, BrightnessDropdownInput},
 };
-use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
+use wayle_config::schemas::styling::Size;
+
+use crate::{
+    i18n::t,
+    shell::bar::dropdowns::{resolve_content_height, resolve_dimension},
+};
 
 const BASE_WIDTH: f32 = 320.0;
 
@@ -26,6 +31,9 @@ pub(crate) struct BrightnessDropdown {
     device_items: FactoryVecDeque<BrightnessDeviceItem>,
     devices_watcher: WatcherToken,
     scaled_width: i32,
+    scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
 }
 
 #[relm4::component(pub(crate))]
@@ -42,6 +50,8 @@ impl Component for BrightnessDropdown {
             set_has_arrow: false,
             #[watch]
             set_width_request: model.scaled_width,
+            #[watch]
+            set_height_request: model.scaled_height,
 
             #[template]
             Dropdown {
@@ -125,12 +135,16 @@ impl Component for BrightnessDropdown {
         watchers::spawn_top_level(&sender, &init.brightness, &init.config);
 
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.brightness.get();
 
         let mut model = Self {
             devices,
             device_items,
             devices_watcher: WatcherToken::new(),
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_content_height(size.height),
+            width_override: size.width,
+            height_override: size.height,
         };
 
         model.sync_devices();
@@ -166,7 +180,8 @@ impl Component for BrightnessDropdown {
                 self.sync_single_device(&device_name);
             }
             BrightnessDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_content_height(self.height_override);
             }
         }
     }

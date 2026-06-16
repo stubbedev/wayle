@@ -352,6 +352,37 @@ impl schemars::JsonSchema for ColorValue {
     }
 }
 
+/// Light/dark appearance mode.
+///
+/// `Auto` keeps each provider's own light setting and the configured static
+/// palette as-is. `Light`/`Dark` force the mode: dynamic providers switch their
+/// light flag, and the static palette swaps to its built-in light/dark variant
+/// when one exists.
+#[wayle_enum(default)]
+#[serde(rename_all = "lowercase")]
+pub enum Appearance {
+    /// Follow each provider's own setting / the configured palette.
+    #[default]
+    Auto,
+    /// Force the light variant.
+    Light,
+    /// Force the dark variant.
+    Dark,
+}
+
+impl Appearance {
+    /// Forced light state: `Some(true)` for light, `Some(false)` for dark,
+    /// `None` for auto.
+    #[must_use]
+    pub fn forced_light(self) -> Option<bool> {
+        match self {
+            Self::Auto => None,
+            Self::Light => Some(true),
+            Self::Dark => Some(false),
+        }
+    }
+}
+
 /// Source of color palette values.
 ///
 /// Dynamic providers (Matugen, Pywal, Wallust) inject palette tokens at runtime.

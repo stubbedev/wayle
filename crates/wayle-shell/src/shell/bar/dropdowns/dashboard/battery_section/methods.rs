@@ -8,9 +8,6 @@ const BATTERY_ICON_FULL: f64 = 75.0;
 const BATTERY_ICON_MEDIUM: f64 = 50.0;
 const BATTERY_ICON_LOW: f64 = 25.0;
 
-pub(super) const BATTERY_WARNING: f64 = 30.0;
-pub(super) const BATTERY_CRITICAL: f64 = 15.0;
-
 const SECONDS_PER_HOUR: i64 = 3600;
 const SECONDS_PER_MINUTE: i64 = 60;
 

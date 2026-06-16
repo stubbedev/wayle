@@ -14,10 +14,33 @@ pub(crate) use self::registry::{
     DropdownFactory, DropdownInstance, DropdownRegistry, dispatch_click, dispatch_click_widget,
     require_service,
 };
+use wayle_config::schemas::styling::Size;
+
 use crate::shell::services::ShellServices;
 
-pub(crate) fn scaled_dimension(base: f32, scale: f32) -> i32 {
-    (base * scale).round() as i32
+/// Resolves a dropdown width/height override to a pixel request.
+///
+/// `None` keeps the built-in default (`base * scale`). A [`Size::Scale`]
+/// multiplies the base before scaling; a [`Size::Px`] is an absolute length
+/// that ignores the scale.
+pub(crate) fn resolve_dimension(override_: Option<Size>, base: f32, scale: f32) -> i32 {
+    match override_ {
+        Some(size) => size.resolve_px(base, scale).round() as i32,
+        None => (base * scale).round() as i32,
+    }
+}
+
+/// Resolves an optional height override for dropdowns that otherwise size their
+/// height to content.
+///
+/// Returns `-1` (GTK's "natural size" request) when no override applies. Only
+/// an absolute [`Size::Px`] takes effect, since there is no base height to
+/// scale a multiplier against.
+pub(crate) fn resolve_content_height(override_: Option<Size>) -> i32 {
+    match override_ {
+        Some(Size::Px(px)) => px.round() as i32,
+        Some(Size::Scale(_)) | None => -1,
+    }
 }
 
 macro_rules! register_dropdowns {

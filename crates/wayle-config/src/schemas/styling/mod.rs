@@ -4,11 +4,11 @@ mod types;
 pub use palette::PaletteConfig;
 use schemars::schema_for;
 pub use types::{
-    ColorValue, CssToken, FontWeightClass, GapClass, HexColor, IconSizeClass, InvalidCssToken,
-    InvalidHexColor, MatugenScheme, NormalizedF64, PaddingClass, Percentage, PywalContrast,
-    RadiusClass, RoundingLevel, ScaleFactor, SignedNormalizedF64, Size, Spacing, TextSizeClass,
-    ThemeEntry, ThemeProvider, ThresholdColors, ThresholdEntry, WallustBackend, WallustColorspace,
-    WallustPalette, evaluate_thresholds,
+    Appearance, ColorValue, CssToken, FontWeightClass, GapClass, HexColor, IconSizeClass,
+    InvalidCssToken, InvalidHexColor, MatugenScheme, NormalizedF64, PaddingClass, Percentage,
+    PywalContrast, RadiusClass, RoundingLevel, ScaleFactor, SignedNormalizedF64, Size, Spacing,
+    TextSizeClass, ThemeEntry, ThemeProvider, ThresholdColors, ThresholdEntry, WallustBackend,
+    WallustColorspace, WallustPalette, evaluate_thresholds,
 };
 use wayle_derive::wayle_config;
 
@@ -28,6 +28,12 @@ pub struct StylingConfig {
     /// Corner rounding for dropdowns, popovers, and dialogs.
     #[default(RoundingLevel::default())]
     pub rounding: ConfigProperty<RoundingLevel>,
+
+    /// Light/dark appearance mode. `Auto` follows each provider / the configured
+    /// palette; `Light`/`Dark` force the mode (static palettes swap to their
+    /// built-in light/dark variant when one exists).
+    #[default(Appearance::default())]
+    pub appearance: ConfigProperty<Appearance>,
 
     /// Theme provider (wayle, matugen, pywal, wallust).
     #[serde(rename = "theme-provider")]
@@ -153,9 +159,15 @@ impl ModuleInfoProvider for StylingConfig {
 crate::register_module!(StylingConfig);
 
 impl StylingConfig {
-    /// Assembles a palette from the individual color fields.
+    /// Assembles a palette from the individual color fields, applying the
+    /// configured appearance mode.
+    ///
+    /// When `appearance` forces light or dark and the active base theme has a
+    /// built-in variant for that mode, the variant's palette is returned
+    /// instead. This is non-destructive: `palette-base-theme` is unchanged, so
+    /// switching back to `Auto` restores the configured colors.
     pub fn palette(&self) -> Palette {
-        Palette {
+        let base = Palette {
             bg: self.palette.bg.get().to_string(),
             surface: self.palette.surface.get().to_string(),
             elevated: self.palette.elevated.get().to_string(),
@@ -166,6 +178,22 @@ impl StylingConfig {
             yellow: self.palette.yellow.get().to_string(),
             green: self.palette.green.get().to_string(),
             blue: self.palette.blue.get().to_string(),
+        };
+
+        let Some(want_light) = self.appearance.get().forced_light() else {
+            return base;
+        };
+
+        let theme = self.palette_base_theme.get();
+        if !theme.is_empty()
+            && let Some(variant) =
+                crate::infrastructure::themes::palettes::appearance_variant(&theme, want_light)
+            && let Some(palette) =
+                crate::infrastructure::themes::palettes::palette_by_name(variant)
+        {
+            return palette;
         }
+
+        base
     }
 }

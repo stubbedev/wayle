@@ -15,7 +15,9 @@ use self::{
     player_view::{PlayerView, PlayerViewInit, PlayerViewInput, PlayerViewOutput},
     source_picker::{SourcePicker, SourcePickerInit, SourcePickerOutput},
 };
-use crate::shell::bar::dropdowns::scaled_dimension;
+use wayle_config::schemas::styling::Size;
+
+use crate::shell::bar::dropdowns::resolve_dimension;
 
 const BASE_WIDTH: f32 = 380.0;
 const BASE_HEIGHT: f32 = 410.0;
@@ -38,6 +40,8 @@ impl MediaPage {
 pub(crate) struct MediaDropdown {
     scaled_width: i32,
     scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
     active_page: MediaPage,
     player_view: Controller<PlayerView>,
     source_picker: Controller<SourcePicker>,
@@ -98,11 +102,14 @@ impl Component for MediaDropdown {
             .forward(sender.input_sender(), MediaDropdownMsg::SourcePicker);
 
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.media.get();
         watchers::spawn(&sender, &init.config);
 
         let model = Self {
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
-            scaled_height: scaled_dimension(BASE_HEIGHT, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
+            width_override: size.width,
+            height_override: size.height,
             active_page: MediaPage::Main,
             player_view,
             source_picker,
@@ -148,8 +155,8 @@ impl Component for MediaDropdown {
     ) {
         match msg {
             MediaDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
-                self.scaled_height = scaled_dimension(BASE_HEIGHT, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_dimension(self.height_override, BASE_HEIGHT, scale);
             }
         }
     }

@@ -22,7 +22,9 @@ use self::{
         messages::{NotificationGroupInput, NotificationGroupOutput},
     },
 };
-use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
+use wayle_config::schemas::styling::Size;
+
+use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 425.0;
 const BASE_HEIGHT: f32 = 725.0;
@@ -33,6 +35,8 @@ pub(crate) struct NotificationDropdown {
 
     scaled_width: i32,
     scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
 
     dnd: bool,
     has_notifications: bool,
@@ -173,6 +177,7 @@ impl Component for NotificationDropdown {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.notification.get();
         let dnd = init.notification.dnd.get();
 
         let groups = FactoryVecDeque::builder()
@@ -186,8 +191,10 @@ impl Component for NotificationDropdown {
         let mut model = Self {
             notification: init.notification.clone(),
             config: init.config.clone(),
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
-            scaled_height: scaled_dimension(BASE_HEIGHT, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
+            width_override: size.width,
+            height_override: size.height,
             dnd,
             has_notifications: false,
             groups,
@@ -236,8 +243,8 @@ impl Component for NotificationDropdown {
             }
 
             NotificationDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
-                self.scaled_height = scaled_dimension(BASE_HEIGHT, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_dimension(self.height_override, BASE_HEIGHT, scale);
             }
 
             NotificationDropdownCmd::IconSourceChanged => {

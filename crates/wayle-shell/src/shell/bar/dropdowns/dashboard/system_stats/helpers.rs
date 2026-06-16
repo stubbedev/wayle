@@ -1,25 +1,11 @@
 use wayle_widgets::primitives::progress_ring::ColorVariant;
 
-const WARNING_THRESHOLD: f32 = 60.0;
-const ERROR_THRESHOLD: f32 = 85.0;
-
-pub(super) fn threshold_color(percent: f32) -> ColorVariant {
-    if percent >= ERROR_THRESHOLD {
+/// Resolves a usage or temperature reading to a ring color given the configured
+/// `warning` and `error` thresholds (both expressed in the reading's own unit).
+pub(super) fn threshold_color(value: f32, warning: f32, error: f32) -> ColorVariant {
+    if value >= error {
         ColorVariant::Error
-    } else if percent >= WARNING_THRESHOLD {
-        ColorVariant::Warning
-    } else {
-        ColorVariant::Success
-    }
-}
-
-const TEMP_WARNING_CELSIUS: f32 = 65.0;
-const TEMP_ERROR_CELSIUS: f32 = 85.0;
-
-pub(super) fn temp_color(celsius: f32) -> ColorVariant {
-    if celsius >= TEMP_ERROR_CELSIUS {
-        ColorVariant::Error
-    } else if celsius >= TEMP_WARNING_CELSIUS {
+    } else if value >= warning {
         ColorVariant::Warning
     } else {
         ColorVariant::Success

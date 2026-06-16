@@ -14,10 +14,7 @@ use wayle_widgets::{
 };
 
 pub(crate) use self::messages::BatterySectionInit;
-use self::{
-    messages::BatterySectionCmd,
-    methods::{BATTERY_CRITICAL, BATTERY_WARNING},
-};
+use self::messages::BatterySectionCmd;
 use crate::i18n::t;
 
 const PERCENTAGE_DIVISOR: f64 = 100.0;
@@ -31,6 +28,8 @@ pub(crate) struct BatterySection {
     time_remaining_secs: i64,
     is_warning: bool,
     is_critical: bool,
+    warning_threshold: f64,
+    critical_threshold: f64,
 
     power_profile: PowerProfile,
     has_power_profiles: bool,
@@ -188,8 +187,10 @@ impl Component for BatterySection {
             state: DeviceState::Unknown,
             time_remaining_secs: 0,
 
-            is_warning: percentage <= BATTERY_WARNING && percentage > BATTERY_CRITICAL,
-            is_critical: percentage <= BATTERY_CRITICAL,
+            is_warning: percentage <= init.warning && percentage > init.critical,
+            is_critical: percentage <= init.critical,
+            warning_threshold: init.warning,
+            critical_threshold: init.critical,
 
             power_profile,
             has_power_profiles,
@@ -215,8 +216,9 @@ impl Component for BatterySection {
                 self.state = state;
                 self.time_remaining_secs = time_remaining_secs;
 
-                self.is_warning = percentage <= BATTERY_WARNING && percentage > BATTERY_CRITICAL;
-                self.is_critical = percentage <= BATTERY_CRITICAL;
+                self.is_warning =
+                    percentage <= self.warning_threshold && percentage > self.critical_threshold;
+                self.is_critical = percentage <= self.critical_threshold;
             }
 
             BatterySectionCmd::PowerProfileChanged(profile) => {

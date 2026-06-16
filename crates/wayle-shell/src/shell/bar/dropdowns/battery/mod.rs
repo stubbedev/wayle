@@ -14,7 +14,9 @@ use self::{
     messages::{BatteryDropdownCmd, BatteryDropdownInit},
     power_profile::{PowerProfileInit, PowerProfileSection},
 };
-use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
+use wayle_config::schemas::styling::Size;
+
+use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 382.0;
 const BASE_HEIGHT: f32 = 312.0;
@@ -22,6 +24,8 @@ const BASE_HEIGHT: f32 = 312.0;
 pub(crate) struct BatteryDropdown {
     scaled_width: i32,
     scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
     battery_section: Controller<BatterySection>,
     power_profile: Controller<PowerProfileSection>,
 }
@@ -95,11 +99,14 @@ impl Component for BatteryDropdown {
             .detach();
 
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.battery.get();
         watchers::spawn(&sender, &init.config);
 
         let model = Self {
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
-            scaled_height: scaled_dimension(BASE_HEIGHT, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
+            width_override: size.width,
+            height_override: size.height,
             battery_section,
             power_profile,
         };
@@ -119,8 +126,8 @@ impl Component for BatteryDropdown {
     ) {
         match msg {
             BatteryDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
-                self.scaled_height = scaled_dimension(BASE_HEIGHT, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_dimension(self.height_override, BASE_HEIGHT, scale);
             }
         }
     }

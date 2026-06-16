@@ -55,6 +55,10 @@ pub struct AnimationsConfig {
     /// Per-surface override for toasts (`wayle toast`).
     #[default(SurfaceAnimation::default())]
     pub toast: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for bar widget dropdown foldouts.
+    #[default(SurfaceAnimation::default())]
+    pub dropdown: ConfigProperty<SurfaceAnimation>,
 }
 
 /// Transient surface an animation applies to.
@@ -66,6 +70,8 @@ pub enum AnimSurface {
     Osd,
     /// Toasts shown via `wayle toast`.
     Toast,
+    /// Bar widget dropdown foldouts.
+    Dropdown,
 }
 
 impl AnimationsConfig {
@@ -74,6 +80,7 @@ impl AnimationsConfig {
             AnimSurface::Notifications => self.notifications.get(),
             AnimSurface::Osd => self.osd.get(),
             AnimSurface::Toast => self.toast.get(),
+            AnimSurface::Dropdown => self.dropdown.get(),
         }
     }
 

@@ -1,5 +1,48 @@
 use wayle_brightness::types::BacklightType;
 
+use crate::i18n::t;
+
+/// Derives a human-friendly display name from a raw sysfs backlight identifier
+/// (e.g. `intel_backlight` -> "Built-in display").
+pub(crate) fn friendly_device_name(raw: &str, kind: BacklightType) -> String {
+    let lower = raw.to_ascii_lowercase();
+
+    if lower.contains("kbd") || lower.contains("keyboard") {
+        return t!("dropdown-brightness-device-keyboard");
+    }
+
+    if lower.starts_with("ddcci") || lower.contains("ddc") || lower.contains("i2c") {
+        return t!("dropdown-brightness-device-external");
+    }
+
+    if lower.contains("backlight")
+        || lower.starts_with("intel_")
+        || lower.starts_with("amdgpu")
+        || lower.starts_with("acpi_video")
+        || lower.starts_with("nvidia")
+        || matches!(kind, BacklightType::Firmware | BacklightType::Platform)
+    {
+        return t!("dropdown-brightness-device-internal");
+    }
+
+    prettify(raw)
+}
+
+/// Title-cases a raw identifier as a fallback display name.
+fn prettify(raw: &str) -> String {
+    raw.split(['_', '-', ' '])
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 pub(crate) fn device_subtitle(
     device_name: &str,
     kind: BacklightType,

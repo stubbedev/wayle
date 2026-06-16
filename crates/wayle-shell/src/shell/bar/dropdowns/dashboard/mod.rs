@@ -27,9 +27,37 @@ use self::{
     system_stats::{SystemStatsInit, SystemStatsInput, SystemStatsSection},
     user_session::{UserSessionInit, UserSessionSection},
 };
-use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
+use wayle_config::schemas::styling::Size;
+
+use crate::{
+    i18n::t,
+    shell::bar::dropdowns::{resolve_content_height, resolve_dimension},
+};
 
 const BASE_WIDTH: f32 = 380.0;
+
+/// Resolved dashboard threshold values read from config.
+struct DashboardThresholds {
+    usage_warning: f32,
+    usage_error: f32,
+    temp_warning: f32,
+    temp_error: f32,
+    battery_warning: f64,
+    battery_critical: f64,
+}
+
+fn dashboard_thresholds(config: &wayle_config::ConfigService) -> DashboardThresholds {
+    let cfg = config.config();
+    let d = &cfg.modules.dashboard;
+    DashboardThresholds {
+        usage_warning: d.usage_warning.get(),
+        usage_error: d.usage_error.get(),
+        temp_warning: d.temp_warning.get(),
+        temp_error: d.temp_error.get(),
+        battery_warning: f64::from(d.battery_warning.get()),
+        battery_critical: f64::from(d.battery_critical.get()),
+    }
+}
 
 /// Launches the settings app on the active workspace.
 ///
@@ -63,6 +91,9 @@ fn spawn_settings_app() {
 
 pub(crate) struct DashboardDropdown {
     scaled_width: i32,
+    scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
 
     quick_actions: Controller<QuickActionsSection>,
     controls: Controller<ControlsSection>,
@@ -87,6 +118,8 @@ impl Component for DashboardDropdown {
             set_has_arrow: false,
             #[watch]
             set_width_request: model.scaled_width,
+            #[watch]
+            set_height_request: model.scaled_height,
 
             #[template]
             #[name = "dashboard_container"]
@@ -158,6 +191,9 @@ impl Component for DashboardDropdown {
         }
     }
 
+    // Wires every dashboard section (battery, network, stats, media, session,
+    // controls, quick actions) plus sizing and thresholds, so it runs long.
+    #[allow(clippy::too_many_lines)]
     fn init(
         init: Self::Init,
         root: Self::Root,
@@ -190,11 +226,15 @@ impl Component for DashboardDropdown {
             .as_ref()
             .filter(|battery_svc| battery_svc.device.is_present.get())
             .cloned();
+        let thresholds = dashboard_thresholds(&init.config);
+
         let battery = battery_svc.map(|svc| {
             BatterySection::builder()
                 .launch(BatterySectionInit {
                     battery: Some(svc),
                     power_profiles: init.power_profiles.clone(),
+                    warning: thresholds.battery_warning,
+                    critical: thresholds.battery_critical,
                 })
                 .detach()
         });
@@ -209,6 +249,10 @@ impl Component for DashboardDropdown {
         let system_stats = SystemStatsSection::builder()
             .launch(SystemStatsInit {
                 sysinfo: init.sysinfo.clone(),
+                usage_warning: thresholds.usage_warning,
+                usage_error: thresholds.usage_error,
+                temp_warning: thresholds.temp_warning,
+                temp_error: thresholds.temp_error,
             })
             .detach();
 
@@ -221,11 +265,15 @@ impl Component for DashboardDropdown {
             .detach();
 
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.dashboard.get();
 
         watchers::spawn(&sender, &init.config);
 
         let model = Self {
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_content_height(size.height),
+            width_override: size.width,
+            height_override: size.height,
 
             quick_actions,
             controls,
@@ -300,7 +348,8 @@ impl Component for DashboardDropdown {
     ) {
         match msg {
             DashboardDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_content_height(self.height_override);
             }
         }
     }

@@ -3,13 +3,20 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
+    time::Duration,
 };
 
 use gtk::prelude::*;
 use gtk4_layer_shell::{KeyboardMode, LayerShell};
 use relm4::{gtk, prelude::*};
 use tracing::{debug, warn};
-use wayle_config::{ClickAction, schemas::bar::Location};
+use wayle_config::{
+    ClickAction,
+    schemas::{
+        animations::{AnimSurface, AnimationType},
+        bar::Location,
+    },
+};
 use wayle_widgets::prelude::{BarButton, BarButtonInput};
 
 use crate::{process, shell::services::ShellServices};
@@ -40,6 +47,10 @@ pub(crate) fn require_service<T>(
 /// dropdown and avoids rebuilding the same component repeatedly.
 pub(crate) struct DropdownInstance {
     popover: gtk::Popover,
+    /// Wraps the popover content so enter/exit animations can be played. The
+    /// popover keeps its own size request, so the revealer animates content
+    /// within stable geometry rather than resizing the popover surface.
+    revealer: gtk::Revealer,
     _controller: Box<dyn Any>,
     thaw_target: Rc<Cell<Option<relm4::Sender<BarButtonInput>>>>,
     original_height: Cell<Option<i32>>,
@@ -49,6 +60,16 @@ impl DropdownInstance {
     pub(crate) fn new(popover: gtk::Popover, controller: Box<dyn Any>) -> Self {
         let thaw_target: Rc<Cell<Option<relm4::Sender<BarButtonInput>>>> = Rc::default();
         let original_height = Cell::new(None);
+
+        // Re-parent the popover's content under a revealer so show/hide can be
+        // animated like the notification and toast surfaces.
+        let revealer = gtk::Revealer::new();
+        revealer.set_reveal_child(true);
+        if let Some(child) = popover.child() {
+            popover.set_child(None::<&gtk::Widget>);
+            revealer.set_child(Some(&child));
+        }
+        popover.set_child(Some(&revealer));
 
         popover.connect_map(|popover| {
             debug!(
@@ -123,10 +144,51 @@ impl DropdownInstance {
 
         Self {
             popover,
+            revealer,
             _controller: controller,
             thaw_target,
             original_height,
         }
+    }
+
+    /// Plays the enter animation: collapse instantly, then reveal on the next
+    /// main-loop tick so the transition actually runs (a same-tick false→true
+    /// does not animate). With animations disabled this reveals immediately.
+    fn animate_in(&self, style: &DropdownStyle) {
+        let (duration, transition) = style.enter;
+        self.revealer.set_transition_type(transition);
+        self.revealer.set_transition_duration(duration);
+
+        if duration == 0 {
+            self.revealer.set_reveal_child(true);
+            return;
+        }
+
+        self.revealer.set_reveal_child(false);
+        let revealer = self.revealer.clone();
+        gtk::glib::idle_add_local_once(move || revealer.set_reveal_child(true));
+    }
+
+    /// Plays the exit animation, then pops the popover down once it finishes.
+    ///
+    /// Only programmatic closes (toggling the bar button, re-anchoring) run
+    /// through here; native autohide outside-clicks close the popover instantly
+    /// because they rely on the Wayland popup grab, which has no exit hook.
+    fn animate_out(&self, style: &DropdownStyle) {
+        let (duration, transition) = style.exit;
+        if duration == 0 {
+            self.popover.popdown();
+            return;
+        }
+
+        self.revealer.set_transition_type(transition);
+        self.revealer.set_transition_duration(duration);
+        self.revealer.set_reveal_child(false);
+
+        let popover = self.popover.clone();
+        gtk::glib::timeout_add_local_once(Duration::from_millis(u64::from(duration)), move || {
+            popover.popdown();
+        });
     }
 
     /// Toggles popover visibility for the given bar button.
@@ -149,7 +211,7 @@ impl DropdownInstance {
         );
 
         if visible && same_parent {
-            self.popover.popdown();
+            self.animate_out(&style);
             return;
         }
 
@@ -171,7 +233,7 @@ impl DropdownInstance {
         let same_parent = self.popover.parent().as_ref() == Some(widget_ref);
 
         if self.popover.is_visible() && same_parent {
-            self.popover.popdown();
+            self.animate_out(&style);
             return;
         }
 
@@ -192,6 +254,7 @@ impl DropdownInstance {
             "popup (widget path)"
         );
         self.popover.popup();
+        self.animate_in(&style);
     }
 
     fn reparent_and_show(&self, bar_button: &Controller<BarButton>, style: DropdownStyle) {
@@ -241,6 +304,7 @@ impl DropdownInstance {
             "popup (button path)"
         );
         self.popover.popup();
+        self.animate_in(&style);
     }
 
     fn clamp_height(&self) {
@@ -401,6 +465,21 @@ struct DropdownStyle {
     shadow_enabled: bool,
     autohide: bool,
     freeze_label: bool,
+    /// `(duration_ms, transition)` for the enter animation.
+    enter: (u32, gtk::RevealerTransitionType),
+    /// `(duration_ms, transition)` for the exit animation.
+    exit: (u32, gtk::RevealerTransitionType),
+}
+
+fn revealer_transition(anim: AnimationType) -> gtk::RevealerTransitionType {
+    match anim {
+        AnimationType::None => gtk::RevealerTransitionType::None,
+        AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
+        AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
+        AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
+        AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
+        AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
+    }
 }
 
 const REM_PX: f32 = 16.0;
@@ -588,10 +667,19 @@ fn dropdown_style(registry: &DropdownRegistry) -> DropdownStyle {
     let config = registry.services.config.config();
     let bar = &config.bar;
     let scale = bar.scale.get().value();
+    let animations = &config.animations;
     DropdownStyle {
         margins: DropdownMargins::new(scale, bar.location.get()),
         shadow_enabled: bar.dropdown_shadow.get(),
         autohide: bar.dropdown_autohide.get(),
         freeze_label: bar.dropdown_freeze_label.get(),
+        enter: (
+            animations.duration_for(AnimSurface::Dropdown, false),
+            revealer_transition(animations.transition_for(AnimSurface::Dropdown, false)),
+        ),
+        exit: (
+            animations.duration_for(AnimSurface::Dropdown, true),
+            revealer_transition(animations.transition_for(AnimSurface::Dropdown, true)),
+        ),
     }
 }

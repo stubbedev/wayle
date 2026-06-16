@@ -25,7 +25,9 @@ use self::{
     sun_times::{SunTimes, SunTimesInit},
     weather_header::{WeatherHeader, WeatherHeaderInit},
 };
-use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
+use wayle_config::schemas::styling::Size;
+
+use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 395.0;
 const BASE_HEIGHT: f32 = 695.0;
@@ -36,6 +38,8 @@ pub(crate) struct WeatherDropdown {
 
     scaled_width: i32,
     scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
     page: WeatherPage,
     error_kind: Option<WeatherErrorKind>,
 
@@ -229,6 +233,7 @@ impl Component for WeatherDropdown {
             .detach();
 
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.weather.get();
         let (page, error_kind) = match init.weather.status.get() {
             WeatherStatus::Loading => (WeatherPage::Loading, None),
             WeatherStatus::Loaded => (WeatherPage::Loaded, None),
@@ -240,8 +245,10 @@ impl Component for WeatherDropdown {
         let model = Self {
             weather: init.weather,
             config: init.config,
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
-            scaled_height: scaled_dimension(BASE_HEIGHT, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
+            width_override: size.width,
+            height_override: size.height,
             page,
             error_kind,
             weather_header,
@@ -277,8 +284,8 @@ impl Component for WeatherDropdown {
     ) {
         match msg {
             WeatherDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
-                self.scaled_height = scaled_dimension(BASE_HEIGHT, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_dimension(self.height_override, BASE_HEIGHT, scale);
             }
 
             WeatherDropdownCmd::PageChanged { page, error } => {

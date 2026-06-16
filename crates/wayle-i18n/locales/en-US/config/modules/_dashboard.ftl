@@ -44,5 +44,23 @@ settings-modules-dashboard-dropdown-reboot-command = Reboot Command
 settings-modules-dashboard-dropdown-poweroff-command = Power Off Command
     .description = Shell command for the power-off button
 
+settings-modules-dashboard-usage-warning = Usage Warning
+    .description = CPU/RAM/disk usage percent at which the rings turn warning
+
+settings-modules-dashboard-usage-error = Usage Error
+    .description = CPU/RAM/disk usage percent at which the rings turn error
+
+settings-modules-dashboard-temp-warning = Temp Warning
+    .description = CPU temperature (°C) at which the temp ring turns warning
+
+settings-modules-dashboard-temp-error = Temp Error
+    .description = CPU temperature (°C) at which the temp ring turns error
+
+settings-modules-dashboard-battery-warning = Battery Warning
+    .description = Battery percent at or below which the dashboard battery shows warning
+
+settings-modules-dashboard-battery-critical = Battery Critical
+    .description = Battery percent at or below which the dashboard battery shows critical
+
 settings-modules-dashboard-user-session-actions = Session Actions
     .description = Session actions shown in the dashboard (lock, log-out, reboot, power-off)

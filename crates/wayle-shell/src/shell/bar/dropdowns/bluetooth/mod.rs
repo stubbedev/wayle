@@ -19,7 +19,9 @@ use self::{
     messages::{BluetoothDropdownCmd, BluetoothDropdownInit, BluetoothDropdownMsg},
     pairing_card::{PairingCard, messages::PairingCardInit},
 };
-use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
+use wayle_config::schemas::styling::Size;
+
+use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 382.0;
 const BASE_HEIGHT: f32 = 512.0;
@@ -30,6 +32,8 @@ pub(crate) struct BluetoothDropdown {
     bluetooth: Option<Arc<BluetoothService>>,
     scaled_width: i32,
     scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
     enabled: bool,
     available: bool,
     scanning: bool,
@@ -340,14 +344,17 @@ impl Component for BluetoothDropdown {
             .forward(sender.input_sender(), BluetoothDropdownMsg::PairingCard);
 
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.bluetooth.get();
 
         watchers::spawn_config_watcher(&sender, &init.config);
         watchers::spawn_service_watcher(&sender, &init.bluetooth);
 
         let model = Self {
             bluetooth: None,
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
-            scaled_height: scaled_dimension(BASE_HEIGHT, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
+            width_override: size.width,
+            height_override: size.height,
             enabled: false,
             available: false,
             scanning: false,
@@ -407,8 +414,8 @@ impl Component for BluetoothDropdown {
             }
 
             BluetoothDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
-                self.scaled_height = scaled_dimension(BASE_HEIGHT, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_dimension(self.height_override, BASE_HEIGHT, scale);
             }
 
             BluetoothDropdownCmd::ScanComplete => {

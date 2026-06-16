@@ -28,6 +28,9 @@ settings-animations-osd = OSD
 settings-animations-toast = Toast
     .description = Per-surface animation override for toasts
 
+settings-animations-dropdown = Dropdown
+    .description = Per-surface animation override for bar widget dropdown foldouts
+
 
 ## AnimationType variants
 enum-animation-type-none = None

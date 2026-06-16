@@ -22,7 +22,9 @@ use self::{
     },
     messages::{NetworkDropdownCmd, NetworkDropdownInit, NetworkDropdownMsg},
 };
-use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
+use wayle_config::schemas::styling::Size;
+
+use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 382.0;
 const BASE_HEIGHT: f32 = 512.0;
@@ -31,6 +33,8 @@ pub(crate) struct NetworkDropdown {
     network: Arc<NetworkService>,
     scaled_width: i32,
     scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
     wifi_enabled: bool,
     wifi_available: bool,
     scanning: bool,
@@ -150,13 +154,16 @@ impl Component for NetworkDropdown {
         let wifi_enabled = wifi.as_ref().is_some_and(|wifi| wifi.enabled.get());
 
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.network.get();
 
         watchers::spawn(&sender, &init.config, &init.network);
 
         let mut model = Self {
             network: init.network,
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
-            scaled_height: scaled_dimension(BASE_HEIGHT, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
+            width_override: size.width,
+            height_override: size.height,
             wifi_enabled,
             wifi_available,
             scanning: false,
@@ -231,8 +238,8 @@ impl Component for NetworkDropdown {
     ) {
         match msg {
             NetworkDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
-                self.scaled_height = scaled_dimension(BASE_HEIGHT, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_dimension(self.height_override, BASE_HEIGHT, scale);
             }
 
             NetworkDropdownCmd::WifiDeviceChanged => {

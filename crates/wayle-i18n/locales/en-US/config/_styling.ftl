@@ -8,6 +8,9 @@ settings-styling-scale = Scale
 settings-styling-rounding = Rounding
     .description = Corner rounding for dropdowns, popovers, and dialogs
 
+settings-styling-appearance = Appearance
+    .description = Light/dark mode. Auto follows the palette/provider; Light/Dark force it
+
 settings-styling-theme-provider = Theme Provider
     .description = Source for color palette (wayle, matugen, pywal, wallust)
 
@@ -94,6 +97,11 @@ settings-palette-green = Green
 settings-palette-blue = Blue
     .description = Blue semantic color
 
+
+## Appearance variants
+enum-appearance-auto = Auto
+enum-appearance-light = Light
+enum-appearance-dark = Dark
 
 ## ThemeProvider variants
 enum-theme-provider-wayle = Wayle

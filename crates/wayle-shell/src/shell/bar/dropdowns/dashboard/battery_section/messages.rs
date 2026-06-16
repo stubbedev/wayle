@@ -7,6 +7,10 @@ use wayle_power_profiles::{PowerProfilesService, types::profile::PowerProfile};
 pub(crate) struct BatterySectionInit {
     pub battery: Option<Arc<BatteryService>>,
     pub power_profiles: Property<Option<Arc<PowerProfilesService>>>,
+    /// Battery percent at or below which the warning state shows.
+    pub warning: f64,
+    /// Battery percent at or below which the critical state shows.
+    pub critical: f64,
 }
 
 #[derive(Debug)]

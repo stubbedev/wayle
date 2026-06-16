@@ -7,7 +7,7 @@ mod threshold;
 mod typography;
 mod validated;
 
-pub use color::{ColorValue, CssToken, InvalidCssToken, ThemeProvider};
+pub use color::{Appearance, ColorValue, CssToken, InvalidCssToken, ThemeProvider};
 pub use extractor::{
     MatugenScheme, PywalContrast, SignedNormalizedF64, WallustBackend, WallustColorspace,
     WallustPalette,

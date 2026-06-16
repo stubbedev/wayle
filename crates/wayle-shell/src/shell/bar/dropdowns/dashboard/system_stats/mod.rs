@@ -25,6 +25,10 @@ pub(crate) struct SystemStatsSection {
     mem_ring: Controller<ProgressRing>,
     disk_ring: Controller<ProgressRing>,
     temp_ring: Controller<ProgressRing>,
+    usage_warning: f32,
+    usage_error: f32,
+    temp_warning: f32,
+    temp_error: f32,
 }
 
 #[relm4::component(pub(crate))]
@@ -160,13 +164,23 @@ impl Component for SystemStatsSection {
 
         let cpu_data = init.sysinfo.cpu.get();
 
-        methods::update_usage_ring(&cpu_ring, cpu_data.usage_percent);
+        methods::update_usage_ring(
+            &cpu_ring,
+            cpu_data.usage_percent,
+            init.usage_warning,
+            init.usage_error,
+        );
 
         if let Some(celsius) = cpu_data.temperature_celsius {
-            methods::update_temp_ring(&temp_ring, celsius);
+            methods::update_temp_ring(&temp_ring, celsius, init.temp_warning, init.temp_error);
         }
 
-        methods::update_usage_ring(&mem_ring, init.sysinfo.memory.get().usage_percent);
+        methods::update_usage_ring(
+            &mem_ring,
+            init.sysinfo.memory.get().usage_percent,
+            init.usage_warning,
+            init.usage_error,
+        );
 
         let disk_usage = init
             .sysinfo
@@ -175,7 +189,7 @@ impl Component for SystemStatsSection {
             .iter()
             .find(|disk| disk.mount_point.as_os_str() == "/")
             .map_or(0.0, |disk| disk.usage_percent);
-        methods::update_usage_ring(&disk_ring, disk_usage);
+        methods::update_usage_ring(&disk_ring, disk_usage, init.usage_warning, init.usage_error);
 
         let model = Self {
             sysinfo: init.sysinfo,
@@ -185,6 +199,10 @@ impl Component for SystemStatsSection {
             mem_ring,
             disk_ring,
             temp_ring,
+            usage_warning: init.usage_warning,
+            usage_error: init.usage_error,
+            temp_warning: init.temp_warning,
+            temp_error: init.temp_error,
         };
 
         let cpu_ring_widget = model.cpu_ring.widget();
@@ -222,18 +240,38 @@ impl Component for SystemStatsSection {
     ) {
         match msg {
             SystemStatsCmd::CpuChanged { usage, temp } => {
-                methods::update_usage_ring(&self.cpu_ring, usage);
+                methods::update_usage_ring(
+                    &self.cpu_ring,
+                    usage,
+                    self.usage_warning,
+                    self.usage_error,
+                );
                 if let Some(celsius) = temp {
-                    methods::update_temp_ring(&self.temp_ring, celsius);
+                    methods::update_temp_ring(
+                        &self.temp_ring,
+                        celsius,
+                        self.temp_warning,
+                        self.temp_error,
+                    );
                 }
             }
 
             SystemStatsCmd::MemoryChanged { usage } => {
-                methods::update_usage_ring(&self.mem_ring, usage);
+                methods::update_usage_ring(
+                    &self.mem_ring,
+                    usage,
+                    self.usage_warning,
+                    self.usage_error,
+                );
             }
 
             SystemStatsCmd::DiskChanged { usage } => {
-                methods::update_usage_ring(&self.disk_ring, usage);
+                methods::update_usage_ring(
+                    &self.disk_ring,
+                    usage,
+                    self.usage_warning,
+                    self.usage_error,
+                );
             }
         }
     }

@@ -78,6 +78,77 @@ pub fn builtins() -> Vec<ThemeEntry> {
         .collect()
 }
 
+/// Canonical dark/light theme pairs, used in both directions by
+/// [`appearance_variant`]. The first entry of each family is the one a light
+/// theme maps back to when forcing dark mode.
+const THEME_PAIRS: &[(&str, &str)] = &[
+    ("catppuccin-mocha", "catppuccin-latte"),
+    ("everforest-dark", "everforest-light"),
+    ("everforest-dark-hard", "everforest-light-hard"),
+    ("everforest-dark-soft", "everforest-light-soft"),
+    ("gruvbox-dark", "gruvbox-light"),
+    ("gruvbox-dark-hard", "gruvbox-light-hard"),
+    ("gruvbox-dark-soft", "gruvbox-light-soft"),
+    ("kanagawa-wave", "kanagawa-lotus"),
+    ("one-dark", "one-light"),
+    ("rose-pine-main", "rose-pine-dawn"),
+    ("solarized-dark", "solarized-light"),
+    ("tokyo-night-night", "tokyo-night-day"),
+    ("nightfox-nightfox", "nightfox-dayfox"),
+];
+
+/// Extra dark sub-variants that share a family's light theme. One-way: forcing
+/// light maps these to the shared light theme; they are already dark.
+const DARK_SUBVARIANT_LIGHT: &[(&str, &str)] = &[
+    ("catppuccin-macchiato", "catppuccin-latte"),
+    ("catppuccin-frappe", "catppuccin-latte"),
+    ("kanagawa-dragon", "kanagawa-lotus"),
+    ("rose-pine-moon", "rose-pine-dawn"),
+    ("tokyo-night-storm", "tokyo-night-day"),
+    ("tokyo-night-moon", "tokyo-night-day"),
+    ("nightfox-carbonfox", "nightfox-dayfox"),
+    ("nightfox-duskfox", "nightfox-dayfox"),
+    ("nightfox-nordfox", "nightfox-dayfox"),
+    ("nightfox-terafox", "nightfox-dayfox"),
+];
+
+/// Returns the name of `theme`'s light or dark sibling, or `None` when `theme`
+/// already matches the requested mode or has no paired variant.
+#[must_use]
+pub fn appearance_variant(theme: &str, want_light: bool) -> Option<&'static str> {
+    if want_light {
+        if THEME_PAIRS.iter().any(|(_, light)| *light == theme) {
+            return None; // already a light theme
+        }
+        if let Some((_, light)) = THEME_PAIRS.iter().find(|(dark, _)| *dark == theme) {
+            return Some(light);
+        }
+        DARK_SUBVARIANT_LIGHT
+            .iter()
+            .find(|(dark, _)| *dark == theme)
+            .map(|(_, light)| *light)
+    } else {
+        if THEME_PAIRS.iter().any(|(dark, _)| *dark == theme)
+            || DARK_SUBVARIANT_LIGHT.iter().any(|(dark, _)| *dark == theme)
+        {
+            return None; // already a dark theme
+        }
+        THEME_PAIRS
+            .iter()
+            .find(|(_, light)| *light == theme)
+            .map(|(dark, _)| *dark)
+    }
+}
+
+/// Looks up a built-in theme palette by name.
+#[must_use]
+pub fn palette_by_name(name: &str) -> Option<Palette> {
+    builtins()
+        .into_iter()
+        .find(|entry| entry.name == name)
+        .map(|entry| entry.palette)
+}
+
 /// Default palette
 pub fn wayle() -> Palette {
     use wayle_theme::*;

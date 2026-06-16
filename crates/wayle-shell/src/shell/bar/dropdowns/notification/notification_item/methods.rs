@@ -94,10 +94,20 @@ impl NotificationItem {
         main_row.set_cursor_from_name(Some("pointer"));
 
         let notification = self.notification.clone();
+        let row = main_row.clone();
         let click = gtk::GestureClick::new();
 
         click.connect_released(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
+
+            // Invoking the default action usually opens another app/window, so
+            // close the dropdown foldout the item lives in before acting.
+            if let Some(popover) = row
+                .ancestor(gtk::Popover::static_type())
+                .and_downcast::<gtk::Popover>()
+            {
+                popover.popdown();
+            }
 
             let notif = notification.clone();
             spawn_local(async move {

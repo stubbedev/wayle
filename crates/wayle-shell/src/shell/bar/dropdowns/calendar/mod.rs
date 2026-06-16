@@ -16,13 +16,21 @@ use self::{
     helpers::{day_names_array, format_date_rest, months_array, weekdays_array},
     messages::{CalendarDropdownCmd, CalendarDropdownInit},
 };
-use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
+use wayle_config::schemas::styling::Size;
+
+use crate::{
+    i18n::t,
+    shell::bar::dropdowns::{resolve_content_height, resolve_dimension},
+};
 
 const BASE_WIDTH: f32 = 340.0;
 
 pub(crate) struct CalendarDropdown {
     calendar: Controller<Calendar>,
     scaled_width: i32,
+    scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
     use_12h: bool,
     show_seconds: bool,
     week_start: Weekday,
@@ -53,6 +61,8 @@ impl Component for CalendarDropdown {
             set_has_arrow: false,
             #[watch]
             set_width_request: model.scaled_width,
+            #[watch]
+            set_height_request: model.scaled_height,
 
             #[template]
             Dropdown {
@@ -181,6 +191,7 @@ impl Component for CalendarDropdown {
             .detach();
 
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.calendar.get();
 
         watchers::spawn(&sender, &init.config);
 
@@ -190,7 +201,10 @@ impl Component for CalendarDropdown {
 
         let model = Self {
             calendar,
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_content_height(size.height),
+            width_override: size.width,
+            height_override: size.height,
             use_12h,
             show_seconds,
             week_start,
@@ -218,7 +232,8 @@ impl Component for CalendarDropdown {
     ) {
         match msg {
             CalendarDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_content_height(self.height_override);
             }
 
             CalendarDropdownCmd::TimeTick => {

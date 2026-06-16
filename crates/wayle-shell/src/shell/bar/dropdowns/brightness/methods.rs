@@ -7,7 +7,7 @@ use wayle_brightness::{BacklightDevice, Percentage};
 use super::{
     BrightnessDropdown,
     device_item::messages::{BrightnessDeviceInit, BrightnessDeviceItemMsg},
-    helpers::device_subtitle,
+    helpers::{device_subtitle, friendly_device_name},
 };
 
 const DEVICE_ICON: &str = "ld-sun-symbolic";
@@ -22,6 +22,7 @@ impl BrightnessDropdown {
         for device in &self.devices {
             guard.push_back(BrightnessDeviceInit {
                 name: device.name.to_string(),
+                title: friendly_device_name(device.name.as_str(), device.backlight_type),
                 subtitle: device_subtitle(device.name.as_str(), device.backlight_type, multi),
                 icon: DEVICE_ICON,
                 percentage: device.percentage().value(),

@@ -16,7 +16,9 @@ use self::{
     main_section::{MainSection, MainSectionInit, MainSectionOutput},
     messages::{AudioDropdownCmd, AudioDropdownInit, AudioDropdownMsg},
 };
-use crate::{i18n::t, shell::bar::dropdowns::scaled_dimension};
+use wayle_config::schemas::styling::Size;
+
+use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 382.0;
 const BASE_HEIGHT: f32 = 512.0;
@@ -41,6 +43,8 @@ impl AudioPage {
 pub(crate) struct AudioDropdown {
     scaled_width: i32,
     scaled_height: i32,
+    width_override: Option<Size>,
+    height_override: Option<Size>,
     active_page: AudioPage,
     main_section: Controller<MainSection>,
     output_picker: Controller<DevicePicker>,
@@ -131,11 +135,14 @@ impl Component for AudioDropdown {
             .forward(sender.input_sender(), AudioDropdownMsg::InputPicker);
 
         let scale = init.config.config().styling.scale.get().value();
+        let size = init.config.config().dropdowns.audio.get();
         watchers::spawn(&sender, &init.config);
 
         let model = Self {
-            scaled_width: scaled_dimension(BASE_WIDTH, scale),
-            scaled_height: scaled_dimension(BASE_HEIGHT, scale),
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
+            width_override: size.width,
+            height_override: size.height,
             active_page: AudioPage::Main,
             main_section,
             output_picker,
@@ -175,8 +182,8 @@ impl Component for AudioDropdown {
     ) {
         match msg {
             AudioDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = scaled_dimension(BASE_WIDTH, scale);
-                self.scaled_height = scaled_dimension(BASE_HEIGHT, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_dimension(self.height_override, BASE_HEIGHT, scale);
             }
         }
     }

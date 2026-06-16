@@ -1,6 +1,6 @@
 @mixin switch-base {
     --puck-shadow: 0 0 calc(0.5rem * var(--global-scale)) calc(0.15rem * var(--global-scale))
-        rgba(0, 0, 0, 0.4);
+        var(--shadow-color-soft);
 
     all: unset;
     border-radius: var(--rounding-element);

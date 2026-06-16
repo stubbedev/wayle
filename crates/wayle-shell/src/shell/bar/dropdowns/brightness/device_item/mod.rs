@@ -10,6 +10,7 @@ pub(super) use self::messages::{
 
 pub(super) struct BrightnessDeviceItem {
     pub name: String,
+    pub title: String,
     pub subtitle: Option<String>,
     pub icon: &'static str,
     slider: DebouncedSlider,
@@ -52,7 +53,7 @@ impl FactoryComponent for BrightnessDeviceItem {
                         set_halign: gtk::Align::Start,
                         set_ellipsize: gtk::pango::EllipsizeMode::End,
                         #[watch]
-                        set_label: &self.name,
+                        set_label: &self.title,
                     },
 
                     gtk::Label {
@@ -79,6 +80,7 @@ impl FactoryComponent for BrightnessDeviceItem {
     fn init_model(init: Self::Init, _index: &Self::Index, _sender: FactorySender<Self>) -> Self {
         Self {
             name: init.name,
+            title: init.title,
             subtitle: init.subtitle,
             icon: init.icon,
             slider: DebouncedSlider::with_label(init.percentage),
