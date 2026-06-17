@@ -1,7 +1,9 @@
 mod factory;
+mod geoclue;
 mod helpers;
 mod messages;
 mod methods;
+mod solar;
 mod watchers;
 
 use std::{rc::Rc, sync::Arc};
@@ -14,6 +16,7 @@ use wayle_widgets::prelude::{
     BarButton, BarButtonBehavior, BarButtonColors, BarButtonInit, BarButtonOutput,
 };
 
+use self::solar::Phase;
 pub(crate) use self::{
     factory::Factory,
     messages::{HyprsunsetCmd, HyprsunsetInit, HyprsunsetMsg},
@@ -27,6 +30,12 @@ pub(crate) struct HyprsunsetModule {
     current_temp: u32,
     current_gamma: u32,
     dropdowns: Rc<DropdownRegistry>,
+    /// Last solar phase applied by the auto-schedule (None while disabled).
+    auto_phase: Option<Phase>,
+    /// A manual toggle is overriding the auto-schedule until the next boundary.
+    manual_override: bool,
+    /// Location resolved via GeoClue; preferred over configured lat/long.
+    geo_location: Option<(f64, f64)>,
 }
 
 #[relm4::component(pub(crate))]
@@ -85,6 +94,9 @@ impl Component for HyprsunsetModule {
 
         watchers::spawn_config_watchers(&sender, &config);
         watchers::spawn_state_watcher(&sender);
+        watchers::spawn_schedule_watcher(&sender);
+        watchers::spawn_schedule_config_watcher(&sender, &config);
+        watchers::spawn_location_watcher(&sender, &config);
 
         let model = Self {
             bar_button,
@@ -93,6 +105,9 @@ impl Component for HyprsunsetModule {
             current_temp: config.temperature.get(),
             current_gamma: config.gamma.get(),
             dropdowns: init.dropdowns,
+            auto_phase: None,
+            manual_override: false,
+            geo_location: None,
         };
         let bar_button = model.bar_button.widget();
         let widgets = view_output!();
@@ -107,6 +122,11 @@ impl Component for HyprsunsetModule {
             HyprsunsetMsg::LeftClick => {
                 let action = config.left_click.get();
                 if matches!(&action, ClickAction::Shell(s) if s == ":toggle") {
+                    // Under auto-schedule, a manual toggle overrides the schedule
+                    // until the next sunrise/sunset boundary.
+                    if config.auto_schedule.get() {
+                        self.manual_override = true;
+                    }
                     self.toggle_filter(&sender, config);
                     return;
                 }
@@ -124,14 +144,14 @@ impl Component for HyprsunsetModule {
     fn update_cmd(
         &mut self,
         msg: HyprsunsetCmd,
-        _sender: ComponentSender<Self>,
+        sender: ComponentSender<Self>,
         _root: &Self::Root,
     ) {
-        let config = &self.config.config().modules.hyprsunset;
+        let config = self.config.config().modules.hyprsunset.clone();
 
         match msg {
             HyprsunsetCmd::ConfigChanged => {
-                self.update_display(config);
+                self.update_display(&config);
             }
             HyprsunsetCmd::StateChanged(state) => {
                 let enabled = state.is_some();
@@ -147,7 +167,17 @@ impl Component for HyprsunsetModule {
                     self.enabled = enabled;
                     self.current_temp = temp;
                     self.current_gamma = gamma;
-                    self.update_display(config);
+                    self.update_display(&config);
+                }
+            }
+            HyprsunsetCmd::TickSchedule => {
+                self.evaluate_schedule(&sender, &config);
+            }
+            HyprsunsetCmd::LocationResolved(lat, lng) => {
+                if self.geo_location != Some((lat, lng)) {
+                    debug!(lat, lng, "geoclue location resolved");
+                    self.geo_location = Some((lat, lng));
+                    self.evaluate_schedule(&sender, &config);
                 }
             }
         }

@@ -1,19 +1,21 @@
 use std::{rc::Rc, sync::Arc};
 
 use wayle_config::ConfigService;
+use wayle_core::DeferredService;
+use wayle_power_profiles::PowerProfilesService;
 use wayle_widgets::prelude::BarSettings;
 
-use super::helpers::HyprsunsetState;
 use crate::shell::bar::dropdowns::DropdownRegistry;
 
-pub(crate) struct HyprsunsetInit {
+pub(crate) struct PowerProfilesInit {
     pub settings: BarSettings,
+    pub power_profiles: DeferredService<PowerProfilesService>,
     pub config: Arc<ConfigService>,
     pub dropdowns: Rc<DropdownRegistry>,
 }
 
 #[derive(Debug)]
-pub(crate) enum HyprsunsetMsg {
+pub(crate) enum PowerProfilesMsg {
     LeftClick,
     RightClick,
     MiddleClick,
@@ -22,11 +24,9 @@ pub(crate) enum HyprsunsetMsg {
 }
 
 #[derive(Debug)]
-pub(crate) enum HyprsunsetCmd {
+#[allow(clippy::enum_variant_names)]
+pub(crate) enum PowerProfilesCmd {
+    ServiceReady(Arc<PowerProfilesService>),
+    StateChanged,
     ConfigChanged,
-    StateChanged(Option<HyprsunsetState>),
-    /// Re-evaluate the sunrise/sunset auto-schedule.
-    TickSchedule,
-    /// GeoClue resolved a location for the auto-schedule (latitude, longitude).
-    LocationResolved(f64, f64),
 }

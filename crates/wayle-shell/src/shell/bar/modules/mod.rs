@@ -12,6 +12,7 @@ mod hyprsunset;
 mod idle_inhibit;
 mod keybind_mode;
 mod keyboard_input;
+mod mail;
 mod mango_workspaces;
 mod media;
 mod microphone;
@@ -20,6 +21,7 @@ mod network;
 mod niri_workspaces;
 mod notification;
 mod power;
+mod power_profiles;
 mod ram;
 mod recorder;
 mod registry;
@@ -73,6 +75,7 @@ register_modules! {
     IdleInhibit => idle_inhibit::Factory,
     KeybindMode => keybind_mode::Factory,
     KeyboardInput => keyboard_input::Factory,
+    Mail => mail::Factory,
     MangoWorkspaces => mango_workspaces::Factory,
     Media => media::Factory,
     Microphone => microphone::Factory,
@@ -81,6 +84,7 @@ register_modules! {
     NiriWorkspaces => niri_workspaces::Factory,
     Notifications => notification::Factory,
     Power => power::Factory,
+    PowerProfiles => power_profiles::Factory,
     Ram => ram::Factory,
     Recorder => recorder::Factory,
     Separator => separator::Factory,

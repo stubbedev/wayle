@@ -24,10 +24,11 @@ in
       default = false;
       description = ''
         Enable the backing system services wayle integrates with: UPower
-        (battery) and BlueZ (bluetooth), plus wl-clipboard and xdg-utils. Set
-        with `mkDefault` so your own settings win. Networking
-        (NetworkManager), power-profiles-daemon, and PipeWire are intentionally
-        left out — enable those deliberately to avoid clashing with your setup.
+        (battery), BlueZ (bluetooth), and GeoClue (location for the hyprsunset
+        auto-schedule), plus wl-clipboard and xdg-utils. Set with `mkDefault` so
+        your own settings win. Networking (NetworkManager),
+        power-profiles-daemon, and PipeWire are intentionally left out — enable
+        those deliberately to avoid clashing with your setup.
       '';
     };
 
@@ -65,6 +66,21 @@ in
     (lib.mkIf cfg.autoInstallDependencies {
       services.upower.enable = lib.mkDefault true;
       hardware.bluetooth.enable = lib.mkDefault true;
+
+      # GeoClue backs the hyprsunset auto-schedule's location lookup. The
+      # appConfig entry whitelists wayle (DesktopId "wayle") so the daemon
+      # serves it without an agent prompt; isSystem skips the per-user agent.
+      # If GeoClue is unavailable the schedule falls back to the configured
+      # latitude/longitude, so this is purely a convenience.
+      services.geoclue2 = {
+        enable = lib.mkDefault true;
+        appConfig.wayle = {
+          desktopID = "wayle";
+          isAllowed = true;
+          isSystem = true;
+        };
+      };
+
       environment.systemPackages =
         lib.optional (pkgs ? wl-clipboard) pkgs.wl-clipboard
         ++ lib.optional (pkgs ? xdg-utils) pkgs.xdg-utils;

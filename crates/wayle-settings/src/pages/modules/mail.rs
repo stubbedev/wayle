@@ -1,13 +1,9 @@
-//! Hyprsunset module settings.
+//! Mail (notmuch) module settings.
 
 use wayle_config::Config;
 
 use crate::{
-    editors::{
-        number::{number_f64, number_u32},
-        text::text,
-        toggle::toggle,
-    },
+    editors::{text::text, toggle::toggle},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -18,7 +14,7 @@ use crate::{
 };
 
 pub(crate) fn entry(config: &Config) -> LeafEntry {
-    let module = &config.modules.hyprsunset;
+    let module = &config.modules.mail;
 
     let fields = BarButtonFields {
         icon_show: &module.icon_show,
@@ -38,28 +34,19 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
     };
 
     LeafEntry {
-        id: "hyprsunset",
-        i18n_key: "settings-nav-hyprsunset",
-        icon: "ld-sun-symbolic",
+        id: "mail",
+        i18n_key: "settings-nav-mail",
+        icon: "ld-mail-symbolic",
         spec: page_spec(
-            "settings-page-hyprsunset",
+            "settings-page-mail",
             vec![
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![
                         text(&module.format),
-                        number_u32(&module.temperature),
-                        number_u32(&module.gamma),
-                        text(&module.icon_off),
-                        text(&module.icon_on),
-                    ],
-                },
-                SectionSpec {
-                    title_key: "settings-section-hyprsunset-schedule",
-                    items: vec![
-                        toggle(&module.auto_schedule),
-                        number_f64(&module.latitude, -90.0, 90.0, 0.1, 4),
-                        number_f64(&module.longitude, -180.0, 180.0, 0.1, 4),
+                        text(&module.query),
+                        text(&module.icon_name),
+                        toggle(&module.hide_when_zero),
                     ],
                 },
                 bar_display_section(&fields),

@@ -1,13 +1,9 @@
-//! Hyprsunset module settings.
+//! Power profiles module settings.
 
 use wayle_config::Config;
 
 use crate::{
-    editors::{
-        number::{number_f64, number_u32},
-        text::text,
-        toggle::toggle,
-    },
+    editors::{color_value::color_value, text::text},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -18,7 +14,7 @@ use crate::{
 };
 
 pub(crate) fn entry(config: &Config) -> LeafEntry {
-    let module = &config.modules.hyprsunset;
+    let module = &config.modules.power_profiles;
 
     let fields = BarButtonFields {
         icon_show: &module.icon_show,
@@ -38,28 +34,25 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
     };
 
     LeafEntry {
-        id: "hyprsunset",
-        i18n_key: "settings-nav-hyprsunset",
-        icon: "ld-sun-symbolic",
+        id: "power-profiles",
+        i18n_key: "settings-nav-power-profiles",
+        icon: "ld-scale-symbolic",
         spec: page_spec(
-            "settings-page-hyprsunset",
+            "settings-page-power-profiles",
             vec![
                 SectionSpec {
                     title_key: "settings-section-general",
-                    items: vec![
-                        text(&module.format),
-                        number_u32(&module.temperature),
-                        number_u32(&module.gamma),
-                        text(&module.icon_off),
-                        text(&module.icon_on),
-                    ],
+                    items: vec![text(&module.format)],
                 },
                 SectionSpec {
-                    title_key: "settings-section-hyprsunset-schedule",
+                    title_key: "settings-section-power-profiles-profiles",
                     items: vec![
-                        toggle(&module.auto_schedule),
-                        number_f64(&module.latitude, -90.0, 90.0, 0.1, 4),
-                        number_f64(&module.longitude, -180.0, 180.0, 0.1, 4),
+                        text(&module.icon_power_saver),
+                        color_value(&module.color_power_saver),
+                        text(&module.icon_balanced),
+                        color_value(&module.color_balanced),
+                        text(&module.icon_performance),
+                        color_value(&module.color_performance),
                     ],
                 },
                 bar_display_section(&fields),

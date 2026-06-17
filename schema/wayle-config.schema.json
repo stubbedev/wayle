@@ -613,6 +613,7 @@
             "idle-inhibit",
             "keybind-mode",
             "keyboard-input",
+            "mail",
             "media",
             "mango-workspaces",
             "microphone",
@@ -621,6 +622,7 @@
             "niri-workspaces",
             "notifications",
             "power",
+            "power-profiles",
             "ram",
             "recorder",
             "separator",
@@ -2340,6 +2342,11 @@
     "HyprsunsetConfig": {
       "description": "Toggle for Hyprland's blue-light filter.",
       "properties": {
+        "auto-schedule": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Automatically enable the filter at night and disable it during the day,\nbased on local sunrise/sunset computed from `latitude`/`longitude`.\n\nWhile enabled, the module drives the filter on the solar schedule. A\nmanual click toggles an override that lasts until the next sunrise or\nsunset, after which the schedule resumes."
+        },
         "border-color": {
           "$ref": "#/$defs/ColorValue",
           "default": "yellow",
@@ -2405,10 +2412,20 @@
           "default": true,
           "description": "Display label."
         },
+        "latitude": {
+          "$ref": "#/$defs/double",
+          "default": 0.0,
+          "description": "Latitude for the sunrise/sunset schedule, in decimal degrees\n(north positive). Range: -90 to 90. Only used when `auto-schedule` is on."
+        },
         "left-click": {
           "$ref": "#/$defs/ClickAction",
           "default": ":toggle",
           "description": "Action on left click. Default toggles blue light filter."
+        },
+        "longitude": {
+          "$ref": "#/$defs/double",
+          "default": 0.0,
+          "description": "Longitude for the sunrise/sunset schedule, in decimal degrees\n(east positive). Range: -180 to 180. Only used when `auto-schedule` is on."
         },
         "middle-click": {
           "$ref": "#/$defs/ClickAction",
@@ -2825,6 +2842,102 @@
           "type": "string"
         }
       ]
+    },
+    "MailConfig": {
+      "description": "Unread mail count, backed by a notmuch query.\n\nRuns `notmuch count <query>` and re-queries whenever the maildir changes\n(event-driven via an inotify watch on the notmuch database path). Hidden\nwhile the count is zero when `hide-when-zero` is set.",
+      "properties": {
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "format": {
+          "$ref": "#/$defs/string",
+          "default": "{{ count }}",
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ count }}` - Number of messages matching the query\n\n## Examples\n\n- `\"{{ count }}\"` - \"3\""
+        },
+        "hide-when-zero": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Hide the module entirely while the count is zero."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast."
+        },
+        "icon-name": {
+          "$ref": "#/$defs/string",
+          "default": "ld-mail-symbolic",
+          "description": "Module icon."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display label."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on left click. Empty for no action, or a shell command (e.g. your mail client)."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "query": {
+          "$ref": "#/$defs/string",
+          "default": "tag:unread",
+          "description": "notmuch search query whose match count is shown.\n\nAny query `notmuch count` accepts, e.g. `tag:unread`,\n`tag:unread and tag:inbox`, `folder:work and tag:unread`."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        }
+      },
+      "type": "object"
     },
     "MangoWorkspacesConfig": {
       "description": "MangoWM tag switcher module configuration.",
@@ -3518,6 +3631,7 @@
         "hyprsunset": {
           "$ref": "#/$defs/HyprsunsetConfig",
           "default": {
+            "auto-schedule": false,
             "border-color": "yellow",
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
@@ -3531,7 +3645,9 @@
             "label-color": "yellow",
             "label-max-length": 0,
             "label-show": true,
+            "latitude": 0.0,
             "left-click": ":toggle",
+            "longitude": 0.0,
             "middle-click": "",
             "right-click": "",
             "scroll-down": "",
@@ -3609,6 +3725,30 @@
             "scroll-up": ""
           },
           "description": "Keyboard input module."
+        },
+        "mail": {
+          "$ref": "#/$defs/MailConfig",
+          "default": {
+            "border-color": "blue",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "format": "{{ count }}",
+            "hide-when-zero": true,
+            "icon-bg-color": "bg-surface-elevated",
+            "icon-color": "auto",
+            "icon-name": "ld-mail-symbolic",
+            "icon-show": true,
+            "label-color": "auto",
+            "label-max-length": 0,
+            "label-show": true,
+            "left-click": "",
+            "middle-click": "",
+            "query": "tag:unread",
+            "right-click": "",
+            "scroll-down": "",
+            "scroll-up": ""
+          },
+          "description": "Unread mail count module."
         },
         "mango-workspaces": {
           "$ref": "#/$defs/MangoWorkspacesConfig",
@@ -3842,6 +3982,33 @@
             "scroll-up": ""
           },
           "description": "Power menu module."
+        },
+        "power-profiles": {
+          "$ref": "#/$defs/PowerProfilesConfig",
+          "default": {
+            "border-color": "blue",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "color-balanced": "blue",
+            "color-performance": "red",
+            "color-power-saver": "green",
+            "format": "{{ profile }}",
+            "icon-balanced": "ld-scale-symbolic",
+            "icon-bg-color": "bg-surface-elevated",
+            "icon-color": "auto",
+            "icon-performance": "ld-rocket-symbolic",
+            "icon-power-saver": "ld-leaf-symbolic",
+            "icon-show": true,
+            "label-color": "auto",
+            "label-max-length": 0,
+            "label-show": false,
+            "left-click": ":cycle",
+            "middle-click": "",
+            "right-click": "",
+            "scroll-down": "",
+            "scroll-up": ""
+          },
+          "description": "Power profile indicator/switcher module."
         },
         "ram": {
           "$ref": "#/$defs/RamConfig",
@@ -4954,6 +5121,117 @@
           "$ref": "#/$defs/ClickAction",
           "default": "",
           "description": "Action on left click."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        }
+      },
+      "type": "object"
+    },
+    "PowerProfilesConfig": {
+      "description": "Power profile indicator and switcher (power-profiles-daemon).\n\nShows the active profile with a per-profile icon and color, and cycles\nthrough the available profiles on click. Backed by the same\npower-profiles-daemon D-Bus interface as `powerprofilesctl`.",
+      "properties": {
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "color-balanced": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Icon/label color while the balanced profile is active."
+        },
+        "color-performance": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "red",
+          "description": "Icon/label color while the performance profile is active."
+        },
+        "color-power-saver": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "green",
+          "description": "Icon/label color while the power-saver profile is active."
+        },
+        "format": {
+          "$ref": "#/$defs/string",
+          "default": "{{ profile }}",
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ profile }}` - Active profile name (power-saver, balanced, performance)\n\n## Examples\n\n- `\"{{ profile }}\"` - \"balanced\""
+        },
+        "icon-balanced": {
+          "$ref": "#/$defs/string",
+          "default": "ld-scale-symbolic",
+          "description": "Icon shown while the balanced profile is active."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast.\n\nOverridden per active profile by the `color-*` fields."
+        },
+        "icon-performance": {
+          "$ref": "#/$defs/string",
+          "default": "ld-rocket-symbolic",
+          "description": "Icon shown while the performance profile is active."
+        },
+        "icon-power-saver": {
+          "$ref": "#/$defs/string",
+          "default": "ld-leaf-symbolic",
+          "description": "Icon shown while the power-saver profile is active."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display label."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": ":cycle",
+          "description": "Action on left click. Default cycles to the next power profile."
         },
         "middle-click": {
           "$ref": "#/$defs/ClickAction",
@@ -7334,6 +7612,7 @@
           "workspace-padding": 0.5
         },
         "hyprsunset": {
+          "auto-schedule": false,
           "border-color": "yellow",
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
@@ -7347,7 +7626,9 @@
           "label-color": "yellow",
           "label-max-length": 0,
           "label-show": true,
+          "latitude": 0.0,
           "left-click": ":toggle",
+          "longitude": 0.0,
           "middle-click": "",
           "right-click": "",
           "scroll-down": "",
@@ -7408,6 +7689,26 @@
           "layout-alias-map": {},
           "left-click": "",
           "middle-click": "",
+          "right-click": "",
+          "scroll-down": "",
+          "scroll-up": ""
+        },
+        "mail": {
+          "border-color": "blue",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "format": "{{ count }}",
+          "hide-when-zero": true,
+          "icon-bg-color": "bg-surface-elevated",
+          "icon-color": "auto",
+          "icon-name": "ld-mail-symbolic",
+          "icon-show": true,
+          "label-color": "auto",
+          "label-max-length": 0,
+          "label-show": true,
+          "left-click": "",
+          "middle-click": "",
+          "query": "tag:unread",
           "right-click": "",
           "scroll-down": "",
           "scroll-up": ""
@@ -7608,6 +7909,29 @@
           "icon-color": "auto",
           "icon-name": "ld-power-symbolic",
           "left-click": "",
+          "middle-click": "",
+          "right-click": "",
+          "scroll-down": "",
+          "scroll-up": ""
+        },
+        "power-profiles": {
+          "border-color": "blue",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "color-balanced": "blue",
+          "color-performance": "red",
+          "color-power-saver": "green",
+          "format": "{{ profile }}",
+          "icon-balanced": "ld-scale-symbolic",
+          "icon-bg-color": "bg-surface-elevated",
+          "icon-color": "auto",
+          "icon-performance": "ld-rocket-symbolic",
+          "icon-power-saver": "ld-leaf-symbolic",
+          "icon-show": true,
+          "label-color": "auto",
+          "label-max-length": 0,
+          "label-show": false,
+          "left-click": ":cycle",
           "middle-click": "",
           "right-click": "",
           "scroll-down": "",
