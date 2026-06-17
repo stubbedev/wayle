@@ -281,9 +281,7 @@ fn spawn_monitor(
                         .map_or_else(|| String::from("pipeline"), |s| s.name().to_string());
                     Some(format!("{src}: {}", err.error()))
                 }
-                gst::MessageView::Eos(_) => {
-                    Some(String::from("capture source ended unexpectedly"))
-                }
+                gst::MessageView::Eos(_) => Some(String::from("capture source ended unexpectedly")),
                 _ => None,
             };
             if let Some(reason) = reason {

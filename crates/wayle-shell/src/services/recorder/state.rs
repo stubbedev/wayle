@@ -231,7 +231,11 @@ impl RecorderState {
         if path.is_empty() {
             return;
         }
-        self.notify(&t!("recorder-notification-saved"), path, "ld-video-symbolic");
+        self.notify(
+            &t!("recorder-notification-saved"),
+            path,
+            "ld-video-symbolic",
+        );
     }
 
     /// Toggles recording on/off.
