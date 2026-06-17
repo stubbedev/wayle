@@ -9,6 +9,7 @@ members = [
 	"crates/wayle-ipc",
 	"crates/wayle-recorder",
 	"crates/wayle-settings",
+	"crates/wayle-share-preview",
 	"crates/wayle-shell",
 	"crates/wayle-styling",
 	"crates/wayle-widgets",
@@ -101,6 +102,10 @@ tracing-subscriber = { version = "0.3.20", features = ["env-filter", "json"] }
 unic-langid = "0.9"
 wildcard = "0.3"
 zbus = { version = "5.11.0", default-features = false, features = ["tokio"] }
+hyprland = "0.4.0-beta.2"
+regex = "1.12"
+shlex = "2.0"
+wayland-client = "0.31.14"
 
 wayle-audio = "0.1.3"
 wayle-battery = "0.1.2"
@@ -128,6 +133,7 @@ wayle-icons = { path = "crates/wayle-icons" }
 wayle-idle-inhibit = { path = "crates/wayle-idle-inhibit" }
 wayle-ipc = { path = "crates/wayle-ipc" }
 wayle-recorder = { path = "crates/wayle-recorder" }
+wayle-share-preview = { path = "crates/wayle-share-preview" }
 wayle-shell = { path = "crates/wayle-shell" }
 wayle-styling = { path = "crates/wayle-styling" }
 wayle-widgets = { path = "crates/wayle-widgets" }

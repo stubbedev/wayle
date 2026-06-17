@@ -33,7 +33,8 @@ use zbus::{Connection, fdo::DBusProxy};
 
 use crate::{
     services::{
-        IdleInhibitService, RecorderService, ShellIpcService, ToastBus, WidgetBus, widget_ipc,
+        IdleInhibitService, RecorderService, ShellIpcService, ToastBus, WidgetBus, share_picker,
+        widget_ipc,
     },
     shell::ShellServices,
     startup::StartupTimer,
@@ -157,6 +158,8 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 
     let (widget_bus, toast_bus) = init_widget_socket().await;
 
+    init_share_picker().await;
+
     let recorder = init_recorder(config_service.clone()).await;
 
     timer.mark_services_done();
@@ -186,6 +189,14 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
     };
 
     Ok((timer, services))
+}
+
+/// Registers the share picker D-Bus service. Non-fatal: a failure just leaves
+/// the shell usable without the custom screencast picker.
+async fn init_share_picker() {
+    if let Err(err) = share_picker::start().await {
+        warn!(error = %err, "Share picker service unavailable");
+    }
 }
 
 /// Initializes the recorder service, returning `None` (non-fatal) if GStreamer

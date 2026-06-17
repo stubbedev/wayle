@@ -19,6 +19,8 @@ pub mod panel;
 pub mod power;
 /// Screen recorder control commands
 pub mod recorder;
+/// xdg-desktop-portal screencast picker stub
+pub mod share_picker;
 /// ANSI styling for help output
 pub mod style;
 /// System tray commands

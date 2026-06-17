@@ -22,6 +22,9 @@ fn main() {
             cli::app::generate_completions(shell);
             return;
         }
+        // The portal reads the selection from stdout, so this path must not
+        // initialize stdout tracing — run it in its own minimal runtime.
+        Commands::SharePicker { allow_token } => return run_share_picker(allow_token),
         _ => {}
     }
 
@@ -58,7 +61,9 @@ fn main() {
                 percentage,
                 duration,
             } => cli::toast::execute(&label, icon.as_deref(), percentage, duration).await,
-            Commands::Shell | Commands::Completions { .. } => unreachable!(),
+            Commands::Shell | Commands::Completions { .. } | Commands::SharePicker { .. } => {
+                unreachable!()
+            }
         }
     });
 
@@ -73,4 +78,15 @@ fn run_shell() {
         eprintln!("Error: {err}");
         process::exit(1);
     }
+}
+
+/// Runs the portal screencast picker stub in a dedicated runtime, without
+/// stdout tracing, then exits with its status code.
+fn run_share_picker(allow_token: bool) {
+    let Ok(runtime) = Runtime::new() else {
+        eprintln!("Failed to create tokio runtime");
+        process::exit(1);
+    };
+    let code = runtime.block_on(cli::share_picker::execute(allow_token));
+    process::exit(code);
 }

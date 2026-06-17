@@ -1,0 +1,80 @@
+diff --git a/src/core/PortalManager.cpp b/src/core/PortalManager.cpp
+index cf733a3..209a189 100644
+--- a/src/core/PortalManager.cpp
++++ b/src/core/PortalManager.cpp
+@@ -44,6 +44,7 @@ CPortalManager::CPortalManager() {
+     m_sConfig.config->addConfigValue("screencopy:max_fps", Hyprlang::INT{120L});
+     m_sConfig.config->addConfigValue("screencopy:allow_token_by_default", Hyprlang::INT{0L});
+     m_sConfig.config->addConfigValue("screencopy:custom_picker_binary", Hyprlang::STRING{""});
++    m_sConfig.config->addConfigValue("screencopy:auto_select_single_monitor", Hyprlang::INT{0L});
+     m_sConfig.config->addConfigValue("screencopy:force_shm", Hyprlang::INT{0L});
+ 
+     m_sConfig.config->commence();
+diff --git a/src/core/PortalManager.hpp b/src/core/PortalManager.hpp
+index 0394a3b..5db19d5 100644
+--- a/src/core/PortalManager.hpp
++++ b/src/core/PortalManager.hpp
+@@ -53,6 +53,15 @@ class CPortalManager {
+     sdbus::IConnection* getConnection();
+     SOutput*            getOutputFromName(const std::string& name);
+ 
++    // Read-only access to the output list for callers that only need the
++    // count / a single name (the vector itself stays private).
++    size_t              outputCount() const {
++        return m_vOutputs.size();
++    }
++    std::string firstOutputName() const {
++        return m_vOutputs.empty() ? "" : m_vOutputs.front()->name;
++    }
++
+     struct {
+         pw_loop* loop = nullptr;
+     } m_sPipewire;
+diff --git a/src/portals/Screencopy.cpp b/src/portals/Screencopy.cpp
+index 412501f..efd2563 100644
+--- a/src/portals/Screencopy.cpp
++++ b/src/portals/Screencopy.cpp
+@@ -97,9 +97,16 @@ dbUasv CScreencopyPortal::onSelectSources(sdbus::ObjectPath requestHandle, sdbus
+         } geometry;
+     } restoreData;
+ 
++    // The set of source types the client is willing to capture. Defaults to
++    // "all" when the client omits the option; narrowed below if it sends one.
++    uint32_t requestedTypes = MONITOR | WINDOW | VIRTUAL;
++
+     for (auto& [key, val] : options) {
+ 
+-        if (key == "cursor_mode") {
++        if (key == "types") {
++            requestedTypes = val.get<uint32_t>();
++            Debug::log(LOG, "[screencopy] option types to {}", requestedTypes);
++        } else if (key == "cursor_mode") {
+             PSESSION->cursorMode = val.get<uint32_t>();
+             Debug::log(LOG, "[screencopy] option cursor_mode to {}", PSESSION->cursorMode);
+         } else if (key == "restore_data") {
+@@ -210,9 +217,22 @@ dbUasv CScreencopyPortal::onSelectSources(sdbus::ObjectPath requestHandle, sdbus
+             SHAREDATA.h = restoreData.geometry.h;
+         }
+     } else {
+-        Debug::log(LOG, "[screencopy] restore data invalid / missing, prompting");
+-
+-        SHAREDATA = promptForScreencopySelection();
++        // Auto-select the only monitor when the client asks for monitors but
++        // not windows (e.g. Chrome's "Entire screen") and exactly one output
++        // exists. The choice is then unambiguous, so the picker adds nothing.
++        static auto* const* PAUTOSELECT =
++            (Hyprlang::INT* const*)g_pPortalManager->m_sConfig.config->getConfigValuePtr("screencopy:auto_select_single_monitor")->getDataStaticPtr();
++
++        const bool MONITORONLY = (requestedTypes & MONITOR) && !(requestedTypes & WINDOW);
++
++        if (**PAUTOSELECT && MONITORONLY && g_pPortalManager->outputCount() == 1) {
++            Debug::log(LOG, "[screencopy] auto-selecting the single monitor, not prompting");
++            SHAREDATA.type   = TYPE_OUTPUT;
++            SHAREDATA.output = g_pPortalManager->firstOutputName();
++        } else {
++            Debug::log(LOG, "[screencopy] restore data invalid / missing, prompting");
++            SHAREDATA = promptForScreencopySelection();
++        }
+     }
+ 
+     Debug::log(LOG, "[screencopy] SHAREDATA returned selection {}", (int)SHAREDATA.type);

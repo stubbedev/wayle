@@ -2,6 +2,7 @@
 
 pub mod idle_inhibit;
 pub mod recorder;
+pub mod share_picker;
 pub mod shell_ipc;
 pub mod widget_ipc;
 

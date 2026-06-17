@@ -1,0 +1,23 @@
+[package]
+name = "wayle-share-preview"
+description = "Wayland screencopy + hyprland toplevel-export preview capture for the share picker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+bitflags.workspace = true
+thiserror.workspace = true
+image = "0.25.10"
+log = "0.4"
+memfd = "0.6.5"
+wayland-backend = "0.3.15"
+wayland-client = "0.31.14"
+wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
+wayland-scanner = "0.31.10"
+hyprland = { version = "0.4.0-beta.2", optional = true }
+
+[features]
+hyprland-rs = ["dep:hyprland"]

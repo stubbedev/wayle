@@ -3,6 +3,7 @@ mod helpers;
 mod notification_popup;
 mod osd;
 pub(crate) mod services;
+pub(crate) mod share_picker;
 
 use std::time::Instant;
 
@@ -17,6 +18,7 @@ use tracing::{debug, info};
 use self::{
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
+    share_picker::SharePicker,
 };
 use crate::{startup::StartupTimer, watchers};
 
@@ -26,6 +28,7 @@ pub(crate) struct Shell {
     services: ShellServices,
     _notification_popup: Option<Controller<NotificationPopupHost>>,
     _osd: Option<Controller<Osd>>,
+    _share_picker: Controller<SharePicker>,
 }
 
 pub(crate) struct ShellInit {
@@ -98,12 +101,16 @@ impl Component for Shell {
 
         let osd = create_osd(&init.services);
 
+        let share_picker = SharePicker::builder().launch(()).detach();
+        crate::services::share_picker::register_sender(share_picker.sender().clone());
+
         let model = Shell {
             css_provider,
             bars,
             services: init.services,
             _notification_popup: notification_popup,
             _osd: osd,
+            _share_picker: share_picker,
         };
         let widgets = view_output!();
 

@@ -125,6 +125,13 @@ pub enum Commands {
         #[arg(long)]
         duration: Option<u32>,
     },
+    /// xdg-desktop-portal screencast picker (invoked by the portal, not by hand)
+    #[command(name = "share-picker")]
+    SharePicker {
+        /// Pre-check the "allow restore token" box.
+        #[arg(long)]
+        allow_token: bool,
+    },
     /// Run the desktop shell in the foreground
     Shell,
     /// Generate shell completions

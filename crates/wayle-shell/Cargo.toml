@@ -46,6 +46,11 @@ wayle-config.workspace = true
 wayle-core.workspace = true
 wayle-ipc.workspace = true
 wayle-recorder.workspace = true
+wayle-share-preview = { workspace = true, features = ["hyprland-rs"] }
+hyprland.workspace = true
+regex.workspace = true
+shlex.workspace = true
+wayland-client.workspace = true
 minijinja.workspace = true
 wildcard.workspace = true
 wayle-hyprland.workspace = true
