@@ -47,7 +47,8 @@ pub(crate) fn init_css_provider(
         }
     };
 
-    let css = format!("{STATIC_CSS}\n{theme}\n{user}");
+    let anim = config.animations.css_overrides();
+    let css = format!("{STATIC_CSS}\n{theme}\n{anim}\n{user}");
 
     provider.load_from_string(&css);
     info!("Initial CSS loaded");

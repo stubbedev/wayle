@@ -15,7 +15,7 @@ button.network-scan-btn {
     }
 
     &.scanning image {
-        animation: network-scan-spin 1s steps(20) infinite;
+        animation: network-scan-spin var(--cfg-anim-scan, 1s) steps(20) infinite;
     }
 }
 

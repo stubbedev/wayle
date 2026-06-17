@@ -186,5 +186,7 @@ fn compile_bundle(config: &Config) -> Result<String, Error> {
         Err(_) => String::new(),
     };
 
-    Ok(format!("{STATIC_CSS}\n{theme}\n{user}"))
+    let anim = config.animations.css_overrides();
+
+    Ok(format!("{STATIC_CSS}\n{theme}\n{anim}\n{user}"))
 }

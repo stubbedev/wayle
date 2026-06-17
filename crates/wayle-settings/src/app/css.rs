@@ -41,5 +41,7 @@ pub(super) fn build_css(config_service: &ConfigService) -> String {
         }
     };
 
-    format!("{STATIC_CSS}\n{theme}\n{user}")
+    let anim = config.animations.css_overrides();
+
+    format!("{STATIC_CSS}\n{theme}\n{anim}\n{user}")
 }

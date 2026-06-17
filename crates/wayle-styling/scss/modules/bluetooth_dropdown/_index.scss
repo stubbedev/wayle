@@ -30,7 +30,7 @@ button.bluetooth-scan-btn {
     }
 
     &.scanning image {
-        animation: bt-scan-spin 1s steps(20) infinite;
+        animation: bt-scan-spin var(--cfg-anim-scan, 1s) steps(20) infinite;
     }
 }
 
