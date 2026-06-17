@@ -46,6 +46,12 @@ test:
 # Format, lint and test. Run before every release.
 check: lint test
 
+# Regenerate the committed config JSON schema from the Rust types. The schema's
+# $id embeds the workspace version, so this must be re-run after a version bump
+# (the release flow does this automatically) — CI fails if it drifts.
+schema:
+    {{cargo}} run -q -p wayle -- config schema --stdout | jq -S . > schema/wayle-config.schema.json
+
 # ─────────────────────────── Dependencies ───────────────────────────
 
 # Update Cargo.lock to the latest semver-compatible versions.
@@ -109,8 +115,11 @@ _release bump:
     sed -i -E '/\[workspace\.package\]/,/^\[/{s|^(version = )"[^"]*"|\1"'"$NEW"'"|}' Cargo.toml
     # Refresh Cargo.lock so `cargo build --locked` in CI sees the new version.
     cargo update --workspace
-    if [ -n "$(git status --porcelain Cargo.toml Cargo.lock)" ]; then
-        git add Cargo.toml Cargo.lock
+    # The schema $id embeds the version — regenerate so it doesn't drift and
+    # fail the CI schema check (which is exactly what happened for v0.7.3).
+    just schema
+    if [ -n "$(git status --porcelain Cargo.toml Cargo.lock schema/wayle-config.schema.json)" ]; then
+        git add Cargo.toml Cargo.lock schema/wayle-config.schema.json
         git commit -m "chore: release v${NEW}"
     fi
     git tag -a "v${NEW}" -m "v${NEW}"
