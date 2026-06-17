@@ -71,6 +71,7 @@ impl Component for RecorderDropdown {
                         set_spacing: 8,
 
                         gtk::Button {
+                            add_css_class: "primary",
                             add_css_class: "recorder-record-button",
                             set_hexpand: true,
                             #[watch]
@@ -83,6 +84,7 @@ impl Component for RecorderDropdown {
                         },
 
                         gtk::Button {
+                            add_css_class: "secondary",
                             add_css_class: "recorder-pause-button",
                             #[watch]
                             set_sensitive: model.active,

@@ -22,6 +22,7 @@ mod niri_workspaces;
 mod notification_module;
 mod power;
 mod ram;
+mod recorder;
 mod separator;
 mod storage;
 mod systray;
@@ -58,6 +59,7 @@ pub(crate) fn factories() -> Vec<fn(&Config) -> LeafEntry> {
         notification_module::entry,
         power::entry,
         ram::entry,
+        recorder::entry,
         separator::entry,
         storage::entry,
         systray::entry,

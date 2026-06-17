@@ -1,0 +1,96 @@
+//! Recorder module settings.
+
+use wayle_config::Config;
+
+use crate::{
+    editors::{
+        enum_select::enum_select, number::number_u32, slider::percentage, text::text,
+        toggle::toggle,
+    },
+    pages::{
+        nav::LeafEntry,
+        sections::bar_button::{
+            BarButtonFields, actions_section, bar_display_section, colors_section,
+        },
+        spec::{SectionSpec, page_spec},
+    },
+};
+
+pub(crate) fn entry(config: &Config) -> LeafEntry {
+    let module = &config.modules.recorder;
+
+    let fields = BarButtonFields {
+        icon_show: &module.icon_show,
+        label_show: &module.label_show,
+        label_max_length: &module.label_max_length,
+        border_show: &module.border_show,
+        icon_color: &module.icon_color,
+        icon_bg_color: &module.icon_bg_color,
+        label_color: &module.label_color,
+        button_bg_color: &module.button_bg_color,
+        border_color: &module.border_color,
+        left_click: &module.left_click,
+        right_click: &module.right_click,
+        middle_click: &module.middle_click,
+        scroll_up: &module.scroll_up,
+        scroll_down: &module.scroll_down,
+    };
+
+    LeafEntry {
+        id: "recorder",
+        i18n_key: "settings-nav-recorder",
+        icon: "ld-video-symbolic",
+        spec: page_spec(
+            "settings-page-recorder",
+            vec![
+                SectionSpec {
+                    title_key: "settings-section-general",
+                    items: vec![
+                        text(&module.format),
+                        enum_select(&module.output_format),
+                        text(&module.output_directory),
+                        toggle(&module.show_cursor),
+                    ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-video",
+                    items: vec![
+                        number_u32(&module.bitrate_kbps),
+                        number_u32(&module.framerate),
+                        enum_select(&module.encoder_preset),
+                    ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-audio",
+                    items: vec![
+                        toggle(&module.system_audio),
+                        toggle(&module.microphone),
+                        text(&module.microphone_device),
+                        number_u32(&module.audio_bitrate_kbps),
+                        toggle(&module.separate_audio_tracks),
+                    ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-webcam",
+                    items: vec![
+                        toggle(&module.webcam_enabled),
+                        text(&module.webcam_device),
+                        enum_select(&module.webcam_position),
+                        percentage(&module.webcam_size),
+                    ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-icons",
+                    items: vec![
+                        text(&module.icon_idle),
+                        text(&module.icon_recording),
+                        text(&module.icon_paused),
+                    ],
+                },
+                bar_display_section(&fields),
+                colors_section(&fields),
+                actions_section(&fields),
+            ],
+        ),
+    }
+}

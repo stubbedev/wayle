@@ -1,0 +1,79 @@
+.recorder-dropdown-content {
+    // Record / pause action buttons. The buttons carry the standard
+    // `primary` / `secondary` classes so they pick up the themed button
+    // colors; this only handles their layout in the dropdown.
+    .recorder-controls {
+        margin-bottom: var(--space-md);
+
+        > button {
+            min-height: calc(2rem * var(--global-scale));
+
+            > label {
+                margin: var(--space-sm) var(--space-md);
+            }
+        }
+    }
+
+    // Label + control rows (switches, combos, spin buttons).
+    .recorder-row {
+        min-height: calc(2.25rem * var(--global-scale));
+        margin-top: var(--space-sm);
+
+        > label {
+            font-size: var(--text-md);
+            font-weight: var(--weight-medium);
+            color: var(--fg-default);
+        }
+
+        // Raw gtk DropDown / SpinButton aren't themed at the primitive
+        // level (recorder is the only dropdown using them), so give them
+        // the same overlay-fill + border-on-focus treatment as the other
+        // popovers' inputs.
+        > dropdown,
+        > spinbutton {
+            min-width: calc(8rem * var(--global-scale));
+            color: var(--fg-default);
+            font-size: var(--text-md);
+            font-weight: var(--weight-medium);
+            background: var(--bg-overlay);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--rounding-element);
+            transition: border-color var(--duration-fast);
+
+            &:focus-within {
+                border-color: var(--accent);
+            }
+        }
+
+        > dropdown > button {
+            all: unset;
+
+            > * {
+                margin: var(--space-xs) var(--space-sm);
+            }
+
+            arrow {
+                -gtk-icon-size: var(--icon-sm);
+                color: var(--fg-subtle);
+            }
+        }
+
+        > spinbutton {
+            > text {
+                min-height: 0;
+                padding: var(--space-xs) var(--space-sm);
+            }
+
+            button {
+                all: unset;
+                color: var(--fg-muted);
+                padding: 0 var(--space-xs);
+                transition: color var(--duration-fast);
+
+                &:hover {
+                    color: var(--fg-default);
+                }
+            }
+        }
+    }
+}
