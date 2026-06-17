@@ -50,7 +50,7 @@ popover.dropdown {
         all: unset;
         opacity: 1.0;
 
-        > .dropdown {
+        .dropdown {
             min-width: 0;
             background-color: var(--dropdown-surface);
             opacity: 1.0;
