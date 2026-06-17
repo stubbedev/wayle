@@ -3,7 +3,7 @@
 //! Returns a PipeWire remote file descriptor + node id that `pipewiresrc` can
 //! consume, which is the Wayland-correct way to capture the screen.
 
-use std::os::fd::OwnedFd;
+use std::{fs, os::fd::OwnedFd, path::PathBuf};
 
 use ashpd::{
     desktop::{
@@ -14,6 +14,37 @@ use ashpd::{
 };
 
 use crate::Error;
+
+/// Path to the cached ScreenCast restore token:
+/// `$XDG_STATE_HOME/wayle/screencast.token` (or `~/.local/state/...`).
+///
+/// Returns `None` if neither `XDG_STATE_HOME` nor `HOME` is set.
+fn restore_token_path() -> Option<PathBuf> {
+    let state_home = match std::env::var_os("XDG_STATE_HOME") {
+        Some(v) if !v.is_empty() => PathBuf::from(v),
+        _ => PathBuf::from(std::env::var_os("HOME")?).join(".local/state"),
+    };
+    Some(state_home.join("wayle").join("screencast.token"))
+}
+
+/// Reads the cached restore token, if one was saved by a prior session.
+fn load_restore_token() -> Option<String> {
+    let token = fs::read_to_string(restore_token_path()?).ok()?;
+    let token = token.trim();
+    (!token.is_empty()).then(|| token.to_owned())
+}
+
+/// Persists the restore token so the next session can skip the picker.
+/// Best-effort: failures are ignored (a missing token just re-prompts).
+fn save_restore_token(token: &str) {
+    let Some(path) = restore_token_path() else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    let _ = fs::write(path, token);
+}
 
 /// A negotiated screen-capture stream.
 pub(crate) struct ScreenCast {
@@ -45,6 +76,12 @@ pub(crate) async fn open_screencast(show_cursor: bool) -> Result<ScreenCast, Err
     };
     let sources: BitFlags<SourceType> = SourceType::Monitor.into();
 
+    // Reuse the previous grant: Persistent + a cached restore token make the
+    // portal replay the prior monitor selection without showing the picker.
+    // The picker appears only on the first ever capture, or after the token is
+    // invalidated (portal/compositor restart, version bump, revoked grant).
+    let stored_token = load_restore_token();
+
     proxy
         .select_sources(
             &session,
@@ -52,7 +89,8 @@ pub(crate) async fn open_screencast(show_cursor: bool) -> Result<ScreenCast, Err
                 .set_cursor_mode(cursor_mode)
                 .set_sources(sources)
                 .set_multiple(false)
-                .set_persist_mode(PersistMode::DoNot),
+                .set_persist_mode(PersistMode::ExplicitlyRevoked)
+                .set_restore_token(stored_token.as_deref()),
         )
         .await
         .map_err(|e| portal_err(&e))?;
@@ -63,6 +101,11 @@ pub(crate) async fn open_screencast(show_cursor: bool) -> Result<ScreenCast, Err
         .map_err(|e| portal_err(&e))?
         .response()
         .map_err(|e| portal_err(&e))?;
+
+    // Persist the (possibly refreshed) token so the next session is promptless.
+    if let Some(token) = streams.restore_token() {
+        save_restore_token(token);
+    }
 
     let stream = streams
         .streams()
