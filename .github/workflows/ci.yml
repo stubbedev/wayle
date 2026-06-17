@@ -349,9 +349,11 @@ jobs:
                   # substituter, it just won't push.
                   authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
                   # Push only from master; PR builds validate but don't pollute
-                  # the cache. pushFilter is a regex of paths to EXCLUDE, so
-                  # '.*' excludes everything (no push), '' excludes nothing.
-                  pushFilter: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') && '' || '.*' }}
+                  # the cache. NB: don't use pushFilter with an empty string for
+                  # the "push all" branch — '' is falsy in GHA expressions, so
+                  # `cond && '' || '.*'` always yields '.*' and never pushes.
+                  # skipPush takes 'true'/'false' (both non-empty) and is safe.
+                  skipPush: ${{ github.event_name != 'push' || github.ref != 'refs/heads/master' }}
 
             - name: Build package
               run: nix build .#wayle -L
