@@ -9,8 +9,10 @@ license.workspace = true
 
 [dependencies]
 ashpd.workspace = true
+futures.workspace = true
 gstreamer.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
 tracing.workspace = true
 
 [lints.clippy]

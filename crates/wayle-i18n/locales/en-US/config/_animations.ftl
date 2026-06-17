@@ -19,6 +19,15 @@ settings-animations-enter-duration = Enter Duration
 settings-animations-exit-duration = Exit Duration
     .description = Exit animation length in milliseconds. Unset falls back to Duration
 
+settings-animations-interaction-duration = Interaction Duration
+    .description = Length in ms of in-dropdown hover and page transitions. Disabled animations remove them
+
+settings-animations-ui-duration = UI Duration
+    .description = Base length in ms for general UI micro-transitions (hover, focus, color fades)
+
+settings-animations-indicators = Indicators
+    .description = Run looping status indicators: spinners, scan animations, the recording pulse, the clock blink
+
 settings-animations-notifications = Notifications
     .description = Per-surface animation override for notification popup cards
 

@@ -116,6 +116,49 @@ pub(crate) fn number_u32(property: &ConfigProperty<u32>) -> SettingRowInit {
     }
 }
 
+/// Row with an integer spin for a `u32` property constrained to a caller-given
+/// `[min, max]` range and step. The SpinButton clamps input to the range; use
+/// when an unbounded `number_u32` would let a user enter a value the consumer
+/// can't handle (e.g. a 0 framerate).
+pub(crate) fn number_u32_range(
+    property: &ConfigProperty<u32>,
+    range_min: u32,
+    range_max: u32,
+    step: u32,
+) -> SettingRowInit {
+    let controller = NumberControl::builder()
+        .launch(NumberInit {
+            property: property.clone(),
+            range_min: f64::from(range_min),
+            range_max: f64::from(range_max),
+            step: f64::from(step.max(1)),
+            digits: 0,
+            to_f64: |value| f64::from(*value),
+            from_f64: |value| {
+                if !value.is_finite() {
+                    return 0;
+                }
+                value
+                    .round()
+                    .clamp(f64::from(u32::MIN), f64::from(u32::MAX)) as u32
+            },
+        })
+        .detach();
+
+    let widget = controller.widget().clone();
+
+    SettingRowInit {
+        i18n_key: property.i18n_key(),
+        handle: PropertyHandle::new(property, |value| value.to_string()),
+        control: widget.upcast(),
+        keepalive: Box::new(controller),
+        full_width: false,
+        dirty_badge: None,
+        behavior: RowBehavior::Setting,
+        unit: None,
+    }
+}
+
 /// Row with an integer spin for a `u64` property, capped at 2^53 (f64 integer precision limit).
 pub(crate) fn number_u64(property: &ConfigProperty<u64>) -> SettingRowInit {
     let controller = NumberControl::builder()

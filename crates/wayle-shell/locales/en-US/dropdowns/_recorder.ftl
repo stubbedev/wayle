@@ -19,4 +19,6 @@ dropdown-recorder-preset = Quality Preset
 # Toasts + notifications
 recorder-toast-starting = Starting recording…
 recorder-toast-stopped = Recording stopped
+recorder-toast-failed = Recording failed
 recorder-notification-saved = Recording saved
+recorder-notification-failed = Recording failed

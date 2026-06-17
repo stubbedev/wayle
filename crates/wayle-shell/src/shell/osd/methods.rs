@@ -41,13 +41,25 @@ impl Osd {
         self.current_event = Some(event);
         self.dismiss_id = self.dismiss_id.wrapping_add(1);
 
+        // Toasts and OSD events share this single window but can target
+        // different positions/monitors/layers, so re-anchor per event before
+        // mapping it.
+        self.apply_position(root);
+        self.apply_layer(root);
+
         // Map the window, then reveal the child so the revealer animates it in.
         // Both are model-driven; the view applies them via `#[watch]`.
         self.visible = true;
         self.revealed = true;
-        let _ = root;
 
-        let duration = duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
+        let duration = duration_override.unwrap_or_else(|| {
+            let config = self.config.config();
+            if matches!(self.current_event, Some(OsdEvent::Custom { .. })) {
+                config.toasts.duration.get()
+            } else {
+                config.osd.duration.get()
+            }
+        });
         Self::schedule_dismiss(sender, duration, self.dismiss_id);
     }
 
@@ -79,12 +91,42 @@ impl Osd {
         sender: &ComponentSender<Self>,
         root: &gtk::Window,
     ) {
+        // Resolve a named preset (if any), then let explicit request fields
+        // override the preset's values.
+        let preset = toast.preset.as_ref().and_then(|id| {
+            self.config
+                .config()
+                .toasts
+                .presets
+                .get()
+                .into_iter()
+                .find(|p| &p.id == id)
+        });
+
+        let label = toast
+            .label
+            .or_else(|| preset.as_ref().and_then(|p| p.label.clone()))
+            .unwrap_or_default();
+        let icon = toast
+            .icon
+            .or_else(|| preset.as_ref().and_then(|p| p.icon.clone()));
+        let percentage = toast
+            .percentage
+            .or_else(|| preset.as_ref().and_then(|p| p.percentage));
+        let duration_ms = toast
+            .duration_ms
+            .or_else(|| preset.as_ref().and_then(|p| p.duration_ms));
+        let class = toast
+            .class
+            .or_else(|| preset.as_ref().and_then(|p| p.class.clone()));
+
         self.show_event(
             OsdEvent::Custom {
-                label: toast.label,
-                icon: toast.icon,
-                percentage: toast.percentage,
-                duration_ms: toast.duration_ms,
+                label,
+                icon,
+                percentage,
+                duration_ms,
+                class,
             },
             sender,
             root,
@@ -263,10 +305,23 @@ impl Osd {
 
     pub(super) fn apply_position(&self, root: &gtk::Window) {
         let config = self.config.config();
-        let osd_config = &config.osd;
-        let position = osd_config.position.get();
+        // Toasts (`Custom`) anchor against `[toasts]`; everything else `[osd]`.
+        let is_toast = matches!(self.current_event, Some(OsdEvent::Custom { .. }));
+        let (position, monitor, margin_spacing) = if is_toast {
+            (
+                config.toasts.position.get(),
+                config.toasts.monitor.get(),
+                config.toasts.margin.get(),
+            )
+        } else {
+            (
+                config.osd.position.get(),
+                config.osd.monitor.get(),
+                config.osd.margin.get(),
+            )
+        };
         let scale = config.styling.scale.get().value();
-        let margin = (osd_config.margin.get().value() * scale) as i32;
+        let margin = (margin_spacing.value() * scale) as i32;
 
         reset_anchors(root);
 
@@ -320,8 +375,6 @@ impl Osd {
             }
         }
 
-        let monitor = osd_config.monitor.get();
-
         match &monitor {
             OsdMonitor::Primary => apply_primary_monitor(root),
             OsdMonitor::Connector(name) => {
@@ -331,7 +384,12 @@ impl Osd {
     }
 
     pub(super) fn apply_layer(&self, root: &gtk::Window) {
-        let configured = self.config.config().osd.layer.get();
+        let config = self.config.config();
+        let configured = if matches!(self.current_event, Some(OsdEvent::Custom { .. })) {
+            config.toasts.layer.get()
+        } else {
+            config.osd.layer.get()
+        };
         apply_window_layer(root, configured, &self.config);
     }
 
@@ -387,15 +445,17 @@ pub(super) fn anim_duration(model: &Osd) -> u32 {
         .duration_for(anim_surface(model), !model.revealed)
 }
 
-pub(super) fn osd_classes(model: &Osd) -> Vec<&'static str> {
-    let mut classes = vec!["osd"];
+pub(super) fn osd_classes(model: &Osd) -> Vec<String> {
+    let mut classes = vec![String::from("osd")];
+
+    let is_toast = matches!(model.current_event, Some(OsdEvent::Custom { .. }));
 
     if model
         .current_event
         .as_ref()
         .is_some_and(|event| matches!(event, OsdEvent::Slider { muted: true, .. }))
     {
-        classes.push("muted");
+        classes.push(String::from("muted"));
     }
 
     if model
@@ -403,11 +463,23 @@ pub(super) fn osd_classes(model: &Osd) -> Vec<&'static str> {
         .as_ref()
         .is_some_and(|event| matches!(event, OsdEvent::Toggle { active: false, .. }))
     {
-        classes.push("toggle-off");
+        classes.push(String::from("toggle-off"));
     }
 
-    if model.config.config().osd.border.get() {
-        classes.push("bordered");
+    let bordered = if is_toast {
+        model.config.config().toasts.border.get()
+    } else {
+        model.config.config().osd.border.get()
+    };
+    if bordered {
+        classes.push(String::from("bordered"));
+    }
+
+    if let Some(OsdEvent::Custom {
+        class: Some(class), ..
+    }) = &model.current_event
+    {
+        classes.push(class.clone());
     }
 
     classes
@@ -439,9 +511,16 @@ pub(super) fn is_toggle(event: &Option<OsdEvent>) -> bool {
     })
 }
 
-/// Horizontal alignment for the toast/toggle header, from `osd.text-align`.
+/// Horizontal alignment for the toast/toggle header. Toasts read
+/// `toasts.text-align`; OSD toggles read `osd.text-align`.
 pub(super) fn toast_align(model: &Osd) -> gtk::Align {
-    match model.config.config().osd.text_align.get() {
+    let config = model.config.config();
+    let align = if matches!(model.current_event, Some(OsdEvent::Custom { .. })) {
+        config.toasts.text_align.get()
+    } else {
+        config.osd.text_align.get()
+    };
+    match align {
         OsdTextAlign::Start => gtk::Align::Start,
         OsdTextAlign::Center => gtk::Align::Center,
         OsdTextAlign::End => gtk::Align::End,

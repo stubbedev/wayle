@@ -36,6 +36,8 @@ pub(crate) enum OsdEvent {
         icon: Option<String>,
         percentage: Option<f64>,
         duration_ms: Option<u32>,
+        /// Extra CSS class applied to the toast, from `--class` or a preset.
+        class: Option<String>,
     },
 }
 

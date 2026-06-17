@@ -1,5 +1,6 @@
 //! Settings page components, one per logical category. Each page owns its rows and control keepalives.
 
+pub(crate) mod animations;
 pub(crate) mod bar;
 pub(crate) mod general;
 pub(crate) mod layout;
@@ -11,4 +12,5 @@ pub(crate) mod page;
 pub(crate) mod sections;
 pub(crate) mod spec;
 pub(crate) mod styling;
+pub(crate) mod toasts;
 pub(crate) mod wallpaper;

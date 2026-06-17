@@ -128,6 +128,16 @@
           "default": null,
           "description": "Global exit duration in ms. Unset → `duration`."
         },
+        "indicators": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Run looping status indicators: spinners, network/bluetooth scan\nanimations, the recording pulse, and the clock blink. Disable (or set\n`enabled = false`) for a fully static UI."
+        },
+        "interaction-duration": {
+          "$ref": "#/$defs/uint32",
+          "default": 150,
+          "description": "Duration in ms for in-place dropdown transitions: hover highlights and\nthe page/stack crossfades inside dropdowns. `enabled = false` removes\nthem entirely."
+        },
         "notifications": {
           "$ref": "#/$defs/SurfaceAnimation",
           "default": {
@@ -162,6 +172,11 @@
           "$ref": "#/$defs/AnimationType",
           "default": "fade",
           "description": "Transition style used for enter/exit of the OSD, toasts, and\nnotification cards. Base fallback for every surface and direction."
+        },
+        "ui-duration": {
+          "$ref": "#/$defs/uint32",
+          "default": 250,
+          "description": "Base duration in ms for general UI micro-transitions (hover, focus, and\ncolor fades) driven by the CSS `--duration-*` token family. Fast,\nnormal, and slow speeds are derived from this. `enabled = false` zeroes\nthem for an instant UI."
         }
       },
       "type": "object"
@@ -228,6 +243,12 @@
     "Array_of_ThresholdEntry": {
       "items": {
         "$ref": "#/$defs/ThresholdEntry"
+      },
+      "type": "array"
+    },
+    "Array_of_ToastPreset": {
+      "items": {
+        "$ref": "#/$defs/ToastPreset"
       },
       "type": "array"
     },
@@ -6260,6 +6281,113 @@
         }
       ]
     },
+    "ToastPreset": {
+      "description": "A reusable toast preset, triggerable by id with `wayle toast --preset <id>`.\n\nA preset captures a toast's text, icon, optional progress bar, duration, and\nCSS class so it can be fired by name. Any field can still be overridden per\ninvocation on the command line (or over the widget socket).\n\n## Example\n\n```toml\n[[toasts.presets]]\nid = \"saved\"\nlabel = \"Saved\"\nicon = \"ld-check-symbolic\"\nduration-ms = 1500\nclass = \"success\"\n\n# Fire it: wayle toast --preset saved\n```",
+      "properties": {
+        "class": {
+          "default": null,
+          "description": "Extra CSS class applied to the toast for custom styling.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duration-ms": {
+          "default": null,
+          "description": "Auto-dismiss duration in milliseconds. Unset falls back to the toast\nconfig duration.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "icon": {
+          "default": null,
+          "description": "Symbolic icon name shown beside the text.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Unique identifier. Trigger with `wayle toast --preset <id>`.",
+          "type": "string"
+        },
+        "label": {
+          "default": null,
+          "description": "Toast text. An explicit label on the command line overrides this.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "percentage": {
+          "default": null,
+          "description": "Progress percentage (0-100). When set, renders a progress bar instead\nof a plain icon + label toast.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "ToastsConfig": {
+      "description": "Toast overlays shown via `wayle toast`.\n\nToasts are independent of the OSD: they have their own screen position,\nmonitor, layer, duration, alignment, and a list of reusable presets.",
+      "properties": {
+        "border": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show a border around the toast."
+        },
+        "duration": {
+          "$ref": "#/$defs/uint32",
+          "default": 2500,
+          "description": "Auto-dismiss delay in milliseconds."
+        },
+        "enabled": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show toast overlays pushed via `wayle toast`."
+        },
+        "layer": {
+          "$ref": "#/$defs/Layer",
+          "default": "overlay",
+          "description": "Layer-shell layer toasts are placed on."
+        },
+        "margin": {
+          "$ref": "#/$defs/Spacing",
+          "default": 150.0,
+          "description": "Margin from screen edges."
+        },
+        "monitor": {
+          "$ref": "#/$defs/OsdMonitor",
+          "default": "primary",
+          "description": "Target monitor: \"primary\" or a connector name like \"DP-1\"."
+        },
+        "position": {
+          "$ref": "#/$defs/OsdPosition",
+          "default": "bottom",
+          "description": "Screen anchor position."
+        },
+        "presets": {
+          "$ref": "#/$defs/Array_of_ToastPreset",
+          "default": [],
+          "description": "Reusable toast presets, each triggerable with `wayle toast --preset <id>`."
+        },
+        "text-align": {
+          "$ref": "#/$defs/OsdTextAlign",
+          "default": "center",
+          "description": "Horizontal alignment of toast content."
+        }
+      },
+      "type": "object"
+    },
     "TransitionDuration": {
       "description": "Transition duration in seconds, clamped to >= 0.",
       "format": "float",
@@ -7254,6 +7382,8 @@
         "enter-duration": null,
         "exit": null,
         "exit-duration": null,
+        "indicators": true,
+        "interaction-duration": 150,
         "notifications": {
           "enter": null,
           "enter-duration": null,
@@ -7272,7 +7402,8 @@
           "exit": null,
           "exit-duration": null
         },
-        "transition": "fade"
+        "transition": "fade",
+        "ui-duration": 250
       },
       "description": "Animation settings."
     },
@@ -8169,6 +8300,21 @@
         "wallust-saturation": 0
       },
       "description": "Styling configuration (theme, fonts, scale)."
+    },
+    "toasts": {
+      "$ref": "#/$defs/ToastsConfig",
+      "default": {
+        "border": true,
+        "duration": 2500,
+        "enabled": true,
+        "layer": "overlay",
+        "margin": 150.0,
+        "monitor": "primary",
+        "position": "bottom",
+        "presets": [],
+        "text-align": "center"
+      },
+      "description": "Toast overlay settings."
     },
     "wallpaper": {
       "$ref": "#/$defs/WallpaperConfig",

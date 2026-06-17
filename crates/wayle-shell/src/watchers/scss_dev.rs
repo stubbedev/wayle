@@ -116,7 +116,8 @@ fn recompile_css(cmd_sender: &relm4::Sender<ShellCmd>, config_service: &ConfigSe
                 }
             };
 
-            let css = format!("{static_css}\n{theme}\n{user}");
+            let anim = config.animations.css_overrides();
+            let css = format!("{static_css}\n{theme}\n{anim}\n{user}");
             debug!("SCSS recompiled");
             let _ = cmd_sender.send(ShellCmd::CssRecompiled(css));
         }

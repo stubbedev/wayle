@@ -126,7 +126,8 @@ fn recompile(sender: &relm4::Sender<SettingsAppMsg>, config_service: &ConfigServ
                 }
             };
 
-            let css = format!("{static_css}\n{theme}\n{user}");
+            let anim = config.animations.css_overrides();
+            let css = format!("{static_css}\n{theme}\n{anim}\n{user}");
             debug!("SCSS recompiled for settings");
             let _ = sender.send(SettingsAppMsg::DevCssRecompiled(css));
         }

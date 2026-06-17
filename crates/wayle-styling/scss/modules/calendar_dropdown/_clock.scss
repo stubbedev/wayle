@@ -16,7 +16,7 @@ label.clock-time {
 }
 
 label.clock-separator {
-    animation: blink 1s ease-in-out infinite;
+    animation: blink var(--cfg-anim-blink, 1s) ease-in-out infinite;
 }
 
 .show-seconds label.clock-separator {

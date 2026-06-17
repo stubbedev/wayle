@@ -38,8 +38,20 @@
       devShells = forAllSystems (
         pkgs:
         let
+          # GStreamer plugin packages the recorder dlopens at runtime
+          # (pipewiresrc, v4l2src, x264enc, opusenc, mp4/matroska/webm mux,
+          # compositor). pipewire ships the pipewiresrc plugin.
+          gstPlugins = (with pkgs.gst_all_1; [
+            gstreamer
+            gst-plugins-base
+            gst-plugins-good
+            gst-plugins-bad
+            gst-plugins-ugly
+            gst-libav
+          ]) ++ [ pkgs.pipewire ];
+
           # Native libraries the workspace links and dlopens at runtime.
-          libs = with pkgs; [
+          libs = (with pkgs; [
             gtk4
             gtk4-layer-shell
             gtksourceview5
@@ -53,16 +65,7 @@
             pipewire
             fftw
             systemd # provides libudev
-            # GStreamer: the recorder builds against gstreamer-1.0 and loads
-            # these plugins at runtime (pipewiresrc, v4l2src, x264enc, opusenc,
-            # mp4/matroska/webm mux, compositor).
-            gst_all_1.gstreamer
-            gst_all_1.gst-plugins-base
-            gst_all_1.gst-plugins-good
-            gst_all_1.gst-plugins-bad
-            gst_all_1.gst-plugins-ugly
-            gst_all_1.gst-libav
-          ];
+          ]) ++ gstPlugins;
         in
         {
           # `nix develop` provides every native dependency `cargo build`,
@@ -97,6 +100,13 @@
             # test` and `just run` need these on the loader path — linking alone
             # (via pkg-config) is not enough.
             LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libs;
+
+            # The recorder's GStreamer pipeline finds its plugins via this path.
+            # Without it `cargo run`/`just run` inside the devShell can't load
+            # pipewiresrc/x264enc/etc., so the recorder fails to start (the
+            # `nix build` package sets the same var via preFixup).
+            GST_PLUGIN_SYSTEM_PATH_1_0 =
+              pkgs.lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins;
           };
         }
       );

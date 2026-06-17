@@ -52,7 +52,18 @@ in
       systemd.user.services.wayle = lib.mkIf cfg.systemd.enable {
         description = "Wayle desktop shell";
         partOf = [ cfg.systemd.target ];
-        after = [ cfg.systemd.target ];
+        # The recorder captures via the xdg-desktop-portal ScreenCast interface
+        # over PipeWire; order after (and weakly want) both so they're up when
+        # the shell starts. Wants is weak: a missing unit just logs.
+        after = [
+          cfg.systemd.target
+          "pipewire.service"
+          "xdg-desktop-portal.service"
+        ];
+        wants = [
+          "pipewire.service"
+          "xdg-desktop-portal.service"
+        ];
         wantedBy = [ cfg.systemd.target ];
         serviceConfig = {
           ExecStart = "${lib.getExe cfg.package} shell";

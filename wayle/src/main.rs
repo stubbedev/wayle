@@ -60,7 +60,19 @@ fn main() {
                 icon,
                 percentage,
                 duration,
-            } => cli::toast::execute(&label, icon.as_deref(), percentage, duration).await,
+                preset,
+                class,
+            } => {
+                cli::toast::execute(
+                    label.as_deref(),
+                    icon.as_deref(),
+                    percentage,
+                    duration,
+                    preset.as_deref(),
+                    class.as_deref(),
+                )
+                .await
+            }
             Commands::Shell | Commands::Completions { .. } | Commands::SharePicker { .. } => {
                 unreachable!()
             }
