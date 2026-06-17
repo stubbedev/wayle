@@ -97,7 +97,19 @@ in
       Unit = {
         Description = "Wayle desktop shell";
         PartOf = [ cfg.systemd.target ];
-        After = [ cfg.systemd.target ];
+        # The recorder captures via the xdg-desktop-portal ScreenCast interface
+        # over PipeWire; order after (and weakly want) both so they're up when
+        # the shell starts. Wants is weak: a missing unit just logs, never
+        # blocks the shell.
+        After = [
+          cfg.systemd.target
+          "pipewire.service"
+          "xdg-desktop-portal.service"
+        ];
+        Wants = [
+          "pipewire.service"
+          "xdg-desktop-portal.service"
+        ];
       };
       Service = {
         ExecStart = "${lib.getExe cfg.package} shell";

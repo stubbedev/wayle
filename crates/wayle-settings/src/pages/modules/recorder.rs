@@ -4,7 +4,7 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select, number::number_u32, slider::percentage, text::text,
+        enum_select::enum_select, number::number_u32_range, slider::percentage, text::text,
         toggle::toggle,
     },
     pages::{
@@ -55,8 +55,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-video",
                     items: vec![
-                        number_u32(&module.bitrate_kbps),
-                        number_u32(&module.framerate),
+                        // Bounds mirror the recorder dropdown + engine clamps so
+                        // the settings UI can't produce a value capture rejects.
+                        number_u32_range(&module.bitrate_kbps, 500, 50_000, 500),
+                        number_u32_range(&module.framerate, 1, 240, 1),
                         enum_select(&module.encoder_preset),
                     ],
                 },
@@ -66,7 +68,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         toggle(&module.system_audio),
                         toggle(&module.microphone),
                         text(&module.microphone_device),
-                        number_u32(&module.audio_bitrate_kbps),
+                        number_u32_range(&module.audio_bitrate_kbps, 16, 512, 16),
                         toggle(&module.separate_audio_tracks),
                     ],
                 },

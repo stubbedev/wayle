@@ -8,7 +8,7 @@ use std::{
 };
 
 use chrono::Local;
-use tokio::{process::Command, time::interval};
+use tokio::{process::Command, sync::mpsc, time::interval};
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
 use wayle_config::{
@@ -28,6 +28,8 @@ use crate::{
 
 /// Icon shown on the recorder toasts.
 const TOAST_ICON: &str = "ld-circle-dot-symbolic";
+/// Icon shown on recorder failure toasts/notifications.
+const ERROR_ICON: &str = "ld-circle-alert-symbolic";
 /// How long the "starting" toast stays on screen, in milliseconds.
 const START_TOAST_MS: u32 = 1000;
 /// Delay between the start toast and the actual capture. Kept longer than
@@ -85,6 +87,16 @@ impl RecorderState {
         let opts = self.build_options();
         let path = opts.output_path.clone();
 
+        // filesink won't create missing directories; do it ourselves so a
+        // first-ever recording into ~/Videos (or a custom dir) doesn't fail.
+        if let Some(parent) = PathBuf::from(&path).parent()
+            && let Err(err) = std::fs::create_dir_all(parent)
+        {
+            warn!(error = %err, dir = %parent.display(), "cannot create recording directory");
+            self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
+            return;
+        }
+
         // Announce the start and pulse the bar icon, then wait for the toast
         // to clear the screen before capture begins — otherwise the toast is
         // in the recording.
@@ -92,7 +104,8 @@ impl RecorderState {
         self.preparing.set(true);
         tokio::time::sleep(Duration::from_millis(START_CAPTURE_DELAY_MS)).await;
 
-        match self.recorder.start(&opts).await {
+        let (term_tx, term_rx) = mpsc::unbounded_channel();
+        match self.recorder.start(&opts, term_tx).await {
             Ok(()) => {
                 self.file_path.set(path);
                 self.elapsed_secs.set(0);
@@ -102,12 +115,41 @@ impl RecorderState {
                 self.active.set(true);
                 self.preparing.set(false);
                 self.start_timer();
+                self.watch_termination(term_rx);
             }
             Err(err) => {
                 self.preparing.set(false);
                 warn!(error = %err, "failed to start recording");
+                self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
             }
         }
+    }
+
+    /// Watches for an unexpected pipeline death (source disconnect, disk full,
+    /// encoder fault) reported by the engine, and resets UI state + notifies
+    /// the user if one arrives.
+    fn watch_termination(&self, mut term_rx: mpsc::UnboundedReceiver<String>) {
+        let state = self.clone();
+        tokio::spawn(async move {
+            if let Some(reason) = term_rx.recv().await {
+                state.handle_unexpected_stop(&reason);
+            }
+        });
+    }
+
+    /// Tears down a recording that died on its own and tells the user why.
+    fn handle_unexpected_stop(&self, reason: &str) {
+        if !self.active.get() {
+            return;
+        }
+        warn!(reason, "recording terminated unexpectedly");
+        self.cancel_timer();
+        // Best-effort teardown of the (already failed) pipeline.
+        let _ = self.recorder.stop();
+        self.active.set(false);
+        self.paused.set(false);
+        self.elapsed_secs.set(0);
+        self.show_error(&format!("{}: {reason}", t!("recorder-toast-failed")));
     }
 
     /// Stops the active recording.
@@ -123,8 +165,17 @@ impl RecorderState {
         self.paused.set(false);
         self.elapsed_secs.set(0);
 
-        self.show_toast(&t!("recorder-toast-stopped"), STOP_TOAST_MS);
-        self.notify_saved(&self.file_path.get());
+        // Only claim success if the muxer actually wrote a non-empty file;
+        // otherwise the capture died and "saved" would be a lie.
+        let path = self.file_path.get();
+        let saved = std::fs::metadata(&path).is_ok_and(|m| m.len() > 0);
+        if saved {
+            self.show_toast(&t!("recorder-toast-stopped"), STOP_TOAST_MS);
+            self.notify_saved(&path);
+        } else {
+            warn!(path = %path, "recording produced no output file");
+            self.show_error(&t!("recorder-toast-failed"));
+        }
     }
 
     /// Publishes a recorder toast to the OSD.
@@ -137,30 +188,46 @@ impl RecorderState {
         });
     }
 
-    /// Fires a desktop notification (via `notify-send`) reporting where the
-    /// recording was saved. No-op when the path is empty.
-    fn notify_saved(&self, path: &str) {
-        if path.is_empty() {
-            return;
-        }
+    /// Shows a failure toast and fires a desktop notification so the user is
+    /// never left guessing why a recording silently stopped.
+    fn show_error(&self, message: &str) {
+        self.toast_bus.publish(ToastRequest {
+            label: message.to_owned(),
+            icon: Some(ERROR_ICON.to_owned()),
+            percentage: None,
+            duration_ms: Some(STOP_TOAST_MS),
+        });
+        self.notify(&t!("recorder-notification-failed"), message, ERROR_ICON);
+    }
+
+    /// Spawns a fire-and-forget `notify-send` with the given summary/body/icon.
+    fn notify(&self, summary: &str, body: &str, icon: &str) {
         let mut command = Command::new("notify-send");
         command
             .arg("--app-name=Wayle")
-            .arg("--icon=ld-video-symbolic")
-            .arg(t!("recorder-notification-saved"))
-            .arg(path)
+            .arg(format!("--icon={icon}"))
+            .arg(summary)
+            .arg(body)
             .stdout(Stdio::null())
             .stderr(Stdio::null());
 
         match command.spawn() {
             Ok(child) => {
-                // Reap the child so it doesn't linger as a zombie.
                 tokio::spawn(async move {
                     let _ = child.wait_with_output().await;
                 });
             }
             Err(err) => warn!(error = %err, "cannot spawn notify-send"),
         }
+    }
+
+    /// Fires a desktop notification (via `notify-send`) reporting where the
+    /// recording was saved. No-op when the path is empty.
+    fn notify_saved(&self, path: &str) {
+        if path.is_empty() {
+            return;
+        }
+        self.notify(&t!("recorder-notification-saved"), path, "ld-video-symbolic");
     }
 
     /// Toggles recording on/off.
