@@ -103,6 +103,28 @@ jobs:
                     "wayle-${VERSION}-${ARCH}-linux.tar.gz" \
                     --clobber
 
+    nix:
+        name: Nix build + cache
+        needs: changelog
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  submodules: recursive
+
+            - uses: cachix/install-nix-action@v31
+              with:
+                  extra_nix_config: |
+                      experimental-features = nix-command flakes
+
+            - uses: cachix/cachix-action@v16
+              with:
+                  name: wayle
+                  authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+            - name: Build and push release package
+              run: nix build .#wayle -L
+
     ubuntu:
         name: Package (Ubuntu ${{ matrix.arch }})
         needs: changelog

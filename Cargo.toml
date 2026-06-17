@@ -150,6 +150,9 @@ unwrap_used = "deny"
 missing_docs = "warn"
 unsafe_code = "deny"
 
+# Thin LTO + parallel codegen: ~2-4x faster link than fat LTO / 1 unit, with
+# negligible runtime cost for a GTK app. Used by `just build` and every CI
+# `cargo build --release` (per-PR build, packaging, release artifacts).
 [profile.release]
-lto = true
-codegen-units = 1
+lto = "thin"
+codegen-units = 16

@@ -72,11 +72,18 @@
               pkg-config
               cmake
               clang
+              mold # fast linker — wired in via RUSTFLAGS below
             ];
 
             # System libraries linked by the workspace and its -sys crates
             # (gtk4 + layer-shell, gtksourceview5, audio, cava/fftw, udev, …).
             buildInputs = libs;
+
+            # Link with mold via clang instead of the default bfd linker — cuts
+            # relink time hard with 591 crates. Scoped to the devShell (every
+            # `just` recipe runs `nix develop --command cargo`), so it never
+            # leaks into CI or the `nix build` package, which lack mold.
+            RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=mold";
 
             # bindgen (via the cava build script) needs libclang at runtime.
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";

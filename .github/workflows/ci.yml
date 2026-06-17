@@ -321,10 +321,39 @@ jobs:
             - name: Build Fedora package
               run: ./scripts/ci/build-packages.sh "${{ steps.archive.outputs.archive }}" "${{ steps.archive.outputs.version }}" rpm
 
+    nix:
+        name: Nix build + cache
+        needs: changes
+        if: needs.changes.outputs.code == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  submodules: recursive
+
+            - uses: cachix/install-nix-action@v31
+              with:
+                  extra_nix_config: |
+                      experimental-features = nix-command flakes
+
+            - uses: cachix/cachix-action@v16
+              with:
+                  name: wayle
+                  # Empty on fork PRs (secret absent) — cachix still serves as a
+                  # substituter, it just won't push.
+                  authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+                  # Push only from master; PR builds validate but don't pollute
+                  # the cache. pushFilter is a regex of paths to EXCLUDE, so
+                  # '.*' excludes everything (no push), '' excludes nothing.
+                  pushFilter: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') && '' || '.*' }}
+
+            - name: Build package
+              run: nix build .#wayle -L
+
     ci-status:
         name: CI Status
         if: always()
-        needs: [lint, test, build, ubuntu, fedora]
+        needs: [lint, test, build, ubuntu, fedora, nix]
         runs-on: ubuntu-latest
         steps:
             - name: Check results
@@ -333,6 +362,7 @@ jobs:
                         "${{ needs.test.result }}" == "failure" || \
                         "${{ needs.build.result }}" == "failure" || \
                         "${{ needs.ubuntu.result }}" == "failure" || \
+                        "${{ needs.nix.result }}" == "failure" || \
                         "${{ needs.fedora.result }}" == "failure" ]]; then
                     echo "One or more checks failed"
                     exit 1
