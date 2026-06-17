@@ -335,11 +335,22 @@ jobs:
             # master only — PRs/forks lack the token, they still pull above.
             - name: Push to attic
               if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+              # Best-effort: a cache-push failure (e.g. a transient 504 from the
+              # single-vCPU cache box on a large closure) must not redden an
+              # otherwise-green build. Retry with backoff, then give up softly.
+              continue-on-error: true
               env:
                   ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
               run: |
                   nix run nixpkgs#attic-client -- login stubbe https://nix.stubbe.dev "$ATTIC_TOKEN"
-                  nix run nixpkgs#attic-client -- push wayle $(cat /tmp/wayle-outpaths)
+                  for attempt in 1 2 3; do
+                      if nix run nixpkgs#attic-client -- push wayle $(cat /tmp/wayle-outpaths); then
+                          exit 0
+                      fi
+                      echo "::warning::attic push attempt $attempt failed; retrying in $((attempt * 30))s"
+                      sleep $((attempt * 30))
+                  done
+                  echo "::warning::attic push failed after 3 attempts; cache push is best-effort, continuing"
 
     ci-status:
         name: CI Status
