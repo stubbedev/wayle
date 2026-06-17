@@ -1,0 +1,30 @@
+[package]
+name = "wayle-audio"
+description = "PulseAudio service with reactive state"
+version = "0.1.4"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[dependencies]
+async-trait.workspace = true
+derive_more.workspace = true
+futures.workspace = true
+libc.workspace = true
+libpulse-binding.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+wayle-core.workspace = true
+wayle-traits.workspace = true
+zbus.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,28 @@
+[package]
+name = "wayle-brightness"
+description = "Backlight control for internal displays"
+version = "0.1.2"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[dependencies]
+derive_more.workspace = true
+futures.workspace = true
+nix = { version = "0.30", features = ["poll", "fs"] }
+udev = "0.9"
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+wayle-core.workspace = true
+wayle-traits.workspace = true
+zbus.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

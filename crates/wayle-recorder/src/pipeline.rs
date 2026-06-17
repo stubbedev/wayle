@@ -103,12 +103,21 @@ fn video_encoder(
     // Keyframe every ~2s keeps files seekable without inflating size.
     let keyint = fps.saturating_mul(2).max(1);
     match format {
+        // `tune=zerolatency` disables the lookahead and B-frame buffering that
+        // otherwise make x264enc hold ~55 input frames before emitting its
+        // first encoded frame. The screen source is damage-driven (variable
+        // framerate), so a short recording of a near-static screen can deliver
+        // fewer frames than that buffer, leaving the muxer with no data and
+        // producing a 0-byte file. Zerolatency flushes each frame straight
+        // through, so even brief or motionless captures always write output.
         OutputFormat::Mp4 | OutputFormat::Mkv => format!(
-            "x264enc bitrate={bitrate} speed-preset={} key-int-max={keyint}",
+            "x264enc bitrate={bitrate} speed-preset={} tune=zerolatency key-int-max={keyint}",
             preset.x264()
         ),
+        // `lag-in-frames=0` is the VP9 equivalent: no alt-ref lookahead, so the
+        // encoder emits frames immediately instead of buffering them.
         OutputFormat::Webm => format!(
-            "vp9enc target-bitrate={} cpu-used={} deadline=good keyframe-max-dist={keyint}",
+            "vp9enc target-bitrate={} cpu-used={} deadline=realtime lag-in-frames=0 keyframe-max-dist={keyint}",
             bitrate.saturating_mul(1000),
             preset.vp9_cpu_used()
         ),

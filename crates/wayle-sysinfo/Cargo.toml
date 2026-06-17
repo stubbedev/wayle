@@ -1,0 +1,22 @@
+[package]
+name = "wayle-sysinfo"
+description = "CPU, memory, disk, and network metrics"
+version = "0.1.2"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[dependencies]
+derive_more.workspace = true
+futures.workspace = true
+sysinfo.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+wayle-core.workspace = true
+
+[lints]
+workspace = true

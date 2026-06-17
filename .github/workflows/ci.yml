@@ -208,6 +208,8 @@ jobs:
 
             - name: Checkout repository
               uses: actions/checkout@v6
+              with:
+                  submodules: recursive
 
             - name: Fix Git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -266,6 +268,8 @@ jobs:
 
             - name: Checkout repository
               uses: actions/checkout@v6
+              with:
+                  submodules: recursive
 
             - name: Fix Git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"

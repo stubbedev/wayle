@@ -13,6 +13,25 @@ members = [
 	"crates/wayle-shell",
 	"crates/wayle-styling",
 	"crates/wayle-widgets",
+	# Service crates, folded in from the former wayle-services repo.
+	"crates/wayle-audio",
+	"crates/wayle-battery",
+	"crates/wayle-bluetooth",
+	"crates/wayle-brightness",
+	"crates/wayle-cava",
+	"crates/wayle-core",
+	"crates/wayle-hyprland",
+	"crates/wayle-mango",
+	"crates/wayle-media",
+	"crates/wayle-network",
+	"crates/wayle-niri",
+	"crates/wayle-notification",
+	"crates/wayle-power-profiles",
+	"crates/wayle-sysinfo",
+	"crates/wayle-systray",
+	"crates/wayle-traits",
+	"crates/wayle-wallpaper",
+	"crates/wayle-weather",
 	"wayle",
 ]
 exclude = ["sandbox"]
@@ -58,7 +77,8 @@ i18n-embed-fl = "0.10"
 indicatif = "0.18"
 inventory = "0.3"
 libc = "0.2.176"
-libpulse-binding = "2.30.1"
+libpulse-binding = { version = "2.30.1", features = ["pa_v13"] }
+niri-ipc = "=25.11.0"
 minijinja = { version = "2.15", default-features = false, features = [
 	"builtins",
 	"serde",
@@ -107,24 +127,25 @@ regex = "1.12"
 shlex = "2.0"
 wayland-client = "0.31.14"
 
-wayle-audio = "0.1.3"
-wayle-battery = "0.1.2"
-wayle-bluetooth = "0.1.2"
-wayle-brightness = "0.1.2"
-wayle-cava = { version = "0.1.2", features = ["vendored"] }
-wayle-core = "0.1.2"
-wayle-hyprland = "0.2.1"
-wayle-mango = "0.1.1"
-wayle-niri = "0.1.0"
-wayle-media = "0.1.2"
-wayle-network = "0.1.2"
-wayle-notification = "0.1.3"
-wayle-power-profiles = "0.1.3"
-wayle-sysinfo = "0.1.2"
-wayle-systray = "0.1.3"
-wayle-traits = "0.1.2"
-wayle-wallpaper = "0.1.3"
-wayle-weather = "0.1.2"
+# Service crates, folded in from the former wayle-services repo as path members.
+wayle-audio = { path = "crates/wayle-audio" }
+wayle-battery = { path = "crates/wayle-battery" }
+wayle-bluetooth = { path = "crates/wayle-bluetooth" }
+wayle-brightness = { path = "crates/wayle-brightness" }
+wayle-cava = { path = "crates/wayle-cava", features = ["vendored"] }
+wayle-core = { path = "crates/wayle-core" }
+wayle-hyprland = { path = "crates/wayle-hyprland" }
+wayle-mango = { path = "crates/wayle-mango" }
+wayle-niri = { path = "crates/wayle-niri" }
+wayle-media = { path = "crates/wayle-media" }
+wayle-network = { path = "crates/wayle-network" }
+wayle-notification = { path = "crates/wayle-notification" }
+wayle-power-profiles = { path = "crates/wayle-power-profiles" }
+wayle-sysinfo = { path = "crates/wayle-sysinfo" }
+wayle-systray = { path = "crates/wayle-systray" }
+wayle-traits = { path = "crates/wayle-traits" }
+wayle-wallpaper = { path = "crates/wayle-wallpaper" }
+wayle-weather = { path = "crates/wayle-weather" }
 
 wayle-config = { path = "crates/wayle-config" }
 wayle-derive = { path = "crates/wayle-derive" }

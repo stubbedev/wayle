@@ -83,7 +83,9 @@ let
     ] ++ gstPlugins;
 
     # wayle-cava's build script runs bindgen, which needs libclang — required
-    # in the deps layer too, since wayle-cava is an external dependency.
+    # in the deps layer too. wayle-cava is now a path member (folded in from the
+    # former wayle-services repo), and its `vendored` feature compiles the
+    # bundled C sources under crates/wayle-cava/cava.
     env.LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
   };
 
@@ -121,7 +123,7 @@ craneLib.buildPackage (
 
     meta = {
       description = "Wayland desktop shell with a bar, dropdowns, OSD, and recorder (GTK4 + Relm4)";
-      homepage = "https://github.com/wayle-rs/wayle";
+      homepage = "https://github.com/stubbedev/wayle";
       license = lib.licenses.mit;
       mainProgram = "wayle";
       platforms = lib.platforms.linux;

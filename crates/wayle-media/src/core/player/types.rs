@@ -1,0 +1,21 @@
+use std::time::Duration;
+
+use tokio_util::sync::CancellationToken;
+use zbus::Connection;
+
+use crate::{core::metadata::art::ArtResolver, types::PlayerId};
+
+#[doc(hidden)]
+pub struct PlayerParams<'a> {
+    pub(crate) connection: &'a Connection,
+    pub(crate) player_id: PlayerId,
+}
+
+#[doc(hidden)]
+pub struct LivePlayerParams<'a> {
+    pub(crate) connection: &'a Connection,
+    pub(crate) player_id: PlayerId,
+    pub(crate) cancellation_token: &'a CancellationToken,
+    pub(crate) art_resolver: Option<ArtResolver>,
+    pub(crate) position_poll_interval: Duration,
+}
