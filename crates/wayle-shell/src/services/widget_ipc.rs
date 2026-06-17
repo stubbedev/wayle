@@ -94,7 +94,7 @@ impl ToastBus {
     }
 
     /// Publishes a toast (no-op when no subscribers are listening).
-    fn publish(&self, toast: ToastRequest) {
+    pub fn publish(&self, toast: ToastRequest) {
         let _ = self.tx.send(toast);
     }
 }

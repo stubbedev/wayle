@@ -34,11 +34,17 @@ pub(super) fn spawn_state_watchers(
 ) {
     let active = state.active.clone();
     let paused = state.paused.clone();
+    let preparing = state.preparing.clone();
     let elapsed = state.elapsed_secs.clone();
 
     watch!(
         sender,
-        [active.watch(), paused.watch(), elapsed.watch()],
+        [
+            active.watch(),
+            paused.watch(),
+            preparing.watch(),
+            elapsed.watch()
+        ],
         |out| {
             let _ = out.send(RecorderCmd::StateChanged);
         }

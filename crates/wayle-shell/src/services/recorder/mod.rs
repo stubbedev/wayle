@@ -12,6 +12,8 @@ use wayle_config::ConfigService;
 use wayle_recorder::Recorder;
 use zbus::Connection;
 
+use crate::services::widget_ipc::ToastBus;
+
 /// Screen recorder service.
 ///
 /// Owns the GStreamer engine + shared reactive state and exposes control over
@@ -28,9 +30,9 @@ impl RecorderService {
     ///
     /// Returns [`Error`] if GStreamer init, the session bus connection, or the
     /// D-Bus registration fails.
-    pub async fn new(config: Arc<ConfigService>) -> Result<Self, Error> {
+    pub async fn new(config: Arc<ConfigService>, toast_bus: ToastBus) -> Result<Self, Error> {
         let recorder = Recorder::new().map_err(|e| Error::Engine(e.to_string()))?;
-        let state = RecorderState::new(Arc::new(recorder), config);
+        let state = RecorderState::new(Arc::new(recorder), config, toast_bus);
 
         let connection = Connection::session()
             .await

@@ -160,7 +160,7 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 
     init_share_picker().await;
 
-    let recorder = init_recorder(config_service.clone()).await;
+    let recorder = init_recorder(config_service.clone(), toast_bus.clone()).await;
 
     timer.mark_services_done();
 
@@ -201,8 +201,11 @@ async fn init_share_picker() {
 
 /// Initializes the recorder service, returning `None` (non-fatal) if GStreamer
 /// or the D-Bus registration is unavailable.
-async fn init_recorder(config: Arc<ConfigService>) -> Option<Arc<RecorderService>> {
-    match RecorderService::new(config).await {
+async fn init_recorder(
+    config: Arc<ConfigService>,
+    toast_bus: ToastBus,
+) -> Option<Arc<RecorderService>> {
+    match RecorderService::new(config, toast_bus).await {
         Ok(service) => Some(Arc::new(service)),
         Err(err) => {
             warn!(error = %err, "Recorder service unavailable");

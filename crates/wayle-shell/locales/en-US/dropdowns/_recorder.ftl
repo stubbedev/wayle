@@ -15,3 +15,8 @@ dropdown-recorder-bitrate = Bitrate (kbps)
 dropdown-recorder-audio-bitrate = Audio Bitrate (kbps)
 dropdown-recorder-separate-tracks = Separate Audio Tracks
 dropdown-recorder-preset = Quality Preset
+
+# Toasts + notifications
+recorder-toast-starting = Starting recording…
+recorder-toast-stopped = Recording stopped
+recorder-notification-saved = Recording saved

@@ -2,12 +2,13 @@
 
 use std::{
     path::PathBuf,
+    process::Stdio,
     sync::{Arc, Mutex, PoisonError},
     time::Duration,
 };
 
 use chrono::Local;
-use tokio::time::interval;
+use tokio::{process::Command, time::interval};
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
 use wayle_config::{
@@ -20,6 +21,22 @@ use wayle_recorder::{
     WebcamOptions, WebcamPosition as EngineWebcamPosition,
 };
 
+use crate::{
+    i18n::t,
+    services::widget_ipc::{ToastBus, ToastRequest},
+};
+
+/// Icon shown on the recorder toasts.
+const TOAST_ICON: &str = "ld-circle-dot-symbolic";
+/// How long the "starting" toast stays on screen, in milliseconds.
+const START_TOAST_MS: u32 = 1000;
+/// Delay between the start toast and the actual capture. Kept longer than
+/// [`START_TOAST_MS`] (plus the OSD's exit animation) so the toast has cleared
+/// the screen before recording begins — otherwise it ends up in the capture.
+const START_CAPTURE_DELAY_MS: u64 = 1400;
+/// How long the "stopped" toast stays on screen, in milliseconds.
+const STOP_TOAST_MS: u32 = 1500;
+
 /// Reactive recorder state shared between the D-Bus daemon and the bar module.
 ///
 /// The bar module watches these properties to update its icon/label; the daemon
@@ -30,25 +47,31 @@ pub struct RecorderState {
     pub active: Property<bool>,
     /// Whether the active recording is paused.
     pub paused: Property<bool>,
+    /// Whether a start has been requested and is in its pre-capture delay
+    /// (the bar pulses its icon during this window).
+    pub preparing: Property<bool>,
     /// Elapsed recording time in seconds.
     pub elapsed_secs: Property<u32>,
     /// Path of the current/last output file.
     pub file_path: Property<String>,
     recorder: Arc<Recorder>,
     config: Arc<ConfigService>,
+    toast_bus: ToastBus,
     timer_token: Arc<Mutex<CancellationToken>>,
 }
 
 impl RecorderState {
     /// Creates recorder state wrapping the given engine and config.
-    pub fn new(recorder: Arc<Recorder>, config: Arc<ConfigService>) -> Self {
+    pub fn new(recorder: Arc<Recorder>, config: Arc<ConfigService>, toast_bus: ToastBus) -> Self {
         Self {
             active: Property::new(false),
             paused: Property::new(false),
+            preparing: Property::new(false),
             elapsed_secs: Property::new(0),
             file_path: Property::new(String::new()),
             recorder,
             config,
+            toast_bus,
             timer_token: Arc::new(Mutex::new(CancellationToken::new())),
         }
     }
@@ -61,15 +84,29 @@ impl RecorderState {
 
         let opts = self.build_options();
         let path = opts.output_path.clone();
+
+        // Announce the start and pulse the bar icon, then wait for the toast
+        // to clear the screen before capture begins — otherwise the toast is
+        // in the recording.
+        self.show_toast(&t!("recorder-toast-starting"), START_TOAST_MS);
+        self.preparing.set(true);
+        tokio::time::sleep(Duration::from_millis(START_CAPTURE_DELAY_MS)).await;
+
         match self.recorder.start(&opts).await {
             Ok(()) => {
                 self.file_path.set(path);
                 self.elapsed_secs.set(0);
                 self.paused.set(false);
+                // Flip active before clearing preparing so the icon goes
+                // straight from pulsing to solid-recording, with no idle flash.
                 self.active.set(true);
+                self.preparing.set(false);
                 self.start_timer();
             }
-            Err(err) => warn!(error = %err, "failed to start recording"),
+            Err(err) => {
+                self.preparing.set(false);
+                warn!(error = %err, "failed to start recording");
+            }
         }
     }
 
@@ -85,6 +122,45 @@ impl RecorderState {
         self.active.set(false);
         self.paused.set(false);
         self.elapsed_secs.set(0);
+
+        self.show_toast(&t!("recorder-toast-stopped"), STOP_TOAST_MS);
+        self.notify_saved(&self.file_path.get());
+    }
+
+    /// Publishes a recorder toast to the OSD.
+    fn show_toast(&self, label: &str, duration_ms: u32) {
+        self.toast_bus.publish(ToastRequest {
+            label: label.to_owned(),
+            icon: Some(TOAST_ICON.to_owned()),
+            percentage: None,
+            duration_ms: Some(duration_ms),
+        });
+    }
+
+    /// Fires a desktop notification (via `notify-send`) reporting where the
+    /// recording was saved. No-op when the path is empty.
+    fn notify_saved(&self, path: &str) {
+        if path.is_empty() {
+            return;
+        }
+        let mut command = Command::new("notify-send");
+        command
+            .arg("--app-name=Wayle")
+            .arg("--icon=ld-video-symbolic")
+            .arg(t!("recorder-notification-saved"))
+            .arg(path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+
+        match command.spawn() {
+            Ok(child) => {
+                // Reap the child so it doesn't linger as a zombie.
+                tokio::spawn(async move {
+                    let _ = child.wait_with_output().await;
+                });
+            }
+            Err(err) => warn!(error = %err, "cannot spawn notify-send"),
+        }
     }
 
     /// Toggles recording on/off.

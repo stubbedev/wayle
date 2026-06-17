@@ -10,9 +10,11 @@ impl RecorderModule {
     pub(super) fn update_display(&self, config: &wayle_config::schemas::modules::RecorderConfig) {
         let active = self.state.active.get();
         let paused = self.state.paused.get();
+        let preparing = self.state.preparing.get();
 
         let icon = helpers::select_icon(
             active,
+            preparing,
             paused,
             &config.icon_idle.get(),
             &config.icon_recording.get(),

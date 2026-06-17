@@ -44,6 +44,8 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: archlinux:base-devel
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
             - name: Install dependencies
               run: |
@@ -57,6 +59,7 @@ jobs:
                     libpulse \
                     fftw \
                     libpipewire \
+                    mold \
                     systemd-libs \
                     gstreamer
 
@@ -88,6 +91,8 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: archlinux:base-devel
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
             - name: Install dependencies
               run: |
@@ -101,6 +106,7 @@ jobs:
                     libpulse \
                     fftw \
                     libpipewire \
+                    mold \
                     systemd-libs \
                     gstreamer
 
@@ -123,6 +129,8 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: archlinux:base-devel
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
             - name: Install dependencies
               run: |
@@ -136,6 +144,7 @@ jobs:
                     libpulse \
                     fftw \
                     libpipewire \
+                    mold \
                     systemd-libs \
                     gstreamer \
                     jq
@@ -158,49 +167,6 @@ jobs:
                     exit 1
                   fi
 
-    build:
-        name: Build
-        needs: changes
-        if: needs.changes.outputs.code == 'true'
-        runs-on: ubuntu-latest
-        container:
-            image: archlinux:base-devel
-        steps:
-            - name: Install dependencies
-              run: |
-                  pacman --noconfirm --needed -Syu \
-                    git \
-                    rustup \
-                    clang \
-                    gtk4 \
-                    gtk4-layer-shell \
-                    gtksourceview5 \
-                    libpulse \
-                    fftw \
-                    libpipewire \
-                    systemd-libs \
-                    gstreamer
-
-            - name: Setup Rust
-              run: rustup default stable
-
-            - uses: actions/checkout@v6
-              with:
-                  submodules: recursive
-
-            - uses: Swatinem/rust-cache@v2
-
-            - name: Build workspace
-              run: cargo build --workspace --release
-
-            - name: Build archive
-              id: archive
-              run: |
-                  VERSION=$(sed -n '/\[workspace\.package\]/,/\[/{/^version/p}' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-                  ./scripts/ci/build-archive.sh target/release "${VERSION}" x86_64
-                  echo "archive=wayle-${VERSION}-x86_64-linux.tar.gz" >> "$GITHUB_OUTPUT"
-                  echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
     ubuntu:
         name: Package (Ubuntu)
         needs: changes
@@ -208,6 +174,12 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: ubuntu:latest
+        # CI only validates that packaging works; nothing here ships (release
+        # artifacts come from release.yml). So build debug — same package
+        # layout, far less compile time than --release. Release-only breakage
+        # is still caught by the `nix` job, which builds release.
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
             - name: Install dependencies
               run: |
@@ -231,6 +203,7 @@ jobs:
                     libpulse-dev \
                     libudev-dev \
                     libxkbcommon-dev \
+                    mold \
                     pkg-config
 
             - name: Checkout repository
@@ -245,13 +218,13 @@ jobs:
                   toolchain: stable
 
             - name: Build workspace
-              run: cargo build --workspace --release --locked
+              run: cargo build --workspace --locked
 
             - name: Build archive
               id: archive
               run: |
                   VERSION=$(sed -n '/\[workspace\.package\]/,/\[/{/^version/p}' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-                  ./scripts/ci/build-archive.sh target/release "${VERSION}" x86_64
+                  ./scripts/ci/build-archive.sh target/debug "${VERSION}" x86_64
                   echo "archive=wayle-${VERSION}-x86_64-linux.tar.gz" >> "$GITHUB_OUTPUT"
                   echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -265,6 +238,10 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: fedora:latest
+        # Debug build — CI validates packaging only, nothing ships here. See
+        # the ubuntu job for rationale.
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
             - name: Install dependencies
               run: |
@@ -280,6 +257,7 @@ jobs:
                     gstreamer1-devel \
                     libxkbcommon-devel \
                     make \
+                    mold \
                     pipewire-devel \
                     pkgconf-pkg-config \
                     pulseaudio-libs-devel \
@@ -308,13 +286,13 @@ jobs:
                   toolchain: stable
 
             - name: Build workspace
-              run: cargo build --workspace --release --locked
+              run: cargo build --workspace --locked
 
             - name: Build archive
               id: archive
               run: |
                   VERSION=$(sed -n '/\[workspace\.package\]/,/\[/{/^version/p}' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-                  ./scripts/ci/build-archive.sh target/release "${VERSION}" x86_64
+                  ./scripts/ci/build-archive.sh target/debug "${VERSION}" x86_64
                   echo "archive=wayle-${VERSION}-x86_64-linux.tar.gz" >> "$GITHUB_OUTPUT"
                   echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -361,14 +339,14 @@ jobs:
     ci-status:
         name: CI Status
         if: always()
-        needs: [lint, test, build, ubuntu, fedora, nix]
+        needs: [lint, test, schema, ubuntu, fedora, nix]
         runs-on: ubuntu-latest
         steps:
             - name: Check results
               run: |
                   if [[ "${{ needs.lint.result }}" == "failure" || \
                         "${{ needs.test.result }}" == "failure" || \
-                        "${{ needs.build.result }}" == "failure" || \
+                        "${{ needs.schema.result }}" == "failure" || \
                         "${{ needs.ubuntu.result }}" == "failure" || \
                         "${{ needs.nix.result }}" == "failure" || \
                         "${{ needs.fedora.result }}" == "failure" ]]; then

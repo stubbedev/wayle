@@ -1,3 +1,19 @@
+// Bar module: pulse the icon during the pre-capture delay so it's clear a
+// recording is about to start (driven by the `recorder-preparing` class the
+// bar module toggles while `state.preparing` is set).
+@keyframes recorder-prepare-pulse {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0.35;
+    }
+}
+
+.recorder-preparing .icon-container {
+    animation: recorder-prepare-pulse 0.6s ease-in-out infinite alternate;
+}
+
 .recorder-dropdown-content {
     // Record / pause action buttons. The buttons carry the standard
     // `primary` / `secondary` classes so they pick up the themed button

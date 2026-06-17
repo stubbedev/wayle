@@ -26,6 +26,8 @@ pub(crate) struct RecorderModule {
     config: Arc<ConfigService>,
     state: RecorderState,
     dropdowns: Rc<DropdownRegistry>,
+    /// Mirrors `state.preparing`; drives the pre-capture icon pulse.
+    preparing: bool,
 }
 
 #[relm4::component(pub(crate))]
@@ -37,7 +39,12 @@ impl Component for RecorderModule {
 
     view! {
         gtk::Box {
-            add_css_class: "recorder",
+            #[watch]
+            set_css_classes: if model.preparing {
+                &["recorder", "recorder-preparing"]
+            } else {
+                &["recorder"]
+            },
 
             #[local_ref]
             bar_button -> gtk::MenuButton {},
@@ -86,11 +93,13 @@ impl Component for RecorderModule {
         watchers::spawn_config_watchers(&sender, config);
         watchers::spawn_state_watchers(&sender, &state);
 
+        let preparing = state.preparing.get();
         let model = Self {
             bar_button,
             config: init.config,
             state,
             dropdowns: init.dropdowns,
+            preparing,
         };
         model.update_display(&model.config.config().modules.recorder);
 
@@ -117,6 +126,7 @@ impl Component for RecorderModule {
     fn update_cmd(&mut self, msg: RecorderCmd, _sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             RecorderCmd::ConfigChanged | RecorderCmd::StateChanged => {
+                self.preparing = self.state.preparing.get();
                 let config = &self.config.config().modules.recorder;
                 self.update_display(config);
             }

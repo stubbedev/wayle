@@ -42,19 +42,27 @@ pub(super) fn build_label(format: &str, ctx: &LabelContext) -> String {
 }
 
 /// Selects the icon for the current recorder state.
+///
+/// While `preparing` (the pre-capture delay) the recording icon is shown and
+/// the bar pulses it via the `recorder-preparing` CSS class.
 pub(super) fn select_icon(
     active: bool,
+    preparing: bool,
     paused: bool,
     icon_idle: &str,
     icon_recording: &str,
     icon_paused: &str,
 ) -> String {
-    if !active {
-        icon_idle.to_string()
-    } else if paused {
-        icon_paused.to_string()
-    } else {
+    if active {
+        if paused {
+            icon_paused.to_string()
+        } else {
+            icon_recording.to_string()
+        }
+    } else if preparing {
         icon_recording.to_string()
+    } else {
+        icon_idle.to_string()
     }
 }
 
@@ -89,8 +97,21 @@ mod tests {
 
     #[test]
     fn select_icon_switches() {
-        assert_eq!(select_icon(false, false, "idle", "rec", "pause"), "idle");
-        assert_eq!(select_icon(true, false, "idle", "rec", "pause"), "rec");
-        assert_eq!(select_icon(true, true, "idle", "rec", "pause"), "pause");
+        assert_eq!(
+            select_icon(false, false, false, "idle", "rec", "pause"),
+            "idle"
+        );
+        assert_eq!(
+            select_icon(false, true, false, "idle", "rec", "pause"),
+            "rec"
+        );
+        assert_eq!(
+            select_icon(true, false, false, "idle", "rec", "pause"),
+            "rec"
+        );
+        assert_eq!(
+            select_icon(true, false, true, "idle", "rec", "pause"),
+            "pause"
+        );
     }
 }
