@@ -1,10 +1,15 @@
 {
   description = "wayle — a Wayland desktop shell (Rust + GTK4 + Relm4)";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # crane builds the 591 deps as a separate, Cargo.lock-keyed derivation so a
+    # source edit only recompiles wayle's own crates. See nix/package.nix.
+    crane.url = "github:ipetkov/crane";
+  };
 
   outputs =
-    { self, nixpkgs }:
+    { self, nixpkgs, crane }:
     let
       systems = [
         "x86_64-linux"
@@ -15,13 +20,13 @@
     in
     {
       packages = forAllSystems (pkgs: rec {
-        wayle = pkgs.callPackage ./nix/package.nix { };
+        wayle = pkgs.callPackage ./nix/package.nix { craneLib = crane.mkLib pkgs; };
         default = wayle;
       });
 
       # Adds `wayle` to a nixpkgs instance: `nixpkgs.overlays = [ wayle.overlays.default ];`
       overlays.default = _final: prev: {
-        wayle = prev.callPackage ./nix/package.nix { };
+        wayle = prev.callPackage ./nix/package.nix { craneLib = crane.mkLib prev; };
       };
 
       # NixOS: `imports = [ wayle.nixosModules.default ]; programs.wayle.enable = true;`
