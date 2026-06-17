@@ -323,22 +323,23 @@ jobs:
               with:
                   extra_nix_config: |
                       experimental-features = nix-command flakes
-
-            - uses: cachix/cachix-action@v16
-              with:
-                  name: wayle
-                  # Empty on fork PRs (secret absent) — cachix still serves as a
-                  # substituter, it just won't push.
-                  authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-                  # Push only from master; PR builds validate but don't pollute
-                  # the cache. NB: don't use pushFilter with an empty string for
-                  # the "push all" branch — '' is falsy in GHA expressions, so
-                  # `cond && '' || '.*'` always yields '.*' and never pushes.
-                  # skipPush takes 'true'/'false' (both non-empty) and is safe.
-                  skipPush: ${{ github.event_name != 'push' || github.ref != 'refs/heads/master' }}
+                      # Pull from the self-hosted attic cache on every event
+                      # (incl. fork PRs — read access is public, no secret).
+                      extra-substituters = https://nix.stubbe.dev/wayle
+                      extra-trusted-public-keys = wayle:XD2O2h1Mmka+VegRi2JY7ywNbG9al+TUAZp6CObizFU=
 
             - name: Build package
-              run: nix build '.?submodules=1#wayle' -L
+              run: nix build '.?submodules=1#wayle' -L --print-out-paths | tee /tmp/wayle-outpaths
+
+            # Push the build closure to the attic cache (nix.stubbe.dev/wayle).
+            # master only — PRs/forks lack the token, they still pull above.
+            - name: Push to attic
+              if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+              env:
+                  ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
+              run: |
+                  nix run nixpkgs#attic-client -- login stubbe https://nix.stubbe.dev "$ATTIC_TOKEN"
+                  nix run nixpkgs#attic-client -- push wayle $(cat /tmp/wayle-outpaths)
 
     ci-status:
         name: CI Status
