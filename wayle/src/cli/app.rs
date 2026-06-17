@@ -113,17 +113,23 @@ pub enum Commands {
     },
     /// Show a custom on-screen toast
     Toast {
-        /// Toast text.
-        label: String,
+        /// Toast text. Optional when `--preset` supplies one.
+        label: Option<String>,
         /// Icon name shown beside the text.
         #[arg(long)]
         icon: Option<String>,
         /// Progress percentage (0-100); shows a progress bar when set.
         #[arg(long)]
         percentage: Option<f64>,
-        /// Auto-dismiss duration in milliseconds (OSD default when unset).
+        /// Auto-dismiss duration in milliseconds (toast config default when unset).
         #[arg(long)]
         duration: Option<u32>,
+        /// Preset id from `[[toasts.presets]]` to base this toast on.
+        #[arg(long)]
+        preset: Option<String>,
+        /// Extra CSS class applied to the toast for custom styling.
+        #[arg(long)]
+        class: Option<String>,
     },
     /// xdg-desktop-portal screencast picker (invoked by the portal, not by hand)
     #[command(name = "share-picker")]

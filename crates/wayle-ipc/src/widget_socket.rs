@@ -43,8 +43,10 @@ pub struct WidgetUpdateParams {
 /// Parameters for [`METHOD_TOAST_SHOW`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToastShowParams {
-    /// Toast text.
-    pub label: String,
+    /// Toast text. Optional when `preset` supplies one; an explicit label
+    /// overrides the preset's label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     /// Optional icon name shown beside the text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
@@ -53,10 +55,17 @@ pub struct ToastShowParams {
     /// plain icon + label toast.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub percentage: Option<f64>,
-    /// Optional auto-dismiss duration in milliseconds; falls back to the OSD
+    /// Optional auto-dismiss duration in milliseconds; falls back to the toast
     /// config duration when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<u32>,
+    /// Optional preset id (`[[toasts.presets]]`) to base this toast on.
+    /// Explicit fields above override the preset's values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preset: Option<String>,
+    /// Optional extra CSS class applied to the toast for custom styling.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub class: Option<String>,
 }
 
 /// A JSON-RPC 2.0 request.
@@ -93,16 +102,20 @@ impl Request {
     /// Builds a [`METHOD_TOAST_SHOW`] request.
     #[must_use]
     pub fn toast_show(
-        label: &str,
+        label: Option<&str>,
         icon: Option<&str>,
         percentage: Option<f64>,
         duration_ms: Option<u32>,
+        preset: Option<&str>,
+        class: Option<&str>,
     ) -> Self {
         let params = serde_json::to_value(ToastShowParams {
-            label: label.to_owned(),
+            label: label.map(str::to_owned),
             icon: icon.map(str::to_owned),
             percentage,
             duration_ms,
+            preset: preset.map(str::to_owned),
+            class: class.map(str::to_owned),
         })
         .unwrap_or(serde_json::Value::Null);
 
@@ -208,12 +221,22 @@ pub async fn send_widget_update(id: &str, output: &str) -> Result<(), ClientErro
 /// Returns [`ClientError`] when the socket is unreachable, the I/O fails, the
 /// payload cannot be (de)serialized, or the server rejects the request.
 pub async fn send_toast(
-    label: &str,
+    label: Option<&str>,
     icon: Option<&str>,
     percentage: Option<f64>,
     duration_ms: Option<u32>,
+    preset: Option<&str>,
+    class: Option<&str>,
 ) -> Result<(), ClientError> {
-    send_request(Request::toast_show(label, icon, percentage, duration_ms)).await
+    send_request(Request::toast_show(
+        label,
+        icon,
+        percentage,
+        duration_ms,
+        preset,
+        class,
+    ))
+    .await
 }
 
 /// Sends a single request over the widget socket and awaits the response.

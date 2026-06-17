@@ -181,10 +181,12 @@ impl RecorderState {
     /// Publishes a recorder toast to the OSD.
     fn show_toast(&self, label: &str, duration_ms: u32) {
         self.toast_bus.publish(ToastRequest {
-            label: label.to_owned(),
+            label: Some(label.to_owned()),
             icon: Some(TOAST_ICON.to_owned()),
             percentage: None,
             duration_ms: Some(duration_ms),
+            preset: None,
+            class: None,
         });
     }
 
@@ -192,10 +194,12 @@ impl RecorderState {
     /// never left guessing why a recording silently stopped.
     fn show_error(&self, message: &str) {
         self.toast_bus.publish(ToastRequest {
-            label: message.to_owned(),
+            label: Some(message.to_owned()),
             icon: Some(ERROR_ICON.to_owned()),
             percentage: None,
             duration_ms: Some(STOP_TOAST_MS),
+            preset: None,
+            class: None,
         });
         self.notify(&t!("recorder-notification-failed"), message, ERROR_ICON);
     }
