@@ -29,7 +29,7 @@ use crate::{
 /// Icon shown on the recorder toasts.
 const TOAST_ICON: &str = "ld-circle-dot-symbolic";
 /// Icon shown on recorder failure toasts/notifications.
-const ERROR_ICON: &str = "ld-circle-alert-symbolic";
+const ERROR_ICON: &str = "ld-alert-triangle-symbolic";
 /// How long the "starting" toast stays on screen, in milliseconds.
 const START_TOAST_MS: u32 = 1000;
 /// Delay between the start toast and the actual capture. Kept longer than
