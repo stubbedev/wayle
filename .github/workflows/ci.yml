@@ -338,7 +338,7 @@ jobs:
                   skipPush: ${{ github.event_name != 'push' || github.ref != 'refs/heads/master' }}
 
             - name: Build package
-              run: nix build .#wayle -L
+              run: nix build '.?submodules=1#wayle' -L
 
     ci-status:
         name: CI Status
