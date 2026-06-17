@@ -324,7 +324,13 @@ jobs:
     nix:
         name: Nix build + cache
         needs: changes
-        if: needs.changes.outputs.code == 'true'
+        # Always build + push on master so the cache tracks every commit (a
+        # docs/schema-only commit still rebuilds — mostly cache hits, but keeps
+        # the binary present). On PRs, only when code changed, and push is
+        # suppressed by pushFilter below.
+        if: >-
+            needs.changes.outputs.code == 'true' ||
+            (github.event_name == 'push' && github.ref == 'refs/heads/master')
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6
