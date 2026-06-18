@@ -81,13 +81,22 @@
         }
     }
 
-    // Section headers: a leading icon + the section label.
+    // Section headers: a leading icon + the section label on one row. The
+    // shared `.section-label` carries vertical margins tuned for a stacked
+    // label; in this horizontal header they'd offset the text from the icon,
+    // so drop them and center both children on the row instead.
     .recorder-section-header {
-        margin-top: var(--space-sm);
+        margin-top: var(--space-lg);
 
         > image {
             -gtk-icon-size: var(--icon-sm);
             color: var(--fg-subtle);
+        }
+
+        > image,
+        > .section-label {
+            margin-top: 0;
+            margin-bottom: 0;
         }
     }
 
