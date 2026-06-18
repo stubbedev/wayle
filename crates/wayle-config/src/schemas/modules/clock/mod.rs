@@ -9,7 +9,18 @@ use crate::{
 };
 
 /// Which day appears in the first column of the calendar dropdown.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    wayle_derive::EnumVariants,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum WeekStart {
     /// Week starts on Monday.

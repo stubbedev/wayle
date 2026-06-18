@@ -55,3 +55,12 @@ settings-modules-clock-dropdown-show-seconds = Show Seconds
 
 settings-modules-clock-calendar-weekday-start = Calendar Week Start
     .description = First day of the week in the calendar dropdown
+
+## WeekStart variants
+enum-week-start-monday = Monday
+enum-week-start-tuesday = Tuesday
+enum-week-start-wednesday = Wednesday
+enum-week-start-thursday = Thursday
+enum-week-start-friday = Friday
+enum-week-start-saturday = Saturday
+enum-week-start-sunday = Sunday

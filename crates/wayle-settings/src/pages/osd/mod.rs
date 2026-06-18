@@ -30,6 +30,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     toggle(&osd.enabled),
                     enum_select(&osd.position),
                     enum_select(&osd.layer),
+                    enum_select(&osd.text_align),
                     number_u32(&osd.duration),
                     text_like(&osd.monitor),
                     spacing(&osd.margin),

@@ -232,6 +232,7 @@ settings-section-filtering = Filtering
 settings-section-presets = Presets
 settings-section-speed = Speed
 settings-section-direction = Enter / Exit
+settings-section-thresholds = Thresholds
 settings-section-overrides = Per-surface Overrides
 settings-section-bar-display = Bar Display
 settings-section-colors = Colors

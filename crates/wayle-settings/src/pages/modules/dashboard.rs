@@ -5,14 +5,28 @@ use wayle_config::Config;
 use crate::{
     editors::{
         color_value::color_value,
+        number::number_newtype,
         text::{text, text_like},
         toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
-        spec::{SectionSpec, page_spec},
+        spec::{SectionSpec, SettingRowInit, page_spec},
     },
 };
+
+/// Dashboard threshold spin (`f32` percent / °C) constrained to `[0, max]`.
+fn threshold(property: &wayle_config::ConfigProperty<f32>, max: f64) -> SettingRowInit {
+    number_newtype(
+        property,
+        0.0,
+        max,
+        1.0,
+        0,
+        |value| f64::from(*value),
+        |value| value as f32,
+    )
+}
 
 pub(crate) fn entry(config: &Config) -> LeafEntry {
     let module = &config.modules.dashboard;
@@ -35,6 +49,17 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         text(&module.dropdown_logout_command),
                         text(&module.dropdown_reboot_command),
                         text(&module.dropdown_poweroff_command),
+                    ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-thresholds",
+                    items: vec![
+                        threshold(&module.usage_warning, 100.0),
+                        threshold(&module.usage_error, 100.0),
+                        threshold(&module.temp_warning, 150.0),
+                        threshold(&module.temp_error, 150.0),
+                        threshold(&module.battery_warning, 100.0),
+                        threshold(&module.battery_critical, 100.0),
                     ],
                 },
                 SectionSpec {

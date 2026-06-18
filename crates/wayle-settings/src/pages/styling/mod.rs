@@ -32,6 +32,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-provider",
                     items: vec![
+                        enum_select(&styling.appearance),
                         enum_select(&styling.theme_provider),
                         text(&styling.theming_monitor),
                     ],
