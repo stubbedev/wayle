@@ -334,7 +334,10 @@ pub(super) fn build_outputs_page(
     config: &PickerConfig,
     input: &Sender<SharePickerInput>,
 ) -> ScrolledWindow {
-    let container = Fixed::builder().hexpand(false).vexpand(false).build();
+    // Fill the viewport (not shrink to the children's bounding box) so the
+    // per-card `px_offset_x` / `px_offset_y` have real slack to center the
+    // monitor map into — otherwise the map pins to the top-left corner.
+    let container = Fixed::builder().hexpand(true).vexpand(true).build();
     let scrolled_window = ScrolledWindow::builder()
         .child(&container)
         .css_classes(["share-picker-page"])
