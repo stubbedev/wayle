@@ -7,13 +7,22 @@ dropdown-recorder-stop = Stop
 dropdown-recorder-pause = Pause
 dropdown-recorder-resume = Resume
 
+# Live status row (shown while recording)
+dropdown-recorder-recording = Recording
+dropdown-recorder-paused = Paused
+
+# Section headings
+dropdown-recorder-section-audio = Audio
+dropdown-recorder-section-webcam = Webcam
+dropdown-recorder-section-video = Video
+
 dropdown-recorder-microphone = Microphone
 dropdown-recorder-system-audio = System Audio
 dropdown-recorder-webcam = Webcam Frame
-dropdown-recorder-position = Webcam Position
+dropdown-recorder-position = Position
 dropdown-recorder-bitrate = Bitrate (kbps)
 dropdown-recorder-audio-bitrate = Audio Bitrate (kbps)
-dropdown-recorder-separate-tracks = Separate Audio Tracks
+dropdown-recorder-separate-tracks = Separate Tracks
 dropdown-recorder-preset = Quality Preset
 
 # Toasts + notifications

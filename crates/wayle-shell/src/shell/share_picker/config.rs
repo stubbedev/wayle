@@ -55,7 +55,7 @@ impl Default for PickerConfig {
         Self {
             width: 1000,
             height: 500,
-            resize_size: 200,
+            resize_size: 640,
             widget_size: 150,
             default_page: Page::Windows,
             hide_token_restore: false,

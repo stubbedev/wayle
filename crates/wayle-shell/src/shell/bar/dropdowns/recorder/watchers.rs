@@ -19,7 +19,12 @@ pub(super) fn spawn(
 
     let active = state.active.clone();
     let paused = state.paused.clone();
-    watch!(sender, [active.watch(), paused.watch()], |out| {
-        let _ = out.send(RecorderDropdownCmd::StateChanged);
-    });
+    let elapsed = state.elapsed_secs.clone();
+    watch!(
+        sender,
+        [active.watch(), paused.watch(), elapsed.watch()],
+        |out| {
+            let _ = out.send(RecorderDropdownCmd::StateChanged);
+        }
+    );
 }

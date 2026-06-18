@@ -30,6 +30,10 @@ pub(crate) struct RecorderDropdown {
     scaled_width: i32,
     active: bool,
     paused: bool,
+    /// Mirrors `recorder.webcam_enabled`; gates the position row's sensitivity.
+    webcam_enabled: bool,
+    /// Elapsed seconds of the active recording, for the live status row.
+    elapsed_secs: u32,
 }
 
 #[relm4::component(pub(crate))]
@@ -60,20 +64,46 @@ impl Component for RecorderDropdown {
                     label {
                         set_label: &t!("dropdown-recorder-title"),
                     },
+                    #[template_child]
+                    actions {
+                        set_visible: true,
+
+                        gtk::Box {
+                            add_css_class: "recorder-status",
+                            #[watch]
+                            set_visible: model.active,
+
+                            gtk::Box {
+                                add_css_class: "recorder-status-dot",
+                                #[watch]
+                                set_class_active: ("paused", model.paused),
+                            },
+                            gtk::Label {
+                                add_css_class: "recorder-status-time",
+                                #[watch]
+                                set_label: &format_elapsed(model.elapsed_secs),
+                            },
+                        },
+                    },
                 },
 
                 #[template]
                 DropdownContent {
                     add_css_class: "recorder-dropdown-content",
 
+                    // Primary actions: a full-width record/stop toggle plus a
+                    // pause/resume button that only lights up while recording.
                     gtk::Box {
                         add_css_class: "recorder-controls",
                         set_spacing: 8,
 
                         gtk::Button {
-                            add_css_class: "primary",
                             add_css_class: "recorder-record-button",
                             set_hexpand: true,
+                            #[watch]
+                            set_class_active: ("danger", model.active),
+                            #[watch]
+                            set_class_active: ("primary", !model.active),
                             #[watch]
                             set_label: &if model.active {
                                 t!("dropdown-recorder-stop")
@@ -98,163 +128,198 @@ impl Component for RecorderDropdown {
                         },
                     },
 
-                    gtk::Box {
-                        add_css_class: "recorder-row",
-                        gtk::Label {
-                            set_hexpand: true,
-                            set_halign: gtk::Align::Start,
-                            set_label: &t!("dropdown-recorder-microphone"),
-                        },
-                        #[template]
-                        Switch {
-                            #[block_signal(mic_toggle)]
-                            set_active: model.config.config().modules.recorder.microphone.get(),
-                            connect_state_set[sender] => move |switch, active| {
-                                sender.input(RecorderDropdownMsg::MicrophoneToggled(active));
-                                switch.set_state(active);
-                                gtk::glib::Propagation::Stop
-                            } @mic_toggle,
-                        },
+                    gtk::Label {
+                        add_css_class: "section-label",
+                        set_halign: gtk::Align::Start,
+                        set_label: &t!("dropdown-recorder-section-audio"),
                     },
 
                     gtk::Box {
-                        add_css_class: "recorder-row",
-                        gtk::Label {
-                            set_hexpand: true,
-                            set_halign: gtk::Align::Start,
-                            set_label: &t!("dropdown-recorder-system-audio"),
-                        },
-                        #[template]
-                        Switch {
-                            #[block_signal(sys_toggle)]
-                            set_active: model.config.config().modules.recorder.system_audio.get(),
-                            connect_state_set[sender] => move |switch, active| {
-                                sender.input(RecorderDropdownMsg::SystemAudioToggled(active));
-                                switch.set_state(active);
-                                gtk::glib::Propagation::Stop
-                            } @sys_toggle,
-                        },
-                    },
+                        set_css_classes: &["card", "recorder-card"],
+                        set_orientation: gtk::Orientation::Vertical,
 
-                    gtk::Box {
-                        add_css_class: "recorder-row",
-                        gtk::Label {
-                            set_hexpand: true,
-                            set_halign: gtk::Align::Start,
-                            set_label: &t!("dropdown-recorder-webcam"),
+                        gtk::Box {
+                            add_css_class: "recorder-row",
+                            gtk::Label {
+                                set_hexpand: true,
+                                set_halign: gtk::Align::Start,
+                                set_label: &t!("dropdown-recorder-microphone"),
+                            },
+                            #[template]
+                            Switch {
+                                #[block_signal(mic_toggle)]
+                                set_active: model.config.config().modules.recorder.microphone.get(),
+                                connect_state_set[sender] => move |switch, active| {
+                                    sender.input(RecorderDropdownMsg::MicrophoneToggled(active));
+                                    switch.set_state(active);
+                                    gtk::glib::Propagation::Stop
+                                } @mic_toggle,
+                            },
                         },
-                        #[template]
-                        Switch {
-                            #[block_signal(cam_toggle)]
-                            set_active: model.config.config().modules.recorder.webcam_enabled.get(),
-                            connect_state_set[sender] => move |switch, active| {
-                                sender.input(RecorderDropdownMsg::WebcamToggled(active));
-                                switch.set_state(active);
-                                gtk::glib::Propagation::Stop
-                            } @cam_toggle,
-                        },
-                    },
 
-                    gtk::Box {
-                        add_css_class: "recorder-row",
-                        gtk::Label {
-                            set_hexpand: true,
-                            set_halign: gtk::Align::Start,
-                            set_label: &t!("dropdown-recorder-position"),
+                        gtk::Box {
+                            add_css_class: "recorder-row",
+                            gtk::Label {
+                                set_hexpand: true,
+                                set_halign: gtk::Align::Start,
+                                set_label: &t!("dropdown-recorder-system-audio"),
+                            },
+                            #[template]
+                            Switch {
+                                #[block_signal(sys_toggle)]
+                                set_active: model.config.config().modules.recorder.system_audio.get(),
+                                connect_state_set[sender] => move |switch, active| {
+                                    sender.input(RecorderDropdownMsg::SystemAudioToggled(active));
+                                    switch.set_state(active);
+                                    gtk::glib::Propagation::Stop
+                                } @sys_toggle,
+                            },
                         },
-                        gtk::DropDown {
-                            set_model: Some(&gtk::StringList::new(&[
-                                "Top Left",
-                                "Top Right",
-                                "Bottom Left",
-                                "Bottom Right",
-                            ])),
-                            set_selected: position_index(
-                                model.config.config().modules.recorder.webcam_position.get(),
-                            ),
-                            connect_selected_notify[sender] => move |dropdown| {
-                                sender.input(RecorderDropdownMsg::PositionSelected(dropdown.selected()));
+
+                        gtk::Box {
+                            add_css_class: "recorder-row",
+                            gtk::Label {
+                                set_hexpand: true,
+                                set_halign: gtk::Align::Start,
+                                set_label: &t!("dropdown-recorder-separate-tracks"),
+                            },
+                            #[template]
+                            Switch {
+                                #[block_signal(sep_toggle)]
+                                set_active: model.config.config().modules.recorder.separate_audio_tracks.get(),
+                                connect_state_set[sender] => move |switch, active| {
+                                    sender.input(RecorderDropdownMsg::SeparateTracksToggled(active));
+                                    switch.set_state(active);
+                                    gtk::glib::Propagation::Stop
+                                } @sep_toggle,
+                            },
+                        },
+
+                        gtk::Box {
+                            add_css_class: "recorder-row",
+                            gtk::Label {
+                                set_hexpand: true,
+                                set_halign: gtk::Align::Start,
+                                set_label: &t!("dropdown-recorder-audio-bitrate"),
+                            },
+                            gtk::SpinButton {
+                                set_adjustment: &gtk::Adjustment::new(
+                                    f64::from(model.config.config().modules.recorder.audio_bitrate_kbps.get()),
+                                    MIN_AUDIO_BITRATE,
+                                    MAX_AUDIO_BITRATE,
+                                    AUDIO_BITRATE_STEP,
+                                    AUDIO_BITRATE_STEP,
+                                    0.0,
+                                ),
+                                connect_value_changed[sender] => move |spin| {
+                                    sender.input(RecorderDropdownMsg::AudioBitrateChanged(spin.value() as u32));
+                                },
                             },
                         },
                     },
 
+                    gtk::Label {
+                        add_css_class: "section-label",
+                        set_halign: gtk::Align::Start,
+                        set_label: &t!("dropdown-recorder-section-webcam"),
+                    },
+
                     gtk::Box {
-                        add_css_class: "recorder-row",
-                        gtk::Label {
-                            set_hexpand: true,
-                            set_halign: gtk::Align::Start,
-                            set_label: &t!("dropdown-recorder-bitrate"),
+                        set_css_classes: &["card", "recorder-card"],
+                        set_orientation: gtk::Orientation::Vertical,
+
+                        gtk::Box {
+                            add_css_class: "recorder-row",
+                            gtk::Label {
+                                set_hexpand: true,
+                                set_halign: gtk::Align::Start,
+                                set_label: &t!("dropdown-recorder-webcam"),
+                            },
+                            #[template]
+                            Switch {
+                                #[block_signal(cam_toggle)]
+                                set_active: model.config.config().modules.recorder.webcam_enabled.get(),
+                                connect_state_set[sender] => move |switch, active| {
+                                    sender.input(RecorderDropdownMsg::WebcamToggled(active));
+                                    switch.set_state(active);
+                                    gtk::glib::Propagation::Stop
+                                } @cam_toggle,
+                            },
                         },
-                        gtk::SpinButton {
-                            set_adjustment: &gtk::Adjustment::new(
-                                f64::from(model.config.config().modules.recorder.bitrate_kbps.get()),
-                                MIN_BITRATE,
-                                MAX_BITRATE,
-                                BITRATE_STEP,
-                                BITRATE_STEP,
-                                0.0,
-                            ),
-                            connect_value_changed[sender] => move |spin| {
-                                sender.input(RecorderDropdownMsg::BitrateChanged(spin.value() as u32));
+
+                        gtk::Box {
+                            add_css_class: "recorder-row",
+                            #[watch]
+                            set_sensitive: model.webcam_enabled,
+                            gtk::Label {
+                                set_hexpand: true,
+                                set_halign: gtk::Align::Start,
+                                set_label: &t!("dropdown-recorder-position"),
+                            },
+                            gtk::DropDown {
+                                set_model: Some(&gtk::StringList::new(&[
+                                    "Top Left",
+                                    "Top Right",
+                                    "Bottom Left",
+                                    "Bottom Right",
+                                ])),
+                                set_selected: position_index(
+                                    model.config.config().modules.recorder.webcam_position.get(),
+                                ),
+                                connect_selected_notify[sender] => move |dropdown| {
+                                    sender.input(RecorderDropdownMsg::PositionSelected(dropdown.selected()));
+                                },
                             },
                         },
                     },
 
+                    gtk::Label {
+                        add_css_class: "section-label",
+                        set_halign: gtk::Align::Start,
+                        set_label: &t!("dropdown-recorder-section-video"),
+                    },
+
                     gtk::Box {
-                        add_css_class: "recorder-row",
-                        gtk::Label {
-                            set_hexpand: true,
-                            set_halign: gtk::Align::Start,
-                            set_label: &t!("dropdown-recorder-audio-bitrate"),
-                        },
-                        gtk::SpinButton {
-                            set_adjustment: &gtk::Adjustment::new(
-                                f64::from(model.config.config().modules.recorder.audio_bitrate_kbps.get()),
-                                MIN_AUDIO_BITRATE,
-                                MAX_AUDIO_BITRATE,
-                                AUDIO_BITRATE_STEP,
-                                AUDIO_BITRATE_STEP,
-                                0.0,
-                            ),
-                            connect_value_changed[sender] => move |spin| {
-                                sender.input(RecorderDropdownMsg::AudioBitrateChanged(spin.value() as u32));
+                        set_css_classes: &["card", "recorder-card"],
+                        set_orientation: gtk::Orientation::Vertical,
+
+                        gtk::Box {
+                            add_css_class: "recorder-row",
+                            gtk::Label {
+                                set_hexpand: true,
+                                set_halign: gtk::Align::Start,
+                                set_label: &t!("dropdown-recorder-bitrate"),
+                            },
+                            gtk::SpinButton {
+                                set_adjustment: &gtk::Adjustment::new(
+                                    f64::from(model.config.config().modules.recorder.bitrate_kbps.get()),
+                                    MIN_BITRATE,
+                                    MAX_BITRATE,
+                                    BITRATE_STEP,
+                                    BITRATE_STEP,
+                                    0.0,
+                                ),
+                                connect_value_changed[sender] => move |spin| {
+                                    sender.input(RecorderDropdownMsg::BitrateChanged(spin.value() as u32));
+                                },
                             },
                         },
-                    },
 
-                    gtk::Box {
-                        add_css_class: "recorder-row",
-                        gtk::Label {
-                            set_hexpand: true,
-                            set_halign: gtk::Align::Start,
-                            set_label: &t!("dropdown-recorder-separate-tracks"),
-                        },
-                        #[template]
-                        Switch {
-                            #[block_signal(sep_toggle)]
-                            set_active: model.config.config().modules.recorder.separate_audio_tracks.get(),
-                            connect_state_set[sender] => move |switch, active| {
-                                sender.input(RecorderDropdownMsg::SeparateTracksToggled(active));
-                                switch.set_state(active);
-                                gtk::glib::Propagation::Stop
-                            } @sep_toggle,
-                        },
-                    },
-
-                    gtk::Box {
-                        add_css_class: "recorder-row",
-                        gtk::Label {
-                            set_hexpand: true,
-                            set_halign: gtk::Align::Start,
-                            set_label: &t!("dropdown-recorder-preset"),
-                        },
-                        gtk::DropDown {
-                            set_model: Some(&gtk::StringList::new(&["Speed", "Balanced", "Quality"])),
-                            set_selected: preset_index(
-                                model.config.config().modules.recorder.encoder_preset.get(),
-                            ),
-                            connect_selected_notify[sender] => move |dropdown| {
-                                sender.input(RecorderDropdownMsg::PresetSelected(dropdown.selected()));
+                        gtk::Box {
+                            add_css_class: "recorder-row",
+                            gtk::Label {
+                                set_hexpand: true,
+                                set_halign: gtk::Align::Start,
+                                set_label: &t!("dropdown-recorder-preset"),
+                            },
+                            gtk::DropDown {
+                                set_model: Some(&gtk::StringList::new(&["Speed", "Balanced", "Quality"])),
+                                set_selected: preset_index(
+                                    model.config.config().modules.recorder.encoder_preset.get(),
+                                ),
+                                connect_selected_notify[sender] => move |dropdown| {
+                                    sender.input(RecorderDropdownMsg::PresetSelected(dropdown.selected()));
+                                },
                             },
                         },
                     },
@@ -276,6 +341,8 @@ impl Component for RecorderDropdown {
             scaled_width: resolve_dimension(None, BASE_WIDTH, scale),
             active: init.state.active.get(),
             paused: init.state.paused.get(),
+            webcam_enabled: init.config.config().modules.recorder.webcam_enabled.get(),
+            elapsed_secs: init.state.elapsed_secs.get(),
             config: init.config,
             state: init.state,
         };
@@ -296,7 +363,10 @@ impl Component for RecorderDropdown {
             }
             RecorderDropdownMsg::MicrophoneToggled(active) => recorder.microphone.set(active),
             RecorderDropdownMsg::SystemAudioToggled(active) => recorder.system_audio.set(active),
-            RecorderDropdownMsg::WebcamToggled(active) => recorder.webcam_enabled.set(active),
+            RecorderDropdownMsg::WebcamToggled(active) => {
+                recorder.webcam_enabled.set(active);
+                self.webcam_enabled = active;
+            }
             RecorderDropdownMsg::PositionSelected(index) => {
                 recorder.webcam_position.set(position_from_index(index));
             }
@@ -323,11 +393,25 @@ impl Component for RecorderDropdown {
             RecorderDropdownCmd::StateChanged => {
                 self.active = self.state.active.get();
                 self.paused = self.state.paused.get();
+                self.elapsed_secs = self.state.elapsed_secs.get();
             }
             RecorderDropdownCmd::ScaleChanged(scale) => {
                 self.scaled_width = resolve_dimension(None, BASE_WIDTH, scale);
             }
         }
+    }
+}
+
+/// Formats elapsed seconds as `M:SS` (or `H:MM:SS` past an hour) for the
+/// live status readout in the header.
+fn format_elapsed(secs: u32) -> String {
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    let seconds = secs % 60;
+    if hours > 0 {
+        format!("{hours}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{minutes}:{seconds:02}")
     }
 }
 

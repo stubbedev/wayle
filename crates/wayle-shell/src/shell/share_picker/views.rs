@@ -618,8 +618,9 @@ fn append_output_on_allocation(
             card.set_height_request(transform_y(height as i32) as i32);
 
             let transformed_monitor_width = transform_x(monitors_width);
+            let transformed_monitor_height = transform_y(monitors_height);
             let px_offset_x = (alloc_w as f64 - transformed_monitor_width).max(0.0) / 2.0;
-            let px_offset_y = (alloc_h as f64 - transform_x(monitors_height)).max(0.0) / 2.0;
+            let px_offset_y = (alloc_h as f64 - transformed_monitor_height).max(0.0) / 2.0;
 
             container.put(
                 &card,
