@@ -162,6 +162,8 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 
     let recorder = init_recorder(config_service.clone(), toast_bus.clone()).await;
 
+    let mail = crate::services::MailService::new(config_service.clone());
+
     timer.mark_services_done();
 
     let services = ShellServices {
@@ -173,6 +175,7 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
         hyprland: optional.hyprland,
         power_profiles,
         idle_inhibit: core.idle_inhibit,
+        mail,
         recorder,
         mango: optional.mango,
         media: daemons.media,

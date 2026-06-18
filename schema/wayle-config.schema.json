@@ -268,6 +268,12 @@
       },
       "type": "array"
     },
+    "Array_of_MailAccount": {
+      "items": {
+        "$ref": "#/$defs/MailAccount"
+      },
+      "type": "array"
+    },
     "Array_of_MonitorWallpaperConfig": {
       "items": {
         "$ref": "#/$defs/MonitorWallpaperConfig"
@@ -2090,6 +2096,14 @@
           },
           "description": "Dashboard dropdown panel size. Height grows to fit content."
         },
+        "mail": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Mail dropdown panel size. Height grows to fit content."
+        },
         "media": {
           "$ref": "#/$defs/DropdownSize",
           "default": {
@@ -2904,9 +2918,45 @@
         }
       ]
     },
+    "MailAccount": {
+      "description": "One mail account in the `[modules.mail]` per-account breakdown.\n\nEach account has its own notmuch query; the dropdown shows the per-account\nunread counts and the bar shows their sum.\n\n## Example\n\n```toml\n[[modules.mail.accounts]]\nname = \"Work\"\nquery = \"folder:work/INBOX and tag:unread\"\nprovider = \"gmail\"\n```",
+      "properties": {
+        "icon": {
+          "default": null,
+          "description": "Optional icon override. Empty uses the provider's default icon.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Display name shown in the dropdown.",
+          "type": "string"
+        },
+        "provider": {
+          "$ref": "#/$defs/MailProvider",
+          "default": "generic",
+          "description": "Provider, selecting the default brand icon."
+        },
+        "query": {
+          "description": "notmuch query whose match count is this account's unread total.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "query"
+      ],
+      "type": "object"
+    },
     "MailConfig": {
       "description": "Unread mail count, backed by a notmuch query.\n\nRuns `notmuch count <query>` and re-queries whenever the maildir changes\n(event-driven via an inotify watch on the notmuch database path). Hidden\nwhile the count is zero when `hide-when-zero` is set.",
       "properties": {
+        "accounts": {
+          "$ref": "#/$defs/Array_of_MailAccount",
+          "default": [],
+          "description": "Per-account unread breakdown shown in the mail dropdown. Each account\nhas its own notmuch query and a provider (for its icon). When set, the\nbar count/label is the sum across accounts and `query` is ignored."
+        },
         "border-color": {
           "$ref": "#/$defs/ColorValue",
           "default": "blue",
@@ -2969,8 +3019,8 @@
         },
         "left-click": {
           "$ref": "#/$defs/ClickAction",
-          "default": "",
-          "description": "Action on left click. Empty for no action, or a shell command (e.g. your mail client)."
+          "default": "dropdown:mail",
+          "description": "Action on left click. Defaults to opening the per-account dropdown; set\nto empty for no action, or a shell command (e.g. your mail client)."
         },
         "middle-click": {
           "$ref": "#/$defs/ClickAction",
@@ -2995,7 +3045,7 @@
         "query": {
           "$ref": "#/$defs/string",
           "default": "tag:unread",
-          "description": "notmuch search query whose match count is shown.\n\nAny query `notmuch count` accepts, e.g. `tag:unread`,\n`tag:unread and tag:inbox`, `folder:work and tag:unread`."
+          "description": "notmuch search query whose match count is shown.\n\nAny query `notmuch count` accepts, e.g. `tag:unread`,\n`tag:unread and tag:inbox`, `folder:work and tag:unread`.\n\nIgnored when `accounts` is non-empty — the bar count is then the sum of\nthe per-account queries."
         },
         "right-click": {
           "$ref": "#/$defs/ClickAction",
@@ -3014,6 +3064,46 @@
         }
       },
       "type": "object"
+    },
+    "MailProvider": {
+      "description": "Mail provider, used to pick a default brand icon for an account.",
+      "oneOf": [
+        {
+          "const": "generic",
+          "description": "Generic mailbox; uses the plain mail glyph.",
+          "type": "string"
+        },
+        {
+          "const": "gmail",
+          "description": "Gmail.",
+          "type": "string"
+        },
+        {
+          "const": "outlook",
+          "description": "Microsoft Outlook.",
+          "type": "string"
+        },
+        {
+          "const": "icloud",
+          "description": "Apple iCloud Mail.",
+          "type": "string"
+        },
+        {
+          "const": "proton",
+          "description": "Proton Mail.",
+          "type": "string"
+        },
+        {
+          "const": "fastmail",
+          "description": "Fastmail.",
+          "type": "string"
+        },
+        {
+          "const": "yahoo",
+          "description": "Yahoo Mail.",
+          "type": "string"
+        }
+      ]
     },
     "MangoWorkspacesConfig": {
       "description": "MangoWM tag switcher module configuration.",
@@ -3805,6 +3895,7 @@
         "mail": {
           "$ref": "#/$defs/MailConfig",
           "default": {
+            "accounts": [],
             "border-color": "blue",
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
@@ -3817,7 +3908,7 @@
             "label-color": "auto",
             "label-max-length": 0,
             "label-show": true,
-            "left-click": "",
+            "left-click": "dropdown:mail",
             "middle-click": "",
             "notify": false,
             "notify-body": "{{ new }} new ({{ count }} unread)",
@@ -7553,6 +7644,10 @@
           "height": null,
           "width": null
         },
+        "mail": {
+          "height": null,
+          "width": null
+        },
         "media": {
           "height": null,
           "width": null
@@ -7877,6 +7972,7 @@
           "scroll-up": ""
         },
         "mail": {
+          "accounts": [],
           "border-color": "blue",
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
@@ -7889,7 +7985,7 @@
           "label-color": "auto",
           "label-max-length": 0,
           "label-show": true,
-          "left-click": "",
+          "left-click": "dropdown:mail",
           "middle-click": "",
           "notify": false,
           "notify-body": "{{ new }} new ({{ count }} unread)",

@@ -21,6 +21,7 @@ Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visuals
 | [`bar`](/config/bar) | Bar chrome: per-monitor layout, spacing, colors, and button styling. |
 | [`dropdowns`](/config/dropdowns) | Per-dropdown foldout panel sizing. |
 | [`general`](/config/general) | Shell-wide settings that don't belong to any specific module. |
+| [`mail-account`](/config/mail-account) | One mail account in the `[modules.mail]` per-account breakdown. |
 | [`osd`](/config/osd) | On-screen display overlay for transient events like volume and brightness. |
 | [`styling`](/config/styling) | Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet. |
 | [`toast-preset`](/config/toast-preset) | A reusable toast preset, triggerable by id with `wayle toast --preset <id>`. |

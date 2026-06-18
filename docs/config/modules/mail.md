@@ -27,6 +27,7 @@ right = ["mail"]
 |---|---|---|---|
 | `format` | string | `"{{ count }}"` | Format string for the label. |
 | `query` | string | `"tag:unread"` | notmuch search query whose match count is shown. |
+| `accounts` | array of [`MailAccount`](/config/types#mail-account) | `[]` | Per-account unread breakdown shown in the mail dropdown. Each account has its own notmuch query and a provider (for its icon). When set, the bar count/label is the sum across accounts and `query` is ignored. |
 | `hide-when-zero` | bool | `true` | Hide the module entirely while the count is zero. |
 | `notify` | bool | `false` | Fire a desktop notification (via `notify-send`) when the unread count rises — i.e. new mail arrives. The module icon is used as the notification icon. The single notmuch query means this is not per-account; it reports the change in the total match count. |
 | `notify-summary` | string | `"New mail"` | Notification summary when new mail arrives. |
@@ -54,6 +55,9 @@ right = ["mail"]
 Any query `notmuch count` accepts, e.g. `tag:unread`,
 `tag:unread and tag:inbox`, `folder:work and tag:unread`.
 
+Ignored when `accounts` is non-empty — the bar count is then the sum of
+the per-account queries.
+
 :::
 
 ::: details More about `notify-summary`
@@ -79,7 +83,7 @@ Any query `notmuch count` accepts, e.g. `tag:unread`,
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `left-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on left click. Empty for no action, or a shell command (e.g. your mail client). |
+| `left-click` | [`ClickAction`](/config/types#click-action) | `"dropdown:mail"` | Action on left click. Defaults to opening the per-account dropdown; set to empty for no action, or a shell command (e.g. your mail client). |
 | `right-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on right click. |
 | `middle-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on middle click. |
 | `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
@@ -91,6 +95,7 @@ Any query `notmuch count` accepts, e.g. `tag:unread`,
 [modules.mail]
 format = "{{ count }}"
 query = "tag:unread"
+accounts = []
 hide-when-zero = true
 notify = false
 notify-summary = "New mail"
@@ -105,7 +110,7 @@ label-show = true
 label-color = "auto"
 label-max-length = 0
 button-bg-color = "bg-surface-elevated"
-left-click = ""
+left-click = "dropdown:mail"
 right-click = ""
 middle-click = ""
 scroll-up = ""

@@ -85,7 +85,7 @@ impl Component for MailModule {
             });
 
         watchers::spawn_config_watchers(&sender, &config);
-        watchers::spawn_mail_watcher(&sender, config.query.clone());
+        watchers::spawn_total_watcher(&sender, &init.mail);
 
         // Hidden until the first count arrives (avoids a flash at zero unread).
         if config.hide_when_zero.get() {
@@ -119,7 +119,7 @@ impl Component for MailModule {
         dropdowns::dispatch_click(&action, &self.dropdowns, &self.bar_button);
     }
 
-    fn update_cmd(&mut self, msg: MailCmd, sender: ComponentSender<Self>, root: &Self::Root) {
+    fn update_cmd(&mut self, msg: MailCmd, _sender: ComponentSender<Self>, root: &Self::Root) {
         let config = &self.config.config().modules.mail;
 
         match msg {
@@ -134,9 +134,6 @@ impl Component for MailModule {
             }
             MailCmd::ConfigChanged => {
                 self.update_display(config, root);
-            }
-            MailCmd::QueryChanged => {
-                self.requery(&sender, config);
             }
         }
     }

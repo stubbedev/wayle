@@ -1,3 +1,6 @@
+mod account;
+
+pub use account::{MailAccount, MailProvider};
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
@@ -31,9 +34,19 @@ pub struct MailConfig {
     ///
     /// Any query `notmuch count` accepts, e.g. `tag:unread`,
     /// `tag:unread and tag:inbox`, `folder:work and tag:unread`.
+    ///
+    /// Ignored when `accounts` is non-empty — the bar count is then the sum of
+    /// the per-account queries.
     #[serde(rename = "query")]
     #[default(String::from("tag:unread"))]
     pub query: ConfigProperty<String>,
+
+    /// Per-account unread breakdown shown in the mail dropdown. Each account
+    /// has its own notmuch query and a provider (for its icon). When set, the
+    /// bar count/label is the sum across accounts and `query` is ignored.
+    #[serde(rename = "accounts")]
+    #[default(Vec::new())]
+    pub accounts: ConfigProperty<Vec<MailAccount>>,
 
     /// Hide the module entirely while the count is zero.
     #[serde(rename = "hide-when-zero")]
@@ -114,9 +127,10 @@ pub struct MailConfig {
     #[default(ColorValue::Token(CssToken::BgSurfaceElevated))]
     pub button_bg_color: ConfigProperty<ColorValue>,
 
-    /// Action on left click. Empty for no action, or a shell command (e.g. your mail client).
+    /// Action on left click. Defaults to opening the per-account dropdown; set
+    /// to empty for no action, or a shell command (e.g. your mail client).
     #[serde(rename = "left-click")]
-    #[default(ClickAction::None)]
+    #[default(ClickAction::Dropdown(String::from("mail")))]
     pub left_click: ConfigProperty<ClickAction>,
 
     /// Action on right click.

@@ -53,7 +53,7 @@ pub use hyprsunset::HyprsunsetConfig;
 pub use idle_inhibit::IdleInhibitConfig;
 pub use keybind_mode::KeybindModeConfig;
 pub use keyboard_input::KeyboardInputConfig;
-pub use mail::MailConfig;
+pub use mail::{MailAccount, MailConfig, MailProvider};
 pub use mango_workspaces::MangoWorkspacesConfig;
 pub use media::{BUILTIN_MAPPINGS, MediaConfig, MediaIconType};
 pub use microphone::MicrophoneConfig;

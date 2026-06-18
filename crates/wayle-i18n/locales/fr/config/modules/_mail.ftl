@@ -11,6 +11,17 @@ settings-modules-mail-query = Requête
 settings-modules-mail-hide-when-zero = Masquer si vide
     .description = Masquer entièrement le module lorsque le nombre est zéro
 
+settings-modules-mail-accounts = Comptes
+    .description = Répartition des non lus par compte affichée dans le menu ; le compteur de la barre en est la somme
+
+enum-mail-provider-generic = Générique
+enum-mail-provider-gmail = Gmail
+enum-mail-provider-outlook = Outlook
+enum-mail-provider-icloud = iCloud
+enum-mail-provider-proton = Proton
+enum-mail-provider-fastmail = Fastmail
+enum-mail-provider-yahoo = Yahoo
+
 settings-modules-mail-notify = Notifier les nouveaux courriers
     .description = Émettre une notification de bureau lorsque le nombre de non lus augmente
 

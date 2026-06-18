@@ -25,6 +25,7 @@ impl ModuleFactory for Factory {
             settings: settings.clone(),
             config: services.config.clone(),
             dropdowns: dropdowns.clone(),
+            mail: services.mail.clone(),
         };
         let controller = dynamic_controller(MailModule::builder().launch(init).detach());
         Some(ModuleInstance { controller, class })

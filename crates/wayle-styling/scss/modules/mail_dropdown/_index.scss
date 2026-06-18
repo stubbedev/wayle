@@ -1,0 +1,36 @@
+// Mail dropdown: a per-account list of provider icon + name + unread count.
+.mail-dropdown {
+    .mail-dropdown-list {
+        padding: var(--space-xs);
+    }
+
+    .mail-dropdown-row {
+        padding: var(--space-xs) var(--space-sm);
+        border-radius: var(--rounding-element);
+
+        &:hover {
+            background: var(--bg-elevated);
+        }
+
+        .mail-account-name {
+            font-size: var(--text-md);
+            color: var(--fg-default);
+        }
+
+        .mail-account-count {
+            font-weight: var(--weight-bold);
+            color: var(--fg-default);
+
+            &.dim {
+                font-weight: var(--weight-normal);
+                color: var(--fg-muted);
+            }
+        }
+    }
+
+    .mail-dropdown-empty {
+        padding: var(--space-md);
+        color: var(--fg-muted);
+        font-size: var(--text-sm);
+    }
+}

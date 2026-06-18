@@ -483,6 +483,43 @@ Bar position on screen.
 | `"left"` | Left edge of the screen. |
 | `"right"` | Right edge of the screen. |
 
+## MailAccount {#mail-account}
+
+One mail account in the `[modules.mail]` per-account breakdown.
+
+Each account has its own notmuch query; the dropdown shows the per-account
+unread counts and the bar shows their sum.
+
+### Example
+
+```toml
+[[modules.mail.accounts]]
+name = "Work"
+query = "folder:work/INBOX and tag:unread"
+provider = "gmail"
+```
+
+| Field | Description |
+|---|---|
+| `name` | Display name shown in the dropdown. |
+| `query` | notmuch query whose match count is this account's unread total. |
+| `provider` | Provider, selecting the default brand icon. |
+| `icon` | Optional icon override. Empty uses the provider's default icon. |
+
+## MailProvider {#mail-provider}
+
+Mail provider, used to pick a default brand icon for an account.
+
+| Value | Meaning |
+|---|---|
+| `"generic"` | Generic mailbox; uses the plain mail glyph. |
+| `"gmail"` | Gmail. |
+| `"outlook"` | Microsoft Outlook. |
+| `"icloud"` | Apple iCloud Mail. |
+| `"proton"` | Proton Mail. |
+| `"fastmail"` | Fastmail. |
+| `"yahoo"` | Yahoo Mail. |
+
 ## MatugenScheme {#matugen-scheme}
 
 Matugen color scheme type.

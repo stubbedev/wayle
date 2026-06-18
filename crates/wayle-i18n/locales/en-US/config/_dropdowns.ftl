@@ -16,6 +16,9 @@ settings-dropdowns-calendar = Calendar
 settings-dropdowns-dashboard = Dashboard
     .description = Dashboard dropdown panel size (width override; height fits content)
 
+settings-dropdowns-mail = Mail
+    .description = Mail dropdown panel size (width override; height fits content)
+
 settings-dropdowns-media = Media
     .description = Media dropdown panel size (width/height override)
 

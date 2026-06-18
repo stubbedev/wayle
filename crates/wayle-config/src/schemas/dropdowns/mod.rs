@@ -39,6 +39,10 @@ pub struct DropdownsConfig {
     #[default(DropdownSize::default())]
     pub dashboard: ConfigProperty<DropdownSize>,
 
+    /// Mail dropdown panel size. Height grows to fit content.
+    #[default(DropdownSize::default())]
+    pub mail: ConfigProperty<DropdownSize>,
+
     /// Media dropdown panel size.
     #[default(DropdownSize::default())]
     pub media: ConfigProperty<DropdownSize>,

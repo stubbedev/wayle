@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{icon::icon, text::text, toggle::toggle},
+    editors::{icon::icon, mail_account_list::mail_account_list, text::text, toggle::toggle},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -51,6 +51,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         text(&module.notify_summary),
                         text(&module.notify_body),
                     ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-mail-accounts",
+                    items: vec![mail_account_list(&module.accounts)],
                 },
                 bar_display_section(&fields),
                 colors_section(&fields),

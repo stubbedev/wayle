@@ -4,6 +4,7 @@ mod bluetooth;
 mod brightness;
 mod calendar;
 mod dashboard;
+mod mail;
 mod media;
 mod network;
 mod notification;
@@ -70,6 +71,7 @@ register_dropdowns! {
     "brightness" => brightness::Factory,
     "calendar" => calendar::Factory,
     "dashboard" => dashboard::Factory,
+    "mail" => mail::Factory,
     "media" => media::Factory,
     "network" => network::Factory,
     "notification" => notification::Factory,

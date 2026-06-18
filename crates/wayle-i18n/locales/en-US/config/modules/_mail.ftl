@@ -11,6 +11,17 @@ settings-modules-mail-query = Query
 settings-modules-mail-hide-when-zero = Hide When Zero
     .description = Hide the module entirely while the count is zero
 
+settings-modules-mail-accounts = Accounts
+    .description = Per-account unread breakdown shown in the dropdown; the bar count is their sum
+
+enum-mail-provider-generic = Generic
+enum-mail-provider-gmail = Gmail
+enum-mail-provider-outlook = Outlook
+enum-mail-provider-icloud = iCloud
+enum-mail-provider-proton = Proton
+enum-mail-provider-fastmail = Fastmail
+enum-mail-provider-yahoo = Yahoo
+
 settings-modules-mail-notify = Notify on New Mail
     .description = Fire a desktop notification when the unread count rises
 

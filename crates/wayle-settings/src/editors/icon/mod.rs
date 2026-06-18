@@ -34,6 +34,43 @@ fn icon_names() -> Rc<Vec<String>> {
     })
 }
 
+/// Widgets kept alive for the lifetime of the editor row.
+type IconKeepalive = (gtk::MenuButton, gtk::Popover, Rc<dyn Fn(&str)>, Rc<Cell<bool>>);
+
+/// Builds the picker popover body (search entry + scrolled grid) and returns it
+/// alongside the search entry and grid for wiring.
+fn build_popover() -> (gtk::Popover, gtk::SearchEntry, gtk::FlowBox) {
+    let search = gtk::SearchEntry::builder()
+        .placeholder_text(t("settings-icon-search"))
+        .build();
+
+    let flow = gtk::FlowBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .max_children_per_line(8)
+        .row_spacing(4)
+        .column_spacing(4)
+        .homogeneous(true)
+        .build();
+
+    let scroller = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .min_content_height(280)
+        .min_content_width(320)
+        .child(&flow)
+        .build();
+
+    let popover_box = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .css_classes(["icon-picker-popover"])
+        .build();
+    popover_box.append(&search);
+    popover_box.append(&scroller);
+
+    let popover = gtk::Popover::builder().child(&popover_box).build();
+    (popover, search, flow)
+}
+
 /// Updates the trigger button to reflect the current icon name.
 fn update_display(image: &gtk::Image, label: &gtk::Label, name: &str) {
     if name.is_empty() {
@@ -90,34 +127,7 @@ pub(crate) fn icon(property: &ConfigProperty<String>) -> SettingRowInit {
 
     update_display(&image, &label, &property.get());
 
-    let search = gtk::SearchEntry::builder()
-        .placeholder_text(t("settings-icon-search"))
-        .build();
-
-    let flow = gtk::FlowBox::builder()
-        .selection_mode(gtk::SelectionMode::None)
-        .max_children_per_line(8)
-        .row_spacing(4)
-        .column_spacing(4)
-        .homogeneous(true)
-        .build();
-
-    let scroller = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Never)
-        .min_content_height(280)
-        .min_content_width(320)
-        .child(&flow)
-        .build();
-
-    let popover_box = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .spacing(8)
-        .css_classes(["icon-picker-popover"])
-        .build();
-    popover_box.append(&search);
-    popover_box.append(&scroller);
-
-    let popover = gtk::Popover::builder().child(&popover_box).build();
+    let (popover, search, flow) = build_popover();
     menu.set_popover(Some(&popover));
 
     // Commit a chosen name: write config, refresh the trigger, close.
@@ -183,8 +193,7 @@ pub(crate) fn icon(property: &ConfigProperty<String>) -> SettingRowInit {
         true
     });
 
-    let keep: (gtk::MenuButton, gtk::Popover, Rc<dyn Fn(&str)>, Rc<Cell<bool>>) =
-        (menu.clone(), popover, commit, built);
+    let keep: IconKeepalive = (menu.clone(), popover, commit, built);
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
