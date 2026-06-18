@@ -82,6 +82,11 @@ pub(crate) async fn open_screencast(show_cursor: bool) -> Result<ScreenCast, Err
     // invalidated (portal/compositor restart, version bump, revoked grant).
     let stored_token = load_restore_token();
 
+    // Await the SelectSources *response*, not just the request dispatch. On
+    // backends that drive the source picker here (e.g. xdg-desktop-portal-
+    // hyprland) a cancelled or failed pick reports its error in this response
+    // and closes the session. Dropping the response silently swallows that
+    // error, so the next Start call fails with a misleading "Invalid session".
     proxy
         .select_sources(
             &session,
@@ -93,6 +98,8 @@ pub(crate) async fn open_screencast(show_cursor: bool) -> Result<ScreenCast, Err
                 .set_restore_token(stored_token.as_deref()),
         )
         .await
+        .map_err(|e| portal_err(&e))?
+        .response()
         .map_err(|e| portal_err(&e))?;
 
     let streams = proxy
