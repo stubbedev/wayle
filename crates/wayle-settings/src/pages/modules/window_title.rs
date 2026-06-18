@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{text::text, toml_editor::toml_editor},
+    editors::{string_map::string_map, text::text},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -45,11 +45,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         text(&module.format),
                         text(&module.icon_name),
-                        toml_editor(
-                            &module.icon_mappings,
-                            "icon-mappings",
-                            &config.styling.palette.bg,
-                        ),
+                        string_map(&module.icon_mappings),
                     ],
                 },
                 bar_display_section(&fields),

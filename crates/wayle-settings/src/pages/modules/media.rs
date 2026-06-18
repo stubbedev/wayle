@@ -4,7 +4,7 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select, string_list::string_list, text::text, toml_editor::toml_editor,
+        enum_select::enum_select, string_list::string_list, string_map::string_map, text::text,
     },
     pages::{
         nav::LeafEntry,
@@ -49,11 +49,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         text(&module.format),
                         text(&module.icon_name),
                         text(&module.spinning_disc_icon),
-                        toml_editor(
-                            &module.player_icons,
-                            "player-icons",
-                            &config.styling.palette.bg,
-                        ),
+                        string_map(&module.player_icons),
                         string_list(&module.players_ignored),
                         string_list(&module.player_priority),
                     ],

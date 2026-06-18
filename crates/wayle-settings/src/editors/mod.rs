@@ -13,6 +13,7 @@ pub(crate) mod number;
 pub(crate) mod optional;
 pub(crate) mod slider;
 pub(crate) mod string_list;
+pub(crate) mod string_map;
 pub(crate) mod surface_animation;
 pub(crate) mod text;
 pub(crate) mod theme_selector;

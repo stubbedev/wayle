@@ -7,6 +7,7 @@ use crate::{
         color_value::color_value,
         enum_select::enum_select,
         number::number_u8,
+        string_map::string_map,
         text::{text, text_like},
         toggle::toggle,
         toml_editor::toml_editor,
@@ -65,11 +66,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     title_key: "settings-section-mappings",
                     items: vec![
                         toml_editor(&module.tag_map, "tag-map", &config.styling.palette.bg),
-                        toml_editor(
-                            &module.app_icon_map,
-                            "app-icon-map",
-                            &config.styling.palette.bg,
-                        ),
+                        string_map(&module.app_icon_map),
                     ],
                 },
                 SectionSpec {
