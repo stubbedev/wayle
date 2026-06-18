@@ -8,9 +8,15 @@ on:
 permissions:
     contents: read
 
+# Cancel superseded runs on PRs (fast feedback on fixup pushes), but NEVER on
+# master: the nix job populates the attic cache + GH /nix/store cache in its
+# post-steps, and a follow-up master push must not cancel that mid-build —
+# doing so leaves the cache unpopulated and forces the next run to recompile
+# wayle-deps from scratch (~30 min). Master runs queue instead of cancelling,
+# which also warms the cache sequentially: run N populates what run N+1 hits.
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
     CARGO_TERM_COLOR: always
@@ -159,9 +165,11 @@ jobs:
         name: Nix build + cache
         needs: changes
         # Always build + push on master so the cache tracks every commit (a
-        # docs/schema-only commit still rebuilds — mostly cache hits, but keeps
-        # the binary present). On PRs, only when code changed, and push is
-        # suppressed because the attic-action step is master-only.
+        # docs/schema-only commit still runs — mostly cache hits once wayle-deps
+        # is cached, but keeps the binary present). On PRs, only when code
+        # changed. Same-repo PRs also push to attic (see the push step), so a
+        # deps bump compiled in a PR is a cache hit when it merges to master
+        # instead of a fresh ~30 min rebuild.
         if: >-
             needs.changes.outputs.code == 'true' ||
             (github.event_name == 'push' && github.ref == 'refs/heads/master')
@@ -197,11 +205,15 @@ jobs:
 
             # Push everything built during this run to the attic cache. The
             # action installs a cached attic-client (no `nix run` cold eval) and
-            # pushes in a post-job step. master-only: PRs/forks lack the token
-            # and just pull via the substituter above. Best-effort: large-path
-            # 504s don't fail the job (GH cache above is the reliable reuse).
+            # pushes in a post-job step. Runs on master pushes and same-repo PRs
+            # (both have the token) so PR-built deps are in attic before merge.
+            # Fork PRs lack the secret and just pull via the substituter above.
+            # Best-effort: large-path 504s don't fail the job (the GH cache
+            # above is the reliable cross-run reuse path).
             - name: Setup attic push
-              if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+              if: >-
+                  github.event_name == 'push' ||
+                  github.event.pull_request.head.repo.full_name == github.repository
               uses: ryanccn/attic-action@v0
               with:
                   endpoint: https://nix.stubbe.dev
