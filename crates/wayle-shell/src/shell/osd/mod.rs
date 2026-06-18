@@ -79,7 +79,7 @@ impl Component for Osd {
                 set_orientation: gtk::Orientation::Vertical,
 
                 #[watch]
-                set_css_classes: &osd_classes(&model),
+                set_css_classes: &osd_classes(&model).iter().map(String::as_str).collect::<Vec<_>>(),
 
                 #[name = "slider_header"]
                 gtk::Box {

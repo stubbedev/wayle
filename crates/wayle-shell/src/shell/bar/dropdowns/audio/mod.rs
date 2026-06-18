@@ -48,6 +48,7 @@ pub(crate) struct AudioDropdown {
     main_section: Controller<MainSection>,
     output_picker: Controller<DevicePicker>,
     input_picker: Controller<DevicePicker>,
+    transition_ms: u32,
 }
 
 #[relm4::component(pub(crate))]
@@ -88,7 +89,7 @@ impl Component for AudioDropdown {
                     add_css_class: "dropdown-content",
                     set_vexpand: true,
                     set_transition_type: gtk::StackTransitionType::SlideLeftRight,
-                    set_transition_duration: 200,
+                    set_transition_duration: model.transition_ms,
                     #[local_ref]
                     add_named[Some("main")] = main_section_widget -> gtk::Box {},
 
@@ -135,6 +136,7 @@ impl Component for AudioDropdown {
 
         let scale = init.config.config().styling.scale.get().value();
         let size = init.config.config().dropdowns.audio.get();
+        let transition_ms = init.config.config().animations.interaction_duration_ms();
         watchers::spawn(&sender, &init.config);
 
         let model = Self {
@@ -146,6 +148,7 @@ impl Component for AudioDropdown {
             main_section,
             output_picker,
             input_picker,
+            transition_ms,
         };
 
         let main_section_widget = model.main_section.widget();

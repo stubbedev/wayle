@@ -44,6 +44,27 @@ pub struct AnimationsConfig {
     #[default(None)]
     pub exit_duration: ConfigProperty<Option<u32>>,
 
+    /// Duration in ms for in-place dropdown transitions: hover highlights and
+    /// the page/stack crossfades inside dropdowns. `enabled = false` removes
+    /// them entirely.
+    #[serde(rename = "interaction-duration")]
+    #[default(150u32)]
+    pub interaction_duration: ConfigProperty<u32>,
+
+    /// Base duration in ms for general UI micro-transitions (hover, focus, and
+    /// color fades) driven by the CSS `--duration-*` token family. Fast,
+    /// normal, and slow speeds are derived from this. `enabled = false` zeroes
+    /// them for an instant UI.
+    #[serde(rename = "ui-duration")]
+    #[default(250u32)]
+    pub ui_duration: ConfigProperty<u32>,
+
+    /// Run looping status indicators: spinners, network/bluetooth scan
+    /// animations, the recording pulse, and the clock blink. Disable (or set
+    /// `enabled = false`) for a fully static UI.
+    #[default(true)]
+    pub indicators: ConfigProperty<bool>,
+
     /// Per-surface override for notification popup cards.
     #[default(SurfaceAnimation::default())]
     pub notifications: ConfigProperty<SurfaceAnimation>,
@@ -100,6 +121,51 @@ impl AnimationsConfig {
         per_surface
             .or(global)
             .unwrap_or_else(|| self.transition.get())
+    }
+
+    /// Resolved duration in ms for in-place dropdown transitions (hover
+    /// highlights, page/stack crossfades). `0` when animations are disabled.
+    #[must_use]
+    pub fn interaction_duration_ms(&self) -> u32 {
+        if self.enabled.get() {
+            self.interaction_duration.get()
+        } else {
+            0
+        }
+    }
+
+    /// CSS custom-property overrides that bridge the animation config into the
+    /// stylesheet. Returns a `:root { … }` block setting the `--duration-*`
+    /// token family from `ui-duration` (scaled to fast/normal/slow) and, when
+    /// indicators are off, freezing every looping keyframe via `--cfg-anim-*`.
+    ///
+    /// Disabling animations zeroes the durations so CSS transitions are
+    /// instant. Emitted after the static stylesheet so it overrides the
+    /// compile-time token defaults.
+    #[must_use]
+    pub fn css_overrides(&self) -> String {
+        let on = self.enabled.get();
+        let ui = if on { self.ui_duration.get() } else { 0 };
+        let scaled = |factor: f32| (ui as f32 * factor).round() as u32;
+
+        let indicators_on = on && self.indicators.get();
+        let frozen = if indicators_on {
+            String::new()
+        } else {
+            String::from(
+                "    --cfg-anim-spin: 0s;\n    --cfg-anim-media-spin: 0s;\n    \
+                 --cfg-anim-scan: 0s;\n    --cfg-anim-blink: 0s;\n    --cfg-anim-pulse: 0s;\n",
+            )
+        };
+
+        format!(
+            ":root {{\n    --duration-super-fast: {sf}ms;\n    --duration-fast: {f}ms;\n    \
+             --duration-normal: {n}ms;\n    --duration-slow: {s}ms;\n{frozen}}}",
+            sf = scaled(0.3),
+            f = scaled(0.6),
+            n = ui,
+            s = scaled(1.4),
+        )
     }
 
     /// Resolved duration in ms for a surface and direction. `0` when disabled.

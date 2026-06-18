@@ -13,6 +13,7 @@ mod hyprsunset;
 mod idle_inhibit;
 mod keybind_mode;
 mod keyboard_input;
+mod mail;
 mod mango_workspaces;
 mod media;
 mod microphone;
@@ -22,6 +23,7 @@ mod niri_workspaces;
 /// Notification module configuration and popup types.
 pub mod notification;
 mod power;
+mod power_profiles;
 mod ram;
 mod recorder;
 mod separator;
@@ -50,6 +52,7 @@ pub use hyprsunset::HyprsunsetConfig;
 pub use idle_inhibit::IdleInhibitConfig;
 pub use keybind_mode::KeybindModeConfig;
 pub use keyboard_input::KeyboardInputConfig;
+pub use mail::MailConfig;
 pub use mango_workspaces::MangoWorkspacesConfig;
 pub use media::{BUILTIN_MAPPINGS, MediaConfig, MediaIconType};
 pub use microphone::MicrophoneConfig;
@@ -63,6 +66,7 @@ pub use notification::{
     UrgencyBarThreshold,
 };
 pub use power::PowerConfig;
+pub use power_profiles::PowerProfilesConfig;
 pub use ram::RamConfig;
 pub use recorder::{EncoderPreset, RecorderConfig, RecorderFormat, WebcamPosition};
 pub use separator::SeparatorConfig;
@@ -108,6 +112,8 @@ pub struct ModulesConfig {
     /// Keyboard input module.
     #[serde(rename = "keyboard-input")]
     pub keyboard_input: KeyboardInputConfig,
+    /// Unread mail count module.
+    pub mail: MailConfig,
     /// MangoWM tag switcher module.
     #[serde(rename = "mango-workspaces")]
     pub mango_workspaces: MangoWorkspacesConfig,
@@ -128,6 +134,9 @@ pub struct ModulesConfig {
     pub notifications: NotificationConfig,
     /// Power menu module.
     pub power: PowerConfig,
+    /// Power profile indicator/switcher module.
+    #[serde(rename = "power-profiles")]
+    pub power_profiles: PowerProfilesConfig,
     /// RAM usage module.
     pub ram: RamConfig,
     /// Screen recorder module.

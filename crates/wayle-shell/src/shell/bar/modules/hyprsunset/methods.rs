@@ -1,3 +1,4 @@
+use chrono::Utc;
 use relm4::prelude::*;
 use tracing::debug;
 use wayle_config::schemas::modules::HyprsunsetConfig;
@@ -7,6 +8,7 @@ use super::{
     HyprsunsetModule,
     helpers::{self, LabelContext},
     messages::HyprsunsetCmd,
+    solar::{self, Phase},
 };
 
 impl HyprsunsetModule {
@@ -28,6 +30,62 @@ impl HyprsunsetModule {
                 HyprsunsetCmd::StateChanged(Some(helpers::HyprsunsetState { temp, gamma }))
             }
         });
+    }
+
+    /// Re-evaluate the sunrise/sunset auto-schedule and drive the filter.
+    ///
+    /// Night → filter on (at the configured temperature/gamma); day → off. A
+    /// manual toggle sets [`Self::manual_override`], which suppresses automatic
+    /// changes until the next sunrise/sunset boundary, then resumes.
+    pub(super) fn evaluate_schedule(
+        &mut self,
+        sender: &ComponentSender<Self>,
+        config: &HyprsunsetConfig,
+    ) {
+        if !config.auto_schedule.get() {
+            // Reset so re-enabling re-applies from a clean slate.
+            self.auto_phase = None;
+            self.manual_override = false;
+            return;
+        }
+
+        // GeoClue location wins when available; otherwise the configured coords.
+        let (lat, lng) = self
+            .geo_location
+            .unwrap_or((config.latitude.get(), config.longitude.get()));
+        let phase = solar::phase_at(Utc::now(), lat, lng);
+        let phase_changed = self.auto_phase != Some(phase);
+        self.auto_phase = Some(phase);
+
+        if phase_changed {
+            // Crossing sunrise/sunset hands control back to the schedule.
+            self.manual_override = false;
+        }
+
+        if self.manual_override {
+            return;
+        }
+
+        let want_on = phase == Phase::Night;
+        if want_on == self.enabled {
+            return;
+        }
+
+        if want_on {
+            let temp = config.temperature.get();
+            let gamma = config.gamma.get();
+            debug!(temp, gamma, "auto-schedule: night, enabling filter");
+            sender.oneshot_command(async move {
+                let _ = helpers::start(temp, gamma).await;
+                HyprsunsetCmd::StateChanged(Some(helpers::HyprsunsetState { temp, gamma }))
+            });
+        } else {
+            debug!("auto-schedule: day, disabling filter");
+            sender.oneshot_command(async move {
+                let _ = helpers::stop().await;
+                HyprsunsetCmd::StateChanged(None)
+            });
+        }
     }
 
     pub(super) fn update_display(&self, config: &HyprsunsetConfig) {

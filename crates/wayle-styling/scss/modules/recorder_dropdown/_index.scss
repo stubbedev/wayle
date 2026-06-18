@@ -11,7 +11,7 @@
 }
 
 .recorder-preparing .icon-container {
-    animation: recorder-prepare-pulse 0.6s ease-in-out infinite alternate;
+    animation: recorder-prepare-pulse var(--cfg-anim-pulse, 0.6s) ease-in-out infinite alternate;
 }
 
 .recorder-dropdown-content {

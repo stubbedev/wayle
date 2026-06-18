@@ -219,6 +219,8 @@ pub enum BarModule {
     Hyprsunset,
     /// Keyboard layout indicator.
     KeyboardInput,
+    /// Unread mail count (notmuch).
+    Mail,
     /// Media player controls.
     Media,
     /// Microphone mute status.
@@ -235,6 +237,8 @@ pub enum BarModule {
     Notifications,
     /// Power menu button.
     Power,
+    /// Power profile indicator/switcher.
+    PowerProfiles,
     /// RAM usage indicator.
     Ram,
     /// Screen recorder toggle.
@@ -301,6 +305,7 @@ impl BarModule {
             Self::IdleInhibit => "idle-inhibit",
             Self::Hyprsunset => "hyprsunset",
             Self::KeyboardInput => "keyboard-input",
+            Self::Mail => "mail",
             Self::Media => "media",
             Self::Microphone => "microphone",
             Self::Network => "network",
@@ -309,6 +314,7 @@ impl BarModule {
             Self::MangoWorkspaces => "mango-workspaces",
             Self::Notifications => "notifications",
             Self::Power => "power",
+            Self::PowerProfiles => "power-profiles",
             Self::Ram => "ram",
             Self::Recorder => "recorder",
             Self::Separator => "separator",
@@ -337,6 +343,7 @@ impl BarModule {
             "idle-inhibit" => Self::IdleInhibit,
             "hyprsunset" => Self::Hyprsunset,
             "keyboard-input" => Self::KeyboardInput,
+            "mail" => Self::Mail,
             "media" => Self::Media,
             "microphone" => Self::Microphone,
             "network" => Self::Network,
@@ -345,6 +352,7 @@ impl BarModule {
             "mango-workspaces" => Self::MangoWorkspaces,
             "notifications" => Self::Notifications,
             "power" => Self::Power,
+            "power-profiles" => Self::PowerProfiles,
             "ram" => Self::Ram,
             "recorder" => Self::Recorder,
             "separator" => Self::Separator,
@@ -424,6 +432,7 @@ const BUILTIN_MODULES: &[&str] = &[
     "idle-inhibit",
     "keybind-mode",
     "keyboard-input",
+    "mail",
     "media",
     "mango-workspaces",
     "microphone",
@@ -432,6 +441,7 @@ const BUILTIN_MODULES: &[&str] = &[
     "niri-workspaces",
     "notifications",
     "power",
+    "power-profiles",
     "ram",
     "recorder",
     "separator",

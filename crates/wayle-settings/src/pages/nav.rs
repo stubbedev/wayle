@@ -3,7 +3,10 @@
 
 use wayle_config::Config;
 
-use super::{bar, general, modules, notifications, osd, spec::PageSpec, styling, wallpaper};
+use super::{
+    animations, bar, general, modules, notifications, osd, spec::PageSpec, styling, toasts,
+    wallpaper,
+};
 
 pub(crate) struct LeafEntry {
     pub(crate) id: &'static str,
@@ -27,7 +30,7 @@ pub(crate) fn layout() -> Vec<NavSectionLayout> {
         },
         NavSectionLayout {
             i18n_key: "settings-nav-appearance",
-            factories: vec![styling::entry, wallpaper::entry],
+            factories: vec![styling::entry, wallpaper::entry, animations::entry],
         },
         NavSectionLayout {
             i18n_key: "settings-nav-system",
@@ -35,7 +38,7 @@ pub(crate) fn layout() -> Vec<NavSectionLayout> {
         },
         NavSectionLayout {
             i18n_key: "settings-nav-overlays",
-            factories: vec![notifications::entry, osd::entry],
+            factories: vec![notifications::entry, osd::entry, toasts::entry],
         },
         NavSectionLayout {
             i18n_key: "settings-nav-modules",

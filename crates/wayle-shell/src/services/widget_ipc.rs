@@ -63,14 +63,18 @@ impl Default for WidgetBus {
 /// A custom on-screen toast request pushed over the socket.
 #[derive(Debug, Clone)]
 pub struct ToastRequest {
-    /// Toast text.
-    pub label: String,
+    /// Toast text. `None` when only a preset supplies the label.
+    pub label: Option<String>,
     /// Optional icon name.
     pub icon: Option<String>,
     /// Optional progress percentage (0-100); shows a progress bar when set.
     pub percentage: Option<f64>,
-    /// Optional auto-dismiss duration in milliseconds (OSD default when `None`).
+    /// Optional auto-dismiss duration in milliseconds (toast default when `None`).
     pub duration_ms: Option<u32>,
+    /// Optional preset id (`[[toasts.presets]]`) to base this toast on.
+    pub preset: Option<String>,
+    /// Optional extra CSS class applied to the toast.
+    pub class: Option<String>,
 }
 
 /// In-process broadcast bus carrying toast requests from the socket to the OSD.
@@ -233,6 +237,8 @@ fn process_request(line: &str, buses: &Buses) -> Response {
                     icon: params.icon,
                     percentage: params.percentage,
                     duration_ms: params.duration_ms,
+                    preset: params.preset,
+                    class: params.class,
                 });
                 Response::ok(request.id)
             }
@@ -279,7 +285,7 @@ mod tests {
         assert!(response.error.is_none());
         assert_eq!(response.id, 9);
         let toast = rx.try_recv().expect("toast published");
-        assert_eq!(toast.label, "hi");
+        assert_eq!(toast.label.as_deref(), Some("hi"));
         assert_eq!(toast.icon.as_deref(), Some("ld-bell-symbolic"));
         assert_eq!(toast.duration_ms, None);
     }

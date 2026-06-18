@@ -25,6 +25,7 @@ pub fn spawn(sender: &ComponentSender<Shell>, services: &ShellServices) {
     let palette_stream = changes_stream(&config.styling.palette);
     let general_stream = changes_stream(&config.general);
     let bar_stream = changes_stream(&config.bar);
+    let animations_stream = changes_stream(&config.animations);
     let global_scale_stream = config.styling.scale.watch();
     let global_rounding_stream = config.styling.rounding.watch();
     let appearance_stream = config.styling.appearance.watch();
@@ -46,6 +47,7 @@ pub fn spawn(sender: &ComponentSender<Shell>, services: &ShellServices) {
             palette_stream,
             general_stream,
             bar_stream,
+            animations_stream,
             global_scale_stream,
             global_rounding_stream,
             appearance_stream,
@@ -68,5 +70,7 @@ pub(super) fn build_css(config: &wayle_config::Config) -> String {
         }
     };
 
-    format!("{STATIC_CSS}\n{theme}\n{user}")
+    let anim = config.animations.css_overrides();
+
+    format!("{STATIC_CSS}\n{theme}\n{anim}\n{user}")
 }

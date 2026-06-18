@@ -8,6 +8,15 @@ settings-modules-hyprsunset-temperature = Température
 settings-modules-hyprsunset-gamma = Gamma
     .description = Pourcentage de gamma de l'écran lorsque le filtre est activé (0-200)
 
+settings-modules-hyprsunset-auto-schedule = Planification auto
+    .description = Activer automatiquement la nuit et désactiver le jour, selon le lever/coucher du soleil local. La position est détectée via GeoClue, avec repli sur les coordonnées ci-dessous
+
+settings-modules-hyprsunset-latitude = Latitude
+    .description = Latitude de repli en degrés décimaux (nord positif, -90 à 90), utilisée quand GeoClue est indisponible
+
+settings-modules-hyprsunset-longitude = Longitude
+    .description = Longitude de repli en degrés décimaux (est positif, -180 à 180), utilisée quand GeoClue est indisponible
+
 settings-modules-hyprsunset-icon-off = Icône désactivée
     .description = Icône lorsque le filtre est désactivé
 

@@ -7,7 +7,7 @@
 
 use wayle_config::schemas::{
     animations::AnimationsConfig, bar::BarConfig, general::GeneralConfig, modules::ModulesConfig,
-    osd::OsdConfig, styling::StylingConfig, wallpaper::WallpaperConfig,
+    osd::OsdConfig, styling::StylingConfig, toasts::ToastsConfig, wallpaper::WallpaperConfig,
 };
 use wayle_i18n::loader;
 
@@ -69,6 +69,7 @@ fn collect_all_keys() -> Vec<&'static str> {
     keys.extend(BarConfig::all_i18n_keys());
     keys.extend(StylingConfig::all_i18n_keys());
     keys.extend(OsdConfig::all_i18n_keys());
+    keys.extend(ToastsConfig::all_i18n_keys());
     keys.extend(AnimationsConfig::all_i18n_keys());
     keys.extend(WallpaperConfig::all_i18n_keys());
     keys.extend(ModulesConfig::all_i18n_keys());

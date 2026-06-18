@@ -3,7 +3,11 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{number::number_u32, text::text},
+    editors::{
+        number::{number_f64, number_u32},
+        text::text,
+        toggle::toggle,
+    },
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -48,6 +52,14 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         number_u32(&module.gamma),
                         text(&module.icon_off),
                         text(&module.icon_on),
+                    ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-hyprsunset-schedule",
+                    items: vec![
+                        toggle(&module.auto_schedule),
+                        number_f64(&module.latitude, -90.0, 90.0, 0.1, 4),
+                        number_f64(&module.longitude, -180.0, 180.0, 0.1, 4),
                     ],
                 },
                 bar_display_section(&fields),

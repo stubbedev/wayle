@@ -6,7 +6,7 @@
 
     &:checked {
         opacity: 1;
-        animation: spin 1s linear infinite;
+        animation: spin var(--cfg-anim-spin, 1s) linear infinite;
 
         &:disabled {
             opacity: 0.5;

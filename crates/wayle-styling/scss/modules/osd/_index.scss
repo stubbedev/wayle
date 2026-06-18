@@ -62,3 +62,41 @@ progressbar.osd-bar {
 .osd.bordered {
     border: 1px solid var(--border-default);
 }
+
+// Semantic toast variants, applied via `wayle toast --class <name>` or a
+// preset's `class`. Each tints the surface, icon, label, and progress fill
+// with its status color and adds a left accent stripe.
+@mixin toast-variant($accent) {
+    background: color-mix(in srgb, #{$accent} 12%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #{$accent} 30%, transparent);
+    border-left: calc(0.18rem * var(--global-scale)) solid #{$accent};
+
+    image.osd-icon {
+        color: #{$accent};
+    }
+
+    label.osd-label {
+        color: #{$accent};
+    }
+
+    progressbar.osd-bar trough progress {
+        background: #{$accent};
+    }
+}
+
+.osd.success {
+    @include toast-variant(var(--status-success));
+}
+
+.osd.error,
+.osd.danger {
+    @include toast-variant(var(--status-error));
+}
+
+.osd.warning {
+    @include toast-variant(var(--status-warning));
+}
+
+.osd.info {
+    @include toast-variant(var(--status-info));
+}

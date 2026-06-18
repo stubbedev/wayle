@@ -39,6 +39,28 @@ pub struct HyprsunsetConfig {
     #[default(100)]
     pub gamma: ConfigProperty<u32>,
 
+    /// Automatically enable the filter at night and disable it during the day,
+    /// based on local sunrise/sunset computed from `latitude`/`longitude`.
+    ///
+    /// While enabled, the module drives the filter on the solar schedule. A
+    /// manual click toggles an override that lasts until the next sunrise or
+    /// sunset, after which the schedule resumes.
+    #[serde(rename = "auto-schedule")]
+    #[default(false)]
+    pub auto_schedule: ConfigProperty<bool>,
+
+    /// Latitude for the sunrise/sunset schedule, in decimal degrees
+    /// (north positive). Range: -90 to 90. Only used when `auto-schedule` is on.
+    #[serde(rename = "latitude")]
+    #[default(0.0)]
+    pub latitude: ConfigProperty<f64>,
+
+    /// Longitude for the sunrise/sunset schedule, in decimal degrees
+    /// (east positive). Range: -180 to 180. Only used when `auto-schedule` is on.
+    #[serde(rename = "longitude")]
+    #[default(0.0)]
+    pub longitude: ConfigProperty<f64>,
+
     /// Icon when filter is disabled (showing normal daylight colors).
     #[serde(rename = "icon-off")]
     #[default(String::from("ld-sun-symbolic"))]

@@ -25,4 +25,8 @@ pub(crate) enum HyprsunsetMsg {
 pub(crate) enum HyprsunsetCmd {
     ConfigChanged,
     StateChanged(Option<HyprsunsetState>),
+    /// Re-evaluate the sunrise/sunset auto-schedule.
+    TickSchedule,
+    /// GeoClue resolved a location for the auto-schedule (latitude, longitude).
+    LocationResolved(f64, f64),
 }

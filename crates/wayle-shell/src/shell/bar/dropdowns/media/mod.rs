@@ -44,6 +44,7 @@ pub(crate) struct MediaDropdown {
     active_page: MediaPage,
     player_view: Controller<PlayerView>,
     source_picker: Controller<SourcePicker>,
+    transition_ms: u32,
 }
 
 #[relm4::component(pub(crate))]
@@ -69,7 +70,7 @@ impl Component for MediaDropdown {
                 gtk::Stack {
                     set_vexpand: true,
                     set_transition_type: gtk::StackTransitionType::SlideLeftRight,
-                    set_transition_duration: 200,
+                    set_transition_duration: model.transition_ms,
                     #[local_ref]
                     add_named[Some("main")] = player_view_widget -> gtk::Box {},
 
@@ -102,6 +103,7 @@ impl Component for MediaDropdown {
 
         let scale = init.config.config().styling.scale.get().value();
         let size = init.config.config().dropdowns.media.get();
+        let transition_ms = init.config.config().animations.interaction_duration_ms();
         watchers::spawn(&sender, &init.config);
 
         let model = Self {
@@ -112,6 +114,7 @@ impl Component for MediaDropdown {
             active_page: MediaPage::Main,
             player_view,
             source_picker,
+            transition_ms,
         };
 
         let input_sender = sender.input_sender().clone();

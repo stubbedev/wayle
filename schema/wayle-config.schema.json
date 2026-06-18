@@ -128,6 +128,16 @@
           "default": null,
           "description": "Global exit duration in ms. Unset → `duration`."
         },
+        "indicators": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Run looping status indicators: spinners, network/bluetooth scan\nanimations, the recording pulse, and the clock blink. Disable (or set\n`enabled = false`) for a fully static UI."
+        },
+        "interaction-duration": {
+          "$ref": "#/$defs/uint32",
+          "default": 150,
+          "description": "Duration in ms for in-place dropdown transitions: hover highlights and\nthe page/stack crossfades inside dropdowns. `enabled = false` removes\nthem entirely."
+        },
         "notifications": {
           "$ref": "#/$defs/SurfaceAnimation",
           "default": {
@@ -162,6 +172,11 @@
           "$ref": "#/$defs/AnimationType",
           "default": "fade",
           "description": "Transition style used for enter/exit of the OSD, toasts, and\nnotification cards. Base fallback for every surface and direction."
+        },
+        "ui-duration": {
+          "$ref": "#/$defs/uint32",
+          "default": 250,
+          "description": "Base duration in ms for general UI micro-transitions (hover, focus, and\ncolor fades) driven by the CSS `--duration-*` token family. Fast,\nnormal, and slow speeds are derived from this. `enabled = false` zeroes\nthem for an instant UI."
         }
       },
       "type": "object"
@@ -228,6 +243,12 @@
     "Array_of_ThresholdEntry": {
       "items": {
         "$ref": "#/$defs/ThresholdEntry"
+      },
+      "type": "array"
+    },
+    "Array_of_ToastPreset": {
+      "items": {
+        "$ref": "#/$defs/ToastPreset"
       },
       "type": "array"
     },
@@ -613,6 +634,7 @@
             "idle-inhibit",
             "keybind-mode",
             "keyboard-input",
+            "mail",
             "media",
             "mango-workspaces",
             "microphone",
@@ -621,6 +643,7 @@
             "niri-workspaces",
             "notifications",
             "power",
+            "power-profiles",
             "ram",
             "recorder",
             "separator",
@@ -2340,6 +2363,11 @@
     "HyprsunsetConfig": {
       "description": "Toggle for Hyprland's blue-light filter.",
       "properties": {
+        "auto-schedule": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Automatically enable the filter at night and disable it during the day,\nbased on local sunrise/sunset computed from `latitude`/`longitude`.\n\nWhile enabled, the module drives the filter on the solar schedule. A\nmanual click toggles an override that lasts until the next sunrise or\nsunset, after which the schedule resumes."
+        },
         "border-color": {
           "$ref": "#/$defs/ColorValue",
           "default": "yellow",
@@ -2405,10 +2433,20 @@
           "default": true,
           "description": "Display label."
         },
+        "latitude": {
+          "$ref": "#/$defs/double",
+          "default": 0.0,
+          "description": "Latitude for the sunrise/sunset schedule, in decimal degrees\n(north positive). Range: -90 to 90. Only used when `auto-schedule` is on."
+        },
         "left-click": {
           "$ref": "#/$defs/ClickAction",
           "default": ":toggle",
           "description": "Action on left click. Default toggles blue light filter."
+        },
+        "longitude": {
+          "$ref": "#/$defs/double",
+          "default": 0.0,
+          "description": "Longitude for the sunrise/sunset schedule, in decimal degrees\n(east positive). Range: -180 to 180. Only used when `auto-schedule` is on."
         },
         "middle-click": {
           "$ref": "#/$defs/ClickAction",
@@ -2825,6 +2863,102 @@
           "type": "string"
         }
       ]
+    },
+    "MailConfig": {
+      "description": "Unread mail count, backed by a notmuch query.\n\nRuns `notmuch count <query>` and re-queries whenever the maildir changes\n(event-driven via an inotify watch on the notmuch database path). Hidden\nwhile the count is zero when `hide-when-zero` is set.",
+      "properties": {
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "format": {
+          "$ref": "#/$defs/string",
+          "default": "{{ count }}",
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ count }}` - Number of messages matching the query\n\n## Examples\n\n- `\"{{ count }}\"` - \"3\""
+        },
+        "hide-when-zero": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Hide the module entirely while the count is zero."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast."
+        },
+        "icon-name": {
+          "$ref": "#/$defs/string",
+          "default": "ld-mail-symbolic",
+          "description": "Module icon."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display label."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on left click. Empty for no action, or a shell command (e.g. your mail client)."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "query": {
+          "$ref": "#/$defs/string",
+          "default": "tag:unread",
+          "description": "notmuch search query whose match count is shown.\n\nAny query `notmuch count` accepts, e.g. `tag:unread`,\n`tag:unread and tag:inbox`, `folder:work and tag:unread`."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        }
+      },
+      "type": "object"
     },
     "MangoWorkspacesConfig": {
       "description": "MangoWM tag switcher module configuration.",
@@ -3518,6 +3652,7 @@
         "hyprsunset": {
           "$ref": "#/$defs/HyprsunsetConfig",
           "default": {
+            "auto-schedule": false,
             "border-color": "yellow",
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
@@ -3531,7 +3666,9 @@
             "label-color": "yellow",
             "label-max-length": 0,
             "label-show": true,
+            "latitude": 0.0,
             "left-click": ":toggle",
+            "longitude": 0.0,
             "middle-click": "",
             "right-click": "",
             "scroll-down": "",
@@ -3609,6 +3746,30 @@
             "scroll-up": ""
           },
           "description": "Keyboard input module."
+        },
+        "mail": {
+          "$ref": "#/$defs/MailConfig",
+          "default": {
+            "border-color": "blue",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "format": "{{ count }}",
+            "hide-when-zero": true,
+            "icon-bg-color": "bg-surface-elevated",
+            "icon-color": "auto",
+            "icon-name": "ld-mail-symbolic",
+            "icon-show": true,
+            "label-color": "auto",
+            "label-max-length": 0,
+            "label-show": true,
+            "left-click": "",
+            "middle-click": "",
+            "query": "tag:unread",
+            "right-click": "",
+            "scroll-down": "",
+            "scroll-up": ""
+          },
+          "description": "Unread mail count module."
         },
         "mango-workspaces": {
           "$ref": "#/$defs/MangoWorkspacesConfig",
@@ -3842,6 +4003,33 @@
             "scroll-up": ""
           },
           "description": "Power menu module."
+        },
+        "power-profiles": {
+          "$ref": "#/$defs/PowerProfilesConfig",
+          "default": {
+            "border-color": "blue",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "color-balanced": "blue",
+            "color-performance": "red",
+            "color-power-saver": "green",
+            "format": "{{ profile }}",
+            "icon-balanced": "ld-scale-symbolic",
+            "icon-bg-color": "bg-surface-elevated",
+            "icon-color": "auto",
+            "icon-performance": "ld-rocket-symbolic",
+            "icon-power-saver": "ld-leaf-symbolic",
+            "icon-show": true,
+            "label-color": "auto",
+            "label-max-length": 0,
+            "label-show": false,
+            "left-click": ":cycle",
+            "middle-click": "",
+            "right-click": "",
+            "scroll-down": "",
+            "scroll-up": ""
+          },
+          "description": "Power profile indicator/switcher module."
         },
         "ram": {
           "$ref": "#/$defs/RamConfig",
@@ -4978,6 +5166,117 @@
       },
       "type": "object"
     },
+    "PowerProfilesConfig": {
+      "description": "Power profile indicator and switcher (power-profiles-daemon).\n\nShows the active profile with a per-profile icon and color, and cycles\nthrough the available profiles on click. Backed by the same\npower-profiles-daemon D-Bus interface as `powerprofilesctl`.",
+      "properties": {
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "color-balanced": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Icon/label color while the balanced profile is active."
+        },
+        "color-performance": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "red",
+          "description": "Icon/label color while the performance profile is active."
+        },
+        "color-power-saver": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "green",
+          "description": "Icon/label color while the power-saver profile is active."
+        },
+        "format": {
+          "$ref": "#/$defs/string",
+          "default": "{{ profile }}",
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ profile }}` - Active profile name (power-saver, balanced, performance)\n\n## Examples\n\n- `\"{{ profile }}\"` - \"balanced\""
+        },
+        "icon-balanced": {
+          "$ref": "#/$defs/string",
+          "default": "ld-scale-symbolic",
+          "description": "Icon shown while the balanced profile is active."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast.\n\nOverridden per active profile by the `color-*` fields."
+        },
+        "icon-performance": {
+          "$ref": "#/$defs/string",
+          "default": "ld-rocket-symbolic",
+          "description": "Icon shown while the performance profile is active."
+        },
+        "icon-power-saver": {
+          "$ref": "#/$defs/string",
+          "default": "ld-leaf-symbolic",
+          "description": "Icon shown while the power-saver profile is active."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display label."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": ":cycle",
+          "description": "Action on left click. Default cycles to the next power profile."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        }
+      },
+      "type": "object"
+    },
     "PywalContrast": {
       "description": "Pywal contrast ratio clamped to 1.0-21.0 (WCAG range).",
       "format": "double",
@@ -5982,6 +6281,113 @@
         }
       ]
     },
+    "ToastPreset": {
+      "description": "A reusable toast preset, triggerable by id with `wayle toast --preset <id>`.\n\nA preset captures a toast's text, icon, optional progress bar, duration, and\nCSS class so it can be fired by name. Any field can still be overridden per\ninvocation on the command line (or over the widget socket).\n\n## Example\n\n```toml\n[[toasts.presets]]\nid = \"saved\"\nlabel = \"Saved\"\nicon = \"ld-check-symbolic\"\nduration-ms = 1500\nclass = \"success\"\n\n# Fire it: wayle toast --preset saved\n```",
+      "properties": {
+        "class": {
+          "default": null,
+          "description": "Extra CSS class applied to the toast for custom styling.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duration-ms": {
+          "default": null,
+          "description": "Auto-dismiss duration in milliseconds. Unset falls back to the toast\nconfig duration.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "icon": {
+          "default": null,
+          "description": "Symbolic icon name shown beside the text.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Unique identifier. Trigger with `wayle toast --preset <id>`.",
+          "type": "string"
+        },
+        "label": {
+          "default": null,
+          "description": "Toast text. An explicit label on the command line overrides this.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "percentage": {
+          "default": null,
+          "description": "Progress percentage (0-100). When set, renders a progress bar instead\nof a plain icon + label toast.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "ToastsConfig": {
+      "description": "Toast overlays shown via `wayle toast`.\n\nToasts are independent of the OSD: they have their own screen position,\nmonitor, layer, duration, alignment, and a list of reusable presets.",
+      "properties": {
+        "border": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show a border around the toast."
+        },
+        "duration": {
+          "$ref": "#/$defs/uint32",
+          "default": 2500,
+          "description": "Auto-dismiss delay in milliseconds."
+        },
+        "enabled": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show toast overlays pushed via `wayle toast`."
+        },
+        "layer": {
+          "$ref": "#/$defs/Layer",
+          "default": "overlay",
+          "description": "Layer-shell layer toasts are placed on."
+        },
+        "margin": {
+          "$ref": "#/$defs/Spacing",
+          "default": 150.0,
+          "description": "Margin from screen edges."
+        },
+        "monitor": {
+          "$ref": "#/$defs/OsdMonitor",
+          "default": "primary",
+          "description": "Target monitor: \"primary\" or a connector name like \"DP-1\"."
+        },
+        "position": {
+          "$ref": "#/$defs/OsdPosition",
+          "default": "bottom",
+          "description": "Screen anchor position."
+        },
+        "presets": {
+          "$ref": "#/$defs/Array_of_ToastPreset",
+          "default": [],
+          "description": "Reusable toast presets, each triggerable with `wayle toast --preset <id>`."
+        },
+        "text-align": {
+          "$ref": "#/$defs/OsdTextAlign",
+          "default": "center",
+          "description": "Horizontal alignment of toast content."
+        }
+      },
+      "type": "object"
+    },
     "TransitionDuration": {
       "description": "Transition duration in seconds, clamped to >= 0.",
       "format": "float",
@@ -6976,6 +7382,8 @@
         "enter-duration": null,
         "exit": null,
         "exit-duration": null,
+        "indicators": true,
+        "interaction-duration": 150,
         "notifications": {
           "enter": null,
           "enter-duration": null,
@@ -6994,7 +7402,8 @@
           "exit": null,
           "exit-duration": null
         },
-        "transition": "fade"
+        "transition": "fade",
+        "ui-duration": 250
       },
       "description": "Animation settings."
     },
@@ -7334,6 +7743,7 @@
           "workspace-padding": 0.5
         },
         "hyprsunset": {
+          "auto-schedule": false,
           "border-color": "yellow",
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
@@ -7347,7 +7757,9 @@
           "label-color": "yellow",
           "label-max-length": 0,
           "label-show": true,
+          "latitude": 0.0,
           "left-click": ":toggle",
+          "longitude": 0.0,
           "middle-click": "",
           "right-click": "",
           "scroll-down": "",
@@ -7408,6 +7820,26 @@
           "layout-alias-map": {},
           "left-click": "",
           "middle-click": "",
+          "right-click": "",
+          "scroll-down": "",
+          "scroll-up": ""
+        },
+        "mail": {
+          "border-color": "blue",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "format": "{{ count }}",
+          "hide-when-zero": true,
+          "icon-bg-color": "bg-surface-elevated",
+          "icon-color": "auto",
+          "icon-name": "ld-mail-symbolic",
+          "icon-show": true,
+          "label-color": "auto",
+          "label-max-length": 0,
+          "label-show": true,
+          "left-click": "",
+          "middle-click": "",
+          "query": "tag:unread",
           "right-click": "",
           "scroll-down": "",
           "scroll-up": ""
@@ -7608,6 +8040,29 @@
           "icon-color": "auto",
           "icon-name": "ld-power-symbolic",
           "left-click": "",
+          "middle-click": "",
+          "right-click": "",
+          "scroll-down": "",
+          "scroll-up": ""
+        },
+        "power-profiles": {
+          "border-color": "blue",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "color-balanced": "blue",
+          "color-performance": "red",
+          "color-power-saver": "green",
+          "format": "{{ profile }}",
+          "icon-balanced": "ld-scale-symbolic",
+          "icon-bg-color": "bg-surface-elevated",
+          "icon-color": "auto",
+          "icon-performance": "ld-rocket-symbolic",
+          "icon-power-saver": "ld-leaf-symbolic",
+          "icon-show": true,
+          "label-color": "auto",
+          "label-max-length": 0,
+          "label-show": false,
+          "left-click": ":cycle",
           "middle-click": "",
           "right-click": "",
           "scroll-down": "",
@@ -7845,6 +8300,21 @@
         "wallust-saturation": 0
       },
       "description": "Styling configuration (theme, fonts, scale)."
+    },
+    "toasts": {
+      "$ref": "#/$defs/ToastsConfig",
+      "default": {
+        "border": true,
+        "duration": 2500,
+        "enabled": true,
+        "layer": "overlay",
+        "margin": 150.0,
+        "monitor": "primary",
+        "position": "bottom",
+        "presets": [],
+        "text-align": "center"
+      },
+      "description": "Toast overlay settings."
     },
     "wallpaper": {
       "$ref": "#/$defs/WallpaperConfig",

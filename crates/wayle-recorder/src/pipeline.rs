@@ -22,7 +22,9 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
     let node = cast.node_id;
     let fps = opts.framerate.max(1);
     let (screen_w, screen_h) = cast.size.unwrap_or(FALLBACK_SIZE);
-    let path = &opts.output_path;
+    // Quote so paths/devices with spaces or special chars don't break the
+    // gst-launch parser (which otherwise splits on whitespace and `!`).
+    let path = quote(&opts.output_path);
 
     let video_encoder = video_encoder(opts.format, opts.bitrate_kbps, opts.preset, fps);
     let audio_encoder = format!("opusenc bitrate={}", opts.audio.bitrate_kbps.max(16) * 1000);
@@ -39,7 +41,7 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
         let device = if cam.device.is_empty() {
             String::new()
         } else {
-            format!(" device={}", cam.device)
+            format!(" device={}", quote(&cam.device))
         };
 
         // `add-borders=true` letterboxes the webcam into the box, so a camera
@@ -47,14 +49,14 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
         desc.push_str(&format!(
             "compositor name=comp background=black \
              sink_1::xpos={xpos} sink_1::ypos={ypos} sink_1::width={cam_w} sink_1::height={cam_h} \
-             ! videoconvert ! queue ! {video_encoder} ! queue ! {muxer} name=mux ! filesink location=\"{path}\" \
+             ! videoconvert ! queue ! {video_encoder} ! queue ! {muxer} name=mux ! filesink location={path} \
              pipewiresrc fd={fd} path={node} do-timestamp=true ! videorate ! video/x-raw,framerate={fps}/1 ! videoconvert ! queue ! comp.sink_0 \
              v4l2src{device} ! videorate ! videoconvert ! videoscale add-borders=true ! video/x-raw,width={cam_w},height={cam_h},framerate={fps}/1 ! queue ! comp.sink_1 "
         ));
     } else {
         desc.push_str(&format!(
             "pipewiresrc fd={fd} path={node} do-timestamp=true ! videorate ! video/x-raw,framerate={fps}/1 \
-             ! videoconvert ! queue ! {video_encoder} ! queue ! {muxer} name=mux ! filesink location=\"{path}\" "
+             ! videoconvert ! queue ! {video_encoder} ! queue ! {muxer} name=mux ! filesink location={path} "
         ));
     }
 
@@ -66,7 +68,10 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
         if opts.audio.microphone_device.is_empty() {
             audio_sources.push(String::from("pulsesrc"));
         } else {
-            audio_sources.push(format!("pulsesrc device={}", opts.audio.microphone_device));
+            audio_sources.push(format!(
+                "pulsesrc device={}",
+                quote(&opts.audio.microphone_device)
+            ));
         }
     }
 
@@ -90,6 +95,14 @@ pub(crate) fn build(opts: &RecordOptions, cast: &ScreenCast) -> String {
     }
 
     desc.trim_end().to_owned()
+}
+
+/// Wraps a value in double quotes for the `gst-launch` parser, escaping any
+/// embedded backslashes and quotes. Without this, a path or device name
+/// containing a space, `!`, or quote breaks pipeline parsing.
+fn quote(value: &str) -> String {
+    let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
+    format!("\"{escaped}\"")
 }
 
 /// Builds the video encoder element for a format.

@@ -38,6 +38,8 @@ pub mod schemas {
     pub mod osd;
     /// Styling configuration.
     pub mod styling;
+    /// Toast overlay configuration.
+    pub mod toasts;
     /// Wallpaper service configuration.
     pub mod wallpaper;
 }
@@ -77,7 +79,8 @@ pub use infrastructure::{
 };
 use schemas::{
     animations::AnimationsConfig, bar::BarConfig, dropdowns::DropdownsConfig,
-    modules::ModulesConfig, osd::OsdConfig, styling::StylingConfig, wallpaper::WallpaperConfig,
+    modules::ModulesConfig, osd::OsdConfig, styling::StylingConfig, toasts::ToastsConfig,
+    wallpaper::WallpaperConfig,
 };
 use wayle_derive::wayle_config;
 
@@ -118,6 +121,9 @@ pub struct Config {
 
     /// On-screen display settings.
     pub osd: OsdConfig,
+
+    /// Toast overlay settings.
+    pub toasts: ToastsConfig,
 
     /// Animation settings.
     pub animations: AnimationsConfig,

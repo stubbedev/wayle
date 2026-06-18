@@ -11,16 +11,26 @@ let
 
   pkgIfPresent = name: lib.optional (builtins.hasAttr name pkgs) (builtins.getAttr name pkgs);
 
+  # Modules referenced anywhere in the bar layout. Used to install the soft
+  # dependencies a module shells out to only when that module is actually used.
+  layoutZones = cfg.settings.bar.layout or [ ];
+  layoutModules = lib.concatMap (
+    zone: (zone.left or [ ]) ++ (zone.center or [ ]) ++ (zone.right or [ ])
+  ) layoutZones;
+  usesMail = lib.elem "mail" layoutModules;
+
   # Soft dependencies wayle shells out to, selected from the config. Theme
   # providers are spawned for wallpaper-driven color extraction; wl-clipboard
-  # and xdg-utils back copy / open-link actions. Missing packages are skipped.
+  # and xdg-utils back copy / open-link actions; notmuch backs the mail module.
+  # Missing packages are skipped.
   themeProvider = cfg.settings.styling.theme-provider or "wayle";
   softDeps =
     pkgIfPresent "wl-clipboard"
     ++ pkgIfPresent "xdg-utils"
     ++ lib.optionals (themeProvider == "matugen") (pkgIfPresent "matugen")
     ++ lib.optionals (themeProvider == "wallust") (pkgIfPresent "wallust")
-    ++ lib.optionals (themeProvider == "pywal") (pkgIfPresent "pywal");
+    ++ lib.optionals (themeProvider == "pywal") (pkgIfPresent "pywal")
+    ++ lib.optionals usesMail (pkgIfPresent "notmuch");
 in
 {
   options.programs.wayle = {
@@ -38,10 +48,12 @@ in
       default = false;
       description = ''
         Install the user-space soft dependencies wayle's config implies
-        (theme-provider tools like matugen/wallust/pywal, plus wl-clipboard and
-        xdg-utils). System-level dependencies (NetworkManager, bluez, upower,
-        power-profiles-daemon, pipewire/wireplumber) are not installed by
-        home-manager — enable those at the NixOS level.
+        (theme-provider tools like matugen/wallust/pywal, wl-clipboard and
+        xdg-utils, plus notmuch when the `mail` module is in the layout).
+        System-level dependencies (NetworkManager, bluez, upower,
+        power-profiles-daemon, GeoClue for the hyprsunset auto-schedule,
+        pipewire/wireplumber) are not installed by home-manager — enable those
+        at the NixOS level.
       '';
     };
 
@@ -97,7 +109,19 @@ in
       Unit = {
         Description = "Wayle desktop shell";
         PartOf = [ cfg.systemd.target ];
-        After = [ cfg.systemd.target ];
+        # The recorder captures via the xdg-desktop-portal ScreenCast interface
+        # over PipeWire; order after (and weakly want) both so they're up when
+        # the shell starts. Wants is weak: a missing unit just logs, never
+        # blocks the shell.
+        After = [
+          cfg.systemd.target
+          "pipewire.service"
+          "xdg-desktop-portal.service"
+        ];
+        Wants = [
+          "pipewire.service"
+          "xdg-desktop-portal.service"
+        ];
       };
       Service = {
         ExecStart = "${lib.getExe cfg.package} shell";

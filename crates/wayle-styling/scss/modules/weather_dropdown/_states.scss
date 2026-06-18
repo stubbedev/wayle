@@ -6,7 +6,7 @@
 image.loading-icon {
     -gtk-icon-size: var(--icon-3xl);
     color: var(--fg-subtle);
-    animation: pulse 2s infinite;
+    animation: pulse var(--cfg-anim-pulse, 2s) infinite;
 }
 
 label.loading-text {
