@@ -9,6 +9,7 @@ RUN dnf -y install \
         clang \
         cmake \
         curl \
+        desktop-file-utils \
         'dnf-command(builddep)' \
         fftw-devel \
         gcc \

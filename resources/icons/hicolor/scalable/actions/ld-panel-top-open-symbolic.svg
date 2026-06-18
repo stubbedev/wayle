@@ -1,0 +1,18 @@
+<svg width='16' height='16'
+     xmlns='http://www.w3.org/2000/svg'
+     xmlns:gpa='https://www.gtk.org/grappa'
+     gpa:version='2'>
+  <path d='M3.5 2L12.5 2A1.5 1.5 0 0 1 14 3.5L14 12.5A1.5 1.5 0 0 1 12.5 14L3.5 14A1.5 1.5 0 0 1 2 12.5L2 3.5A1.5 1.5 0 0 1 3.5 2ZM4 3.2L12 3.2A0.8 0.8 0 0 1 12.8 4L12.8 12A0.8 0.8 0 0 1 12 12.8L4 12.8A0.8 0.8 0 0 1 3.2 12L3.2 4A0.8 0.8 0 0 1 4 3.2Z'
+fill-rule='evenodd'
+stroke='none'
+fill='rgb(0,0,0)'
+gpa:fill='foreground'/>
+  <path d='M3.2 5.4L12.8 5.4L12.8 6.6L3.2 6.6Z'
+stroke='none'
+fill='rgb(0,0,0)'
+gpa:fill='foreground'/>
+  <path d='M6 10.6L8 8.6L10 10.6L9.1 11.5L8 10.4L6.9 11.5Z'
+stroke='none'
+fill='rgb(0,0,0)'
+gpa:fill='foreground'/>
+</svg>
