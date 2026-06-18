@@ -65,7 +65,7 @@ impl Component for NotificationPopupHost {
         let config = init.config.config();
         let notif_config = &config.modules.notifications;
         let scale = config.styling.scale.get().value();
-        let gap = (notif_config.popup_gap.get().value() * scale) as i32;
+        let gap = notif_config.popup_gap.get().resolve_px(1.0, scale) as i32;
 
         init.notification
             .set_popup_duration(notif_config.popup_duration.get());
@@ -111,7 +111,7 @@ impl Component for NotificationPopupHost {
                 let config = self.config.config();
                 let notif_config = &config.modules.notifications;
                 let scale = config.styling.scale.get().value();
-                let gap = (notif_config.popup_gap.get().value() * scale) as i32;
+                let gap = notif_config.popup_gap.get().resolve_px(1.0, scale) as i32;
                 self.card_container.set_spacing(gap);
 
                 self.notification

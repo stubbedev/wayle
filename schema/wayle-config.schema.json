@@ -1099,9 +1099,9 @@
           "description": "Audio capture backend."
         },
         "internal-padding": {
-          "$ref": "#/$defs/Spacing",
+          "$ref": "#/$defs/Size",
           "default": 0.5,
-          "description": "Padding at the ends of the visualizer."
+          "description": "Padding at the ends of the visualizer. Accepts a scale multiplier or\npixels (e.g. `\"8px\"`)."
         },
         "left-click": {
           "$ref": "#/$defs/ClickAction",
@@ -2977,6 +2977,21 @@
           "default": "",
           "description": "Action on middle click."
         },
+        "notify": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Fire a desktop notification (via `notify-send`) when the unread count\nrises — i.e. new mail arrives. The module icon is used as the\nnotification icon. The single notmuch query means this is not\nper-account; it reports the change in the total match count."
+        },
+        "notify-body": {
+          "$ref": "#/$defs/string",
+          "default": "{{ new }} new ({{ count }} unread)",
+          "description": "Notification body when new mail arrives. Same placeholders as\n`notify-summary`."
+        },
+        "notify-summary": {
+          "$ref": "#/$defs/string",
+          "default": "New mail",
+          "description": "Notification summary when new mail arrives.\n\n## Placeholders\n\n- `{{ count }}` - Total messages matching the query\n- `{{ new }}` - How many arrived since the last count"
+        },
         "query": {
           "$ref": "#/$defs/string",
           "default": "tag:unread",
@@ -3804,6 +3819,9 @@
             "label-show": true,
             "left-click": "",
             "middle-click": "",
+            "notify": false,
+            "notify-body": "{{ new }} new ({{ count }} unread)",
+            "notify-summary": "New mail",
             "query": "tag:unread",
             "right-click": "",
             "scroll-down": "",
@@ -4790,9 +4808,9 @@
           "description": "Maximum popup display duration in milliseconds.\n\nApplications may request a shorter timeout, which takes precedence."
         },
         "popup-gap": {
-          "$ref": "#/$defs/Spacing",
+          "$ref": "#/$defs/Size",
           "default": 8.0,
-          "description": "Gap between stacked popups."
+          "description": "Gap between stacked popups. Accepts a scale multiplier or pixels (e.g.\n`\"8px\"`)."
         },
         "popup-hover-pause": {
           "$ref": "#/$defs/boolean",
@@ -4805,14 +4823,14 @@
           "description": "Layer-shell layer popup notifications are placed on.\n\nWhen `general.tearing-mode` is enabled, `overlay` is demoted to `top`\nto allow fullscreen tearing."
         },
         "popup-margin-x": {
-          "$ref": "#/$defs/Spacing",
+          "$ref": "#/$defs/Size",
           "default": 0.0,
-          "description": "Horizontal margin from screen edges."
+          "description": "Horizontal margin from screen edges. Accepts a scale multiplier or\npixels (e.g. `\"12px\"`)."
         },
         "popup-margin-y": {
-          "$ref": "#/$defs/Spacing",
+          "$ref": "#/$defs/Size",
           "default": 0.0,
-          "description": "Vertical margin from screen edges."
+          "description": "Vertical margin from screen edges. Accepts a scale multiplier or pixels\n(e.g. `\"12px\"`)."
         },
         "popup-max-visible": {
           "$ref": "#/$defs/uint32",
@@ -4930,9 +4948,9 @@
           "description": "Layer-shell layer the OSD is placed on.\n\nWhen `general.tearing-mode` is enabled, `overlay` is demoted to `top`\nto allow fullscreen tearing."
         },
         "margin": {
-          "$ref": "#/$defs/Spacing",
+          "$ref": "#/$defs/Size",
           "default": 150.0,
-          "description": "Margin from screen edges."
+          "description": "Margin from screen edges. Accepts a scale multiplier or pixels (e.g.\n`\"150px\"`)."
         },
         "monitor": {
           "$ref": "#/$defs/OsdMonitor",
@@ -5760,12 +5778,6 @@
       ],
       "description": "Size as a scale multiplier (number) or absolute pixels (e.g. \"24px\")"
     },
-    "Spacing": {
-      "description": "Non-negative spacing value (clamped at 0).",
-      "format": "float",
-      "minimum": 0.0,
-      "type": "number"
-    },
     "StackingOrder": {
       "description": "Order in which popups are stacked on screen.",
       "oneOf": [
@@ -6401,9 +6413,9 @@
           "description": "Layer-shell layer toasts are placed on."
         },
         "margin": {
-          "$ref": "#/$defs/Spacing",
+          "$ref": "#/$defs/Size",
           "default": 150.0,
-          "description": "Margin from screen edges."
+          "description": "Margin from screen edges. Accepts a scale multiplier or pixels (e.g.\n`\"150px\"`)."
         },
         "monitor": {
           "$ref": "#/$defs/OsdMonitor",
@@ -7879,6 +7891,9 @@
           "label-show": true,
           "left-click": "",
           "middle-click": "",
+          "notify": false,
+          "notify-body": "{{ new }} new ({{ count }} unread)",
+          "notify-summary": "New mail",
           "query": "tag:unread",
           "right-click": "",
           "scroll-down": "",

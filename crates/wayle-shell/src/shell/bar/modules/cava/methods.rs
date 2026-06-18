@@ -66,8 +66,8 @@ impl CavaModule {
         let bar_spacing = cava_config.bar_gap.get() as f64;
         let bar_scale = full_config.bar.scale.get().value();
         let fill_color = color::resolve_rgba(&cava_config.color.get(), config);
-        let padding_rem = cava_config.internal_padding.get().value();
-        let horizontal_padding = helpers::rem_to_px(padding_rem, bar_scale);
+        let horizontal_padding =
+            helpers::resolve_padding_px(cava_config.internal_padding.get(), bar_scale);
 
         let render_params = rendering::RenderParams {
             bar_width,
@@ -140,8 +140,7 @@ impl CavaModule {
         let bar_width = cava_config.bar_width.get();
         let bar_gap = cava_config.bar_gap.get();
         let bar_scale = full_config.bar.scale.get().value();
-        let padding_rem = cava_config.internal_padding.get().value();
-        let padding_px = helpers::rem_to_px(padding_rem, bar_scale);
+        let padding_px = helpers::resolve_padding_px(cava_config.internal_padding.get(), bar_scale);
         let length = helpers::calculate_widget_length(bars, bar_width, bar_gap, padding_px);
 
         if self.is_vertical {

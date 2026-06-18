@@ -5,6 +5,7 @@ use wayle_config::Config;
 use crate::{
     editors::{
         enum_select::enum_select,
+        icon::icon,
         number::number_u32,
         text::{text, text_like},
     },
@@ -53,7 +54,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         text(&module.format),
                         enum_select(&module.time_format),
                         number_u32(&module.refresh_interval_seconds),
-                        text(&module.icon_name),
+                        icon(&module.icon_name),
                     ],
                 },
                 SectionSpec {

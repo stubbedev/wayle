@@ -11,6 +11,15 @@ settings-modules-mail-query = Requête
 settings-modules-mail-hide-when-zero = Masquer si vide
     .description = Masquer entièrement le module lorsque le nombre est zéro
 
+settings-modules-mail-notify = Notifier les nouveaux courriers
+    .description = Émettre une notification de bureau lorsque le nombre de non lus augmente
+
+settings-modules-mail-notify-summary = Résumé de la notification
+    .description = Texte du résumé. Espaces réservés : {"{{ count }}"} (total), {"{{ new }}"} (nouveaux)
+
+settings-modules-mail-notify-body = Corps de la notification
+    .description = Texte du corps. Espaces réservés : {"{{ count }}"} (total), {"{{ new }}"} (nouveaux)
+
 settings-modules-mail-icon-name = Icône
     .description = Icône du module
 

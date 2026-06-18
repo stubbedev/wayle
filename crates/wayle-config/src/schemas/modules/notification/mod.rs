@@ -11,7 +11,7 @@ use crate::{
     docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::{
         general::Layer,
-        styling::{ColorValue, CssToken, Spacing, ThresholdEntry},
+        styling::{ColorValue, CssToken, Size, ThresholdEntry},
     },
 };
 
@@ -155,20 +155,23 @@ pub struct NotificationConfig {
     #[default(true)]
     pub popup_hover_pause: ConfigProperty<bool>,
 
-    /// Horizontal margin from screen edges.
+    /// Horizontal margin from screen edges. Accepts a scale multiplier or
+    /// pixels (e.g. `"12px"`).
     #[serde(rename = "popup-margin-x")]
-    #[default(Spacing::new(0.0))]
-    pub popup_margin_x: ConfigProperty<Spacing>,
+    #[default(Size::scale(0.0))]
+    pub popup_margin_x: ConfigProperty<Size>,
 
-    /// Vertical margin from screen edges.
+    /// Vertical margin from screen edges. Accepts a scale multiplier or pixels
+    /// (e.g. `"12px"`).
     #[serde(rename = "popup-margin-y")]
-    #[default(Spacing::new(0.0))]
-    pub popup_margin_y: ConfigProperty<Spacing>,
+    #[default(Size::scale(0.0))]
+    pub popup_margin_y: ConfigProperty<Size>,
 
-    /// Gap between stacked popups.
+    /// Gap between stacked popups. Accepts a scale multiplier or pixels (e.g.
+    /// `"8px"`).
     #[serde(rename = "popup-gap")]
-    #[default(Spacing::new(8.0))]
-    pub popup_gap: ConfigProperty<Spacing>,
+    #[default(Size::scale(8.0))]
+    pub popup_gap: ConfigProperty<Size>,
 
     /// Target monitor: "primary" or a connector name like "DP-1".
     #[serde(rename = "popup-monitor")]

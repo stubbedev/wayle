@@ -36,9 +36,9 @@ right = ["notifications"]
 | `popup-stacking-order` | [`StackingOrder`](/config/types#stacking-order) | `"newest-first"` | Order in which popups stack on screen. |
 | `popup-duration` | u32 | `5000` | Maximum popup display duration in milliseconds. |
 | `popup-hover-pause` | bool | `true` | Pause popup auto-dismiss timer on hover. |
-| `popup-margin-x` | [`Spacing`](/config/types#spacing) | `0` | Horizontal margin from screen edges. |
-| `popup-margin-y` | [`Spacing`](/config/types#spacing) | `0` | Vertical margin from screen edges. |
-| `popup-gap` | [`Spacing`](/config/types#spacing) | `8` | Gap between stacked popups. |
+| `popup-margin-x` | [`Size`](/config/types#size) | `0` | Horizontal margin from screen edges. Accepts a scale multiplier or pixels (e.g. `"12px"`). |
+| `popup-margin-y` | [`Size`](/config/types#size) | `0` | Vertical margin from screen edges. Accepts a scale multiplier or pixels (e.g. `"12px"`). |
+| `popup-gap` | [`Size`](/config/types#size) | `8` | Gap between stacked popups. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
 | `popup-monitor` | [`PopupMonitor`](/config/types#popup-monitor) | `"primary"` | Target monitor: "primary" or a connector name like "DP-1". |
 | `popup-layer` | [`Layer`](/config/types#layer) | `"overlay"` | Layer-shell layer popup notifications are placed on. |
 | `popup-close-behavior` | [`PopupCloseBehavior`](/config/types#popup-close-behavior) | `"dismiss"` | What happens when the close button on a popup is clicked. |

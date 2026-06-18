@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{color_value::color_value, text::text},
+    editors::{color_value::color_value, icon::icon, text::text},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -47,11 +47,11 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-power-profiles-profiles",
                     items: vec![
-                        text(&module.icon_power_saver),
+                        icon(&module.icon_power_saver),
                         color_value(&module.color_power_saver),
-                        text(&module.icon_balanced),
+                        icon(&module.icon_balanced),
                         color_value(&module.color_balanced),
-                        text(&module.icon_performance),
+                        icon(&module.icon_performance),
                         color_value(&module.color_performance),
                     ],
                 },

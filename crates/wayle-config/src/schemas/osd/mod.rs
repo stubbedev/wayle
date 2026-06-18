@@ -7,7 +7,7 @@ use wayle_derive::wayle_config;
 use crate::{
     ConfigProperty,
     docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-    schemas::{general::Layer, styling::Spacing},
+    schemas::{general::Layer, styling::Size},
 };
 
 /// On-screen display overlay for transient events like volume and brightness.
@@ -35,9 +35,10 @@ pub struct OsdConfig {
     #[default(OsdMonitor::default())]
     pub monitor: ConfigProperty<OsdMonitor>,
 
-    /// Margin from screen edges.
-    #[default(Spacing::new(150.0))]
-    pub margin: ConfigProperty<Spacing>,
+    /// Margin from screen edges. Accepts a scale multiplier or pixels (e.g.
+    /// `"150px"`).
+    #[default(Size::scale(150.0))]
+    pub margin: ConfigProperty<Size>,
 
     /// Show a border around the OSD.
     #[default(true)]

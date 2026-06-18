@@ -6,6 +6,7 @@ use crate::{
     editors::{
         color_value::color_value,
         enum_select::enum_select,
+        icon::icon,
         string_list::string_list,
         string_map::string_map,
         text::{text, text_like},
@@ -49,8 +50,8 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         toggle(&module.app_icons_show),
                         toggle(&module.app_icons_dedupe),
-                        text(&module.app_icons_fallback),
-                        text(&module.app_icons_empty),
+                        icon(&module.app_icons_fallback),
+                        icon(&module.app_icons_empty),
                     ],
                 },
                 SectionSpec {

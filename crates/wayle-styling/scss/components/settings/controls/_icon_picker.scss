@@ -1,0 +1,20 @@
+// Icon-name field: a trigger button (preview + name) that opens a searchable
+// grid of icon previews.
+.icon-picker-trigger {
+    padding: var(--space-xs) var(--space-sm);
+
+    label {
+        font-size: var(--text-sm);
+        color: var(--fg-default);
+    }
+}
+
+.icon-picker-popover {
+    padding: var(--space-sm);
+
+    .icon-picker-cell {
+        padding: var(--space-xs);
+        min-width: calc(2rem * var(--global-scale));
+        min-height: calc(2rem * var(--global-scale));
+    }
+}

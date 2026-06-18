@@ -26,6 +26,20 @@ struct SizeControl {
     refresh: Rc<dyn Fn()>,
 }
 
+/// Reconfigures the spin for the selected mode: pixels are whole numbers
+/// (integer steps, no decimals), scale multipliers keep two decimals.
+fn configure_spin_for_mode(spin: &gtk::SpinButton, is_px: bool) {
+    if is_px {
+        spin.set_digits(0);
+        spin.set_increments(1.0, 10.0);
+        spin.set_snap_to_ticks(true);
+    } else {
+        spin.set_digits(2);
+        spin.set_increments(0.05, 1.0);
+        spin.set_snap_to_ticks(false);
+    }
+}
+
 /// Syncs the three sub-controls from a `Size` value (with signals blocked by
 /// the caller where needed).
 fn apply_size(
@@ -38,12 +52,14 @@ fn apply_size(
         Some(Size::Scale(v)) => {
             inherit.set_active(false);
             mode.set_selected(SCALE_INDEX);
+            configure_spin_for_mode(spin, false);
             spin.set_value(f64::from(v));
         }
         Some(Size::Px(v)) => {
             inherit.set_active(false);
             mode.set_selected(PX_INDEX);
-            spin.set_value(f64::from(v));
+            configure_spin_for_mode(spin, true);
+            spin.set_value(f64::from(v.round()));
         }
         None => inherit.set_active(true),
     }
@@ -62,6 +78,7 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
 
     let inherit = gtk::CheckButton::with_label(&t("settings-inherit"));
     inherit.set_valign(gtk::Align::Center);
+    inherit.add_css_class("size-inherit");
 
     let modes = gtk::StringList::new(&[&t("settings-size-scale"), &t("settings-size-px")]);
     let mode = gtk::DropDown::new(Some(modes), gtk::Expression::NONE);
@@ -89,11 +106,11 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
                 set(None);
                 return;
             }
-            let value = spin.value() as f32;
+            let raw = spin.value();
             let size = if mode.selected() == PX_INDEX {
-                Size::px(value)
+                Size::px(raw.round() as f32)
             } else {
-                Size::scale(value)
+                Size::scale(raw as f32)
             };
             set(Some(size));
         })
@@ -109,7 +126,11 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
         toggle_commit();
     });
     let mode_commit = Rc::clone(&commit);
-    let mode_handler = mode.connect_selected_notify(move |_| mode_commit());
+    let mode_spin = spin.clone();
+    let mode_handler = mode.connect_selected_notify(move |dd| {
+        configure_spin_for_mode(&mode_spin, dd.selected() == PX_INDEX);
+        mode_commit();
+    });
     let spin_commit = Rc::clone(&commit);
     let spin_handler = spin.connect_value_changed(move |_| spin_commit());
 

@@ -20,3 +20,15 @@
         }
     }
 }
+
+// Inherit (default) toggle in the size editors: a touch smaller than the
+// surrounding controls so it reads as a secondary "use the default" affordance.
+.size-inherit {
+    font-size: var(--text-sm);
+
+    check {
+        min-width: calc(0.85rem * var(--global-scale));
+        min-height: calc(0.85rem * var(--global-scale));
+        -gtk-icon-size: calc(0.85rem * var(--global-scale));
+    }
+}

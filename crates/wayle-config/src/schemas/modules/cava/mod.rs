@@ -9,7 +9,7 @@ use wayle_derive::wayle_config;
 use crate::{
     ClickAction, ConfigProperty,
     docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-    schemas::styling::{ColorValue, CssToken, NormalizedF64, Spacing},
+    schemas::styling::{ColorValue, CssToken, NormalizedF64, Size},
 };
 
 /// Audio frequency bars visualising the output stream.
@@ -85,10 +85,11 @@ pub struct CavaConfig {
     #[default(1)]
     pub bar_gap: ConfigProperty<u32>,
 
-    /// Padding at the ends of the visualizer.
+    /// Padding at the ends of the visualizer. Accepts a scale multiplier or
+    /// pixels (e.g. `"8px"`).
     #[serde(rename = "internal-padding")]
-    #[default(Spacing::new(0.5))]
-    pub internal_padding: ConfigProperty<Spacing>,
+    #[default(Size::scale(0.5))]
+    pub internal_padding: ConfigProperty<Size>,
 
     /// Display border around the visualizer.
     #[serde(rename = "border-show")]

@@ -11,6 +11,15 @@ settings-modules-mail-query = Query
 settings-modules-mail-hide-when-zero = Hide When Zero
     .description = Hide the module entirely while the count is zero
 
+settings-modules-mail-notify = Notify on New Mail
+    .description = Fire a desktop notification when the unread count rises
+
+settings-modules-mail-notify-summary = Notification Summary
+    .description = Summary text. Placeholders: {"{{ count }}"} (total), {"{{ new }}"} (new)
+
+settings-modules-mail-notify-body = Notification Body
+    .description = Body text. Placeholders: {"{{ count }}"} (total), {"{{ new }}"} (new)
+
 settings-modules-mail-icon-name = Icon
     .description = Module icon
 

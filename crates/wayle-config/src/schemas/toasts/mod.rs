@@ -10,7 +10,7 @@ use crate::{
     schemas::{
         general::Layer,
         osd::{OsdMonitor, OsdPosition, OsdTextAlign},
-        styling::Spacing,
+        styling::Size,
     },
 };
 
@@ -41,9 +41,10 @@ pub struct ToastsConfig {
     #[default(OsdMonitor::default())]
     pub monitor: ConfigProperty<OsdMonitor>,
 
-    /// Margin from screen edges.
-    #[default(Spacing::new(150.0))]
-    pub margin: ConfigProperty<Spacing>,
+    /// Margin from screen edges. Accepts a scale multiplier or pixels (e.g.
+    /// `"150px"`).
+    #[default(Size::scale(150.0))]
+    pub margin: ConfigProperty<Size>,
 
     /// Show a border around the toast.
     #[default(true)]

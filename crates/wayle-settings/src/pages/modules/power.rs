@@ -5,7 +5,8 @@ use wayle_config::Config;
 use crate::{
     editors::{
         color_value::color_value,
-        text::{text, text_like},
+        icon::icon,
+        text::text_like,
         toggle::toggle,
     },
     pages::{
@@ -26,7 +27,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
             vec![
                 SectionSpec {
                     title_key: "settings-section-general",
-                    items: vec![text(&module.icon_name)],
+                    items: vec![icon(&module.icon_name)],
                 },
                 SectionSpec {
                     title_key: "settings-section-bar-display",

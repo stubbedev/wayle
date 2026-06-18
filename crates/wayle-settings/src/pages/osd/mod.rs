@@ -5,7 +5,8 @@ use wayle_config::Config;
 use crate::{
     editors::{
         enum_select::enum_select,
-        number::{number_u32, spacing},
+        number::number_u32,
+        size::size,
         text::text_like,
         toggle::toggle,
     },
@@ -33,7 +34,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     enum_select(&osd.text_align),
                     number_u32(&osd.duration),
                     text_like(&osd.monitor),
-                    spacing(&osd.margin),
+                    size(&osd.margin),
                     toggle(&osd.border),
                 ],
             }],

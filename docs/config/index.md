@@ -19,9 +19,12 @@ Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visuals
 |---|---|
 | [`animations`](/config/animations) | Enter/exit and change animations for transient surfaces. |
 | [`bar`](/config/bar) | Bar chrome: per-monitor layout, spacing, colors, and button styling. |
+| [`dropdowns`](/config/dropdowns) | Per-dropdown foldout panel sizing. |
 | [`general`](/config/general) | Shell-wide settings that don't belong to any specific module. |
 | [`osd`](/config/osd) | On-screen display overlay for transient events like volume and brightness. |
 | [`styling`](/config/styling) | Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet. |
+| [`toast-preset`](/config/toast-preset) | A reusable toast preset, triggerable by id with `wayle toast --preset <id>`. |
+| [`toasts`](/config/toasts) | Toast overlays shown via `wayle toast`. |
 | [`wallpaper`](/config/wallpaper) | Wallpaper rendering, cycling, and per-monitor overrides. |
 
 ## Bar modules
@@ -44,6 +47,7 @@ Modules appear inside `[[bar.layout]]` arrays. Each row links to the full refere
 | [`idle-inhibit`](/config/modules/idle-inhibit) | Toggle that prevents screen dim, lock, and suspend while active. |
 | [`keybind-mode`](/config/modules/keybind-mode) | Current keybind-mode indicator for modal compositors. |
 | [`keyboard-input`](/config/modules/keyboard-input) | Active keyboard layout indicator. |
+| [`mail`](/config/modules/mail) | Unread mail count, backed by a notmuch query. |
 | [`mango-workspaces`](/config/modules/mango-workspaces) | MangoWM tag switcher module configuration. |
 | [`media`](/config/modules/media) | Now-playing title and playback controls for the active MPRIS player. |
 | [`microphone`](/config/modules/microphone) | Microphone input level and mute toggle. |
@@ -52,7 +56,9 @@ Modules appear inside `[[bar.layout]]` arrays. Each row links to the full refere
 | [`niri-workspaces`](/config/modules/niri-workspaces) | Niri workspace indicators with click-to-switch. |
 | [`notifications`](/config/modules/notifications) | Notification center: icon in the bar, dropdown with history, DND toggle. |
 | [`power`](/config/modules/power) | Shutdown, reboot, and logout menu. |
+| [`power-profiles`](/config/modules/power-profiles) | Power profile indicator and switcher (power-profiles-daemon). |
 | [`ram`](/config/modules/ram) | Memory and swap usage. |
+| [`recorder`](/config/modules/recorder) | Native screen recorder backed by a GStreamer pipeline. |
 | [`separator`](/config/modules/separator) | A vertical rule between bar modules. |
 | [`storage`](/config/modules/storage) | Disk usage for a mount point. |
 | [`systray`](/config/modules/systray) | System tray icons via the StatusNotifierItem protocol. |
@@ -63,6 +69,6 @@ Modules appear inside `[[bar.layout]]` arrays. Each row links to the full refere
 
 ## Shared types
 
-Every named type referenced across the config (`Color`, `ClickAction`, `Spacing`, and others) is documented on the [types page](/config/types).
+Every named type referenced across the config (`Color`, `ClickAction`, `Size`, and others) is documented on the [types page](/config/types).
 
 </div>

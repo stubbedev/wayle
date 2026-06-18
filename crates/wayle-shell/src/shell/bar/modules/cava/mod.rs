@@ -94,8 +94,7 @@ impl Component for CavaModule {
         let bar_width = cava_config.bar_width.get();
         let bar_gap = cava_config.bar_gap.get();
         let bar_scale = bar_config.scale.get().value();
-        let internal_padding = cava_config.internal_padding.get().value();
-        let padding_px = helpers::rem_to_px(internal_padding, bar_scale);
+        let padding_px = helpers::resolve_padding_px(cava_config.internal_padding.get(), bar_scale);
 
         let drawing_area = gtk::DrawingArea::new();
         let length = helpers::calculate_widget_length(bars, bar_width, bar_gap, padding_px);

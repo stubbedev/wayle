@@ -4,7 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select, string_list::string_list, string_map::string_map, text::text,
+        enum_select::enum_select, icon::icon, string_list::string_list, string_map::string_map,
+        text::text,
     },
     pages::{
         nav::LeafEntry,
@@ -47,8 +48,8 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         enum_select(&module.icon_type),
                         text(&module.format),
-                        text(&module.icon_name),
-                        text(&module.spinning_disc_icon),
+                        icon(&module.icon_name),
+                        icon(&module.spinning_disc_icon),
                         string_map(&module.player_icons),
                         string_list(&module.players_ignored),
                         string_list(&module.player_priority),

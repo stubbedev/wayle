@@ -4,6 +4,7 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
+        icon::icon,
         number::number_u64,
         text::{text, text_like},
         threshold_list::threshold_list,
@@ -50,7 +51,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         number_u64(&module.poll_interval_ms),
                         text_like(&module.mount_point),
                         text(&module.format),
-                        text(&module.icon_name),
+                        icon(&module.icon_name),
                         threshold_list(&module.thresholds),
                     ],
                 },

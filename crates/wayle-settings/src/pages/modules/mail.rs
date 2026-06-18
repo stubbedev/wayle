@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{text::text, toggle::toggle},
+    editors::{icon::icon, text::text, toggle::toggle},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -45,8 +45,11 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         text(&module.format),
                         text(&module.query),
-                        text(&module.icon_name),
+                        icon(&module.icon_name),
                         toggle(&module.hide_when_zero),
+                        toggle(&module.notify),
+                        text(&module.notify_summary),
+                        text(&module.notify_body),
                     ],
                 },
                 bar_display_section(&fields),

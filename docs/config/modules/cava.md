@@ -37,7 +37,7 @@ right = ["cava"]
 | `button-bg-color` | [`ColorValue`](/config/types#color-value) | `"bg-surface-elevated"` | Module background color. |
 | `bar-width` | u32 | `6` | Width of each frequency bar in pixels. |
 | `bar-gap` | u32 | `1` | Gap between frequency bars in pixels. |
-| `internal-padding` | [`Spacing`](/config/types#spacing) | `0.5` | Padding at the ends of the visualizer. |
+| `internal-padding` | [`Size`](/config/types#size) | `0.5` | Padding at the ends of the visualizer. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
 | `border-show` | bool | `false` | Display border around the visualizer. |
 | `border-color` | [`ColorValue`](/config/types#color-value) | `"border-accent"` | Border color. |
 | `left-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on left click. |

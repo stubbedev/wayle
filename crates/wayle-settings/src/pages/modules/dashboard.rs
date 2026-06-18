@@ -6,6 +6,7 @@ use crate::{
     editors::{
         color_value::color_value,
         enum_list::enum_list,
+        icon::icon,
         number::number_newtype,
         text::{text, text_like},
         toggle::toggle,
@@ -41,7 +42,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
             vec![
                 SectionSpec {
                     title_key: "settings-section-general",
-                    items: vec![text(&module.icon_override)],
+                    items: vec![icon(&module.icon_override)],
                 },
                 SectionSpec {
                     title_key: "settings-section-commands",

@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{enum_select::enum_select, text::text, toggle::toggle},
+    editors::{enum_select::enum_select, icon::icon, text::text, toggle::toggle},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -42,7 +42,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
             vec![
                 SectionSpec {
                     title_key: "settings-section-general",
-                    items: vec![text(&module.format), text(&module.icon_name)],
+                    items: vec![text(&module.format), icon(&module.icon_name)],
                 },
                 SectionSpec {
                     title_key: "settings-section-dropdown",

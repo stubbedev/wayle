@@ -321,7 +321,7 @@ impl Osd {
             )
         };
         let scale = config.styling.scale.get().value();
-        let margin = (margin_spacing.value() * scale) as i32;
+        let margin = margin_spacing.resolve_px(1.0, scale) as i32;
 
         reset_anchors(root);
 

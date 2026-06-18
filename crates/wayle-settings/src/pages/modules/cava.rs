@@ -9,7 +9,8 @@ use crate::{
     editors::{
         color_value::color_value,
         enum_select::enum_select,
-        number::{number_f64, number_newtype, number_u32, spacing},
+        number::{number_f64, number_newtype, number_u32},
+        size::size,
         slider::normalized,
         text::{text, text_like},
         toggle::toggle,
@@ -79,7 +80,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         enum_select(&module.direction),
                         number_u32(&module.bar_width),
                         number_u32(&module.bar_gap),
-                        spacing(&module.internal_padding),
+                        size(&module.internal_padding),
                     ],
                 },
                 SectionSpec {

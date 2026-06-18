@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{number::number_u64, text::text},
+    editors::{icon::icon, number::number_u64, text::text},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -46,7 +46,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         number_u64(&module.poll_interval_ms),
                         text(&module.interface),
                         text(&module.format),
-                        text(&module.icon_name),
+                        icon(&module.icon_name),
                     ],
                 },
                 bar_display_section(&fields),

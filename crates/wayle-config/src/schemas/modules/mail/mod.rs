@@ -40,6 +40,30 @@ pub struct MailConfig {
     #[default(true)]
     pub hide_when_zero: ConfigProperty<bool>,
 
+    /// Fire a desktop notification (via `notify-send`) when the unread count
+    /// rises — i.e. new mail arrives. The module icon is used as the
+    /// notification icon. The single notmuch query means this is not
+    /// per-account; it reports the change in the total match count.
+    #[serde(rename = "notify")]
+    #[default(false)]
+    pub notify: ConfigProperty<bool>,
+
+    /// Notification summary when new mail arrives.
+    ///
+    /// ## Placeholders
+    ///
+    /// - `{{ count }}` - Total messages matching the query
+    /// - `{{ new }}` - How many arrived since the last count
+    #[serde(rename = "notify-summary")]
+    #[default(String::from("New mail"))]
+    pub notify_summary: ConfigProperty<String>,
+
+    /// Notification body when new mail arrives. Same placeholders as
+    /// `notify-summary`.
+    #[serde(rename = "notify-body")]
+    #[default(String::from("{{ new }} new ({{ count }} unread)"))]
+    pub notify_body: ConfigProperty<String>,
+
     /// Module icon.
     #[serde(rename = "icon-name")]
     #[default(String::from("ld-mail-symbolic"))]

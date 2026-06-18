@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{string_list::string_list, text::text},
+    editors::{icon::icon, string_list::string_list},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -43,13 +43,13 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![
-                        text(&module.wifi_disabled_icon),
-                        text(&module.wifi_acquiring_icon),
-                        text(&module.wifi_offline_icon),
-                        text(&module.wifi_connected_icon),
-                        text(&module.wired_connected_icon),
-                        text(&module.wired_acquiring_icon),
-                        text(&module.wired_disconnected_icon),
+                        icon(&module.wifi_disabled_icon),
+                        icon(&module.wifi_acquiring_icon),
+                        icon(&module.wifi_offline_icon),
+                        icon(&module.wifi_connected_icon),
+                        icon(&module.wired_connected_icon),
+                        icon(&module.wired_acquiring_icon),
+                        icon(&module.wired_disconnected_icon),
                         string_list(&module.wifi_signal_icons),
                     ],
                 },

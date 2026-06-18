@@ -4,6 +4,7 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
+        icon::icon,
         number::{number_f64, number_u32},
         text::text,
         toggle::toggle,
@@ -50,8 +51,8 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         text(&module.format),
                         number_u32(&module.temperature),
                         number_u32(&module.gamma),
-                        text(&module.icon_off),
-                        text(&module.icon_on),
+                        icon(&module.icon_off),
+                        icon(&module.icon_on),
                     ],
                 },
                 SectionSpec {

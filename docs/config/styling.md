@@ -15,6 +15,7 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 |---|---|---|---|
 | `scale` | [`ScaleFactor`](/config/types#scale-factor) | `1.01` | Scale multiplier for dropdowns, popovers, and dialogs. |
 | `rounding` | [`RoundingLevel`](/config/types#rounding-level) | `"sm"` | Corner rounding for dropdowns, popovers, and dialogs. |
+| `appearance` | [`Appearance`](/config/types#appearance) | `"auto"` | Light/dark appearance mode. `Auto` follows each provider / the configured palette; `Light`/`Dark` force the mode (static palettes swap to their built-in light/dark variant when one exists). |
 | `theming-monitor` | string | `""` | Monitor whose wallpaper drives color extraction. Empty uses the first available. |
 | `palette_base_theme` | string | `""` | Currently active theme preset name, and/or the base for the palette when the palette has been modified. Persisted backing state for the theme selector; not a labeled setting of its own. |
 
@@ -65,6 +66,7 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 [styling]
 scale = 1.0099999904632568
 rounding = "sm"
+appearance = "auto"
 theme-provider = "wayle"
 theming-monitor = ""
 matugen-scheme = "tonal-spot"

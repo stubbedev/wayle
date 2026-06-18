@@ -24,6 +24,9 @@ right = ["hyprsunset"]
 | `format` | string | `"{{ status }}"` | Format string for the label. |
 | `temperature` | u32 | `5000` | Color temperature in Kelvin when filter is enabled. Range: 1000-20000. |
 | `gamma` | u32 | `100` | Display gamma percentage when filter is enabled. Range: 0-200. |
+| `auto-schedule` | bool | `false` | Automatically enable the filter at night and disable it during the day, based on local sunrise/sunset computed from `latitude`/`longitude`. |
+| `latitude` | f64 | `0` | Latitude for the sunrise/sunset schedule, in decimal degrees (north positive). Range: -90 to 90. Only used when `auto-schedule` is on. |
+| `longitude` | f64 | `0` | Longitude for the sunrise/sunset schedule, in decimal degrees (east positive). Range: -180 to 180. Only used when `auto-schedule` is on. |
 | `icon-off` | string | `"ld-sun-symbolic"` | Icon when filter is disabled (showing normal daylight colors). |
 | `icon-on` | string | `"ld-moon-symbolic"` | Icon when filter is enabled (showing warm night colors). |
 | `border-show` | bool | `false` | Display border around button. |
@@ -46,6 +49,14 @@ right = ["hyprsunset"]
 - `"{{ status }}"` - "On"
 - `"{{ temp }}K {{ gamma }}%"` - "4500K 80%"
 - `"{{ status }} ({{ temp }}K)"` - "On (4500K)"
+
+:::
+
+::: details More about `auto-schedule`
+
+While enabled, the module drives the filter on the solar schedule. A
+manual click toggles an override that lasts until the next sunrise or
+sunset, after which the schedule resumes.
 
 :::
 
@@ -76,6 +87,9 @@ right = ["hyprsunset"]
 format = "{{ status }}"
 temperature = 5000
 gamma = 100
+auto-schedule = false
+latitude = 0.0
+longitude = 0.0
 icon-off = "ld-sun-symbolic"
 icon-on = "ld-moon-symbolic"
 border-show = false

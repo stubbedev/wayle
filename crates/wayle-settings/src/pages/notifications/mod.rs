@@ -5,7 +5,8 @@ use wayle_config::Config;
 use crate::{
     editors::{
         enum_select::enum_select,
-        number::{number_u32, spacing},
+        number::number_u32,
+        size::size,
         string_list::string_list,
         text::text_like,
         toggle::toggle,
@@ -48,9 +49,9 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         text_like(&notif.popup_monitor),
                         enum_select(&notif.popup_layer),
-                        spacing(&notif.popup_margin_x),
-                        spacing(&notif.popup_margin_y),
-                        spacing(&notif.popup_gap),
+                        size(&notif.popup_margin_x),
+                        size(&notif.popup_margin_y),
+                        size(&notif.popup_gap),
                     ],
                 },
                 SectionSpec {

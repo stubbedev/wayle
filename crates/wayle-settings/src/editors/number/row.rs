@@ -1,10 +1,7 @@
 use std::fmt;
 
 use relm4::{gtk::prelude::*, prelude::*};
-use wayle_config::{
-    ConfigProperty,
-    schemas::styling::{ScaleFactor, Spacing},
-};
+use wayle_config::{ConfigProperty, schemas::styling::ScaleFactor};
 use wayle_i18n::t;
 
 use crate::{
@@ -16,37 +13,6 @@ use crate::{
 
 /// Largest `u64` that round-trips through `f64` without precision loss (2^53).
 const U64_SPIN_MAX: f64 = 9_007_199_254_740_992.0;
-
-/// Row with a numeric spin bound to a `Spacing` property, stepping in 0.5 pixel increments up to 500.
-pub(crate) fn spacing(property: &ConfigProperty<Spacing>) -> SettingRowInit {
-    let controller = NumberControl::builder()
-        .launch(NumberInit {
-            property: property.clone(),
-            range_min: Spacing::MIN as f64,
-            range_max: 500.0,
-            step: 0.5,
-            digits: 2,
-            to_f64: |spacing| spacing.value() as f64,
-            from_f64: |value| {
-                let clean = if value.is_finite() { value } else { 0.0 };
-                Spacing::new(clean.clamp(Spacing::MIN as f64, 500.0) as f32)
-            },
-        })
-        .detach();
-
-    let widget = controller.widget().clone();
-
-    SettingRowInit {
-        i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |value| value.value().to_string()),
-        control: widget.upcast(),
-        keepalive: Box::new(controller),
-        full_width: false,
-        dirty_badge: None,
-        behavior: RowBehavior::Setting,
-        unit: Some(String::from("rem")),
-    }
-}
 
 /// Row with an integer spin covering the full `u8` range.
 pub(crate) fn number_u8(property: &ConfigProperty<u8>) -> SettingRowInit {

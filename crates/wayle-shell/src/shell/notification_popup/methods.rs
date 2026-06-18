@@ -185,8 +185,8 @@ impl NotificationPopupHost {
         let notif_config = &config.modules.notifications;
         let position = notif_config.popup_position.get();
         let scale = config.styling.scale.get().value();
-        let mx = (notif_config.popup_margin_x.get().value() * scale) as i32;
-        let my = (notif_config.popup_margin_y.get().value() * scale) as i32;
+        let mx = notif_config.popup_margin_x.get().resolve_px(1.0, scale) as i32;
+        let my = notif_config.popup_margin_y.get().resolve_px(1.0, scale) as i32;
 
         reset_anchors(root);
 

@@ -4,8 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select, number::number_u32_range, slider::percentage, text::text,
-        toggle::toggle,
+        enum_select::enum_select, icon::icon, number::number_u32_range, slider::percentage,
+        text::text, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -84,9 +84,9 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-icons",
                     items: vec![
-                        text(&module.icon_idle),
-                        text(&module.icon_recording),
-                        text(&module.icon_paused),
+                        icon(&module.icon_idle),
+                        icon(&module.icon_recording),
+                        icon(&module.icon_paused),
                     ],
                 },
                 bar_display_section(&fields),

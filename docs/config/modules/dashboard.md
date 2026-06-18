@@ -23,6 +23,12 @@ right = ["dashboard"]
 |---|---|---|---|
 | `icon-override` | string | `""` | Override the auto-detected distro icon. |
 | `border-show` | bool | `false` | Display border around button. |
+| `usage-warning` | f32 | `60` | CPU/RAM/disk usage percent at which the dashboard rings turn warning. |
+| `usage-error` | f32 | `85` | CPU/RAM/disk usage percent at which the dashboard rings turn error. |
+| `temp-warning` | f32 | `65` | CPU temperature (°C) at which the dashboard temp ring turns warning. |
+| `temp-error` | f32 | `85` | CPU temperature (°C) at which the dashboard temp ring turns error. |
+| `battery-warning` | f32 | `30` | Battery percent at or below which the dashboard battery shows warning. |
+| `battery-critical` | f32 | `15` | Battery percent at or below which the dashboard battery shows critical. |
 | `user-session` | [`UserSessionConfig`](/config/types#user-session-config) | `{...}` | User session configuration |
 
 ## Colors
@@ -70,6 +76,12 @@ dropdown-lock-command = "loginctl lock-session"
 dropdown-logout-command = "loginctl terminate-session $XDG_SESSION_ID"
 dropdown-reboot-command = "systemctl reboot"
 dropdown-poweroff-command = "systemctl poweroff"
+usage-warning = 60.0
+usage-error = 85.0
+temp-warning = 65.0
+temp-error = 85.0
+battery-warning = 30.0
+battery-critical = 15.0
 
 [modules.dashboard.user-session]
 actions = [

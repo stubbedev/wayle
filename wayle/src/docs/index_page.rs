@@ -59,7 +59,7 @@ pub fn render_config_index(modules: &[ModuleEntry]) -> String {
 
     page.push_str("## Shared types\n\n");
     page.push_str(
-        "Every named type referenced across the config (`Color`, `ClickAction`, `Spacing`, and others) is documented on the [types page](/config/types).\n",
+        "Every named type referenced across the config (`Color`, `ClickAction`, `Size`, and others) is documented on the [types page](/config/types).\n",
     );
 
     page.push_str("\n</div>\n");

@@ -18,5 +18,5 @@ pub use theme::ThemeEntry;
 pub use threshold::{ThresholdColors, ThresholdEntry, evaluate_thresholds};
 pub use typography::{FontWeightClass, TextSizeClass};
 pub use validated::{
-    HexColor, InvalidHexColor, NormalizedF64, Percentage, ScaleFactor, Size, Spacing,
+    HexColor, InvalidHexColor, NormalizedF64, Percentage, ScaleFactor, Size,
 };

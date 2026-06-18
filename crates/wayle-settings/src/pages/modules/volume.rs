@@ -4,7 +4,7 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select, string_list::string_list, text::text,
+        enum_select::enum_select, icon::icon, string_list::string_list, text::text,
         threshold_list::threshold_list,
     },
     pages::{
@@ -46,7 +46,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![
-                        text(&module.icon_muted),
+                        icon(&module.icon_muted),
                         text(&module.format),
                         string_list(&module.level_icons),
                         threshold_list(&module.thresholds),

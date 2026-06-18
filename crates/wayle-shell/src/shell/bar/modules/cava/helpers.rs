@@ -1,12 +1,17 @@
 use std::sync::Arc;
 
 use wayle_cava::{CavaService, InputMethod};
-use wayle_config::{ConfigService, schemas::modules::CavaInput};
+use wayle_config::{
+    ConfigService,
+    schemas::{modules::CavaInput, styling::Size},
+};
 
 const REM_BASE: f32 = 16.0;
 
-pub(super) fn rem_to_px(rem: f32, scale: f32) -> f64 {
-    f64::from(rem * scale * REM_BASE)
+/// Resolves the visualizer end-padding to pixels: a scale multiplier is taken
+/// as rem (against the 16px base and bar scale), a pixel value is literal.
+pub(super) fn resolve_padding_px(size: Size, scale: f32) -> f64 {
+    f64::from(size.resolve_px(REM_BASE, scale))
 }
 
 pub(super) fn map_input(input: CavaInput) -> InputMethod {

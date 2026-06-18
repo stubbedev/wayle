@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{string_map::string_map, text::text},
+    editors::{icon::icon, string_map::string_map, text::text},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -44,7 +44,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     title_key: "settings-section-general",
                     items: vec![
                         text(&module.format),
-                        text(&module.icon_name),
+                        icon(&module.icon_name),
                         string_map(&module.icon_mappings),
                     ],
                 },

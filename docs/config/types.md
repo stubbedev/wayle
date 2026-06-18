@@ -36,6 +36,24 @@ notifications). Maps onto GTK's revealer transitions.
 | `"swing-left"` | Slide in from / out to the left edge with a rotating swing. |
 | `"swing-right"` | Slide in from / out to the right edge with a rotating swing. |
 
+## AnimationType2 {#animation-type2}
+
+Enter/exit transition style for transient surfaces (OSD, toasts,
+notifications). Maps onto GTK's revealer transitions.
+
+| Value | Meaning |
+|---|---|
+| `"none"` | No transition; surfaces appear and disappear instantly. |
+| `"fade"` | Cross-fade opacity in and out. |
+| `"slide-up"` | Slide in from / out to the top edge. |
+| `"slide-down"` | Slide in from / out to the bottom edge. |
+| `"slide-left"` | Slide in from / out to the left edge. |
+| `"slide-right"` | Slide in from / out to the right edge. |
+| `"swing-up"` | Slide in from / out to the top edge with a rotating swing. |
+| `"swing-down"` | Slide in from / out to the bottom edge with a rotating swing. |
+| `"swing-left"` | Slide in from / out to the left edge with a rotating swing. |
+| `"swing-right"` | Slide in from / out to the right edge with a rotating swing. |
+
 ## AppIconSource {#app-icon-source}
 
 Icon source for app volume entries in the dropdown.
@@ -44,6 +62,21 @@ Icon source for app volume entries in the dropdown.
 |---|---|
 | `"mapped"` | Wayle's curated symbolic icons matched by app name. |
 | `"native"` | Native application icons reported by PulseAudio. |
+
+## Appearance {#appearance}
+
+Light/dark appearance mode.
+
+`Auto` keeps each provider's own light setting and the configured static
+palette as-is. `Light`/`Dark` force the mode: dynamic providers switch their
+light flag, and the static palette swaps to its built-in light/dark variant
+when one exists.
+
+| Value | Meaning |
+|---|---|
+| `"auto"` | Follow each provider's own setting / the configured palette. |
+| `"light"` | Force the light variant. |
+| `"dark"` | Force the dark variant. |
 
 ## BarButtonVariant {#bar-button-variant}
 
@@ -170,7 +203,7 @@ show = false
 
 Bar module name. Built-in modules or custom modules with a `custom-<id>` pattern.
 
-One of: `"battery"`, `"bluetooth"`, `"brightness"`, `"cava"`, `"clock"`, `"cpu"`, `"dashboard"`, `"hyprland-workspaces"`, `"hyprsunset"`, `"idle-inhibit"`, `"keybind-mode"`, `"keyboard-input"`, `"media"`, `"mango-workspaces"`, `"microphone"`, `"netstat"`, `"network"`, `"niri-workspaces"`, `"notifications"`, `"power"`, `"ram"`, `"separator"`, `"storage"`, `"systray"`, `"updates"`, `"volume"`, `"weather"`, `"window-title"`, `"world-clock"`.
+One of: `"battery"`, `"bluetooth"`, `"brightness"`, `"cava"`, `"clock"`, `"cpu"`, `"dashboard"`, `"hyprland-workspaces"`, `"hyprsunset"`, `"idle-inhibit"`, `"keybind-mode"`, `"keyboard-input"`, `"mail"`, `"media"`, `"mango-workspaces"`, `"microphone"`, `"netstat"`, `"network"`, `"niri-workspaces"`, `"notifications"`, `"power"`, `"power-profiles"`, `"ram"`, `"recorder"`, `"separator"`, `"storage"`, `"systray"`, `"updates"`, `"volume"`, `"weather"`, `"window-title"`, `"world-clock"`.
 
 String matching `^custom-[a-z0-9-]+$`.
 
@@ -307,6 +340,30 @@ What identifies a workspace in the UI.
 | `"label"` | Show workspace number or name. |
 | `"icon"` | Show icon from `workspace-map` (falls back to label if unmapped). |
 | `"none"` | Show nothing - only app icons visible. |
+
+## DropdownSize {#dropdown-size}
+
+Size override for a dropdown foldout panel.
+
+Each field is optional: when unset the dropdown keeps its built-in default
+size (scaled by the global scale). A [`Size`] may be a scale multiplier of
+the built-in base (e.g. `1.5`) or an absolute pixel length (e.g. `"480px"`).
+
+| Field | Description |
+|---|---|
+| `width` | Panel width override. Unset uses the built-in default width. |
+| `height` | Panel height override. Unset uses the built-in default height. Has no |
+
+## EncoderPreset {#encoder-preset}
+
+Encoder speed/quality trade-off. Slower presets produce smaller files at
+the same bitrate, using more CPU.
+
+| Value | Meaning |
+|---|---|
+| `"speed"` | Fastest, lowest CPU, largest files. |
+| `"balanced"` | Balanced size and CPU (default). |
+| `"quality"` | Slowest, best compression / smallest files. |
 
 ## ExecutionMode {#execution-mode}
 
@@ -518,6 +575,16 @@ Screen anchor for the OSD overlay.
 | `"bottom-left"` | Bottom-left corner. |
 | `"left"` | Left-center edge. |
 
+## OsdTextAlign {#osd-text-align}
+
+Horizontal alignment of OSD toast/toggle content.
+
+| Value | Meaning |
+|---|---|
+| `"start"` | Align content to the start (left in LTR layouts). |
+| `"center"` | Center content horizontally. |
+| `"end"` | Align content to the end (right in LTR layouts). |
+
 ## PaletteConfig {#palette-config}
 
 Color palette configuration for the active theme.
@@ -580,6 +647,16 @@ Pywal contrast ratio clamped to 1.0-21.0 (WCAG range).
 Number in `[1.0, 21.0]`.
 
 Serialises as `double`.
+
+## RecorderFormat {#recorder-format}
+
+Container format / codec preset for recordings.
+
+| Value | Meaning |
+|---|---|
+| `"mp4"` | H.264 in an MP4 container. |
+| `"mkv"` | H.264 in a Matroska container (resilient to crashes). |
+| `"webm"` | VP9 in a WebM container. |
 
 ## RestartDelay {#restart-delay}
 
@@ -656,14 +733,6 @@ Number `>= 0.0`.
 
 String matching `^[0-9]+(\.[0-9]+)?px$`.
 
-## Spacing {#spacing}
-
-Non-negative spacing value (clamped at 0).
-
-Number `>= 0.0`.
-
-Serialises as `float`.
-
 ## StackingOrder {#stacking-order}
 
 Order in which popups are stacked on screen.
@@ -696,6 +765,18 @@ Storage mount targets accepted by `mount-point`.
 Supports a single string for backwards compatibility or an array of paths.
 
 String.
+
+## SurfaceAnimation {#surface-animation}
+
+Per-surface enter/exit animation override. Any field left unset falls back
+to the global `[animations]` enter/exit, then to `transition`/`duration`.
+
+| Field | Description |
+|---|---|
+| `enter` | Enter transition for this surface. Unset → global `enter`, then `transition`. |
+| `exit` | Exit transition for this surface. Unset → global `exit`, then `transition`. |
+| `enter-duration` | Enter duration in ms. Unset → global `enter-duration`, then `duration`. |
+| `exit-duration` | Exit duration in ms. Unset → global `exit-duration`, then `duration`. |
 
 ## TemperatureUnit {#temperature-unit}
 
@@ -758,6 +839,36 @@ Time display format.
 |---|---|
 | `"12h"` | 12-hour format with AM/PM (e.g., "6:30 AM"). |
 | `"24h"` | 24-hour format (e.g., "06:30"). |
+
+## ToastPreset {#toast-preset}
+
+A reusable toast preset, triggerable by id with `wayle toast --preset <id>`.
+
+A preset captures a toast's text, icon, optional progress bar, duration, and
+CSS class so it can be fired by name. Any field can still be overridden per
+invocation on the command line (or over the widget socket).
+
+### Example
+
+```toml
+[[toasts.presets]]
+id = "saved"
+label = "Saved"
+icon = "ld-check-symbolic"
+duration-ms = 1500
+class = "success"
+
+# Fire it: wayle toast --preset saved
+```
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier. Trigger with `wayle toast --preset <id>`. |
+| `label` | Toast text. An explicit label on the command line overrides this. |
+| `icon` | Symbolic icon name shown beside the text. |
+| `percentage` | Progress percentage (0-100). When set, renders a progress bar instead |
+| `duration-ms` | Auto-dismiss duration in milliseconds. Unset falls back to the toast |
+| `class` | Extra CSS class applied to the toast for custom styling. |
 
 ## TransitionDuration {#transition-duration}
 
@@ -908,6 +1019,17 @@ Weather data provider selection.
 | `"open-meteo"` | Open-Meteo (no API key required). |
 | `"visual-crossing"` | Visual Crossing (requires API key). |
 | `"weather-api"` | WeatherAPI.com (requires API key). |
+
+## WebcamPosition {#webcam-position}
+
+Corner the webcam picture-in-picture frame is anchored to in the recording.
+
+| Value | Meaning |
+|---|---|
+| `"top-left"` | Top-left corner. |
+| `"top-right"` | Top-right corner. |
+| `"bottom-left"` | Bottom-left corner. |
+| `"bottom-right"` | Bottom-right corner. |
 
 ## WeekStart {#week-start}
 
