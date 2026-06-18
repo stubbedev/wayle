@@ -1,0 +1,37 @@
+# CI base image (Arch) — system deps + Rust toolchain baked in so the
+# lint/test/schema job skips `pacman -Syu` and `rustup install` on every run.
+# Built and pushed by .github/workflows/ci-images.yml.
+FROM archlinux:base-devel
+
+# jq: config-schema diff. github-cli: release uploads. mold: fast linker.
+RUN pacman --noconfirm --needed -Syu \
+        git \
+        github-cli \
+        rustup \
+        clang \
+        gtk4 \
+        gtk4-layer-shell \
+        gtksourceview5 \
+        libpulse \
+        fftw \
+        libpipewire \
+        mold \
+        systemd-libs \
+        gstreamer \
+        jq \
+    && pacman -Scc --noconfirm
+
+# Pin toolchain location: GitHub container jobs set HOME=/github/home at
+# runtime, so a default-location ~/.rustup baked here wouldn't be found.
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+# stable for builds/tests/clippy; nightly rustfmt for `cargo +nightly fmt`.
+RUN rustup default stable \
+    && rustup component add clippy \
+    && rustup toolchain install nightly --component rustfmt \
+    && mkdir -p "$RUSTUP_HOME" "$CARGO_HOME" \
+    && chmod -R a+w "$RUSTUP_HOME" "$CARGO_HOME"
+
+LABEL org.opencontainers.image.source=https://github.com/stubbedev/wayle

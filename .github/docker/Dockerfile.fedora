@@ -1,0 +1,38 @@
+# CI base image (Fedora) — system deps + Rust toolchain + mold baked in so the
+# packaging job skips dnf install and toolchain setup on every run.
+# Built and pushed by .github/workflows/ci-images.yml.
+FROM fedora:latest
+
+# mold: fast linker. gh: release uploads. dnf-command(builddep) lets the
+# release job resolve spec BuildRequires (deps themselves are already present).
+RUN dnf -y install \
+        clang \
+        cmake \
+        curl \
+        'dnf-command(builddep)' \
+        fftw-devel \
+        gcc \
+        gh \
+        git \
+        gtk4-devel \
+        gtk4-layer-shell-devel \
+        gtksourceview5-devel \
+        gstreamer1-devel \
+        libxkbcommon-devel \
+        make \
+        mold \
+        pipewire-devel \
+        pkgconf-pkg-config \
+        pulseaudio-libs-devel \
+        rpm-build \
+        systemd-devel \
+    && dnf clean all
+
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --default-toolchain stable --profile minimal \
+    && chmod -R a+w "$RUSTUP_HOME" "$CARGO_HOME"
+
+LABEL org.opencontainers.image.source=https://github.com/stubbedev/wayle

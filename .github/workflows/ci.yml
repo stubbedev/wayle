@@ -37,41 +37,26 @@ jobs:
                         - 'Cargo.*'
                         - '.github/workflows/ci.yml'
 
-    lint:
-        name: Lint
+    # Lint + test + schema share one container so the workspace and its
+    # dependencies compile once into a single target dir, then clippy, the test
+    # build, and `cargo run` reuse those artifacts — instead of three separate
+    # containers each compiling from scratch.
+    check:
+        name: Check (lint + test + schema)
         needs: changes
         if: needs.changes.outputs.code == 'true'
         runs-on: ubuntu-latest
         container:
-            image: archlinux:base-devel
+            image: ghcr.io/stubbedev/wayle/ci-arch:latest
         env:
             RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
-            - name: Install dependencies
-              run: |
-                  pacman --noconfirm --needed -Syu \
-                    git \
-                    rustup \
-                    clang \
-                    gtk4 \
-                    gtk4-layer-shell \
-                    gtksourceview5 \
-                    libpulse \
-                    fftw \
-                    libpipewire \
-                    mold \
-                    systemd-libs \
-                    gstreamer
-
-            - name: Setup Rust
-              run: |
-                  rustup default stable
-                  rustup toolchain install nightly --component rustfmt
-                  rustup component add clippy
-
             - uses: actions/checkout@v6
               with:
                   submodules: recursive
+
+            - name: Fix Git ownership
+              run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
             - uses: Swatinem/rust-cache@v2
 
@@ -84,79 +69,8 @@ jobs:
             - name: Check icons exist
               run: ./scripts/ci/check-icons.sh
 
-    test:
-        name: Test
-        needs: changes
-        if: needs.changes.outputs.code == 'true'
-        runs-on: ubuntu-latest
-        container:
-            image: archlinux:base-devel
-        env:
-            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
-        steps:
-            - name: Install dependencies
-              run: |
-                  pacman --noconfirm --needed -Syu \
-                    git \
-                    rustup \
-                    clang \
-                    gtk4 \
-                    gtk4-layer-shell \
-                    gtksourceview5 \
-                    libpulse \
-                    fftw \
-                    libpipewire \
-                    mold \
-                    systemd-libs \
-                    gstreamer
-
-            - name: Setup Rust
-              run: rustup default stable
-
-            - uses: actions/checkout@v6
-              with:
-                  submodules: recursive
-
-            - uses: Swatinem/rust-cache@v2
-
             - name: Run tests
               run: cargo test --workspace --no-fail-fast
-
-    schema:
-        name: Config schema
-        needs: changes
-        if: needs.changes.outputs.code == 'true'
-        runs-on: ubuntu-latest
-        container:
-            image: archlinux:base-devel
-        env:
-            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
-        steps:
-            - name: Install dependencies
-              run: |
-                  pacman --noconfirm --needed -Syu \
-                    git \
-                    rustup \
-                    clang \
-                    gtk4 \
-                    gtk4-layer-shell \
-                    gtksourceview5 \
-                    libpulse \
-                    fftw \
-                    libpipewire \
-                    mold \
-                    systemd-libs \
-                    gstreamer \
-                    jq
-
-            - name: Setup Rust
-              run: rustup default stable
-
-            - uses: actions/checkout@v6
-              with:
-                  submodules: recursive
-
-            - uses: Swatinem/rust-cache@v2
 
             - name: Check config schema is up to date
               run: |
@@ -173,7 +87,7 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         runs-on: ubuntu-latest
         container:
-            image: ubuntu:latest
+            image: ghcr.io/stubbedev/wayle/ci-ubuntu:latest
         # CI only validates that packaging works; nothing here ships (release
         # artifacts come from release.yml). So build debug — same package
         # layout, far less compile time than --release. Release-only breakage
@@ -181,31 +95,6 @@ jobs:
         env:
             RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
-            - name: Install dependencies
-              run: |
-                  apt-get update
-                  apt-get install -y --no-install-recommends \
-                    build-essential \
-                    ca-certificates \
-                    clang \
-                    cmake \
-                    curl \
-                    debhelper \
-                    desktop-file-utils \
-                    dpkg-dev \
-                    git \
-                    libfftw3-dev \
-                    libgstreamer1.0-dev \
-                    libgtk-4-dev \
-                    libgtk4-layer-shell-dev \
-                    libgtksourceview-5-dev \
-                    libpipewire-0.3-dev \
-                    libpulse-dev \
-                    libudev-dev \
-                    libxkbcommon-dev \
-                    mold \
-                    pkg-config
-
             - name: Checkout repository
               uses: actions/checkout@v6
               with:
@@ -214,10 +103,7 @@ jobs:
             - name: Fix Git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-            - name: Setup Rust
-              uses: actions-rust-lang/setup-rust-toolchain@v1
-              with:
-                  toolchain: stable
+            - uses: Swatinem/rust-cache@v2
 
             - name: Build workspace
               run: cargo build --workspace --locked
@@ -239,33 +125,12 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         runs-on: ubuntu-latest
         container:
-            image: fedora:latest
+            image: ghcr.io/stubbedev/wayle/ci-fedora:latest
         # Debug build — CI validates packaging only, nothing ships here. See
         # the ubuntu job for rationale.
         env:
             RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
-            - name: Install dependencies
-              run: |
-                  dnf -y install \
-                    clang \
-                    cmake \
-                    fftw-devel \
-                    gcc \
-                    git \
-                    gtk4-devel \
-                    gtk4-layer-shell-devel \
-                    gtksourceview5-devel \
-                    gstreamer1-devel \
-                    libxkbcommon-devel \
-                    make \
-                    mold \
-                    pipewire-devel \
-                    pkgconf-pkg-config \
-                    pulseaudio-libs-devel \
-                    rpm-build \
-                    systemd-devel
-
             - name: Checkout repository
               uses: actions/checkout@v6
               with:
@@ -274,20 +139,7 @@ jobs:
             - name: Fix Git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-            - name: Install RPM build dependencies
-              run: |
-                  VERSION=$(sed -n '/\[workspace\.package\]/,/\[/{/^version/p}' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-                  DATE="$(LC_ALL=C date '+%a %b %d %Y')"
-                  sed \
-                    -e "s/@VERSION@/${VERSION}/g" \
-                    -e "s/@DATE@/${DATE}/g" \
-                    packaging/rpm/wayle.spec.in >/tmp/wayle.spec
-                  dnf -y --setopt=install_weak_deps=False builddep /tmp/wayle.spec
-
-            - name: Setup Rust
-              uses: actions-rust-lang/setup-rust-toolchain@v1
-              with:
-                  toolchain: stable
+            - uses: Swatinem/rust-cache@v2
 
             - name: Build workspace
               run: cargo build --workspace --locked
@@ -309,7 +161,7 @@ jobs:
         # Always build + push on master so the cache tracks every commit (a
         # docs/schema-only commit still rebuilds — mostly cache hits, but keeps
         # the binary present). On PRs, only when code changed, and push is
-        # suppressed by pushFilter below.
+        # suppressed because the attic-action step is master-only.
         if: >-
             needs.changes.outputs.code == 'true' ||
             (github.event_name == 'push' && github.ref == 'refs/heads/master')
@@ -328,41 +180,30 @@ jobs:
                       extra-substituters = https://nix.stubbe.dev/wayle
                       extra-trusted-public-keys = wayle:XD2O2h1Mmka+VegRi2JY7ywNbG9al+TUAZp6CObizFU=
 
-            - name: Build package
-              run: nix build '.?submodules=1#wayle' -L --print-out-paths | tee /tmp/wayle-outpaths
-
-            # Push the build closure to the attic cache (nix.stubbe.dev/wayle).
-            # master only — PRs/forks lack the token, they still pull above.
-            - name: Push to attic
+            # Push everything built during this run to the attic cache. The
+            # action installs a cached attic-client (no `nix run` cold eval) and
+            # pushes in a post-job step. master-only: PRs/forks lack the token
+            # and just pull via the substituter above.
+            - name: Setup attic push
               if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-              # Best-effort: a cache-push failure (e.g. a transient 504 from the
-              # single-vCPU cache box on a large closure) must not redden an
-              # otherwise-green build. Retry with backoff, then give up softly.
-              continue-on-error: true
-              env:
-                  ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
-              run: |
-                  nix run nixpkgs#attic-client -- login stubbe https://nix.stubbe.dev "$ATTIC_TOKEN"
-                  for attempt in 1 2 3; do
-                      if nix run nixpkgs#attic-client -- push wayle $(cat /tmp/wayle-outpaths); then
-                          exit 0
-                      fi
-                      echo "::warning::attic push attempt $attempt failed; retrying in $((attempt * 30))s"
-                      sleep $((attempt * 30))
-                  done
-                  echo "::warning::attic push failed after 3 attempts; cache push is best-effort, continuing"
+              uses: ryanccn/attic-action@v0
+              with:
+                  endpoint: https://nix.stubbe.dev
+                  cache: wayle
+                  token: ${{ secrets.ATTIC_TOKEN }}
+
+            - name: Build package
+              run: nix build '.?submodules=1#wayle' -L
 
     ci-status:
         name: CI Status
         if: always()
-        needs: [lint, test, schema, ubuntu, fedora, nix]
+        needs: [check, ubuntu, fedora, nix]
         runs-on: ubuntu-latest
         steps:
             - name: Check results
               run: |
-                  if [[ "${{ needs.lint.result }}" == "failure" || \
-                        "${{ needs.test.result }}" == "failure" || \
-                        "${{ needs.schema.result }}" == "failure" || \
+                  if [[ "${{ needs.check.result }}" == "failure" || \
                         "${{ needs.ubuntu.result }}" == "failure" || \
                         "${{ needs.nix.result }}" == "failure" || \
                         "${{ needs.fedora.result }}" == "failure" ]]; then

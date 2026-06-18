@@ -1,0 +1,41 @@
+# CI base image (Ubuntu) — system deps + Rust toolchain + mold baked in so the
+# packaging job skips apt install and toolchain setup on every run.
+# Built and pushed by .github/workflows/ci-images.yml.
+FROM ubuntu:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# mold: fast linker. gh: release uploads. The rest are build/packaging deps.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        clang \
+        cmake \
+        curl \
+        debhelper \
+        desktop-file-utils \
+        dpkg-dev \
+        gh \
+        git \
+        libfftw3-dev \
+        libgstreamer1.0-dev \
+        libgtk-4-dev \
+        libgtk4-layer-shell-dev \
+        libgtksourceview-5-dev \
+        libpipewire-0.3-dev \
+        libpulse-dev \
+        libudev-dev \
+        libxkbcommon-dev \
+        mold \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --default-toolchain stable --profile minimal \
+    && chmod -R a+w "$RUSTUP_HOME" "$CARGO_HOME"
+
+LABEL org.opencontainers.image.source=https://github.com/stubbedev/wayle

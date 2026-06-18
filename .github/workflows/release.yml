@@ -56,36 +56,21 @@ jobs:
         needs: changelog
         runs-on: ubuntu-latest
         container:
-            image: archlinux:base-devel
+            image: ghcr.io/stubbedev/wayle/ci-arch:latest
         strategy:
             matrix:
                 arch: [x86_64]
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
-            - name: Install dependencies
-              run: |
-                  pacman --noconfirm --needed -Syu \
-                    git \
-                    github-cli \
-                    rustup \
-                    clang \
-                    gtk4 \
-                    gtk4-layer-shell \
-                    gtksourceview5 \
-                    libpulse \
-                    fftw \
-                    libpipewire \
-                    systemd-libs \
-                    gstreamer
-
-            - name: Setup Rust
-              run: rustup default stable
-
             - uses: actions/checkout@v6
               with:
                   submodules: recursive
 
             - name: Fix git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+            - uses: Swatinem/rust-cache@v2
 
             - name: Build release binaries
               run: cargo build --release --locked
@@ -116,11 +101,18 @@ jobs:
               with:
                   extra_nix_config: |
                       experimental-features = nix-command flakes
+                      # Pull from the self-hosted attic cache (same as CI).
+                      extra-substituters = https://nix.stubbe.dev/wayle
+                      extra-trusted-public-keys = wayle:XD2O2h1Mmka+VegRi2JY7ywNbG9al+TUAZp6CObizFU=
 
-            - uses: cachix/cachix-action@v16
+            # Push the release build closure to the attic cache — the single
+            # source of truth for both CI and releases.
+            - name: Setup attic push
+              uses: ryanccn/attic-action@v0
               with:
-                  name: wayle
-                  authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+                  endpoint: https://nix.stubbe.dev
+                  cache: wayle
+                  token: ${{ secrets.ATTIC_TOKEN }}
 
             - name: Build and push release package
               run: nix build '.?submodules=1#wayle' -L
@@ -130,36 +122,13 @@ jobs:
         needs: changelog
         runs-on: ubuntu-latest
         container:
-            image: ubuntu:latest
+            image: ghcr.io/stubbedev/wayle/ci-ubuntu:latest
         strategy:
             matrix:
                 arch: [x86_64]
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
-            - name: Install dependencies
-              run: |
-                  apt-get update
-                  apt-get install -y --no-install-recommends \
-                    build-essential \
-                    ca-certificates \
-                    clang \
-                    cmake \
-                    curl \
-                    debhelper \
-                    desktop-file-utils \
-                    dpkg-dev \
-                    gh \
-                    git \
-                    libfftw3-dev \
-                    libgstreamer1.0-dev \
-                    libgtk-4-dev \
-                    libgtk4-layer-shell-dev \
-                    libgtksourceview-5-dev \
-                    libpipewire-0.3-dev \
-                    libpulse-dev \
-                    libudev-dev \
-                    libxkbcommon-dev \
-                    pkg-config
-
             - name: Checkout repository
               uses: actions/checkout@v6
               with:
@@ -168,10 +137,7 @@ jobs:
             - name: Fix Git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-            - name: Setup Rust
-              uses: actions-rust-lang/setup-rust-toolchain@v1
-              with:
-                  toolchain: stable
+            - uses: Swatinem/rust-cache@v2
 
             - name: Build release binaries
               run: cargo build --release --locked
@@ -197,32 +163,13 @@ jobs:
         needs: changelog
         runs-on: ubuntu-latest
         container:
-            image: fedora:latest
+            image: ghcr.io/stubbedev/wayle/ci-fedora:latest
         strategy:
             matrix:
                 arch: [x86_64]
+        env:
+            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
         steps:
-            - name: Install dependencies
-              run: |
-                  dnf -y install \
-                    clang \
-                    cmake \
-                    fftw-devel \
-                    gcc \
-                    gh \
-                    git \
-                    gtk4-devel \
-                    gtk4-layer-shell-devel \
-                    gtksourceview5-devel \
-                    gstreamer1-devel \
-                    libxkbcommon-devel \
-                    make \
-                    pipewire-devel \
-                    pkgconf-pkg-config \
-                    pulseaudio-libs-devel \
-                    rpm-build \
-                    systemd-devel
-
             - name: Checkout repository
               uses: actions/checkout@v6
               with:
@@ -241,10 +188,7 @@ jobs:
                     packaging/rpm/wayle.spec.in >/tmp/wayle.spec
                   dnf -y --setopt=install_weak_deps=False builddep /tmp/wayle.spec
 
-            - name: Setup Rust
-              uses: actions-rust-lang/setup-rust-toolchain@v1
-              with:
-                  toolchain: stable
+            - uses: Swatinem/rust-cache@v2
 
             - name: Build release binaries
               run: cargo build --release --locked
