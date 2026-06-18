@@ -117,6 +117,21 @@
             GST_PLUGIN_SYSTEM_PATH_1_0 =
               pkgs.lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins;
           };
+        in
+        {
+          inherit default;
+
+          # `nix develop .#css` — same env as the default shell, but with
+          # WAYLE_DEV=1 exported, so any `cargo run` (shell or wayle-settings)
+          # hot-reloads SCSS from crates/wayle-styling/scss/** on save with no
+          # restart. For rapid CSS iteration; `just dev-settings` runs a single
+          # session the same way.
+          css = default.overrideAttrs (old: {
+            WAYLE_DEV = "1";
+            shellHook = (old.shellHook or "") + ''
+              echo "WAYLE_DEV=1 — SCSS hot-reload on. Edit crates/wayle-styling/scss/**, then: cargo run --bin wayle-settings"
+            '';
+          });
         }
       );
     };

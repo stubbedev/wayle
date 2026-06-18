@@ -64,7 +64,13 @@ jobs:
             - name: Fix Git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+            # Save the cargo cache only on master; PRs restore it but don't
+            # write their own. Per-PR rust caches share the same hard 10 GiB
+            # repo cache budget as the nix /nix/store cache, and evicting that
+            # nix cache is what forced wayle-deps to recompile every run.
             - uses: Swatinem/rust-cache@v2
+              with:
+                  save-if: ${{ github.ref == 'refs/heads/master' }}
 
             - name: Check formatting
               run: cargo +nightly fmt --all --check
@@ -109,7 +115,13 @@ jobs:
             - name: Fix Git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+            # Save the cargo cache only on master; PRs restore it but don't
+            # write their own. Per-PR rust caches share the same hard 10 GiB
+            # repo cache budget as the nix /nix/store cache, and evicting that
+            # nix cache is what forced wayle-deps to recompile every run.
             - uses: Swatinem/rust-cache@v2
+              with:
+                  save-if: ${{ github.ref == 'refs/heads/master' }}
 
             - name: Build workspace
               run: cargo build --workspace --locked
@@ -145,7 +157,13 @@ jobs:
             - name: Fix Git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+            # Save the cargo cache only on master; PRs restore it but don't
+            # write their own. Per-PR rust caches share the same hard 10 GiB
+            # repo cache budget as the nix /nix/store cache, and evicting that
+            # nix cache is what forced wayle-deps to recompile every run.
             - uses: Swatinem/rust-cache@v2
+              with:
+                  save-if: ${{ github.ref == 'refs/heads/master' }}
 
             - name: Build workspace
               run: cargo build --workspace --locked
@@ -188,28 +206,31 @@ jobs:
                       extra-substituters = https://nix.stubbe.dev/wayle
                       extra-trusted-public-keys = wayle:XD2O2h1Mmka+VegRi2JY7ywNbG9al+TUAZp6CObizFU=
 
-            # Cache /nix/store across runs via the GitHub Actions cache. This is
-            # the reliable path for CI-to-CI reuse of the big `wayle-deps`
-            # derivation: the attic box (single vCPU) 504s ingesting its ~700 MiB
-            # NAR, so attic push is best-effort. GH cache handles large blobs
-            # (chunked) and restores wayle-deps so deps never recompile. Keyed on
-            # the lockfiles + nix expr — the only inputs to wayle-deps.
-            - uses: nix-community/cache-nix-action@v7
+            # Restore /nix/store from the GitHub Actions cache so the big
+            # `wayle-deps` derivation (591 crates, ~30 min) is reused instead of
+            # recompiled. Keyed on the lockfiles + nix expr — the only inputs to
+            # wayle-deps. Runs on every event; PRs restore master's cache.
+            #
+            # SAVE is split out below and gated to master pushes. Previously the
+            # combined action also saved on PRs, and each PR's branch-scoped
+            # ~3.2 GiB /nix/store cache counted against GitHub's hard 10 GiB
+            # per-repo cache budget. With the four Swatinem rust caches also in
+            # that budget, every save evicted the master nix cache by LRU — so
+            # the next nix run restored nothing and recompiled wayle-deps from
+            # scratch (~30 min) on *every* push, lockfile change or not.
+            - name: Restore Nix store cache
+              uses: nix-community/cache-nix-action/restore@v7
               with:
                   primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', 'nix/package.nix') }}
                   restore-prefixes-first-match: nix-${{ runner.os }}-
-                  purge: true
-                  purge-prefixes: nix-${{ runner.os }}-
-                  purge-created: 0
-                  purge-primary-key: never
 
             # Push everything built during this run to the attic cache. The
             # action installs a cached attic-client (no `nix run` cold eval) and
             # pushes in a post-job step. Runs on master pushes and same-repo PRs
             # (both have the token) so PR-built deps are in attic before merge.
             # Fork PRs lack the secret and just pull via the substituter above.
-            # Best-effort: large-path 504s don't fail the job (the GH cache
-            # above is the reliable cross-run reuse path).
+            # Best-effort: large-path 504s don't fail the job. The master-only
+            # GH /nix/store cache above is the primary cross-run reuse path.
             - name: Setup attic push
               if: >-
                   github.event_name == 'push' ||
@@ -225,6 +246,23 @@ jobs:
               # (the system extra_nix_config above sets it too, but this trusts
               # the flake's own setting and silences the untrusted-config warning).
               run: nix build '.?submodules=1#wayle' -L --accept-flake-config
+
+            # Save /nix/store ONLY on master pushes — never on PRs. One master
+            # nix cache fits comfortably under the 10 GiB budget; per-PR copies
+            # do not, and evicting the master cache is what forced the deps
+            # rebuild. purge drops stale nix-${os}-* keys (e.g. from an old
+            # Cargo.lock) so the budget keeps shrinking instead of growing. Saves
+            # only when the exact key is absent, so a no-op restore-hit run skips
+            # re-uploading 3.2 GiB.
+            - name: Save Nix store cache
+              if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+              uses: nix-community/cache-nix-action/save@v7
+              with:
+                  primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', 'nix/package.nix') }}
+                  purge: true
+                  purge-prefixes: nix-${{ runner.os }}-
+                  purge-created: 0
+                  purge-primary-key: never
 
     ci-status:
         name: CI Status
