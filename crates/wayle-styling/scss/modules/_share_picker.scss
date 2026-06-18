@@ -39,6 +39,10 @@
                     background var(--duration-fast),
                     color var(--duration-fast);
 
+                &:not(:last-child) {
+                    margin-right: var(--space-sm);
+                }
+
                 &:hover {
                     background: var(--bg-hover);
                 }
