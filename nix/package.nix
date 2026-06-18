@@ -59,6 +59,12 @@ let
     version = cargoToml.workspace.package.version;
     strictDeps = true;
 
+    # CI's `test` job covers the suite. Skipping checks here applies to BOTH
+    # the deps layer and the final build, so the cached `wayle-deps` derivation
+    # doesn't compile + run unit tests — saves ~4.5 min and shrinks the artifact
+    # pushed to the binary cache.
+    doCheck = false;
+
     nativeBuildInputs = [
       pkg-config
       cmake
@@ -89,16 +95,13 @@ let
     env.LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
   };
 
-  # The cached dependency layer. Built once per Cargo.lock; pushed to cachix.
+  # The cached dependency layer. Built once per Cargo.lock; pushed to attic.
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 in
 craneLib.buildPackage (
   commonArgs
   // {
     inherit cargoArtifacts;
-
-    # CI's `test` job covers the suite; skip it here so `nix build` only builds.
-    doCheck = false;
 
     # GTK app wrapping is only needed for the final binary, not the deps layer.
     nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ wrapGAppsHook4 ];

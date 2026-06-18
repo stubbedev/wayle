@@ -105,6 +105,14 @@ jobs:
                       extra-substituters = https://nix.stubbe.dev/wayle
                       extra-trusted-public-keys = wayle:XD2O2h1Mmka+VegRi2JY7ywNbG9al+TUAZp6CObizFU=
 
+            # Restore /nix/store from the GitHub Actions cache (shared with the
+            # CI nix job via the lockfile key) so a tag build reuses the cached
+            # wayle-deps instead of recompiling. See ci.yml for rationale.
+            - uses: nix-community/cache-nix-action@v7
+              with:
+                  primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', 'nix/package.nix') }}
+                  restore-prefixes-first-match: nix-${{ runner.os }}-
+
             # Push the release build closure to the attic cache — the single
             # source of truth for both CI and releases.
             - name: Setup attic push

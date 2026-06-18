@@ -180,10 +180,26 @@ jobs:
                       extra-substituters = https://nix.stubbe.dev/wayle
                       extra-trusted-public-keys = wayle:XD2O2h1Mmka+VegRi2JY7ywNbG9al+TUAZp6CObizFU=
 
+            # Cache /nix/store across runs via the GitHub Actions cache. This is
+            # the reliable path for CI-to-CI reuse of the big `wayle-deps`
+            # derivation: the attic box (single vCPU) 504s ingesting its ~700 MiB
+            # NAR, so attic push is best-effort. GH cache handles large blobs
+            # (chunked) and restores wayle-deps so deps never recompile. Keyed on
+            # the lockfiles + nix expr — the only inputs to wayle-deps.
+            - uses: nix-community/cache-nix-action@v7
+              with:
+                  primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', 'nix/package.nix') }}
+                  restore-prefixes-first-match: nix-${{ runner.os }}-
+                  purge: true
+                  purge-prefixes: nix-${{ runner.os }}-
+                  purge-created: 0
+                  purge-primary-key: never
+
             # Push everything built during this run to the attic cache. The
             # action installs a cached attic-client (no `nix run` cold eval) and
             # pushes in a post-job step. master-only: PRs/forks lack the token
-            # and just pull via the substituter above.
+            # and just pull via the substituter above. Best-effort: large-path
+            # 504s don't fail the job (GH cache above is the reliable reuse).
             - name: Setup attic push
               if: github.event_name == 'push' && github.ref == 'refs/heads/master'
               uses: ryanccn/attic-action@v0
