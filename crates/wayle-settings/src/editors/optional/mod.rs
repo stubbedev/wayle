@@ -11,16 +11,21 @@
 
 use std::rc::Rc;
 
-use relm4::gtk::{self, glib::SignalHandlerId, prelude::*};
+use relm4::{
+    Component, ComponentController,
+    gtk::{self, glib::SignalHandlerId, prelude::*},
+};
 use serde::{
     Deserialize,
     de::value::{Error as SerdeValueError, StrDeserializer},
 };
-use wayle_config::{ConfigProperty, EnumVariant, EnumVariants};
+use wayle_config::{ConfigProperty, EnumVariant, EnumVariants, schemas::styling::ColorValue};
 use wayle_i18n::t;
 
 use crate::{
-    editors::spawn_property_watcher, pages::spec::SettingRowInit, property_handle::PropertyHandle,
+    editors::{color_value::ColorValueControl, spawn_property_watcher},
+    pages::spec::SettingRowInit,
+    property_handle::PropertyHandle,
     row::RowBehavior,
 };
 
@@ -293,5 +298,243 @@ where
             .trim_matches('"')
             .to_owned(),
         None => t("settings-inherit"),
+    }
+}
+
+/// Builds an *Inherit* checkbox + spin button for an `Option<f64>` field.
+pub(crate) fn optional_number_f64_widget(
+    get: Rc<dyn Fn() -> Option<f64>>,
+    set: Rc<dyn Fn(Option<f64>)>,
+    min: f64,
+    max: f64,
+    step: f64,
+    digits: u32,
+    fallback: f64,
+) -> OptionalWidget {
+    let container = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(8)
+        .valign(gtk::Align::Center)
+        .build();
+
+    let inherit = gtk::CheckButton::with_label(&t("settings-inherit"));
+    inherit.set_valign(gtk::Align::Center);
+
+    let adjustment = gtk::Adjustment::new(fallback, min, max, step, step, 0.0);
+    let spin = gtk::SpinButton::builder()
+        .adjustment(&adjustment)
+        .digits(digits)
+        .valign(gtk::Align::Center)
+        .build();
+
+    let initial = get();
+    inherit.set_active(initial.is_none());
+    spin.set_sensitive(initial.is_some());
+    if let Some(value) = initial {
+        spin.set_value(value);
+    }
+
+    container.append(&inherit);
+    container.append(&spin);
+
+    let toggle_set = Rc::clone(&set);
+    let toggle_spin = spin.clone();
+    let inherit_handler = inherit.connect_toggled(move |inherit| {
+        let inherited = inherit.is_active();
+        toggle_spin.set_sensitive(!inherited);
+        if inherited {
+            toggle_set(None);
+        } else {
+            toggle_set(Some(toggle_spin.value()));
+        }
+    });
+    let inherit_handler = Rc::new(inherit_handler);
+
+    let spin_set = Rc::clone(&set);
+    let spin_inherit = inherit.clone();
+    let spin_handler = spin.connect_value_changed(move |spin| {
+        if !spin_inherit.is_active() {
+            spin_set(Some(spin.value()));
+        }
+    });
+    let spin_handler = Rc::new(spin_handler);
+
+    let refresh_inherit = inherit.clone();
+    let refresh_spin = spin.clone();
+    let refresh_inherit_handler = Rc::clone(&inherit_handler);
+    let refresh_spin_handler = Rc::clone(&spin_handler);
+    let refresh: Rc<dyn Fn()> = Rc::new(move || {
+        let value = get();
+        refresh_inherit.block_signal(&refresh_inherit_handler);
+        refresh_spin.block_signal(&refresh_spin_handler);
+        refresh_inherit.set_active(value.is_none());
+        refresh_spin.set_sensitive(value.is_some());
+        if let Some(value) = value {
+            refresh_spin.set_value(value);
+        }
+        refresh_spin.unblock_signal(&refresh_spin_handler);
+        refresh_inherit.unblock_signal(&refresh_inherit_handler);
+    });
+
+    OptionalWidget {
+        widget: container.upcast(),
+        refresh,
+    }
+}
+
+/// Builds a text entry for an `Option<String>` field. An empty entry means
+/// *unset* (`None`); any text means `Some(text)`.
+pub(crate) fn optional_text_widget(
+    get: Rc<dyn Fn() -> Option<String>>,
+    set: Rc<dyn Fn(Option<String>)>,
+    placeholder: &str,
+) -> OptionalWidget {
+    let entry = gtk::Entry::builder()
+        .text(get().unwrap_or_default())
+        .placeholder_text(placeholder)
+        .hexpand(true)
+        .build();
+
+    let change_set = Rc::clone(&set);
+    let handler = entry.connect_changed(move |entry| {
+        let text = entry.text().to_string();
+        change_set(if text.is_empty() { None } else { Some(text) });
+    });
+    let handler = Rc::new(handler);
+
+    let refresh_entry = entry.clone();
+    let refresh_handler = Rc::clone(&handler);
+    let refresh: Rc<dyn Fn()> = Rc::new(move || {
+        let value = get().unwrap_or_default();
+        if refresh_entry.text() != value.as_str() {
+            refresh_entry.block_signal(&refresh_handler);
+            refresh_entry.set_text(&value);
+            refresh_entry.unblock_signal(&refresh_handler);
+        }
+    });
+
+    OptionalWidget {
+        widget: entry.upcast(),
+        refresh,
+    }
+}
+
+/// Builds an *Inherit* checkbox + the full ColorValue editor for an
+/// `Option<ColorValue>` field. The ColorValue editor is reused unchanged by
+/// driving it through a scratch property mirrored back to the field.
+pub(crate) fn optional_color_widget(
+    get: Rc<dyn Fn() -> Option<ColorValue>>,
+    set: Rc<dyn Fn(Option<ColorValue>)>,
+) -> OptionalWidget {
+    let container = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(8)
+        .valign(gtk::Align::Center)
+        .build();
+
+    let inherit = gtk::CheckButton::with_label(&t("settings-inherit"));
+    inherit.set_valign(gtk::Align::Center);
+
+    let scratch = ConfigProperty::new(get().unwrap_or(ColorValue::Auto));
+    let controller = ColorValueControl::builder()
+        .launch(scratch.clone())
+        .detach();
+    let color_widget = controller.widget().clone();
+
+    let initial = get();
+    inherit.set_active(initial.is_none());
+    color_widget.set_sensitive(initial.is_some());
+
+    container.append(&inherit);
+    container.append(&color_widget);
+
+    let toggle_set = Rc::clone(&set);
+    let toggle_scratch = scratch.clone();
+    let toggle_widget = color_widget.clone();
+    let inherit_handler = inherit.connect_toggled(move |inherit| {
+        let inherited = inherit.is_active();
+        toggle_widget.set_sensitive(!inherited);
+        if inherited {
+            toggle_set(None);
+        } else {
+            toggle_set(Some(toggle_scratch.get()));
+        }
+    });
+    let inherit_handler = Rc::new(inherit_handler);
+
+    // Scratch edits (made through the ColorValue component) flow to the field
+    // while not inherited.
+    let scratch_set = Rc::clone(&set);
+    let scratch_inherit = inherit.clone();
+    let scratch_for_watch = scratch.clone();
+    let scratch_watcher = spawn_property_watcher(&scratch, move || {
+        if !scratch_inherit.is_active() {
+            scratch_set(Some(scratch_for_watch.get()));
+        }
+        true
+    });
+
+    let refresh_inherit = inherit.clone();
+    let refresh_widget = color_widget.clone();
+    let refresh_scratch = scratch.clone();
+    let refresh_inherit_handler = Rc::clone(&inherit_handler);
+    // Keep the component + scratch watcher alive for the widget's lifetime.
+    let keep = (controller, scratch_watcher);
+    let refresh: Rc<dyn Fn()> = Rc::new(move || {
+        let _ = &keep;
+        let value = get();
+        refresh_inherit.block_signal(&refresh_inherit_handler);
+        match value {
+            Some(color) => {
+                refresh_inherit.set_active(false);
+                refresh_widget.set_sensitive(true);
+                if refresh_scratch.get() != color {
+                    refresh_scratch.set(color);
+                }
+            }
+            None => {
+                refresh_inherit.set_active(true);
+                refresh_widget.set_sensitive(false);
+            }
+        }
+        refresh_inherit.unblock_signal(&refresh_inherit_handler);
+    });
+
+    OptionalWidget {
+        widget: container.upcast(),
+        refresh,
+    }
+}
+
+/// Row with a text entry for a top-level `Option<String>` property.
+pub(crate) fn text_optional(
+    property: &ConfigProperty<Option<String>>,
+    placeholder: &str,
+) -> SettingRowInit {
+    let get_prop = property.clone();
+    let set_prop = property.clone();
+    let widget = optional_text_widget(
+        Rc::new(move || get_prop.get()),
+        Rc::new(move |value| set_prop.set(value)),
+        placeholder,
+    );
+
+    let control = widget.widget.clone();
+    let refresh = Rc::new(widget);
+    let watcher_refresh = Rc::clone(&refresh);
+    let watcher = spawn_property_watcher(property, move || {
+        watcher_refresh.refresh();
+        true
+    });
+
+    SettingRowInit {
+        i18n_key: property.i18n_key(),
+        handle: PropertyHandle::new(property, |value| value.clone().unwrap_or_default()),
+        control,
+        keepalive: Box::new((refresh, watcher)),
+        full_width: false,
+        dirty_badge: None,
+        behavior: RowBehavior::Setting,
+        unit: None,
     }
 }

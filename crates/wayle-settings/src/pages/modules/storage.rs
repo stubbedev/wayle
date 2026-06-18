@@ -6,7 +6,7 @@ use crate::{
     editors::{
         number::number_u64,
         text::{text, text_like},
-        toml_editor::toml_editor,
+        threshold_list::threshold_list,
     },
     pages::{
         nav::LeafEntry,
@@ -51,7 +51,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         text_like(&module.mount_point),
                         text(&module.format),
                         text(&module.icon_name),
-                        toml_editor(&module.thresholds, "thresholds", &config.styling.palette.bg),
+                        threshold_list(&module.thresholds),
                     ],
                 },
                 bar_display_section(&fields),

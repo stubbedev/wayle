@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{text::text, toml_editor::toml_editor},
+    editors::{text::text, threshold_list::threshold_list},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -46,7 +46,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         text(&module.icon_name),
                         text(&module.icon_unread),
                         text(&module.icon_dnd),
-                        toml_editor(&module.thresholds, "thresholds", &config.styling.palette.bg),
+                        threshold_list(&module.thresholds),
                     ],
                 },
                 bar_display_section(&fields),

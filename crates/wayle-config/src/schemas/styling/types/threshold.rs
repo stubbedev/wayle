@@ -27,7 +27,7 @@ use super::color::ColorValue;
 /// icon-color = "status-error"
 /// label-color = "status-error"
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ThresholdEntry {
     /// Activate when metric value >= this threshold.
     #[serde(default)]

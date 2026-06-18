@@ -17,6 +17,7 @@ pub(crate) mod string_map;
 pub(crate) mod surface_animation;
 pub(crate) mod text;
 pub(crate) mod theme_selector;
+pub(crate) mod threshold_list;
 pub(crate) mod toggle;
 pub(crate) mod toml_editor;
 
