@@ -4,7 +4,11 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select, number::number_u32, toggle::toggle, toml_editor::toml_editor,
+        enum_select::enum_select,
+        number::number_u32,
+        optional::{enum_select_optional, number_u32_optional},
+        surface_animation::surface_animation,
+        toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -12,20 +16,15 @@ use crate::{
     },
 };
 
+/// Upper bound (ms) for the optional enter/exit duration spins.
+const MAX_DURATION_MS: u32 = 100_000;
+/// Step (ms) for duration spins.
+const DURATION_STEP_MS: u32 = 10;
+/// Spin value shown when a duration leaves the inherited state.
+const DURATION_FALLBACK_MS: u32 = 200;
+
 pub(crate) fn entry(config: &Config) -> LeafEntry {
     let anim = &config.animations;
-    let bg = &config.styling.palette.bg;
-
-    // Per-surface overrides are stored as whole structs, so they are edited as
-    // TOML rather than field-by-field controls.
-    let mut notifications = toml_editor(&anim.notifications, "notifications", bg);
-    notifications.i18n_key = Some("settings-animations-notifications");
-    let mut osd = toml_editor(&anim.osd, "osd", bg);
-    osd.i18n_key = Some("settings-animations-osd");
-    let mut toast = toml_editor(&anim.toast, "toast", bg);
-    toast.i18n_key = Some("settings-animations-toast");
-    let mut dropdown = toml_editor(&anim.dropdown, "dropdown", bg);
-    dropdown.i18n_key = Some("settings-animations-dropdown");
 
     LeafEntry {
         id: "animations",
@@ -43,6 +42,27 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     ],
                 },
                 SectionSpec {
+                    title_key: "settings-section-direction",
+                    items: vec![
+                        enum_select_optional(&anim.enter),
+                        enum_select_optional(&anim.exit),
+                        number_u32_optional(
+                            &anim.enter_duration,
+                            0,
+                            MAX_DURATION_MS,
+                            DURATION_STEP_MS,
+                            DURATION_FALLBACK_MS,
+                        ),
+                        number_u32_optional(
+                            &anim.exit_duration,
+                            0,
+                            MAX_DURATION_MS,
+                            DURATION_STEP_MS,
+                            DURATION_FALLBACK_MS,
+                        ),
+                    ],
+                },
+                SectionSpec {
                     title_key: "settings-section-speed",
                     items: vec![
                         number_u32(&anim.ui_duration),
@@ -52,7 +72,12 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 },
                 SectionSpec {
                     title_key: "settings-section-overrides",
-                    items: vec![notifications, osd, toast, dropdown],
+                    items: vec![
+                        surface_animation(&anim.notifications, "settings-animations-notifications"),
+                        surface_animation(&anim.osd, "settings-animations-osd"),
+                        surface_animation(&anim.toast, "settings-animations-toast"),
+                        surface_animation(&anim.dropdown, "settings-animations-dropdown"),
+                    ],
                 },
             ],
         ),

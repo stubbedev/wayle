@@ -19,6 +19,14 @@ pub enum AnimationType {
     SlideLeft,
     /// Slide in from / out to the right edge.
     SlideRight,
+    /// Slide in from / out to the top edge with a rotating swing.
+    SwingUp,
+    /// Slide in from / out to the bottom edge with a rotating swing.
+    SwingDown,
+    /// Slide in from / out to the left edge with a rotating swing.
+    SwingLeft,
+    /// Slide in from / out to the right edge with a rotating swing.
+    SwingRight,
 }
 
 /// Per-surface enter/exit animation override. Any field left unset falls back

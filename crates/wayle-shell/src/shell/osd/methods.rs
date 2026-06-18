@@ -422,6 +422,10 @@ fn revealer_transition(anim: AnimationType) -> gtk::RevealerTransitionType {
         AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
         AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
         AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
+        AnimationType::SwingUp => gtk::RevealerTransitionType::SwingUp,
+        AnimationType::SwingDown => gtk::RevealerTransitionType::SwingDown,
+        AnimationType::SwingLeft => gtk::RevealerTransitionType::SwingLeft,
+        AnimationType::SwingRight => gtk::RevealerTransitionType::SwingRight,
     }
 }
 

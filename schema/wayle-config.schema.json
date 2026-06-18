@@ -47,6 +47,26 @@
           "const": "slide-right",
           "description": "Slide in from / out to the right edge.",
           "type": "string"
+        },
+        {
+          "const": "swing-up",
+          "description": "Slide in from / out to the top edge with a rotating swing.",
+          "type": "string"
+        },
+        {
+          "const": "swing-down",
+          "description": "Slide in from / out to the bottom edge with a rotating swing.",
+          "type": "string"
+        },
+        {
+          "const": "swing-left",
+          "description": "Slide in from / out to the left edge with a rotating swing.",
+          "type": "string"
+        },
+        {
+          "const": "swing-right",
+          "description": "Slide in from / out to the right edge with a rotating swing.",
+          "type": "string"
         }
       ]
     },
@@ -81,6 +101,26 @@
         {
           "const": "slide-right",
           "description": "Slide in from / out to the right edge.",
+          "type": "string"
+        },
+        {
+          "const": "swing-up",
+          "description": "Slide in from / out to the top edge with a rotating swing.",
+          "type": "string"
+        },
+        {
+          "const": "swing-down",
+          "description": "Slide in from / out to the bottom edge with a rotating swing.",
+          "type": "string"
+        },
+        {
+          "const": "swing-left",
+          "description": "Slide in from / out to the left edge with a rotating swing.",
+          "type": "string"
+        },
+        {
+          "const": "swing-right",
+          "description": "Slide in from / out to the right edge with a rotating swing.",
           "type": "string"
         }
       ]

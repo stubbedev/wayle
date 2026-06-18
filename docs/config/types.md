@@ -31,6 +31,10 @@ notifications). Maps onto GTK's revealer transitions.
 | `"slide-down"` | Slide in from / out to the bottom edge. |
 | `"slide-left"` | Slide in from / out to the left edge. |
 | `"slide-right"` | Slide in from / out to the right edge. |
+| `"swing-up"` | Slide in from / out to the top edge with a rotating swing. |
+| `"swing-down"` | Slide in from / out to the bottom edge with a rotating swing. |
+| `"swing-left"` | Slide in from / out to the left edge with a rotating swing. |
+| `"swing-right"` | Slide in from / out to the right edge with a rotating swing. |
 
 ## AppIconSource {#app-icon-source}
 

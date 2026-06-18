@@ -117,6 +117,10 @@ impl NotificationPopupHost {
             AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
             AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
             AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
+            AnimationType::SwingUp => gtk::RevealerTransitionType::SwingUp,
+            AnimationType::SwingDown => gtk::RevealerTransitionType::SwingDown,
+            AnimationType::SwingLeft => gtk::RevealerTransitionType::SwingLeft,
+            AnimationType::SwingRight => gtk::RevealerTransitionType::SwingRight,
         };
         (
             animations.duration_for(AnimSurface::Notifications, exiting),

@@ -1,0 +1,22 @@
+// Per-surface animation override: a stack of label + inherit-aware control
+// rows shown full-width beneath the setting label.
+.surface-animation {
+    background: var(--bg-elevated);
+    border-radius: var(--rounding-element);
+
+    .surface-animation-row {
+        min-height: calc(2.25rem * var(--global-scale));
+        padding: var(--space-xs) var(--space-sm);
+        border-spacing: var(--space-sm);
+
+        & + .surface-animation-row {
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .surface-animation-label {
+            font-size: var(--text-md);
+            font-weight: var(--weight-medium);
+            color: var(--fg-default);
+        }
+    }
+}

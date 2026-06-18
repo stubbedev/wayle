@@ -48,3 +48,7 @@ enum-animation-type-slide-up = Slide Up
 enum-animation-type-slide-down = Slide Down
 enum-animation-type-slide-left = Slide Left
 enum-animation-type-slide-right = Slide Right
+enum-animation-type-swing-up = Swing Up
+enum-animation-type-swing-down = Swing Down
+enum-animation-type-swing-left = Swing Left
+enum-animation-type-swing-right = Swing Right
