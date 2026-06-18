@@ -75,8 +75,6 @@
             fftw
             systemd # provides libudev
           ]) ++ gstPlugins;
-        in
-        {
           # `nix develop` provides every native dependency `cargo build`,
           # `just check`, and the `release-*` recipes need. The Rust toolchain
           # is intentionally NOT pinned here — Cargo.toml's rust-version is ahead
