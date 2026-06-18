@@ -4,6 +4,7 @@
   pkg-config,
   cmake,
   clang,
+  mold,
   wrapGAppsHook4,
   llvmPackages,
   gtk4,
@@ -69,6 +70,7 @@ let
       pkg-config
       cmake
       clang
+      mold
     ];
 
     buildInputs = [
@@ -93,6 +95,11 @@ let
     # former wayle-services repo), and its `vendored` feature compiles the
     # bundled C sources under crates/wayle-cava/cava.
     env.LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
+
+    # Link with mold via clang (matches the devShell). Linking 30 crates + GTK
+    # with the default bfd linker is a chunk of the final-crate build time; mold
+    # cuts it. Applies to both the deps layer and the final build.
+    env.RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=mold";
   };
 
   # The cached dependency layer. Built once per Cargo.lock; pushed to attic.
