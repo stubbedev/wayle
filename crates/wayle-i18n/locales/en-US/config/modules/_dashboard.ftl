@@ -64,3 +64,9 @@ settings-modules-dashboard-battery-critical = Battery Critical
 
 settings-modules-dashboard-user-session-actions = Session Actions
     .description = Session actions shown in the dashboard (lock, log-out, reboot, power-off)
+
+## SessionAction variants
+enum-session-action-lock = Lock
+enum-session-action-logout = Log Out
+enum-session-action-reboot = Reboot
+enum-session-action-power-off = Power Off

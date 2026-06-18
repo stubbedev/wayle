@@ -9,7 +9,7 @@ use relm4::{
     gtk::{glib, prelude::*},
     prelude::*,
 };
-pub(crate) use row::{toml_editor, toml_editor_sized};
+pub(crate) use row::toml_editor_sized;
 use serde::{Deserialize, Serialize};
 use sourceview5::prelude::*;
 use wayle_config::{ConfigProperty, schemas::styling::HexColor};

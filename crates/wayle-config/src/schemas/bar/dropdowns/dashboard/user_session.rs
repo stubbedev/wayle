@@ -2,7 +2,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// One action the dashboard session actions
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Serialize, Deserialize, JsonSchema, wayle_derive::EnumVariants,
+)]
 pub enum SessionAction {
     /// Lock the session
     #[serde(rename = "lock")]

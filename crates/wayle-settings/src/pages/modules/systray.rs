@@ -5,7 +5,7 @@ use wayle_config::Config;
 use crate::{
     editors::{
         color_value::color_value, string_list::string_list, text::text_like, toggle::toggle,
-        toml_editor::toml_editor,
+        tray_override_list::tray_override_list,
     },
     pages::{
         nav::LeafEntry,
@@ -30,7 +30,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         text_like(&module.item_gap),
                         text_like(&module.internal_padding),
                         string_list(&module.blacklist),
-                        toml_editor(&module.overrides, "overrides", &config.styling.palette.bg),
+                        tray_override_list(&module.overrides),
                     ],
                 },
                 SectionSpec {

@@ -5,6 +5,8 @@
 pub(crate) mod bar_layout;
 pub(crate) mod color;
 pub(crate) mod color_value;
+pub(crate) mod dropdown_size;
+pub(crate) mod enum_list;
 pub(crate) mod enum_select;
 pub(crate) mod file_picker;
 pub(crate) mod font;
@@ -18,8 +20,11 @@ pub(crate) mod surface_animation;
 pub(crate) mod text;
 pub(crate) mod theme_selector;
 pub(crate) mod threshold_list;
+pub(crate) mod toast_preset_list;
 pub(crate) mod toggle;
 pub(crate) mod toml_editor;
+pub(crate) mod tray_override_list;
+pub(crate) mod workspace_style_map;
 
 use futures::StreamExt;
 use relm4::{

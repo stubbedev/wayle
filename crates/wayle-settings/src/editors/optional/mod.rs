@@ -382,43 +382,6 @@ pub(crate) fn optional_number_f64_widget(
     }
 }
 
-/// Builds a text entry for an `Option<String>` field. An empty entry means
-/// *unset* (`None`); any text means `Some(text)`.
-pub(crate) fn optional_text_widget(
-    get: Rc<dyn Fn() -> Option<String>>,
-    set: Rc<dyn Fn(Option<String>)>,
-    placeholder: &str,
-) -> OptionalWidget {
-    let entry = gtk::Entry::builder()
-        .text(get().unwrap_or_default())
-        .placeholder_text(placeholder)
-        .hexpand(true)
-        .build();
-
-    let change_set = Rc::clone(&set);
-    let handler = entry.connect_changed(move |entry| {
-        let text = entry.text().to_string();
-        change_set(if text.is_empty() { None } else { Some(text) });
-    });
-    let handler = Rc::new(handler);
-
-    let refresh_entry = entry.clone();
-    let refresh_handler = Rc::clone(&handler);
-    let refresh: Rc<dyn Fn()> = Rc::new(move || {
-        let value = get().unwrap_or_default();
-        if refresh_entry.text() != value.as_str() {
-            refresh_entry.block_signal(&refresh_handler);
-            refresh_entry.set_text(&value);
-            refresh_entry.unblock_signal(&refresh_handler);
-        }
-    });
-
-    OptionalWidget {
-        widget: entry.upcast(),
-        refresh,
-    }
-}
-
 /// Builds an *Inherit* checkbox + the full ColorValue editor for an
 /// `Option<ColorValue>` field. The ColorValue editor is reused unchanged by
 /// driving it through a scratch property mirrored back to the field.
@@ -503,38 +466,5 @@ pub(crate) fn optional_color_widget(
     OptionalWidget {
         widget: container.upcast(),
         refresh,
-    }
-}
-
-/// Row with a text entry for a top-level `Option<String>` property.
-pub(crate) fn text_optional(
-    property: &ConfigProperty<Option<String>>,
-    placeholder: &str,
-) -> SettingRowInit {
-    let get_prop = property.clone();
-    let set_prop = property.clone();
-    let widget = optional_text_widget(
-        Rc::new(move || get_prop.get()),
-        Rc::new(move |value| set_prop.set(value)),
-        placeholder,
-    );
-
-    let control = widget.widget.clone();
-    let refresh = Rc::new(widget);
-    let watcher_refresh = Rc::clone(&refresh);
-    let watcher = spawn_property_watcher(property, move || {
-        watcher_refresh.refresh();
-        true
-    });
-
-    SettingRowInit {
-        i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |value| value.clone().unwrap_or_default()),
-        control,
-        keepalive: Box::new((refresh, watcher)),
-        full_width: false,
-        dirty_badge: None,
-        behavior: RowBehavior::Setting,
-        unit: None,
     }
 }

@@ -11,7 +11,7 @@ use crate::{
         string_map::string_map,
         text::{text, text_like},
         toggle::toggle,
-        toml_editor::toml_editor,
+        workspace_style_map::workspace_style_map,
     },
     pages::{
         nav::LeafEntry,
@@ -75,11 +75,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-mappings",
                     items: vec![
-                        toml_editor(
-                            &module.workspace_map,
-                            "workspace-map",
-                            &config.styling.palette.bg,
-                        ),
+                        workspace_style_map(&module.workspace_map),
                         string_map(&module.app_icon_map),
                         string_list(&module.workspace_ignore),
                     ],

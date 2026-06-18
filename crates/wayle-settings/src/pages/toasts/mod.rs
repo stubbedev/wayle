@@ -7,8 +7,8 @@ use crate::{
         enum_select::enum_select,
         number::{number_u32, spacing},
         text::text_like,
+        toast_preset_list::toast_preset_list,
         toggle::toggle,
-        toml_editor::toml_editor_sized,
     },
     pages::{
         nav::LeafEntry,
@@ -19,8 +19,7 @@ use crate::{
 pub(crate) fn entry(config: &Config) -> LeafEntry {
     let toasts = &config.toasts;
 
-    let mut presets_editor =
-        toml_editor_sized(&toasts.presets, "presets", 30, &config.styling.palette.bg);
+    let mut presets_editor = toast_preset_list(&toasts.presets);
     presets_editor.i18n_key = Some("settings-toasts-presets-editor");
 
     LeafEntry {

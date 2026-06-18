@@ -2,6 +2,7 @@
 
 pub(crate) mod animations;
 pub(crate) mod bar;
+pub(crate) mod dropdowns;
 pub(crate) mod general;
 pub(crate) mod layout;
 pub(crate) mod modules;

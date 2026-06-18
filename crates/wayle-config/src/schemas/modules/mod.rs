@@ -46,7 +46,8 @@ pub use cpu::CpuConfig;
 pub use custom::{CustomModuleDefinition, ExecutionMode, RestartDelay, RestartPolicy, StateColors};
 pub use dashboard::DashboardConfig;
 pub use hyprland_workspaces::{
-    ActiveIndicator, DisplayMode, HyprlandWorkspacesConfig, Numbering, UrgentMode, WorkspaceStyle,
+    ActiveIndicator, DisplayMode, HyprlandWorkspacesConfig, Numbering, UrgentMode, WorkspaceMap,
+    WorkspaceStyle,
 };
 pub use hyprsunset::HyprsunsetConfig;
 pub use idle_inhibit::IdleInhibitConfig;

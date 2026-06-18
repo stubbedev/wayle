@@ -5,6 +5,7 @@ use wayle_config::Config;
 use crate::{
     editors::{
         color_value::color_value,
+        enum_list::enum_list,
         number::number_newtype,
         text::{text, text_like},
         toggle::toggle,
@@ -45,6 +46,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-commands",
                     items: vec![
+                        enum_list(&module.user_session.actions),
                         text(&module.dropdown_lock_command),
                         text(&module.dropdown_logout_command),
                         text(&module.dropdown_reboot_command),

@@ -142,6 +142,12 @@ impl Deref for WorkspaceMap {
     }
 }
 
+impl From<BTreeMap<i32, WorkspaceStyle>> for WorkspaceMap {
+    fn from(map: BTreeMap<i32, WorkspaceStyle>) -> Self {
+        Self(map)
+    }
+}
+
 impl<'a> IntoIterator for &'a WorkspaceMap {
     type Item = (&'a i32, &'a WorkspaceStyle);
     type IntoIter = std::collections::btree_map::Iter<'a, i32, WorkspaceStyle>;
