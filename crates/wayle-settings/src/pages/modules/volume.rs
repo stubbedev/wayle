@@ -3,7 +3,9 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{enum_select::enum_select, text::text, toml_editor::toml_editor},
+    editors::{
+        enum_select::enum_select, string_list::string_list, text::text, toml_editor::toml_editor,
+    },
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -45,11 +47,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         text(&module.icon_muted),
                         text(&module.format),
-                        toml_editor(
-                            &module.level_icons,
-                            "level-icons",
-                            &config.styling.palette.bg,
-                        ),
+                        string_list(&module.level_icons),
                         toml_editor(&module.thresholds, "thresholds", &config.styling.palette.bg),
                     ],
                 },

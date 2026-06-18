@@ -7,6 +7,7 @@ use crate::{
         color_value::color_value,
         enum_select::enum_select,
         number::number_u8,
+        string_list::string_list,
         text::{text, text_like},
         toggle::toggle,
         toml_editor::toml_editor,
@@ -83,11 +84,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                             "app-icon-map",
                             &config.styling.palette.bg,
                         ),
-                        toml_editor(
-                            &module.workspace_ignore,
-                            "workspace-ignore",
-                            &config.styling.palette.bg,
-                        ),
+                        string_list(&module.workspace_ignore),
                     ],
                 },
                 SectionSpec {

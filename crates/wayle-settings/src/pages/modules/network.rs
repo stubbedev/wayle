@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{text::text, toml_editor::toml_editor},
+    editors::{string_list::string_list, text::text},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -50,11 +50,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         text(&module.wired_connected_icon),
                         text(&module.wired_acquiring_icon),
                         text(&module.wired_disconnected_icon),
-                        toml_editor(
-                            &module.wifi_signal_icons,
-                            "wifi-signal-icons",
-                            &config.styling.palette.bg,
-                        ),
+                        string_list(&module.wifi_signal_icons),
                     ],
                 },
                 bar_display_section(&fields),

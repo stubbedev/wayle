@@ -1,0 +1,40 @@
+// Vec<String> editor: a column of text-entry rows with reorder/remove buttons
+// plus an Add button, shown full-width beneath the setting label.
+.string-list-editor {
+    .string-list {
+        background: var(--bg-elevated);
+        border-radius: var(--rounding-element);
+        padding: var(--space-xs);
+    }
+
+    .string-list-row {
+        & + .string-list-row {
+            margin-top: var(--space-xs);
+        }
+
+        entry {
+            background: var(--bg-overlay);
+        }
+    }
+
+    button.string-list-button {
+        padding: var(--space-xs);
+        color: var(--fg-subtle);
+        -gtk-icon-size: var(--icon-sm);
+        transition: color var(--duration-fast);
+
+        &:hover {
+            color: var(--fg-default);
+        }
+    }
+
+    button.string-list-add {
+        color: var(--fg-muted);
+        font-size: var(--text-sm);
+        font-weight: var(--weight-medium);
+
+        &:hover {
+            color: var(--fg-default);
+        }
+    }
+}

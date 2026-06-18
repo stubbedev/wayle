@@ -6,9 +6,9 @@ use crate::{
     editors::{
         enum_select::enum_select,
         number::{number_u32, spacing},
+        string_list::string_list,
         text::text_like,
         toggle::toggle,
-        toml_editor::toml_editor,
     },
     pages::{
         nav::LeafEntry,
@@ -57,7 +57,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     title_key: "settings-section-filtering",
                     items: vec![
                         enum_select(&notif.icon_source),
-                        toml_editor(&notif.blocklist, "blocklist", &config.styling.palette.bg),
+                        string_list(&notif.blocklist),
                     ],
                 },
             ],
