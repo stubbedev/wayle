@@ -37,13 +37,17 @@ fn icon_names() -> Rc<Vec<String>> {
     })
 }
 
-/// Widgets kept alive for the lifetime of the editor row.
-type IconKeepalive = (
-    gtk::MenuButton,
-    gtk::Popover,
-    Rc<dyn Fn(&str)>,
-    Rc<Cell<bool>>,
-);
+/// A reusable icon-name picker: the trigger button plus the bits kept alive for
+/// its lifetime. Embed [`Self::widget`] anywhere a compact icon field is needed
+/// (the standalone `icon` row, or a cell inside a list/map editor) and call
+/// [`Self::set_display`] to reflect an externally-driven value change.
+pub(crate) struct IconPickerWidget {
+    pub(crate) widget: gtk::MenuButton,
+    /// Updates the trigger preview + name from the outside (e.g. a config
+    /// watcher) without going through the picker's own commit path.
+    pub(crate) set_display: Rc<dyn Fn(&str)>,
+    _keep: Box<dyn std::any::Any>,
+}
 
 /// Builds the picker popover body (search entry + scrolled grid) and returns it
 /// alongside the search entry and grid for wiring.
@@ -55,6 +59,9 @@ fn build_popover() -> (gtk::Popover, gtk::SearchEntry, gtk::FlowBox) {
     let flow = gtk::FlowBox::builder()
         .selection_mode(gtk::SelectionMode::None)
         .max_children_per_line(8)
+        // Top-align so a short (or filtered) result set sits at the top of the
+        // scroll area instead of floating in its vertical center.
+        .valign(gtk::Align::Start)
         .row_spacing(4)
         .column_spacing(4)
         .homogeneous(true)
@@ -102,6 +109,8 @@ fn populate_grid(flow: &gtk::FlowBox, commit: &Rc<dyn Fn(&str)>) {
             .child(&image)
             .build();
         button.set_widget_name(name);
+        // Pointer cursor so the previews read as clickable.
+        button.set_cursor_from_name(Some("pointer"));
 
         let commit = Rc::clone(commit);
         let name = name.clone();
@@ -111,8 +120,10 @@ fn populate_grid(flow: &gtk::FlowBox, commit: &Rc<dyn Fn(&str)>) {
     }
 }
 
-/// Row that edits an icon-name string with a searchable, preview-driven picker.
-pub(crate) fn icon(property: &ConfigProperty<String>) -> SettingRowInit {
+/// Builds a reusable icon-name picker bound to a `set` callback, displaying
+/// `initial` to start. The caller owns when/how the value is persisted; the
+/// picker just reports the chosen (or typed) name.
+pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPickerWidget {
     let image = gtk::Image::new();
     image.set_pixel_size(PREVIEW_SIZE);
     let label = gtk::Label::builder()
@@ -133,19 +144,18 @@ pub(crate) fn icon(property: &ConfigProperty<String>) -> SettingRowInit {
         .valign(gtk::Align::Center)
         .build();
 
-    update_display(&image, &label, &property.get());
+    update_display(&image, &label, initial);
 
     let (popover, search, flow) = build_popover();
     menu.set_popover(Some(&popover));
 
-    // Commit a chosen name: write config, refresh the trigger, close.
+    // Commit a chosen name: report it via `set`, refresh the trigger, close.
     let commit: Rc<dyn Fn(&str)> = {
-        let set = property.clone();
         let image = image.clone();
         let label = label.clone();
         let menu = menu.clone();
         Rc::new(move |name: &str| {
-            set.set(name.to_owned());
+            set(name);
             update_display(&image, &label, name);
             menu.popdown();
         })
@@ -192,22 +202,41 @@ pub(crate) fn icon(property: &ConfigProperty<String>) -> SettingRowInit {
         });
     }
 
+    let set_display: Rc<dyn Fn(&str)> = {
+        let image = image.clone();
+        let label = label.clone();
+        Rc::new(move |name: &str| update_display(&image, &label, name))
+    };
+
+    IconPickerWidget {
+        widget: menu,
+        set_display,
+        _keep: Box::new((popover, commit, built)),
+    }
+}
+
+/// Row that edits an icon-name string with a searchable, preview-driven picker.
+pub(crate) fn icon(property: &ConfigProperty<String>) -> SettingRowInit {
+    let set: Rc<dyn Fn(&str)> = {
+        let set = property.clone();
+        Rc::new(move |name: &str| set.set(name.to_owned()))
+    };
+    let picker = icon_picker_widget(&property.get(), set);
+    let control = picker.widget.clone().upcast();
+
     // External config changes (reset, file edit) refresh the trigger.
-    let refresh_image = image.clone();
-    let refresh_label = label.clone();
+    let set_display = Rc::clone(&picker.set_display);
     let get = property.clone();
     let watcher = spawn_property_watcher(property, move || {
-        update_display(&refresh_image, &refresh_label, &get.get());
+        set_display(&get.get());
         true
     });
-
-    let keep: IconKeepalive = (menu.clone(), popover, commit, built);
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
         handle: PropertyHandle::new(property, |value: &String| value.clone()),
-        control: menu.upcast(),
-        keepalive: Box::new((keep, watcher)),
+        control,
+        keepalive: Box::new((picker, watcher)),
         full_width: false,
         dirty_badge: None,
         behavior: RowBehavior::Setting,

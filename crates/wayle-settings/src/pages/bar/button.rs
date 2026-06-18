@@ -4,8 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        color_value::color_value, enum_select::enum_select, number::number_u8, slider::percentage,
-        text::text_like,
+        color_value::color_value, enum_select::enum_select, number::number_u8, size::size,
+        slider::percentage,
     },
     pages::{
         nav::LeafEntry,
@@ -30,23 +30,20 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         percentage(&bar.button_opacity),
                         percentage(&bar.button_bg_opacity),
                         enum_select(&bar.button_rounding),
-                        text_like(&bar.button_gap),
+                        size(&bar.button_gap),
                         enum_select(&bar.button_icon_position),
                     ],
                 },
                 SectionSpec {
                     title_key: "settings-section-icons",
-                    items: vec![
-                        text_like(&bar.button_icon_size),
-                        text_like(&bar.button_icon_padding),
-                    ],
+                    items: vec![size(&bar.button_icon_size), size(&bar.button_icon_padding)],
                 },
                 SectionSpec {
                     title_key: "settings-section-labels",
                     items: vec![
-                        text_like(&bar.button_label_size),
+                        size(&bar.button_label_size),
                         enum_select(&bar.button_label_weight),
-                        text_like(&bar.button_label_padding),
+                        size(&bar.button_label_padding),
                     ],
                 },
                 SectionSpec {
@@ -61,8 +58,8 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         percentage(&bar.button_group_opacity),
                         enum_select(&bar.button_group_rounding),
-                        text_like(&bar.button_group_padding),
-                        text_like(&bar.button_group_module_gap),
+                        size(&bar.button_group_padding),
+                        size(&bar.button_group_module_gap),
                         color_value(&bar.button_group_background),
                         enum_select(&bar.button_group_border_location),
                         number_u8(&bar.button_group_border_width),

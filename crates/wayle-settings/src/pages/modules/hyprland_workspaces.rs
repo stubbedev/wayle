@@ -4,14 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        color_value::color_value,
-        enum_select::enum_select,
-        icon::icon,
-        number::number_u8,
-        string_list::string_list,
-        string_map::string_map,
-        text::{text, text_like},
-        toggle::toggle,
+        color_value::color_value, enum_select::enum_select, icon::icon, number::number_u8,
+        size::size, string_list::string_list, string_map::string_map, text::text, toggle::toggle,
         workspace_style_map::workspace_style_map,
     },
     pages::{
@@ -60,10 +54,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-sizing",
                     items: vec![
-                        text_like(&module.icon_gap),
-                        text_like(&module.workspace_padding),
-                        text_like(&module.icon_size),
-                        text_like(&module.label_size),
+                        size(&module.icon_gap),
+                        size(&module.workspace_padding),
+                        size(&module.icon_size),
+                        size(&module.label_size),
                     ],
                 },
                 SectionSpec {

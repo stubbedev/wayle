@@ -105,7 +105,7 @@ impl State {
     fn append_card(self: &Rc<Self>, account: &MailAccount) {
         let root = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .css_classes(["threshold-card"])
+            .css_classes(["card-form-card"])
             .build();
 
         let name = entry(&account.name, "name");
@@ -139,7 +139,7 @@ impl State {
 
         let remove = gtk::Button::builder()
             .label(t("settings-list-remove"))
-            .css_classes(["string-list-add", "threshold-remove"])
+            .css_classes(["string-list-add", "card-form-remove"])
             .halign(gtk::Align::End)
             .build();
         let remove_state = Rc::clone(self);
@@ -181,14 +181,18 @@ fn entry(text: &str, placeholder: &str) -> gtk::Entry {
 fn field_row(label_key: &str, control: &gtk::Widget) -> gtk::Box {
     let row = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .css_classes(["threshold-row"])
+        .spacing(8)
+        .css_classes(["card-form-row"])
         .build();
+    // Fixed-width label on the left so every control starts at the same x; the
+    // control fills the rest of the row (entries already hexpand; this also
+    // covers the provider DropDown so it spans the row like the entries).
     let label = gtk::Label::builder()
         .label(t(label_key))
         .halign(gtk::Align::Start)
-        .hexpand(true)
-        .css_classes(["threshold-label"])
+        .css_classes(["card-form-label"])
         .build();
+    control.set_hexpand(true);
     row.append(&label);
     row.append(control);
     row
@@ -199,7 +203,7 @@ pub(crate) fn mail_account_list(property: &ConfigProperty<Vec<MailAccount>>) -> 
     let list = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(8)
-        .css_classes(["threshold-list"])
+        .css_classes(["card-form-list"])
         .build();
 
     let state = Rc::new(State {
@@ -228,7 +232,7 @@ pub(crate) fn mail_account_list(property: &ConfigProperty<Vec<MailAccount>>) -> 
         .orientation(gtk::Orientation::Vertical)
         .spacing(8)
         .hexpand(true)
-        .css_classes(["threshold-editor"])
+        .css_classes(["card-form-editor"])
         .build();
     container.append(&list);
     container.append(&add);

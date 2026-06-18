@@ -12,9 +12,22 @@
 .icon-picker-popover {
     padding: var(--space-sm);
 
+    // Search field: inner horizontal padding so the text and placeholder don't
+    // sit flush against the field edges.
+    entry {
+        padding: 0 var(--space-sm);
+    }
+
     .icon-picker-cell {
         padding: var(--space-xs);
         min-width: calc(2rem * var(--global-scale));
         min-height: calc(2rem * var(--global-scale));
+        border-radius: var(--rounding-element);
+        transition: background var(--duration-fast);
+
+        // Highlight the preview under the pointer so the pick target is clear.
+        &:hover {
+            background: var(--bg-overlay);
+        }
     }
 }

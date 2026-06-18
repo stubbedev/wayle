@@ -8,6 +8,7 @@ use crate::{
         enum_select::enum_select,
         icon::icon,
         number::number_u8,
+        size::size,
         string_map::string_map,
         text::{text, text_like},
         toggle::toggle,
@@ -50,10 +51,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-sizing",
                     items: vec![
-                        text_like(&module.tag_padding),
-                        text_like(&module.icon_gap),
-                        text_like(&module.icon_size),
-                        text_like(&module.label_size),
+                        size(&module.tag_padding),
+                        size(&module.icon_gap),
+                        size(&module.icon_size),
+                        size(&module.label_size),
                     ],
                 },
                 SectionSpec {

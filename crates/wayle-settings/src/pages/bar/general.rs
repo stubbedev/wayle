@@ -8,8 +8,8 @@ use crate::{
         color_value::color_value,
         enum_select::enum_select,
         number::{number_u8, scale},
+        size::size,
         slider::percentage,
-        text::text_like,
         toggle::toggle,
     },
     pages::{
@@ -50,11 +50,11 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-spacing",
                     items: vec![
-                        text_like(&bar.inset_edge),
-                        text_like(&bar.inset_ends),
-                        text_like(&bar.padding),
-                        text_like(&bar.padding_ends),
-                        text_like(&bar.module_gap),
+                        size(&bar.inset_edge),
+                        size(&bar.inset_ends),
+                        size(&bar.padding),
+                        size(&bar.padding_ends),
+                        size(&bar.module_gap),
                     ],
                 },
                 SectionSpec {

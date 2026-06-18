@@ -23,7 +23,11 @@ use wayle_config::{
 use wayle_i18n::t;
 
 use crate::{
-    editors::{optional::optional_color_widget, spawn_property_watcher},
+    editors::{
+        icon::{IconPickerWidget, icon_picker_widget},
+        optional::optional_color_widget,
+        spawn_property_watcher,
+    },
     pages::spec::SettingRowInit,
     property_handle::PropertyHandle,
     row::RowBehavior,
@@ -82,9 +86,11 @@ fn non_empty(text: &str) -> Option<String> {
 
 struct Row {
     key: gtk::Entry,
-    icon: gtk::Entry,
+    icon: Rc<RefCell<Option<String>>>,
     label: gtk::Entry,
     color: Rc<RefCell<Option<ColorValue>>>,
+    /// Kept alive so the icon picker's popover + signal closures outlive the row.
+    _icon_picker: IconPickerWidget,
 }
 
 struct MapState<M: StyleMap> {
@@ -104,7 +110,7 @@ impl<M: StyleMap> MapState<M> {
                 (
                     row.key.text().to_string(),
                     WorkspaceStyle {
-                        icon: non_empty(&row.icon.text()),
+                        icon: row.icon.borrow().clone(),
                         color: row.color.borrow().clone(),
                         label: non_empty(&row.label.text()),
                     },
@@ -136,19 +142,28 @@ impl<M: StyleMap> MapState<M> {
             .build();
 
         let key_entry = entry(key, t("settings-workspace-key-placeholder"));
-        let icon_entry = entry(
-            style.icon.as_deref().unwrap_or(""),
-            t("settings-workspace-icon-placeholder"),
-        );
         let label_entry = entry(
             style.label.as_deref().unwrap_or(""),
             t("settings-workspace-label-placeholder"),
         );
 
-        for e in [&key_entry, &icon_entry, &label_entry] {
+        for e in [&key_entry, &label_entry] {
             let commit_state = Rc::clone(self);
             e.connect_changed(move |_| commit_state.commit());
         }
+
+        // Icon: a preview-driven picker (same component as the standalone icon
+        // fields) instead of a bare text entry. Its value lives in a cell the
+        // picker writes; collecting reads the cell.
+        let icon_value = Rc::new(RefCell::new(style.icon.clone()));
+        let icon_cell = Rc::clone(&icon_value);
+        let icon_state = Rc::clone(self);
+        let icon_set: Rc<dyn Fn(&str)> = Rc::new(move |name: &str| {
+            *icon_cell.borrow_mut() = non_empty(name);
+            icon_state.commit();
+        });
+        let icon_picker = icon_picker_widget(style.icon.as_deref().unwrap_or(""), icon_set);
+        icon_picker.widget.set_hexpand(true);
 
         let color = Rc::new(RefCell::new(style.color.clone()));
         let color_get = Rc::clone(&color);
@@ -172,7 +187,7 @@ impl<M: StyleMap> MapState<M> {
         remove.connect_clicked(move |_| remove_state.remove_row(&remove_key));
 
         root.append(&key_entry);
-        root.append(&icon_entry);
+        root.append(&icon_picker.widget);
         root.append(&label_entry);
         root.append(&color_widget.widget);
         root.append(&remove);
@@ -180,9 +195,10 @@ impl<M: StyleMap> MapState<M> {
         self.list.append(&root);
         self.rows.borrow_mut().push(Row {
             key: key_entry,
-            icon: icon_entry,
+            icon: icon_value,
             label: label_entry,
             color,
+            _icon_picker: icon_picker,
         });
     }
 

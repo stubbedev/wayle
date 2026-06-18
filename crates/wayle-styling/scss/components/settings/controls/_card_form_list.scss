@@ -1,0 +1,82 @@
+// Shared styling for the "card form" list editors — a Vec<T> rendered as a
+// stack of elevated cards, each a column of label + input rows, with a Remove
+// button per card and an Add button below. Used by the mail-account and
+// toast-preset editors (and any future editor of the same shape). Inputs share
+// the overlay-fill + border-on-focus look the dropdown popovers use, so the
+// controls in a card read as one consistent column.
+.card-form-editor {
+    .card-form-card {
+        background: var(--bg-elevated);
+        border-radius: var(--rounding-element);
+        padding: var(--space-sm) var(--space-md);
+    }
+
+    .card-form-row {
+        min-height: calc(2.25rem * var(--global-scale));
+
+        & + .card-form-row {
+            margin-top: var(--space-xs);
+        }
+
+        // Fixed label column so every control's left edge lines up across rows.
+        .card-form-label {
+            min-width: calc(5rem * var(--global-scale));
+            font-size: var(--text-md);
+            font-weight: var(--weight-medium);
+            color: var(--fg-default);
+        }
+
+        // Text entries, dropdowns, and spin buttons share one input treatment.
+        entry,
+        dropdown,
+        spinbutton {
+            min-height: 0;
+            color: var(--fg-default);
+            font-size: var(--text-md);
+            background: var(--bg-overlay);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--rounding-element);
+            transition: border-color var(--duration-fast);
+
+            &:focus-within {
+                border-color: var(--accent);
+            }
+        }
+
+        entry > text,
+        spinbutton > text {
+            min-height: 0;
+            padding: var(--space-xs) var(--space-sm);
+        }
+
+        // Strip the raw DropDown button chrome and match the entries' padding.
+        dropdown > button {
+            all: unset;
+
+            > * {
+                margin: var(--space-xs) var(--space-sm);
+            }
+
+            arrow {
+                -gtk-icon-size: var(--icon-sm);
+                color: var(--fg-subtle);
+            }
+        }
+
+        spinbutton button {
+            all: unset;
+            color: var(--fg-muted);
+            padding: 0 var(--space-xs);
+            transition: color var(--duration-fast);
+
+            &:hover {
+                color: var(--fg-default);
+            }
+        }
+    }
+
+    button.card-form-remove {
+        margin-top: var(--space-xs);
+        color: var(--status-error);
+    }
+}

@@ -4,7 +4,7 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        color_value::color_value, string_list::string_list, text::text_like, toggle::toggle,
+        color_value::color_value, size::size, string_list::string_list, toggle::toggle,
         tray_override_list::tray_override_list,
     },
     pages::{
@@ -26,9 +26,9 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![
-                        text_like(&module.icon_scale),
-                        text_like(&module.item_gap),
-                        text_like(&module.internal_padding),
+                        size(&module.icon_scale),
+                        size(&module.item_gap),
+                        size(&module.internal_padding),
                         string_list(&module.blacklist),
                         tray_override_list(&module.overrides),
                     ],
