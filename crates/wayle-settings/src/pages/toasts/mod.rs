@@ -4,12 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select,
-        number::number_u32,
-        size::size,
-        text::text_like,
-        toast_preset_list::toast_preset_list,
-        toggle::toggle,
+        enum_select::enum_select, number::number_u32, size::size, text::text_like,
+        toast_preset_list::toast_preset_list, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,

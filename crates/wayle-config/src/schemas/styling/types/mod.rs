@@ -17,6 +17,4 @@ pub use sizing::{GapClass, IconSizeClass, PaddingClass};
 pub use theme::ThemeEntry;
 pub use threshold::{ThresholdColors, ThresholdEntry, evaluate_thresholds};
 pub use typography::{FontWeightClass, TextSizeClass};
-pub use validated::{
-    HexColor, InvalidHexColor, NormalizedF64, Percentage, ScaleFactor, Size,
-};
+pub use validated::{HexColor, InvalidHexColor, NormalizedF64, Percentage, ScaleFactor, Size};

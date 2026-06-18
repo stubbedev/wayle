@@ -3,12 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{
-        color_value::color_value,
-        icon::icon,
-        text::text_like,
-        toggle::toggle,
-    },
+    editors::{color_value::color_value, icon::icon, text::text_like, toggle::toggle},
     pages::{
         nav::LeafEntry,
         spec::{SectionSpec, page_spec},

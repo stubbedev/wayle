@@ -7,7 +7,10 @@ use std::{cell::RefCell, rc::Rc};
 use relm4::gtk::{self, prelude::*};
 use serde::{
     Deserialize,
-    de::{IntoDeserializer, value::Error as SerdeValueError, value::StrDeserializer},
+    de::{
+        IntoDeserializer,
+        value::{Error as SerdeValueError, StrDeserializer},
+    },
 };
 use wayle_config::{
     ConfigProperty, EnumVariants,
@@ -117,7 +120,10 @@ impl State {
         let provider_state = Rc::clone(self);
         provider.connect_selected_notify(move |_| provider_state.commit());
 
-        root.append(&field_row("settings-mail-account-name", &name.clone().upcast()));
+        root.append(&field_row(
+            "settings-mail-account-name",
+            &name.clone().upcast(),
+        ));
         root.append(&field_row(
             "settings-mail-account-query",
             &query.clone().upcast(),
@@ -126,7 +132,10 @@ impl State {
             "settings-mail-account-provider",
             &provider.clone().upcast(),
         ));
-        root.append(&field_row("settings-mail-account-icon", &icon.clone().upcast()));
+        root.append(&field_row(
+            "settings-mail-account-icon",
+            &icon.clone().upcast(),
+        ));
 
         let remove = gtk::Button::builder()
             .label(t("settings-list-remove"))
@@ -148,7 +157,11 @@ impl State {
     }
 
     fn remove_card(self: &Rc<Self>, name: &gtk::Entry) {
-        let index = self.cards.borrow().iter().position(|card| &card.name == name);
+        let index = self
+            .cards
+            .borrow()
+            .iter()
+            .position(|card| &card.name == name);
         if let Some(index) = index {
             self.cards.borrow_mut().remove(index);
             self.commit();

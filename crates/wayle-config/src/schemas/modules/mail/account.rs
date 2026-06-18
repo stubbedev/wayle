@@ -101,13 +101,10 @@ impl MailAccount {
     /// Resolved icon: an explicit non-empty override, else the provider default.
     #[must_use]
     pub fn resolved_icon(&self) -> String {
-        self.icon
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .map_or_else(
-                || self.provider.default_icon().to_owned(),
-                ToOwned::to_owned,
-            )
+        self.icon.as_deref().filter(|s| !s.is_empty()).map_or_else(
+            || self.provider.default_icon().to_owned(),
+            ToOwned::to_owned,
+        )
     }
 }
 
