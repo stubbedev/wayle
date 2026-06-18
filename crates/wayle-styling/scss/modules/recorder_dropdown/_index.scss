@@ -60,8 +60,58 @@
         > button {
             min-height: calc(2rem * var(--global-scale));
 
-            > label {
+            // Record button carries an icon + label box; pad it like the old
+            // bare label did.
+            > box {
                 margin: var(--space-sm) var(--space-md);
+
+                image {
+                    -gtk-icon-size: var(--icon-sm);
+                }
+            }
+        }
+
+        // Pause/resume is icon-only to keep the action row compact.
+        .recorder-pause-button {
+            min-width: calc(2rem * var(--global-scale));
+
+            image {
+                -gtk-icon-size: var(--icon-sm);
+            }
+        }
+    }
+
+    // Section headers: a leading icon + the section label.
+    .recorder-section-header {
+        margin-top: var(--space-sm);
+
+        > image {
+            -gtk-icon-size: var(--icon-sm);
+            color: var(--fg-subtle);
+        }
+    }
+
+    // Visual webcam-corner picker: a 2x2 grid standing in for the screen, the
+    // active corner filled with the accent color.
+    .recorder-position-preview {
+        > .recorder-position-cell {
+            all: unset;
+            min-width: calc(1.5rem * var(--global-scale));
+            min-height: calc(1rem * var(--global-scale));
+            border-radius: var(--rounding-element);
+            background: var(--bg-overlay);
+            border: 1px solid var(--border-strong);
+            transition:
+                background var(--duration-fast),
+                border-color var(--duration-fast);
+
+            &:hover {
+                border-color: var(--accent);
+            }
+
+            &.active {
+                background: var(--accent);
+                border-color: var(--accent);
             }
         }
     }

@@ -5,6 +5,7 @@
 pub(crate) mod bar_layout;
 pub(crate) mod color;
 pub(crate) mod color_value;
+pub(crate) mod device_select;
 pub(crate) mod dropdown_size;
 pub(crate) mod enum_list;
 pub(crate) mod enum_select;

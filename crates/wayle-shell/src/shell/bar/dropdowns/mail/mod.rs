@@ -9,11 +9,7 @@ use wayle_widgets::prelude::*;
 
 pub(super) use self::factory::Factory;
 use self::messages::{MailDropdownCmd, MailDropdownInit};
-use crate::{
-    i18n::t,
-    services::mail::AccountUnread,
-    shell::bar::dropdowns::resolve_dimension,
-};
+use crate::{i18n::t, services::mail::AccountUnread, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 300.0;
 const BASE_HEIGHT: f32 = 360.0;

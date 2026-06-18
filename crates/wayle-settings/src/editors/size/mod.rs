@@ -94,8 +94,12 @@ pub(crate) fn size(property: &ConfigProperty<Size>) -> SettingRowInit {
     let spin_commit = Rc::clone(&commit);
     let spin_handler = spin.connect_value_changed(move |_| spin_commit());
 
-    let handlers: Rc<(gtk::DropDown, SignalHandlerId, gtk::SpinButton, SignalHandlerId)> =
-        Rc::new((mode, mode_handler, spin, spin_handler));
+    let handlers: Rc<(
+        gtk::DropDown,
+        SignalHandlerId,
+        gtk::SpinButton,
+        SignalHandlerId,
+    )> = Rc::new((mode, mode_handler, spin, spin_handler));
 
     let refresh_apply = Rc::clone(&apply);
     let get = property.clone();

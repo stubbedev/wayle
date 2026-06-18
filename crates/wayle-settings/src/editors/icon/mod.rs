@@ -3,12 +3,15 @@
 //! previews). The search entry doubles as a free-text field — pressing Enter
 //! commits whatever was typed, so arbitrary system-theme icon names still work.
 
-use std::{cell::Cell, cell::OnceCell, rc::Rc};
+use std::{
+    cell::{Cell, OnceCell},
+    rc::Rc,
+};
 
 use relm4::gtk::{self, prelude::*};
 use wayle_config::ConfigProperty;
-use wayle_icons::IconManager;
 use wayle_i18n::t;
+use wayle_icons::IconManager;
 
 use crate::{
     editors::spawn_property_watcher, pages::spec::SettingRowInit, property_handle::PropertyHandle,
@@ -35,7 +38,12 @@ fn icon_names() -> Rc<Vec<String>> {
 }
 
 /// Widgets kept alive for the lifetime of the editor row.
-type IconKeepalive = (gtk::MenuButton, gtk::Popover, Rc<dyn Fn(&str)>, Rc<Cell<bool>>);
+type IconKeepalive = (
+    gtk::MenuButton,
+    gtk::Popover,
+    Rc<dyn Fn(&str)>,
+    Rc<Cell<bool>>,
+);
 
 /// Builds the picker popover body (search entry + scrolled grid) and returns it
 /// alongside the search entry and grid for wiring.
