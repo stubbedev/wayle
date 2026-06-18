@@ -209,7 +209,10 @@ jobs:
                   token: ${{ secrets.ATTIC_TOKEN }}
 
             - name: Build package
-              run: nix build '.?submodules=1#wayle' -L
+              # --accept-flake-config: honor the flake's nixConfig substituter
+              # (the system extra_nix_config above sets it too, but this trusts
+              # the flake's own setting and silences the untrusted-config warning).
+              run: nix build '.?submodules=1#wayle' -L --accept-flake-config
 
     ci-status:
         name: CI Status

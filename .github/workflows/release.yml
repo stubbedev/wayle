@@ -123,7 +123,10 @@ jobs:
                   token: ${{ secrets.ATTIC_TOKEN }}
 
             - name: Build and push release package
-              run: nix build '.?submodules=1#wayle' -L
+              # --accept-flake-config: trust the flake's nixConfig substituter
+              # (also set via extra_nix_config above); silences the
+              # untrusted-config warning.
+              run: nix build '.?submodules=1#wayle' -L --accept-flake-config
 
     ubuntu:
         name: Package (Ubuntu ${{ matrix.arch }})
