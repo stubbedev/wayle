@@ -17,8 +17,10 @@ dropdown-recorder-section-webcam = Webcam
 dropdown-recorder-section-video = Video
 
 dropdown-recorder-microphone = Microphone
+dropdown-recorder-microphone-device = Source
 dropdown-recorder-system-audio = System Audio
 dropdown-recorder-webcam = Webcam Frame
+dropdown-recorder-webcam-device = Camera
 dropdown-recorder-position = Position
 dropdown-recorder-bitrate = Bitrate (kbps)
 dropdown-recorder-audio-bitrate = Audio Bitrate (kbps)

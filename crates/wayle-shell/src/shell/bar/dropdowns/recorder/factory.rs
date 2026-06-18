@@ -14,6 +14,7 @@ impl DropdownFactory for Factory {
         let init = RecorderDropdownInit {
             config: services.config.clone(),
             state: recorder.state(),
+            audio: services.audio.clone(),
         };
         let controller = RecorderDropdown::builder().launch(init).detach();
 

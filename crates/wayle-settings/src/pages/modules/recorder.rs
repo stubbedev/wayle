@@ -4,8 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select, icon::icon, number::number_u32_range, slider::percentage,
-        text::text, toggle::toggle,
+        device_select::webcam_device_select, enum_select::enum_select, icon::icon,
+        number::number_u32_range, slider::percentage, text::text, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -76,7 +76,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     title_key: "settings-section-webcam",
                     items: vec![
                         toggle(&module.webcam_enabled),
-                        text(&module.webcam_device),
+                        webcam_device_select(&module.webcam_device),
                         enum_select(&module.webcam_position),
                         percentage(&module.webcam_size),
                     ],

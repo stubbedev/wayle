@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use relm4::ComponentSender;
+use wayle_audio::AudioService;
 use wayle_config::ConfigService;
 use wayle_widgets::watch;
 
@@ -11,6 +12,7 @@ pub(super) fn spawn(
     sender: &ComponentSender<RecorderDropdown>,
     config: &Arc<ConfigService>,
     state: &RecorderState,
+    audio: Option<&Arc<AudioService>>,
 ) {
     let scale = config.config().styling.scale.clone();
     watch!(sender, [scale.watch()], |out| {
@@ -27,4 +29,12 @@ pub(super) fn spawn(
             let _ = out.send(RecorderDropdownCmd::StateChanged);
         }
     );
+
+    // Rebuild the microphone-source picker when devices hotplug.
+    if let Some(audio) = audio {
+        let input_devices = audio.input_devices.clone();
+        watch!(sender, [input_devices.watch()], |out| {
+            let _ = out.send(RecorderDropdownCmd::MicrophonesUpdated);
+        });
+    }
 }
