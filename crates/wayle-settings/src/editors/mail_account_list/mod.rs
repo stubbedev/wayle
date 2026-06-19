@@ -21,6 +21,7 @@ use wayle_i18n::t;
 use crate::{
     editors::{
         icon::{IconPickerWidget, icon_picker_widget},
+        list_controls::{add_button, remove_button},
         spawn_property_watcher,
     },
     pages::spec::SettingRowInit,
@@ -154,11 +155,8 @@ impl State {
             &icon_picker.widget.clone().upcast(),
         ));
 
-        let remove = gtk::Button::builder()
-            .label(t("settings-list-remove"))
-            .css_classes(["string-list-add", "card-form-remove"])
-            .halign(gtk::Align::End)
-            .build();
+        let remove = remove_button("settings-list-remove");
+        remove.set_halign(gtk::Align::End);
         let remove_state = Rc::clone(self);
         let remove_name = name.clone();
         remove.connect_clicked(move |_| remove_state.remove_card(&remove_name));
@@ -231,11 +229,7 @@ pub(crate) fn mail_account_list(property: &ConfigProperty<Vec<MailAccount>>) -> 
     });
     state.rebuild();
 
-    let add = gtk::Button::builder()
-        .label(t("settings-list-add"))
-        .css_classes(["string-list-add"])
-        .halign(gtk::Align::Start)
-        .build();
+    let add = add_button("settings-list-add");
     let add_state = Rc::clone(&state);
     add.connect_clicked(move |_| {
         add_state.append_card(&MailAccount {

@@ -17,7 +17,9 @@ use wayle_config::ConfigProperty;
 use wayle_i18n::t;
 
 use crate::{
-    editors::spawn_property_watcher, pages::spec::SettingRowInit, property_handle::PropertyHandle,
+    editors::{list_controls::add_button, spawn_property_watcher},
+    pages::spec::SettingRowInit,
+    property_handle::PropertyHandle,
     row::RowBehavior,
 };
 
@@ -168,12 +170,7 @@ pub(crate) fn string_map<M: StringMap>(property: &ConfigProperty<M>) -> SettingR
     });
     state.rebuild(&property.get().to_pairs());
 
-    let add = gtk::Button::builder()
-        .label(t("settings-map-add"))
-        .css_classes(["string-list-add"])
-        .halign(gtk::Align::Start)
-        .build();
-    add.set_cursor_from_name(Some("pointer"));
+    let add = add_button("settings-map-add");
     let add_state = Rc::clone(&state);
     add.connect_clicked(move |_| {
         add_state.append_row("", "");

@@ -13,11 +13,11 @@ use std::{cell::RefCell, rc::Rc};
 
 use relm4::gtk::{self, prelude::*};
 use wayle_config::ConfigProperty;
-use wayle_i18n::t;
 
 use crate::{
     editors::{
         icon::{IconPickerWidget, icon_picker_widget},
+        list_controls::add_button,
         spawn_property_watcher,
     },
     pages::spec::SettingRowInit,
@@ -174,12 +174,7 @@ pub(crate) fn icon_list(property: &ConfigProperty<Vec<String>>) -> SettingRowIni
     });
     state.rebuild(&property.get());
 
-    let add = gtk::Button::builder()
-        .label(t("settings-list-add"))
-        .css_classes(["string-list-add"])
-        .halign(gtk::Align::Start)
-        .build();
-    add.set_cursor_from_name(Some("pointer"));
+    let add = add_button("settings-list-add");
     let add_state = Rc::clone(&state);
     add.connect_clicked(move |_| {
         add_state.append_row("");

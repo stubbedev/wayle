@@ -15,7 +15,9 @@ use wayle_config::{
 use wayle_i18n::t;
 
 use crate::{
-    editors::{optional::optional_color_widget, spawn_property_watcher},
+    editors::{
+        list_controls::add_button, optional::optional_color_widget, spawn_property_watcher,
+    },
     pages::spec::SettingRowInit,
     property_handle::PropertyHandle,
     row::RowBehavior,
@@ -147,11 +149,7 @@ pub(crate) fn tray_override_list(
     });
     state.rebuild();
 
-    let add = gtk::Button::builder()
-        .label(t("settings-map-add"))
-        .css_classes(["string-list-add"])
-        .halign(gtk::Align::Start)
-        .build();
+    let add = add_button("settings-map-add");
     let add_state = Rc::clone(&state);
     add.connect_clicked(move |_| {
         add_state.append_row(&TrayItemOverride {

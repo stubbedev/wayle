@@ -15,10 +15,9 @@ use wayle_config::{
     ConfigProperty,
     schemas::{bar::BarLayout, modules::CustomModuleDefinition},
 };
-use wayle_i18n::t;
 use zone::{DragPayload, DropLocation};
 
-use super::{WatcherHandle, spawn_property_watcher};
+use super::{WatcherHandle, list_controls::add_button, spawn_property_watcher};
 
 pub(crate) struct BarLayoutInit {
     pub(crate) property: ConfigProperty<Vec<BarLayout>>,
@@ -85,22 +84,10 @@ impl SimpleComponent for BarLayoutControl {
             }
         }
 
-        let add_icon = gtk::Image::from_icon_name("ld-plus-symbolic");
-        let add_label = gtk::Label::new(Some(&t("settings-layout-add")));
-        let add_content = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        add_content.append(&add_icon);
-        add_content.append(&add_label);
-
-        let add_button = gtk::Button::builder()
-            .child(&add_content)
-            .halign(gtk::Align::Start)
-            .build();
-
-        add_button.add_css_class("ghost");
-        add_button.set_cursor_from_name(Some("pointer"));
+        let add = add_button("settings-layout-add");
 
         let input_sender = sender.input_sender().clone();
-        add_button.connect_clicked(move |_button| {
+        add.connect_clicked(move |_button| {
             let _ = input_sender.send(BarLayoutMsg::Add);
         });
 
@@ -110,7 +97,7 @@ impl SimpleComponent for BarLayoutControl {
         });
 
         root.append(&card_list);
-        root.append(&add_button);
+        root.append(&add);
 
         let model = Self {
             property: init.property,

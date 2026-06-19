@@ -25,6 +25,7 @@ use wayle_i18n::t;
 use crate::{
     editors::{
         icon::{IconPickerWidget, icon_picker_widget},
+        list_controls::add_button,
         optional::optional_color_widget,
         spawn_property_watcher,
     },
@@ -235,11 +236,7 @@ pub(crate) fn workspace_style_map<M: StyleMap>(property: &ConfigProperty<M>) -> 
     });
     state.rebuild();
 
-    let add = gtk::Button::builder()
-        .label(t("settings-map-add"))
-        .css_classes(["string-list-add"])
-        .halign(gtk::Align::Start)
-        .build();
+    let add = add_button("settings-map-add");
     let add_state = Rc::clone(&state);
     add.connect_clicked(move |_| {
         add_state.append_row("", &WorkspaceStyle::default());

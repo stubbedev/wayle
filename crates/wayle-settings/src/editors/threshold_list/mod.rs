@@ -21,6 +21,7 @@ use wayle_i18n::t;
 
 use crate::{
     editors::{
+        list_controls::{add_button, remove_button},
         optional::{OptionalWidget, optional_color_widget, optional_number_f64_widget},
         spawn_property_watcher,
     },
@@ -109,11 +110,8 @@ impl ThresholdState {
             root.append(&field_row(label_key, &control.widget));
         }
 
-        let remove = gtk::Button::builder()
-            .label(t("settings-list-remove"))
-            .css_classes(["string-list-add", "threshold-remove"])
-            .halign(gtk::Align::End)
-            .build();
+        let remove = remove_button("settings-list-remove");
+        remove.set_halign(gtk::Align::End);
         let remove_state = Rc::clone(self);
         let remove_index = Rc::clone(&index);
         remove.connect_clicked(move |_| {
@@ -204,11 +202,7 @@ pub(crate) fn threshold_list(property: &ConfigProperty<Vec<ThresholdEntry>>) -> 
     });
     state.rebuild();
 
-    let add = gtk::Button::builder()
-        .label(t("settings-list-add"))
-        .css_classes(["string-list-add"])
-        .halign(gtk::Align::Start)
-        .build();
+    let add = add_button("settings-list-add");
     let add_state = Rc::clone(&state);
     add.connect_clicked(move |_| {
         let mut entries = add_state.entries();

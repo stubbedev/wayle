@@ -1,0 +1,31 @@
+// Shared add / remove buttons for list, map, and card-form editors. A compact
+// bordered icon button; plus = add, trash = remove (destructive). Styled like
+// the entry/dropdown fields so it reads as a real button.
+.list-control-button {
+    padding: var(--space-xs);
+    min-width: 0;
+    min-height: 0;
+    color: var(--fg-muted);
+    background-color: var(--bg-overlay);
+    border: 1px solid var(--border-default);
+    border-radius: var(--rounding-element);
+    -gtk-icon-size: var(--icon-sm);
+    transition:
+        color var(--duration-fast),
+        border-color var(--duration-fast);
+
+    &:hover {
+        color: var(--fg-default);
+        border-color: var(--accent);
+    }
+}
+
+.list-control-remove {
+    margin-top: var(--space-xs);
+    color: var(--status-error);
+
+    &:hover {
+        color: var(--status-error);
+        border-color: var(--status-error);
+    }
+}

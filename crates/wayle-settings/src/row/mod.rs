@@ -132,6 +132,9 @@ impl SimpleComponent for SettingRow {
                 },
             },
 
+            // Always allocated so showing/hiding it never reflows the row (the
+            // icon is taller than the title it sits beside). Toggle opacity +
+            // interactivity instead of visibility.
             #[name = "reset_button"]
             gtk::Button {
                 add_css_class: "setting-reset",
@@ -140,7 +143,11 @@ impl SimpleComponent for SettingRow {
                 set_hexpand: false,
                 set_cursor_from_name: Some("pointer"),
                 #[watch]
-                set_visible: model.has_runtime_override(),
+                set_opacity: if model.has_runtime_override() { 1.0 } else { 0.0 },
+                #[watch]
+                set_sensitive: model.has_runtime_override(),
+                #[watch]
+                set_can_focus: model.has_runtime_override(),
                 connect_clicked => SettingRowMsg::ClearOverride,
             },
 

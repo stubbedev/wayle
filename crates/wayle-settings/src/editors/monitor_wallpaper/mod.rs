@@ -9,9 +9,8 @@ use card::{MonitorCard, MonitorCardOutput};
 use relm4::{gtk, gtk::prelude::*, prelude::*};
 pub(crate) use row::monitor_wallpaper;
 use wayle_config::{ConfigProperty, schemas::wallpaper::MonitorWallpaperConfig};
-use wayle_i18n::t;
 
-use super::{WatcherHandle, spawn_property_watcher};
+use super::{WatcherHandle, list_controls::add_button, spawn_property_watcher};
 
 pub(crate) struct MonitorWallpaperControl {
     pub(super) property: ConfigProperty<Vec<MonitorWallpaperConfig>>,
@@ -67,22 +66,10 @@ impl SimpleComponent for MonitorWallpaperControl {
             }
         }
 
-        let add_icon = gtk::Image::from_icon_name("ld-plus-symbolic");
-        let add_label = gtk::Label::new(Some(&t("settings-monitor-add")));
-        let add_content = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        add_content.append(&add_icon);
-        add_content.append(&add_label);
-
-        let add_button = gtk::Button::builder()
-            .child(&add_content)
-            .halign(gtk::Align::Start)
-            .build();
-
-        add_button.add_css_class("ghost");
-        add_button.set_cursor_from_name(Some("pointer"));
+        let add = add_button("settings-monitor-add");
 
         let input_sender = sender.input_sender().clone();
-        add_button.connect_clicked(move |_button| {
+        add.connect_clicked(move |_button| {
             let _ = input_sender.send(MonitorWallpaperMsg::Add);
         });
 
@@ -92,7 +79,7 @@ impl SimpleComponent for MonitorWallpaperControl {
         });
 
         root.append(&card_list);
-        root.append(&add_button);
+        root.append(&add);
 
         let model = Self {
             property,
