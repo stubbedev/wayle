@@ -28,6 +28,7 @@ settings-layout-count = { $count } layouts
 settings-font-search = Search fonts...
 settings-unit-scale = scale
 settings-inherit = Inherit (default)
+settings-override = Override the default
 settings-icon-none = No icon
 settings-icon-clear = Clear icon
 settings-icon-search = Search icons...

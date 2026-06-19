@@ -51,6 +51,31 @@ impl PropertyHandle {
         }
     }
 
+    /// Overrides the source so it reflects a single field of a composite
+    /// property: `Default` (no badge / reset) while the field is `None`
+    /// (inherited), otherwise the whole property's source. Lets two rows backed
+    /// by the same atomic struct property (e.g. a dropdown's width + height)
+    /// show the "config"/"custom" badge only on the axis that was actually set.
+    pub(crate) fn with_field_source<T, U>(
+        mut self,
+        property: &ConfigProperty<T>,
+        project: fn(&T) -> Option<U>,
+    ) -> Self
+    where
+        T: Clone + Send + Sync + PartialEq + 'static,
+        U: 'static,
+    {
+        let prop = property.clone();
+        self.source = Box::new(move || {
+            if project(&prop.get()).is_some() {
+                prop.source()
+            } else {
+                ValueSource::Default
+            }
+        });
+        self
+    }
+
     pub(crate) fn source(&self) -> ValueSource {
         (self.source)()
     }

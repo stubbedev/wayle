@@ -47,6 +47,7 @@ settings-layout-hidden = Barre masquée sur ce moniteur
 ## Tailles et menus déroulants
 settings-size-scale = Échelle
 settings-size-px = Pixels
+settings-override = Remplacer la valeur par défaut
 settings-dropdown-width = Largeur
     .description = Largeur du panneau. Non défini utilise la valeur par défaut
 settings-dropdown-height = Hauteur

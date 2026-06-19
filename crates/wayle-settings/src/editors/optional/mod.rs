@@ -1,8 +1,9 @@
 //! "Inherit"-aware controls for `Option<_>` config fields.
 //!
 //! A `None` value means "inherit / use the fallback". Enum fields render as a
-//! dropdown whose first entry is *Inherit*; numeric fields render as an
-//! *Inherit* checkbox next to a spin button that is disabled while inherited.
+//! dropdown whose first entry is *Inherit*; numeric/color fields render as an
+//! override switch ([`override_switch`]) next to a control that is disabled
+//! while inherited — the switch is **on** only when a custom value is set.
 //!
 //! The widget builders ([`optional_enum_widget`], [`optional_number_widget`])
 //! are generic over `get`/`set` closures so they can drive either a whole
@@ -44,6 +45,19 @@ impl OptionalWidget {
     pub(crate) fn refresh(&self) {
         (self.refresh)();
     }
+}
+
+/// A compact "override the default" switch shared by every optional editor: a
+/// lone switch (no label — the value controls beside it light up when it's on,
+/// and the tooltip names it). Switch **on** means the field carries a custom
+/// value; **off** means it inherits (value `None`). So the calm default state is
+/// every switch off, and flipping one on enables its controls.
+pub(crate) fn override_switch() -> gtk::Switch {
+    gtk::Switch::builder()
+        .valign(gtk::Align::Center)
+        .css_classes(["inherit-switch"])
+        .tooltip_text(t("settings-override"))
+        .build()
 }
 
 fn variant_label(variant: &EnumVariant) -> String {
@@ -141,8 +155,7 @@ pub(crate) fn optional_number_widget(
         .valign(gtk::Align::Center)
         .build();
 
-    let inherit = gtk::CheckButton::with_label(&t("settings-inherit"));
-    inherit.set_valign(gtk::Align::Center);
+    let inherit = override_switch();
 
     let adjustment = gtk::Adjustment::new(f64::from(fallback), min, max, step, step, 0.0);
     let spin = gtk::SpinButton::builder()
@@ -152,7 +165,7 @@ pub(crate) fn optional_number_widget(
         .build();
 
     let initial = get();
-    inherit.set_active(initial.is_none());
+    inherit.set_active(initial.is_some());
     spin.set_sensitive(initial.is_some());
     if let Some(value) = initial {
         spin.set_value(f64::from(value));
@@ -161,26 +174,26 @@ pub(crate) fn optional_number_widget(
     container.append(&inherit);
     container.append(&spin);
 
-    // Checkbox: toggling inherit on clears the value; toggling off commits the
-    // current spin value so the field leaves the inherited state immediately.
+    // Switch: turning override on commits the current spin value so the field
+    // leaves the inherited state immediately; turning it off clears the value.
     let toggle_set = Rc::clone(&set);
     let toggle_spin = spin.clone();
-    let inherit_handler = inherit.connect_toggled(move |inherit| {
-        let inherited = inherit.is_active();
-        toggle_spin.set_sensitive(!inherited);
-        if inherited {
-            toggle_set(None);
-        } else {
+    let inherit_handler = inherit.connect_active_notify(move |inherit| {
+        let active = inherit.is_active();
+        toggle_spin.set_sensitive(active);
+        if active {
             toggle_set(Some(toggle_spin.value() as u32));
+        } else {
+            toggle_set(None);
         }
     });
     let inherit_handler = Rc::new(inherit_handler);
 
-    // Spin: only writes while not inherited.
+    // Spin: only writes while overriding.
     let spin_set = Rc::clone(&set);
     let spin_inherit = inherit.clone();
     let spin_handler = spin.connect_value_changed(move |spin| {
-        if !spin_inherit.is_active() {
+        if spin_inherit.is_active() {
             spin_set(Some(spin.value() as u32));
         }
     });
@@ -194,7 +207,7 @@ pub(crate) fn optional_number_widget(
         let value = get();
         refresh_inherit.block_signal(&refresh_inherit_handler);
         refresh_spin.block_signal(&refresh_spin_handler);
-        refresh_inherit.set_active(value.is_none());
+        refresh_inherit.set_active(value.is_some());
         refresh_spin.set_sensitive(value.is_some());
         if let Some(value) = value {
             refresh_spin.set_value(f64::from(value));
@@ -319,8 +332,7 @@ pub(crate) fn optional_number_f64_widget(
         .valign(gtk::Align::Center)
         .build();
 
-    let inherit = gtk::CheckButton::with_label(&t("settings-inherit"));
-    inherit.set_valign(gtk::Align::Center);
+    let inherit = override_switch();
 
     let adjustment = gtk::Adjustment::new(fallback, min, max, step, step, 0.0);
     let spin = gtk::SpinButton::builder()
@@ -330,7 +342,7 @@ pub(crate) fn optional_number_f64_widget(
         .build();
 
     let initial = get();
-    inherit.set_active(initial.is_none());
+    inherit.set_active(initial.is_some());
     spin.set_sensitive(initial.is_some());
     if let Some(value) = initial {
         spin.set_value(value);
@@ -341,13 +353,13 @@ pub(crate) fn optional_number_f64_widget(
 
     let toggle_set = Rc::clone(&set);
     let toggle_spin = spin.clone();
-    let inherit_handler = inherit.connect_toggled(move |inherit| {
-        let inherited = inherit.is_active();
-        toggle_spin.set_sensitive(!inherited);
-        if inherited {
-            toggle_set(None);
-        } else {
+    let inherit_handler = inherit.connect_active_notify(move |inherit| {
+        let active = inherit.is_active();
+        toggle_spin.set_sensitive(active);
+        if active {
             toggle_set(Some(toggle_spin.value()));
+        } else {
+            toggle_set(None);
         }
     });
     let inherit_handler = Rc::new(inherit_handler);
@@ -355,7 +367,7 @@ pub(crate) fn optional_number_f64_widget(
     let spin_set = Rc::clone(&set);
     let spin_inherit = inherit.clone();
     let spin_handler = spin.connect_value_changed(move |spin| {
-        if !spin_inherit.is_active() {
+        if spin_inherit.is_active() {
             spin_set(Some(spin.value()));
         }
     });
@@ -369,7 +381,7 @@ pub(crate) fn optional_number_f64_widget(
         let value = get();
         refresh_inherit.block_signal(&refresh_inherit_handler);
         refresh_spin.block_signal(&refresh_spin_handler);
-        refresh_inherit.set_active(value.is_none());
+        refresh_inherit.set_active(value.is_some());
         refresh_spin.set_sensitive(value.is_some());
         if let Some(value) = value {
             refresh_spin.set_value(value);
@@ -397,8 +409,7 @@ pub(crate) fn optional_color_widget(
         .valign(gtk::Align::Center)
         .build();
 
-    let inherit = gtk::CheckButton::with_label(&t("settings-inherit"));
-    inherit.set_valign(gtk::Align::Center);
+    let inherit = override_switch();
 
     let scratch = ConfigProperty::new(get().unwrap_or(ColorValue::Auto));
     let controller = ColorValueControl::builder()
@@ -407,7 +418,7 @@ pub(crate) fn optional_color_widget(
     let color_widget = controller.widget().clone();
 
     let initial = get();
-    inherit.set_active(initial.is_none());
+    inherit.set_active(initial.is_some());
     color_widget.set_sensitive(initial.is_some());
 
     container.append(&inherit);
@@ -416,24 +427,24 @@ pub(crate) fn optional_color_widget(
     let toggle_set = Rc::clone(&set);
     let toggle_scratch = scratch.clone();
     let toggle_widget = color_widget.clone();
-    let inherit_handler = inherit.connect_toggled(move |inherit| {
-        let inherited = inherit.is_active();
-        toggle_widget.set_sensitive(!inherited);
-        if inherited {
-            toggle_set(None);
-        } else {
+    let inherit_handler = inherit.connect_active_notify(move |inherit| {
+        let active = inherit.is_active();
+        toggle_widget.set_sensitive(active);
+        if active {
             toggle_set(Some(toggle_scratch.get()));
+        } else {
+            toggle_set(None);
         }
     });
     let inherit_handler = Rc::new(inherit_handler);
 
     // Scratch edits (made through the ColorValue component) flow to the field
-    // while not inherited.
+    // while overriding.
     let scratch_set = Rc::clone(&set);
     let scratch_inherit = inherit.clone();
     let scratch_for_watch = scratch.clone();
     let scratch_watcher = spawn_property_watcher(&scratch, move || {
-        if !scratch_inherit.is_active() {
+        if scratch_inherit.is_active() {
             scratch_set(Some(scratch_for_watch.get()));
         }
         true
@@ -451,14 +462,14 @@ pub(crate) fn optional_color_widget(
         refresh_inherit.block_signal(&refresh_inherit_handler);
         match value {
             Some(color) => {
-                refresh_inherit.set_active(false);
+                refresh_inherit.set_active(true);
                 refresh_widget.set_sensitive(true);
                 if refresh_scratch.get() != color {
                     refresh_scratch.set(color);
                 }
             }
             None => {
-                refresh_inherit.set_active(true);
+                refresh_inherit.set_active(false);
                 refresh_widget.set_sensitive(false);
             }
         }

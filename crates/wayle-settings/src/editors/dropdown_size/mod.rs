@@ -13,7 +13,9 @@ use wayle_config::{
 use wayle_i18n::t;
 
 use crate::{
-    editors::spawn_property_watcher, pages::spec::SettingRowInit, property_handle::PropertyHandle,
+    editors::{optional::override_switch, spawn_property_watcher},
+    pages::spec::SettingRowInit,
+    property_handle::PropertyHandle,
     row::RowBehavior,
 };
 
@@ -44,24 +46,24 @@ fn configure_spin_for_mode(spin: &gtk::SpinButton, is_px: bool) {
 /// the caller where needed).
 fn apply_size(
     value: Option<Size>,
-    inherit: &gtk::CheckButton,
+    inherit: &gtk::Switch,
     mode: &gtk::DropDown,
     spin: &gtk::SpinButton,
 ) {
     match value {
         Some(Size::Scale(v)) => {
-            inherit.set_active(false);
+            inherit.set_active(true);
             mode.set_selected(SCALE_INDEX);
             configure_spin_for_mode(spin, false);
             spin.set_value(f64::from(v));
         }
         Some(Size::Px(v)) => {
-            inherit.set_active(false);
+            inherit.set_active(true);
             mode.set_selected(PX_INDEX);
             configure_spin_for_mode(spin, true);
             spin.set_value(f64::from(v.round()));
         }
-        None => inherit.set_active(true),
+        None => inherit.set_active(false),
     }
     let active = value.is_some();
     mode.set_sensitive(active);
@@ -76,9 +78,7 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
         .valign(gtk::Align::Center)
         .build();
 
-    let inherit = gtk::CheckButton::with_label(&t("settings-inherit"));
-    inherit.set_valign(gtk::Align::Center);
-    inherit.add_css_class("size-inherit");
+    let inherit = override_switch();
 
     let modes = gtk::StringList::new(&[&t("settings-size-scale"), &t("settings-size-px")]);
     let mode = gtk::DropDown::new(Some(modes), gtk::Expression::NONE);
@@ -102,7 +102,7 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
         let mode = mode.clone();
         let spin = spin.clone();
         Rc::new(move || {
-            if inherit.is_active() {
+            if !inherit.is_active() {
                 set(None);
                 return;
             }
@@ -119,8 +119,8 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
     let toggle_commit = Rc::clone(&commit);
     let toggle_mode = mode.clone();
     let toggle_spin = spin.clone();
-    let inherit_handler = inherit.connect_toggled(move |inherit| {
-        let active = !inherit.is_active();
+    let inherit_handler = inherit.connect_active_notify(move |inherit| {
+        let active = inherit.is_active();
         toggle_mode.set_sensitive(active);
         toggle_spin.set_sensitive(active);
         toggle_commit();
@@ -135,7 +135,7 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
     let spin_handler = spin.connect_value_changed(move |_| spin_commit());
 
     let handlers: Rc<(
-        gtk::CheckButton,
+        gtk::Switch,
         SignalHandlerId,
         gtk::DropDown,
         SignalHandlerId,
@@ -218,7 +218,8 @@ fn size_field_row(
 
     SettingRowInit {
         i18n_key: Some(i18n_key),
-        handle: PropertyHandle::new(property, move |size| display_size(get_field(size))),
+        handle: PropertyHandle::new(property, move |size| display_size(get_field(size)))
+            .with_field_source(property, get_field),
         control: widget,
         keepalive: Box::new((control, watcher)),
         full_width: false,

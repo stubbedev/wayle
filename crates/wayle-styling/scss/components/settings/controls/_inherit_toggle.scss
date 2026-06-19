@@ -1,0 +1,12 @@
+// Compact "inherit / use the default" toggle used by every optional editor: a
+// lone small switch (no label). When inherited it's on and the value controls
+// beside it are dimmed, which conveys the state; the tooltip names it.
+.inherit-switch {
+    min-width: calc(1.9rem * var(--global-scale));
+    min-height: calc(1.05rem * var(--global-scale));
+
+    slider {
+        min-width: calc(0.85rem * var(--global-scale));
+        min-height: calc(0.85rem * var(--global-scale));
+    }
+}
