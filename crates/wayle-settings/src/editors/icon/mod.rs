@@ -117,7 +117,7 @@ fn build_popover() -> (gtk::Popover, gtk::Entry, gtk::Button, gtk::FlowBox) {
 /// Updates the trigger button to reflect the current icon name.
 fn update_display(image: &gtk::Image, label: &gtk::Label, name: &str) {
     if name.is_empty() {
-        image.set_icon_name(Some("image-missing"));
+        image.set_icon_name(Some("ld-image-symbolic"));
         label.set_text(&t("settings-icon-none"));
     } else {
         image.set_icon_name(Some(name));

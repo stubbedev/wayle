@@ -110,16 +110,33 @@ pub(crate) fn resolve_icon(
 }
 
 /// Classifies a non-empty icon string as either a file path or theme icon name.
+///
+/// A `-symbolic.svg` file (e.g. a brand glyph wayle hands `notify-send` as an
+/// absolute path) is resolved back to its theme name so GTK loads it through
+/// the symbolic code path and recolors it to the foreground — otherwise the
+/// monochrome glyph renders as a flat black shape on the dark popup.
 fn try_icon_string(value: &Option<String>) -> Option<ResolvedIcon> {
     let icon = value.as_deref().filter(|raw| !raw.is_empty())?;
 
-    if let Some(path) = icon.strip_prefix("file://") {
+    let path = icon.strip_prefix("file://").unwrap_or(icon);
+    if path.starts_with('/') {
+        if let Some(name) = symbolic_icon_name(path) {
+            return Some(ResolvedIcon::Named(name));
+        }
         Some(ResolvedIcon::File(path.to_owned()))
-    } else if icon.starts_with('/') {
-        Some(ResolvedIcon::File(icon.to_owned()))
     } else {
         Some(ResolvedIcon::Named(icon.to_owned()))
     }
+}
+
+/// The theme name for a symbolic SVG path (`/…/si-gmail-symbolic.svg` →
+/// `si-gmail-symbolic`), or `None` for any other file.
+fn symbolic_icon_name(path: &str) -> Option<String> {
+    let stem = std::path::Path::new(path)
+        .file_name()?
+        .to_str()?
+        .strip_suffix(".svg")?;
+    stem.ends_with("-symbolic").then(|| stem.to_owned())
 }
 
 fn mapped_icon(app_name: &Option<String>) -> ResolvedIcon {
