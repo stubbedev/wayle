@@ -15,6 +15,11 @@
     border-color: var(--accent);
 }
 
+// Disabled (inherited / override off): dim so it reads as not clickable.
+.setting-control dropdown:disabled {
+    opacity: 0.45;
+}
+
 .setting-control dropdown button arrow {
     -gtk-icon-source: -gtk-icontheme("ld-chevron-down-symbolic");
     -gtk-icon-size: var(--icon-xs);

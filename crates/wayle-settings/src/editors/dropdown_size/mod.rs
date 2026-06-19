@@ -82,6 +82,7 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
 
     let modes = gtk::StringList::new(&[&t("settings-size-scale"), &t("settings-size-px")]);
     let mode = gtk::DropDown::new(Some(modes), gtk::Expression::NONE);
+    mode.set_cursor_from_name(Some("pointer"));
 
     let adjustment = gtk::Adjustment::new(SPIN_FALLBACK, 0.0, 10_000.0, 0.05, 1.0, 0.0);
     let spin = gtk::SpinButton::builder()

@@ -53,11 +53,13 @@ impl OptionalWidget {
 /// value; **off** means it inherits (value `None`). So the calm default state is
 /// every switch off, and flipping one on enables its controls.
 pub(crate) fn override_switch() -> gtk::Switch {
-    gtk::Switch::builder()
+    let switch = gtk::Switch::builder()
         .valign(gtk::Align::Center)
         .css_classes(["inherit-switch"])
         .tooltip_text(t("settings-override"))
-        .build()
+        .build();
+    switch.set_cursor_from_name(Some("pointer"));
+    switch
 }
 
 fn variant_label(variant: &EnumVariant) -> String {

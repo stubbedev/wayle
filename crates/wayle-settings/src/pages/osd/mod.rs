@@ -21,19 +21,24 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
         icon: "ld-monitor-symbolic",
         spec: page_spec(
             "settings-page-osd",
-            vec![SectionSpec {
-                title_key: "settings-section-display",
-                items: vec![
-                    toggle(&osd.enabled),
-                    enum_select(&osd.position),
-                    enum_select(&osd.layer),
-                    enum_select(&osd.text_align),
-                    number_u32(&osd.duration),
-                    text_like(&osd.monitor),
-                    size(&osd.margin),
-                    toggle(&osd.border),
-                ],
-            }],
+            vec![
+                SectionSpec {
+                    title_key: "settings-section-general",
+                    items: vec![toggle(&osd.enabled)],
+                },
+                SectionSpec {
+                    title_key: "settings-section-display",
+                    items: vec![
+                        enum_select(&osd.position),
+                        enum_select(&osd.layer),
+                        enum_select(&osd.text_align),
+                        number_u32(&osd.duration),
+                        text_like(&osd.monitor),
+                        size(&osd.margin),
+                        toggle(&osd.border),
+                    ],
+                },
+            ],
         ),
     }
 }
