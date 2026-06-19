@@ -2139,26 +2139,6 @@
       },
       "type": "object"
     },
-    "EncoderPreset": {
-      "description": "Encoder speed/quality trade-off. Slower presets produce smaller files at\nthe same bitrate, using more CPU.",
-      "oneOf": [
-        {
-          "const": "speed",
-          "description": "Fastest, lowest CPU, largest files.",
-          "type": "string"
-        },
-        {
-          "const": "balanced",
-          "description": "Balanced size and CPU (default).",
-          "type": "string"
-        },
-        {
-          "const": "quality",
-          "description": "Slowest, best compression / smallest files.",
-          "type": "string"
-        }
-      ]
-    },
     "ExecutionMode": {
       "description": "Execution mode for custom module commands.",
       "oneOf": [
@@ -4207,12 +4187,9 @@
         "recorder": {
           "$ref": "#/$defs/RecorderConfig",
           "default": {
-            "audio-bitrate-kbps": 128,
-            "bitrate-kbps": 8000,
             "border-color": "red",
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
-            "encoder-preset": "balanced",
             "format": "{{ elapsed }}",
             "framerate": 30,
             "icon-bg-color": "red",
@@ -5532,16 +5509,6 @@
     "RecorderConfig": {
       "description": "Native screen recorder backed by a GStreamer pipeline.\n\nClick the bar button to start/stop; the dropdown exposes the recording\noptions below. Controllable from the CLI / RPC socket:\n`wayle recorder start|stop|toggle|pause|status`.",
       "properties": {
-        "audio-bitrate-kbps": {
-          "$ref": "#/$defs/uint32",
-          "default": 128,
-          "description": "Audio bitrate per track in kilobits per second."
-        },
-        "bitrate-kbps": {
-          "$ref": "#/$defs/uint32",
-          "default": 8000,
-          "description": "Video bitrate in kilobits per second."
-        },
         "border-color": {
           "$ref": "#/$defs/ColorValue",
           "default": "red",
@@ -5556,11 +5523,6 @@
           "$ref": "#/$defs/ColorValue",
           "default": "bg-surface-elevated",
           "description": "Button background color token."
-        },
-        "encoder-preset": {
-          "$ref": "#/$defs/EncoderPreset",
-          "default": "balanced",
-          "description": "Encoder speed/quality trade-off (smaller files vs less CPU)."
         },
         "format": {
           "$ref": "#/$defs/string",
@@ -8240,12 +8202,9 @@
           "thresholds": []
         },
         "recorder": {
-          "audio-bitrate-kbps": 128,
-          "bitrate-kbps": 8000,
           "border-color": "red",
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
-          "encoder-preset": "balanced",
           "format": "{{ elapsed }}",
           "framerate": 30,
           "icon-bg-color": "red",
