@@ -15,20 +15,6 @@ pub enum WebcamPosition {
     BottomRight,
 }
 
-/// Encoder speed/quality trade-off. Slower presets produce smaller files at
-/// the same bitrate, using more CPU.
-#[wayle_enum(default)]
-#[serde(rename_all = "kebab-case")]
-pub enum EncoderPreset {
-    /// Fastest, lowest CPU, largest files.
-    Speed,
-    /// Balanced size and CPU (default).
-    #[default]
-    Balanced,
-    /// Slowest, best compression / smallest files.
-    Quality,
-}
-
 /// Container format / codec preset for recordings.
 #[wayle_enum(default)]
 #[serde(rename_all = "kebab-case")]

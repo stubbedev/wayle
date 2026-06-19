@@ -21,7 +21,7 @@ use futures::StreamExt;
 use gst::prelude::*;
 use gstreamer as gst;
 pub use options::{
-    AudioOptions, EncoderPreset, OutputFormat, RecordOptions, WebcamOptions, WebcamPosition,
+    AudioOptions, OutputFormat, RecordOptions, WebcamOptions, WebcamPosition,
 };
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
@@ -129,26 +129,23 @@ impl Recorder {
         }
 
         let cast = portal::open_screencast(opts.show_cursor).await?;
-        let description = pipeline::build(opts, &cast);
-        info!(path = %opts.output_path, "starting recording pipeline");
 
-        let element =
-            gst::parse::launch(&description).map_err(|e| Error::Pipeline(e.to_string()))?;
-        let pipeline = element
-            .downcast::<gst::Pipeline>()
-            .map_err(|_| Error::Pipeline(String::from("parsed element is not a pipeline")))?;
-
-        pipeline
-            .set_state(gst::State::Playing)
-            .map_err(|e| Error::State(e.to_string()))?;
-
-        // A live pipeline reaches Playing asynchronously, so set_state above
-        // returning Ok means nothing. Block until it actually settles; if it
-        // failed, scrape the bus for the real reason and tear down.
-        if let Err(reason) = confirm_playing(&pipeline) {
-            let _ = pipeline.set_state(gst::State::Null);
-            return Err(Error::Capture(reason));
-        }
+        // Prefer a hardware encoder, but never let a flaky GPU encode path block
+        // a recording: if the detected hardware encoder fails to launch or reach
+        // Playing, rebuild on the always-available software path and try once
+        // more before giving up. Reuses the same portal session, so the user is
+        // never re-prompted.
+        let built = pipeline::build(opts, &cast);
+        info!(path = %opts.output_path, hardware = built.hardware, "starting recording pipeline");
+        let pipeline = match launch_pipeline(&built.description) {
+            Ok(pipeline) => pipeline,
+            Err(reason) if built.hardware => {
+                warn!(reason, "hardware encoder failed; retrying with software");
+                let software = pipeline::build_software(opts, &cast);
+                launch_pipeline(&software.description).map_err(Error::Capture)?
+            }
+            Err(reason) => return Err(Error::Capture(reason)),
+        };
 
         let stopping = std::sync::Arc::new(AtomicBool::new(false));
         let monitor = spawn_monitor(&pipeline, stopping.clone(), term_tx);
@@ -222,6 +219,34 @@ impl Recorder {
             .map_err(|e| Error::State(e.to_string()))?;
         Ok(())
     }
+}
+
+/// Parses, plays, and confirms a single pipeline attempt.
+///
+/// Returns the running pipeline, or a human-readable reason on any failure
+/// (parse, downcast, state change, or a failed/timed-out transition to
+/// `Playing`). A failed pipeline is reset to `Null` before returning so it
+/// releases its resources; the caller can then retry with another description.
+fn launch_pipeline(description: &str) -> Result<gst::Pipeline, String> {
+    let element = gst::parse::launch(description).map_err(|e| e.to_string())?;
+    let pipeline = element
+        .downcast::<gst::Pipeline>()
+        .map_err(|_| String::from("parsed element is not a pipeline"))?;
+
+    if let Err(e) = pipeline.set_state(gst::State::Playing) {
+        let _ = pipeline.set_state(gst::State::Null);
+        return Err(e.to_string());
+    }
+
+    // A live pipeline reaches Playing asynchronously, so set_state returning Ok
+    // means nothing. Block until it actually settles; if it failed, scrape the
+    // bus for the real reason and tear down.
+    if let Err(reason) = confirm_playing(&pipeline) {
+        let _ = pipeline.set_state(gst::State::Null);
+        return Err(reason);
+    }
+
+    Ok(pipeline)
 }
 
 /// Blocks until the pipeline finishes its transition to `Playing`.

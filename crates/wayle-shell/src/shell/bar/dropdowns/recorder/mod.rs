@@ -8,10 +8,7 @@ use std::sync::Arc;
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
 use wayle_audio::AudioService;
-use wayle_config::{
-    ConfigService,
-    schemas::modules::{EncoderPreset, WebcamPosition},
-};
+use wayle_config::{ConfigService, schemas::modules::WebcamPosition};
 use wayle_widgets::prelude::*;
 
 pub(super) use self::factory::Factory;
@@ -22,12 +19,6 @@ use self::{
 use crate::{i18n::t, services::recorder::RecorderState, shell::bar::dropdowns::resolve_dimension};
 
 const BASE_WIDTH: f32 = 360.0;
-const MIN_BITRATE: f64 = 500.0;
-const MAX_BITRATE: f64 = 50_000.0;
-const BITRATE_STEP: f64 = 500.0;
-const MIN_AUDIO_BITRATE: f64 = 16.0;
-const MAX_AUDIO_BITRATE: f64 = 512.0;
-const AUDIO_BITRATE_STEP: f64 = 16.0;
 
 pub(crate) struct RecorderDropdown {
     config: Arc<ConfigService>,
@@ -261,28 +252,6 @@ impl Component for RecorderDropdown {
                                 } @sep_toggle,
                             },
                         },
-
-                        gtk::Box {
-                            add_css_class: "recorder-row",
-                            gtk::Label {
-                                set_hexpand: true,
-                                set_halign: gtk::Align::Start,
-                                set_label: &t!("dropdown-recorder-audio-bitrate"),
-                            },
-                            gtk::SpinButton {
-                                set_adjustment: &gtk::Adjustment::new(
-                                    f64::from(model.config.config().modules.recorder.audio_bitrate_kbps.get()),
-                                    MIN_AUDIO_BITRATE,
-                                    MAX_AUDIO_BITRATE,
-                                    AUDIO_BITRATE_STEP,
-                                    AUDIO_BITRATE_STEP,
-                                    0.0,
-                                ),
-                                connect_value_changed[sender] => move |spin| {
-                                    sender.input(RecorderDropdownMsg::AudioBitrateChanged(spin.value() as u32));
-                                },
-                            },
-                        },
                     },
 
                     // --- Webcam (hidden entirely when no camera is present) ----
@@ -391,63 +360,6 @@ impl Component for RecorderDropdown {
                             },
                         },
                     },
-
-                    // --- Video -------------------------------------------------
-                    gtk::Box {
-                        add_css_class: "recorder-section-header",
-                        set_spacing: 6,
-                        gtk::Image { set_icon_name: Some("ld-film-symbolic") },
-                        gtk::Label {
-                            add_css_class: "section-label",
-                            set_halign: gtk::Align::Start,
-                            set_label: &t!("dropdown-recorder-section-video"),
-                        },
-                    },
-
-                    gtk::Box {
-                        set_css_classes: &["card", "recorder-card"],
-                        set_orientation: gtk::Orientation::Vertical,
-
-                        gtk::Box {
-                            add_css_class: "recorder-row",
-                            gtk::Label {
-                                set_hexpand: true,
-                                set_halign: gtk::Align::Start,
-                                set_label: &t!("dropdown-recorder-bitrate"),
-                            },
-                            gtk::SpinButton {
-                                set_adjustment: &gtk::Adjustment::new(
-                                    f64::from(model.config.config().modules.recorder.bitrate_kbps.get()),
-                                    MIN_BITRATE,
-                                    MAX_BITRATE,
-                                    BITRATE_STEP,
-                                    BITRATE_STEP,
-                                    0.0,
-                                ),
-                                connect_value_changed[sender] => move |spin| {
-                                    sender.input(RecorderDropdownMsg::BitrateChanged(spin.value() as u32));
-                                },
-                            },
-                        },
-
-                        gtk::Box {
-                            add_css_class: "recorder-row",
-                            gtk::Label {
-                                set_hexpand: true,
-                                set_halign: gtk::Align::Start,
-                                set_label: &t!("dropdown-recorder-preset"),
-                            },
-                            gtk::DropDown {
-                                set_model: Some(&gtk::StringList::new(&["Speed", "Balanced", "Quality"])),
-                                set_selected: preset_index(
-                                    model.config.config().modules.recorder.encoder_preset.get(),
-                                ),
-                                connect_selected_notify[sender] => move |dropdown| {
-                                    sender.input(RecorderDropdownMsg::PresetSelected(dropdown.selected()));
-                                },
-                            },
-                        },
-                    },
                 },
             },
         }
@@ -520,15 +432,8 @@ impl Component for RecorderDropdown {
                 recorder.webcam_position.set(position);
                 self.webcam_position = position;
             }
-            RecorderDropdownMsg::BitrateChanged(kbps) => recorder.bitrate_kbps.set(kbps),
-            RecorderDropdownMsg::AudioBitrateChanged(kbps) => {
-                recorder.audio_bitrate_kbps.set(kbps);
-            }
             RecorderDropdownMsg::SeparateTracksToggled(active) => {
                 recorder.separate_audio_tracks.set(active);
-            }
-            RecorderDropdownMsg::PresetSelected(index) => {
-                recorder.encoder_preset.set(preset_from_index(index));
             }
         }
     }
@@ -598,21 +503,5 @@ fn position_from_index(index: u32) -> WebcamPosition {
         1 => WebcamPosition::TopRight,
         2 => WebcamPosition::BottomLeft,
         _ => WebcamPosition::BottomRight,
-    }
-}
-
-fn preset_index(preset: EncoderPreset) -> u32 {
-    match preset {
-        EncoderPreset::Speed => 0,
-        EncoderPreset::Balanced => 1,
-        EncoderPreset::Quality => 2,
-    }
-}
-
-fn preset_from_index(index: u32) -> EncoderPreset {
-    match index {
-        0 => EncoderPreset::Speed,
-        2 => EncoderPreset::Quality,
-        _ => EncoderPreset::Balanced,
     }
 }

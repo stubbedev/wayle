@@ -49,12 +49,29 @@ pub(crate) struct IconPickerWidget {
     _keep: Box<dyn std::any::Any>,
 }
 
-/// Builds the picker popover body (search entry + scrolled grid) and returns it
-/// alongside the search entry and grid for wiring.
-fn build_popover() -> (gtk::Popover, gtk::SearchEntry, gtk::FlowBox) {
+/// Builds the picker popover body (search entry + clear button + scrolled grid)
+/// and returns it alongside the search entry, clear button, and grid for wiring.
+fn build_popover() -> (gtk::Popover, gtk::SearchEntry, gtk::Button, gtk::FlowBox) {
     let search = gtk::SearchEntry::builder()
         .placeholder_text(t("settings-icon-search"))
+        .hexpand(true)
         .build();
+
+    // Commits the empty string so a field can be set back to "no icon".
+    let clear = gtk::Button::builder()
+        .icon_name("edit-clear-symbolic")
+        .tooltip_text(t("settings-icon-clear"))
+        .css_classes(["flat"])
+        .valign(gtk::Align::Center)
+        .build();
+    clear.set_cursor_from_name(Some("pointer"));
+
+    let header = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(4)
+        .build();
+    header.append(&search);
+    header.append(&clear);
 
     let flow = gtk::FlowBox::builder()
         .selection_mode(gtk::SelectionMode::None)
@@ -79,11 +96,11 @@ fn build_popover() -> (gtk::Popover, gtk::SearchEntry, gtk::FlowBox) {
         .spacing(8)
         .css_classes(["icon-picker-popover"])
         .build();
-    popover_box.append(&search);
+    popover_box.append(&header);
     popover_box.append(&scroller);
 
     let popover = gtk::Popover::builder().child(&popover_box).build();
-    (popover, search, flow)
+    (popover, search, clear, flow)
 }
 
 /// Updates the trigger button to reflect the current icon name.
@@ -146,7 +163,7 @@ pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPi
 
     update_display(&image, &label, initial);
 
-    let (popover, search, flow) = build_popover();
+    let (popover, search, clear, flow) = build_popover();
     menu.set_popover(Some(&popover));
 
     // Commit a chosen name: report it via `set`, refresh the trigger, close.
@@ -200,6 +217,11 @@ pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPi
                 commit(&text);
             }
         });
+    }
+    // Clear button commits the empty string to set the field to "no icon".
+    {
+        let commit = Rc::clone(&commit);
+        clear.connect_clicked(move |_| commit(""));
     }
 
     let set_display: Rc<dyn Fn(&str)> = {

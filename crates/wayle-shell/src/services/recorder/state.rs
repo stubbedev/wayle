@@ -13,12 +13,12 @@ use tokio_util::sync::CancellationToken;
 use tracing::warn;
 use wayle_config::{
     ConfigService,
-    schemas::modules::{EncoderPreset, RecorderFormat, WebcamPosition},
+    schemas::modules::{RecorderFormat, WebcamPosition},
 };
 use wayle_core::Property;
 use wayle_recorder::{
-    AudioOptions, EncoderPreset as EngineEncoderPreset, OutputFormat, RecordOptions, Recorder,
-    WebcamOptions, WebcamPosition as EngineWebcamPosition,
+    AudioOptions, OutputFormat, RecordOptions, Recorder, WebcamOptions,
+    WebcamPosition as EngineWebcamPosition,
 };
 
 use crate::{
@@ -38,6 +38,24 @@ const START_TOAST_MS: u32 = 1000;
 const START_CAPTURE_DELAY_MS: u64 = 1400;
 /// How long the "stopped" toast stays on screen, in milliseconds.
 const STOP_TOAST_MS: u32 = 1500;
+
+/// Lifecycle of a recording. This is the single source of truth that gates
+/// start/stop, updated synchronously so it never has the gap the public
+/// `active` property does — `active` only flips true *after* the pre-capture
+/// delay and portal negotiation, which is too late to dedupe rapid clicks.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Status {
+    /// Nothing running; a `start` is allowed.
+    Idle,
+    /// A start was requested and is in its pre-capture delay / portal
+    /// negotiation. No pipeline is recording yet, and `active` is still false.
+    Starting,
+    /// A pipeline is actively recording.
+    Recording,
+    /// A stop is in progress, or has cancelled an in-flight start. Blocks
+    /// further starts/stops until it settles back to `Idle`.
+    Stopping,
+}
 
 /// Reactive recorder state shared between the D-Bus daemon and the bar module.
 ///
@@ -60,6 +78,11 @@ pub struct RecorderState {
     config: Arc<ConfigService>,
     toast_bus: ToastBus,
     timer_token: Arc<Mutex<CancellationToken>>,
+    /// Authoritative lifecycle gate; see [`Status`].
+    status: Arc<Mutex<Status>>,
+    /// Cancels the current in-flight `start` (its pre-capture delay / portal
+    /// negotiation) so a stop can abort a recording before it begins.
+    start_cancel: Arc<Mutex<CancellationToken>>,
 }
 
 impl RecorderState {
@@ -75,14 +98,65 @@ impl RecorderState {
             config,
             toast_bus,
             timer_token: Arc::new(Mutex::new(CancellationToken::new())),
+            status: Arc::new(Mutex::new(Status::Idle)),
+            start_cancel: Arc::new(Mutex::new(CancellationToken::new())),
         }
     }
 
+    fn lock_status(&self) -> std::sync::MutexGuard<'_, Status> {
+        self.status.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Replaces the in-flight start's cancellation token with a fresh one for a
+    /// new attempt, returning the new token.
+    fn arm_start_cancel(&self) -> CancellationToken {
+        let token = CancellationToken::new();
+        *self
+            .start_cancel
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = token.clone();
+        token
+    }
+
+    /// Cancels any in-flight start so it tears itself down.
+    fn cancel_start(&self) {
+        self.start_cancel
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .cancel();
+    }
+
+    /// Returns to the idle state: stops the timer and clears every UI property.
+    fn reset_idle(&self) {
+        self.cancel_timer();
+        *self.lock_status() = Status::Idle;
+        self.preparing.set(false);
+        self.active.set(false);
+        self.paused.set(false);
+        self.elapsed_secs.set(0);
+    }
+
     /// Starts a recording using the current config, if not already recording.
+    ///
+    /// Idempotent against rapid clicks: the `Idle -> Starting` transition is
+    /// claimed synchronously under [`Self::status`], so a second call while a
+    /// start is still negotiating (or while recording) is a no-op rather than a
+    /// duplicate portal session / pipeline.
     pub async fn start(&self) {
-        if self.active.get() {
-            return;
+        // Claim the start atomically. Anything other than Idle means a start,
+        // recording, or stop is already in flight — bail.
+        {
+            let mut status = self.lock_status();
+            if *status != Status::Idle {
+                return;
+            }
+            *status = Status::Starting;
         }
+
+        // Fresh cancellation token for this attempt; `stop` cancels it to abort
+        // a start that is still in its delay / portal negotiation.
+        let cancel = self.arm_start_cancel();
+        self.preparing.set(true);
 
         let opts = self.build_options();
         let path = opts.output_path.clone();
@@ -93,20 +167,40 @@ impl RecorderState {
             && let Err(err) = std::fs::create_dir_all(parent)
         {
             warn!(error = %err, dir = %parent.display(), "cannot create recording directory");
+            self.reset_idle();
             self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
             return;
         }
 
         // Announce the start and pulse the bar icon, then wait for the toast
         // to clear the screen before capture begins — otherwise the toast is
-        // in the recording.
+        // in the recording. Cancellable: a stop during this window aborts
+        // cleanly without ever opening the portal.
         self.show_toast(&t!("recorder-toast-starting"), START_TOAST_MS);
-        self.preparing.set(true);
-        tokio::time::sleep(Duration::from_millis(START_CAPTURE_DELAY_MS)).await;
+        tokio::select! {
+            () = cancel.cancelled() => {
+                self.reset_idle();
+                return;
+            }
+            () = tokio::time::sleep(Duration::from_millis(START_CAPTURE_DELAY_MS)) => {}
+        }
 
         let (term_tx, term_rx) = mpsc::unbounded_channel();
         match self.recorder.start(&opts, term_tx).await {
             Ok(()) => {
+                // A stop may have arrived while the portal/pipeline negotiated.
+                // Commit to Recording only if nothing cancelled us meanwhile;
+                // decide under the status lock so it can't race `stop`.
+                let mut status = self.lock_status();
+                if *status != Status::Starting || cancel.is_cancelled() {
+                    drop(status);
+                    let _ = self.recorder.stop();
+                    self.reset_idle();
+                    return;
+                }
+                *status = Status::Recording;
+                drop(status);
+
                 self.file_path.set(path);
                 self.elapsed_secs.set(0);
                 self.paused.set(false);
@@ -118,7 +212,7 @@ impl RecorderState {
                 self.watch_termination(term_rx);
             }
             Err(err) => {
-                self.preparing.set(false);
+                self.reset_idle();
                 warn!(error = %err, "failed to start recording");
                 self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
             }
@@ -139,28 +233,56 @@ impl RecorderState {
 
     /// Tears down a recording that died on its own and tells the user why.
     fn handle_unexpected_stop(&self, reason: &str) {
-        if !self.active.get() {
-            return;
+        // Only act on a live recording; ignore if a normal stop already ran.
+        {
+            let mut status = self.lock_status();
+            if *status != Status::Recording {
+                return;
+            }
+            *status = Status::Stopping;
         }
         warn!(reason, "recording terminated unexpectedly");
-        self.cancel_timer();
         // Best-effort teardown of the (already failed) pipeline.
         let _ = self.recorder.stop();
-        self.active.set(false);
-        self.paused.set(false);
-        self.elapsed_secs.set(0);
+        self.reset_idle();
         self.show_error(&format!("{}: {reason}", t!("recorder-toast-failed")));
     }
 
-    /// Stops the active recording.
+    /// Stops the active recording (or cancels one that is still starting).
+    ///
+    /// Idempotent: only the first call from `Recording`/`Starting` does work;
+    /// repeats while already `Stopping`/`Idle` are no-ops, so a double-press
+    /// can't double-stop or accidentally start a new recording.
     pub fn stop(&self) {
-        if !self.active.get() {
+        // Claim the stop. From Recording we own teardown here; from Starting we
+        // only flag Stopping + cancel, and let the in-flight `start` (which owns
+        // the half-built pipeline) tear itself down and return to Idle.
+        let prev = {
+            let mut status = self.lock_status();
+            match *status {
+                Status::Idle | Status::Stopping => return,
+                prev => {
+                    *status = Status::Stopping;
+                    prev
+                }
+            }
+        };
+
+        // Abort any start still in its delay / portal negotiation.
+        self.cancel_start();
+
+        if prev == Status::Starting {
+            // The in-flight `start` observes the cancellation and resets to
+            // Idle itself. Nothing was recorded, so no "saved" toast.
             return;
         }
+
+        // prev == Recording: tear down the live pipeline.
         self.cancel_timer();
         if let Err(err) = self.recorder.stop() {
             warn!(error = %err, "failed to stop recording");
         }
+        *self.lock_status() = Status::Idle;
         self.active.set(false);
         self.paused.set(false);
         self.elapsed_secs.set(0);
@@ -239,11 +361,16 @@ impl RecorderState {
     }
 
     /// Toggles recording on/off.
+    ///
+    /// Keys off the lifecycle status rather than `active`: during the
+    /// pre-capture delay `active` is still false, but a toggle should cancel
+    /// the pending start instead of kicking off a second one.
     pub async fn toggle(&self) {
-        if self.active.get() {
-            self.stop();
-        } else {
+        let idle = *self.lock_status() == Status::Idle;
+        if idle {
             self.start().await;
+        } else {
+            self.stop();
         }
     }
 
@@ -279,14 +406,11 @@ impl RecorderState {
             output_path: output_path(&rec.output_directory.get(), format),
             format,
             framerate: rec.framerate.get(),
-            bitrate_kbps: rec.bitrate_kbps.get(),
-            preset: map_preset(rec.encoder_preset.get()),
             show_cursor: rec.show_cursor.get(),
             audio: AudioOptions {
                 microphone: rec.microphone.get(),
                 microphone_device: rec.microphone_device.get(),
                 system_audio: rec.system_audio.get(),
-                bitrate_kbps: rec.audio_bitrate_kbps.get(),
                 separate_tracks: rec.separate_audio_tracks.get(),
             },
             webcam,
@@ -330,14 +454,6 @@ impl RecorderState {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         guard.cancel();
-    }
-}
-
-fn map_preset(preset: EncoderPreset) -> EngineEncoderPreset {
-    match preset {
-        EncoderPreset::Speed => EngineEncoderPreset::Speed,
-        EncoderPreset::Balanced => EngineEncoderPreset::Balanced,
-        EncoderPreset::Quality => EngineEncoderPreset::Quality,
     }
 }
 

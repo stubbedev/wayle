@@ -23,10 +23,7 @@ pub(crate) enum RecorderDropdownMsg {
     WebcamToggled(bool),
     WebcamDeviceSelected(u32),
     PositionSelected(u32),
-    BitrateChanged(u32),
-    AudioBitrateChanged(u32),
     SeparateTracksToggled(bool),
-    PresetSelected(u32),
 }
 
 #[derive(Debug)]

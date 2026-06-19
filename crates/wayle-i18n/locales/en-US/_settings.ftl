@@ -29,6 +29,7 @@ settings-font-search = Search fonts...
 settings-unit-scale = scale
 settings-inherit = Inherit (default)
 settings-icon-none = No icon
+settings-icon-clear = Clear icon
 settings-icon-search = Search icons...
 settings-list-add = Add
 settings-list-remove = Remove

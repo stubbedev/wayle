@@ -55,11 +55,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-video",
                     items: vec![
-                        // Bounds mirror the recorder dropdown + engine clamps so
-                        // the settings UI can't produce a value capture rejects.
-                        number_u32_range(&module.bitrate_kbps, 500, 50_000, 500),
+                        // Quality and the encoder are chosen automatically
+                        // (hardware-accelerated when available, constant-quality
+                        // either way), so framerate is the only video knob left.
                         number_u32_range(&module.framerate, 1, 240, 1),
-                        enum_select(&module.encoder_preset),
                     ],
                 },
                 SectionSpec {
@@ -68,7 +67,6 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         toggle(&module.system_audio),
                         toggle(&module.microphone),
                         text(&module.microphone_device),
-                        number_u32_range(&module.audio_bitrate_kbps, 16, 512, 16),
                         toggle(&module.separate_audio_tracks),
                     ],
                 },
