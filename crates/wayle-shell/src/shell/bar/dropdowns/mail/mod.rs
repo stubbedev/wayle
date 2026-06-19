@@ -9,10 +9,13 @@ use wayle_widgets::prelude::*;
 
 pub(super) use self::factory::Factory;
 use self::messages::{MailDropdownCmd, MailDropdownInit};
-use crate::{i18n::t, services::mail::AccountUnread, shell::bar::dropdowns::resolve_dimension};
+use crate::{
+    i18n::t,
+    services::mail::AccountUnread,
+    shell::bar::dropdowns::{resolve_content_height, resolve_dimension},
+};
 
 const BASE_WIDTH: f32 = 300.0;
-const BASE_HEIGHT: f32 = 360.0;
 const ROW_ICON_SIZE: i32 = 20;
 
 pub(crate) struct MailDropdown {
@@ -67,6 +70,7 @@ impl Component for MailDropdown {
                     gtk::ScrolledWindow {
                         set_hscrollbar_policy: gtk::PolicyType::Never,
                         set_vexpand: true,
+                        set_propagate_natural_height: true,
 
                         #[local_ref]
                         list_widget -> gtk::Box {},
@@ -94,7 +98,7 @@ impl Component for MailDropdown {
 
         let model = Self {
             scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
-            scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
+            scaled_height: resolve_content_height(size.height),
             width_override: size.width,
             height_override: size.height,
             list,
@@ -115,7 +119,7 @@ impl Component for MailDropdown {
         match msg {
             MailDropdownCmd::ScaleChanged(scale) => {
                 self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
-                self.scaled_height = resolve_dimension(self.height_override, BASE_HEIGHT, scale);
+                self.scaled_height = resolve_content_height(self.height_override);
             }
             MailDropdownCmd::AccountsChanged(accounts) => {
                 rebuild_list(&self.list, &accounts);

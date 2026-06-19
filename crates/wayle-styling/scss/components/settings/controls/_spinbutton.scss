@@ -11,12 +11,9 @@
     padding: var(--space-xs) var(--space-sm);
 }
 
+// Stepper buttons are hidden in code (no theme icon → invisible click strips).
 .setting-control spinbutton button {
-    padding: 0 var(--space-xs);
-    color: var(--fg-muted);
-}
-
-.setting-control spinbutton button:hover {
-    color: var(--fg-default);
-    background-color: var(--bg-hover);
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
 }

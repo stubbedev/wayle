@@ -1,7 +1,18 @@
 // Icon-name field: a trigger button (preview + name) that opens a searchable
 // grid of icon previews.
-.icon-picker-trigger {
+// Match the entry/dropdown box: a lighter filled rect with a subtle border that
+// turns accent on hover, so the trigger reads as an editable field. The visible
+// box is the MenuButton's inner `button` node (the theme styles that, not the
+// outer `menubutton`).
+.icon-picker-trigger > button {
     padding: var(--space-xs) var(--space-sm);
+    background-color: var(--bg-overlay);
+    border: 1px solid var(--border-default);
+    border-radius: var(--rounding-element);
+
+    &:hover {
+        border-color: var(--accent);
+    }
 
     label {
         font-size: var(--text-sm);
@@ -16,6 +27,20 @@
     // sit flush against the field edges.
     entry {
         padding: 0 var(--space-sm);
+    }
+
+    // Clear button beside the search field: highlight under the pointer like the
+    // grid cells so it reads as clickable.
+    .icon-picker-clear {
+        padding: var(--space-sm);
+        min-width: 0;
+        min-height: 0;
+        border-radius: var(--rounding-element);
+        transition: background var(--duration-fast);
+
+        &:hover {
+            background: var(--bg-overlay);
+        }
     }
 
     .icon-picker-cell {

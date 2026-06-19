@@ -50,22 +50,35 @@ pub(crate) struct IconPickerWidget {
 }
 
 /// Builds the picker popover body (search entry + scrolled grid) and returns it
-/// alongside the search entry and grid for wiring. The search entry carries a
-/// secondary "clear" icon that commits the empty string (set the field to "no
-/// icon") — kept inside the field rather than as a separate button beside it.
-fn build_popover() -> (gtk::Popover, gtk::Entry, gtk::FlowBox) {
+/// alongside the search entry, the clear button, and grid for wiring. The clear
+/// button sits beside the search field and commits the empty string (set the
+/// field to "no icon"); it's a real button so it gets a pointer cursor on hover,
+/// which an in-entry secondary icon can't.
+fn build_popover() -> (gtk::Popover, gtk::Entry, gtk::Button, gtk::FlowBox) {
     let search = gtk::Entry::builder()
         .placeholder_text(t("settings-icon-search"))
         .primary_icon_name("edit-find-symbolic")
-        .secondary_icon_name("edit-clear-symbolic")
-        .secondary_icon_activatable(true)
-        .secondary_icon_tooltip_text(t("settings-icon-clear"))
         .hexpand(true)
         .build();
 
+    let clear = gtk::Button::builder()
+        .icon_name("ld-x-circle-symbolic")
+        .css_classes(["flat", "icon-picker-clear"])
+        .tooltip_text(t("settings-icon-clear"))
+        .valign(gtk::Align::Center)
+        .build();
+    clear.set_cursor_from_name(Some("pointer"));
+
+    let search_row = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(4)
+        .build();
+    search_row.append(&search);
+    search_row.append(&clear);
+
     let flow = gtk::FlowBox::builder()
         .selection_mode(gtk::SelectionMode::None)
-        .max_children_per_line(8)
+        .max_children_per_line(10)
         // Top-align so a short (or filtered) result set sits at the top of the
         // scroll area instead of floating in its vertical center.
         .valign(gtk::Align::Start)
@@ -76,8 +89,8 @@ fn build_popover() -> (gtk::Popover, gtk::Entry, gtk::FlowBox) {
 
     let scroller = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)
-        .min_content_height(280)
-        .min_content_width(320)
+        .min_content_height(420)
+        .min_content_width(440)
         .child(&flow)
         .build();
 
@@ -86,7 +99,7 @@ fn build_popover() -> (gtk::Popover, gtk::Entry, gtk::FlowBox) {
         .spacing(8)
         .css_classes(["icon-picker-popover"])
         .build();
-    popover_box.append(&search);
+    popover_box.append(&search_row);
     popover_box.append(&scroller);
 
     // Left-align the dropdown under the trigger's start edge (no arrow): GTK
@@ -98,7 +111,7 @@ fn build_popover() -> (gtk::Popover, gtk::Entry, gtk::FlowBox) {
         .position(gtk::PositionType::Bottom)
         .halign(gtk::Align::Start)
         .build();
-    (popover, search, flow)
+    (popover, search, clear, flow)
 }
 
 /// Updates the trigger button to reflect the current icon name.
@@ -135,26 +148,6 @@ fn populate_grid(flow: &gtk::FlowBox, commit: &Rc<dyn Fn(&str)>) {
     }
 }
 
-/// Shows a pointer cursor while hovering an entry's secondary (clear) icon,
-/// reverting to the text cursor elsewhere. GTK4 dropped the CSS `cursor`
-/// property, so the icon can't be made to read as clickable via styling alone.
-fn pointer_over_secondary_icon(entry: &gtk::Entry) {
-    let motion = gtk::EventControllerMotion::new();
-    let target = entry.clone();
-    let over_icon = Cell::new(false);
-    motion.connect_motion(move |_, x, y| {
-        let area = target.icon_area(gtk::EntryIconPosition::Secondary);
-        let inside = x >= f64::from(area.x())
-            && x <= f64::from(area.x() + area.width())
-            && y >= f64::from(area.y())
-            && y <= f64::from(area.y() + area.height());
-        if inside != over_icon.replace(inside) {
-            target.set_cursor_from_name(Some(if inside { "pointer" } else { "text" }));
-        }
-    });
-    entry.add_controller(motion);
-}
-
 /// Builds a reusable icon-name picker bound to a `set` callback, displaying
 /// `initial` to start. The caller owns when/how the value is persisted; the
 /// picker just reports the chosen (or typed) name.
@@ -183,10 +176,13 @@ pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPi
         .css_classes(["icon-picker-trigger"])
         .valign(gtk::Align::Center)
         .build();
+    // GTK4 dropped the CSS `cursor` property, so the pointer must be set in code
+    // for the trigger to read as clickable like the entry/dropdown fields.
+    menu.set_cursor_from_name(Some("pointer"));
 
     update_display(&image, &label, initial);
 
-    let (popover, search, flow) = build_popover();
+    let (popover, search, clear, flow) = build_popover();
     menu.set_popover(Some(&popover));
 
     // Escape closes the picker without committing. A capture-phase controller is
@@ -258,17 +254,11 @@ pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPi
             }
         });
     }
-    // The entry's secondary (clear) icon commits the empty string to set the
-    // field to "no icon".
+    // The clear button commits the empty string to set the field to "no icon".
     {
         let commit = Rc::clone(&commit);
-        search.connect_icon_release(move |_, position| {
-            if position == gtk::EntryIconPosition::Secondary {
-                commit("");
-            }
-        });
+        clear.connect_clicked(move |_| commit(""));
     }
-    pointer_over_secondary_icon(&search);
 
     let set_display: Rc<dyn Fn(&str)> = {
         let image = image.clone();

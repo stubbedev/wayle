@@ -19,7 +19,12 @@ use wayle_config::{
 use wayle_i18n::t;
 
 use crate::{
-    editors::spawn_property_watcher, pages::spec::SettingRowInit, property_handle::PropertyHandle,
+    editors::{
+        icon::{IconPickerWidget, icon_picker_widget},
+        spawn_property_watcher,
+    },
+    pages::spec::SettingRowInit,
+    property_handle::PropertyHandle,
     row::RowBehavior,
 };
 
@@ -64,7 +69,10 @@ struct Card {
     name: gtk::Entry,
     query: gtk::Entry,
     provider: gtk::DropDown,
-    icon: gtk::Entry,
+    /// Current icon-name override, written by the picker's `set` callback.
+    icon: Rc<RefCell<String>>,
+    /// Kept alive so the picker's popover + signal closures outlive the card.
+    _icon_picker: IconPickerWidget,
 }
 
 struct State {
@@ -83,7 +91,7 @@ impl State {
                 name: card.name.text().to_string(),
                 query: card.query.text().to_string(),
                 provider: provider_at(card.provider.selected()),
-                icon: non_empty(&card.icon.text()),
+                icon: non_empty(card.icon.borrow().as_str()),
             })
             .collect()
     }
@@ -110,8 +118,7 @@ impl State {
 
         let name = entry(&account.name, "name");
         let query = entry(&account.query, "tag:unread and folder:…");
-        let icon = entry(account.icon.as_deref().unwrap_or(""), "icon override");
-        for e in [&name, &query, &icon] {
+        for e in [&name, &query] {
             let commit_state = Rc::clone(self);
             e.connect_changed(move |_| commit_state.commit());
         }
@@ -119,6 +126,16 @@ impl State {
         let provider = provider_dropdown(account.provider);
         let provider_state = Rc::clone(self);
         provider.connect_selected_notify(move |_| provider_state.commit());
+
+        let icon_value = Rc::new(RefCell::new(account.icon.clone().unwrap_or_default()));
+        let set_icon = Rc::clone(&icon_value);
+        let icon_state = Rc::clone(self);
+        let set: Rc<dyn Fn(&str)> = Rc::new(move |name: &str| {
+            *set_icon.borrow_mut() = name.to_string();
+            icon_state.commit();
+        });
+        let icon_picker = icon_picker_widget(&icon_value.borrow(), set);
+        icon_picker.widget.set_hexpand(true);
 
         root.append(&field_row(
             "settings-mail-account-name",
@@ -134,7 +151,7 @@ impl State {
         ));
         root.append(&field_row(
             "settings-mail-account-icon",
-            &icon.clone().upcast(),
+            &icon_picker.widget.clone().upcast(),
         ));
 
         let remove = gtk::Button::builder()
@@ -152,7 +169,8 @@ impl State {
             name,
             query,
             provider,
-            icon,
+            icon: icon_value,
+            _icon_picker: icon_picker,
         });
     }
 

@@ -67,7 +67,17 @@ where
             .numeric(true)
             .build();
 
-        spin.set_cursor_from_name(Some("pointer"));
+        // Hide the up/down stepper buttons: they carry no theme icon here, so
+        // they render as invisible-but-clickable strips. The field is
+        // type-and-edit only, so it gets the text cursor like a plain entry.
+        spin.set_cursor_from_name(Some("text"));
+        let mut child = spin.first_child();
+        while let Some(widget) = child {
+            child = widget.next_sibling();
+            if widget.is::<gtk::Button>() {
+                widget.set_visible(false);
+            }
+        }
         spin.set_range(init.range_min, init.range_max);
         spin.set_increments(init.step, init.step * 10.0);
         spin.set_value(current);
