@@ -3010,17 +3010,17 @@
         "notify": {
           "$ref": "#/$defs/boolean",
           "default": false,
-          "description": "Fire a desktop notification (via `notify-send`) when the unread count\nrises — i.e. new mail arrives. The module icon is used as the\nnotification icon. The single notmuch query means this is not\nper-account; it reports the change in the total match count."
+          "description": "Fire a desktop notification (via `notify-send`) when the unread count\nrises — i.e. new mail arrives. One notification per newly-arrived\nmessage (capped per burst), showing its sender and subject. With\n`accounts` configured, each notification uses that account's provider\nicon; otherwise the module icon is used."
         },
         "notify-body": {
           "$ref": "#/$defs/string",
-          "default": "{{ new }} new ({{ count }} unread)",
+          "default": "{{ subject }}",
           "description": "Notification body when new mail arrives. Same placeholders as\n`notify-summary`."
         },
         "notify-summary": {
           "$ref": "#/$defs/string",
-          "default": "New mail",
-          "description": "Notification summary when new mail arrives.\n\n## Placeholders\n\n- `{{ count }}` - Total messages matching the query\n- `{{ new }}` - How many arrived since the last count"
+          "default": "{{ sender }}",
+          "description": "Notification summary when new mail arrives.\n\n## Placeholders\n\n- `{{ sender }}` - Message sender (name or address)\n- `{{ subject }}` - Message subject\n- `{{ count }}` - Total messages matching the query\n- `{{ new }}` - How many arrived since the last count"
         },
         "query": {
           "$ref": "#/$defs/string",
@@ -3891,8 +3891,8 @@
             "left-click": "dropdown:mail",
             "middle-click": "",
             "notify": false,
-            "notify-body": "{{ new }} new ({{ count }} unread)",
-            "notify-summary": "New mail",
+            "notify-body": "{{ subject }}",
+            "notify-summary": "{{ sender }}",
             "query": "tag:unread",
             "right-click": "",
             "scroll-down": "",
@@ -7950,8 +7950,8 @@
           "left-click": "dropdown:mail",
           "middle-click": "",
           "notify": false,
-          "notify-body": "{{ new }} new ({{ count }} unread)",
-          "notify-summary": "New mail",
+          "notify-body": "{{ subject }}",
+          "notify-summary": "{{ sender }}",
           "query": "tag:unread",
           "right-click": "",
           "scroll-down": "",

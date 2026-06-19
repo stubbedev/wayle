@@ -23,13 +23,13 @@ enum-mail-provider-fastmail = Fastmail
 enum-mail-provider-yahoo = Yahoo
 
 settings-modules-mail-notify = Notify on New Mail
-    .description = Fire a desktop notification when the unread count rises
+    .description = Fire a desktop notification per new message (sender, subject, provider icon)
 
 settings-modules-mail-notify-summary = Notification Summary
-    .description = Summary text. Placeholders: {"{{ count }}"} (total), {"{{ new }}"} (new)
+    .description = Summary text. Placeholders: {"{{ sender }}"}, {"{{ subject }}"}, {"{{ count }}"} (total), {"{{ new }}"} (new)
 
 settings-modules-mail-notify-body = Notification Body
-    .description = Body text. Placeholders: {"{{ count }}"} (total), {"{{ new }}"} (new)
+    .description = Body text. Placeholders: {"{{ sender }}"}, {"{{ subject }}"}, {"{{ count }}"} (total), {"{{ new }}"} (new)
 
 settings-modules-mail-icon-name = Icon
     .description = Module icon

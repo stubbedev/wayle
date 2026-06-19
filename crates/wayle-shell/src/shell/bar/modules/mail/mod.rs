@@ -24,10 +24,6 @@ pub(crate) struct MailModule {
     config: Arc<ConfigService>,
     dropdowns: Rc<DropdownRegistry>,
     count: u32,
-    /// Whether a baseline count has been received. The first count seeds the
-    /// baseline without notifying, so existing unread mail at startup doesn't
-    /// fire a spurious "new mail" notification.
-    seeded: bool,
 }
 
 #[relm4::component(pub(crate))]
@@ -97,7 +93,6 @@ impl Component for MailModule {
             config: config_service,
             dropdowns: init.dropdowns,
             count: 0,
-            seeded: false,
         };
         let bar_button = model.bar_button.widget();
         let widgets = view_output!();
@@ -124,12 +119,7 @@ impl Component for MailModule {
 
         match msg {
             MailCmd::CountChanged(count) => {
-                let previous = self.count;
                 self.count = count;
-                if self.seeded && count > previous && config.notify.get() {
-                    helpers::fire_new_mail_notification(config, count, count - previous);
-                }
-                self.seeded = true;
                 self.update_display(config, root);
             }
             MailCmd::ConfigChanged => {
