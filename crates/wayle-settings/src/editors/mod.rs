@@ -12,6 +12,7 @@ pub(crate) mod enum_select;
 pub(crate) mod file_picker;
 pub(crate) mod font;
 pub(crate) mod icon;
+pub(crate) mod icon_list;
 pub(crate) mod mail_account_list;
 pub(crate) mod monitor_wallpaper;
 pub(crate) mod number;
