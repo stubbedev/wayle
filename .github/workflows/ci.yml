@@ -20,6 +20,15 @@ concurrency:
 
 env:
     CARGO_TERM_COLOR: always
+    # Keep the runner's root disk from filling (the "No space left on device"
+    # failures). CI never debugs the binaries, so drop debuginfo — the largest
+    # part of a debug `target/` — and disable incremental artifacts, which add
+    # large per-crate caches with no cross-run value here. The container jobs
+    # (check/ubuntu/fedora) can't free host tool caches from inside the
+    # container, so shrinking what we generate is the durable lever.
+    CARGO_INCREMENTAL: "0"
+    CARGO_PROFILE_DEV_DEBUG: "0"
+    CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
     changes:
@@ -193,6 +202,17 @@ jobs:
             (github.event_name == 'push' && github.ref == 'refs/heads/master')
         runs-on: ubuntu-latest
         steps:
+            # Reclaim ~25 GiB of preinstalled tool caches (android/dotnet/etc.)
+            # before the release nix build. This job runs on the host (no
+            # container), so it can free host paths the container jobs can't.
+            - name: Free disk space
+              uses: jlumbroso/free-disk-space@main
+              with:
+                  tool-cache: true
+                  large-packages: false
+                  docker-images: false
+                  swap-storage: false
+
             - uses: actions/checkout@v6
               with:
                   submodules: recursive
