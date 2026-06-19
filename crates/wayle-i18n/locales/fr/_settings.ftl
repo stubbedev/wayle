@@ -44,6 +44,15 @@ settings-layout-zone-right = DROITE
 settings-layout-zone-empty = (vide)
 settings-layout-hidden = Barre masquée sur ce moniteur
 
+## Tailles et menus déroulants
+settings-size-scale = Échelle
+settings-size-px = Pixels
+settings-dropdown-width = Largeur
+settings-dropdown-height = Hauteur
+settings-section-sizes = Tailles des panneaux
+settings-nav-dropdowns = Menus déroulants
+settings-page-dropdowns = Menus déroulants
+
 ## Badges de source
 settings-source-config = config
     .description = Défini dans config.toml

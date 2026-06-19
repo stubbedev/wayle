@@ -20,9 +20,7 @@ use std::{
 use futures::StreamExt;
 use gst::prelude::*;
 use gstreamer as gst;
-pub use options::{
-    AudioOptions, OutputFormat, RecordOptions, WebcamOptions, WebcamPosition,
-};
+pub use options::{AudioOptions, OutputFormat, RecordOptions, WebcamOptions, WebcamPosition};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 

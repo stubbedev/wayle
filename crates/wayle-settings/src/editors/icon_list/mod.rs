@@ -117,7 +117,10 @@ impl IconListState {
     }
 
     fn index_of(&self, trigger: &gtk::MenuButton) -> Option<usize> {
-        self.rows.borrow().iter().position(|r| &r.trigger == trigger)
+        self.rows
+            .borrow()
+            .iter()
+            .position(|r| &r.trigger == trigger)
     }
 
     fn remove_row(self: &Rc<Self>, trigger: &gtk::MenuButton) {
