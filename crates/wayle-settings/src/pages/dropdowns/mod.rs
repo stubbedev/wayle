@@ -1,9 +1,9 @@
 //! Dropdowns settings page: per-dropdown panel size (width/height) overrides.
 
-use wayle_config::Config;
+use wayle_config::{Config, ConfigProperty, schemas::dropdowns::DropdownSize};
 
 use crate::{
-    editors::dropdown_size::dropdown_size,
+    editors::dropdown_size::dropdown_size_rows,
     pages::{
         nav::LeafEntry,
         spec::{SectionSpec, page_spec},
@@ -19,21 +19,27 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
         icon: "ld-panel-top-open-symbolic",
         spec: page_spec(
             "settings-page-dropdowns",
-            vec![SectionSpec {
-                title_key: "settings-section-sizes",
-                items: vec![
-                    dropdown_size(&dropdowns.audio),
-                    dropdown_size(&dropdowns.battery),
-                    dropdown_size(&dropdowns.bluetooth),
-                    dropdown_size(&dropdowns.brightness),
-                    dropdown_size(&dropdowns.calendar),
-                    dropdown_size(&dropdowns.dashboard),
-                    dropdown_size(&dropdowns.media),
-                    dropdown_size(&dropdowns.network),
-                    dropdown_size(&dropdowns.notification),
-                    dropdown_size(&dropdowns.weather),
-                ],
-            }],
+            vec![
+                size_section(&dropdowns.audio),
+                size_section(&dropdowns.battery),
+                size_section(&dropdowns.bluetooth),
+                size_section(&dropdowns.brightness),
+                size_section(&dropdowns.calendar),
+                size_section(&dropdowns.dashboard),
+                size_section(&dropdowns.media),
+                size_section(&dropdowns.network),
+                size_section(&dropdowns.notification),
+                size_section(&dropdowns.weather),
+            ],
         ),
+    }
+}
+
+/// One section per dropdown: the dropdown's name as the title, width + height
+/// rows inside — the same shape as the general settings sections.
+fn size_section(property: &ConfigProperty<DropdownSize>) -> SectionSpec {
+    SectionSpec {
+        title_key: property.i18n_key().unwrap_or("settings-section-sizes"),
+        items: dropdown_size_rows(property),
     }
 }

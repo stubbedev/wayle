@@ -48,10 +48,13 @@ settings-layout-hidden = Barre masquée sur ce moniteur
 settings-size-scale = Échelle
 settings-size-px = Pixels
 settings-dropdown-width = Largeur
+    .description = Largeur du panneau. Non défini utilise la valeur par défaut
 settings-dropdown-height = Hauteur
+    .description = Hauteur du panneau. Non défini utilise la valeur par défaut
 settings-section-sizes = Tailles des panneaux
 settings-nav-dropdowns = Menus déroulants
 settings-page-dropdowns = Menus déroulants
+    .breadcrumb = Superpositions
 
 ## Badges de source
 settings-source-config = config

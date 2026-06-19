@@ -1,14 +1,18 @@
-//! Field-by-field editor for a per-surface animation override
-//! ([`SurfaceAnimation`]).
+//! Per-surface animation override ([`SurfaceAnimation`]) rendered as four
+//! standard setting rows — enter/exit transitions and enter/exit durations.
 //!
-//! [`ConfigProperty`] is atomic — it has no sub-property handles — so each
-//! inner control reads the whole struct, replaces one field, and writes it
-//! back. A single watcher on the property refreshes all four controls when the
-//! value changes externally (reset, config reload).
+//! [`ConfigProperty`] is atomic — it has no sub-property handles — so each row
+//! reads the whole struct, replaces one field, and writes it back. Every row
+//! shares the same backing [`ConfigProperty<SurfaceAnimation>`]; the source
+//! badge / reset therefore reflect the whole override, and each control runs
+//! its own watcher so external changes (reset, config reload) re-sync it.
+//!
+//! These build plain [`SettingRowInit`]s (`full_width: false`) so they render
+//! and align exactly like the general (non-override) animation rows — one
+//! surface per section, four rows each.
 
 use std::rc::Rc;
 
-use relm4::gtk::{self, prelude::*};
 use wayle_config::{
     ConfigProperty,
     schemas::animations::{AnimationType, SurfaceAnimation},
@@ -17,7 +21,7 @@ use wayle_i18n::t;
 
 use crate::{
     editors::{
-        optional::{OptionalWidget, optional_enum_widget, optional_number_widget},
+        optional::{optional_enum_widget, optional_number_widget},
         spawn_property_watcher,
     },
     pages::spec::SettingRowInit,
@@ -30,85 +34,99 @@ const MAX_DURATION_MS: f64 = 100_000.0;
 /// Spin value shown when a duration leaves the inherited state.
 const DURATION_FALLBACK_MS: u32 = 200;
 
-/// Builds a labeled sub-row (`label … control`) inside the composite.
-fn field_row(label_key: &str, control: &gtk::Widget) -> gtk::Box {
-    let row = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .css_classes(["surface-animation-row"])
-        .build();
-    let label = gtk::Label::builder()
-        .label(t(label_key))
-        .halign(gtk::Align::Start)
-        .hexpand(true)
-        .css_classes(["surface-animation-label"])
-        .build();
-    row.append(&label);
-    row.append(control);
-    row
+/// The four rows that edit a [`SurfaceAnimation`] override, ready to drop into a
+/// section's `items` like any other settings row.
+pub(crate) fn surface_animation_rows(
+    property: &ConfigProperty<SurfaceAnimation>,
+) -> Vec<SettingRowInit> {
+    vec![
+        enum_field_row(
+            property,
+            "settings-animations-enter",
+            |surface| surface.enter,
+            |surface, value| surface.enter = value,
+        ),
+        enum_field_row(
+            property,
+            "settings-animations-exit",
+            |surface| surface.exit,
+            |surface, value| surface.exit = value,
+        ),
+        number_field_row(
+            property,
+            "settings-animations-enter-duration",
+            |surface| surface.enter_duration,
+            |surface, value| surface.enter_duration = value,
+        ),
+        number_field_row(
+            property,
+            "settings-animations-exit-duration",
+            |surface| surface.exit_duration,
+            |surface, value| surface.exit_duration = value,
+        ),
+    ]
 }
 
-/// Full-width row that edits a [`SurfaceAnimation`] as four inherit-aware
-/// controls (enter/exit transitions + enter/exit durations).
-pub(crate) fn surface_animation(
+/// One *Inherit + variants* dropdown row for a single enum field.
+fn enum_field_row(
     property: &ConfigProperty<SurfaceAnimation>,
     i18n_key: &'static str,
+    get_field: fn(&SurfaceAnimation) -> Option<AnimationType>,
+    set_field: fn(&mut SurfaceAnimation, Option<AnimationType>),
 ) -> SettingRowInit {
-    let enter = optional_enum_widget::<AnimationType>(
-        field_getter(property, |surface| surface.enter),
-        field_setter(property, |surface, value| surface.enter = value),
+    let widget = optional_enum_widget::<AnimationType>(
+        field_getter(property, get_field),
+        field_setter(property, set_field),
     );
-    let exit = optional_enum_widget::<AnimationType>(
-        field_getter(property, |surface| surface.exit),
-        field_setter(property, |surface, value| surface.exit = value),
-    );
-    let enter_duration = optional_number_widget(
-        field_getter(property, |surface| surface.enter_duration),
-        field_setter(property, |surface, value| surface.enter_duration = value),
-        0.0,
-        MAX_DURATION_MS,
-        10.0,
-        DURATION_FALLBACK_MS,
-    );
-    let exit_duration = optional_number_widget(
-        field_getter(property, |surface| surface.exit_duration),
-        field_setter(property, |surface, value| surface.exit_duration = value),
-        0.0,
-        MAX_DURATION_MS,
-        10.0,
-        DURATION_FALLBACK_MS,
-    );
-
-    let container = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .hexpand(true)
-        .css_classes(["surface-animation"])
-        .build();
-    container.append(&field_row("settings-animations-enter", &enter.widget));
-    container.append(&field_row("settings-animations-exit", &exit.widget));
-    container.append(&field_row(
-        "settings-animations-enter-duration",
-        &enter_duration.widget,
-    ));
-    container.append(&field_row(
-        "settings-animations-exit-duration",
-        &exit_duration.widget,
-    ));
-
-    let controls: Rc<[OptionalWidget]> = Rc::from([enter, exit, enter_duration, exit_duration]);
-    let watcher_controls = Rc::clone(&controls);
+    let control = widget.widget.clone();
+    let refresh = Rc::new(widget);
+    let watcher_refresh = Rc::clone(&refresh);
     let watcher = spawn_property_watcher(property, move || {
-        for control in watcher_controls.iter() {
-            control.refresh();
-        }
+        watcher_refresh.refresh();
         true
     });
 
     SettingRowInit {
         i18n_key: Some(i18n_key),
-        handle: PropertyHandle::new(property, display_surface),
-        control: container.upcast(),
-        keepalive: Box::new((controls, watcher)),
-        full_width: true,
+        handle: PropertyHandle::new(property, move |surface| display_enum(get_field(surface))),
+        control,
+        keepalive: Box::new((refresh, watcher)),
+        full_width: false,
+        dirty_badge: None,
+        behavior: RowBehavior::Setting,
+        unit: None,
+    }
+}
+
+/// One *Inherit* checkbox + spin row for a single duration field.
+fn number_field_row(
+    property: &ConfigProperty<SurfaceAnimation>,
+    i18n_key: &'static str,
+    get_field: fn(&SurfaceAnimation) -> Option<u32>,
+    set_field: fn(&mut SurfaceAnimation, Option<u32>),
+) -> SettingRowInit {
+    let widget = optional_number_widget(
+        field_getter(property, get_field),
+        field_setter(property, set_field),
+        0.0,
+        MAX_DURATION_MS,
+        10.0,
+        DURATION_FALLBACK_MS,
+    );
+    let control = widget.widget.clone();
+    let refresh = Rc::new(widget);
+    let watcher_refresh = Rc::clone(&refresh);
+    let watcher = spawn_property_watcher(property, move || {
+        watcher_refresh.refresh();
+        true
+    });
+
+    SettingRowInit {
+        i18n_key: Some(i18n_key),
+        handle: PropertyHandle::new(property, move |surface| display_duration(get_field(surface))),
+        control,
+        keepalive: Box::new((refresh, watcher)),
+        full_width: false,
         dirty_badge: None,
         behavior: RowBehavior::Setting,
         unit: None,
@@ -137,22 +155,21 @@ fn field_setter<T: 'static>(
     })
 }
 
-/// Compact one-line summary of the override for the source badge tooltip.
-fn display_surface(surface: &SurfaceAnimation) -> String {
-    let parts = [
-        surface.enter.map(|value| format!("enter={value:?}")),
-        surface.exit.map(|value| format!("exit={value:?}")),
-        surface
-            .enter_duration
-            .map(|value| format!("enter-dur={value}")),
-        surface
-            .exit_duration
-            .map(|value| format!("exit-dur={value}")),
-    ];
-    let summary = parts.into_iter().flatten().collect::<Vec<_>>().join(", ");
-    if summary.is_empty() {
-        t("settings-inherit")
-    } else {
-        summary
+/// Display string for an optional enum field (the config-value badge tooltip).
+fn display_enum(value: Option<AnimationType>) -> String {
+    match value {
+        Some(value) => serde_json::to_string(&value)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_owned(),
+        None => t("settings-inherit"),
+    }
+}
+
+/// Display string for an optional duration field.
+fn display_duration(value: Option<u32>) -> String {
+    match value {
+        Some(value) => value.to_string(),
+        None => t("settings-inherit"),
     }
 }

@@ -170,83 +170,69 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
     }
 }
 
-fn field_row(label_key: &str, control: &gtk::Widget) -> gtk::Box {
-    let row = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .css_classes(["surface-animation-row"])
-        .build();
-    let label = gtk::Label::builder()
-        .label(t(label_key))
-        .halign(gtk::Align::Start)
-        .hexpand(true)
-        .css_classes(["surface-animation-label"])
-        .build();
-    row.append(&label);
-    row.append(control);
-    row
+/// The two rows that edit a [`DropdownSize`] (width + height), ready to drop
+/// into a section's `items` like any other settings row. They build plain
+/// [`SettingRowInit`]s (`full_width: false`) so they render and align exactly
+/// like the general settings rows — one dropdown per section, two rows each.
+pub(crate) fn dropdown_size_rows(property: &ConfigProperty<DropdownSize>) -> Vec<SettingRowInit> {
+    vec![
+        size_field_row(
+            property,
+            "settings-dropdown-width",
+            |size| size.width,
+            |size, value| size.width = value,
+        ),
+        size_field_row(
+            property,
+            "settings-dropdown-height",
+            |size| size.height,
+            |size, value| size.height = value,
+        ),
+    ]
 }
 
-/// Full-width row that edits a `DropdownSize` (width + height) property.
-pub(crate) fn dropdown_size(property: &ConfigProperty<DropdownSize>) -> SettingRowInit {
-    let width = {
-        let get = property.clone();
-        let set = property.clone();
-        size_control(
-            Rc::new(move || get.get().width),
-            Rc::new(move |value| {
-                let mut size = set.get();
-                size.width = value;
-                set.set(size);
-            }),
-        )
-    };
-    let height = {
-        let get = property.clone();
-        let set = property.clone();
-        size_control(
-            Rc::new(move || get.get().height),
-            Rc::new(move |value| {
-                let mut size = set.get();
-                size.height = value;
-                set.set(size);
-            }),
-        )
-    };
+/// One inherit + Scale/Px + spin row for a single `Size` field of the struct.
+fn size_field_row(
+    property: &ConfigProperty<DropdownSize>,
+    i18n_key: &'static str,
+    get_field: fn(&DropdownSize) -> Option<Size>,
+    set_field: fn(&mut DropdownSize, Option<Size>),
+) -> SettingRowInit {
+    let get = property.clone();
+    let set = property.clone();
+    let control = size_control(
+        Rc::new(move || get_field(&get.get())),
+        Rc::new(move |value| {
+            let mut size = set.get();
+            set_field(&mut size, value);
+            set.set(size);
+        }),
+    );
 
-    let container = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .hexpand(true)
-        .css_classes(["card", "surface-animation"])
-        .build();
-    container.append(&field_row("settings-dropdown-width", &width.widget));
-    container.append(&field_row("settings-dropdown-height", &height.widget));
-
-    let refreshers = [Rc::clone(&width.refresh), Rc::clone(&height.refresh)];
-    let keep = (width, height);
+    let widget = control.widget.clone();
+    let refresh = Rc::clone(&control.refresh);
     let watcher = spawn_property_watcher(property, move || {
-        for refresh in &refreshers {
-            refresh();
-        }
+        refresh();
         true
     });
 
     SettingRowInit {
-        i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, display_size),
-        control: container.upcast(),
-        keepalive: Box::new((keep, watcher)),
-        full_width: true,
+        i18n_key: Some(i18n_key),
+        handle: PropertyHandle::new(property, move |size| display_size(get_field(size))),
+        control: widget,
+        keepalive: Box::new((control, watcher)),
+        full_width: false,
         dirty_badge: None,
         behavior: RowBehavior::Setting,
         unit: None,
     }
 }
 
-fn display_size(size: &DropdownSize) -> String {
-    let part = |value: Option<Size>| match value {
+/// Display string for a single optional `Size` field (the value badge tooltip).
+fn display_size(value: Option<Size>) -> String {
+    match value {
         Some(Size::Scale(v)) => format!("{v}x"),
         Some(Size::Px(v)) => format!("{v}px"),
         None => t("settings-inherit"),
-    };
-    format!("{} × {}", part(size.width), part(size.height))
+    }
 }
