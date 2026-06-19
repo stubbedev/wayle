@@ -2,7 +2,7 @@
     all: unset;
     font-size: var(--text-md);
     font-weight: var(--weight-bold);
-    padding: var(--space-xs) var(--space-sm);
+    padding: calc(var(--space-xs) * 0.5) var(--space-xs);
     border-radius: var(--rounding-element);
     background: var(--bg-active);
     color: var(--fg-default);
@@ -32,7 +32,7 @@
     all: unset;
     font-size: var(--text-sm);
     font-weight: var(--weight-bold);
-    padding: var(--space-xs) var(--space-sm);
+    padding: calc(var(--space-xs) * 0.5) var(--space-xs);
     border-radius: var(--rounding-element);
     background: var(--bg-active);
     color: var(--fg-muted);
