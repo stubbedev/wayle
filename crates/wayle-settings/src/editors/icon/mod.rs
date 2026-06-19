@@ -166,6 +166,23 @@ pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPi
     let (popover, search, clear, flow) = build_popover();
     menu.set_popover(Some(&popover));
 
+    // Escape closes the picker without committing. A capture-phase controller is
+    // needed because the search entry otherwise swallows Escape to clear itself.
+    {
+        let key = gtk::EventControllerKey::new();
+        key.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let menu = menu.clone();
+        key.connect_key_pressed(move |_, keyval, _, _| {
+            if keyval == gtk::gdk::Key::Escape {
+                menu.popdown();
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
+            }
+        });
+        popover.add_controller(key);
+    }
+
     // Commit a chosen name: report it via `set`, refresh the trigger, close.
     let commit: Rc<dyn Fn(&str)> = {
         let image = image.clone();
