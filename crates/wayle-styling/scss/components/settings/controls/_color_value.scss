@@ -36,6 +36,13 @@
     padding: var(--space-xs) var(--space-sm);
 }
 
+// The trigger shows a `color-value-row` inside the dropdown button; the row
+// already supplies the field padding, so zero the button's own padding to avoid
+// doubling it (which made the color select taller than every other input).
+.setting-control dropdown.color-value-dropdown button {
+    padding: 0;
+}
+
 .color-value-dot {
     min-width: calc(0.625rem * var(--global-scale));
     min-height: calc(0.625rem * var(--global-scale));
