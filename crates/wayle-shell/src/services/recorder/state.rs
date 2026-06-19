@@ -158,6 +158,19 @@ impl RecorderState {
         let cancel = self.arm_start_cancel();
         self.preparing.set(true);
 
+        // Drive the rest (toast delay, portal negotiation, pipeline launch) on a
+        // tokio task so the caller returns immediately: the heavy/blocking work
+        // never runs on the GTK main thread (dropdown path) or stalls the D-Bus
+        // handler (bar/CLI path). The synchronous `preparing` pulse above is the
+        // immediate feedback.
+        let state = self.clone();
+        tokio::spawn(async move { state.run_start(cancel).await });
+    }
+
+    /// Body of a start attempt: announce it, wait out the pre-capture delay,
+    /// negotiate the portal, launch the pipeline, and commit to Recording —
+    /// unless a `stop` cancels us first (by cancelling [`Self::start_cancel`]).
+    async fn run_start(&self, cancel: CancellationToken) {
         let opts = self.build_options();
         let path = opts.output_path.clone();
 
@@ -277,27 +290,40 @@ impl RecorderState {
             return;
         }
 
-        // prev == Recording: tear down the live pipeline.
+        // prev == Recording. Flip the UI to stopped *now*, before the blocking
+        // muxer finalize below. `recorder.stop()` sends EOS and blocks until the
+        // muxer writes its trailer (up to EOS_TIMEOUT, ~5s); if we left `active`
+        // true across it the bar icon would keep showing "recording" the whole
+        // time, and the user — seeing no feedback — presses again, which no-ops
+        // while we are Stopping. Status stays Stopping until the finalize
+        // completes, so no new recording can start mid-teardown.
         self.cancel_timer();
-        if let Err(err) = self.recorder.stop() {
-            warn!(error = %err, "failed to stop recording");
-        }
-        *self.lock_status() = Status::Idle;
         self.active.set(false);
         self.paused.set(false);
         self.elapsed_secs.set(0);
-
-        // Only claim success if the muxer actually wrote a non-empty file;
-        // otherwise the capture died and "saved" would be a lie.
         let path = self.file_path.get();
-        let saved = std::fs::metadata(&path).is_ok_and(|m| m.len() > 0);
-        if saved {
-            self.show_toast(&t!("recorder-toast-stopped"), STOP_TOAST_MS);
-            self.notify_saved(&path);
-        } else {
-            warn!(path = %path, "recording produced no output file");
-            self.show_error(&t!("recorder-toast-failed"));
-        }
+
+        // Run the blocking finalize off the async executor so it never stalls
+        // the D-Bus handler / tokio worker, then settle to Idle and report
+        // where the file landed.
+        let state = self.clone();
+        tokio::task::spawn_blocking(move || {
+            if let Err(err) = state.recorder.stop() {
+                warn!(error = %err, "failed to stop recording");
+            }
+            *state.lock_status() = Status::Idle;
+
+            // Only claim success if the muxer actually wrote a non-empty file;
+            // otherwise the capture died and "saved" would be a lie.
+            let saved = std::fs::metadata(&path).is_ok_and(|m| m.len() > 0);
+            if saved {
+                state.show_toast(&t!("recorder-toast-stopped"), STOP_TOAST_MS);
+                state.notify_saved(&path);
+            } else {
+                warn!(path = %path, "recording produced no output file");
+                state.show_error(&t!("recorder-toast-failed"));
+            }
+        });
     }
 
     /// Publishes a recorder toast to the OSD.

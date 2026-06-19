@@ -17,6 +17,7 @@ use relm4::{
 };
 pub(crate) use row::webcam_device_select;
 use wayle_config::ConfigProperty;
+use wayle_widgets::prelude::ellipsizing_string_factory;
 
 use super::{WatcherHandle, spawn_property_watcher};
 
@@ -80,6 +81,7 @@ impl SimpleComponent for DeviceSelectControl {
         let current_index = index_of(&choices, &current);
 
         let dropdown = gtk::DropDown::new(Some(string_list), gtk::Expression::NONE);
+        dropdown.set_factory(Some(&ellipsizing_string_factory()));
         dropdown.set_selected(current_index);
         dropdown.set_cursor_from_name(Some("pointer"));
 

@@ -204,6 +204,7 @@ impl Component for RecorderDropdown {
                             },
                             #[name = "mic_device_dropdown"]
                             gtk::DropDown {
+                                set_factory: Some(&ellipsizing_string_factory()),
                                 set_model: Some(&string_list(&model.mic_sources)),
                                 set_selected: devices::index_of(
                                     &model.mic_sources,
@@ -303,6 +304,7 @@ impl Component for RecorderDropdown {
                                 set_label: &t!("dropdown-recorder-webcam-device"),
                             },
                             gtk::DropDown {
+                                set_factory: Some(&ellipsizing_string_factory()),
                                 set_model: Some(&string_list(&model.cameras)),
                                 set_selected: devices::index_of(
                                     &model.cameras,

@@ -32,6 +32,12 @@
     font-size: var(--text-base);
     font-weight: var(--weight-semibold);
     color: var(--fg-muted);
+    transition: background-color var(--duration-fast);
+}
+
+/* Gap between options so they read as distinct rows, not one block. */
+.setting-control dropdown listview row:not(:last-child) {
+    margin-bottom: var(--space-xs);
 }
 
 .setting-control dropdown listview row:hover {

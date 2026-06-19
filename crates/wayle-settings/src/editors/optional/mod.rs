@@ -21,6 +21,7 @@ use serde::{
 };
 use wayle_config::{ConfigProperty, EnumVariant, EnumVariants, schemas::styling::ColorValue};
 use wayle_i18n::t;
+use wayle_widgets::prelude::ellipsizing_string_factory;
 
 use crate::{
     editors::{color_value::ColorValueControl, spawn_property_watcher},
@@ -84,6 +85,7 @@ where
 
     let string_list = gtk::StringList::new(&labels.iter().map(String::as_str).collect::<Vec<_>>());
     let dropdown = gtk::DropDown::new(Some(string_list), gtk::Expression::NONE);
+    dropdown.set_factory(Some(&ellipsizing_string_factory()));
     dropdown.set_cursor_from_name(Some("pointer"));
     dropdown.set_selected(enum_index(&get()));
 

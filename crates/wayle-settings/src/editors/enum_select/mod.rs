@@ -13,6 +13,7 @@ use serde::{
 };
 use wayle_config::{ConfigProperty, EnumVariant, EnumVariants};
 use wayle_i18n::t;
+use wayle_widgets::prelude::ellipsizing_string_factory;
 
 use super::{WatcherHandle, spawn_property_watcher};
 
@@ -73,6 +74,7 @@ where
         let current_index = variant_index_of(&property.get(), variants);
 
         let dropdown = gtk::DropDown::new(Some(string_list), gtk::Expression::NONE);
+        dropdown.set_factory(Some(&ellipsizing_string_factory()));
         dropdown.set_selected(current_index);
         dropdown.set_cursor_from_name(Some("pointer"));
 

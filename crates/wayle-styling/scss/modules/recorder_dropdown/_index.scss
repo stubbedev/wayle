@@ -179,6 +179,35 @@
             }
         }
 
+        // The open list (popover). GTK only themes the closed button by
+        // default, leaving the menu unstyled; match the settings dropdown —
+        // padded contents, a gap between rows, a clear hover, and an
+        // accent-tinted selected row.
+        > dropdown popover > contents {
+            padding: var(--space-xs);
+
+            listview row {
+                padding: var(--space-xs) var(--space-sm);
+                border-radius: var(--rounding-element);
+                color: var(--fg-muted);
+                transition: background-color var(--duration-fast);
+
+                &:not(:last-child) {
+                    margin-bottom: var(--space-xs);
+                }
+
+                &:hover {
+                    background-color: var(--bg-hover);
+                    color: var(--fg-default);
+                }
+
+                &:selected {
+                    background-color: var(--accent-subtle);
+                    color: var(--accent);
+                }
+            }
+        }
+
         > spinbutton {
             > text {
                 min-height: 0;
