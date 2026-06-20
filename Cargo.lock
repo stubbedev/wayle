@@ -5745,7 +5745,6 @@ dependencies = [
  "gdk4",
  "gio-unix",
  "glob",
- "gstreamer",
  "gtk4",
  "gtk4-layer-shell",
  "hyprland",

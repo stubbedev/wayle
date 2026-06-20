@@ -3,9 +3,11 @@
 //! Compositor-agnostic: window thumbnails capture via Hyprland's
 //! toplevel-export when a handle is available, otherwise the generic
 //! `ext-image-copy-capture` path; output thumbnails + layout come from
-//! `wl_output` (wlr-screencopy). The capturable window/output identity all
-//! flows from the `XDPH_WINDOW_SHARING_LIST` toplevels and `wl_output`, never
-//! the Hyprland socket.
+//! `wl_output` (wlr-screencopy). The capturable window identity comes from the
+//! `XDPH_WINDOW_SHARING_LIST` toplevels when XDPH is the portal (Hyprland), and
+//! otherwise from a generic `ext_foreign_toplevel_list_v1` enumeration (see
+//! [`ext_fallback_toplevels`]); outputs come from `wl_output`. Never the
+//! Hyprland socket.
 
 use std::sync::Arc;
 
@@ -43,9 +45,16 @@ pub(super) fn add_escape_controller(
 
 // --- Windows page ----------------------------------------------------------
 
-/// Builds the windows page from the XDPH toplevel list.
+/// Builds the windows page.
+///
+/// `toplevels` is the XDPH `XDPH_WINDOW_SHARING_LIST` (set only when XDPH is the
+/// screencast portal, i.e. Hyprland). When it is empty — `wayle share-picker`
+/// run standalone, or a non-XDPH portal — we fall back to enumerating toplevels
+/// generically via `ext_foreign_toplevel_list_v1` so the tab still populates.
+/// See [`ext_fallback_toplevels`] for why those entries are display-only.
 pub(super) fn build_windows_page(
     toplevels: &[Toplevel],
+    con: &Connection,
     config: &PickerConfig,
     input: &Sender<SharePickerInput>,
 ) -> ScrolledWindow {
@@ -62,6 +71,14 @@ pub(super) fn build_windows_page(
         .css_classes(["share-picker-page"])
         .build();
 
+    let fallback;
+    let toplevels = if toplevels.is_empty() {
+        fallback = ext_fallback_toplevels(con);
+        fallback.as_slice()
+    } else {
+        toplevels
+    };
+
     if toplevels.is_empty() {
         return placeholder(&scrolled_window, "No windows available");
     }
@@ -73,6 +90,36 @@ pub(super) fn build_windows_page(
 
     container.set_max_children_per_line(config.windows_max_per_row.min(toplevels.len() as u32));
     scrolled_window
+}
+
+/// Enumerates capturable toplevels generically via `ext_foreign_toplevel_list_v1`,
+/// used when `XDPH_WINDOW_SHARING_LIST` is unset.
+///
+/// The synthetic ids are display-only: unlike the XDPH list, they do **not**
+/// round-trip to a portal (XDPH's `window:<id>` is its own wlr-foreign-toplevel
+/// resource id). Capture instead re-matches the chosen window by app_id + title
+/// in [`capture_window_buffer`]'s `ext` branch, so the synthetic id is never
+/// resolved against anything.
+fn ext_fallback_toplevels(con: &Connection) -> Vec<Toplevel> {
+    let manager = match ExtToplevelManager::new(con) {
+        Ok(manager) => manager,
+        Err(err) => {
+            debug!(%err, "share picker: ext toplevel enumeration unavailable");
+            return Vec::new();
+        }
+    };
+
+    manager
+        .toplevels()
+        .iter()
+        .enumerate()
+        .map(|(index, toplevel)| Toplevel {
+            id: index as u64,
+            class: toplevel.app_id.clone().unwrap_or_default(),
+            title: toplevel.title.clone().unwrap_or_default(),
+            window_address: None,
+        })
+        .collect()
 }
 
 fn build_window_card(
@@ -611,7 +658,7 @@ pub(super) fn populate_notebook(
 ) {
     use super::config::Page;
 
-    let windows = build_windows_page(toplevels, config, input);
+    let windows = build_windows_page(toplevels, con, config, input);
     let windows_idx = notebook.append_page(&windows, Some(&page_label("Windows")));
     let outputs = build_outputs_page(con, config, input);
     let outputs_idx = notebook.append_page(&outputs, Some(&page_label("Outputs")));

@@ -87,6 +87,8 @@
     // so drop them and center both children on the row instead.
     .recorder-section-header {
         margin-top: var(--space-lg);
+        // Breathing room between the section title and its group/card below.
+        margin-bottom: var(--space-sm);
 
         > image {
             -gtk-icon-size: var(--icon-sm);
@@ -131,15 +133,30 @@
         }
     }
 
-    // Label + control rows (switches, combos, spin buttons).
+    // Label + control rows (switches, combos, spin buttons). Padding matches
+    // the settings rows (`.setting-row`) so the popover reads consistently.
     .recorder-row {
         min-height: calc(2.25rem * var(--global-scale));
-        padding: var(--space-xs) var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
 
         > label {
             font-size: var(--text-md);
             font-weight: var(--weight-medium);
             color: var(--fg-default);
+        }
+
+        // Match the settings switches (`.setting-control switch`): the bare
+        // `switch` primitive is taller/wider and would look oversized next to
+        // the popover rows. Keep these dimensions in sync with
+        // `components/settings/controls/_inherit_toggle.scss`.
+        > switch {
+            min-height: calc(var(--text-sm) + var(--space-sm) + 0.3rem * var(--global-scale));
+            min-width: calc(var(--text-sm) + var(--space-sm) + 0.7rem * var(--global-scale));
+
+            slider {
+                min-width: calc(var(--text-sm) + var(--space-sm));
+                min-height: calc(var(--text-sm) + var(--space-sm));
+            }
         }
 
         // Raw gtk DropDown / SpinButton aren't themed at the primitive
@@ -148,7 +165,10 @@
         // popovers' inputs.
         > dropdown,
         > spinbutton {
-            min-width: calc(8rem * var(--global-scale));
+            // Capped short so a long device name can't crowd or overlap the
+            // row label; the ellipsizing factory truncates the selection to
+            // this width with a trailing "…".
+            min-width: calc(7rem * var(--global-scale));
             color: var(--fg-default);
             font-size: var(--text-md);
             font-weight: var(--weight-medium);
