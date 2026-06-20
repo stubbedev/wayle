@@ -1,14 +1,23 @@
 // Compact "inherit / use the default" toggle used by every optional editor: a
 // lone small switch (no label). When inherited it's on and the value controls
 // beside it are dimmed, which conveys the state; the tooltip names it.
-.inherit-switch {
-    // Same height/puck as the regular settings toggle switch (the `switch`
-    // primitive); only the width stays a touch narrower since it has no label.
-    min-width: calc(2.1rem * var(--global-scale));
-    min-height: calc(1.375rem * var(--global-scale));
+// Every settings switch (the toggle editor + the inherit toggle) matches the
+// height of the value inputs (entry/spin/dropdown), whose box is
+// `font(text-sm) + 2x space-xs padding + border`. On the bare `switch`
+// primitive they render shorter and sit lower than the inputs beside them.
+// Scoped to `.setting-control` so the bar/dropdown switches are untouched.
+.setting-control switch {
+    min-height: calc(var(--text-sm) + var(--space-sm) + 0.3rem * var(--global-scale));
 
     slider {
-        min-width: calc(1.1rem * var(--global-scale));
-        min-height: calc(1.1rem * var(--global-scale));
+        // Track height minus the primitive's 0.15rem puck margin on each side.
+        min-width: calc(var(--text-sm) + var(--space-sm));
+        min-height: calc(var(--text-sm) + var(--space-sm));
     }
+}
+
+// The inherit toggle has no label, so keep it a touch narrower; height comes
+// from the shared `.setting-control switch` rule above.
+.inherit-switch {
+    min-width: calc(2.1rem * var(--global-scale));
 }

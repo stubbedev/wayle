@@ -11,6 +11,12 @@
     padding: var(--space-xs) var(--space-sm);
 }
 
+// Accent the border on hover/focus, matching the entry and dropdown inputs.
+.setting-control spinbutton:hover,
+.setting-control spinbutton:focus-within {
+    border-color: var(--accent);
+}
+
 // Disabled (inherited / override off): dim so it reads as not editable.
 .setting-control spinbutton:disabled {
     opacity: 0.45;
