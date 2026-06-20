@@ -143,14 +143,20 @@ impl RemoteDesktop {
             config.device_types & (DEVICE_KEYBOARD | DEVICE_POINTER)
         };
 
-        match VirtualInput::spawn() {
-            Ok(input) => {
+        // Binding the virtual devices blocks on a Wayland roundtrip; keep it off
+        // the async executor.
+        match tokio::task::spawn_blocking(VirtualInput::spawn).await {
+            Ok(Ok(input)) => {
                 if let Ok(mut map) = self.inputs.lock() {
                     map.insert(session_handle, Arc::new(input));
                 }
             }
-            Err(err) => {
+            Ok(Err(err)) => {
                 error!(%err, "remotedesktop: cannot start virtual input");
+                return (Response::Other.code(), HashMap::new());
+            }
+            Err(err) => {
+                error!(%err, "remotedesktop: virtual input task failed");
                 return (Response::Other.code(), HashMap::new());
             }
         }

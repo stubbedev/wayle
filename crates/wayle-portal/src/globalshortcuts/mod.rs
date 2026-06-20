@@ -60,21 +60,27 @@ impl GlobalShortcuts {
 
     /// Ensures the Wayland manager is running, starting it (and the activation
     /// signal task) on first use. Returns `false` if it is unavailable.
-    fn ensure_manager(&self) -> bool {
-        let Ok(mut guard) = self.handle.lock() else {
-            return false;
-        };
-        if guard.is_some() {
+    ///
+    /// The manager setup blocks on a Wayland roundtrip, so it runs on the
+    /// blocking pool rather than the async D-Bus executor.
+    async fn ensure_manager(&self) -> bool {
+        if self.handle.lock().map(|guard| guard.is_some()).unwrap_or(false) {
             return true;
         }
-        match manager::spawn() {
-            Ok((handle, events)) => {
+        match tokio::task::spawn_blocking(manager::spawn).await {
+            Ok(Ok((handle, events))) => {
                 self.spawn_signal_task(events);
-                *guard = Some(handle);
+                if let Ok(mut guard) = self.handle.lock() {
+                    guard.get_or_insert(handle);
+                }
                 true
             }
-            Err(err) => {
+            Ok(Err(err)) => {
                 warn!(%err, "global shortcuts unavailable on this compositor");
+                false
+            }
+            Err(err) => {
+                warn!(%err, "global shortcuts manager task failed");
                 false
             }
         }
@@ -172,7 +178,7 @@ impl GlobalShortcuts {
         _options: HashMap<String, OwnedValue>,
     ) -> (u32, HashMap<String, OwnedValue>) {
         let session = self.sessions.get(&session_handle).unwrap_or_default();
-        let available = self.ensure_manager();
+        let available = self.ensure_manager().await;
 
         if available && let Ok(guard) = self.handle.lock() && let Some(handle) = guard.as_ref() {
             for (id, props) in &shortcuts {

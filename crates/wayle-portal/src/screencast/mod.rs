@@ -193,7 +193,9 @@ impl ScreenCast {
             },
         };
 
-        let stream = match self.begin_stream(&session_handle, &selection.target, config.cursor_mode)
+        let stream = match self
+            .begin_stream(&session_handle, &selection.target, config.cursor_mode)
+            .await
         {
             Ok(stream) => stream,
             Err(err) => {
@@ -236,19 +238,28 @@ struct StreamInfo {
 
 impl ScreenCast {
     /// Starts the PipeWire producer and stores its handle on the session.
+    ///
+    /// PipeWire/Wayland setup blocks (it waits for the producer thread to
+    /// capture a first frame and connect), so it runs on the blocking pool
+    /// rather than stalling the async D-Bus executor.
     #[cfg(feature = "pipewire")]
-    fn begin_stream(
+    async fn begin_stream(
         &self,
         session_handle: &OwnedObjectPath,
         target: &CaptureTarget,
         cursor_mode: u32,
     ) -> Result<StreamInfo, String> {
         let show_cursor = source::CursorMode::from_bits(cursor_mode).show_cursor();
-        let handle = pipewire::start_stream(target.clone(), show_cursor, DEFAULT_FPS)?;
+        let source_type = target.source_type();
+        let target = target.clone();
+        let handle =
+            tokio::task::spawn_blocking(move || pipewire::start_stream(target, show_cursor, DEFAULT_FPS))
+                .await
+                .map_err(|err| format!("screencast stream task failed: {err}"))??;
         let info = StreamInfo {
             node_id: handle.node_id,
             size: handle.size,
-            source_type: target.source_type(),
+            source_type,
         };
         if let Ok(mut map) = self.streams.lock() {
             map.entry(session_handle.clone()).or_default().push(handle);
@@ -258,7 +269,7 @@ impl ScreenCast {
 
     /// Without the `pipewire` feature there is no producer.
     #[cfg(not(feature = "pipewire"))]
-    fn begin_stream(
+    async fn begin_stream(
         &self,
         _session_handle: &OwnedObjectPath,
         _target: &CaptureTarget,
