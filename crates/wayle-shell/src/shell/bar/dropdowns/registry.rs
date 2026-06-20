@@ -645,10 +645,65 @@ fn dispatch_action(
             }
         }
         ClickAction::Shell(cmd) => {
-            debug!(command = %cmd, "click: shell");
-            process::run_if_set(cmd);
+            // Builtin `wayle …` actions are handled in-process (no subprocess,
+            // no dependence on `wayle` being on $PATH); anything else shells out.
+            if try_builtin(cmd, registry) {
+                debug!(command = %cmd, "click: builtin");
+            } else {
+                debug!(command = %cmd, "click: shell");
+                process::run_if_set(cmd);
+            }
         }
         ClickAction::None => debug!("click: none"),
+    }
+}
+
+/// Routes recognized `wayle …` commands to their in-process service instead of
+/// spawning a subprocess. Returns `true` when handled.
+fn try_builtin(cmd: &str, registry: &DropdownRegistry) -> bool {
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
+    if parts.first() != Some(&"wayle") {
+        return false;
+    }
+    match parts.get(1).copied() {
+        Some("screenshot") => {
+            let Some(sender) = crate::services::screenshot::host_sender() else {
+                return false;
+            };
+            let mode = parts.get(2).copied().unwrap_or("region").to_owned();
+            let target = parts.get(3).copied().unwrap_or("").to_owned();
+            let (reply, _rx) = tokio::sync::oneshot::channel();
+            sender.emit(crate::shell::screenshot::ScreenshotInput::Capture {
+                mode,
+                target,
+                reply,
+            });
+            true
+        }
+        Some("recorder") => {
+            let Some(recorder) = registry.services.recorder.as_ref() else {
+                return false;
+            };
+            let state = recorder.state();
+            match parts.get(2).copied() {
+                Some("toggle") => {
+                    relm4::spawn(async move {
+                        state.toggle().await;
+                    });
+                }
+                Some("start") => {
+                    relm4::spawn(async move {
+                        state.start().await;
+                    });
+                }
+                Some("stop") => state.stop(),
+                Some("pause") => state.set_paused(true),
+                Some("resume") => state.set_paused(false),
+                _ => return false,
+            }
+            true
+        }
+        _ => false,
     }
 }
 

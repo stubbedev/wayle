@@ -69,6 +69,7 @@ const V4L2_CAP_VIDEO_CAPTURE: u32 = 0x0000_0001;
 const V4L2_CAP_DEVICE_CAPS: u32 = 0x8000_0000;
 
 /// Queries a `/dev/videoN` node; returns its card name if it can capture video.
+#[allow(unsafe_code)]
 fn capture_card(path: &str) -> Option<String> {
     let file = fs::File::open(path).ok()?;
     let mut cap: V4l2Capability = unsafe { mem::zeroed() };

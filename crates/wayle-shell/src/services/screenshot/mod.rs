@@ -30,7 +30,7 @@ pub(crate) fn register_sender(sender: Sender<ScreenshotInput>) {
 }
 
 /// Returns a clone of the registered host sender, if the UI is ready.
-pub(super) fn host_sender() -> Option<Sender<ScreenshotInput>> {
+pub(crate) fn host_sender() -> Option<Sender<ScreenshotInput>> {
     HOST_SENDER.get().cloned()
 }
 

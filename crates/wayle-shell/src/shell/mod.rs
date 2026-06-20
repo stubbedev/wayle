@@ -21,7 +21,7 @@ use self::{
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
     region_overlay::RegionOverlay,
-    screenshot::Screenshot,
+    screenshot::{Screenshot, ScreenshotInit},
     share_picker::SharePicker,
 };
 use crate::{startup::StartupTimer, watchers};
@@ -116,7 +116,12 @@ impl Component for Shell {
         crate::services::region_overlay::register_sender(region_overlay.sender().clone());
 
         let screenshot = Screenshot::builder()
-            .launch(init.services.config.clone())
+            .launch(ScreenshotInit {
+                config: init.services.config.clone(),
+                hyprland: init.services.hyprland.clone(),
+                niri: init.services.niri.clone(),
+                mango: init.services.mango.clone(),
+            })
             .detach();
         crate::services::screenshot::register_sender(screenshot.sender().clone());
 

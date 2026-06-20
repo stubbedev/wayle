@@ -31,6 +31,18 @@
     padding: var(--space-xs);
 }
 
+/* Searchable dropdowns (the action picker): breathing room between the search
+   entry and the options list below it, plus horizontal padding so the search
+   icon doesn't sit flush against the input edge. */
+.setting-control dropdown popover entry.search {
+    margin-bottom: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+}
+
+.setting-control dropdown popover entry.search image {
+    margin-right: var(--space-xs);
+}
+
 .setting-control dropdown listview row {
     padding: var(--space-xs) var(--space-sm);
     border-radius: var(--rounding-element);

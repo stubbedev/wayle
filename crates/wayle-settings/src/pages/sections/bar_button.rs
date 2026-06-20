@@ -3,7 +3,12 @@
 use wayle_config::{ClickAction, ConfigProperty, schemas::styling::ColorValue};
 
 use crate::{
-    editors::{color_value::color_value, number::number_u32, text::text_like, toggle::toggle},
+    editors::{
+        action::{ActionChoice, action},
+        color_value::color_value,
+        number::number_u32,
+        toggle::toggle,
+    },
     pages::spec::SectionSpec,
 };
 
@@ -49,15 +54,15 @@ pub(crate) fn colors_section(fields: &BarButtonFields) -> SectionSpec {
     }
 }
 
-pub(crate) fn actions_section(fields: &BarButtonFields) -> SectionSpec {
+pub(crate) fn actions_section(fields: &BarButtonFields, choices: &[ActionChoice]) -> SectionSpec {
     SectionSpec {
         title_key: "settings-section-actions",
         items: vec![
-            text_like(fields.left_click),
-            text_like(fields.right_click),
-            text_like(fields.middle_click),
-            text_like(fields.scroll_up),
-            text_like(fields.scroll_down),
+            action(fields.left_click, choices.to_vec()),
+            action(fields.right_click, choices.to_vec()),
+            action(fields.middle_click, choices.to_vec()),
+            action(fields.scroll_up, choices.to_vec()),
+            action(fields.scroll_down, choices.to_vec()),
         ],
     }
 }

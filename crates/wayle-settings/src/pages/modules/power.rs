@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{color_value::color_value, icon::icon, text::text_like, toggle::toggle},
+    editors::{color_value::color_value, icon::icon, toggle::toggle},
     pages::{
         nav::LeafEntry,
         spec::{SectionSpec, page_spec},
@@ -39,11 +39,11 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-actions",
                     items: vec![
-                        text_like(&module.left_click),
-                        text_like(&module.right_click),
-                        text_like(&module.middle_click),
-                        text_like(&module.scroll_up),
-                        text_like(&module.scroll_down),
+                        crate::editors::action::action(&module.left_click, crate::pages::sections::action_choices::choices_for("power")),
+                        crate::editors::action::action(&module.right_click, crate::pages::sections::action_choices::choices_for("power")),
+                        crate::editors::action::action(&module.middle_click, crate::pages::sections::action_choices::choices_for("power")),
+                        crate::editors::action::action(&module.scroll_up, crate::pages::sections::action_choices::choices_for("power")),
+                        crate::editors::action::action(&module.scroll_down, crate::pages::sections::action_choices::choices_for("power")),
                     ],
                 },
             ],

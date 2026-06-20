@@ -1,5 +1,6 @@
 pub mod buffer;
 pub mod error;
+pub mod ext_capture;
 pub mod frame;
 pub mod image;
 pub mod output;

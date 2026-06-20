@@ -1,10 +1,13 @@
 //! Notebook page builders for the share picker: windows, outputs, region.
 //!
-//! Ported from the standalone `hyprland-preview-share-picker`. Selection is
-//! delivered through a Relm4 input [`Sender`] instead of a GTK action, and
-//! logging goes through `tracing`.
+//! Compositor-agnostic: window thumbnails capture via Hyprland's
+//! toplevel-export when a handle is available, otherwise the generic
+//! `ext-image-copy-capture` path; output thumbnails + layout come from
+//! `wl_output` (wlr-screencopy). The capturable window/output identity all
+//! flows from the `XDPH_WINDOW_SHARING_LIST` toplevels and `wl_output`, never
+//! the Hyprland socket.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use gtk4::{
     Box, Button, EventControllerKey, Fixed, FlowBox, FlowBoxChild, GestureClick, Label, Notebook,
@@ -12,23 +15,15 @@ use gtk4::{
     glib::{self, clone},
     prelude::*,
 };
-use hyprland::{
-    data::{Clients, Monitor, Monitors, Transforms},
-    shared::HyprData,
-};
 use relm4::Sender;
-use tracing::{debug, error, warn};
-use wayland_client::{Connection, protocol::wl_output::WlOutput};
+use tracing::{debug, error};
+use wayland_client::Connection;
 use wayle_share_preview::{
-    frame::FrameManager, image::Image, output::OutputManager, toplevel::Toplevel,
+    buffer::Buffer, ext_capture::ExtToplevelManager, frame::FrameManager, image::Image,
+    image::Transforms, output::OutputManager, toplevel::Toplevel,
 };
 
-use super::{
-    SharePickerInput,
-    config::PickerConfig,
-    image::ImageExt,
-    util::{ClientExt, MonitorTransformExt},
-};
+use super::{SharePickerInput, config::PickerConfig, image::ImageExt, util::OutputInfo};
 
 /// Adds an Escape-to-cancel key controller to a widget.
 pub(super) fn add_escape_controller(
@@ -49,9 +44,7 @@ pub(super) fn add_escape_controller(
 // --- Windows page ----------------------------------------------------------
 
 /// Builds the windows page from the XDPH toplevel list.
-#[allow(clippy::cognitive_complexity)]
 pub(super) fn build_windows_page(
-    con: &Connection,
     toplevels: &[Toplevel],
     config: &PickerConfig,
     input: &Sender<SharePickerInput>,
@@ -69,82 +62,22 @@ pub(super) fn build_windows_page(
         .css_classes(["share-picker-page"])
         .build();
 
-    let manager = match FrameManager::new(con) {
-        Ok(manager) => Arc::new(manager),
-        Err(err) => {
-            error!(%err, "unable to create frame manager");
-            return placeholder(&scrolled_window, "No windows available");
-        }
-    };
-    let clients = match Clients::get() {
-        Ok(clients) => clients
-            .into_iter()
-            .map(|mut client| {
-                client.sanitize();
-                client
-            })
-            .collect::<Vec<_>>(),
-        Err(err) => {
-            error!(%err, "unable to get clients from hyprland socket");
-            Vec::new()
-        }
-    };
-    let monitors = Monitors::get()
-        .map(|monitors| monitors.into_iter().collect::<Vec<_>>())
-        .unwrap_or_else(|err| {
-            error!(%err, "unable to get monitors from hyprland socket");
-            Vec::new()
-        });
-
-    let mut cards = 0;
-    for toplevel in toplevels {
-        let Some(client) = clients
-            .iter()
-            .find(|c| c.class.eq(&toplevel.class) && c.title.eq(&toplevel.title))
-        else {
-            error!("no hyprland client matches toplevel class and title");
-            continue;
-        };
-        let Some(monitor) = monitors.iter().find(|m| Some(m.id) == client.monitor) else {
-            error!("no hyprland monitor for hyprland client");
-            continue;
-        };
-
-        let handle_str = &format!("{}", client.address)[2..];
-        let alt_handle = match u64::from_str_radix(handle_str, 16) {
-            Ok(handle) => handle,
-            Err(err) => {
-                error!(%err, "unable to convert client address to u64");
-                continue;
-            }
-        };
-
-        let card = build_window_card(
-            toplevel,
-            config,
-            monitor.transform,
-            alt_handle,
-            &manager,
-            input,
-        );
-        cards += 1;
-        container.insert(&card, 0);
-    }
-
-    if cards == 0 {
+    if toplevels.is_empty() {
         return placeholder(&scrolled_window, "No windows available");
     }
 
-    container.set_max_children_per_line(config.windows_max_per_row.min(cards));
+    for toplevel in toplevels {
+        let card = build_window_card(toplevel, config, input);
+        container.insert(&card, 0);
+    }
+
+    container.set_max_children_per_line(config.windows_max_per_row.min(toplevels.len() as u32));
     scrolled_window
 }
 
 fn build_window_card(
     toplevel: &Toplevel,
     config: &PickerConfig,
-    transform: Transforms,
-    alt_handle: u64,
-    manager: &Arc<FrameManager>,
     input: &Sender<SharePickerInput>,
 ) -> FlowBoxChild {
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -226,14 +159,7 @@ fn build_window_card(
         move |_| input.emit(SharePickerInput::Select(payload.clone()))
     ));
 
-    request_window_frame(
-        toplevel,
-        config.resize_size,
-        transform,
-        alt_handle,
-        manager.clone(),
-        tx,
-    );
+    request_window_frame(toplevel, config.resize_size, tx);
     update_frame_lazily(card, picture, Some(spinner), rx);
 
     container
@@ -242,44 +168,63 @@ fn build_window_card(
 fn request_window_frame(
     toplevel: &Toplevel,
     resize_size: u32,
-    transform: Transforms,
-    alt_handle: u64,
-    manager: Arc<FrameManager>,
     tx: tokio::sync::oneshot::Sender<Image>,
 ) {
     let id = toplevel.id;
-    let handle = toplevel.window_address.unwrap_or_else(|| {
-        warn!(
-            id,
-            "missing window address in toplevel, falling back to socket address"
-        );
-        alt_handle
-    });
+    let address = toplevel.window_address;
+    let class = toplevel.class.clone();
+    let title = toplevel.title.clone();
 
     relm4::spawn(async move {
-        // FrameManager::capture_frame needs `&mut self`; clone the (cheap,
-        // Connection-backed) manager so each concurrent capture owns one.
-        let mut manager = (*manager).clone();
-        let buffer = match manager.capture_frame(handle) {
+        let buffer = match capture_window_buffer(address, &class, &title) {
             Ok(buffer) => buffer,
-            Err(err) => return error!(%err, id, "unable to capture frame for toplevel"),
+            Err(err) => return error!(%err, id, "unable to capture window frame"),
         };
         let img = match Image::new(buffer).and_then(Image::into_rgb) {
             Ok(img) => img,
-            Err(err) => return error!(%err, id, "unable to build rgb image for toplevel"),
+            Err(err) => return error!(%err, id, "unable to build rgb image for window"),
         };
         let mut img = img;
         img.resize_to_fit(resize_size);
-        let img = img.transform(transform.into());
         if tx.send(img).is_err() {
-            error!(id, "unable to transmit toplevel image: channel closed");
+            error!(id, "unable to transmit window image: channel closed");
         }
     });
 }
 
+/// Captures a window: Hyprland toplevel-export when a handle is present,
+/// otherwise the generic `ext` path matching by app_id/title.
+fn capture_window_buffer(
+    address: Option<u64>,
+    class: &str,
+    title: &str,
+) -> Result<Buffer, String> {
+    let connection =
+        Connection::connect_to_env().map_err(|e| format!("cannot connect to wayland: {e}"))?;
+
+    if let Some(handle) = address
+        && let Ok(mut manager) = FrameManager::new(&connection)
+        && let Ok(buffer) = manager.capture_frame(handle)
+    {
+        return Ok(buffer);
+    }
+
+    let mut manager = ExtToplevelManager::new(&connection)
+        .map_err(|_| "window capture not supported on this compositor".to_owned())?;
+    let handle = manager
+        .toplevels()
+        .iter()
+        .find(|t| t.app_id.as_deref() == Some(class) && t.title.as_deref() == Some(title))
+        .map(|t| t.handle.clone())
+        .ok_or("could not match the window to capture")?;
+    manager
+        .capture_toplevel(&handle)
+        .map_err(|e| format!("window capture failed: {e}"))
+}
+
 // --- Outputs page ----------------------------------------------------------
 
-/// Pixel bounding box across all monitors, used to lay out output cards.
+/// Pixel bounding box across all outputs, used to lay out output cards.
 struct MonitorArea {
     min_x: i32,
     max_x: i32,
@@ -292,18 +237,18 @@ struct MonitorArea {
     offset_y: i32,
 }
 
-impl From<&Vec<Monitor>> for MonitorArea {
-    fn from(monitors: &Vec<Monitor>) -> Self {
-        let min_x = monitors.iter().map(|m| m.x).min().unwrap_or_default();
-        let min_y = monitors.iter().map(|m| m.y).min().unwrap_or_default();
-        let max_x = monitors
+impl From<&[OutputInfo]> for MonitorArea {
+    fn from(outputs: &[OutputInfo]) -> Self {
+        let min_x = outputs.iter().map(|o| o.x).min().unwrap_or_default();
+        let min_y = outputs.iter().map(|o| o.y).min().unwrap_or_default();
+        let max_x = outputs
             .iter()
-            .map(|m| m.x + m.width as i32)
+            .map(|o| o.x + o.width)
             .max()
             .unwrap_or_default();
-        let max_y = monitors
+        let max_y = outputs
             .iter()
-            .map(|m| m.y + m.height as i32)
+            .map(|o| o.y + o.height)
             .max()
             .unwrap_or_default();
         let width = max_x - min_x;
@@ -315,14 +260,14 @@ impl From<&Vec<Monitor>> for MonitorArea {
             max_y,
             width,
             height,
-            aspect_ratio: width as f64 / height as f64,
+            aspect_ratio: width as f64 / height.max(1) as f64,
             offset_x: -min_x,
             offset_y: -min_y,
         }
     }
 }
 
-/// Builds the outputs page from the live monitor layout.
+/// Builds the outputs page from the live `wl_output` layout.
 #[allow(clippy::cognitive_complexity)]
 pub(super) fn build_outputs_page(
     con: &Connection,
@@ -345,117 +290,46 @@ pub(super) fn build_outputs_page(
             return placeholder(&scrolled_window, "No outputs available");
         }
     };
-    let mut monitors = match Monitors::get() {
-        Ok(monitors) => monitors.into_iter().collect::<Vec<_>>(),
-        Err(err) => {
-            error!(%err, "unable to get monitors from hyprland socket");
-            return placeholder(&scrolled_window, "No outputs available");
-        }
-    };
-    monitors
-        .iter_mut()
-        .for_each(MonitorTransformExt::apply_transform);
-    if config.outputs_respect_scaling {
-        apply_output_scaling(&mut monitors);
-    }
-    let area = MonitorArea::from(&monitors);
 
-    if manager.outputs.is_empty() {
+    let mut outputs: Vec<OutputInfo> = manager
+        .outputs
+        .iter()
+        .filter_map(|(wl_output, output)| OutputInfo::from_output(wl_output, output))
+        .collect();
+
+    if outputs.is_empty() {
         return placeholder(&scrolled_window, "No outputs available");
     }
 
-    for (wl_output, output) in &manager.outputs {
-        let Some(name) = &output.name else {
-            error!("output without a name");
-            continue;
-        };
-        let Some(monitor) = monitors.iter().find(|m| m.name.eq(name)).cloned() else {
-            error!(name, "output does not exist on hyprland");
-            continue;
-        };
-        let card = build_output_card(&monitor, config, wl_output, &area, &manager, input);
-        append_output_on_allocation(&container, &card, &monitor, &area);
+    if config.outputs_respect_scaling {
+        apply_output_scaling(&mut outputs);
+    }
+    let area = MonitorArea::from(outputs.as_slice());
+
+    for output in &outputs {
+        let card = build_output_card(output, config, &manager, &area, input);
+        append_output_on_allocation(&container, &card, output, &area);
     }
 
     scrolled_window
 }
 
-/// Compensates monitor positions for fractional scaling. Verbatim port of the
-/// upstream heuristic; ugly but matches what users already see.
-fn apply_output_scaling(monitors: &mut [Monitor]) {
-    let mut translations: HashMap<i128, i32> = HashMap::new();
-    monitors.iter().for_each(|m| {
-        translations.insert(m.id, 0);
-    });
-
-    monitors.sort_by_key(|a| a.x);
-    let copy = monitors.to_vec();
-    monitors.iter_mut().for_each(|m| {
-        if m.scale != 1.0 {
-            let new_width = (m.width as f32 / m.scale) as u16;
-            let translation = if new_width > m.width {
-                (new_width - m.width) as i32
-            } else {
-                -((m.width - new_width) as i32)
-            };
-            copy.iter()
-                .filter(|o| {
-                    o.x > m.x + m.width as i32
-                        && o.y <= m.y + m.height as i32
-                        && o.y + o.height as i32 >= m.y
-                })
-                .for_each(|o| {
-                    if let Some(entry) = translations.get_mut(&o.id) {
-                        *entry += translation;
-                    }
-                });
-            m.width = new_width;
-        }
-    });
-    for (key, value) in translations.iter_mut() {
-        if let Some(m) = monitors.iter_mut().find(|m| m.id == *key) {
-            m.x += *value;
-        }
-        *value = 0;
-    }
-
-    monitors.sort_by_key(|a| a.y);
-    let copy = monitors.to_vec();
-    monitors.iter_mut().for_each(|m| {
-        if m.scale != 1.0 {
-            let new_height = (m.height as f32 / m.scale) as u16;
-            let translation = if new_height > m.height {
-                (new_height - m.height) as i32
-            } else {
-                -((m.height - new_height) as i32)
-            };
-            copy.iter()
-                .filter(|o| {
-                    o.y > m.y + m.height as i32
-                        && o.x <= m.x + m.width as i32
-                        && o.x + o.width as i32 >= m.x
-                })
-                .for_each(|o| {
-                    if let Some(entry) = translations.get_mut(&o.id) {
-                        *entry += translation;
-                    }
-                });
-            m.height = new_height;
-        }
-    });
-    for (key, value) in &translations {
-        if let Some(m) = monitors.iter_mut().find(|m| m.id == *key) {
-            m.y += *value;
+/// Scales each output's extent down to logical size, so mixed-DPI layouts read
+/// the way the compositor lays them out.
+fn apply_output_scaling(outputs: &mut [OutputInfo]) {
+    for output in outputs.iter_mut() {
+        if output.scale > 1.0 {
+            output.width = (output.width as f32 / output.scale) as i32;
+            output.height = (output.height as f32 / output.scale) as i32;
         }
     }
 }
 
 fn build_output_card(
-    monitor: &Monitor,
+    output: &OutputInfo,
     config: &PickerConfig,
-    output: &WlOutput,
-    area: &MonitorArea,
     manager: &Arc<OutputManager>,
+    area: &MonitorArea,
     input: &Sender<SharePickerInput>,
 ) -> Button {
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -477,16 +351,16 @@ fn build_output_card(
         .css_classes(["share-picker-card", "share-picker-card-loading"])
         .build();
 
-    if area.min_x != monitor.x {
+    if area.min_x != output.x {
         card.set_margin_start(config.outputs_spacing as i32);
     }
-    if area.max_x != monitor.x + monitor.width as i32 {
+    if area.max_x != output.x + output.width {
         card.set_margin_end(config.outputs_spacing as i32);
     }
-    if area.min_y != monitor.y {
+    if area.min_y != output.y {
         card.set_margin_top(config.outputs_spacing as i32);
     }
-    if area.max_y != monitor.y + monitor.height as i32 {
+    if area.max_y != output.y + output.height {
         card.set_margin_bottom(config.outputs_spacing as i32);
     }
     card.append(&picture);
@@ -494,7 +368,7 @@ fn build_output_card(
     if config.outputs_show_label {
         let label = Label::builder()
             .max_width_chars(1)
-            .label(&monitor.name)
+            .label(&output.name)
             .ellipsize(gtk4::pango::EllipsizeMode::End)
             .single_line_mode(true)
             .css_classes(["share-picker-image-label"])
@@ -505,7 +379,7 @@ fn build_output_card(
 
     let container = Button::builder().focusable(true).child(&card).build();
     container.set_cursor_from_name(Some("pointer"));
-    let payload = format!("screen:{}", monitor.name);
+    let payload = format!("screen:{}", output.name);
 
     container.connect_clicked(clone!(
         #[strong]
@@ -515,32 +389,26 @@ fn build_output_card(
         move |_| input.emit(SharePickerInput::Select(payload.clone()))
     ));
 
-    request_output_frame(
-        monitor,
-        config.resize_size,
-        output.clone(),
-        manager.clone(),
-        tx,
-    );
+    request_output_frame(output, config.resize_size, manager.clone(), tx);
     update_frame_lazily(card, picture, None, rx);
 
     container
 }
 
 fn request_output_frame(
-    monitor: &Monitor,
+    output: &OutputInfo,
     resize_size: u32,
-    output: WlOutput,
     manager: Arc<OutputManager>,
     tx: tokio::sync::oneshot::Sender<Image>,
 ) {
-    let name = monitor.name.clone();
-    let transform = monitor.transform;
+    let name = output.name.clone();
+    let wl_output = output.wl_output.clone();
+    let transform = output.transform;
 
     relm4::spawn(async move {
         // capture_output needs `&mut self`; clone per concurrent capture.
         let mut manager = (*manager).clone();
-        let buffer = match manager.capture_output(&output) {
+        let buffer = match manager.capture_output(&wl_output) {
             Ok(buffer) => buffer,
             Err(err) => return error!(%err, name, "unable to capture output"),
         };
@@ -550,7 +418,7 @@ fn request_output_frame(
         };
         let mut img = img;
         img.resize_to_fit(resize_size);
-        let img = img.transform(transform.into());
+        let img = img.transform(Transforms::from(transform));
         if tx.send(img).is_err() {
             error!(name, "unable to transmit output image: channel closed");
         }
@@ -561,7 +429,7 @@ fn request_output_frame(
 fn append_output_on_allocation(
     container: &Fixed,
     card: &Button,
-    monitor: &Monitor,
+    output: &OutputInfo,
     area: &MonitorArea,
 ) {
     let aspect_ratio = area.aspect_ratio;
@@ -569,7 +437,7 @@ fn append_output_on_allocation(
     let monitors_height = area.height;
     let offset_x = area.offset_x;
     let offset_y = area.offset_y;
-    let (height, width, x, y) = (monitor.height, monitor.width, monitor.x, monitor.y);
+    let (height, width, x, y) = (output.height, output.width, output.x, output.y);
 
     container.add_tick_callback(clone!(
         #[strong]
@@ -581,8 +449,8 @@ fn append_output_on_allocation(
                 return glib::ControlFlow::Continue;
             }
             let container_aspect_ratio = alloc_w as f64 / alloc_h as f64;
-            let monitors_width_f = monitors_width as f64;
-            let monitors_height_f = monitors_height as f64;
+            let monitors_width_f = monitors_width.max(1) as f64;
+            let monitors_height_f = monitors_height.max(1) as f64;
             let transform_x = |x: i32| {
                 if aspect_ratio > container_aspect_ratio {
                     (x as f64 / monitors_width_f) * alloc_w as f64
@@ -598,8 +466,8 @@ fn append_output_on_allocation(
                 }
             };
 
-            card.set_width_request(transform_x(width as i32) as i32);
-            card.set_height_request(transform_y(height as i32) as i32);
+            card.set_width_request(transform_x(width) as i32);
+            card.set_height_request(transform_y(height) as i32);
 
             let transformed_monitor_width = transform_x(monitors_width);
             let transformed_monitor_height = transform_y(monitors_height);
@@ -736,7 +604,7 @@ pub(super) fn populate_notebook(
 ) {
     use super::config::Page;
 
-    let windows = build_windows_page(con, toplevels, config, input);
+    let windows = build_windows_page(toplevels, config, input);
     let windows_idx = notebook.append_page(&windows, Some(&page_label("Windows")));
     let outputs = build_outputs_page(con, config, input);
     let outputs_idx = notebook.append_page(&outputs, Some(&page_label("Outputs")));

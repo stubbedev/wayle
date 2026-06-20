@@ -25,6 +25,7 @@ mod power;
 mod power_profiles;
 mod ram;
 mod recorder;
+mod screenshot;
 mod separator;
 mod storage;
 mod systray;
@@ -64,6 +65,7 @@ pub(crate) fn factories() -> Vec<fn(&Config) -> LeafEntry> {
         power_profiles::entry,
         ram::entry,
         recorder::entry,
+        screenshot::entry,
         separator::entry,
         storage::entry,
         systray::entry,

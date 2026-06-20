@@ -1,47 +1,50 @@
-//! Small adapters over `hyprland` data types used by the share picker views.
+//! Compositor-agnostic output info + string helpers for the share picker.
 
-use hyprland::data::{Client, Monitor};
+use wayland_client::protocol::wl_output::{Transform, WlOutput};
+use wayle_share_preview::output::Output;
 
-/// Applies a monitor's rotation to its reported dimensions.
-pub(super) trait MonitorTransformExt {
-    /// Swaps width/height for 90°/270° rotations so the layout matches what is
-    /// shown on screen.
-    fn apply_transform(&mut self);
+/// An output's connector name and global logical geometry, derived from
+/// `wl_output` data so it works on any compositor (no Hyprland socket).
+#[derive(Clone)]
+pub(super) struct OutputInfo {
+    pub(super) wl_output: WlOutput,
+    pub(super) name: String,
+    pub(super) x: i32,
+    pub(super) y: i32,
+    /// Width/height with the output transform already applied (90°/270°
+    /// rotations swap the axes), so layout matches what is shown.
+    pub(super) width: i32,
+    pub(super) height: i32,
+    pub(super) scale: f32,
+    pub(super) transform: Transform,
 }
 
-impl MonitorTransformExt for Monitor {
-    fn apply_transform(&mut self) {
-        match self.transform {
-            hyprland::data::Transforms::Normal
-            | hyprland::data::Transforms::Normal180
-            | hyprland::data::Transforms::Flipped
-            | hyprland::data::Transforms::Flipped180 => {}
-            hyprland::data::Transforms::Normal90
-            | hyprland::data::Transforms::Normal270
-            | hyprland::data::Transforms::Flipped90
-            | hyprland::data::Transforms::Flipped270 => {
-                std::mem::swap(&mut self.height, &mut self.width);
-            }
+impl OutputInfo {
+    /// Builds an [`OutputInfo`] from a screencopy `(WlOutput, Output)` pair,
+    /// or `None` when the output lacks a name or mode.
+    pub(super) fn from_output(wl_output: &WlOutput, output: &Output) -> Option<Self> {
+        let name = output.name.clone()?;
+        let mode = output.mode.as_ref()?;
+        let geometry = output.geometry.as_ref();
+        let transform = geometry.map_or(Transform::Normal, |g| g.transform);
+
+        let (mut width, mut height) = (mode.width, mode.height);
+        if matches!(
+            transform,
+            Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270
+        ) {
+            std::mem::swap(&mut width, &mut height);
         }
+
+        Some(Self {
+            wl_output: wl_output.clone(),
+            name,
+            x: geometry.map_or(0, |g| g.x),
+            y: geometry.map_or(0, |g| g.y),
+            width,
+            height,
+            scale: output.scale.unwrap_or(1) as f32,
+            transform,
+        })
     }
-}
-
-/// Strips shell-significant characters from window class/title strings.
-pub(super) trait ClientExt {
-    /// Replaces quoting/expansion characters that could break the XDPH
-    /// selection string with spaces.
-    fn sanitize(&mut self);
-}
-
-impl ClientExt for Client {
-    fn sanitize(&mut self) {
-        self.title = sanitize_string(&self.title);
-        self.class = sanitize_string(&self.class);
-    }
-}
-
-fn sanitize_string(target: &str) -> String {
-    target
-        .replace(['\'', '\"', '$', '`'], " ")
-        .replace(">]", ">")
 }

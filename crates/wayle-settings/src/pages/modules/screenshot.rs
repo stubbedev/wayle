@@ -1,9 +1,9 @@
-//! Microphone module settings.
+//! Screenshot module settings.
 
 use wayle_config::Config;
 
 use crate::{
-    editors::{icon::icon, threshold_list::threshold_list},
+    editors::{icon::icon, text::text, toggle::toggle},
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub(crate) fn entry(config: &Config) -> LeafEntry {
-    let module = &config.modules.microphone;
+    let module = &config.modules.screenshot;
 
     let fields = BarButtonFields {
         icon_show: &module.icon_show,
@@ -34,23 +34,29 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
     };
 
     LeafEntry {
-        id: "microphone",
-        i18n_key: "settings-nav-microphone",
-        icon: "ld-mic-symbolic",
+        id: "screenshot",
+        i18n_key: "settings-nav-screenshot",
+        icon: "ld-camera-symbolic",
         spec: page_spec(
-            "settings-page-microphone",
+            "settings-page-screenshot",
             vec![
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![
-                        icon(&module.icon_active),
-                        icon(&module.icon_muted),
-                        threshold_list(&module.thresholds),
+                        text(&module.output_directory),
+                        text(&module.filename_format),
+                        text(&module.label),
+                        toggle(&module.copy_to_clipboard),
+                        toggle(&module.notify),
                     ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-icons",
+                    items: vec![icon(&module.icon)],
                 },
                 bar_display_section(&fields),
                 colors_section(&fields),
-                actions_section(&fields, &crate::pages::sections::action_choices::choices_for("microphone")),
+                actions_section(&fields, &crate::pages::sections::action_choices::choices_for("screenshot")),
             ],
         ),
     }

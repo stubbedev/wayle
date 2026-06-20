@@ -188,6 +188,24 @@ pub enum Transforms {
     Flipped270,
 }
 
+impl From<wayland_client::protocol::wl_output::Transform> for Transforms {
+    fn from(value: wayland_client::protocol::wl_output::Transform) -> Self {
+        use wayland_client::protocol::wl_output::Transform as T;
+        match value {
+            T::Normal => Transforms::Normal,
+            T::_90 => Transforms::Normal90,
+            T::_180 => Transforms::Normal180,
+            T::_270 => Transforms::Normal270,
+            T::Flipped => Transforms::Flipped,
+            T::Flipped90 => Transforms::Flipped90,
+            T::Flipped180 => Transforms::Flipped180,
+            T::Flipped270 => Transforms::Flipped270,
+            // wl_output::Transform is #[non_exhaustive]; treat unknown as normal.
+            _ => Transforms::Normal,
+        }
+    }
+}
+
 #[cfg(feature = "hyprland-rs")]
 impl From<hyprland::data::Transforms> for Transforms {
     fn from(value: hyprland::data::Transforms) -> Self {

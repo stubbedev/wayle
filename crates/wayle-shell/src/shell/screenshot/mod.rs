@@ -18,7 +18,8 @@ use std::{
     sync::Arc,
 };
 
-use capture::{CaptureKind, capture};
+use capture::{CaptureKind, WindowTarget, capture};
+use hyprland::shared::{HyprData, HyprDataActiveOptional};
 use relm4::{
     gtk,
     gtk::{gdk, glib, prelude::*},
@@ -27,6 +28,9 @@ use relm4::{
 use tokio::sync::oneshot;
 use tracing::warn;
 use wayle_config::{ConfigService, schemas::modules::ScreenshotConfig};
+use wayle_hyprland::HyprlandService;
+use wayle_mango::MangoService;
+use wayle_niri::NiriService;
 
 /// Messages driving the screenshot host.
 pub(crate) enum ScreenshotInput {
@@ -51,14 +55,26 @@ impl std::fmt::Debug for ScreenshotInput {
     }
 }
 
+/// Init for the screenshot host: config plus the optional compositor services
+/// used to resolve the focused output / active window.
+pub(crate) struct ScreenshotInit {
+    pub(crate) config: Arc<ConfigService>,
+    pub(crate) hyprland: Option<Arc<HyprlandService>>,
+    pub(crate) niri: Option<Arc<NiriService>>,
+    pub(crate) mango: Option<Arc<MangoService>>,
+}
+
 /// The screenshot host component.
 pub(crate) struct Screenshot {
     config: Arc<ConfigService>,
+    hyprland: Option<Arc<HyprlandService>>,
+    niri: Option<Arc<NiriService>>,
+    mango: Option<Arc<MangoService>>,
 }
 
 #[relm4::component(pub(crate))]
 impl Component for Screenshot {
-    type Init = Arc<ConfigService>;
+    type Init = ScreenshotInit;
     type Input = ScreenshotInput;
     type Output = ();
     type CommandOutput = ();
@@ -77,7 +93,12 @@ impl Component for Screenshot {
         root: Self::Root,
         _sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = Screenshot { config: init };
+        let model = Screenshot {
+            config: init.config,
+            hyprland: init.hyprland,
+            niri: init.niri,
+            mango: init.mango,
+        };
         let widgets = view_output!();
         ComponentParts { model, widgets }
     }
@@ -89,23 +110,101 @@ impl Component for Screenshot {
             reply,
         } = msg;
         let config = self.config.clone();
+        // Resolve compositor-specific focus up front (sync, GTK thread).
+        let focused_output = self.focused_output_name();
+        let window_target = (mode == "window")
+            .then(|| self.active_window_target())
+            .unwrap_or_default();
         glib::spawn_future_local(async move {
-            let result = run(config, mode, target).await;
+            let result = run(config, mode, target, focused_output, window_target).await;
             let _ = reply.send(result);
         });
     }
 }
 
+impl Screenshot {
+    /// Connector name of the focused output, resolved from whichever compositor
+    /// service is present. `None` lets capture fall back to the first output.
+    fn focused_output_name(&self) -> Option<String> {
+        if self.hyprland.is_some()
+            && let Ok(monitors) = hyprland::data::Monitors::get()
+            && let Some(name) = monitors.into_iter().find(|m| m.focused).map(|m| m.name)
+        {
+            return Some(name);
+        }
+        if let Some(mango) = &self.mango
+            && let Some(name) = mango
+                .monitors
+                .get()
+                .iter()
+                .find(|m| m.is_active)
+                .map(|m| m.name.clone())
+        {
+            return Some(name);
+        }
+        // niri / unknown: caller falls back to the first output.
+        None
+    }
+
+    /// Identifies the active window from whichever compositor service is present.
+    fn active_window_target(&self) -> WindowTarget {
+        if self.hyprland.is_some()
+            && let Ok(Some(client)) = hyprland::data::Client::get_active()
+        {
+            let address = format!("{}", client.address);
+            let handle = u64::from_str_radix(address.trim_start_matches("0x"), 16).ok();
+            return WindowTarget {
+                hyprland_handle: handle,
+                app_id: Some(client.class),
+                title: Some(client.title),
+            };
+        }
+        if let Some(niri) = &self.niri
+            && let Some(id) = niri.focused_window_id.get()
+            && let Some(window) = niri.window(id)
+        {
+            return WindowTarget {
+                hyprland_handle: None,
+                app_id: window.app_id.get(),
+                title: window.title.get(),
+            };
+        }
+        if let Some(mango) = &self.mango
+            && let Some(client) = mango.focused_client.get()
+        {
+            return WindowTarget {
+                hyprland_handle: None,
+                app_id: client.app_id,
+                title: client.title,
+            };
+        }
+        WindowTarget::default()
+    }
+}
+
 /// Resolves the target, captures, saves, and applies clipboard/notify options.
-async fn run(config: Arc<ConfigService>, mode: String, target: String) -> Result<String, String> {
+async fn run(
+    config: Arc<ConfigService>,
+    mode: String,
+    target: String,
+    focused_output: Option<String>,
+    window_target: WindowTarget,
+) -> Result<String, String> {
     let kind = match mode.as_str() {
         "region" => match crate::services::region_overlay::request_region().await {
             Some(selection) => CaptureKind::Region(selection),
             // Cancelled — not an error; report an empty path.
             None => return Ok(String::new()),
         },
-        "output" => CaptureKind::Output((!target.is_empty()).then(|| target.clone())),
-        "window" => CaptureKind::Window(None),
+        "output" => {
+            let name = if target.is_empty() {
+                focused_output
+            } else {
+                Some(target)
+            };
+            CaptureKind::Output(name)
+        }
+        "window" => CaptureKind::Window(window_target),
         other => return Err(format!("unknown screenshot mode: {other}")),
     };
 
