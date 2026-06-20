@@ -104,15 +104,11 @@ impl Osd {
         let icon = toast
             .icon
             .or_else(|| preset.as_ref().and_then(|p| p.icon.clone()));
-        let percentage = toast
-            .percentage
-            .or_else(|| preset.as_ref().and_then(|p| p.percentage));
-        let duration_ms = toast
-            .duration_ms
-            .or_else(|| preset.as_ref().and_then(|p| p.duration_ms));
-        let class = toast
-            .class
-            .or_else(|| preset.as_ref().and_then(|p| p.class.clone()));
+        // Percentage, duration, and class are runtime-only (supplied per
+        // invocation); presets carry only label + icon.
+        let percentage = toast.percentage;
+        let duration_ms = toast.duration_ms;
+        let class = toast.class;
 
         self.show_event(
             OsdEvent::Custom {

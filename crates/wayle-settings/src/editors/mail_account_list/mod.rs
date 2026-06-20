@@ -20,8 +20,9 @@ use wayle_i18n::t;
 
 use crate::{
     editors::{
+        card_form::{card, entry, field_row},
         icon::{IconPickerWidget, icon_picker_widget},
-        list_controls::{add_button, remove_button},
+        list_controls::add_button,
         spawn_property_watcher,
     },
     pages::spec::SettingRowInit,
@@ -112,11 +113,6 @@ impl State {
     }
 
     fn append_card(self: &Rc<Self>, account: &MailAccount) {
-        let root = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .css_classes(["card-form-card"])
-            .build();
-
         let name = entry(&account.name, "name");
         let query = entry(&account.query, "tag:unread and folder:…");
         for e in [&name, &query] {
@@ -138,31 +134,26 @@ impl State {
         let icon_picker = icon_picker_widget(&icon_value.borrow(), set);
         icon_picker.widget.set_hexpand(true);
 
-        root.append(&field_row(
-            "settings-mail-account-name",
-            &name.clone().upcast(),
-        ));
-        root.append(&field_row(
+        let cw = card("settings-mail-account-name", &name.clone().upcast());
+        cw.body.append(&field_row(
             "settings-mail-account-query",
             &query.clone().upcast(),
         ));
-        root.append(&field_row(
+        cw.body.append(&field_row(
             "settings-mail-account-provider",
             &provider.clone().upcast(),
         ));
-        root.append(&field_row(
+        cw.body.append(&field_row(
             "settings-mail-account-icon",
             &icon_picker.widget.clone().upcast(),
         ));
 
-        let remove = remove_button("settings-list-remove");
-        remove.set_halign(gtk::Align::End);
         let remove_state = Rc::clone(self);
         let remove_name = name.clone();
-        remove.connect_clicked(move |_| remove_state.remove_card(&remove_name));
-        root.append(&remove);
+        cw.delete
+            .connect_clicked(move |_| remove_state.remove_card(&remove_name));
 
-        self.list.append(&root);
+        self.list.append(&cw.root);
         self.cards.borrow_mut().push(Card {
             name,
             query,
@@ -184,34 +175,6 @@ impl State {
             self.rebuild();
         }
     }
-}
-
-fn entry(text: &str, placeholder: &str) -> gtk::Entry {
-    gtk::Entry::builder()
-        .text(text)
-        .placeholder_text(placeholder)
-        .hexpand(true)
-        .build()
-}
-
-fn field_row(label_key: &str, control: &gtk::Widget) -> gtk::Box {
-    let row = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .spacing(8)
-        .css_classes(["card-form-row"])
-        .build();
-    // Fixed-width label on the left so every control starts at the same x; the
-    // control fills the rest of the row (entries already hexpand; this also
-    // covers the provider DropDown so it spans the row like the entries).
-    let label = gtk::Label::builder()
-        .label(t(label_key))
-        .halign(gtk::Align::Start)
-        .css_classes(["card-form-label"])
-        .build();
-    control.set_hexpand(true);
-    row.append(&label);
-    row.append(control);
-    row
 }
 
 /// Full-width row that edits the mail `Vec<MailAccount>` property.
