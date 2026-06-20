@@ -18,7 +18,9 @@
 
 mod error;
 mod globalshortcuts;
+mod inhibit;
 mod lockdown;
+mod notification;
 mod protocol;
 mod remotedesktop;
 mod request;
@@ -27,6 +29,7 @@ mod screencast;
 mod screenshot;
 mod session;
 mod settings;
+mod wallpaper;
 
 use std::future::pending;
 
@@ -36,8 +39,9 @@ use zbus::Connection;
 
 pub use self::error::Error;
 use self::{
-    globalshortcuts::GlobalShortcuts, lockdown::Lockdown, remotedesktop::RemoteDesktop,
-    screencast::ScreenCast, screenshot::Screenshot, settings::Settings,
+    globalshortcuts::GlobalShortcuts, inhibit::Inhibit, lockdown::Lockdown,
+    notification::Notification, remotedesktop::RemoteDesktop, screencast::ScreenCast,
+    screenshot::Screenshot, settings::Settings, wallpaper::WallpaperPortal,
 };
 
 /// The backend's well-known D-Bus name (matches `wayle.portal`'s `DBusName`).
@@ -85,6 +89,18 @@ pub async fn run() -> Result<(), Error> {
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
         .at(path, GlobalShortcuts::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Notification::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, WallpaperPortal::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Inhibit::new(connection.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
 
