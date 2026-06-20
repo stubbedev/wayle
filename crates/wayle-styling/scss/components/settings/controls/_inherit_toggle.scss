@@ -5,19 +5,20 @@
 // height of the value inputs (entry/spin/dropdown), whose box is
 // `font(text-sm) + 2x space-xs padding + border`. On the bare `switch`
 // primitive they render shorter and sit lower than the inputs beside them.
-// Scoped to `.setting-control` so the bar/dropdown switches are untouched.
-.setting-control switch {
+// Scoped to settings switches (the toggle editor lives in `.setting-control`;
+// the inherit toggle carries `.inherit-switch`) so the bar/dropdown switches
+// stay untouched. Both share the exact same dimensions.
+.setting-control switch,
+.inherit-switch {
     min-height: calc(var(--text-sm) + var(--space-sm) + 0.3rem * var(--global-scale));
+    // Track = puck + 0.15rem margin each side + slide room. Narrower than the
+    // `switch` primitive's 2.5rem default.
+    min-width: calc(var(--text-sm) + var(--space-sm) + 0.7rem * var(--global-scale));
 
     slider {
-        // Track height minus the primitive's 0.15rem puck margin on each side.
+        // Puck width = its filled height (track minus the 0.15rem margins) so
+        // it renders square.
         min-width: calc(var(--text-sm) + var(--space-sm));
         min-height: calc(var(--text-sm) + var(--space-sm));
     }
-}
-
-// The inherit toggle has no label, so keep it a touch narrower; height comes
-// from the shared `.setting-control switch` rule above.
-.inherit-switch {
-    min-width: calc(2.1rem * var(--global-scale));
 }
