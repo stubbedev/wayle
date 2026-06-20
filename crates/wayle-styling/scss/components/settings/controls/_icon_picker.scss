@@ -18,6 +18,14 @@
         font-size: var(--text-sm);
         color: var(--fg-default);
     }
+
+    // Match the trigger icon to the field text so the row is the same height as
+    // every other input; min-width keeps name labels aligned across stacked
+    // pickers (replaces the old fixed width-request in code).
+    image {
+        -gtk-icon-size: var(--icon-sm);
+        min-width: var(--icon-sm);
+    }
 }
 
 .icon-picker-popover {

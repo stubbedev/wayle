@@ -69,7 +69,6 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         toggle(&module.system_audio),
                         toggle(&module.microphone),
                         microphone_device_select(&module.microphone_device),
-                        toggle(&module.separate_audio_tracks),
                     ],
                 },
                 SectionSpec {
@@ -77,7 +76,8 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         toggle(&module.webcam_enabled),
                         webcam_device_select(&module.webcam_device),
-                        enum_select(&module.webcam_position),
+                        percentage(&module.webcam_x),
+                        percentage(&module.webcam_y),
                         percentage(&module.webcam_size),
                     ],
                 },

@@ -1,7 +1,7 @@
 mod types;
 
 use schemars::schema_for;
-pub use types::{RecorderFormat, WebcamPosition};
+pub use types::RecorderFormat;
 use wayle_derive::wayle_config;
 
 use crate::{
@@ -57,15 +57,9 @@ pub struct RecorderConfig {
     #[default(true)]
     pub system_audio: ConfigProperty<bool>,
 
-    /// Keep microphone and system audio as separate, individually editable
-    /// tracks instead of mixing them into one.
-    #[serde(rename = "separate-audio-tracks")]
-    #[default(true)]
-    pub separate_audio_tracks: ConfigProperty<bool>,
-
     /// Capture framerate in frames per second.
     #[serde(rename = "framerate")]
-    #[default(30u32)]
+    #[default(60u32)]
     pub framerate: ConfigProperty<u32>,
 
     /// Overlay a webcam picture-in-picture frame into the recording.
@@ -78,10 +72,19 @@ pub struct RecorderConfig {
     #[default(String::new())]
     pub webcam_device: ConfigProperty<String>,
 
-    /// Corner the webcam frame is anchored to.
-    #[serde(rename = "webcam-position")]
-    #[default(WebcamPosition::default())]
-    pub webcam_position: ConfigProperty<WebcamPosition>,
+    /// Webcam frame horizontal position, as a percentage of the free
+    /// horizontal space (0 = flush left, 100 = flush right). Stored relative so
+    /// it stays correct across monitors of different resolutions.
+    #[serde(rename = "webcam-x")]
+    #[default(Percentage::new(100))]
+    pub webcam_x: ConfigProperty<Percentage>,
+
+    /// Webcam frame vertical position, as a percentage of the free vertical
+    /// space (0 = flush top, 100 = flush bottom). Stored relative so it stays
+    /// correct across monitors of different resolutions.
+    #[serde(rename = "webcam-y")]
+    #[default(Percentage::new(100))]
+    pub webcam_y: ConfigProperty<Percentage>,
 
     /// Webcam frame width as a percentage of the recording width.
     #[serde(rename = "webcam-size")]

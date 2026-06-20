@@ -23,6 +23,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 futures.workspace = true
 zbus.workspace = true
+libc.workspace = true
 wayle-config = { path = "../wayle-config" }
 wayle-icons = { path = "../wayle-icons" }
 wayle-i18n = { path = "../wayle-i18n" }

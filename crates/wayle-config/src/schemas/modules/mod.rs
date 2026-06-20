@@ -29,6 +29,7 @@ mod power;
 mod power_profiles;
 mod ram;
 mod recorder;
+mod screenshot;
 mod separator;
 mod storage;
 /// System tray module configuration and shared base sizes.
@@ -73,7 +74,8 @@ pub use notification::{
 pub use power::PowerConfig;
 pub use power_profiles::PowerProfilesConfig;
 pub use ram::RamConfig;
-pub use recorder::{RecorderConfig, RecorderFormat, WebcamPosition};
+pub use recorder::{RecorderConfig, RecorderFormat};
+pub use screenshot::ScreenshotConfig;
 pub use separator::SeparatorConfig;
 pub use storage::{StorageConfig, StorageMountPoint};
 pub use systray::{SystrayConfig, TrayItemOverride};
@@ -146,6 +148,8 @@ pub struct ModulesConfig {
     pub ram: RamConfig,
     /// Screen recorder module.
     pub recorder: RecorderConfig,
+    /// Screenshot capture module.
+    pub screenshot: ScreenshotConfig,
     /// Storage usage module.
     pub storage: StorageConfig,
     /// Separator module.

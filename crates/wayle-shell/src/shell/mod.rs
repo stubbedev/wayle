@@ -2,6 +2,8 @@ mod bar;
 mod helpers;
 mod notification_popup;
 mod osd;
+pub(crate) mod region_overlay;
+pub(crate) mod screenshot;
 pub(crate) mod services;
 pub(crate) mod share_picker;
 
@@ -18,6 +20,8 @@ use tracing::{debug, info};
 use self::{
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
+    region_overlay::RegionOverlay,
+    screenshot::Screenshot,
     share_picker::SharePicker,
 };
 use crate::{startup::StartupTimer, watchers};
@@ -29,6 +33,8 @@ pub(crate) struct Shell {
     _notification_popup: Option<Controller<NotificationPopupHost>>,
     _osd: Option<Controller<Osd>>,
     _share_picker: Controller<SharePicker>,
+    _region_overlay: Controller<RegionOverlay>,
+    _screenshot: Controller<Screenshot>,
 }
 
 pub(crate) struct ShellInit {
@@ -106,6 +112,14 @@ impl Component for Shell {
             .detach();
         crate::services::share_picker::register_sender(share_picker.sender().clone());
 
+        let region_overlay = RegionOverlay::builder().launch(()).detach();
+        crate::services::region_overlay::register_sender(region_overlay.sender().clone());
+
+        let screenshot = Screenshot::builder()
+            .launch(init.services.config.clone())
+            .detach();
+        crate::services::screenshot::register_sender(screenshot.sender().clone());
+
         let model = Shell {
             css_provider,
             bars,
@@ -113,6 +127,8 @@ impl Component for Shell {
             _notification_popup: notification_popup,
             _osd: osd,
             _share_picker: share_picker,
+            _region_overlay: region_overlay,
+            _screenshot: screenshot,
         };
         let widgets = view_output!();
 

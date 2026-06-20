@@ -4,7 +4,7 @@
 //! delivered through a Relm4 input [`Sender`] instead of a GTK action, and
 //! logging goes through `tracing`.
 
-use std::{collections::HashMap, process::Command, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use gtk4::{
     Box, Button, EventControllerKey, Fixed, FlowBox, FlowBoxChild, GestureClick, Label, Notebook,
@@ -16,7 +16,6 @@ use hyprland::{
     data::{Clients, Monitor, Monitors, Transforms},
     shared::HyprData,
 };
-use regex::Regex;
 use relm4::Sender;
 use tracing::{debug, error, warn};
 use wayland_client::{Connection, protocol::wl_output::WlOutput};
@@ -619,12 +618,9 @@ fn append_output_on_allocation(
 
 // --- Region page -----------------------------------------------------------
 
-/// Builds the region page; clicking the button runs the region tool and emits
-/// the selected `region:<output>@<x>,<y>,<w>,<h>`.
-pub(super) fn build_region_page(
-    config: &PickerConfig,
-    input: &Sender<SharePickerInput>,
-) -> ScrolledWindow {
+/// Builds the region page; clicking the button opens the in-shell region
+/// overlay and emits the selected `region:<output>@<x>,<y>,<w>,<h>`.
+pub(super) fn build_region_page(input: &Sender<SharePickerInput>) -> ScrolledWindow {
     let container = Box::builder()
         .css_classes(["share-picker-page"])
         .orientation(gtk4::Orientation::Vertical)
@@ -632,22 +628,6 @@ pub(super) fn build_region_page(
         .valign(gtk4::Align::Center)
         .build();
     let scrolled_window = ScrolledWindow::builder().child(&container).build();
-
-    let Some(args) = shlex::split(&config.region_command) else {
-        error!(command = config.region_command, "invalid region command");
-        return scrolled_window;
-    };
-    if args.is_empty() {
-        error!("empty region command");
-        return scrolled_window;
-    }
-    let regex = match Regex::new(r"^.+@-?\d+,-?\d+,\d+,\d+$") {
-        Ok(regex) => regex,
-        Err(err) => {
-            error!(%err, "invalid region regex");
-            return scrolled_window;
-        }
-    };
 
     let button = Button::builder()
         .label("Select region")
@@ -659,40 +639,29 @@ pub(super) fn build_region_page(
     button.connect_clicked(clone!(
         #[strong]
         input,
-        #[strong]
-        args,
-        #[strong]
-        regex,
         move |btn| {
             let Some(root) = btn.root() else {
                 return;
             };
-            let mut command = Command::new(&args[0]);
-            command.args(&args[1..]);
-            debug!(?command, "running region command");
+            // Hide the picker while the overlay is up so it does not occlude
+            // the screen being selected; restore it if the user cancels.
             root.set_visible(false);
 
             glib::spawn_future_local(clone!(
                 #[strong]
                 input,
                 #[strong]
-                regex,
-                #[strong]
                 root,
                 async move {
-                    match command.output() {
-                        Ok(output) => {
-                            let region = String::from_utf8_lossy(&output.stdout);
-                            let region = region.trim();
-                            if regex.is_match(region) {
-                                input.emit(SharePickerInput::Select(format!("region:{region}")));
-                            } else {
-                                error!(region, "region command returned unexpected output");
-                                root.set_visible(true);
-                            }
+                    match crate::services::region_overlay::request_region().await {
+                        Some(sel) => {
+                            input.emit(SharePickerInput::Select(format!(
+                                "region:{}@{},{},{},{}",
+                                sel.output, sel.x, sel.y, sel.width, sel.height
+                            )));
                         }
-                        Err(err) => {
-                            error!(%err, "error while selecting share region");
+                        None => {
+                            debug!("region selection cancelled");
                             root.set_visible(true);
                         }
                     }
@@ -771,7 +740,7 @@ pub(super) fn populate_notebook(
     let windows_idx = notebook.append_page(&windows, Some(&page_label("Windows")));
     let outputs = build_outputs_page(con, config, input);
     let outputs_idx = notebook.append_page(&outputs, Some(&page_label("Outputs")));
-    let region = build_region_page(config, input);
+    let region = build_region_page(input);
     let region_idx = notebook.append_page(&region, Some(&page_label("Region")));
 
     let default = match config.default_page {

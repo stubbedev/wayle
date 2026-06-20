@@ -25,6 +25,7 @@ mod power_profiles;
 mod ram;
 mod recorder;
 mod registry;
+mod screenshot;
 mod separator;
 mod storage;
 mod systray;
@@ -87,6 +88,7 @@ register_modules! {
     PowerProfiles => power_profiles::Factory,
     Ram => ram::Factory,
     Recorder => recorder::Factory,
+    Screenshot => screenshot::Factory,
     Separator => separator::Factory,
     Storage => storage::Factory,
     Systray => systray::Factory,

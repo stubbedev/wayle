@@ -59,11 +59,6 @@ pub struct SharePickerConfig {
     #[default(Size::scale(1.0))]
     pub widget_size: ConfigProperty<Size>,
 
-    /// Region selection command, parsed with shell-word splitting.
-    #[serde(rename = "region-command")]
-    #[default(String::from("slurp -f '%o@%x,%y,%w,%h'"))]
-    pub region_command: ConfigProperty<String>,
-
     /// Spacing between window cards: a multiplier of the default 12px
     /// (`1.0` = default) or absolute pixels.
     #[serde(rename = "windows-spacing")]

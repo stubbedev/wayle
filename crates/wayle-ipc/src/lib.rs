@@ -9,6 +9,9 @@ pub mod idle_inhibit;
 /// Screen recorder D-Bus client proxy.
 pub mod recorder;
 
+/// Screenshot D-Bus client proxy.
+pub mod screenshot;
+
 /// Share picker D-Bus client proxy.
 pub mod share_picker;
 

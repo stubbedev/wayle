@@ -100,28 +100,24 @@
         }
     }
 
-    // Visual webcam-corner picker: a 2x2 grid standing in for the screen, the
-    // active corner filled with the accent color.
+    // Draggable webcam-position preview: the outer frame stands in for the
+    // screen, the inner frame for the picture-in-picture webcam. The inner
+    // frame can be dragged anywhere within the screen.
     .recorder-position-preview {
-        > .recorder-position-cell {
-            all: unset;
-            min-width: calc(1.5rem * var(--global-scale));
-            min-height: calc(1rem * var(--global-scale));
-            border-radius: var(--rounding-element);
-            background: var(--bg-overlay);
-            border: 1px solid var(--border-strong);
-            transition:
-                background var(--duration-fast),
-                border-color var(--duration-fast);
+        border-radius: var(--rounding-element);
+        background: var(--bg-overlay);
+        border: 1px solid var(--border-strong);
+    }
 
-            &:hover {
-                border-color: var(--accent);
-            }
+    .recorder-position-cam {
+        border-radius: var(--rounding-element);
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        opacity: 0.85;
+        transition: opacity var(--duration-fast);
 
-            &.active {
-                background: var(--accent);
-                border-color: var(--accent);
-            }
+        &:hover {
+            opacity: 1;
         }
     }
 
@@ -224,6 +220,32 @@
                     color: var(--fg-default);
                 }
             }
+        }
+    }
+}
+
+// Live on-screen webcam-position overlay (its own layer-shell window, so it is
+// styled at the top level rather than inside .recorder-dropdown).
+.webcam-preview-window {
+    background: transparent;
+
+    .webcam-preview-picture {
+        border-radius: var(--rounding-element);
+        border: 2px solid var(--accent);
+        background: rgba(0, 0, 0, 0.4);
+    }
+
+    .webcam-preview-done {
+        margin: var(--space-xs);
+        min-width: calc(1.75rem * var(--global-scale));
+        min-height: calc(1.75rem * var(--global-scale));
+        border-radius: var(--rounding-full);
+        background: var(--accent);
+        color: var(--on-accent, #fff);
+        opacity: 0.9;
+
+        &:hover {
+            opacity: 1;
         }
     }
 }

@@ -11,15 +11,9 @@ use chrono::Local;
 use tokio::{process::Command, sync::mpsc, time::interval};
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
-use wayle_config::{
-    ConfigService,
-    schemas::modules::{RecorderFormat, WebcamPosition},
-};
+use wayle_config::{ConfigService, schemas::modules::RecorderFormat};
 use wayle_core::Property;
-use wayle_recorder::{
-    AudioOptions, OutputFormat, RecordOptions, Recorder, WebcamOptions,
-    WebcamPosition as EngineWebcamPosition,
-};
+use wayle_recorder::{AudioOptions, OutputFormat, RecordOptions, Recorder, WebcamOptions};
 
 use crate::{
     i18n::t,
@@ -424,7 +418,8 @@ impl RecorderState {
 
         let webcam = rec.webcam_enabled.get().then(|| WebcamOptions {
             device: rec.webcam_device.get(),
-            position: map_position(rec.webcam_position.get()),
+            x_percent: u32::from(rec.webcam_x.get().value()),
+            y_percent: u32::from(rec.webcam_y.get().value()),
             size_percent: u32::from(rec.webcam_size.get().value()),
         });
 
@@ -437,7 +432,6 @@ impl RecorderState {
                 microphone: rec.microphone.get(),
                 microphone_device: rec.microphone_device.get(),
                 system_audio: rec.system_audio.get(),
-                separate_tracks: rec.separate_audio_tracks.get(),
             },
             webcam,
         }
@@ -483,14 +477,6 @@ impl RecorderState {
     }
 }
 
-fn map_position(position: WebcamPosition) -> EngineWebcamPosition {
-    match position {
-        WebcamPosition::TopLeft => EngineWebcamPosition::TopLeft,
-        WebcamPosition::TopRight => EngineWebcamPosition::TopRight,
-        WebcamPosition::BottomLeft => EngineWebcamPosition::BottomLeft,
-        WebcamPosition::BottomRight => EngineWebcamPosition::BottomRight,
-    }
-}
 
 /// Builds a timestamped output path in the configured (or default) directory.
 fn output_path(configured_dir: &str, format: OutputFormat) -> String {

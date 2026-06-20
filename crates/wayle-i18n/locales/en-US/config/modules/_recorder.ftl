@@ -23,9 +23,6 @@ settings-modules-recorder-microphone-device = Microphone Device
 settings-modules-recorder-system-audio = System Audio
     .description = Capture desktop audio in the recording
 
-settings-modules-recorder-separate-audio-tracks = Separate Audio Tracks
-    .description = Keep microphone and system audio as separate, editable tracks
-
 settings-modules-recorder-framerate = Framerate
     .description = Capture framerate in frames per second
 
@@ -35,8 +32,11 @@ settings-modules-recorder-webcam-enabled = Webcam Frame
 settings-modules-recorder-webcam-device = Webcam Device
     .description = V4L2 device path (empty auto-selects the first camera)
 
-settings-modules-recorder-webcam-position = Webcam Position
-    .description = Corner the webcam frame is anchored to
+settings-modules-recorder-webcam-x = Webcam X Position
+    .description = Horizontal position (0% = left, 100% = right), relative so it survives resolution changes
+
+settings-modules-recorder-webcam-y = Webcam Y Position
+    .description = Vertical position (0% = top, 100% = bottom), relative so it survives resolution changes
 
 settings-modules-recorder-webcam-size = Webcam Size
     .description = Webcam frame width as a percentage of the recording width
@@ -92,12 +92,6 @@ settings-modules-recorder-scroll-up = Scroll Up
 settings-modules-recorder-scroll-down = Scroll Down
     .description = Shell command on scroll down
 
-
-## WebcamPosition variants
-enum-webcam-position-top-left = Top Left
-enum-webcam-position-top-right = Top Right
-enum-webcam-position-bottom-left = Bottom Left
-enum-webcam-position-bottom-right = Bottom Right
 
 ## RecorderFormat variants
 enum-recorder-format-mp4 = MP4

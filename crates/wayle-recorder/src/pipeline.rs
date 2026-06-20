@@ -13,12 +13,10 @@ use std::{os::fd::AsRawFd, thread::available_parallelism};
 use gstreamer as gst;
 
 use crate::{
-    options::{OutputFormat, RecordOptions, WebcamPosition},
+    options::{OutputFormat, RecordOptions},
     portal::ScreenCast,
 };
 
-/// Pixel gap between the webcam frame and the screen edge.
-const WEBCAM_MARGIN: i32 = 24;
 /// Fallback screen size when the portal does not report one.
 const FALLBACK_SIZE: (i32, i32) = (1920, 1080);
 /// Opus audio bitrate per track, in bits per second. 128 kbps is transparent
@@ -89,7 +87,8 @@ fn build_with(opts: &RecordOptions, cast: &ScreenCast, allow_hardware: bool) -> 
             (f64::from(screen_w) * f64::from(cam.size_percent.clamp(1, 100)) / 100.0) as i32;
         let cam_w = cam_w.max(80);
         let cam_h = (cam_w * 9 / 16).max(60);
-        let (xpos, ypos) = webcam_xy(cam.position, screen_w, screen_h, cam_w, cam_h);
+        let (xpos, ypos) =
+            webcam_xy(cam.x_percent, cam.y_percent, screen_w, screen_h, cam_w, cam_h);
         let device = if cam.device.is_empty() {
             String::new()
         } else {
@@ -127,8 +126,10 @@ fn build_with(opts: &RecordOptions, cast: &ScreenCast, allow_hardware: bool) -> 
         }
     }
 
-    let mix = !opts.audio.separate_tracks && audio_sources.len() > 1;
-    if mix {
+    // Mix every audio source into one track so any player reproduces mic and
+    // system audio together (separate tracks confused players that only play
+    // the first track).
+    if audio_sources.len() > 1 {
         desc.push_str(&format!(
             "audiomixer name=amix ! audioconvert ! audioresample ! {audio_encoder} ! queue ! mux. "
         ));
@@ -138,7 +139,6 @@ fn build_with(opts: &RecordOptions, cast: &ScreenCast, allow_hardware: bool) -> 
             ));
         }
     } else {
-        // One encoded track per source -> separate, individually editable tracks.
         for source in &audio_sources {
             desc.push_str(&format!(
                 "{source} ! queue ! audioconvert ! audioresample ! {audio_encoder} ! queue ! mux. "
@@ -265,21 +265,23 @@ fn muxer(format: OutputFormat) -> &'static str {
     }
 }
 
-/// Top-left pixel offset of the webcam frame for the chosen corner.
+/// Top-left pixel offset of the webcam frame from relative position percentages.
+///
+/// `x_percent`/`y_percent` (0-100) place the frame within the free space left
+/// over after the frame's own size, so 0 is flush to the left/top edge and 100
+/// is flush to the right/bottom edge. Being relative keeps placement consistent
+/// across monitors of different resolutions.
 fn webcam_xy(
-    position: WebcamPosition,
+    x_percent: u32,
+    y_percent: u32,
     screen_w: i32,
     screen_h: i32,
     cam_w: i32,
     cam_h: i32,
 ) -> (i32, i32) {
-    let m = WEBCAM_MARGIN;
-    match position {
-        WebcamPosition::TopLeft => (m, m),
-        WebcamPosition::TopRight => ((screen_w - cam_w - m).max(0), m),
-        WebcamPosition::BottomLeft => (m, (screen_h - cam_h - m).max(0)),
-        WebcamPosition::BottomRight => {
-            ((screen_w - cam_w - m).max(0), (screen_h - cam_h - m).max(0))
-        }
-    }
+    let free_w = (screen_w - cam_w).max(0);
+    let free_h = (screen_h - cam_h).max(0);
+    let xpos = free_w * i32::try_from(x_percent.min(100)).unwrap_or(100) / 100;
+    let ypos = free_h * i32::try_from(y_percent.min(100)).unwrap_or(100) / 100;
+    (xpos, ypos)
 }

@@ -12,7 +12,7 @@ use wayle_config::{
 use crate::{
     editors::{
         enum_select::enum_select, number::number_u32, size::size_with_base,
-        surface_animation::surface_animation_rows, text::text_like, toggle::toggle,
+        surface_animation::surface_animation_rows, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -44,7 +44,6 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         size_with_base(&sp.height, HEIGHT_BASE_REM),
                         number_u32(&sp.resize_size),
                         size_with_base(&sp.widget_size, WIDGET_BASE_REM),
-                        text_like(&sp.region_command),
                     ],
                 },
                 SectionSpec {

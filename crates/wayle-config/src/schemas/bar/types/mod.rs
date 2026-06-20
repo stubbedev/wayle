@@ -243,6 +243,8 @@ pub enum BarModule {
     Ram,
     /// Screen recorder toggle.
     Recorder,
+    /// Screenshot capture button.
+    Screenshot,
     /// Visual separator between modules.
     Separator,
     /// Storage usage indicator.
@@ -317,6 +319,7 @@ impl BarModule {
             Self::PowerProfiles => "power-profiles",
             Self::Ram => "ram",
             Self::Recorder => "recorder",
+            Self::Screenshot => "screenshot",
             Self::Separator => "separator",
             Self::Storage => "storage",
             Self::Systray => "systray",
@@ -355,6 +358,7 @@ impl BarModule {
             "power-profiles" => Self::PowerProfiles,
             "ram" => Self::Ram,
             "recorder" => Self::Recorder,
+            "screenshot" => Self::Screenshot,
             "separator" => Self::Separator,
             "storage" => Self::Storage,
             "systray" => Self::Systray,
@@ -444,6 +448,7 @@ const BUILTIN_MODULES: &[&str] = &[
     "power-profiles",
     "ram",
     "recorder",
+    "screenshot",
     "separator",
     "storage",
     "systray",

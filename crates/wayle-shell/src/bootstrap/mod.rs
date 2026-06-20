@@ -33,8 +33,8 @@ use zbus::{Connection, fdo::DBusProxy};
 
 use crate::{
     services::{
-        IdleInhibitService, RecorderService, ShellIpcService, ToastBus, WidgetBus, share_picker,
-        widget_ipc,
+        IdleInhibitService, RecorderService, ShellIpcService, ToastBus, WidgetBus, screenshot,
+        share_picker, widget_ipc,
     },
     shell::ShellServices,
     startup::StartupTimer,
@@ -160,6 +160,8 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 
     init_share_picker().await;
 
+    init_screenshot().await;
+
     let recorder = init_recorder(config_service.clone(), toast_bus.clone()).await;
 
     let mail = crate::services::MailService::new(config_service.clone());
@@ -199,6 +201,14 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 async fn init_share_picker() {
     if let Err(err) = share_picker::start().await {
         warn!(error = %err, "Share picker service unavailable");
+    }
+}
+
+/// Registers the screenshot D-Bus service. Non-fatal: a failure just leaves the
+/// shell usable without `wayle screenshot`.
+async fn init_screenshot() {
+    if let Err(err) = screenshot::start().await {
+        warn!(error = %err, "Screenshot service unavailable");
     }
 }
 

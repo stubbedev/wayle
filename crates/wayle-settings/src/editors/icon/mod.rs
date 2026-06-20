@@ -153,11 +153,11 @@ fn populate_grid(flow: &gtk::FlowBox, commit: &Rc<dyn Fn(&str)>) {
 /// picker just reports the chosen (or typed) name.
 pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPickerWidget {
     let image = gtk::Image::new();
-    image.set_pixel_size(PREVIEW_SIZE);
-    // Fixed-width slot so the name labels start at the same x across stacked
-    // pickers (e.g. an icon-list editor), rather than shifting with each icon's
-    // intrinsic glyph width.
-    image.set_width_request(PREVIEW_SIZE);
+    // Size is set in CSS (`var(--icon-sm)`) so the trigger matches the height of
+    // every other settings input (entries, dropdowns) and scales with the UI;
+    // a fixed larger pixel size made the icon rows taller than the rest. The CSS
+    // also pins a min-width so name labels still start at the same x across
+    // stacked pickers (e.g. an icon-list editor).
     image.set_halign(gtk::Align::Center);
     let label = gtk::Label::builder()
         .ellipsize(gtk::pango::EllipsizeMode::End)

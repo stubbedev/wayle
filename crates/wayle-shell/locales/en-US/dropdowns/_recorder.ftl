@@ -21,7 +21,8 @@ dropdown-recorder-system-audio = System Audio
 dropdown-recorder-webcam = Webcam Frame
 dropdown-recorder-webcam-device = Camera
 dropdown-recorder-position = Position
-dropdown-recorder-separate-tracks = Separate Tracks
+dropdown-recorder-adjust = Adjust on Screen
+dropdown-recorder-adjust-stop = Done Adjusting
 
 # Toasts + notifications
 recorder-toast-starting = Starting recording…

@@ -54,6 +54,7 @@ fn main() {
             Commands::Wallpaper { command } => cli::wallpaper::execute(command).await,
             Commands::Idle { command } => cli::idle::execute(command).await,
             Commands::Recorder { command } => cli::recorder::execute(command).await,
+            Commands::Screenshot { command } => cli::screenshot::execute(command).await,
             Commands::Widget { command } => cli::widget::execute(command).await,
             Commands::Toast {
                 label,

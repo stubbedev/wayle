@@ -16,9 +16,6 @@ settings-share-picker-resize-size = Preview Resolution
 settings-share-picker-widget-size = Card Image Height
     .description = Height of each card's preview image — a multiplier of the default (1.0) or pixels
 
-settings-share-picker-region-command = Region Command
-    .description = Command used to select a region (parsed with shell-word splitting)
-
 settings-share-picker-windows-spacing = Card Spacing
     .description = Spacing between window cards — a multiplier of the default (1.0) or pixels
 

@@ -22,8 +22,14 @@ pub(crate) enum RecorderDropdownMsg {
     SystemAudioToggled(bool),
     WebcamToggled(bool),
     WebcamDeviceSelected(u32),
-    PositionSelected(u32),
-    SeparateTracksToggled(bool),
+    /// Webcam frame dragged in the preview; carries the new relative position
+    /// as percentages (0-100) of the free space.
+    WebcamMoved { x_percent: u8, y_percent: u8 },
+    /// Toggle the live on-screen webcam-position overlay.
+    ToggleScreenPreview,
+    /// The on-screen overlay asked to close (its "done" button), or it should
+    /// be torn down (webcam disabled).
+    ClosePreview,
 }
 
 #[derive(Debug)]

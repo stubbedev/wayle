@@ -1,20 +1,22 @@
 mod devices;
 mod factory;
 mod messages;
+mod preview;
 mod watchers;
 
-use std::sync::Arc;
+use std::{cell::Cell, rc::Rc, sync::Arc};
 
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
 use wayle_audio::AudioService;
-use wayle_config::{ConfigService, schemas::modules::WebcamPosition};
+use wayle_config::{ConfigService, schemas::styling::Percentage};
 use wayle_widgets::prelude::*;
 
 pub(super) use self::factory::Factory;
 use self::{
     devices::DeviceChoice,
     messages::{RecorderDropdownCmd, RecorderDropdownInit, RecorderDropdownMsg},
+    preview::{WebcamPreview, WebcamPreviewInit},
 };
 use crate::{i18n::t, services::recorder::RecorderState, shell::bar::dropdowns::resolve_dimension};
 
@@ -35,14 +37,27 @@ pub(crate) struct RecorderDropdown {
     /// Whether at least one V4L2 camera exists; the whole webcam group is
     /// hidden when false.
     has_camera: bool,
-    /// Mirrors `recorder.webcam_position`; highlights the preview corner.
-    webcam_position: WebcamPosition,
+    /// Relative webcam position (0-100) within the free space, mirroring
+    /// `recorder.webcam_x` / `recorder.webcam_y`.
+    webcam_x: u8,
+    webcam_y: u8,
+    /// Pixel geometry of the drag preview, derived from the popover scale and
+    /// the configured webcam size. `cam_x_px`/`cam_y_px` are the frame's offset
+    /// computed from `webcam_x`/`webcam_y`.
+    preview_w: i32,
+    preview_h: i32,
+    cam_w: i32,
+    cam_h: i32,
+    cam_x_px: i32,
+    cam_y_px: i32,
     /// Elapsed seconds of the active recording, for the live status row.
     elapsed_secs: u32,
     /// Snapshot of selectable microphone sources (index 0 = Default).
     mic_sources: Vec<DeviceChoice>,
     /// Snapshot of selectable cameras (index 0 = Automatic).
     cameras: Vec<DeviceChoice>,
+    /// Live on-screen webcam-position overlay, while the user is adjusting it.
+    preview: Option<Controller<WebcamPreview>>,
 }
 
 #[relm4::component(pub(crate))]
@@ -234,25 +249,6 @@ impl Component for RecorderDropdown {
                                 } @sys_toggle,
                             },
                         },
-
-                        gtk::Box {
-                            add_css_class: "recorder-row",
-                            gtk::Label {
-                                set_hexpand: true,
-                                set_halign: gtk::Align::Start,
-                                set_label: &t!("dropdown-recorder-separate-tracks"),
-                            },
-                            #[template]
-                            Switch {
-                                #[block_signal(sep_toggle)]
-                                set_active: model.config.config().modules.recorder.separate_audio_tracks.get(),
-                                connect_state_set[sender] => move |switch, active| {
-                                    sender.input(RecorderDropdownMsg::SeparateTracksToggled(active));
-                                    switch.set_state(active);
-                                    gtk::glib::Propagation::Stop
-                                } @sep_toggle,
-                            },
-                        },
                     },
 
                     // --- Webcam (hidden entirely when no camera is present) ----
@@ -316,48 +312,61 @@ impl Component for RecorderDropdown {
                             },
                         },
 
-                        // Visual corner picker replacing the position dropdown.
+                        // Open a live on-screen overlay of the actual camera at
+                        // its real size/position, draggable directly on screen.
                         gtk::Box {
                             add_css_class: "recorder-row",
                             #[watch]
                             set_sensitive: model.webcam_on,
-                            gtk::Label {
+                            gtk::Button {
                                 set_hexpand: true,
+                                add_css_class: "secondary",
+                                #[watch]
+                                set_label: &if model.preview.is_some() {
+                                    t!("dropdown-recorder-adjust-stop")
+                                } else {
+                                    t!("dropdown-recorder-adjust")
+                                },
+                                connect_clicked => RecorderDropdownMsg::ToggleScreenPreview,
+                            },
+                        },
+
+                        // Draggable position preview: the outer frame is the
+                        // screen, the inner frame the webcam picture-in-picture.
+                        // Drag it anywhere; stored as relative percentages so it
+                        // survives resolution/monitor changes.
+                        gtk::Box {
+                            add_css_class: "recorder-row",
+                            set_orientation: gtk::Orientation::Vertical,
+                            set_spacing: 6,
+                            #[watch]
+                            set_sensitive: model.webcam_on,
+                            gtk::Label {
                                 set_halign: gtk::Align::Start,
                                 set_label: &t!("dropdown-recorder-position"),
                             },
-                            gtk::Grid {
-                                add_css_class: "recorder-position-preview",
-                                set_row_spacing: 4,
-                                set_column_spacing: 4,
+                            gtk::Overlay {
+                                set_halign: gtk::Align::Center,
 
-                                attach[0, 0, 1, 1] = &gtk::Button {
-                                    add_css_class: "recorder-position-cell",
+                                #[wrap(Some)]
+                                set_child = &gtk::Box {
+                                    add_css_class: "recorder-position-preview",
                                     #[watch]
-                                    set_class_active: ("active", model.webcam_position == WebcamPosition::TopLeft),
-                                    set_tooltip_text: Some("Top Left"),
-                                    connect_clicked => RecorderDropdownMsg::PositionSelected(0),
+                                    set_size_request: (model.preview_w, model.preview_h),
                                 },
-                                attach[1, 0, 1, 1] = &gtk::Button {
-                                    add_css_class: "recorder-position-cell",
+
+                                #[name = "position_cam"]
+                                add_overlay = &gtk::Box {
+                                    add_css_class: "recorder-position-cam",
+                                    set_halign: gtk::Align::Start,
+                                    set_valign: gtk::Align::Start,
+                                    set_cursor_from_name: Some("grab"),
                                     #[watch]
-                                    set_class_active: ("active", model.webcam_position == WebcamPosition::TopRight),
-                                    set_tooltip_text: Some("Top Right"),
-                                    connect_clicked => RecorderDropdownMsg::PositionSelected(1),
-                                },
-                                attach[0, 1, 1, 1] = &gtk::Button {
-                                    add_css_class: "recorder-position-cell",
+                                    set_size_request: (model.cam_w, model.cam_h),
                                     #[watch]
-                                    set_class_active: ("active", model.webcam_position == WebcamPosition::BottomLeft),
-                                    set_tooltip_text: Some("Bottom Left"),
-                                    connect_clicked => RecorderDropdownMsg::PositionSelected(2),
-                                },
-                                attach[1, 1, 1, 1] = &gtk::Button {
-                                    add_css_class: "recorder-position-cell",
+                                    set_margin_start: model.cam_x_px,
                                     #[watch]
-                                    set_class_active: ("active", model.webcam_position == WebcamPosition::BottomRight),
-                                    set_tooltip_text: Some("Bottom Right"),
-                                    connect_clicked => RecorderDropdownMsg::PositionSelected(3),
+                                    set_margin_top: model.cam_y_px,
                                 },
                             },
                         },
@@ -380,28 +389,82 @@ impl Component for RecorderDropdown {
         let mic_sources = devices::microphone_sources(init.audio.as_ref());
         let cameras = devices::cameras();
 
-        let model = Self {
-            scaled_width: resolve_dimension(None, BASE_WIDTH, scale),
+        let scaled_width = resolve_dimension(None, BASE_WIDTH, scale);
+        let webcam_x = recorder.webcam_x.get().value();
+        let webcam_y = recorder.webcam_y.get().value();
+        let (preview_w, preview_h, cam_w, cam_h) =
+            preview_geometry(scaled_width, recorder.webcam_size.get().value());
+
+        let mut model = Self {
+            scaled_width,
             active: init.state.active.get(),
             paused: init.state.paused.get(),
             microphone_on: recorder.microphone.get(),
             webcam_on: recorder.webcam_enabled.get(),
             has_camera: cameras.len() > 1,
-            webcam_position: recorder.webcam_position.get(),
+            webcam_x,
+            webcam_y,
+            preview_w,
+            preview_h,
+            cam_w,
+            cam_h,
+            cam_x_px: 0,
+            cam_y_px: 0,
             elapsed_secs: init.state.elapsed_secs.get(),
             mic_sources,
             cameras,
+            preview: None,
             audio: init.audio,
             config: init.config,
             state: init.state,
         };
+        model.reposition_cam();
 
         let widgets = view_output!();
+
+        // Drag the webcam frame anywhere within the screen preview; persist the
+        // resulting position as relative percentages on release.
+        let drag = gtk::GestureDrag::new();
+        let cam = widgets.position_cam.clone();
+        let free_w = (model.preview_w - model.cam_w).max(0);
+        let free_h = (model.preview_h - model.cam_h).max(0);
+        let start = Rc::new(Cell::new((0, 0)));
+        {
+            let (cam, start) = (cam.clone(), start.clone());
+            drag.connect_drag_begin(move |_, _, _| {
+                start.set((cam.margin_start(), cam.margin_top()));
+                cam.set_cursor_from_name(Some("grabbing"));
+            });
+        }
+        {
+            let (cam, start) = (cam.clone(), start.clone());
+            drag.connect_drag_update(move |_, offset_x, offset_y| {
+                let (sx, sy) = start.get();
+                cam.set_margin_start((sx + offset_x as i32).clamp(0, free_w));
+                cam.set_margin_top((sy + offset_y as i32).clamp(0, free_h));
+            });
+        }
+        {
+            let (cam, sender) = (cam.clone(), sender.clone());
+            drag.connect_drag_end(move |_, _, _| {
+                cam.set_cursor_from_name(Some("grab"));
+                let x_percent = pct_from_px(cam.margin_start(), free_w);
+                let y_percent = pct_from_px(cam.margin_top(), free_h);
+                sender.input(RecorderDropdownMsg::WebcamMoved {
+                    x_percent,
+                    y_percent,
+                });
+            });
+        }
+        widgets.position_cam.add_controller(drag);
+
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: Self::Input, _sender: ComponentSender<Self>, _root: &Self::Root) {
-        let recorder = &self.config.config().modules.recorder;
+    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, root: &Self::Root) {
+        // Config is accessed inline per-arm rather than via a match-wide binding:
+        // `config()` borrows `self`, which would otherwise block the `&mut self`
+        // preview helpers below.
         match msg {
             RecorderDropdownMsg::ToggleRecording => {
                 let state = self.state.clone();
@@ -411,32 +474,73 @@ impl Component for RecorderDropdown {
                 self.state.set_paused(!self.state.paused.get());
             }
             RecorderDropdownMsg::MicrophoneToggled(active) => {
-                recorder.microphone.set(active);
+                self.config.config().modules.recorder.microphone.set(active);
                 self.microphone_on = active;
             }
             RecorderDropdownMsg::MicrophoneDeviceSelected(index) => {
                 if let Some(choice) = self.mic_sources.get(index as usize) {
-                    recorder.microphone_device.set(choice.id.clone());
+                    self.config
+                        .config()
+                        .modules
+                        .recorder
+                        .microphone_device
+                        .set(choice.id.clone());
                 }
             }
-            RecorderDropdownMsg::SystemAudioToggled(active) => recorder.system_audio.set(active),
+            RecorderDropdownMsg::SystemAudioToggled(active) => {
+                self.config
+                    .config()
+                    .modules
+                    .recorder
+                    .system_audio
+                    .set(active);
+            }
             RecorderDropdownMsg::WebcamToggled(active) => {
-                recorder.webcam_enabled.set(active);
+                self.config
+                    .config()
+                    .modules
+                    .recorder
+                    .webcam_enabled
+                    .set(active);
                 self.webcam_on = active;
+                if !active {
+                    // Tear the on-screen overlay down when the webcam is off.
+                    self.preview = None;
+                }
             }
             RecorderDropdownMsg::WebcamDeviceSelected(index) => {
                 if let Some(choice) = self.cameras.get(index as usize) {
-                    recorder.webcam_device.set(choice.id.clone());
+                    self.config
+                        .config()
+                        .modules
+                        .recorder
+                        .webcam_device
+                        .set(choice.id.clone());
+                }
+                if self.preview.is_some() {
+                    // Rebuild the overlay so it shows the newly-selected camera.
+                    self.open_preview(root, &sender);
                 }
             }
-            RecorderDropdownMsg::PositionSelected(index) => {
-                let position = position_from_index(index);
-                recorder.webcam_position.set(position);
-                self.webcam_position = position;
+            RecorderDropdownMsg::WebcamMoved {
+                x_percent,
+                y_percent,
+            } => {
+                let recorder = &self.config.config().modules.recorder;
+                recorder.webcam_x.set(Percentage::new(x_percent));
+                recorder.webcam_y.set(Percentage::new(y_percent));
+                self.webcam_x = x_percent;
+                self.webcam_y = y_percent;
+                self.reposition_cam();
             }
-            RecorderDropdownMsg::SeparateTracksToggled(active) => {
-                recorder.separate_audio_tracks.set(active);
+            RecorderDropdownMsg::ToggleScreenPreview => {
+                if self.preview.is_some() {
+                    self.preview = None;
+                } else if self.webcam_on {
+                    self.open_preview(root, &sender);
+                }
             }
+            RecorderDropdownMsg::ClosePreview => self.preview = None,
         }
     }
 
@@ -455,6 +559,10 @@ impl Component for RecorderDropdown {
             }
             RecorderDropdownCmd::ScaleChanged(scale) => {
                 self.scaled_width = resolve_dimension(None, BASE_WIDTH, scale);
+                let size = self.config.config().modules.recorder.webcam_size.get();
+                (self.preview_w, self.preview_h, self.cam_w, self.cam_h) =
+                    preview_geometry(self.scaled_width, size.value());
+                self.reposition_cam();
             }
             RecorderDropdownCmd::MicrophonesUpdated => {
                 // Rebuild the microphone-source list on device hotplug, keeping
@@ -480,6 +588,42 @@ impl Component for RecorderDropdown {
     }
 }
 
+impl RecorderDropdown {
+    /// Recomputes the webcam frame's pixel offset in the preview from its
+    /// relative position and the current preview geometry.
+    fn reposition_cam(&mut self) {
+        let free_w = (self.preview_w - self.cam_w).max(0);
+        let free_h = (self.preview_h - self.cam_h).max(0);
+        self.cam_x_px = free_w * i32::from(self.webcam_x.min(100)) / 100;
+        self.cam_y_px = free_h * i32::from(self.webcam_y.min(100)) / 100;
+    }
+
+    /// Spawns (replacing any existing) the live on-screen webcam overlay on the
+    /// monitor the popover is shown on.
+    fn open_preview(&mut self, root: &gtk::Popover, sender: &ComponentSender<Self>) {
+        let Some(monitor) = monitor_for(root) else {
+            return;
+        };
+        let controller = WebcamPreview::builder()
+            .launch(WebcamPreviewInit {
+                config: self.config.clone(),
+                monitor,
+            })
+            .forward(sender.input_sender(), |()| RecorderDropdownMsg::ClosePreview);
+        self.preview = Some(controller);
+    }
+}
+
+/// Resolves the monitor the popover is displayed on, falling back to the first.
+fn monitor_for(popover: &gtk::Popover) -> Option<gtk::gdk::Monitor> {
+    let display = popover.display();
+    popover
+        .native()
+        .and_then(|native| native.surface())
+        .and_then(|surface| display.monitor_at_surface(&surface))
+        .or_else(|| display.monitors().item(0).and_downcast::<gtk::gdk::Monitor>())
+}
+
 /// Builds a `gtk::StringList` from device choice labels.
 fn string_list(choices: &[DeviceChoice]) -> gtk::StringList {
     let labels: Vec<&str> = choices.iter().map(|c| c.label.as_str()).collect();
@@ -499,11 +643,22 @@ fn format_elapsed(secs: u32) -> String {
     }
 }
 
-fn position_from_index(index: u32) -> WebcamPosition {
-    match index {
-        0 => WebcamPosition::TopLeft,
-        1 => WebcamPosition::TopRight,
-        2 => WebcamPosition::BottomLeft,
-        _ => WebcamPosition::BottomRight,
+/// Pixel geometry of the position preview: the screen frame (16:9, fit to the
+/// popover width) and the webcam frame (the configured size percentage of it).
+fn preview_geometry(scaled_width: i32, size_percent: u8) -> (i32, i32, i32, i32) {
+    let preview_w = (scaled_width - 48).max(160);
+    let preview_h = preview_w * 9 / 16;
+    let cam_w = (preview_w * i32::from(size_percent) / 100).max(24);
+    let cam_h = (cam_w * 9 / 16).max(14);
+    (preview_w, preview_h, cam_w, cam_h)
+}
+
+/// Converts a pixel offset into a 0-100 percentage of the available `free`
+/// span, defaulting to 0 when there is no room to move.
+fn pct_from_px(px: i32, free: i32) -> u8 {
+    if free <= 0 {
+        0
+    } else {
+        (px.clamp(0, free) * 100 / free) as u8
     }
 }

@@ -23,26 +23,17 @@ impl OutputFormat {
     }
 }
 
-/// Corner the webcam picture-in-picture frame is anchored to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WebcamPosition {
-    /// Top-left corner.
-    TopLeft,
-    /// Top-right corner.
-    TopRight,
-    /// Bottom-left corner.
-    BottomLeft,
-    /// Bottom-right corner.
-    BottomRight,
-}
-
 /// Webcam picture-in-picture overlay options.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebcamOptions {
     /// V4L2 device path (e.g. `/dev/video0`). Empty auto-selects the first camera.
     pub device: String,
-    /// Corner the frame is anchored to.
-    pub position: WebcamPosition,
+    /// Horizontal position as a percentage of the free horizontal space
+    /// (0 = flush left, 100 = flush right). Resolution-independent.
+    pub x_percent: u32,
+    /// Vertical position as a percentage of the free vertical space
+    /// (0 = flush top, 100 = flush bottom). Resolution-independent.
+    pub y_percent: u32,
     /// Frame width as a percentage of the recording width (1-100).
     pub size_percent: u32,
 }
@@ -56,9 +47,6 @@ pub struct AudioOptions {
     pub microphone_device: String,
     /// Capture desktop (system) audio via the default sink monitor.
     pub system_audio: bool,
-    /// Keep microphone and system audio as separate tracks (editable) rather
-    /// than mixing them into one.
-    pub separate_tracks: bool,
 }
 
 /// Full set of options for a recording session.

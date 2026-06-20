@@ -42,8 +42,6 @@ pub(super) struct PickerConfig {
     pub(super) outputs_show_label: bool,
     /// Scale output cards by their fractional scale.
     pub(super) outputs_respect_scaling: bool,
-    /// Region selection command, parsed with shell-word splitting.
-    pub(super) region_command: String,
 }
 
 impl PickerConfig {
@@ -74,7 +72,6 @@ impl PickerConfig {
                 .resolve_rem(OUTPUTS_SPACING_BASE_REM, scale) as u32,
             outputs_show_label: sp.outputs_show_label.get(),
             outputs_respect_scaling: sp.outputs_respect_scaling.get(),
-            region_command: sp.region_command.get(),
         }
     }
 }

@@ -35,6 +35,8 @@ tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
 evdev = { version = "0.13", features = ["stream-trait"] }
+libc.workspace = true
+gstreamer.workspace = true
 
 # Service dependencies
 wayle-audio.workspace = true
@@ -48,8 +50,7 @@ wayle-ipc.workspace = true
 wayle-recorder.workspace = true
 wayle-share-preview = { workspace = true, features = ["hyprland-rs"] }
 hyprland.workspace = true
-regex.workspace = true
-shlex.workspace = true
+image = "0.25.10"
 wayland-client.workspace = true
 minijinja.workspace = true
 wildcard.workspace = true

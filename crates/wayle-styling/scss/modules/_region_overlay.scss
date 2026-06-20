@@ -1,0 +1,8 @@
+// Region-selection overlay: a transparent layer-shell surface shown on every
+// monitor while the user drags a selection rectangle (slurp-like). The dim
+// wash, selection hole, and border are painted with cairo in
+// `shell/region_overlay/mod.rs`; the window itself only needs to stay
+// transparent so the cairo surface is what the compositor composites.
+.region-overlay-window {
+    background: transparent;
+}
