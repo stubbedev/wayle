@@ -1,13 +1,16 @@
 //! Niri workspaces module settings.
 
-use wayle_config::Config;
+use wayle_config::{
+    Config,
+    schemas::modules::niri_workspaces::{ICON_BASE_REM, LABEL_BASE_REM},
+};
 
 use crate::{
     editors::{
         color_value::color_value,
         enum_select::enum_select,
         icon::icon,
-        size::size,
+        size::{size, size_with_base},
         string_list::string_list,
         string_map::string_map,
         text::{text, text_like},
@@ -60,8 +63,8 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         size(&module.icon_gap),
                         size(&module.workspace_padding),
-                        size(&module.icon_size),
-                        size(&module.label_size),
+                        size_with_base(&module.icon_size, ICON_BASE_REM),
+                        size_with_base(&module.label_size, LABEL_BASE_REM),
                     ],
                 },
                 SectionSpec {

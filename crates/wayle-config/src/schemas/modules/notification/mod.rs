@@ -15,6 +15,13 @@ use crate::{
     },
 };
 
+/// Base sizes (in rem, `1rem = 16px`) the popup margin/gap scale multipliers
+/// resolve against (`Scale(1.0)` = base). Shared by the shell resolver and the
+/// settings scale↔px conversion. (0.75rem = 12px, 0.5rem = 8px.)
+pub const POPUP_MARGIN_BASE_REM: f32 = 0.75;
+/// See [`POPUP_MARGIN_BASE_REM`]. 0.5rem = 8px.
+pub const POPUP_GAP_BASE_REM: f32 = 0.5;
+
 /// Notification center: icon in the bar, dropdown with history, DND toggle.
 #[wayle_config(bar_button, i18n_prefix = "settings-modules-notifications")]
 pub struct NotificationConfig {
@@ -167,10 +174,10 @@ pub struct NotificationConfig {
     #[default(Size::scale(0.0))]
     pub popup_margin_y: ConfigProperty<Size>,
 
-    /// Gap between stacked popups. Accepts a scale multiplier or pixels (e.g.
-    /// `"8px"`).
+    /// Gap between stacked popups: a multiplier of the default 8px (`1.0` =
+    /// default) or absolute pixels.
     #[serde(rename = "popup-gap")]
-    #[default(Size::scale(8.0))]
+    #[default(Size::scale(1.0))]
     pub popup_gap: ConfigProperty<Size>,
 
     /// Target monitor: "primary" or a connector name like "DP-1".

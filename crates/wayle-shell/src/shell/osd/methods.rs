@@ -307,21 +307,23 @@ impl Osd {
         let config = self.config.config();
         // Toasts (`Custom`) anchor against `[toasts]`; everything else `[osd]`.
         let is_toast = matches!(self.current_event, Some(OsdEvent::Custom { .. }));
-        let (position, monitor, margin_spacing) = if is_toast {
+        let (position, monitor, margin_spacing, margin_base) = if is_toast {
             (
                 config.toasts.position.get(),
                 config.toasts.monitor.get(),
                 config.toasts.margin.get(),
+                wayle_config::schemas::toasts::MARGIN_BASE_REM,
             )
         } else {
             (
                 config.osd.position.get(),
                 config.osd.monitor.get(),
                 config.osd.margin.get(),
+                wayle_config::schemas::osd::MARGIN_BASE_REM,
             )
         };
         let scale = config.styling.scale.get().value();
-        let margin = margin_spacing.resolve_px(1.0, scale) as i32;
+        let margin = margin_spacing.resolve_rem(margin_base, scale) as i32;
 
         reset_anchors(root);
 

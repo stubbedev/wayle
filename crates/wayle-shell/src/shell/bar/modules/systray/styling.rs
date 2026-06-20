@@ -4,23 +4,7 @@ use std::sync::Arc;
 use gtk4::prelude::StyleContextExt;
 use gtk4::prelude::WidgetExt;
 use relm4::gtk;
-use wayle_config::{ConfigService, schemas::styling::Size};
-
-const REM_BASE: f32 = 16.0;
-const BASE_ICON_SIZE: f32 = 1.25;
-
-fn rem_to_px_rounded(rem: f32, scale: f32) -> i32 {
-    (rem * scale * REM_BASE).round() as i32
-}
-
-/// Resolves a [`Size`] to rounded pixels at `base_rem`: scale multipliers use
-/// the rem base and bar scale, pixel values are taken literally.
-fn size_to_px_rounded(size: Size, base_rem: f32, scale: f32) -> i32 {
-    match size {
-        Size::Scale(value) => rem_to_px_rounded(base_rem * value, scale),
-        Size::Px(value) => value.round() as i32,
-    }
-}
+use wayle_config::{ConfigService, schemas::modules::systray::ICON_BASE_REM};
 
 pub(super) fn init_css_provider(
     widget: &impl WidgetExt,
@@ -49,11 +33,14 @@ fn build_css(config_service: &Arc<ConfigService>) -> String {
 
     let bar_scale = bar_config.scale.get().value();
 
-    let item_gap_px = size_to_px_rounded(systray_config.item_gap.get(), 1.0, bar_scale);
+    let item_gap_px = systray_config.item_gap.get().resolve_rem(1.0, bar_scale).round() as i32;
     let icon_size_px =
-        size_to_px_rounded(systray_config.icon_scale.get(), BASE_ICON_SIZE, bar_scale);
-    let internal_padding_px =
-        size_to_px_rounded(systray_config.internal_padding.get(), 1.0, bar_scale);
+        systray_config.icon_scale.get().resolve_rem(ICON_BASE_REM, bar_scale).round() as i32;
+    let internal_padding_px = systray_config
+        .internal_padding
+        .get()
+        .resolve_rem(1.0, bar_scale)
+        .round() as i32;
 
     format!(
         "* {{ --systray-item-gap-px: {item_gap_px}; --systray-icon-size-px: {icon_size_px}; --systray-internal-padding-px: {internal_padding_px}; }}"

@@ -209,18 +209,14 @@ fn build_window_card(
     container.set_tooltip_text(Some(&format!("{}\n{}", toplevel.title, toplevel.class)));
 
     let payload = format!("window:{}", toplevel.id);
+    container.set_cursor_from_name(Some("pointer"));
     let gesture = GestureClick::new();
-    let clicks = config.clicks;
     gesture.connect_released(clone!(
         #[strong]
         input,
         #[strong]
         payload,
-        move |_, n, _, _| {
-            if n as u32 == clicks {
-                input.emit(SharePickerInput::Select(payload.clone()));
-            }
-        }
+        move |_, _, _, _| input.emit(SharePickerInput::Select(payload.clone()))
     ));
     container.add_controller(gesture);
     container.connect_activate(clone!(
@@ -509,23 +505,9 @@ fn build_output_card(
     }
 
     let container = Button::builder().focusable(true).child(&card).build();
+    container.set_cursor_from_name(Some("pointer"));
     let payload = format!("screen:{}", monitor.name);
-    let clicks = config.clicks;
 
-    let gesture = GestureClick::new();
-    gesture.set_propagation_phase(gtk4::PropagationPhase::Capture);
-    gesture.connect_released(clone!(
-        #[strong]
-        input,
-        #[strong]
-        payload,
-        move |_, n, _, _| {
-            if n as u32 == clicks {
-                input.emit(SharePickerInput::Select(payload.clone()));
-            }
-        }
-    ));
-    container.add_controller(gesture);
     container.connect_clicked(clone!(
         #[strong]
         input,
@@ -671,6 +653,7 @@ pub(super) fn build_region_page(
         .label("Select region")
         .css_classes(["primary", "share-picker-region-button"])
         .build();
+    button.set_cursor_from_name(Some("pointer"));
     container.insert_child_after(&button, Option::<&Box>::None);
 
     button.connect_clicked(clone!(
@@ -763,11 +746,15 @@ fn update_frame_lazily(
 
 /// Index of a config page within the notebook.
 pub(super) fn page_label(text: &str) -> Label {
-    Label::builder()
+    let label = Label::builder()
         .css_classes(["share-picker-tab-label"])
         .label(text)
         .hexpand(true)
-        .build()
+        .build();
+    // `hexpand` makes the label fill the tab, so a pointer cursor on it covers
+    // the whole clickable tab area.
+    label.set_cursor_from_name(Some("pointer"));
+    label
 }
 
 /// Appends all three pages to `notebook` and selects the configured default.

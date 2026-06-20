@@ -1,10 +1,10 @@
 //! Toasts settings page: display options and reusable presets for `wayle toast`.
 
-use wayle_config::Config;
+use wayle_config::{Config, schemas::toasts::MARGIN_BASE_REM};
 
 use crate::{
     editors::{
-        enum_select::enum_select, number::number_u32, size::size,
+        enum_select::enum_select, number::number_u32, size::size_with_base,
         surface_animation::surface_animation_rows, text::text_like,
         toast_preset_list::toast_preset_list, toggle::toggle,
     },
@@ -38,7 +38,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         enum_select(&toasts.text_align),
                         number_u32(&toasts.duration),
                         text_like(&toasts.monitor),
-                        size(&toasts.margin),
+                        size_with_base(&toasts.margin, MARGIN_BASE_REM),
                         enum_select(&toasts.layer),
                         toggle(&toasts.border),
                     ],

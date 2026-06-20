@@ -147,6 +147,7 @@ impl Component for SharePicker {
 
         views::add_escape_controller(&root, sender.input_sender().clone());
 
+        widgets.token_check.set_cursor_from_name(Some("pointer"));
         widgets
             .token_check
             .connect_toggled(glib_clone_toggle(&sender));

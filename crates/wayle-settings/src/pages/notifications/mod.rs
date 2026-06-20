@@ -1,11 +1,15 @@
 //! Notifications settings page: popup display, positioning, and filtering.
 
-use wayle_config::Config;
+use wayle_config::{
+    Config,
+    schemas::modules::notification::{POPUP_GAP_BASE_REM, POPUP_MARGIN_BASE_REM},
+};
 
 use crate::{
     editors::{
-        enum_select::enum_select, number::number_u32, size::size, string_list::string_list,
-        surface_animation::surface_animation_rows, text::text_like, toggle::toggle,
+        enum_select::enum_select, number::number_u32, size::size_with_base,
+        string_list::string_list, surface_animation::surface_animation_rows, text::text_like,
+        toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -45,9 +49,9 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         text_like(&notif.popup_monitor),
                         enum_select(&notif.popup_layer),
-                        size(&notif.popup_margin_x),
-                        size(&notif.popup_margin_y),
-                        size(&notif.popup_gap),
+                        size_with_base(&notif.popup_margin_x, POPUP_MARGIN_BASE_REM),
+                        size_with_base(&notif.popup_margin_y, POPUP_MARGIN_BASE_REM),
+                        size_with_base(&notif.popup_gap, POPUP_GAP_BASE_REM),
                     ],
                 },
                 SectionSpec {

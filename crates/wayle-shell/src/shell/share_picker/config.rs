@@ -9,6 +9,12 @@
 
 use wayle_config::Config;
 pub(super) use wayle_config::schemas::share_picker::SharePickerPage as Page;
+// Per-field base sizes (in rem) a `Size::Scale` multiplier resolves against,
+// shared with the settings editor so its scale↔px conversion matches.
+use wayle_config::schemas::share_picker::{
+    HEIGHT_BASE_REM, OUTPUTS_SPACING_BASE_REM, WIDGET_BASE_REM, WIDTH_BASE_REM,
+    WINDOWS_SPACING_BASE_REM,
+};
 
 /// Resolved picker configuration snapshot.
 pub(super) struct PickerConfig {
@@ -24,8 +30,6 @@ pub(super) struct PickerConfig {
     pub(super) default_page: Page,
     /// Hide the restore-token checkbox.
     pub(super) hide_token_restore: bool,
-    /// Clicks required to select a window/output card.
-    pub(super) clicks: u32,
     /// Spacing between window cards.
     pub(super) windows_spacing: u32,
     /// Minimum window cards per row.
@@ -44,20 +48,30 @@ pub(super) struct PickerConfig {
 
 impl PickerConfig {
     /// Resolves a snapshot from the live `[share-picker]` config section.
+    ///
+    /// `Size` fields resolve against the global styling scale and each field's
+    /// rem base, so a `Scale(n)` is `n x base_rem x 16px x scale` (`1.0` =
+    /// default), while a `Px(n)` pins an absolute pixel size.
     pub(super) fn from_config(config: &Config) -> Self {
         let sp = &config.share_picker;
+        let scale = config.styling.scale.get().value();
         Self {
-            width: sp.width.get() as i32,
-            height: sp.height.get() as i32,
+            width: sp.width.get().resolve_rem(WIDTH_BASE_REM, scale) as i32,
+            height: sp.height.get().resolve_rem(HEIGHT_BASE_REM, scale) as i32,
             resize_size: sp.resize_size.get(),
-            widget_size: sp.widget_size.get() as i32,
+            widget_size: sp.widget_size.get().resolve_rem(WIDGET_BASE_REM, scale) as i32,
             default_page: sp.default_page.get(),
             hide_token_restore: sp.hide_token_restore.get(),
-            clicks: sp.clicks.get(),
-            windows_spacing: sp.windows_spacing.get(),
+            windows_spacing: sp
+                .windows_spacing
+                .get()
+                .resolve_rem(WINDOWS_SPACING_BASE_REM, scale) as u32,
             windows_min_per_row: sp.windows_min_per_row.get(),
             windows_max_per_row: sp.windows_max_per_row.get(),
-            outputs_spacing: sp.outputs_spacing.get(),
+            outputs_spacing: sp
+                .outputs_spacing
+                .get()
+                .resolve_rem(OUTPUTS_SPACING_BASE_REM, scale) as u32,
             outputs_show_label: sp.outputs_show_label.get(),
             outputs_respect_scaling: sp.outputs_respect_scaling.get(),
             region_command: sp.region_command.get(),

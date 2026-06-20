@@ -7,7 +7,22 @@ use wayle_derive::wayle_config;
 use crate::{
     ConfigProperty,
     docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
+    schemas::styling::Size,
 };
+
+/// Base sizes (in rem, `1rem = 16px`) a `Size::Scale` multiplier resolves
+/// against, so a scale value reads as a multiplier of the default (`Scale(1.0)`
+/// = default). Shared by the shell resolver and the settings editor's scale↔px
+/// conversion. (62.5rem = 1000px, etc.)
+pub const WIDTH_BASE_REM: f32 = 62.5;
+/// See [`WIDTH_BASE_REM`]. 31.25rem = 500px.
+pub const HEIGHT_BASE_REM: f32 = 31.25;
+/// See [`WIDTH_BASE_REM`]. 9.375rem = 150px.
+pub const WIDGET_BASE_REM: f32 = 9.375;
+/// See [`WIDTH_BASE_REM`]. 0.75rem = 12px.
+pub const WINDOWS_SPACING_BASE_REM: f32 = 0.75;
+/// See [`WIDTH_BASE_REM`]. 0.375rem = 6px.
+pub const OUTPUTS_SPACING_BASE_REM: f32 = 0.375;
 
 /// Screen-share picker shown by xdg-desktop-portal when an app requests a
 /// window, output, or region to capture.
@@ -18,42 +33,42 @@ pub struct SharePickerConfig {
     #[default(SharePickerPage::default())]
     pub default_page: ConfigProperty<SharePickerPage>,
 
-    /// Clicks required to select a window/output card (1 = single, 2 = double).
-    #[default(2u32)]
-    pub clicks: ConfigProperty<u32>,
-
     /// Hide the "allow a restore token" checkbox.
     #[serde(rename = "hide-token-restore")]
     #[default(false)]
     pub hide_token_restore: ConfigProperty<bool>,
 
-    /// Picker window width in pixels.
-    #[default(1000u32)]
-    pub width: ConfigProperty<u32>,
+    /// Picker window width: a multiplier of the default 1000px (`1.0` = default)
+    /// or absolute pixels (e.g. `"1200px"`).
+    #[default(Size::scale(1.0))]
+    pub width: ConfigProperty<Size>,
 
-    /// Picker window height in pixels.
-    #[default(500u32)]
-    pub height: ConfigProperty<u32>,
+    /// Picker window height: a multiplier of the default 500px (`1.0` = default)
+    /// or absolute pixels.
+    #[default(Size::scale(1.0))]
+    pub height: ConfigProperty<Size>,
 
     /// Downscale every captured frame to at most this height in pixels.
     #[serde(rename = "resize-size")]
     #[default(640u32)]
     pub resize_size: ConfigProperty<u32>,
 
-    /// Height of each card's preview image in pixels.
+    /// Height of each card's preview image: a multiplier of the default 150px
+    /// (`1.0` = default) or absolute pixels.
     #[serde(rename = "widget-size")]
-    #[default(150u32)]
-    pub widget_size: ConfigProperty<u32>,
+    #[default(Size::scale(1.0))]
+    pub widget_size: ConfigProperty<Size>,
 
     /// Region selection command, parsed with shell-word splitting.
     #[serde(rename = "region-command")]
     #[default(String::from("slurp -f '%o@%x,%y,%w,%h'"))]
     pub region_command: ConfigProperty<String>,
 
-    /// Spacing between window cards in pixels.
+    /// Spacing between window cards: a multiplier of the default 12px
+    /// (`1.0` = default) or absolute pixels.
     #[serde(rename = "windows-spacing")]
-    #[default(12u32)]
-    pub windows_spacing: ConfigProperty<u32>,
+    #[default(Size::scale(1.0))]
+    pub windows_spacing: ConfigProperty<Size>,
 
     /// Minimum window cards per row.
     #[serde(rename = "windows-min-per-row")]
@@ -65,10 +80,11 @@ pub struct SharePickerConfig {
     #[default(4u32)]
     pub windows_max_per_row: ConfigProperty<u32>,
 
-    /// Spacing between output cards in pixels (applied per side).
+    /// Spacing between output cards (applied per side): a multiplier of the
+    /// default 6px (`1.0` = default) or absolute pixels.
     #[serde(rename = "outputs-spacing")]
-    #[default(6u32)]
-    pub outputs_spacing: ConfigProperty<u32>,
+    #[default(Size::scale(1.0))]
+    pub outputs_spacing: ConfigProperty<Size>,
 
     /// Show the output name label under each output card.
     #[serde(rename = "outputs-show-label")]

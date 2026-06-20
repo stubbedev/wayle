@@ -1,12 +1,18 @@
 //! Share picker settings page: window sizing, page defaults, per-page card
 //! layout, and the enter/exit animation override.
 
-use wayle_config::Config;
+use wayle_config::{
+    Config,
+    schemas::share_picker::{
+        HEIGHT_BASE_REM, OUTPUTS_SPACING_BASE_REM, WIDGET_BASE_REM, WIDTH_BASE_REM,
+        WINDOWS_SPACING_BASE_REM,
+    },
+};
 
 use crate::{
     editors::{
-        enum_select::enum_select, number::number_u32, surface_animation::surface_animation_rows,
-        text::text_like, toggle::toggle,
+        enum_select::enum_select, number::number_u32, size::size_with_base,
+        surface_animation::surface_animation_rows, text::text_like, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -28,24 +34,23 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     title_key: "settings-section-general",
                     items: vec![
                         enum_select(&sp.default_page),
-                        number_u32(&sp.clicks),
                         toggle(&sp.hide_token_restore),
                     ],
                 },
                 SectionSpec {
                     title_key: "settings-section-display",
                     items: vec![
-                        number_u32(&sp.width),
-                        number_u32(&sp.height),
+                        size_with_base(&sp.width, WIDTH_BASE_REM),
+                        size_with_base(&sp.height, HEIGHT_BASE_REM),
                         number_u32(&sp.resize_size),
-                        number_u32(&sp.widget_size),
+                        size_with_base(&sp.widget_size, WIDGET_BASE_REM),
                         text_like(&sp.region_command),
                     ],
                 },
                 SectionSpec {
                     title_key: "settings-section-share-picker-windows",
                     items: vec![
-                        number_u32(&sp.windows_spacing),
+                        size_with_base(&sp.windows_spacing, WINDOWS_SPACING_BASE_REM),
                         number_u32(&sp.windows_min_per_row),
                         number_u32(&sp.windows_max_per_row),
                     ],
@@ -53,7 +58,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-share-picker-outputs",
                     items: vec![
-                        number_u32(&sp.outputs_spacing),
+                        size_with_base(&sp.outputs_spacing, OUTPUTS_SPACING_BASE_REM),
                         toggle(&sp.outputs_show_label),
                         toggle(&sp.outputs_respect_scaling),
                     ],

@@ -1,10 +1,13 @@
 //! System tray module settings.
 
-use wayle_config::Config;
+use wayle_config::{Config, schemas::modules::systray::ICON_BASE_REM};
 
 use crate::{
     editors::{
-        color_value::color_value, size::size, string_list::string_list, toggle::toggle,
+        color_value::color_value,
+        size::{size, size_with_base},
+        string_list::string_list,
+        toggle::toggle,
         tray_override_list::tray_override_list,
     },
     pages::{
@@ -26,7 +29,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![
-                        size(&module.icon_scale),
+                        size_with_base(&module.icon_scale, ICON_BASE_REM),
                         size(&module.item_gap),
                         size(&module.internal_padding),
                         string_list(&module.blacklist),

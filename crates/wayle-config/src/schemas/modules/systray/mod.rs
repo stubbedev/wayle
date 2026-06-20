@@ -94,3 +94,8 @@ pub struct TrayItemOverride {
 }
 
 crate::register_module!(SystrayConfig);
+
+/// Base size (in rem) the `icon_scale` multiplier resolves against
+/// (`Scale(1.0)` = default). Shared by the shell resolver and the settings
+/// editor's scale↔px conversion.
+pub const ICON_BASE_REM: f32 = 1.25;

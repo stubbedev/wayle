@@ -1,6 +1,9 @@
 //! MangoWM tag switcher module settings.
 
-use wayle_config::Config;
+use wayle_config::{
+    Config,
+    schemas::modules::mango_workspaces::{ICON_BASE_REM, LABEL_BASE_REM},
+};
 
 use crate::{
     editors::{
@@ -8,7 +11,7 @@ use crate::{
         enum_select::enum_select,
         icon::icon,
         number::number_u8,
-        size::size,
+        size::{size, size_with_base},
         string_map::string_map,
         text::{text, text_like},
         toggle::toggle,
@@ -53,8 +56,8 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         size(&module.tag_padding),
                         size(&module.icon_gap),
-                        size(&module.icon_size),
-                        size(&module.label_size),
+                        size_with_base(&module.icon_size, ICON_BASE_REM),
+                        size_with_base(&module.label_size, LABEL_BASE_REM),
                     ],
                 },
                 SectionSpec {

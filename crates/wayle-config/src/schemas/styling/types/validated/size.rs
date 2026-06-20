@@ -17,6 +17,10 @@ use tracing::warn;
 /// Largest accepted pixel value, guarding against absurd configs.
 const PX_MAX: f32 = 10_000.0;
 
+/// Pixels per rem. A `Size::Scale` multiplier is a multiple of a field's base
+/// size given in rem, so resolving one to pixels goes through this factor.
+pub const REM_BASE_PX: f32 = 16.0;
+
 /// A configurable size, expressed as either a scale multiplier or pixels.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Size {
@@ -78,6 +82,16 @@ impl Size {
             Self::Scale(multiplier) => base * multiplier * scale,
             Self::Px(value) => value,
         }
+    }
+
+    /// Resolves to pixels where a [`Size::Scale`] multiplier is a multiple of
+    /// `base_rem` rem (`1rem = `[`REM_BASE_PX`]`px`): `Scale(n)` →
+    /// `n * base_rem * REM_BASE_PX * scale`. [`Size::Px`] is absolute. This is
+    /// the canonical resolution for rem-based size fields — callers pass the
+    /// field's base in rem rather than restating the px conversion.
+    #[must_use]
+    pub fn resolve_rem(self, base_rem: f32, scale: f32) -> f32 {
+        self.resolve_px(base_rem * REM_BASE_PX, scale)
     }
 
     /// Parses from a string, accepting `"24px"` or a bare number like `"1.5"`.

@@ -101,14 +101,14 @@ fn build_with(opts: &RecordOptions, cast: &ScreenCast, allow_hardware: bool) -> 
         desc.push_str(&format!(
             "compositor name=comp background=black \
              sink_1::xpos={xpos} sink_1::ypos={ypos} sink_1::width={cam_w} sink_1::height={cam_h} \
-             ! videoconvert ! queue ! {video_encoder} ! queue ! {parser}{muxer} name=mux ! filesink location={path} \
-             pipewiresrc fd={fd} path={node} do-timestamp=true ! videorate ! video/x-raw,framerate={fps}/1 ! videoconvert ! queue ! comp.sink_0 \
-             v4l2src{device} ! videorate ! videoconvert ! videoscale add-borders=true ! video/x-raw,width={cam_w},height={cam_h},framerate={fps}/1 ! queue ! comp.sink_1 "
+             ! videoconvert n-threads=0 ! queue ! {video_encoder} ! queue ! {parser}{muxer} name=mux ! filesink location={path} \
+             pipewiresrc fd={fd} path={node} do-timestamp=true ! videorate ! video/x-raw,framerate={fps}/1 ! videoconvert n-threads=0 ! queue ! comp.sink_0 \
+             v4l2src{device} ! videorate ! videoconvert n-threads=0 ! videoscale add-borders=true ! video/x-raw,width={cam_w},height={cam_h},framerate={fps}/1 ! queue ! comp.sink_1 "
         ));
     } else {
         desc.push_str(&format!(
             "pipewiresrc fd={fd} path={node} do-timestamp=true ! videorate ! video/x-raw,framerate={fps}/1 \
-             ! videoconvert ! queue ! {video_encoder} ! queue ! {parser}{muxer} name=mux ! filesink location={path} "
+             ! videoconvert n-threads=0 ! queue ! {video_encoder} ! queue ! {parser}{muxer} name=mux ! filesink location={path} "
         ));
     }
 

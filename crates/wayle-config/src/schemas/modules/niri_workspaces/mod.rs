@@ -379,3 +379,10 @@ impl ModuleInfoProvider for NiriWorkspacesConfig {
 }
 
 crate::register_module!(NiriWorkspacesConfig);
+
+/// Base size (in rem) the `icon_size` scale multiplier resolves against
+/// (`Scale(1.0)` = default). Shared by the shell resolver and the settings
+/// editor's scale↔px conversion.
+pub const ICON_BASE_REM: f32 = 1.3;
+/// Base size (in rem) the `label_size` scale multiplier resolves against.
+pub const LABEL_BASE_REM: f32 = 1.1;

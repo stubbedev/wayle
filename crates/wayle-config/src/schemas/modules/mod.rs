@@ -8,18 +8,21 @@ mod clock;
 mod cpu;
 mod custom;
 mod dashboard;
-mod hyprland_workspaces;
+/// Hyprland workspaces module configuration and shared base sizes.
+pub mod hyprland_workspaces;
 mod hyprsunset;
 mod idle_inhibit;
 mod keybind_mode;
 mod keyboard_input;
 mod mail;
-mod mango_workspaces;
+/// MangoWM workspaces module configuration and shared base sizes.
+pub mod mango_workspaces;
 mod media;
 mod microphone;
 mod netstat;
 mod network;
-mod niri_workspaces;
+/// Niri workspaces module configuration and shared base sizes.
+pub mod niri_workspaces;
 /// Notification module configuration and popup types.
 pub mod notification;
 mod power;
@@ -28,7 +31,8 @@ mod ram;
 mod recorder;
 mod separator;
 mod storage;
-mod systray;
+/// System tray module configuration and shared base sizes.
+pub mod systray;
 mod volume;
 mod weather;
 mod window_title;

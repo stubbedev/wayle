@@ -10,4 +10,4 @@ pub use hex_color::{HexColor, InvalidHexColor};
 pub use normalized::NormalizedF64;
 pub use percentage::Percentage;
 pub use scale::ScaleFactor;
-pub use size::Size;
+pub use size::{REM_BASE_PX, Size};

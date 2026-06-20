@@ -2,11 +2,20 @@
 //! spin. `Size` is either a scale multiplier or an absolute pixel length, so the
 //! control captures both the mode and the value. In pixel mode the spin is an
 //! integer (floor 0); in scale mode it keeps two decimals.
+//!
+//! A scale value is a multiplier of the field's base size, expressed in rem
+//! (`1rem = 16px`), so switching mode converts the value to its equivalent in
+//! the other unit: at base `9.375`rem (=150px), scale `2.0` ⇄ `300`px. The base
+//! is the same rem value the shell resolver uses, shared via constants in
+//! `wayle-config`.
 
 use std::rc::Rc;
 
 use relm4::gtk::{self, glib::SignalHandlerId, prelude::*};
-use wayle_config::{ConfigProperty, schemas::styling::Size};
+use wayle_config::{
+    ConfigProperty,
+    schemas::styling::{REM_BASE_PX, Size},
+};
 use wayle_i18n::t;
 
 use crate::{
@@ -31,8 +40,16 @@ fn configure_spin_for_mode(spin: &gtk::SpinButton, is_px: bool) {
     }
 }
 
-/// Row that edits a single `Size` property as a Scale/Px dropdown + spin.
+/// Row that edits a single `Size` property whose scale base is 1rem.
 pub(crate) fn size(property: &ConfigProperty<Size>) -> SettingRowInit {
+    size_with_base(property, 1.0)
+}
+
+/// Row that edits a single `Size` property as a Scale/Px dropdown + spin, where
+/// a scale value is a multiplier of `base_rem` (in rem). Switching mode converts
+/// the value to the equivalent in the other unit (scale↔px) using that base.
+pub(crate) fn size_with_base(property: &ConfigProperty<Size>, base_rem: f32) -> SettingRowInit {
+    let base_px = base_rem * REM_BASE_PX;
     let container = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(8)
@@ -88,7 +105,19 @@ pub(crate) fn size(property: &ConfigProperty<Size>) -> SettingRowInit {
     let mode_commit = Rc::clone(&commit);
     let mode_spin = spin.clone();
     let mode_handler = mode.connect_selected_notify(move |dd| {
-        configure_spin_for_mode(&mode_spin, dd.selected() == PX_INDEX);
+        // Convert the current value to the equivalent in the newly-selected
+        // unit so the displayed size stays the same across a mode switch.
+        let to_px = dd.selected() == PX_INDEX;
+        let current = mode_spin.value();
+        let converted = if to_px {
+            (current * f64::from(base_px)).round()
+        } else if base_px > 0.0 {
+            current / f64::from(base_px)
+        } else {
+            current
+        };
+        configure_spin_for_mode(&mode_spin, to_px);
+        mode_spin.set_value(converted);
         mode_commit();
     });
     let spin_commit = Rc::clone(&commit);

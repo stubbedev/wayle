@@ -1,10 +1,10 @@
 //! OSD settings page: display options for on-screen indicators.
 
-use wayle_config::Config;
+use wayle_config::{Config, schemas::osd::MARGIN_BASE_REM};
 
 use crate::{
     editors::{
-        enum_select::enum_select, number::number_u32, size::size,
+        enum_select::enum_select, number::number_u32, size::size_with_base,
         surface_animation::surface_animation_rows, text::text_like, toggle::toggle,
     },
     pages::{
@@ -35,7 +35,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         enum_select(&osd.text_align),
                         number_u32(&osd.duration),
                         text_like(&osd.monitor),
-                        size(&osd.margin),
+                        size_with_base(&osd.margin, MARGIN_BASE_REM),
                         toggle(&osd.border),
                     ],
                 },

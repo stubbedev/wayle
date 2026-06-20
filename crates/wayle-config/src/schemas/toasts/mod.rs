@@ -14,6 +14,11 @@ use crate::{
     },
 };
 
+/// Base size (in rem, `1rem = 16px`) the `margin` scale multiplier resolves
+/// against (`Scale(1.0)` = default, 9.375rem = 150px). Shared by the shell
+/// resolver and the settings scale↔px conversion.
+pub const MARGIN_BASE_REM: f32 = 9.375;
+
 /// Toast overlays shown via `wayle toast`.
 ///
 /// Toasts are independent of the OSD: they have their own screen position,
@@ -41,9 +46,9 @@ pub struct ToastsConfig {
     #[default(OsdMonitor::default())]
     pub monitor: ConfigProperty<OsdMonitor>,
 
-    /// Margin from screen edges. Accepts a scale multiplier or pixels (e.g.
-    /// `"150px"`).
-    #[default(Size::scale(150.0))]
+    /// Margin from screen edges: a multiplier of the default 150px (`1.0` =
+    /// default) or absolute pixels (e.g. `"150px"`).
+    #[default(Size::scale(1.0))]
     pub margin: ConfigProperty<Size>,
 
     /// Show a border around the toast.
