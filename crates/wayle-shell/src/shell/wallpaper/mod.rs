@@ -60,6 +60,12 @@ fn reconcile(
 ) {
     let gdk_monitors: HashMap<String, gdk::Monitor> = current_monitors().into_iter().collect();
     let (transition_enabled, duration_ms) = transition_settings(config);
+    // Global single-file wallpaper, used for monitors that have no wallpaper of
+    // their own yet (e.g. hotplugged after startup, before any cycle tick).
+    let fallback = {
+        let path = config.config().wallpaper.wallpaper.get();
+        (!path.is_empty()).then(|| PathBuf::from(path))
+    };
 
     let mut map = surfaces.borrow_mut();
 
@@ -77,7 +83,7 @@ fn reconcile(
         let Some(surface) = map.get(connector) else {
             continue;
         };
-        if let Some(path) = &state.wallpaper {
+        if let Some(path) = state.wallpaper.as_ref().or(fallback.as_ref()) {
             surface.render(path, state.fit_mode, transition_enabled, duration_ms);
         }
     }
