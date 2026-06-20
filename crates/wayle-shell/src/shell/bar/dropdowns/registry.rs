@@ -17,6 +17,7 @@ use wayle_config::{
         bar::Location,
     },
 };
+use wayle_audio::volume::types::Volume;
 use wayle_widgets::prelude::{BarButton, BarButtonInput};
 
 use crate::{process, shell::services::ShellServices};
@@ -659,12 +660,17 @@ fn dispatch_action(
 }
 
 /// Routes recognized `wayle …` commands to their in-process service instead of
-/// spawning a subprocess. Returns `true` when handled.
+/// spawning a subprocess (no `wayle`-on-$PATH dependency). Each arm mirrors the
+/// corresponding D-Bus daemon's call. Returns `true` when handled; anything not
+/// recognized falls through to a shell-out.
 fn try_builtin(cmd: &str, registry: &DropdownRegistry) -> bool {
     let parts: Vec<&str> = cmd.split_whitespace().collect();
     if parts.first() != Some(&"wayle") {
         return false;
     }
+    let services = &registry.services;
+    let verb = parts.get(2).copied();
+
     match parts.get(1).copied() {
         Some("screenshot") => {
             let Some(sender) = crate::services::screenshot::host_sender() else {
@@ -681,11 +687,11 @@ fn try_builtin(cmd: &str, registry: &DropdownRegistry) -> bool {
             true
         }
         Some("recorder") => {
-            let Some(recorder) = registry.services.recorder.as_ref() else {
+            let Some(recorder) = services.recorder.as_ref() else {
                 return false;
             };
             let state = recorder.state();
-            match parts.get(2).copied() {
+            match verb {
                 Some("toggle") => {
                     relm4::spawn(async move {
                         state.toggle().await;
@@ -703,7 +709,150 @@ fn try_builtin(cmd: &str, registry: &DropdownRegistry) -> bool {
             }
             true
         }
+        Some("audio") => {
+            let Some(audio) = services.audio.as_ref() else {
+                return false;
+            };
+            match verb {
+                Some("output-mute") => {
+                    let Some(device) = audio.default_output.get() else {
+                        return false;
+                    };
+                    relm4::spawn(async move {
+                        let _ = device.set_mute(!device.muted.get()).await;
+                    });
+                }
+                Some("input-mute") => {
+                    let Some(device) = audio.default_input.get() else {
+                        return false;
+                    };
+                    relm4::spawn(async move {
+                        let _ = device.set_mute(!device.muted.get()).await;
+                    });
+                }
+                Some("output-volume") => {
+                    let (Some(level), Some(device)) =
+                        (parts.get(3).copied(), audio.default_output.get())
+                    else {
+                        return false;
+                    };
+                    let level = level.to_owned();
+                    relm4::spawn(async move {
+                        let current = device.volume.get();
+                        if let Some(pct) = adjusted_pct(&level, current.average() * 100.0) {
+                            let vol = Volume::from_percentage(pct, current.channels());
+                            let _ = device.set_volume(vol).await;
+                        }
+                    });
+                }
+                Some("input-volume") => {
+                    let (Some(level), Some(device)) =
+                        (parts.get(3).copied(), audio.default_input.get())
+                    else {
+                        return false;
+                    };
+                    let level = level.to_owned();
+                    relm4::spawn(async move {
+                        let current = device.volume.get();
+                        if let Some(pct) = adjusted_pct(&level, current.average() * 100.0) {
+                            let vol = Volume::from_percentage(pct, current.channels());
+                            let _ = device.set_volume(vol).await;
+                        }
+                    });
+                }
+                _ => return false,
+            }
+            true
+        }
+        Some("media") => {
+            let Some(media) = services.media.as_ref() else {
+                return false;
+            };
+            let Some(player) = media.active_player() else {
+                return false;
+            };
+            match verb {
+                Some("play-pause") => {
+                    relm4::spawn(async move {
+                        let _ = player.play_pause().await;
+                    });
+                }
+                Some("next") => {
+                    relm4::spawn(async move {
+                        let _ = player.next().await;
+                    });
+                }
+                Some("previous") => {
+                    relm4::spawn(async move {
+                        let _ = player.previous().await;
+                    });
+                }
+                _ => return false,
+            }
+            true
+        }
+        Some("idle") => {
+            let state = services.idle_inhibit.state();
+            let indefinite = parts.iter().any(|p| *p == "--indefinite");
+            match verb {
+                Some("toggle") => {
+                    if state.active.get() {
+                        state.disable();
+                    } else {
+                        state.enable(indefinite);
+                    }
+                }
+                Some("on") => state.enable(indefinite),
+                Some("off") => state.disable(),
+                _ => return false,
+            }
+            true
+        }
+        Some("notify") => {
+            let Some(notification) = services.notification.as_ref() else {
+                return false;
+            };
+            match verb {
+                Some("dnd") => notification.set_dnd(!notification.dnd.get()),
+                _ => return false,
+            }
+            true
+        }
+        Some("wallpaper") => {
+            let Some(wallpaper) = services.wallpaper.as_ref() else {
+                return false;
+            };
+            match verb {
+                Some("next") => {
+                    let wallpaper = wallpaper.clone();
+                    relm4::spawn(async move {
+                        let _ = wallpaper.advance_cycle().await;
+                    });
+                }
+                Some("previous") => {
+                    let wallpaper = wallpaper.clone();
+                    relm4::spawn(async move {
+                        let _ = wallpaper.rewind_cycle().await;
+                    });
+                }
+                Some("stop") => wallpaper.stop_cycling(),
+                _ => return false,
+            }
+            true
+        }
         _ => false,
+    }
+}
+
+/// Resolves a volume level string (`"+5"`, `"-10"`, or `"50"`) against the
+/// current percentage, clamped to 0–100.
+fn adjusted_pct(level: &str, current_pct: f64) -> Option<f64> {
+    if let Some(delta) = level.strip_prefix('+') {
+        delta.parse::<f64>().ok().map(|d| (current_pct + d).clamp(0.0, 100.0))
+    } else if let Some(delta) = level.strip_prefix('-') {
+        delta.parse::<f64>().ok().map(|d| (current_pct - d).clamp(0.0, 100.0))
+    } else {
+        level.parse::<f64>().ok().map(|v| v.clamp(0.0, 100.0))
     }
 }
 
