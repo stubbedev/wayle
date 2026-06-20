@@ -29,7 +29,7 @@ use zbus::{
     zvariant::{OwnedObjectPath, OwnedValue, Value},
 };
 
-use self::source::{CaptureTarget, CursorMode, PickerSelection, SourceType, parse_picker_reply};
+use self::source::{CaptureTarget, PickerSelection, SourceType, parse_picker_reply};
 #[cfg(feature = "pipewire")]
 use self::pipewire::StreamHandle;
 use crate::{response::Response, session};
@@ -239,7 +239,7 @@ impl ScreenCast {
         target: &CaptureTarget,
         cursor_mode: u32,
     ) -> Result<StreamInfo, String> {
-        let show_cursor = CursorMode::from_bits(cursor_mode).show_cursor();
+        let show_cursor = source::CursorMode::from_bits(cursor_mode).show_cursor();
         let handle = pipewire::start_stream(target.clone(), show_cursor, DEFAULT_FPS)?;
         let info = StreamInfo {
             node_id: handle.node_id,

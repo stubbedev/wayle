@@ -19,4 +19,9 @@ pub trait Screenshot {
     /// optional output connector name (used by `output` mode) or empty.
     /// Returns the saved PNG path, or an empty string if the user cancelled.
     async fn capture(&self, mode: &str, target: &str) -> Result<String>;
+
+    /// Picks a single screen color interactively, returning it as an sRGB
+    /// `(r, g, b)` tuple with each channel in `[0, 1]`. Errors if the user
+    /// cancels or the pick fails.
+    async fn pick_color(&self) -> Result<(f64, f64, f64)>;
 }

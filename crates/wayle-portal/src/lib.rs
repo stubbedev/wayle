@@ -21,6 +21,7 @@ mod lockdown;
 mod request;
 mod response;
 mod screencast;
+mod screenshot;
 mod session;
 mod settings;
 
@@ -31,7 +32,9 @@ use wayle_config::ConfigService;
 use zbus::Connection;
 
 pub use self::error::Error;
-use self::{lockdown::Lockdown, screencast::ScreenCast, settings::Settings};
+use self::{
+    lockdown::Lockdown, screencast::ScreenCast, screenshot::Screenshot, settings::Settings,
+};
 
 /// The backend's well-known D-Bus name (matches `wayle.portal`'s `DBusName`).
 const BUS_NAME: &str = "org.freedesktop.impl.portal.desktop.wayle";
@@ -66,6 +69,10 @@ pub async fn run() -> Result<(), Error> {
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
         .at(path, ScreenCast::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Screenshot::new(connection.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
 
