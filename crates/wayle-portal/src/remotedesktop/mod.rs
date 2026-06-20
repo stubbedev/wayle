@@ -162,7 +162,7 @@ impl RemoteDesktop {
     }
 
     /// Relative pointer motion.
-    async fn notify_pointer_motion(
+    fn notify_pointer_motion(
         &self,
         session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
@@ -174,7 +174,7 @@ impl RemoteDesktop {
 
     /// Absolute pointer motion (within a stream). Not yet injected: needs the
     /// stream's coordinate extent.
-    async fn notify_pointer_motion_absolute(
+    fn notify_pointer_motion_absolute(
         &self,
         _session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
@@ -186,7 +186,7 @@ impl RemoteDesktop {
     }
 
     /// Pointer button press/release (evdev button code).
-    async fn notify_pointer_button(
+    fn notify_pointer_button(
         &self,
         session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
@@ -203,7 +203,7 @@ impl RemoteDesktop {
     }
 
     /// Smooth scroll.
-    async fn notify_pointer_axis(
+    fn notify_pointer_axis(
         &self,
         session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
@@ -219,7 +219,7 @@ impl RemoteDesktop {
     }
 
     /// Discrete scroll steps.
-    async fn notify_pointer_axis_discrete(
+    fn notify_pointer_axis_discrete(
         &self,
         session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
@@ -233,7 +233,7 @@ impl RemoteDesktop {
     }
 
     /// Key press/release by evdev keycode.
-    async fn notify_keyboard_keycode(
+    fn notify_keyboard_keycode(
         &self,
         session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
@@ -250,7 +250,7 @@ impl RemoteDesktop {
     }
 
     /// Key by keysym. Not yet injected: needs keysym→keycode resolution.
-    async fn notify_keyboard_keysym(
+    fn notify_keyboard_keysym(
         &self,
         _session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
@@ -261,7 +261,7 @@ impl RemoteDesktop {
     }
 
     /// Touch down. Not supported (no virtual-touch protocol).
-    async fn notify_touch_down(
+    fn notify_touch_down(
         &self,
         _session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
@@ -274,7 +274,7 @@ impl RemoteDesktop {
     }
 
     /// Touch motion. Not supported.
-    async fn notify_touch_motion(
+    fn notify_touch_motion(
         &self,
         _session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
@@ -286,7 +286,7 @@ impl RemoteDesktop {
     }
 
     /// Touch up. Not supported.
-    async fn notify_touch_up(
+    fn notify_touch_up(
         &self,
         _session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,

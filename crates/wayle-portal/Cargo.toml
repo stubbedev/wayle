@@ -39,11 +39,13 @@ expect_used = "deny"
 inefficient_to_string = "warn"
 missing_errors_doc = "warn"
 missing_panics_doc = "warn"
-needless_pass_by_value = "warn"
 semicolon_if_nothing_returned = "warn"
 unnecessary_wraps = "warn"
-unused_async = "warn"
-unused_self = "warn"
+# zbus interface methods have a fixed shape: deserialized args arrive by value,
+# handlers take &self and are async by convention even when stateless / awaitless.
+needless_pass_by_value = "allow"
+unused_async = "allow"
+unused_self = "allow"
 
 [lints.rust]
 missing_docs = "warn"

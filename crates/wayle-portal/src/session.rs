@@ -77,24 +77,6 @@ where
     Ok(())
 }
 
-/// Programmatically closes a session from the backend side (e.g. when its
-/// PipeWire streams all end): emits `Closed` and unmounts.
-pub async fn close(connection: &Connection, path: &OwnedObjectPath) {
-    if let Ok(iface) = connection
-        .object_server()
-        .interface::<_, Session>(path)
-        .await
-    {
-        let session = iface.get().await;
-        if session.closed.swap(true, Ordering::SeqCst) {
-            return;
-        }
-        (session.on_close)();
-        let _ = Session::closed(iface.signal_emitter()).await;
-    }
-    unmount(connection, path.clone());
-}
-
 /// Removes the Session object at `path`. Detached so it is safe to call from
 /// within a Session method.
 fn unmount(connection: &Connection, path: OwnedObjectPath) {

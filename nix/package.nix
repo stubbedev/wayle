@@ -129,6 +129,22 @@ craneLib.buildPackage (
       # Reference copy of the systemd user unit; the NixOS/home-manager modules
       # define their own unit with the correct store path.
       install -Dm0644 resources/wayle.service -t $out/share/wayle
+
+      # xdg-desktop-portal backend: the .portal declares which interfaces we
+      # implement, the D-Bus service file lets the portal frontend activate
+      # `wayle portal`, and the systemd unit + portals.conf are reference copies
+      # the modules wire up.
+      install -Dm0644 resources/wayle.portal \
+        -t $out/share/xdg-desktop-portal/portals
+      install -d $out/share/dbus-1/services
+      substitute resources/org.freedesktop.impl.portal.desktop.wayle.service \
+        $out/share/dbus-1/services/org.freedesktop.impl.portal.desktop.wayle.service \
+        --replace-fail /usr/bin/wayle "$out/bin/wayle"
+      install -d $out/share/wayle
+      substitute resources/xdg-desktop-portal-wayle.service \
+        $out/share/wayle/xdg-desktop-portal-wayle.service \
+        --replace-fail /usr/bin/wayle "$out/bin/wayle"
+      install -Dm0644 resources/wayle-portals.conf -t $out/share/wayle
     '';
 
     meta = {

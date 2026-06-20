@@ -37,13 +37,6 @@ use wayland_protocols_wlr::virtual_pointer::v1::client::{
 pub enum InputCommand {
     /// Relative pointer motion in logical pixels.
     PointerMotion { dx: f64, dy: f64 },
-    /// Absolute pointer motion within an extent (e.g. a stream's size).
-    PointerMotionAbsolute {
-        x: f64,
-        y: f64,
-        width: u32,
-        height: u32,
-    },
     /// Pointer button (evdev code) press/release.
     PointerButton { button: u32, pressed: bool },
     /// Smooth scroll on an axis (0 = vertical, 1 = horizontal).
@@ -130,21 +123,6 @@ impl Devices {
         match *command {
             InputCommand::PointerMotion { dx, dy } => {
                 self.pointer.motion(time, dx, dy);
-                self.pointer.frame();
-            }
-            InputCommand::PointerMotionAbsolute {
-                x,
-                y,
-                width,
-                height,
-            } => {
-                self.pointer.motion_absolute(
-                    time,
-                    x.max(0.0) as u32,
-                    y.max(0.0) as u32,
-                    width.max(1),
-                    height.max(1),
-                );
                 self.pointer.frame();
             }
             InputCommand::PointerButton { button, pressed } => {

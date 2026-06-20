@@ -173,7 +173,6 @@ impl Dispatch<HyprlandGlobalShortcutV1, String> for GsState {
                 tv_sec_lo,
                 tv_nsec,
             } => (false, millis(tv_sec_hi, tv_sec_lo, tv_nsec)),
-            _ => return,
         };
         let _ = state.events.send(ShortcutEvent {
             key: key.clone(),

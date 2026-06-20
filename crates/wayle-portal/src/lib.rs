@@ -23,7 +23,6 @@ mod lockdown;
 mod notification;
 mod protocol;
 mod remotedesktop;
-mod request;
 mod response;
 mod screencast;
 mod screenshot;
