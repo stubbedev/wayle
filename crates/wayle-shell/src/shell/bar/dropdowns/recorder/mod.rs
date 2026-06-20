@@ -28,10 +28,6 @@ pub(crate) struct RecorderDropdown {
     scaled_width: i32,
     active: bool,
     paused: bool,
-    /// Mirrors `recorder.microphone`; gates the source picker's sensitivity.
-    microphone_on: bool,
-    /// Mirrors `recorder.webcam_enabled`; gates the webcam rows' sensitivity.
-    webcam_on: bool,
     /// Whether at least one V4L2 camera exists; the whole webcam group is
     /// hidden when false.
     has_camera: bool,
@@ -120,6 +116,7 @@ impl Component for RecorderDropdown {
                         gtk::Button {
                             add_css_class: "recorder-record-button",
                             set_hexpand: true,
+                            set_cursor_from_name: Some("pointer"),
                             #[watch]
                             set_class_active: ("danger", model.active),
                             #[watch]
@@ -151,6 +148,7 @@ impl Component for RecorderDropdown {
                         gtk::Button {
                             add_css_class: "secondary",
                             add_css_class: "recorder-pause-button",
+                            set_cursor_from_name: Some("pointer"),
                             #[watch]
                             set_sensitive: model.active,
                             #[watch]
@@ -206,8 +204,6 @@ impl Component for RecorderDropdown {
 
                         gtk::Box {
                             add_css_class: "recorder-row",
-                            #[watch]
-                            set_sensitive: model.microphone_on,
                             gtk::Label {
                                 set_hexpand: true,
                                 set_halign: gtk::Align::Start,
@@ -217,7 +213,9 @@ impl Component for RecorderDropdown {
                             gtk::DropDown {
                                 set_hexpand: false,
                                 set_halign: gtk::Align::End,
-                                set_factory: Some(&ellipsizing_string_factory()),
+                                // Narrow, ellipsized button; full labels in the open list.
+                                set_factory: Some(&ellipsizing_string_factory_capped(1)),
+                                set_list_factory: Some(&ellipsizing_string_factory()),
                                 set_model: Some(&string_list(&model.mic_sources)),
                                 set_selected: devices::index_of(
                                     &model.mic_sources,
@@ -290,8 +288,6 @@ impl Component for RecorderDropdown {
 
                         gtk::Box {
                             add_css_class: "recorder-row",
-                            #[watch]
-                            set_sensitive: model.webcam_on,
                             gtk::Label {
                                 set_hexpand: true,
                                 set_halign: gtk::Align::Start,
@@ -300,7 +296,9 @@ impl Component for RecorderDropdown {
                             gtk::DropDown {
                                 set_hexpand: false,
                                 set_halign: gtk::Align::End,
-                                set_factory: Some(&ellipsizing_string_factory()),
+                                // Narrow, ellipsized button; full labels in the open list.
+                                set_factory: Some(&ellipsizing_string_factory_capped(1)),
+                                set_list_factory: Some(&ellipsizing_string_factory()),
                                 set_model: Some(&string_list(&model.cameras)),
                                 set_selected: devices::index_of(
                                     &model.cameras,
@@ -381,8 +379,6 @@ impl Component for RecorderDropdown {
             scaled_width,
             active: init.state.active.get(),
             paused: init.state.paused.get(),
-            microphone_on: recorder.microphone.get(),
-            webcam_on: recorder.webcam_enabled.get(),
             has_camera: cameras.len() > 1,
             webcam_x,
             webcam_y,
@@ -433,22 +429,24 @@ impl Component for RecorderDropdown {
             drag.connect_drag_update(move |gesture, offset_x, offset_y| {
                 let (start_x, start_y) = gesture.start_point().unwrap_or((0.0, 0.0));
                 let (grab_x, grab_y) = grab.get();
-                let free_w = (frame.width_request() - cam.width_request()).max(0);
-                let free_h = (frame.height_request() - cam.height_request()).max(0);
+                let margin = webcam_margin(frame.width_request(), frame.height_request());
+                let travel_w = (frame.width_request() - cam.width_request() - 2 * margin).max(0);
+                let travel_h = (frame.height_request() - cam.height_request() - 2 * margin).max(0);
                 let nx = (start_x + offset_x - grab_x).round() as i32;
                 let ny = (start_y + offset_y - grab_y).round() as i32;
-                cam.set_margin_start(nx.clamp(0, free_w));
-                cam.set_margin_top(ny.clamp(0, free_h));
+                cam.set_margin_start(nx.clamp(margin, margin + travel_w));
+                cam.set_margin_top(ny.clamp(margin, margin + travel_h));
             });
         }
         {
             let (cam, frame, sender) = (cam.clone(), frame.clone(), sender.clone());
             drag.connect_drag_end(move |_, _, _| {
                 cam.set_cursor_from_name(Some("grab"));
-                let free_w = (frame.width_request() - cam.width_request()).max(0);
-                let free_h = (frame.height_request() - cam.height_request()).max(0);
-                let x_percent = pct_from_px(cam.margin_start(), free_w);
-                let y_percent = pct_from_px(cam.margin_top(), free_h);
+                let margin = webcam_margin(frame.width_request(), frame.height_request());
+                let travel_w = (frame.width_request() - cam.width_request() - 2 * margin).max(0);
+                let travel_h = (frame.height_request() - cam.height_request() - 2 * margin).max(0);
+                let x_percent = pct_from_px(cam.margin_start(), margin, travel_w);
+                let y_percent = pct_from_px(cam.margin_top(), margin, travel_h);
                 sender.input(RecorderDropdownMsg::WebcamMoved {
                     x_percent,
                     y_percent,
@@ -474,7 +472,6 @@ impl Component for RecorderDropdown {
             }
             RecorderDropdownMsg::MicrophoneToggled(active) => {
                 self.config.config().modules.recorder.microphone.set(active);
-                self.microphone_on = active;
             }
             RecorderDropdownMsg::MicrophoneDeviceSelected(index) => {
                 if let Some(choice) = self.mic_sources.get(index as usize) {
@@ -501,7 +498,6 @@ impl Component for RecorderDropdown {
                     .recorder
                     .webcam_enabled
                     .set(active);
-                self.webcam_on = active;
             }
             RecorderDropdownMsg::WebcamDeviceSelected(index) => {
                 if let Some(choice) = self.cameras.get(index as usize) {
@@ -573,12 +569,14 @@ impl Component for RecorderDropdown {
 
 impl RecorderDropdown {
     /// Recomputes the webcam frame's pixel offset in the preview from its
-    /// relative position and the current preview geometry.
+    /// relative position and the current preview geometry, applying the same
+    /// edge inset as the recording pipeline.
     fn reposition_cam(&mut self) {
-        let free_w = (self.preview_w - self.cam_w).max(0);
-        let free_h = (self.preview_h - self.cam_h).max(0);
-        self.cam_x_px = free_w * i32::from(self.webcam_x.min(100)) / 100;
-        self.cam_y_px = free_h * i32::from(self.webcam_y.min(100)) / 100;
+        let margin = webcam_margin(self.preview_w, self.preview_h);
+        let travel_w = (self.preview_w - self.cam_w - 2 * margin).max(0);
+        let travel_h = (self.preview_h - self.cam_h - 2 * margin).max(0);
+        self.cam_x_px = margin + travel_w * i32::from(self.webcam_x.min(100)) / 100;
+        self.cam_y_px = margin + travel_h * i32::from(self.webcam_y.min(100)) / 100;
     }
 }
 
@@ -611,12 +609,24 @@ fn preview_geometry(scaled_width: i32, size_percent: u8) -> (i32, i32, i32, i32)
     (preview_w, preview_h, cam_w, cam_h)
 }
 
-/// Converts a pixel offset into a 0-100 percentage of the available `free`
-/// span, defaulting to 0 when there is no room to move.
-fn pct_from_px(px: i32, free: i32) -> u8 {
-    if free <= 0 {
+/// Edge inset as a fraction of the preview's *shorter* side, giving the same
+/// pixel gap on every edge so the webcam frame sits equally close to the side
+/// and the bottom (the aspect ratio then decides per-axis travel). Mirrors the
+/// recording pipeline's `EDGE_MARGIN_PERCENT` (`wayle-recorder`); keep in sync.
+const EDGE_MARGIN_PERCENT: i32 = 5;
+
+/// Uniform edge inset in pixels for the preview: [`EDGE_MARGIN_PERCENT`] of the
+/// shorter preview dimension.
+fn webcam_margin(preview_w: i32, preview_h: i32) -> i32 {
+    preview_w.min(preview_h) * EDGE_MARGIN_PERCENT / 100
+}
+
+/// Converts a frame offset into a 0-100 percentage of the inset travel span,
+/// defaulting to 0 when there is no room to move.
+fn pct_from_px(px: i32, margin: i32, travel: i32) -> u8 {
+    if travel <= 0 {
         0
     } else {
-        (px.clamp(0, free) * 100 / free) as u8
+        ((px - margin).clamp(0, travel) * 100 / travel) as u8
     }
 }

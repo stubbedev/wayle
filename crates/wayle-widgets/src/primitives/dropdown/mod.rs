@@ -14,13 +14,23 @@ use relm4::{WidgetTemplate, gtk};
 /// stable width — long values truncate with `…` rather than resizing the
 /// control. Apply with `dropdown.set_factory(Some(&ellipsizing_string_factory()))`.
 pub fn ellipsizing_string_factory() -> gtk::SignalListItemFactory {
+    ellipsizing_string_factory_capped(-1)
+}
+
+/// Like [`ellipsizing_string_factory`], but caps the label's natural width at
+/// `max_width_chars` characters (`-1` for no cap) so the control settles at a
+/// short, fixed width and truncates long values with `…` instead of growing to
+/// fit. Use as a `GtkDropDown` *button* factory (`set_factory`) paired with an
+/// uncapped `set_list_factory` so the open list still shows full labels.
+pub fn ellipsizing_string_factory_capped(max_width_chars: i32) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
-    factory.connect_setup(|_, item| {
+    factory.connect_setup(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
             return;
         };
         let label = gtk::Label::builder()
             .ellipsize(gtk::pango::EllipsizeMode::End)
+            .max_width_chars(max_width_chars)
             .xalign(0.0)
             .build();
         item.set_child(Some(&label));

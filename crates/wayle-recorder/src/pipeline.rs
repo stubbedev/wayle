@@ -265,12 +265,22 @@ fn muxer(format: OutputFormat) -> &'static str {
     }
 }
 
+/// Edge margin between the webcam frame and the screen, as a fraction of the
+/// screen's *shorter* side. Using one dimension gives the same pixel gap on
+/// every edge (rather than a per-axis percentage that gaps wider on the long
+/// axis), so the frame sits equally close to the side and the bottom and the
+/// screen's aspect ratio decides how far it can travel on each axis. The
+/// recorder popover's position preview mirrors this (`EDGE_MARGIN_PERCENT` in
+/// the dropdown module); keep the two in sync.
+const EDGE_MARGIN_PERCENT: i32 = 5;
+
 /// Top-left pixel offset of the webcam frame from relative position percentages.
 ///
-/// `x_percent`/`y_percent` (0-100) place the frame within the free space left
-/// over after the frame's own size, so 0 is flush to the left/top edge and 100
-/// is flush to the right/bottom edge. Being relative keeps placement consistent
-/// across monitors of different resolutions.
+/// `x_percent`/`y_percent` (0-100) place the frame within the travel range left
+/// over after the frame's own size and a uniform [`webcam_margin`] inset on each
+/// side, so 0 sits one margin in from the left/top edge and 100 one margin in
+/// from the right/bottom edge. Being relative keeps placement consistent across
+/// monitors of different resolutions.
 fn webcam_xy(
     x_percent: u32,
     y_percent: u32,
@@ -279,9 +289,15 @@ fn webcam_xy(
     cam_w: i32,
     cam_h: i32,
 ) -> (i32, i32) {
-    let free_w = (screen_w - cam_w).max(0);
-    let free_h = (screen_h - cam_h).max(0);
-    let xpos = free_w * i32::try_from(x_percent.min(100)).unwrap_or(100) / 100;
-    let ypos = free_h * i32::try_from(y_percent.min(100)).unwrap_or(100) / 100;
+    let margin = webcam_margin(screen_w, screen_h);
+    let travel_w = (screen_w - cam_w - 2 * margin).max(0);
+    let travel_h = (screen_h - cam_h - 2 * margin).max(0);
+    let xpos = margin + travel_w * i32::try_from(x_percent.min(100)).unwrap_or(100) / 100;
+    let ypos = margin + travel_h * i32::try_from(y_percent.min(100)).unwrap_or(100) / 100;
     (xpos, ypos)
+}
+
+/// Uniform edge inset in pixels: [`EDGE_MARGIN_PERCENT`] of the shorter side.
+fn webcam_margin(screen_w: i32, screen_h: i32) -> i32 {
+    screen_w.min(screen_h) * EDGE_MARGIN_PERCENT / 100
 }

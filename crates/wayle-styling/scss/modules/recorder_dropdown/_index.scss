@@ -145,17 +145,16 @@
             color: var(--fg-default);
         }
 
-        // Match the settings switches (`.setting-control switch`): the bare
-        // `switch` primitive is taller/wider and would look oversized next to
-        // the popover rows. Keep these dimensions in sync with
-        // `components/settings/controls/_inherit_toggle.scss`.
+        // Compact switch tuned for the popover rows: shorter than the bare
+        // `switch` primitive (1.375rem) so it doesn't dominate the row.
         > switch {
-            min-height: calc(var(--text-sm) + var(--space-sm) + 0.3rem * var(--global-scale));
-            min-width: calc(var(--text-sm) + var(--space-sm) + 0.7rem * var(--global-scale));
+            margin: var(--space-xs) 0;
+            min-height: calc(1rem * var(--global-scale));
+            min-width: calc(3.5rem * var(--global-scale));
 
             slider {
-                min-width: calc(var(--text-sm) + var(--space-sm));
-                min-height: calc(var(--text-sm) + var(--space-sm));
+                min-width: calc(0.8rem * var(--global-scale));
+                min-height: calc(0.8rem * var(--global-scale));
             }
         }
 
@@ -165,12 +164,13 @@
         // popovers' inputs.
         > dropdown,
         > spinbutton {
-            // Capped short so a long device name can't crowd or overlap the
-            // row label; the ellipsizing factory truncates the selection to
-            // this width with a trailing "…".
-            min-width: calc(7rem * var(--global-scale));
+            // Capped so a long device name can't crowd the row label; the capped
+            // button factory truncates the selection to this width with a
+            // trailing "…" (the open list stays full-width). Font matches the
+            // settings dropdown (`text-sm`) so it isn't taller than its row.
+            min-width: calc(8rem * var(--global-scale));
             color: var(--fg-default);
-            font-size: var(--text-md);
+            font-size: var(--text-sm);
             font-weight: var(--weight-medium);
             background: var(--bg-overlay);
             border: 1px solid var(--border-strong);
@@ -190,7 +190,7 @@
             }
 
             arrow {
-                -gtk-icon-size: var(--icon-sm);
+                -gtk-icon-size: var(--icon-xs);
                 color: var(--fg-subtle);
             }
         }
