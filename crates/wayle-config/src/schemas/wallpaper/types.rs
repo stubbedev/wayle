@@ -20,39 +20,15 @@ pub enum FitMode {
     Stretch,
 }
 
-/// Transition animation type.
+/// Wallpaper change animation, rendered natively by wayle.
 #[wayle_enum(default)]
 #[serde(rename_all = "lowercase")]
-pub enum TransitionType {
+pub enum WallpaperTransition {
+    /// Crossfade between the old and new image.
+    #[default]
+    Crossfade,
     /// Instant change with no animation.
     None,
-    /// Basic crossfade.
-    #[default]
-    Simple,
-    /// Fade with bezier-controlled easing.
-    Fade,
-    /// Wipe from left edge to right.
-    Left,
-    /// Wipe from right edge to left.
-    Right,
-    /// Wipe from top edge to bottom.
-    Top,
-    /// Wipe from bottom edge to top.
-    Bottom,
-    /// Wipe at configurable angle.
-    Wipe,
-    /// Wavy wipe effect.
-    Wave,
-    /// Growing circle from a position.
-    Grow,
-    /// Growing circle from center.
-    Center,
-    /// Shrinking circle from edges inward.
-    Outer,
-    /// Growing circle from random position.
-    Any,
-    /// Randomly selects from all transition types.
-    Random,
 }
 
 /// Wallpaper cycling order.
@@ -119,69 +95,6 @@ impl<'de> Deserialize<'de> for TransitionDuration {
             warn!(
                 "transition duration {} below minimum ({}), clamped",
                 raw, DURATION_MIN
-            );
-        }
-        Ok(Self::new(raw))
-    }
-}
-
-const FPS_MIN: u32 = 1;
-const FPS_MAX: u32 = 360;
-
-/// Transition frame rate clamped to 1-360 fps.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(transparent)]
-#[schemars(transparent)]
-pub struct TransitionFps(#[schemars(range(min = FPS_MIN, max = FPS_MAX))] u32);
-
-impl TransitionFps {
-    /// Default frame rate (60 fps).
-    pub const DEFAULT: Self = Self(60);
-
-    /// Creates a frame rate, clamping to 1-360.
-    #[must_use]
-    pub fn new(value: u32) -> Self {
-        Self(value.clamp(FPS_MIN, FPS_MAX))
-    }
-
-    /// Returns the inner u32 value.
-    #[must_use]
-    pub fn value(self) -> u32 {
-        self.0
-    }
-}
-
-impl Default for TransitionFps {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-impl Display for TransitionFps {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<u32> for TransitionFps {
-    fn from(value: u32) -> Self {
-        Self::new(value)
-    }
-}
-
-impl<'de> Deserialize<'de> for TransitionFps {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = u32::deserialize(deserializer)?;
-        if !(FPS_MIN..=FPS_MAX).contains(&raw) {
-            warn!(
-                "transition fps {} out of range (valid: {}-{}), clamped to {}",
-                raw,
-                FPS_MIN,
-                FPS_MAX,
-                raw.clamp(FPS_MIN, FPS_MAX)
             );
         }
         Ok(Self::new(raw))
@@ -273,21 +186,6 @@ mod tests {
     #[test]
     fn transition_duration_preserves_valid() {
         assert!((TransitionDuration::new(1.5).value() - 1.5).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn transition_fps_clamps_below_min() {
-        assert_eq!(TransitionFps::new(0).value(), FPS_MIN);
-    }
-
-    #[test]
-    fn transition_fps_clamps_above_max() {
-        assert_eq!(TransitionFps::new(FPS_MAX + 1).value(), FPS_MAX);
-    }
-
-    #[test]
-    fn transition_fps_preserves_valid() {
-        assert_eq!(TransitionFps::new(144).value(), 144);
     }
 
     #[test]

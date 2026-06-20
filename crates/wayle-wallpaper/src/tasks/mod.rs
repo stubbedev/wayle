@@ -47,9 +47,7 @@ fn spawn_cycling_task(service: &WallpaperService) {
     let task = CyclingTask::new(
         service.cycling.clone(),
         service.monitors.clone(),
-        service.transition.clone(),
         service.shared_cycle.clone(),
-        service.engine_active.clone(),
     );
 
     let cancellation = service.cancellation_token.clone();

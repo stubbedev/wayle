@@ -5,7 +5,7 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 use futures::StreamExt;
 use tracing::warn;
 use wayle_config::schemas::wallpaper::{MonitorWallpaperConfig, WallpaperConfig};
-use wayle_wallpaper::{TransitionConfig, TransitionDuration, TransitionFps, WallpaperService};
+use wayle_wallpaper::WallpaperService;
 
 use crate::{shell::ShellServices, wallpaper_map};
 
@@ -16,44 +16,32 @@ pub(crate) fn spawn(services: &ShellServices) {
 
     let config = services.config.config().wallpaper.clone();
 
-    spawn_transition_watcher(&config, &wallpaper);
+    spawn_single_file_watcher(&config, &wallpaper);
     spawn_cycling_watcher(&config, &wallpaper);
     spawn_cycling_interval_watcher(&config, &wallpaper);
     spawn_shared_cycle_watcher(&config, &wallpaper);
-    spawn_engine_watcher(&config, &wallpaper);
     spawn_monitors_watcher(&config, &wallpaper);
 }
 
-fn spawn_transition_watcher(config: &WallpaperConfig, wallpaper: &Arc<WallpaperService>) {
-    let transition_type = config.transition_type.clone();
-    let transition_duration = config.transition_duration.clone();
-    let transition_fps = config.transition_fps.clone();
+/// Applies the global single-file `wallpaper` to all monitors when it changes
+/// (and cycling is not active).
+fn spawn_single_file_watcher(config: &WallpaperConfig, wallpaper: &Arc<WallpaperService>) {
+    let wallpaper_path = config.wallpaper.clone();
+    let cycling_enabled = config.cycling_enabled.clone();
     let wallpaper = wallpaper.clone();
 
-    let mut type_stream = transition_type.watch();
-    let mut duration_stream = transition_duration.watch();
-    let mut fps_stream = transition_fps.watch();
+    let mut stream = wallpaper_path.watch();
 
     tokio::spawn(async move {
-        type_stream.next().await;
-        duration_stream.next().await;
-        fps_stream.next().await;
+        stream.next().await;
 
-        loop {
-            tokio::select! {
-                Some(_) = type_stream.next() => {}
-                Some(_) = duration_stream.next() => {}
-                Some(_) = fps_stream.next() => {}
-                else => break,
+        while let Some(path) = stream.next().await {
+            if path.is_empty() || cycling_enabled.get() {
+                continue;
             }
-
-            let transition = TransitionConfig {
-                transition_type: wallpaper_map::transition_type(transition_type.get()),
-                duration: TransitionDuration(transition_duration.get().value()),
-                fps: TransitionFps(transition_fps.get().value()),
-                step: None,
-            };
-            wallpaper.set_transition(transition);
+            if let Err(e) = wallpaper.set_wallpaper(PathBuf::from(path), None).await {
+                warn!(error = %e, "cannot apply single-file wallpaper from config change");
+            }
         }
     });
 }
@@ -126,19 +114,6 @@ fn spawn_shared_cycle_watcher(config: &WallpaperConfig, wallpaper: &Arc<Wallpape
 
         while let Some(shared) = stream.next().await {
             wallpaper.shared_cycle.set(shared);
-        }
-    });
-}
-
-fn spawn_engine_watcher(config: &WallpaperConfig, wallpaper: &Arc<WallpaperService>) {
-    let mut stream = config.engine_enabled.watch();
-    let wallpaper = wallpaper.clone();
-
-    tokio::spawn(async move {
-        stream.next().await;
-
-        while let Some(enabled) = stream.next().await {
-            wallpaper.engine_active.set(enabled);
         }
     });
 }

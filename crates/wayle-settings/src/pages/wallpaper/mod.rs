@@ -1,8 +1,8 @@
-//! Wallpaper settings page: engine, transitions, cycling, and per-monitor config.
+//! Wallpaper settings page: single image, transitions, cycling, per-monitor.
 
 use wayle_config::{
     Config,
-    schemas::wallpaper::{CyclingInterval, TransitionDuration, TransitionFps},
+    schemas::wallpaper::{CyclingInterval, TransitionDuration},
 };
 
 use crate::{
@@ -27,13 +27,13 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
             "settings-page-wallpaper",
             vec![
                 SectionSpec {
-                    title_key: "settings-section-engine",
-                    items: vec![toggle(&wp.engine_enabled)],
+                    title_key: "settings-section-general",
+                    items: vec![file_path(&wp.wallpaper)],
                 },
                 SectionSpec {
                     title_key: "settings-section-transition",
                     items: vec![
-                        enum_select(&wp.transition_type),
+                        enum_select(&wp.transition),
                         number_newtype(
                             &wp.transition_duration,
                             0.0,
@@ -42,15 +42,6 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                             1,
                             |v: &TransitionDuration| v.value() as f64,
                             |seconds| TransitionDuration::new(seconds as f32),
-                        ),
-                        number_newtype(
-                            &wp.transition_fps,
-                            1.0,
-                            360.0,
-                            1.0,
-                            0,
-                            |v: &TransitionFps| v.value() as f64,
-                            |fps| TransitionFps::new(fps as u32),
                         ),
                     ],
                 },

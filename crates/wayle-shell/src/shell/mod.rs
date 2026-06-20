@@ -6,6 +6,7 @@ pub(crate) mod region_overlay;
 pub(crate) mod screenshot;
 pub(crate) mod services;
 pub(crate) mod share_picker;
+mod wallpaper;
 
 use std::time::Instant;
 
@@ -23,6 +24,7 @@ use self::{
     region_overlay::RegionOverlay,
     screenshot::{Screenshot, ScreenshotInit},
     share_picker::SharePicker,
+    wallpaper::Wallpaper,
 };
 use crate::{startup::StartupTimer, watchers};
 
@@ -35,6 +37,7 @@ pub(crate) struct Shell {
     _share_picker: Controller<SharePicker>,
     _region_overlay: Controller<RegionOverlay>,
     _screenshot: Controller<Screenshot>,
+    _wallpaper: Option<Wallpaper>,
 }
 
 pub(crate) struct ShellInit {
@@ -125,6 +128,12 @@ impl Component for Shell {
             .detach();
         crate::services::screenshot::register_sender(screenshot.sender().clone());
 
+        let wallpaper = init
+            .services
+            .wallpaper
+            .clone()
+            .map(|service| Wallpaper::spawn(service, init.services.config.clone()));
+
         let model = Shell {
             css_provider,
             bars,
@@ -134,6 +143,7 @@ impl Component for Shell {
             _share_picker: share_picker,
             _region_overlay: region_overlay,
             _screenshot: screenshot,
+            _wallpaper: wallpaper,
         };
         let widgets = view_output!();
 

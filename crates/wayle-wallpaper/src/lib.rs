@@ -1,4 +1,7 @@
-//! Wallpaper management via awww with cycling and theming support.
+//! Wallpaper state management with cycling and theming support.
+//!
+//! This crate tracks per-monitor wallpaper state; the shell renders it natively
+//! to layer-shell surfaces. No external wallpaper tool is involved.
 //!
 //! # Quick Start
 //!
@@ -48,21 +51,16 @@
 //!
 //! | Method | Effect |
 //! |--------|--------|
-//! | `transition(TransitionConfig)` | Animation when changing wallpapers |
 //! | `color_extractor(ColorExtractorConfig)` | Tool and parameters for extracting dominant colors |
 //! | `theming_monitor(Option<String>)` | Which monitor drives color extraction |
 //! | `shared_cycle(bool)` | Sync cycling across monitors in shuffle mode |
-//! | `engine_active(bool)` | Toggle awww rendering (state tracking continues) |
 //!
 //! ```rust,no_run
-//! use wayle_wallpaper::{WallpaperService, TransitionConfig, TransitionType};
+//! use wayle_wallpaper::WallpaperService;
 //!
 //! # async fn example() -> Result<(), wayle_wallpaper::Error> {
 //! let wp = WallpaperService::builder()
-//!     .transition(TransitionConfig {
-//!         transition_type: TransitionType::Left,
-//!         ..Default::default()
-//!     })
+//!     .shared_cycle(true)
 //!     .build()
 //!     .await?;
 //! # Ok(())
@@ -81,7 +79,6 @@
 //! |-------|------|-------------|
 //! | `cycling` | `Option<CyclingConfig>` | Active cycling state |
 //! | `monitors` | `HashMap<String, MonitorState>` | Per-monitor wallpaper and fit mode |
-//! | `transition` | [`TransitionConfig`] | Animation settings |
 //!
 //! # Control Methods
 //!
@@ -89,7 +86,6 @@
 //! - `start_cycling()` / `stop_cycling()` - Directory cycling
 //! - `advance_cycle()` / `rewind_cycle()` - Manual navigation
 //! - `set_fit_mode()` - Change scaling mode per monitor or globally
-//! - `set_transition()` - Configure animations
 //!
 //! # D-Bus Interface
 //!
@@ -101,7 +97,6 @@
 //!
 //! See [`dbus.md`](https://github.com/stubbedev/wayle-services/blob/master/wayle-wallpaper/dbus.md) for the full interface specification.
 
-mod backend;
 mod builder;
 mod dbus;
 pub mod error;
@@ -110,10 +105,6 @@ mod tasks;
 pub mod types;
 mod wayland;
 
-pub use backend::{
-    BezierCurve, Position, TransitionAngle, TransitionConfig, TransitionDuration, TransitionFps,
-    TransitionStep, TransitionType, WaveDimensions,
-};
 pub use builder::WallpaperServiceBuilder;
 pub use dbus::{SERVICE_NAME, SERVICE_PATH, WallpaperProxy};
 pub use error::Error;

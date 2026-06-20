@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use futures::{StreamExt, future::join_all};
+use futures::StreamExt;
 use tokio::{select, sync::mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
@@ -10,17 +10,12 @@ use super::{
     timer::CyclingTimer,
     watcher::{DirectoryChangeSender, DirectoryWatcher},
 };
-use crate::{
-    backend::{AwwwBackend, TransitionConfig},
-    types::{CyclingConfig, CyclingMode, MonitorState},
-};
+use crate::types::{CyclingConfig, CyclingMode, MonitorState};
 
 pub(crate) struct CyclingTask {
     cycling: Property<Option<CyclingConfig>>,
     monitors: Property<HashMap<String, MonitorState>>,
-    transition: Property<TransitionConfig>,
     shared_cycle: Property<bool>,
-    engine_active: Property<bool>,
 
     timer: CyclingTimer,
     directory_watcher: Option<DirectoryWatcher>,
@@ -34,18 +29,14 @@ impl CyclingTask {
     pub fn new(
         cycling: Property<Option<CyclingConfig>>,
         monitors: Property<HashMap<String, MonitorState>>,
-        transition: Property<TransitionConfig>,
         shared_cycle: Property<bool>,
-        engine_active: Property<bool>,
     ) -> Self {
         let (directory_change_sender, directory_change_receiver) = mpsc::unbounded_channel();
 
         Self {
             cycling,
             monitors,
-            transition,
             shared_cycle,
-            engine_active,
             timer: CyclingTimer::new(),
             directory_watcher: None,
             watched_directory: None,
@@ -149,8 +140,7 @@ impl CyclingTask {
             }
         }
 
-        self.monitors.set(monitors.clone());
-        self.apply_wallpapers(&config, &monitors).await;
+        self.monitors.set(monitors);
     }
 
     fn ensure_directory_watcher(&mut self, directory: &PathBuf) {
@@ -210,9 +200,8 @@ impl CyclingTask {
                 state.wallpaper = Some(path.clone());
             }
         }
-        self.monitors.set(monitors.clone());
+        self.monitors.set(monitors);
 
-        self.apply_wallpapers(&config, &monitors).await;
         self.timer.schedule(config.interval);
     }
 
@@ -225,44 +214,6 @@ impl CyclingTask {
             }
         }
 
-        self.monitors.set(monitors.clone());
-        self.apply_wallpapers(config, &monitors).await;
-    }
-
-    async fn apply_wallpapers(
-        &self,
-        config: &CyclingConfig,
-        monitors: &HashMap<String, MonitorState>,
-    ) {
-        if !self.engine_active.get() {
-            return;
-        }
-
-        let transition = self.transition.get();
-
-        let tasks: Vec<_> = monitors
-            .iter()
-            .filter_map(|(name, state)| {
-                config
-                    .image_at(state.cycle_index)
-                    .map(|path| (name, path, state.fit_mode))
-            })
-            .collect();
-
-        let results = join_all(tasks.iter().map(|(name, path, fit_mode)| {
-            AwwwBackend::apply(path, *fit_mode, Some(name.as_str()), &transition)
-        }))
-        .await;
-
-        for (result, (name, path, _)) in results.into_iter().zip(tasks.iter()) {
-            if let Err(err) = result {
-                warn!(
-                    error = %err,
-                    monitor = %name,
-                    path = %path.display(),
-                    "cannot apply wallpaper"
-                );
-            }
-        }
+        self.monitors.set(monitors);
     }
 }

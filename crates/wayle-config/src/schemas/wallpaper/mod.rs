@@ -3,7 +3,7 @@ mod types;
 use schemars::schema_for;
 pub use types::{
     CyclingInterval, CyclingMode, FitMode, MonitorWallpaperConfig, TransitionDuration,
-    TransitionFps, TransitionType,
+    WallpaperTransition,
 };
 use wayle_derive::wayle_config;
 
@@ -15,26 +15,21 @@ use crate::{
 /// Wallpaper rendering, cycling, and per-monitor overrides.
 #[wayle_config(i18n_prefix = "settings-wallpaper")]
 pub struct WallpaperConfig {
-    /// Enable the awww wallpaper engine. Disable to use an external wallpaper
-    /// tool while keeping color extraction and theming.
-    #[serde(rename = "engine-enabled")]
-    #[default(true)]
-    pub engine_enabled: ConfigProperty<bool>,
+    /// A single image file to use as the wallpaper on all monitors. Leave empty
+    /// to use cycling and/or per-monitor overrides instead.
+    #[serde(rename = "wallpaper")]
+    #[default(String::new())]
+    pub wallpaper: ConfigProperty<String>,
 
-    /// Transition animation type.
-    #[serde(rename = "transition-type")]
-    #[default(TransitionType::Simple)]
-    pub transition_type: ConfigProperty<TransitionType>,
+    /// Animation used when the wallpaper changes (crossfade or none).
+    #[serde(rename = "transition")]
+    #[default(WallpaperTransition::Crossfade)]
+    pub transition: ConfigProperty<WallpaperTransition>,
 
     /// Transition animation duration in seconds.
     #[serde(rename = "transition-duration")]
     #[default(TransitionDuration::DEFAULT)]
     pub transition_duration: ConfigProperty<TransitionDuration>,
-
-    /// Transition animation frame rate.
-    #[serde(rename = "transition-fps")]
-    #[default(TransitionFps::DEFAULT)]
-    pub transition_fps: ConfigProperty<TransitionFps>,
 
     /// Enable automatic wallpaper cycling.
     #[serde(rename = "cycling-enabled")]

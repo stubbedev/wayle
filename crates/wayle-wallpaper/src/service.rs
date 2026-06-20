@@ -1,19 +1,15 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use derive_more::Debug;
-use futures::{
-    future::try_join_all,
-    stream::{Stream, StreamExt},
-};
+use futures::stream::{Stream, StreamExt};
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, instrument, warn};
+use tracing::{info, instrument};
 use wayle_core::Property;
 use zbus::Connection;
 
 use crate::{
-    backend::{AwwwBackend, TransitionConfig, wait_for_daemon},
     builder::WallpaperServiceBuilder,
     error::Error,
     types::{ColorExtractorConfig, CyclingConfig, CyclingMode, FitMode, MonitorState},
@@ -39,18 +35,11 @@ pub struct WallpaperService {
     pub monitors: Property<HashMap<String, MonitorState>>,
     /// Tool for extracting color palettes from wallpapers.
     pub color_extractor: Property<ColorExtractorConfig>,
-    /// Animation settings for wallpaper transitions.
-    pub transition: Property<TransitionConfig>,
     /// Synchronize cycling across all monitors in shuffle mode.
     ///
     /// When `true`, all monitors show the same image during shuffle cycling.
     /// Sequential mode always shows the same image regardless of this setting.
     pub shared_cycle: Property<bool>,
-    /// Whether the awww wallpaper engine is active.
-    ///
-    /// When `false`, all state tracking and color extraction continue but
-    /// awww commands are skipped.
-    pub engine_active: Property<bool>,
 }
 
 impl WallpaperService {
@@ -91,33 +80,18 @@ impl WallpaperService {
     ///
     /// # Errors
     ///
-    /// Returns error if the image file does not exist, awww is not installed,
-    /// or the awww daemon is not running.
+    /// Returns [`Error::ImageNotFound`] if the image file does not exist.
     #[instrument(skip(self), fields(path = %path.display(), monitor))]
     pub async fn set_wallpaper(&self, path: PathBuf, monitor: Option<&str>) -> Result<(), Error> {
         if !path.exists() {
             return Err(Error::ImageNotFound(path));
         }
 
+        // Updating the reactive `monitors` state is all that's needed; the
+        // shell renders wallpapers natively by watching this property.
         match monitor {
-            Some(name) => {
-                self.store_wallpaper(name, path.clone());
-
-                if self.engine_active.get() {
-                    let fit_mode = self
-                        .monitors
-                        .get()
-                        .get(name)
-                        .map(|s| s.fit_mode)
-                        .unwrap_or_default();
-                    let transition = self.transition.get();
-                    AwwwBackend::apply(&path, fit_mode, Some(name), &transition).await?;
-                }
-            }
-            None => {
-                self.store_wallpaper_all(path.clone());
-                self.rerender_all().await?;
-            }
+            Some(name) => self.store_wallpaper(name, path),
+            None => self.store_wallpaper_all(path),
         }
 
         Ok(())
@@ -136,7 +110,7 @@ impl WallpaperService {
     ///
     /// # Errors
     ///
-    /// Returns error if awww fails to apply wallpapers.
+    /// Infallible today; returns `Result` for API stability.
     #[instrument(skip(self), fields(mode = %mode, monitor))]
     pub async fn set_fit_mode(&self, mode: FitMode, monitor: Option<&str>) -> Result<(), Error> {
         let mut monitors = self.monitors.get();
@@ -147,24 +121,14 @@ impl WallpaperService {
                     return Ok(());
                 };
                 state.fit_mode = mode;
-                let path = state.wallpaper.clone();
-                self.monitors.set(monitors);
-
-                if self.engine_active.get()
-                    && let Some(path) = path
-                {
-                    let transition = self.transition.get();
-                    AwwwBackend::apply(&path, mode, Some(name), &transition).await?;
-                }
             }
             None => {
                 for state in monitors.values_mut() {
                     state.fit_mode = mode;
                 }
-                self.monitors.set(monitors);
-                self.rerender_all().await?;
             }
         }
+        self.monitors.set(monitors);
 
         Ok(())
     }
@@ -177,8 +141,7 @@ impl WallpaperService {
     ///
     /// # Errors
     ///
-    /// Returns error if the directory doesn't exist, contains no valid images,
-    /// or awww fails to apply wallpapers.
+    /// Returns error if the directory doesn't exist or contains no valid images.
     #[instrument(skip(self), fields(dir = %directory.display()))]
     pub fn start_cycling(
         &self,
@@ -218,7 +181,7 @@ impl WallpaperService {
     ///
     /// # Errors
     ///
-    /// Returns error if awww fails to apply wallpapers.
+    /// Infallible today; returns `Result` for API stability.
     #[instrument(skip(self))]
     pub async fn advance_cycle(&self) -> Result<(), Error> {
         let Some(config) = self.cycling.get() else {
@@ -245,7 +208,7 @@ impl WallpaperService {
     ///
     /// # Errors
     ///
-    /// Returns error if awww fails to apply wallpapers.
+    /// Infallible today; returns `Result` for API stability.
     #[instrument(skip(self))]
     pub async fn rewind_cycle(&self) -> Result<(), Error> {
         let Some(config) = self.cycling.get() else {
@@ -355,72 +318,22 @@ impl WallpaperService {
         }
     }
 
-    /// Sets the transition animation configuration.
-    #[instrument(skip(self))]
-    pub fn set_transition(&self, transition: TransitionConfig) {
-        self.transition.set(transition);
-    }
-
-    /// Renders the current cycle wallpaper to each monitor.
+    /// Stores the current cycle image as each monitor's wallpaper.
+    ///
+    /// Mutating the reactive `monitors` state is enough — the shell renders the
+    /// new image by watching the property.
     async fn render_cycle(&self) -> Result<(), Error> {
         let Some(config) = self.cycling.get() else {
             return Ok(());
         };
 
         let mut monitors = self.monitors.get();
-        let mut to_apply = Vec::new();
-
-        for (monitor_name, state) in monitors.iter_mut() {
-            let Some(path) = config.image_at(state.cycle_index) else {
-                continue;
-            };
-            state.wallpaper = Some(path.clone());
-            to_apply.push((monitor_name.clone(), path, state.fit_mode));
-        }
-
-        self.monitors.set(monitors);
-
-        if self.engine_active.get() {
-            let transition = self.transition.get();
-            let futures = to_apply.iter().map(|(name, path, fit_mode)| {
-                AwwwBackend::apply(path, *fit_mode, Some(name.as_str()), &transition)
-            });
-            try_join_all(futures).await?;
-        }
-
-        Ok(())
-    }
-
-    /// Renders all monitors' wallpapers in a background task.
-    ///
-    /// State must already be updated via `monitors.set()` before calling this.
-    /// Only the awww rendering runs in the background. Waits for the daemon
-    /// startup thread to signal readiness before attempting the render.
-    pub fn render_all_background(self: &Arc<Self>) {
-        let service = Arc::clone(self);
-        tokio::spawn(async move {
-            wait_for_daemon().await;
-            if let Err(e) = service.rerender_all().await {
-                warn!(error = %e, "background wallpaper render failed");
+        for state in monitors.values_mut() {
+            if let Some(path) = config.image_at(state.cycle_index) {
+                state.wallpaper = Some(path.clone());
             }
-        });
-    }
-
-    /// Re-renders all monitors with their current wallpaper.
-    async fn rerender_all(&self) -> Result<(), Error> {
-        if !self.engine_active.get() {
-            return Ok(());
         }
-
-        let monitors = self.monitors.get();
-        let transition = self.transition.get();
-
-        let futures = monitors.iter().filter_map(|(name, state)| {
-            state.wallpaper.as_ref().map(|path| {
-                AwwwBackend::apply(path, state.fit_mode, Some(name.as_str()), &transition)
-            })
-        });
-        try_join_all(futures).await?;
+        self.monitors.set(monitors);
 
         Ok(())
     }

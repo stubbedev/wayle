@@ -1,20 +1,17 @@
 ### Wayle Configuration - Wallpaper Settings
 
-## Engine
+## Wallpaper
 
-settings-wallpaper-engine-enabled = Wallpaper Engine
-    .description = Enable wayle's built-in wallpaper engine (disable to use hyprpaper, swaybg, etc.)
+settings-wallpaper-wallpaper = Wallpaper Image
+    .description = A single image file to use on all monitors (leave empty for cycling / per-monitor)
 
 ## Transition
 
-settings-wallpaper-transition-type = Transition Type
-    .description = Animation type when changing wallpapers
+settings-wallpaper-transition = Transition
+    .description = Animation when the wallpaper changes (crossfade or none)
 
 settings-wallpaper-transition-duration = Transition Duration
     .description = Animation duration in seconds
-
-settings-wallpaper-transition-fps = Transition FPS
-    .description = Animation frame rate
 
 ## Cycling
 
@@ -43,21 +40,9 @@ enum-fit-mode-fit = Fit
 enum-fit-mode-center = Center
 enum-fit-mode-stretch = Stretch
 
-## TransitionType variants
-enum-transition-type-none = None
-enum-transition-type-simple = Simple
-enum-transition-type-fade = Fade
-enum-transition-type-left = Left
-enum-transition-type-right = Right
-enum-transition-type-top = Top
-enum-transition-type-bottom = Bottom
-enum-transition-type-wipe = Wipe
-enum-transition-type-wave = Wave
-enum-transition-type-grow = Grow
-enum-transition-type-center = Center
-enum-transition-type-outer = Outer
-enum-transition-type-any = Any
-enum-transition-type-random = Random
+## WallpaperTransition variants
+enum-wallpaper-transition-crossfade = Crossfade
+enum-wallpaper-transition-none = None
 
 ## CyclingMode variants
 enum-cycling-mode-sequential = Sequential

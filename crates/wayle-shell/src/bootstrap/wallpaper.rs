@@ -7,10 +7,7 @@ use std::{
 
 use tracing::{debug, warn};
 use wayle_config::schemas::wallpaper::MonitorWallpaperConfig;
-use wayle_wallpaper::{
-    ColorExtractorConfig, MonitorState, TransitionConfig, TransitionDuration, TransitionFps,
-    WallpaperService,
-};
+use wayle_wallpaper::{ColorExtractorConfig, MonitorState, WallpaperService};
 
 use crate::wallpaper_map;
 
@@ -19,37 +16,44 @@ pub(super) async fn build_wallpaper_service(
     theming_monitor: Option<String>,
     color_extractor: ColorExtractorConfig,
 ) -> Result<Arc<WallpaperService>, wayle_wallpaper::Error> {
-    let transition = TransitionConfig {
-        transition_type: wallpaper_map::transition_type(cfg.transition_type.get()),
-        duration: TransitionDuration(cfg.transition_duration.get().value()),
-        fps: TransitionFps(cfg.transition_fps.get().value()),
-        step: None,
-    };
-
     let t = Instant::now();
     let service = WallpaperService::builder()
-        .transition(transition)
         .theming_monitor(theming_monitor)
         .color_extractor(color_extractor)
         .shared_cycle(cfg.cycling_same_image.get())
-        .engine_active(cfg.engine_enabled.get())
         .build()
         .await?;
     debug!(elapsed_ms = t.elapsed().as_millis(), "Service built");
 
-    let has_monitor_wallpapers = apply_monitor_config(&service, cfg);
+    // Resolution order: cycling (if enabled) → else the global single file.
+    // Per-monitor overrides apply on top regardless. The shell renders natively
+    // by watching the service's `monitors` state; no external tool is spawned.
+    let cycling_started = start_cycling_from_config(&service, cfg);
+    if !cycling_started {
+        apply_single_file(&service, cfg).await;
+    }
+
+    apply_monitor_config(&service, cfg);
     debug!(
         elapsed_ms = t.elapsed().as_millis(),
         "Monitor config applied"
     );
 
-    let cycling_started = start_cycling_from_config(&service, cfg);
-
-    if has_monitor_wallpapers && !cycling_started {
-        service.render_all_background();
-    }
-
     Ok(service)
+}
+
+/// Applies the global single image file to all monitors, if configured.
+async fn apply_single_file(
+    service: &Arc<WallpaperService>,
+    cfg: &wayle_config::schemas::wallpaper::WallpaperConfig,
+) {
+    let path = cfg.wallpaper.get();
+    if path.is_empty() {
+        return;
+    }
+    if let Err(e) = service.set_wallpaper(PathBuf::from(path), None).await {
+        warn!(error = %e, "cannot apply single-file wallpaper from config");
+    }
 }
 
 fn start_cycling_from_config(

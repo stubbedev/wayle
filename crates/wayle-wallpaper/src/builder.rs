@@ -8,7 +8,6 @@ use wayle_traits::ServiceMonitoring;
 use zbus::Connection;
 
 use crate::{
-    backend::{TransitionConfig, spawn_daemon_if_needed},
     dbus::{self, SERVICE_NAME},
     error::Error,
     service::WallpaperService,
@@ -20,20 +19,16 @@ use crate::{
 #[derive(Debug)]
 pub struct WallpaperServiceBuilder {
     color_extractor: ColorExtractorConfig,
-    transition: TransitionConfig,
     theming_monitor: Option<String>,
     shared_cycle: bool,
-    engine_active: bool,
 }
 
 impl Default for WallpaperServiceBuilder {
     fn default() -> Self {
         Self {
             color_extractor: ColorExtractorConfig::default(),
-            transition: TransitionConfig::default(),
             theming_monitor: None,
             shared_cycle: false,
-            engine_active: true,
         }
     }
 }
@@ -52,7 +47,6 @@ impl WallpaperServiceBuilder {
     #[allow(clippy::cognitive_complexity)]
     pub async fn build(self) -> Result<Arc<WallpaperService>, Error> {
         let start = Instant::now();
-        self.spawn_daemon_if_enabled();
 
         let connection = Self::connect_session_bus().await?;
         debug!(elapsed_ms = start.elapsed().as_millis(), "D-Bus connected");
@@ -78,12 +72,6 @@ impl WallpaperServiceBuilder {
         self
     }
 
-    /// Sets the transition animation configuration.
-    pub fn transition(mut self, transition: TransitionConfig) -> Self {
-        self.transition = transition;
-        self
-    }
-
     /// Sets which monitor's wallpaper drives color extraction.
     pub fn theming_monitor(mut self, monitor: Option<String>) -> Self {
         self.theming_monitor = monitor;
@@ -94,18 +82,6 @@ impl WallpaperServiceBuilder {
     pub fn shared_cycle(mut self, shared: bool) -> Self {
         self.shared_cycle = shared;
         self
-    }
-
-    /// Enables or disables the awww wallpaper engine.
-    pub fn engine_active(mut self, active: bool) -> Self {
-        self.engine_active = active;
-        self
-    }
-
-    fn spawn_daemon_if_enabled(&self) {
-        if self.engine_active {
-            spawn_daemon_if_needed();
-        }
     }
 
     async fn connect_session_bus() -> Result<Connection, Error> {
@@ -127,9 +103,7 @@ impl WallpaperServiceBuilder {
             cycling: Property::new(None),
             monitors: Property::new(HashMap::new()),
             color_extractor: Property::new(self.color_extractor),
-            transition: Property::new(self.transition),
             shared_cycle: Property::new(self.shared_cycle),
-            engine_active: Property::new(self.engine_active),
         })
     }
 
