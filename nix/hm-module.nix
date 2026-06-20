@@ -96,6 +96,25 @@ in
         description = "Systemd target the wayle user service binds to.";
       };
     };
+
+    portal = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Install wayle as an xdg-desktop-portal backend at the user level: the
+          `.portal` interface declaration, the D-Bus activation file, a
+          `xdg-desktop-portal-wayle` user service, and a generic
+          `portals.conf` routing wayle's interfaces (delegating the file/print/
+          account dialogs to xdg-desktop-portal-gtk, which must be installed).
+
+          Off by default: on NixOS use the system module's
+          `programs.wayle.portal.enable` instead (it routes via
+          `xdg.portal.config` without writing a generic `portals.conf`). Enable
+          this for non-NixOS / standalone home-manager setups.
+        '';
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -130,6 +149,42 @@ in
         Slice = "session.slice";
       };
       Install.WantedBy = [ cfg.systemd.target ];
+    };
+
+    # User-level xdg-desktop-portal backend: discovery (.portal), D-Bus
+    # activation, routing, and the activated service. The frontend reads these
+    # from $XDG_DATA_HOME / $XDG_CONFIG_HOME. Per-key form so these merge with
+    # the `wayle/config.toml` entry above.
+    xdg.dataFile."xdg-desktop-portal/portals/wayle.portal" = lib.mkIf cfg.portal.enable {
+      source = "${cfg.package}/share/xdg-desktop-portal/portals/wayle.portal";
+    };
+    xdg.dataFile."dbus-1/services/org.freedesktop.impl.portal.desktop.wayle.service" =
+      lib.mkIf cfg.portal.enable {
+        source = "${cfg.package}/share/dbus-1/services/org.freedesktop.impl.portal.desktop.wayle.service";
+      };
+    # Generic fallback config (read when no <desktop>-portals.conf matches).
+    xdg.configFile."xdg-desktop-portal/portals.conf" = lib.mkIf cfg.portal.enable {
+      source = "${cfg.package}/share/wayle/wayle-portals.conf";
+    };
+
+    systemd.user.services.xdg-desktop-portal-wayle = lib.mkIf cfg.portal.enable {
+      Unit = {
+        Description = "Wayle xdg-desktop-portal backend";
+        PartOf = [ cfg.systemd.target ];
+        After = [
+          cfg.systemd.target
+          "xdg-desktop-portal.service"
+        ];
+      };
+      # D-Bus-activated by the frontend via the .portal's DBusName; no WantedBy.
+      Service = {
+        Type = "dbus";
+        BusName = "org.freedesktop.impl.portal.desktop.wayle";
+        ExecStart = "${lib.getExe cfg.package} portal";
+        Restart = "on-failure";
+        RestartSec = 3;
+        Slice = "session.slice";
+      };
     };
   };
 }
