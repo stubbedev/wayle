@@ -8,6 +8,7 @@
 //! never silently rewrites it.
 
 mod cameras;
+mod microphones;
 mod row;
 
 use relm4::{
@@ -15,7 +16,7 @@ use relm4::{
     gtk::{glib::SignalHandlerId, prelude::*},
     prelude::*,
 };
-pub(crate) use row::webcam_device_select;
+pub(crate) use row::{microphone_device_select, webcam_device_select};
 use wayle_config::ConfigProperty;
 use wayle_widgets::prelude::ellipsizing_string_factory;
 
@@ -45,6 +46,8 @@ pub(crate) struct DeviceSelectControl {
 pub(crate) enum DeviceSelectMsg {
     Selected(u32),
     Refresh,
+    /// Replace the option list (e.g. devices fetched asynchronously after init).
+    SetChoices(Vec<DeviceChoice>),
 }
 
 impl SimpleComponent for DeviceSelectControl {
@@ -127,6 +130,27 @@ impl SimpleComponent for DeviceSelectControl {
                 self.dropdown.block_signal(&self.handler_id);
                 self.dropdown.set_selected(index);
                 self.dropdown.unblock_signal(&self.handler_id);
+            }
+            DeviceSelectMsg::SetChoices(mut choices) => {
+                let current = self.property.get();
+                // Preserve a configured-but-undetected value as its own entry.
+                if !current.is_empty() && !choices.iter().any(|c| c.id == current) {
+                    choices.push(DeviceChoice {
+                        id: current.clone(),
+                        label: current.clone(),
+                    });
+                }
+
+                let labels: Vec<&str> = choices.iter().map(|c| c.label.as_str()).collect();
+                let string_list = gtk::StringList::new(&labels);
+                let index = index_of(&choices, &current);
+
+                self.dropdown.block_signal(&self.handler_id);
+                self.dropdown.set_model(Some(&string_list));
+                self.dropdown.set_selected(index);
+                self.dropdown.unblock_signal(&self.handler_id);
+
+                self.choices = choices;
             }
         }
     }

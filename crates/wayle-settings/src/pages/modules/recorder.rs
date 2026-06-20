@@ -4,7 +4,9 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        device_select::webcam_device_select, enum_select::enum_select, icon::icon,
+        device_select::{microphone_device_select, webcam_device_select},
+        enum_select::enum_select,
+        icon::icon,
         number::number_u32_range, slider::percentage, text::text, toggle::toggle,
     },
     pages::{
@@ -66,7 +68,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         toggle(&module.system_audio),
                         toggle(&module.microphone),
-                        text(&module.microphone_device),
+                        microphone_device_select(&module.microphone_device),
                         toggle(&module.separate_audio_tracks),
                     ],
                 },

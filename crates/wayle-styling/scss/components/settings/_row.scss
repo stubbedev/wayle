@@ -48,6 +48,17 @@
     border-spacing: var(--space-xs);
 }
 
+.file-picker button.icon {
+    padding: var(--space-xs) var(--space-sm);
+    min-height: 0;
+    border: 1px solid var(--border-default);
+}
+
+.file-picker button.icon > image {
+    margin: 0;
+    -gtk-icon-size: var(--icon-sm);
+}
+
 .setting-reset {
     margin-left: var(--space-sm);
     margin-right: var(--space-sm);
