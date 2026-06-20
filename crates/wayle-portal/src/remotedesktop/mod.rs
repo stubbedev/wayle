@@ -21,11 +21,15 @@ use std::{
 use tracing::{debug, error, warn};
 use zbus::{
     Connection, interface,
-    zvariant::{OwnedObjectPath, OwnedValue, Value},
+    zvariant::{OwnedObjectPath, OwnedValue},
 };
 
 use self::input::{InputCommand, VirtualInput};
-use crate::{response::Response, session};
+use crate::{
+    dbus_util::{opt_u32, owned},
+    response::Response,
+    session,
+};
 
 /// Device-type bitmask values (match the portal spec).
 const DEVICE_KEYBOARD: u32 = 1;
@@ -116,10 +120,7 @@ impl RemoteDesktop {
         _app_id: String,
         options: HashMap<String, OwnedValue>,
     ) -> (u32, HashMap<String, OwnedValue>) {
-        let requested = options
-            .get("types")
-            .and_then(|v| u32::try_from(v).ok())
-            .unwrap_or(DEVICE_KEYBOARD | DEVICE_POINTER);
+        let requested = opt_u32(&options, "types").unwrap_or(DEVICE_KEYBOARD | DEVICE_POINTER);
         self.sessions.update(&session_handle, |config| {
             config.device_types = requested;
         });
@@ -155,7 +156,7 @@ impl RemoteDesktop {
         }
 
         let mut results = HashMap::new();
-        if let Ok(devices) = OwnedValue::try_from(Value::from(granted)) {
+        if let Some(devices) = owned(granted) {
             results.insert("devices".to_owned(), devices);
         }
         (Response::Success.code(), results)

@@ -150,21 +150,23 @@ fn run_loop_inner(
                 return;
             };
             match capturer.borrow_mut().capture() {
-                Ok(frame) => match frame.get_bytes() {
-                    Ok(bytes) => {
-                        let stride = frame.stride as usize;
-                        let size = bytes.len();
-                        if let Some(dst) = data.data() {
-                            let n = dst.len().min(size);
-                            dst[..n].copy_from_slice(&bytes[..n]);
+                Ok(frame) => {
+                    let stride = frame.stride as usize;
+                    let Some(dst) = data.data() else {
+                        return;
+                    };
+                    // Read the captured frame straight into the mapped PipeWire
+                    // buffer — no per-frame heap allocation, one copy.
+                    match frame.read_into(dst) {
+                        Ok(written) => {
+                            let chunk = data.chunk_mut();
+                            *chunk.offset_mut() = 0;
+                            *chunk.stride_mut() = stride as i32;
+                            *chunk.size_mut() = written as u32;
                         }
-                        let chunk = data.chunk_mut();
-                        *chunk.offset_mut() = 0;
-                        *chunk.stride_mut() = stride as i32;
-                        *chunk.size_mut() = size as u32;
+                        Err(err) => warn!(%err, "screencast: reading frame bytes failed"),
                     }
-                    Err(err) => warn!(%err, "screencast: reading frame bytes failed"),
-                },
+                }
                 Err(err) => debug!(%err, "screencast: frame capture failed (skipped)"),
             }
         }
@@ -175,7 +177,7 @@ fn run_loop_inner(
         .state_changed(|_, _, old, new| {
             debug!(?old, ?new, "screencast stream state changed");
         })
-        .process(move |stream, ()| produce(stream))
+        .process(move |stream, _user_data| produce(stream))
         .register()
         .map_err(|e| format!("pipewire listener: {e}"))?;
 

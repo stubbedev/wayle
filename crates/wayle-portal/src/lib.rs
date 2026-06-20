@@ -16,6 +16,7 @@
 //! Wallpaper, Access). The generic GTK-dialog interfaces (FileChooser, Print,
 //! …) are delegated to `xdg-desktop-portal-gtk` via `portals.conf`.
 
+mod dbus_util;
 mod error;
 mod globalshortcuts;
 mod inhibit;
@@ -90,8 +91,10 @@ pub async fn run() -> Result<(), Error> {
         .at(path, GlobalShortcuts::new(connection.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
+    let notification = Notification::new(connection.clone());
+    notification.spawn_action_forwarder();
     server
-        .at(path, Notification::new(connection.clone()))
+        .at(path, notification)
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
     server

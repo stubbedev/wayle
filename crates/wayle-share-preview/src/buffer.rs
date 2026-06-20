@@ -79,6 +79,28 @@ impl Buffer {
         Ok(bytes)
     }
 
+    /// Read the frame straight into a caller-provided buffer, returning the
+    /// number of bytes read. Avoids the per-call [`Vec`] allocation of
+    /// [`get_bytes`](Self::get_bytes) — used by the continuous capture path
+    /// (e.g. the portal's PipeWire producer) where a destination buffer already
+    /// exists and is reused every frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::BufferRead`] if reading the backing memfd fails.
+    pub fn read_into(&self, dst: &mut [u8]) -> Result<usize, Error> {
+        let mut file = self.fd.as_file();
+        let mut written = 0;
+        while written < dst.len() {
+            match file.read(&mut dst[written..]) {
+                Ok(0) => break,
+                Ok(n) => written += n,
+                Err(err) => return Err(Error::BufferRead(err)),
+            }
+        }
+        Ok(written)
+    }
+
     /// clear the wayland buffer and remove the temporary file
     ///
     /// should only be called after [`get_bytes`] since all data gets deleted by this function

@@ -24,7 +24,7 @@ use zbus::{
 };
 
 use self::manager::{GsHandle, ShortcutEvent};
-use crate::{response::Response, session, settings::PORTAL_PATH};
+use crate::{dbus_util::opt_string, response::Response, session, settings::PORTAL_PATH};
 
 /// A bound shortcut: its id and the properties echoed back to the app.
 type Shortcut = (String, HashMap<String, OwnedValue>);
@@ -177,8 +177,8 @@ impl GlobalShortcuts {
         if available && let Ok(guard) = self.handle.lock() && let Some(handle) = guard.as_ref() {
             for (id, props) in &shortcuts {
                 let key = route_key(&session.app_id, id);
-                let description = str_prop(props, "description").unwrap_or_default();
-                let trigger = str_prop(props, "preferred_trigger").unwrap_or_default();
+                let description = opt_string(props, "description").unwrap_or_default();
+                let trigger = opt_string(props, "preferred_trigger").unwrap_or_default();
                 handle.register(key.clone(), id, &session.app_id, &description, &trigger);
                 if let Ok(mut map) = self.routes.lock() {
                     map.insert(key, (session_handle.clone(), id.clone()));
@@ -235,13 +235,6 @@ impl GlobalShortcuts {
 /// Registration key tying a compositor shortcut to a session route.
 fn route_key(app_id: &str, id: &str) -> String {
     format!("{app_id}\u{1f}{id}")
-}
-
-/// Reads a string property from a shortcut's vardict.
-fn str_prop(props: &HashMap<String, OwnedValue>, key: &str) -> Option<String> {
-    props
-        .get(key)
-        .and_then(|value| String::try_from(value.try_clone().ok()?).ok())
 }
 
 /// Encodes shortcuts as the `a(sa{sv})` results value.

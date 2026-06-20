@@ -12,10 +12,13 @@ use tracing::warn;
 use wayle_ipc::screenshot::ScreenshotProxy;
 use zbus::{
     Connection, interface,
-    zvariant::{OwnedObjectPath, OwnedValue, Value},
+    zvariant::{OwnedObjectPath, OwnedValue},
 };
 
-use crate::response::Response;
+use crate::{
+    dbus_util::{opt_bool, owned},
+    response::Response,
+};
 
 /// Screenshot portal interface.
 pub struct Screenshot {
@@ -56,26 +59,20 @@ impl Screenshot {
         _parent_window: String,
         options: HashMap<String, OwnedValue>,
     ) -> (u32, HashMap<String, OwnedValue>) {
-        let interactive = options
-            .get("interactive")
-            .and_then(|v| bool::try_from(v).ok())
-            .unwrap_or(false);
+        let interactive = opt_bool(&options, "interactive").unwrap_or(false);
         let mode = screenshot_mode(interactive);
 
         let Some(proxy) = self.proxy().await else {
             return (Response::Other.code(), HashMap::new());
         };
         match proxy.capture(mode, "").await {
-            Ok(path) if !path.is_empty() => {
-                let mut results = HashMap::new();
-                match OwnedValue::try_from(Value::from(path_to_uri(&path))) {
-                    Ok(uri) => {
-                        results.insert("uri".to_owned(), uri);
-                        (Response::Success.code(), results)
-                    }
-                    Err(_) => (Response::Other.code(), HashMap::new()),
-                }
-            }
+            Ok(path) if !path.is_empty() => match owned(path_to_uri(&path)) {
+                Some(uri) => (
+                    Response::Success.code(),
+                    HashMap::from([("uri".to_owned(), uri)]),
+                ),
+                None => (Response::Other.code(), HashMap::new()),
+            },
             // Empty path = the user cancelled the selection.
             Ok(_) => (Response::Cancelled.code(), HashMap::new()),
             Err(err) => {
@@ -97,16 +94,13 @@ impl Screenshot {
             return (Response::Other.code(), HashMap::new());
         };
         match proxy.pick_color().await {
-            Ok((r, g, b)) => {
-                let mut results = HashMap::new();
-                match OwnedValue::try_from(Value::from((r, g, b))) {
-                    Ok(color) => {
-                        results.insert("color".to_owned(), color);
-                        (Response::Success.code(), results)
-                    }
-                    Err(_) => (Response::Other.code(), HashMap::new()),
-                }
-            }
+            Ok((r, g, b)) => match owned((r, g, b)) {
+                Some(color) => (
+                    Response::Success.code(),
+                    HashMap::from([("color".to_owned(), color)]),
+                ),
+                None => (Response::Other.code(), HashMap::new()),
+            },
             Err(err) => {
                 warn!(%err, "screenshot: color pick failed/cancelled");
                 (Response::Cancelled.code(), HashMap::new())

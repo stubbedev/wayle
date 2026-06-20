@@ -32,7 +32,11 @@ use zbus::{
 use self::source::{CaptureTarget, PickerSelection, SourceType, parse_picker_reply};
 #[cfg(feature = "pipewire")]
 use self::pipewire::StreamHandle;
-use crate::{response::Response, session};
+use crate::{
+    dbus_util::{Vardict, opt_bool, opt_u32, owned},
+    response::Response,
+    session,
+};
 
 /// Default capture frame rate.
 const DEFAULT_FPS: u32 = 30;
@@ -150,9 +154,9 @@ impl ScreenCast {
         _app_id: String,
         options: HashMap<String, OwnedValue>,
     ) -> (u32, HashMap<String, OwnedValue>) {
-        let cursor_mode = get_u32(&options, "cursor_mode").unwrap_or(1);
-        let multiple = get_bool(&options, "multiple").unwrap_or(false);
-        let persist_mode = get_u32(&options, "persist_mode").unwrap_or(0);
+        let cursor_mode = opt_u32(&options, "cursor_mode").unwrap_or(1);
+        let multiple = opt_bool(&options, "multiple").unwrap_or(false);
+        let persist_mode = opt_u32(&options, "persist_mode").unwrap_or(0);
         let restore_target = options
             .get("restore_data")
             .and_then(|value| restore::decode(value));
@@ -214,7 +218,7 @@ impl ScreenCast {
             && let Ok(restore_data) = restore::encode(&selection.target)
         {
             results.insert("restore_data".to_owned(), restore_data);
-            if let Ok(mode) = OwnedValue::try_from(Value::from(config.persist_mode)) {
+            if let Some(mode) = owned(config.persist_mode) {
                 results.insert("persist_mode".to_owned(), mode);
             }
         }
@@ -277,19 +281,6 @@ fn build_streams_value(stream: &StreamInfo) -> Result<OwnedValue, zbus::zvariant
     );
     props.insert("size".to_owned(), OwnedValue::try_from(Value::from(size))?);
 
-    let streams: Vec<(u32, HashMap<String, OwnedValue>)> = vec![(stream.node_id, props)];
+    let streams: Vec<(u32, Vardict)> = vec![(stream.node_id, props)];
     OwnedValue::try_from(Value::from(streams))
-}
-
-/// Reads a `u32` option, accepting `u32`/`i32`/`u64` encodings.
-fn get_u32(options: &HashMap<String, OwnedValue>, key: &str) -> Option<u32> {
-    let value = options.get(key)?;
-    u32::try_from(value)
-        .ok()
-        .or_else(|| u64::try_from(value).ok().and_then(|v| u32::try_from(v).ok()))
-}
-
-/// Reads a `bool` option.
-fn get_bool(options: &HashMap<String, OwnedValue>, key: &str) -> Option<bool> {
-    bool::try_from(options.get(key)?).ok()
 }
