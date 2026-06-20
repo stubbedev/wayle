@@ -5343,6 +5343,7 @@ dependencies = [
  "wayle-media",
  "wayle-network",
  "wayle-notification",
+ "wayle-portal",
  "wayle-power-profiles",
  "wayle-shell",
  "wayle-styling",
@@ -5656,6 +5657,18 @@ dependencies = [
  "wayle-core",
  "wayle-traits",
  "wildcard",
+ "zbus",
+]
+
+[[package]]
+name = "wayle-portal"
+version = "0.7.13"
+dependencies = [
+ "futures",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "wayle-config",
  "zbus",
 ]
 

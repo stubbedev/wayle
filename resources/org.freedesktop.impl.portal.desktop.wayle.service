@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.freedesktop.impl.portal.desktop.wayle
+Exec=/usr/bin/wayle portal
+SystemdService=xdg-desktop-portal-wayle.service

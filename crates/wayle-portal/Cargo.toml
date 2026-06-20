@@ -1,0 +1,32 @@
+[package]
+name = "wayle-portal"
+description = "xdg-desktop-portal backend (org.freedesktop.impl.portal.*) for the Wayle shell"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+futures.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+zbus.workspace = true
+wayle-config.workspace = true
+
+[lints.clippy]
+cognitive_complexity = "warn"
+expect_used = "deny"
+inefficient_to_string = "warn"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+needless_pass_by_value = "warn"
+semicolon_if_nothing_returned = "warn"
+unnecessary_wraps = "warn"
+unused_async = "warn"
+unused_self = "warn"
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "allow"

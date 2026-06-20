@@ -25,6 +25,7 @@ fn main() {
         // The portal reads the selection from stdout, so this path must not
         // initialize stdout tracing — run it in its own minimal runtime.
         Commands::SharePicker { allow_token } => return run_share_picker(allow_token),
+        Commands::Portal => return run_portal(),
         _ => {}
     }
 
@@ -74,7 +75,10 @@ fn main() {
                 )
                 .await
             }
-            Commands::Shell | Commands::Completions { .. } | Commands::SharePicker { .. } => {
+            Commands::Shell
+            | Commands::Completions { .. }
+            | Commands::SharePicker { .. }
+            | Commands::Portal => {
                 unreachable!()
             }
         }
@@ -101,5 +105,19 @@ fn run_share_picker(allow_token: bool) {
         process::exit(1);
     };
     let code = runtime.block_on(cli::share_picker::execute(allow_token));
+    process::exit(code);
+}
+
+/// Runs the xdg-desktop-portal backend in a dedicated runtime, then exits with
+/// its status code. The backend blocks until terminated.
+fn run_portal() {
+    let Ok(runtime) = Runtime::new() else {
+        eprintln!("Failed to create tokio runtime");
+        process::exit(1);
+    };
+    if let Err(err) = tracing_init::init_cli_mode() {
+        eprintln!("Failed to initialize tracing: {err}");
+    }
+    let code = runtime.block_on(cli::portal::execute());
     process::exit(code);
 }

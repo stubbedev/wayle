@@ -144,6 +144,8 @@ pub enum Commands {
         #[arg(long)]
         allow_token: bool,
     },
+    /// Run the xdg-desktop-portal backend (activated by the portal frontend)
+    Portal,
     /// Run the desktop shell in the foreground
     Shell,
     /// Generate shell completions

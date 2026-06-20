@@ -1,0 +1,16 @@
+[Unit]
+Description=Wayle xdg-desktop-portal backend
+PartOf=graphical-session.target
+After=graphical-session.target
+Requires=xdg-desktop-portal.service
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.impl.portal.desktop.wayle
+ExecStart=/usr/bin/wayle portal
+Restart=on-failure
+RestartSec=3
+Slice=session.slice
+
+[Install]
+WantedBy=graphical-session.target
