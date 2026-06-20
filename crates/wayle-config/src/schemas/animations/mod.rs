@@ -69,13 +69,9 @@ pub struct AnimationsConfig {
     #[default(SurfaceAnimation::default())]
     pub notifications: ConfigProperty<SurfaceAnimation>,
 
-    /// Per-surface override for the OSD (volume/brightness/toggle).
+    /// Per-surface override for the OSD (volume/brightness/toggle/toast).
     #[default(SurfaceAnimation::default())]
     pub osd: ConfigProperty<SurfaceAnimation>,
-
-    /// Per-surface override for toasts (`wayle toast`).
-    #[default(SurfaceAnimation::default())]
-    pub toast: ConfigProperty<SurfaceAnimation>,
 
     /// Per-surface override for bar widget dropdown foldouts.
     #[default(SurfaceAnimation::default())]
@@ -96,10 +92,8 @@ pub struct AnimationsConfig {
 pub enum AnimSurface {
     /// Notification popup cards.
     Notifications,
-    /// The OSD overlay (volume/brightness/toggle).
+    /// The OSD overlay (volume/brightness/toggle/toast).
     Osd,
-    /// Toasts shown via `wayle toast`.
-    Toast,
     /// Bar widget dropdown foldouts.
     Dropdown,
     /// The screen-share picker overlay.
@@ -113,7 +107,6 @@ impl AnimationsConfig {
         match surface {
             AnimSurface::Notifications => self.notifications.get(),
             AnimSurface::Osd => self.osd.get(),
-            AnimSurface::Toast => self.toast.get(),
             AnimSurface::Dropdown => self.dropdown.get(),
             AnimSurface::SharePicker => self.share_picker.get(),
             AnimSurface::Wallpaper => self.wallpaper.get(),

@@ -52,14 +52,8 @@ impl Osd {
         self.visible = true;
         self.revealed = true;
 
-        let duration = duration_override.unwrap_or_else(|| {
-            let config = self.config.config();
-            if matches!(self.current_event, Some(OsdEvent::Custom { .. })) {
-                config.toasts.duration.get()
-            } else {
-                config.osd.duration.get()
-            }
-        });
+        let duration =
+            duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
         Self::schedule_dismiss(sender, duration, self.dismiss_id);
     }
 
@@ -96,7 +90,7 @@ impl Osd {
         let preset = toast.preset.as_ref().and_then(|id| {
             self.config
                 .config()
-                .toasts
+                .osd
                 .presets
                 .get()
                 .into_iter()
@@ -305,25 +299,15 @@ impl Osd {
 
     pub(super) fn apply_position(&self, root: &gtk::Window) {
         let config = self.config.config();
-        // Toasts (`Custom`) anchor against `[toasts]`; everything else `[osd]`.
-        let is_toast = matches!(self.current_event, Some(OsdEvent::Custom { .. }));
-        let (position, monitor, margin_spacing, margin_base) = if is_toast {
-            (
-                config.toasts.position.get(),
-                config.toasts.monitor.get(),
-                config.toasts.margin.get(),
-                wayle_config::schemas::toasts::MARGIN_BASE_REM,
-            )
-        } else {
-            (
-                config.osd.position.get(),
-                config.osd.monitor.get(),
-                config.osd.margin.get(),
-                wayle_config::schemas::osd::MARGIN_BASE_REM,
-            )
-        };
+        let position = config.osd.position.get();
+        let monitor = config.osd.monitor.get();
         let scale = config.styling.scale.get().value();
-        let margin = margin_spacing.resolve_rem(margin_base, scale) as i32;
+        let margin = config
+            .osd
+            .margin
+            .get()
+            .resolve_rem(wayle_config::schemas::osd::MARGIN_BASE_REM, scale)
+            as i32;
 
         reset_anchors(root);
 
@@ -386,12 +370,7 @@ impl Osd {
     }
 
     pub(super) fn apply_layer(&self, root: &gtk::Window) {
-        let config = self.config.config();
-        let configured = if matches!(self.current_event, Some(OsdEvent::Custom { .. })) {
-            config.toasts.layer.get()
-        } else {
-            config.osd.layer.get()
-        };
+        let configured = self.config.config().osd.layer.get();
         apply_window_layer(root, configured, &self.config);
     }
 
@@ -404,15 +383,6 @@ impl Osd {
             tokio::time::sleep(Duration::from_millis(duration_ms as u64)).await;
             OsdCmd::Dismiss(dismiss_id)
         });
-    }
-}
-
-/// The animation surface for the current event: toasts (`Custom`) resolve
-/// against `[animations.toast]`, everything else against `[animations.osd]`.
-fn anim_surface(model: &Osd) -> AnimSurface {
-    match model.current_event {
-        Some(OsdEvent::Custom { .. }) => AnimSurface::Toast,
-        _ => AnimSurface::Osd,
     }
 }
 
@@ -438,7 +408,7 @@ pub(super) fn anim_transition(model: &Osd) -> gtk::RevealerTransitionType {
         .config
         .config()
         .animations
-        .transition_for(anim_surface(model), !model.revealed);
+        .transition_for(AnimSurface::Osd, !model.revealed);
     revealer_transition(anim)
 }
 
@@ -448,13 +418,11 @@ pub(super) fn anim_duration(model: &Osd) -> u32 {
         .config
         .config()
         .animations
-        .duration_for(anim_surface(model), !model.revealed)
+        .duration_for(AnimSurface::Osd, !model.revealed)
 }
 
 pub(super) fn osd_classes(model: &Osd) -> Vec<String> {
     let mut classes = vec![String::from("osd")];
-
-    let is_toast = matches!(model.current_event, Some(OsdEvent::Custom { .. }));
 
     if model
         .current_event
@@ -472,12 +440,7 @@ pub(super) fn osd_classes(model: &Osd) -> Vec<String> {
         classes.push(String::from("toggle-off"));
     }
 
-    let bordered = if is_toast {
-        model.config.config().toasts.border.get()
-    } else {
-        model.config.config().osd.border.get()
-    };
-    if bordered {
+    if model.config.config().osd.border.get() {
         classes.push(String::from("bordered"));
     }
 
@@ -517,15 +480,9 @@ pub(super) fn is_toggle(event: &Option<OsdEvent>) -> bool {
     })
 }
 
-/// Horizontal alignment for the toast/toggle header. Toasts read
-/// `toasts.text-align`; OSD toggles read `osd.text-align`.
+/// Horizontal alignment for the toast/toggle header, from `osd.text-align`.
 pub(super) fn toast_align(model: &Osd) -> gtk::Align {
-    let config = model.config.config();
-    let align = if matches!(model.current_event, Some(OsdEvent::Custom { .. })) {
-        config.toasts.text_align.get()
-    } else {
-        config.osd.text_align.get()
-    };
+    let align = model.config.config().osd.text_align.get();
     match align {
         OsdTextAlign::Start => gtk::Align::Start,
         OsdTextAlign::Center => gtk::Align::Center,

@@ -1,11 +1,11 @@
-//! Wallpaper settings page: single image, transitions, cycling, per-monitor.
+//! Wallpaper settings page: source image, scaling, cycling, per-monitor, animation.
 
-use wayle_config::{Config, schemas::wallpaper::CyclingInterval};
+use wayle_config::Config;
 
 use crate::{
     editors::{
         enum_select::enum_select, file_picker::file_path, monitor_wallpaper::monitor_wallpaper,
-        number::number_newtype, surface_animation::surface_animation_rows, toggle::toggle,
+        surface_animation::surface_animation_rows, wallpaper_cycling::cycling_reveal,
     },
     pages::{
         nav::LeafEntry,
@@ -23,35 +23,33 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
         spec: page_spec(
             "settings-page-wallpaper",
             vec![
+                // Source: a single image + how it's scaled.
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![file_path(&wp.wallpaper), enum_select(&wp.fit_mode)],
                 },
-                SectionSpec {
-                    title_key: "settings-section-animation",
-                    items: surface_animation_rows(&config.animations.wallpaper),
-                },
+                // Cycling: set a directory to enable; options reveal when it's set.
                 SectionSpec {
                     title_key: "settings-section-cycling",
                     items: vec![
-                        toggle(&wp.cycling_enabled),
                         file_path(&wp.cycling_directory),
-                        enum_select(&wp.cycling_mode),
-                        number_newtype(
+                        cycling_reveal(
+                            &wp.cycling_directory,
+                            &wp.cycling_mode,
                             &wp.cycling_interval_mins,
-                            1.0,
-                            1440.0,
-                            1.0,
-                            0,
-                            |v: &CyclingInterval| v.value() as f64,
-                            |seconds| CyclingInterval::new(seconds as u64),
+                            &wp.cycling_same_image,
                         ),
-                        toggle(&wp.cycling_same_image),
                     ],
                 },
+                // Per-monitor overrides (wallpaper + fit mode per output).
                 SectionSpec {
                     title_key: "settings-section-display",
                     items: vec![monitor_wallpaper(&wp.monitors)],
+                },
+                // Change animation, shared with every other surface.
+                SectionSpec {
+                    title_key: "settings-section-animation",
+                    items: surface_animation_rows(&config.animations.wallpaper),
                 },
             ],
         ),

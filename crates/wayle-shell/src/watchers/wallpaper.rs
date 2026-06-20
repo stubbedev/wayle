@@ -48,10 +48,10 @@ fn spawn_fit_mode_watcher(config: &WallpaperConfig, wallpaper: &Arc<WallpaperSer
 }
 
 /// Applies the global single-file `wallpaper` to all monitors when it changes
-/// (and cycling is not active).
+/// (and a cycling directory is not set, which would take precedence).
 fn spawn_single_file_watcher(config: &WallpaperConfig, wallpaper: &Arc<WallpaperService>) {
     let wallpaper_path = config.wallpaper.clone();
-    let cycling_enabled = config.cycling_enabled.clone();
+    let cycling_directory = config.cycling_directory.clone();
     let wallpaper = wallpaper.clone();
 
     let mut stream = wallpaper_path.watch();
@@ -60,7 +60,7 @@ fn spawn_single_file_watcher(config: &WallpaperConfig, wallpaper: &Arc<Wallpaper
         stream.next().await;
 
         while let Some(path) = stream.next().await {
-            if path.is_empty() || cycling_enabled.get() {
+            if path.is_empty() || !cycling_directory.get().is_empty() {
                 continue;
             }
             if let Err(e) = wallpaper.set_wallpaper(PathBuf::from(path), None).await {
@@ -70,39 +70,41 @@ fn spawn_single_file_watcher(config: &WallpaperConfig, wallpaper: &Arc<Wallpaper
     });
 }
 
+/// Starts/stops cycling as the directory is set or cleared (a non-empty
+/// directory means cycling is on).
 fn spawn_cycling_watcher(config: &WallpaperConfig, wallpaper: &Arc<WallpaperService>) {
-    let cycling_enabled = config.cycling_enabled.clone();
     let cycling_directory = config.cycling_directory.clone();
     let cycling_mode = config.cycling_mode.clone();
     let cycling_interval = config.cycling_interval_mins.clone();
+    let single_file = config.wallpaper.clone();
     let monitors_config = config.monitors.clone();
     let wallpaper = wallpaper.clone();
 
-    let mut enabled_stream = cycling_enabled.watch();
     let mut directory_stream = cycling_directory.watch();
     let mut mode_stream = cycling_mode.watch();
 
     tokio::spawn(async move {
-        enabled_stream.next().await;
         directory_stream.next().await;
         mode_stream.next().await;
 
         loop {
             tokio::select! {
-                Some(_) = enabled_stream.next() => {}
                 Some(_) = directory_stream.next() => {}
                 Some(_) = mode_stream.next() => {}
                 else => break,
             }
 
-            if !cycling_enabled.get() {
-                wallpaper.stop_cycling();
-                restore_monitor_wallpapers(&wallpaper, &monitors_config.get()).await;
-                continue;
-            }
-
             let directory = cycling_directory.get();
             if directory.is_empty() {
+                // Cycling cleared — fall back to per-monitor / single-file.
+                wallpaper.stop_cycling();
+                restore_monitor_wallpapers(&wallpaper, &monitors_config.get()).await;
+                let single = single_file.get();
+                if !single.is_empty()
+                    && let Err(e) = wallpaper.set_wallpaper(PathBuf::from(single), None).await
+                {
+                    warn!(error = %e, "cannot restore single-file wallpaper");
+                }
                 continue;
             }
 

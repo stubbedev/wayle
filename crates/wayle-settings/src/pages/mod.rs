@@ -14,5 +14,4 @@ pub(crate) mod sections;
 pub(crate) mod share_picker;
 pub(crate) mod spec;
 pub(crate) mod styling;
-pub(crate) mod toasts;
 pub(crate) mod wallpaper;

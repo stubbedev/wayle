@@ -74,12 +74,6 @@ fn spawn_config_watcher(sender: &ComponentSender<Osd>, config: &Arc<ConfigServic
     let scale = full_config.styling.scale.clone();
     let tearing_mode = full_config.general.tearing_mode.clone();
 
-    let toasts = &full_config.toasts;
-    let toast_position = toasts.position.clone();
-    let toast_monitor = toasts.monitor.clone();
-    let toast_margin = toasts.margin.clone();
-    let toast_layer = toasts.layer.clone();
-
     watch!(
         sender,
         [
@@ -91,10 +85,6 @@ fn spawn_config_watcher(sender: &ComponentSender<Osd>, config: &Arc<ConfigServic
             layer.watch(),
             scale.watch(),
             tearing_mode.watch(),
-            toast_position.watch(),
-            toast_monitor.watch(),
-            toast_margin.watch(),
-            toast_layer.watch(),
         ],
         |out| {
             let _ = out.send(OsdCmd::ConfigChanged);

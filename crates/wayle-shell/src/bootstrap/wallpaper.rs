@@ -60,10 +60,7 @@ fn start_cycling_from_config(
     service: &Arc<WallpaperService>,
     cfg: &wayle_config::schemas::wallpaper::WallpaperConfig,
 ) -> bool {
-    if !cfg.cycling_enabled.get() {
-        return false;
-    }
-
+    // Cycling is on whenever a directory is configured.
     let directory = cfg.cycling_directory.get();
     if directory.is_empty() {
         return false;

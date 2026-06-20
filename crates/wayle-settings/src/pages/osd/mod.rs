@@ -5,7 +5,8 @@ use wayle_config::{Config, schemas::osd::MARGIN_BASE_REM};
 use crate::{
     editors::{
         enum_select::enum_select, number::number_u32, size::size_with_base,
-        surface_animation::surface_animation_rows, text::text_like, toggle::toggle,
+        surface_animation::surface_animation_rows, text::text_like,
+        toast_preset_list::toast_preset_list, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -38,6 +39,11 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         size_with_base(&osd.margin, MARGIN_BASE_REM),
                         toggle(&osd.border),
                     ],
+                },
+                // Toasts are custom-triggered OSDs; their reusable presets live here.
+                SectionSpec {
+                    title_key: "settings-section-presets",
+                    items: vec![toast_preset_list(&osd.presets)],
                 },
                 SectionSpec {
                     title_key: "settings-section-animation",

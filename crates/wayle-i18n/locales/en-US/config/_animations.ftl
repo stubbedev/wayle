@@ -34,9 +34,6 @@ settings-animations-notifications = Notifications
 settings-animations-osd = OSD
     .description = Per-surface animation override for the OSD (volume/brightness/toggle)
 
-settings-animations-toast = Toast
-    .description = Per-surface animation override for toasts
-
 settings-animations-dropdown = Dropdown
     .description = Per-surface animation override for bar widget dropdown foldouts
 

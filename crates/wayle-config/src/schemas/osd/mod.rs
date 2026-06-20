@@ -1,7 +1,7 @@
 mod types;
 
 use schemars::schema_for;
-pub use types::{OsdMonitor, OsdPosition, OsdTextAlign};
+pub use types::{OsdMonitor, OsdPosition, OsdTextAlign, ToastPreset};
 use wayle_derive::wayle_config;
 
 use crate::{
@@ -55,6 +55,10 @@ pub struct OsdConfig {
     /// to allow fullscreen tearing.
     #[default(Layer::Overlay)]
     pub layer: ConfigProperty<Layer>,
+
+    /// Reusable toast presets, each triggerable with `wayle toast --preset <id>`.
+    #[default(Vec::new())]
+    pub presets: ConfigProperty<Vec<ToastPreset>>,
 }
 
 impl ModuleInfoProvider for OsdConfig {

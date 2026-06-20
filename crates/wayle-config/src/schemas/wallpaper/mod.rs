@@ -26,12 +26,8 @@ pub struct WallpaperConfig {
 
     // The wallpaper change animation is configured under `[animations]`
     // (`AnimSurface::Wallpaper`), shared with every other surface.
-    /// Enable automatic wallpaper cycling.
-    #[serde(rename = "cycling-enabled")]
-    #[default(false)]
-    pub cycling_enabled: ConfigProperty<bool>,
-
-    /// Directory containing wallpaper images for cycling.
+    /// Directory of images to cycle through. Set it to enable cycling; leave
+    /// empty to disable. Takes precedence over the single `wallpaper` image.
     #[serde(rename = "cycling-directory")]
     #[default(String::new())]
     pub cycling_directory: ConfigProperty<String>,

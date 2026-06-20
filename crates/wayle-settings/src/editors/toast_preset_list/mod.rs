@@ -9,7 +9,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use relm4::gtk::{self, prelude::*};
-use wayle_config::{ConfigProperty, schemas::toasts::ToastPreset};
+use wayle_config::{ConfigProperty, schemas::osd::ToastPreset};
 use wayle_i18n::t;
 
 use crate::{

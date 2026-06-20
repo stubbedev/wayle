@@ -41,7 +41,6 @@ pub mod schemas {
     /// Styling configuration.
     pub mod styling;
     /// Toast overlay configuration.
-    pub mod toasts;
     /// Wallpaper service configuration.
     pub mod wallpaper;
 }
@@ -82,7 +81,7 @@ pub use infrastructure::{
 use schemas::{
     animations::AnimationsConfig, bar::BarConfig, dropdowns::DropdownsConfig,
     modules::ModulesConfig, osd::OsdConfig, share_picker::SharePickerConfig, styling::StylingConfig,
-    toasts::ToastsConfig, wallpaper::WallpaperConfig,
+    wallpaper::WallpaperConfig,
 };
 use wayle_derive::wayle_config;
 
@@ -127,9 +126,6 @@ pub struct Config {
     /// Screen-share picker settings.
     #[serde(rename = "share-picker")]
     pub share_picker: SharePickerConfig,
-
-    /// Toast overlay settings.
-    pub toasts: ToastsConfig,
 
     /// Animation settings.
     pub animations: AnimationsConfig,

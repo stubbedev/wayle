@@ -10,11 +10,11 @@ settings-wallpaper-fit-mode = Scaling
 
 ## Cycling
 
-settings-wallpaper-cycling-enabled = Cycling Enabled
-    .description = Automatically cycle through wallpapers in a directory
-
 settings-wallpaper-cycling-directory = Cycling Directory
-    .description = Directory containing wallpaper images
+    .description = Folder of images to cycle through; set it to enable cycling, leave empty to disable
+
+settings-wallpaper-cycling-options = Cycling Options
+    .description = Order, interval, and multi-monitor behaviour while cycling
 
 settings-wallpaper-cycling-mode = Cycling Mode
     .description = Wallpaper cycling order (sequential or shuffle)
