@@ -23,6 +23,8 @@ tokio.workspace = true
 tracing.workspace = true
 zbus.workspace = true
 wayland-client.workspace = true
+wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
+wayland-protocols-misc = { version = "0.3.12", features = ["client"] }
 wayle-config.workspace = true
 wayle-ipc.workspace = true
 wayle-share-preview.workspace = true

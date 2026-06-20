@@ -18,6 +18,7 @@
 
 mod error;
 mod lockdown;
+mod remotedesktop;
 mod request;
 mod response;
 mod screencast;
@@ -33,7 +34,8 @@ use zbus::Connection;
 
 pub use self::error::Error;
 use self::{
-    lockdown::Lockdown, screencast::ScreenCast, screenshot::Screenshot, settings::Settings,
+    lockdown::Lockdown, remotedesktop::RemoteDesktop, screencast::ScreenCast,
+    screenshot::Screenshot, settings::Settings,
 };
 
 /// The backend's well-known D-Bus name (matches `wayle.portal`'s `DBusName`).
@@ -73,6 +75,10 @@ pub async fn run() -> Result<(), Error> {
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
         .at(path, Screenshot::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, RemoteDesktop::new(connection.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
 
