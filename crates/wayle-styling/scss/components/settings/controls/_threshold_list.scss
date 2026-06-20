@@ -1,24 +1,17 @@
-// Vec<ThresholdEntry> editor: a stack of cards, each a labeled grid of
-// optional bound + color controls, shown full-width beneath the setting label.
+// Vec<ThresholdEntry> editor. Reuses the shared card-form chrome (the container
+// also carries `.card-form-editor`): a bordered surface card with a titled
+// header + delete, and a body of rows. Each row is a subtle label on the left
+// with its optional toggle + value control pushed to the right.
 .threshold-editor {
-    .threshold-card {
-        background: var(--bg-elevated);
-        border-radius: var(--rounding-element);
-        padding: var(--space-xs) var(--space-sm);
+    .threshold-row {
+        & + .threshold-row {
+            margin-top: var(--space-xs);
+        }
 
-        .threshold-row {
-            min-height: calc(2.25rem * var(--global-scale));
-            border-spacing: var(--space-sm);
-
-            & + .threshold-row {
-                border-top: 1px solid var(--border-subtle);
-            }
-
-            .threshold-label {
-                font-size: var(--text-md);
-                font-weight: var(--weight-medium);
-                color: var(--fg-default);
-            }
+        .threshold-label {
+            font-size: var(--text-xs);
+            font-weight: var(--weight-bold);
+            color: var(--fg-subtle);
         }
     }
 }

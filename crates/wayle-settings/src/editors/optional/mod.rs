@@ -398,6 +398,46 @@ pub(crate) fn optional_number_f64_widget(
     }
 }
 
+/// Builds a bare ColorValue editor (no override switch) for an
+/// `Option<ColorValue>` field where `Auto` already means "defer / no override".
+/// The field always carries a value: the picker writes `Some(_)`, and `Auto` is
+/// the calm default — so the switch the [`optional_color_widget`] gate provides
+/// would be redundant with the picker's own `Auto` entry.
+pub(crate) fn color_value_widget(
+    get: Rc<dyn Fn() -> Option<ColorValue>>,
+    set: Rc<dyn Fn(Option<ColorValue>)>,
+) -> OptionalWidget {
+    let scratch = ConfigProperty::new(get().unwrap_or(ColorValue::Auto));
+    let controller = ColorValueControl::builder()
+        .launch(scratch.clone())
+        .detach();
+    let widget = controller.widget().clone();
+
+    // Scratch edits (made through the ColorValue component) flow to the field.
+    let scratch_set = Rc::clone(&set);
+    let scratch_for_watch = scratch.clone();
+    let scratch_watcher = spawn_property_watcher(&scratch, move || {
+        scratch_set(Some(scratch_for_watch.get()));
+        true
+    });
+
+    let refresh_scratch = scratch.clone();
+    // Keep the component + scratch watcher alive for the widget's lifetime.
+    let keep = (controller, scratch_watcher);
+    let refresh: Rc<dyn Fn()> = Rc::new(move || {
+        let _ = &keep;
+        let value = get().unwrap_or(ColorValue::Auto);
+        if refresh_scratch.get() != value {
+            refresh_scratch.set(value);
+        }
+    });
+
+    OptionalWidget {
+        widget: widget.upcast(),
+        refresh,
+    }
+}
+
 /// Builds an *Inherit* checkbox + the full ColorValue editor for an
 /// `Option<ColorValue>` field. The ColorValue editor is reused unchanged by
 /// driving it through a scratch property mirrored back to the field.

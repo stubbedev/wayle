@@ -9,6 +9,10 @@
 }
 
 .setting-control entry text {
+    // The shared entry base adds a left/right margin on top of this padding,
+    // doubling the horizontal inset while top/bottom stays at space-xs. Zero it
+    // so the inset is balanced: space-sm sides, space-xs top/bottom.
+    margin: 0;
     padding: var(--space-xs) var(--space-sm);
     min-height: 0;
 }

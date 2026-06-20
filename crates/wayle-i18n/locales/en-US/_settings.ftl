@@ -60,6 +60,7 @@ settings-nav-dropdowns = Dropdowns
 settings-page-dropdowns = Dropdowns
     .breadcrumb = Overlays
 settings-threshold-count = thresholds
+settings-threshold-card-title = Threshold
 settings-threshold-above = Above
 settings-threshold-below = Below
 settings-threshold-icon-color = Icon Color
