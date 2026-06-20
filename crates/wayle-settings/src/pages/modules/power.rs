@@ -3,7 +3,7 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{color_value::color_value, icon::icon, toggle::toggle},
+    editors::{color_value::color_value, icon::icon, text::text, toggle::toggle},
     pages::{
         nav::LeafEntry,
         spec::{SectionSpec, page_spec},
@@ -34,6 +34,16 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         color_value(&module.icon_color),
                         color_value(&module.icon_bg_color),
                         color_value(&module.border_color),
+                    ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-power-menu",
+                    items: vec![
+                        text(&module.lock_command),
+                        text(&module.logout_command),
+                        text(&module.suspend_command),
+                        text(&module.reboot_command),
+                        text(&module.shutdown_command),
                     ],
                 },
                 SectionSpec {

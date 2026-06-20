@@ -109,6 +109,8 @@ pub(crate) enum WorkspaceButtonInput {
 #[derive(Debug)]
 pub(crate) enum WorkspaceButtonOutput {
     Clicked(WorkspaceId),
+    MiddleClick(WorkspaceId),
+    RightClick(WorkspaceId),
     ScrollUp,
     ScrollDown,
 }
@@ -236,6 +238,28 @@ impl FactoryComponent for WorkspaceButton {
             }
         });
         root.add_controller(scroll_controller);
+
+        let middle = gtk::GestureClick::new();
+        middle.set_button(gtk::gdk::BUTTON_MIDDLE);
+        middle.connect_released({
+            let sender = sender.clone();
+            let id = self.id;
+            move |_, _, _, _| {
+                sender.output(WorkspaceButtonOutput::MiddleClick(id)).ok();
+            }
+        });
+        root.add_controller(middle);
+
+        let right = gtk::GestureClick::new();
+        right.set_button(gtk::gdk::BUTTON_SECONDARY);
+        right.connect_released({
+            let sender = sender.clone();
+            let id = self.id;
+            move |_, _, _, _| {
+                sender.output(WorkspaceButtonOutput::RightClick(id)).ok();
+            }
+        });
+        root.add_controller(right);
 
         self.populate_identity(&widgets.identity);
         let urgent_addrs = mem::take(&mut self.initial_urgent_addrs);

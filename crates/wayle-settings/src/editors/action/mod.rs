@@ -1,9 +1,10 @@
-//! Searchable action editor for `ClickAction` fields.
+//! Searchable action editor for click/scroll action fields.
 //!
-//! Presents a searchable dropdown of the module's predefined actions (e.g.
-//! "Capture region"), its dropdown panel(s), "None", and "Custom command…".
-//! Picking "Custom command…" reveals a text entry for a raw shell command. A
-//! value that matches no predefined choice loads into the Custom entry.
+//! Generic over any action type implementing [`ActionValue`] (the bar
+//! [`ClickAction`] and the workspace [`WorkspaceClickAction`]). Presents a
+//! searchable dropdown of the module's predefined actions, plus "None" and
+//! "Custom command…" (which reveals a free-text entry). A value matching no
+//! predefined choice loads into the Custom entry.
 
 mod row;
 
@@ -13,36 +14,96 @@ use relm4::{
     prelude::*,
 };
 pub(crate) use row::action;
-use wayle_config::{ClickAction, ConfigProperty};
+use wayle_config::{
+    ClickAction, ConfigProperty, schemas::modules::WorkspaceClickAction,
+};
 use wayle_widgets::prelude::ellipsizing_string_factory;
 
 use super::{WatcherHandle, spawn_property_watcher};
 
+/// An action value that round-trips through the command string shown in the
+/// "Custom" entry (and stored in TOML).
+pub(crate) trait ActionValue: Clone + Send + Sync + PartialEq + 'static {
+    /// String form: a shell command, `dropdown:<id>`, `focus:<x>`, or empty
+    /// for the no-op action.
+    fn to_command(&self) -> String;
+    /// Parses a command string back into the action (empty = no-op).
+    fn from_command(value: &str) -> Self;
+}
+
+impl ActionValue for ClickAction {
+    fn to_command(&self) -> String {
+        match self {
+            ClickAction::Shell(cmd) => cmd.clone(),
+            ClickAction::Dropdown(name) => format!("dropdown:{name}"),
+            ClickAction::None => String::new(),
+        }
+    }
+
+    fn from_command(value: &str) -> Self {
+        if value.is_empty() {
+            ClickAction::None
+        } else if let Some(name) = value.strip_prefix("dropdown:") {
+            ClickAction::Dropdown(name.to_owned())
+        } else {
+            ClickAction::Shell(value.to_owned())
+        }
+    }
+}
+
+impl ActionValue for WorkspaceClickAction {
+    fn to_command(&self) -> String {
+        match self {
+            WorkspaceClickAction::None => String::new(),
+            WorkspaceClickAction::FocusWorkspace => "focus:this".to_owned(),
+            WorkspaceClickAction::FocusNext => "focus:next".to_owned(),
+            WorkspaceClickAction::FocusPrevious => "focus:previous".to_owned(),
+            WorkspaceClickAction::FocusLast => "focus:last".to_owned(),
+            WorkspaceClickAction::Dropdown(name) => format!("dropdown:{name}"),
+            WorkspaceClickAction::Shell(cmd) => cmd.clone(),
+        }
+    }
+
+    fn from_command(value: &str) -> Self {
+        match value {
+            "" => WorkspaceClickAction::None,
+            "focus:this" => WorkspaceClickAction::FocusWorkspace,
+            "focus:next" => WorkspaceClickAction::FocusNext,
+            "focus:previous" => WorkspaceClickAction::FocusPrevious,
+            "focus:last" => WorkspaceClickAction::FocusLast,
+            _ => match value.strip_prefix("dropdown:") {
+                Some(name) => WorkspaceClickAction::Dropdown(name.to_owned()),
+                None => WorkspaceClickAction::Shell(value.to_owned()),
+            },
+        }
+    }
+}
+
 /// A predefined action a module offers in the dropdown.
 #[derive(Clone)]
-pub(crate) struct ActionChoice {
+pub(crate) struct ActionChoice<T: ActionValue> {
     /// Display label (already localized / human-readable).
     pub(crate) label: String,
     /// The action stored when this choice is selected.
-    pub(crate) action: ClickAction,
+    pub(crate) action: T,
 }
 
 /// Init for the action editor.
-pub(crate) struct ActionInit {
-    pub(crate) property: ConfigProperty<ClickAction>,
-    pub(crate) choices: Vec<ActionChoice>,
+pub(crate) struct ActionInit<T: ActionValue> {
+    pub(crate) property: ConfigProperty<T>,
+    pub(crate) choices: Vec<ActionChoice<T>>,
 }
 
-pub(crate) struct ActionControl {
-    property: ConfigProperty<ClickAction>,
-    choices: Vec<ActionChoice>,
+pub(crate) struct ActionControl<T: ActionValue> {
+    property: ConfigProperty<T>,
+    choices: Vec<ActionChoice<T>>,
     dropdown: gtk::DropDown,
     entry: gtk::Entry,
     revealer: gtk::Revealer,
     dropdown_handler: SignalHandlerId,
     entry_handler: SignalHandlerId,
-    /// True once the user explicitly picked "Custom command…", so an empty /
-    /// `None` value still shows the entry instead of snapping back to "None".
+    /// True once the user explicitly picked "Custom command…", so an empty
+    /// value still shows the entry instead of snapping back to "None".
     custom_mode: bool,
     _watcher: WatcherHandle,
 }
@@ -54,8 +115,8 @@ pub(crate) enum ActionMsg {
     Refresh,
 }
 
-impl SimpleComponent for ActionControl {
-    type Init = ActionInit;
+impl<T: ActionValue> SimpleComponent for ActionControl<T> {
+    type Init = ActionInit<T>;
     type Input = ActionMsg;
     type Output = ();
     type Root = gtk::Box;
@@ -101,13 +162,12 @@ impl SimpleComponent for ActionControl {
             .child(&entry)
             .build();
 
-        let current = property.get();
-        let custom_mode = matches!(current, ClickAction::Shell(_))
-            && index_of_choice(&choices, &current).is_none();
+        let current = property.get().to_command();
+        let custom_mode = !current.is_empty() && index_of_choice(&choices, &current).is_none();
         let index = selection_index(&choices, &current, custom_mode);
         dropdown.set_selected(index);
         if index == custom_index(&choices) {
-            entry.set_text(&command_string(&current));
+            entry.set_text(&current);
             revealer.set_reveal_child(true);
         }
 
@@ -160,34 +220,26 @@ impl SimpleComponent for ActionControl {
                 } else if index == none_index {
                     self.custom_mode = false;
                     self.revealer.set_reveal_child(false);
-                    self.property.set(ClickAction::None);
+                    self.property.set(T::from_command(""));
                 } else if index == custom {
                     self.custom_mode = true;
                     self.revealer.set_reveal_child(true);
                     self.entry.grab_focus();
                     let text = self.entry.text().to_string();
                     if !text.is_empty() {
-                        self.property.set(ClickAction::Shell(text));
+                        self.property.set(T::from_command(&text));
                     }
                 }
             }
             ActionMsg::CustomChanged(text) => {
                 if self.custom_mode {
-                    self.property.set(if text.is_empty() {
-                        ClickAction::None
-                    } else {
-                        ClickAction::Shell(text)
-                    });
+                    self.property.set(T::from_command(&text));
                 }
             }
             ActionMsg::Refresh => {
-                let current = self.property.get();
-                if index_of_choice(&self.choices, &current).is_some()
-                    || current == ClickAction::None
-                {
-                    // A recognized value clears custom mode (unless None was
-                    // reached via an in-progress custom edit).
-                    if !(self.custom_mode && current == ClickAction::None) {
+                let current = self.property.get().to_command();
+                if index_of_choice(&self.choices, &current).is_some() || current.is_empty() {
+                    if !(self.custom_mode && current.is_empty()) {
                         self.custom_mode = false;
                     }
                 }
@@ -199,13 +251,10 @@ impl SimpleComponent for ActionControl {
 
                 let reveal = index == custom_index(&self.choices);
                 self.revealer.set_reveal_child(reveal);
-                if reveal {
-                    let cmd = command_string(&current);
-                    if self.entry.text() != cmd.as_str() {
-                        self.entry.block_signal(&self.entry_handler);
-                        self.entry.set_text(&cmd);
-                        self.entry.unblock_signal(&self.entry_handler);
-                    }
+                if reveal && self.entry.text() != current.as_str() {
+                    self.entry.block_signal(&self.entry_handler);
+                    self.entry.set_text(&current);
+                    self.entry.unblock_signal(&self.entry_handler);
                 }
             }
         }
@@ -213,44 +262,39 @@ impl SimpleComponent for ActionControl {
 }
 
 /// Dropdown labels: choices, then "None", then "Custom command…".
-fn labels(choices: &[ActionChoice]) -> Vec<String> {
+fn labels<T: ActionValue>(choices: &[ActionChoice<T>]) -> Vec<String> {
     let mut labels: Vec<String> = choices.iter().map(|c| c.label.clone()).collect();
     labels.push("None".to_owned());
     labels.push("Custom command…".to_owned());
     labels
 }
 
-fn none_index(choices: &[ActionChoice]) -> u32 {
+fn none_index<T: ActionValue>(choices: &[ActionChoice<T>]) -> u32 {
     choices.len() as u32
 }
 
-fn custom_index(choices: &[ActionChoice]) -> u32 {
+fn custom_index<T: ActionValue>(choices: &[ActionChoice<T>]) -> u32 {
     choices.len() as u32 + 1
 }
 
-fn index_of_choice(choices: &[ActionChoice], action: &ClickAction) -> Option<u32> {
+fn index_of_choice<T: ActionValue>(choices: &[ActionChoice<T>], command: &str) -> Option<u32> {
     choices
         .iter()
-        .position(|c| &c.action == action)
+        .position(|c| c.action.to_command() == command)
         .map(|i| i as u32)
 }
 
-/// Resolves which dropdown row represents `current`.
-fn selection_index(choices: &[ActionChoice], current: &ClickAction, custom_mode: bool) -> u32 {
-    if let Some(index) = index_of_choice(choices, current) {
+/// Resolves which dropdown row represents the current command string.
+fn selection_index<T: ActionValue>(
+    choices: &[ActionChoice<T>],
+    command: &str,
+    custom_mode: bool,
+) -> u32 {
+    if let Some(index) = index_of_choice(choices, command) {
         index
-    } else if *current == ClickAction::None && !custom_mode {
+    } else if command.is_empty() && !custom_mode {
         none_index(choices)
     } else {
         custom_index(choices)
-    }
-}
-
-/// The shell-command / dropdown string form of an action (empty for `None`).
-fn command_string(action: &ClickAction) -> String {
-    match action {
-        ClickAction::Shell(cmd) => cmd.clone(),
-        ClickAction::Dropdown(name) => format!("dropdown:{name}"),
-        ClickAction::None => String::new(),
     }
 }

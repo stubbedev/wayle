@@ -2,6 +2,7 @@ mod bar;
 mod helpers;
 mod notification_popup;
 mod osd;
+pub(crate) mod power_menu;
 pub(crate) mod region_overlay;
 pub(crate) mod screenshot;
 pub(crate) mod services;
@@ -21,6 +22,7 @@ use tracing::{debug, info};
 use self::{
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
+    power_menu::PowerMenu,
     region_overlay::RegionOverlay,
     screenshot::{Screenshot, ScreenshotInit},
     share_picker::SharePicker,
@@ -37,6 +39,7 @@ pub(crate) struct Shell {
     _share_picker: Controller<SharePicker>,
     _region_overlay: Controller<RegionOverlay>,
     _screenshot: Controller<Screenshot>,
+    _power_menu: Controller<PowerMenu>,
     _wallpaper: Option<Wallpaper>,
 }
 
@@ -128,6 +131,11 @@ impl Component for Shell {
             .detach();
         crate::services::screenshot::register_sender(screenshot.sender().clone());
 
+        let power_menu = PowerMenu::builder()
+            .launch(init.services.config.clone())
+            .detach();
+        crate::services::power_menu::register_sender(power_menu.sender().clone());
+
         let wallpaper = init
             .services
             .wallpaper
@@ -143,6 +151,7 @@ impl Component for Shell {
             _share_picker: share_picker,
             _region_overlay: region_overlay,
             _screenshot: screenshot,
+            _power_menu: power_menu,
             _wallpaper: wallpaper,
         };
         let widgets = view_output!();

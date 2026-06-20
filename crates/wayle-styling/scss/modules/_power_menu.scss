@@ -1,0 +1,45 @@
+// Native power menu: a full-screen dimmed layer-shell overlay with a centered
+// row of action buttons (lock / log out / suspend / reboot / shut down).
+// Rendered in `shell/power_menu/mod.rs`; animated via `[animations].power`.
+.power-menu-window {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.power-menu-surface {
+    background: var(--bg-base);
+    border: 1px solid var(--border-default);
+    border-radius: var(--rounding-container);
+    box-shadow: var(--shadow);
+    padding: var(--space-lg);
+}
+
+.power-menu-button {
+    all: unset;
+    padding: var(--space-lg);
+    border-radius: var(--rounding-container);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    transition:
+        background var(--duration-fast),
+        border-color var(--duration-fast);
+
+    &:hover {
+        background: var(--bg-hover);
+        border-color: var(--border-accent);
+    }
+
+    &:active {
+        background: var(--bg-active);
+    }
+}
+
+.power-menu-icon {
+    -gtk-icon-size: var(--icon-lg);
+    color: var(--fg-default);
+}
+
+.power-menu-label {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--fg-muted);
+}

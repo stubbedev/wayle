@@ -18,7 +18,7 @@ impl ModuleFactory for Factory {
     fn create(
         settings: &BarSettings,
         services: &ShellServices,
-        _dropdowns: &Rc<DropdownRegistry>,
+        dropdowns: &Rc<DropdownRegistry>,
         class: Option<String>,
     ) -> Option<ModuleInstance> {
         if !require_hyprland("hyprland-workspaces") {
@@ -29,6 +29,7 @@ impl ModuleFactory for Factory {
             settings: settings.clone(),
             hyprland: services.hyprland.clone(),
             config: services.config.clone(),
+            dropdowns: dropdowns.clone(),
         };
         let controller = dynamic_controller(HyprlandWorkspaces::builder().launch(init).detach());
         Some(ModuleInstance { controller, class })

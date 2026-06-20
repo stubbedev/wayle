@@ -1,14 +1,14 @@
 use relm4::{gtk::prelude::*, prelude::*};
-use wayle_config::{ClickAction, ConfigProperty};
+use wayle_config::ConfigProperty;
 
-use super::{ActionChoice, ActionControl, ActionInit};
+use super::{ActionChoice, ActionControl, ActionInit, ActionValue};
 use crate::{pages::spec::SettingRowInit, property_handle::PropertyHandle, row::RowBehavior};
 
-/// Row with a searchable action dropdown bound to a `ClickAction` property.
-/// Offers `choices` plus "None" and "Custom command…" (a raw shell command).
-pub(crate) fn action(
-    property: &ConfigProperty<ClickAction>,
-    choices: Vec<ActionChoice>,
+/// Row with a searchable action dropdown bound to an action property. Offers
+/// `choices` plus "None" and "Custom command…" (a raw command string).
+pub(crate) fn action<T: ActionValue>(
+    property: &ConfigProperty<T>,
+    choices: Vec<ActionChoice<T>>,
 ) -> SettingRowInit {
     let controller = ActionControl::builder()
         .launch(ActionInit {
@@ -21,11 +21,7 @@ pub(crate) fn action(
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |value: &ClickAction| match value {
-            ClickAction::Shell(cmd) => cmd.clone(),
-            ClickAction::Dropdown(name) => format!("dropdown:{name}"),
-            ClickAction::None => String::new(),
-        }),
+        handle: PropertyHandle::new(property, |value: &T| value.to_command()),
         control: widget.upcast(),
         keepalive: Box::new(controller),
         full_width: false,

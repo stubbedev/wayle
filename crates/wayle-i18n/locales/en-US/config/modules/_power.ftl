@@ -31,3 +31,14 @@ settings-modules-power-scroll-down = Scroll Down
 
 settings-modules-power-left-click = Left Click
     .description = Action on left click
+
+settings-modules-power-lock-command = Lock Command
+    .description = Command run by the power menu's Lock button
+settings-modules-power-logout-command = Log Out Command
+    .description = Command run by the power menu's Log out button
+settings-modules-power-suspend-command = Suspend Command
+    .description = Command run by the power menu's Suspend button
+settings-modules-power-reboot-command = Reboot Command
+    .description = Command run by the power menu's Reboot button
+settings-modules-power-shutdown-command = Shut Down Command
+    .description = Command run by the power menu's Shut down button

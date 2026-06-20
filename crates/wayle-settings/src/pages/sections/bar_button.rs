@@ -54,7 +54,10 @@ pub(crate) fn colors_section(fields: &BarButtonFields) -> SectionSpec {
     }
 }
 
-pub(crate) fn actions_section(fields: &BarButtonFields, choices: &[ActionChoice]) -> SectionSpec {
+pub(crate) fn actions_section(
+    fields: &BarButtonFields,
+    choices: &[ActionChoice<ClickAction>],
+) -> SectionSpec {
     SectionSpec {
         title_key: "settings-section-actions",
         items: vec![

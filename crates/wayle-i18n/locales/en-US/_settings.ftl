@@ -284,6 +284,7 @@ settings-section-overrides = Per-surface Overrides
 settings-section-bar-display = Bar Display
 settings-section-colors = Colors
 settings-section-actions = Actions
+settings-section-power-menu = Power Menu
 settings-section-dropdown = Dropdown
 settings-section-api-keys = API Keys
 settings-section-app-icons = App Icons

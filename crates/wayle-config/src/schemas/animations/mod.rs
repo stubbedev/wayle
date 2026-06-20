@@ -85,6 +85,10 @@ pub struct AnimationsConfig {
     /// Per-surface override for the wallpaper crossfade between images.
     #[default(SurfaceAnimation::default())]
     pub wallpaper: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for the power menu overlay.
+    #[default(SurfaceAnimation::default())]
+    pub power: ConfigProperty<SurfaceAnimation>,
 }
 
 /// Transient surface an animation applies to.
@@ -100,6 +104,8 @@ pub enum AnimSurface {
     SharePicker,
     /// The wallpaper crossfade between images.
     Wallpaper,
+    /// The power menu overlay.
+    Power,
 }
 
 impl AnimationsConfig {
@@ -110,6 +116,7 @@ impl AnimationsConfig {
             AnimSurface::Dropdown => self.dropdown.get(),
             AnimSurface::SharePicker => self.share_picker.get(),
             AnimSurface::Wallpaper => self.wallpaper.get(),
+            AnimSurface::Power => self.power.get(),
         }
     }
 

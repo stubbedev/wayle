@@ -7,13 +7,15 @@ use wayle_config::{
 
 use crate::{
     editors::{
-        color_value::color_value, enum_select::enum_select, icon::icon, number::number_u8,
+        action::action, color_value::color_value, enum_select::enum_select, icon::icon,
+        number::number_u8,
         size::{size, size_with_base},
         string_list::string_list, string_map::string_map, text::text, toggle::toggle,
         workspace_style_map::workspace_style_map,
     },
     pages::{
         nav::LeafEntry,
+        sections::action_choices::workspace_choices,
         spec::{SectionSpec, page_spec},
     },
 };
@@ -93,6 +95,16 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         color_value(&module.empty_color),
                         color_value(&module.container_bg_color),
                         color_value(&module.border_color),
+                    ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-actions",
+                    items: vec![
+                        action(&module.left_click, workspace_choices()),
+                        action(&module.middle_click, workspace_choices()),
+                        action(&module.right_click, workspace_choices()),
+                        action(&module.scroll_up, workspace_choices()),
+                        action(&module.scroll_down, workspace_choices()),
                     ],
                 },
             ],

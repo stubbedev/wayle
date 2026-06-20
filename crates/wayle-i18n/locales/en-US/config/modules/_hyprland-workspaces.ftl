@@ -98,3 +98,14 @@ enum-display-mode-none = None
 ## ActiveIndicator variants
 enum-active-indicator-background = Background
 enum-active-indicator-underline = Underline
+
+settings-modules-hyprland-workspaces-left-click = Left Click
+    .description = Action on left click
+settings-modules-hyprland-workspaces-middle-click = Middle Click
+    .description = Action on middle click
+settings-modules-hyprland-workspaces-right-click = Right Click
+    .description = Action on right click
+settings-modules-hyprland-workspaces-scroll-up = Scroll Up
+    .description = Action on scroll up
+settings-modules-hyprland-workspaces-scroll-down = Scroll Down
+    .description = Action on scroll down

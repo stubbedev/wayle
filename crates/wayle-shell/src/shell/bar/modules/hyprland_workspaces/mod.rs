@@ -21,6 +21,7 @@ mod watchers;
 
 use std::{
     collections::{HashMap, HashSet},
+    rc::Rc,
     sync::Arc,
     time::Duration,
 };
@@ -41,13 +42,14 @@ pub(crate) use self::{
     factory::Factory,
     messages::{WorkspacesCmd, WorkspacesInit, WorkspacesMsg},
 };
-use crate::shell::helpers::COMPONENT_CSS_PRIORITY;
+use crate::shell::{bar::dropdowns::DropdownRegistry, helpers::COMPONENT_CSS_PRIORITY};
 
 const BLINK_INTERVAL: Duration = Duration::from_millis(500);
 
 pub(crate) struct HyprlandWorkspaces {
     hyprland: Option<Arc<HyprlandService>>,
     config: Arc<ConfigService>,
+    pub(super) dropdowns: Rc<DropdownRegistry>,
     settings: BarSettings,
     active_workspace_id: WorkspaceId,
     active_workspace_any_monitor: HashSet<WorkspaceId>,
@@ -121,6 +123,8 @@ impl Component for HyprlandWorkspaces {
             sender.input_sender(),
             |output| match output {
                 WorkspaceButtonOutput::Clicked(id) => WorkspacesMsg::WorkspaceClicked(id),
+                WorkspaceButtonOutput::MiddleClick(id) => WorkspacesMsg::MiddleClick(id),
+                WorkspaceButtonOutput::RightClick(id) => WorkspacesMsg::RightClick(id),
                 WorkspaceButtonOutput::ScrollUp => WorkspacesMsg::ScrollUp,
                 WorkspaceButtonOutput::ScrollDown => WorkspacesMsg::ScrollDown,
             },
@@ -129,6 +133,7 @@ impl Component for HyprlandWorkspaces {
         let mut model = Self {
             hyprland: init.hyprland,
             config: init.config,
+            dropdowns: init.dropdowns,
             settings: init.settings,
             active_workspace_id: active_id,
             active_workspace_any_monitor: active_any_monitor,
@@ -149,15 +154,22 @@ impl Component for HyprlandWorkspaces {
     }
 
     fn update(&mut self, msg: Self::Input, _sender: ComponentSender<Self>, _root: &Self::Root) {
+        let actions = &self.config.config().modules.hyprland_workspaces;
         match msg {
             WorkspacesMsg::WorkspaceClicked(id) => {
-                self.switch_to_workspace(id);
+                self.dispatch_click_action(actions.left_click.get(), id);
+            }
+            WorkspacesMsg::MiddleClick(id) => {
+                self.dispatch_click_action(actions.middle_click.get(), id);
+            }
+            WorkspacesMsg::RightClick(id) => {
+                self.dispatch_click_action(actions.right_click.get(), id);
             }
             WorkspacesMsg::ScrollUp => {
-                self.navigate_workspace(-1);
+                self.dispatch_scroll_action(actions.scroll_up.get());
             }
             WorkspacesMsg::ScrollDown => {
-                self.navigate_workspace(1);
+                self.dispatch_scroll_action(actions.scroll_down.get());
             }
         }
     }

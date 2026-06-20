@@ -2,6 +2,7 @@
 
 pub mod idle_inhibit;
 pub mod mail;
+pub mod power_menu;
 pub mod recorder;
 pub mod region_overlay;
 pub mod screenshot;

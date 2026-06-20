@@ -104,6 +104,12 @@ impl Component for PowerModule {
             PowerMsg::ScrollDown => power.scroll_down.get(),
         };
 
+        // `:menu` opens wayle's native power menu in-process.
+        if matches!(&action, wayle_config::ClickAction::Shell(s) if s == ":menu") {
+            crate::services::power_menu::show();
+            return;
+        }
+
         dropdowns::dispatch_click(&action, &self.dropdowns, &self.bar_button);
     }
 

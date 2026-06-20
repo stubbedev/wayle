@@ -43,6 +43,9 @@ settings-animations-share-picker = Animation
 settings-animations-wallpaper = Wallpaper
     .description = Per-surface animation override for the wallpaper crossfade
 
+settings-animations-power = Power Menu
+    .description = Per-surface animation override for the power menu overlay
+
 
 ## AnimationType variants
 enum-animation-type-none = None

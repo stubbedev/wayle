@@ -6,9 +6,12 @@ use std::{
 use gtk::prelude::*;
 use relm4::prelude::*;
 use tracing::{debug, error, warn};
-use wayle_config::schemas::{
-    bar::BorderLocation,
-    modules::{HyprlandWorkspacesConfig, Numbering, UrgentMode},
+use wayle_config::{
+    ClickAction,
+    schemas::{
+        bar::BorderLocation,
+        modules::{HyprlandWorkspacesConfig, Numbering, UrgentMode, WorkspaceClickAction},
+    },
 };
 use wayle_hyprland::{Address, HyprlandService, WorkspaceId};
 use wayle_widgets::prelude::BarSettings;
@@ -26,8 +29,55 @@ use super::{
     },
     messages::WorkspacesCmd,
 };
+use crate::{process, shell::bar::dropdowns};
 
 impl HyprlandWorkspaces {
+    /// Runs a configured click action for the clicked workspace `id`.
+    pub(super) fn dispatch_click_action(&self, action: WorkspaceClickAction, id: WorkspaceId) {
+        match action {
+            WorkspaceClickAction::None => {}
+            WorkspaceClickAction::FocusWorkspace => self.switch_to_workspace(id),
+            WorkspaceClickAction::FocusNext => self.navigate_workspace(1),
+            WorkspaceClickAction::FocusPrevious => self.navigate_workspace(-1),
+            WorkspaceClickAction::FocusLast => self.focus_last_workspace(),
+            WorkspaceClickAction::Dropdown(name) => {
+                let action = ClickAction::Dropdown(name);
+                dropdowns::dispatch_click_widget(&action, &self.dropdowns, self.buttons.widget());
+            }
+            WorkspaceClickAction::Shell(cmd) => process::run_if_set(&cmd),
+        }
+    }
+
+    /// Runs a configured scroll action (no clicked workspace, so `FocusWorkspace`
+    /// is ignored).
+    pub(super) fn dispatch_scroll_action(&self, action: WorkspaceClickAction) {
+        match action {
+            WorkspaceClickAction::None => {}
+            WorkspaceClickAction::FocusWorkspace => {
+                warn!("FocusWorkspace needs a clicked workspace; scroll ignored");
+            }
+            WorkspaceClickAction::FocusNext => self.navigate_workspace(1),
+            WorkspaceClickAction::FocusPrevious => self.navigate_workspace(-1),
+            WorkspaceClickAction::FocusLast => self.focus_last_workspace(),
+            WorkspaceClickAction::Dropdown(name) => {
+                let action = ClickAction::Dropdown(name);
+                dropdowns::dispatch_click_widget(&action, &self.dropdowns, self.buttons.widget());
+            }
+            WorkspaceClickAction::Shell(cmd) => process::run_if_set(&cmd),
+        }
+    }
+
+    /// Focuses the previously focused workspace (Hyprland `workspace previous`).
+    fn focus_last_workspace(&self) {
+        let Some(hyprland) = &self.hyprland else {
+            return;
+        };
+        let hyprland = hyprland.clone();
+        tokio::spawn(async move {
+            let _ = hyprland.dispatch("workspace previous").await;
+        });
+    }
+
     pub(super) fn is_vertical(&self) -> bool {
         self.settings.is_vertical.get()
     }

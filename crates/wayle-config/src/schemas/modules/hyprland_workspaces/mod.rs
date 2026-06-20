@@ -4,6 +4,7 @@ use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use wayle_derive::{wayle_config, wayle_enum};
 
+use super::WorkspaceClickAction;
 use crate::{
     ConfigProperty,
     docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
@@ -425,6 +426,31 @@ pub struct HyprlandWorkspacesConfig {
     #[serde(rename = "app-icon-map")]
     #[default(BTreeMap::new())]
     pub app_icon_map: ConfigProperty<BTreeMap<String, String>>,
+
+    /// Action on left-clicking a workspace. Default focuses it.
+    #[serde(rename = "left-click")]
+    #[default(WorkspaceClickAction::FocusWorkspace)]
+    pub left_click: ConfigProperty<WorkspaceClickAction>,
+
+    /// Action on middle-clicking a workspace.
+    #[serde(rename = "middle-click")]
+    #[default(WorkspaceClickAction::None)]
+    pub middle_click: ConfigProperty<WorkspaceClickAction>,
+
+    /// Action on right-clicking a workspace.
+    #[serde(rename = "right-click")]
+    #[default(WorkspaceClickAction::None)]
+    pub right_click: ConfigProperty<WorkspaceClickAction>,
+
+    /// Action on scrolling up over the module. Default focuses the previous workspace.
+    #[serde(rename = "scroll-up")]
+    #[default(WorkspaceClickAction::FocusPrevious)]
+    pub scroll_up: ConfigProperty<WorkspaceClickAction>,
+
+    /// Action on scrolling down over the module. Default focuses the next workspace.
+    #[serde(rename = "scroll-down")]
+    #[default(WorkspaceClickAction::FocusNext)]
+    pub scroll_down: ConfigProperty<WorkspaceClickAction>,
 }
 
 impl ModuleInfoProvider for HyprlandWorkspacesConfig {

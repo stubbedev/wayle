@@ -55,10 +55,35 @@ pub struct PowerConfig {
     #[default(ClickAction::None)]
     pub scroll_down: ConfigProperty<ClickAction>,
 
-    /// Action on left click.
+    /// Action on left click. Default opens wayle's native power menu (`:menu`).
     #[serde(rename = "left-click")]
-    #[default(ClickAction::None)]
+    #[default(ClickAction::Shell(String::from(":menu")))]
     pub left_click: ConfigProperty<ClickAction>,
+
+    /// Command run by the power menu's Lock button.
+    #[serde(rename = "lock-command")]
+    #[default(String::from("loginctl lock-session"))]
+    pub lock_command: ConfigProperty<String>,
+
+    /// Command run by the power menu's Log out button.
+    #[serde(rename = "logout-command")]
+    #[default(String::from("loginctl terminate-session $XDG_SESSION_ID"))]
+    pub logout_command: ConfigProperty<String>,
+
+    /// Command run by the power menu's Suspend button.
+    #[serde(rename = "suspend-command")]
+    #[default(String::from("systemctl suspend"))]
+    pub suspend_command: ConfigProperty<String>,
+
+    /// Command run by the power menu's Reboot button.
+    #[serde(rename = "reboot-command")]
+    #[default(String::from("systemctl reboot"))]
+    pub reboot_command: ConfigProperty<String>,
+
+    /// Command run by the power menu's Shut down button.
+    #[serde(rename = "shutdown-command")]
+    #[default(String::from("systemctl poweroff"))]
+    pub shutdown_command: ConfigProperty<String>,
 
     /// Hidden: icon always shown.
     #[serde(skip)]

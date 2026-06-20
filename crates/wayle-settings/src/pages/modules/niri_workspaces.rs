@@ -7,18 +7,20 @@ use wayle_config::{
 
 use crate::{
     editors::{
+        action::action,
         color_value::color_value,
         enum_select::enum_select,
         icon::icon,
         size::{size, size_with_base},
         string_list::string_list,
         string_map::string_map,
-        text::{text, text_like},
+        text::text,
         toggle::toggle,
         workspace_style_map::workspace_style_map,
     },
     pages::{
         nav::LeafEntry,
+        sections::action_choices::workspace_choices,
         spec::{SectionSpec, page_spec},
     },
 };
@@ -100,11 +102,11 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-actions",
                     items: vec![
-                        text_like(&module.left_click),
-                        text_like(&module.middle_click),
-                        text_like(&module.right_click),
-                        text_like(&module.scroll_up),
-                        text_like(&module.scroll_down),
+                        action(&module.left_click, workspace_choices()),
+                        action(&module.middle_click, workspace_choices()),
+                        action(&module.right_click, workspace_choices()),
+                        action(&module.scroll_up, workspace_choices()),
+                        action(&module.scroll_down, workspace_choices()),
                     ],
                 },
             ],

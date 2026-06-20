@@ -1,18 +1,23 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use wayle_config::ConfigService;
 use wayle_hyprland::{Address, HyprlandService, WorkspaceId};
 use wayle_widgets::prelude::BarSettings;
 
+use crate::shell::bar::dropdowns::DropdownRegistry;
+
 pub(crate) struct WorkspacesInit {
     pub settings: BarSettings,
     pub hyprland: Option<Arc<HyprlandService>>,
     pub config: Arc<ConfigService>,
+    pub dropdowns: Rc<DropdownRegistry>,
 }
 
 #[derive(Debug)]
 pub(crate) enum WorkspacesMsg {
     WorkspaceClicked(WorkspaceId),
+    MiddleClick(WorkspaceId),
+    RightClick(WorkspaceId),
     ScrollUp,
     ScrollDown,
 }
