@@ -7,13 +7,27 @@ rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
 
+[features]
+# `pipewire` gates the ScreenCast PipeWire producer, the only part that needs
+# the libpipewire/libspa C libraries. Everything else (D-Bus interfaces,
+# wlr/ext Wayland capture, all pure logic) builds without it, so
+# `cargo test -p wayle-portal --no-default-features` runs the unit tests with
+# no system PipeWire present.
+default = ["pipewire"]
+pipewire = ["dep:pipewire", "dep:libspa"]
+
 [dependencies]
 futures.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 zbus.workspace = true
+wayland-client.workspace = true
 wayle-config.workspace = true
+wayle-ipc.workspace = true
+wayle-share-preview.workspace = true
+pipewire = { workspace = true, optional = true }
+libspa = { workspace = true, optional = true }
 
 [lints.clippy]
 cognitive_complexity = "warn"

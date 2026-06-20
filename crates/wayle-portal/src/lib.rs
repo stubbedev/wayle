@@ -11,24 +11,27 @@
 //!
 //! # Interface coverage
 //!
-//! Implemented natively here: Settings, Lockdown (more land per phase:
-//! ScreenCast, RemoteDesktop, Screenshot, GlobalShortcuts, Inhibit,
-//! Notification, Wallpaper, Access). The generic GTK-dialog interfaces
-//! (FileChooser, Print, …) are delegated to `xdg-desktop-portal-gtk` via
-//! `portals.conf`.
+//! Implemented natively: Settings, Lockdown, ScreenCast (more land per phase:
+//! RemoteDesktop, Screenshot, GlobalShortcuts, Inhibit, Notification,
+//! Wallpaper, Access). The generic GTK-dialog interfaces (FileChooser, Print,
+//! …) are delegated to `xdg-desktop-portal-gtk` via `portals.conf`.
 
 mod error;
 mod lockdown;
+mod request;
+mod response;
+mod screencast;
+mod session;
 mod settings;
 
 use std::future::pending;
 
 use tracing::info;
 use wayle_config::ConfigService;
-use zbus::connection;
+use zbus::Connection;
 
 pub use self::error::Error;
-use self::{lockdown::Lockdown, settings::Settings};
+use self::{lockdown::Lockdown, screencast::ScreenCast, settings::Settings};
 
 /// The backend's well-known D-Bus name (matches `wayle.portal`'s `DBusName`).
 const BUS_NAME: &str = "org.freedesktop.impl.portal.desktop.wayle";
@@ -47,17 +50,29 @@ pub async fn run() -> Result<(), Error> {
         .await
         .map_err(|err| Error::Config(err.to_string()))?;
 
-    let connection = connection::Builder::session()
-        .map_err(|err| Error::Connection(err.to_string()))?
-        .name(BUS_NAME)
-        .map_err(|err| Error::NameRequest(err.to_string()))?
-        .serve_at(settings::PORTAL_PATH, Settings::new(config.clone()))
-        .map_err(|err| Error::Registration(err.to_string()))?
-        .serve_at(settings::PORTAL_PATH, Lockdown)
-        .map_err(|err| Error::Registration(err.to_string()))?
-        .build()
+    let connection = Connection::session()
+        .await
+        .map_err(|err| Error::Connection(err.to_string()))?;
+
+    let server = connection.object_server();
+    let path = settings::PORTAL_PATH;
+    server
+        .at(path, Settings::new(config.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Lockdown)
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, ScreenCast::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+
+    connection
+        .request_name(BUS_NAME)
+        .await
+        .map_err(|err| Error::NameRequest(err.to_string()))?;
 
     settings::spawn_watcher(&connection, config);
 
