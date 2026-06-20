@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wayle Button Styling System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background: #0a0e27;
+            color: #e0e6ed;
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        h1 { margin-bottom: 0.5rem; font-size: 2rem; color: #6ee7b7; }
+        h2 { margin-top: 2rem; margin-bottom: 1rem; font-size: 1.5rem; color: #60a5fa; border-bottom: 2px solid #1e293b; padding-bottom: 0.5rem; }
+        h3 { margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.15rem; color: #a78bfa; }
+        .subtitle { color: #94a3b8; font-size: 0.95rem; margin-bottom: 2rem; }
+        section { margin-bottom: 2rem; }
+        .framework-box {
+            background: #1e293b;
+            border-left: 4px solid #f97316;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .code-block {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: "Courier New", monospace;
+            font-size: 0.9rem;
+        }
+        .file-path {
+            color: #f97316;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .token-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 1rem 0;
+        }
+        .token-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+        .token-card h4 { color: #fbbf24; margin-bottom: 0.5rem; }
+        .token-card code {
+            background: #0f172a;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.3rem;
+            font-size: 0.85rem;
+        }
+        .status { color: #10b981; }
+        .alert { background: #1e3a1f; border-left: 4px solid #10b981; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; }
+        .variant-box {
+            background: #2d3748;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0.5rem;
+            border-left: 3px solid #a78bfa;
+        }
+        .file-ref { color: #f97316; font-weight: 500; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: #1e293b;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+        th { background: #0f172a; color: #a78bfa; font-weight: 600; }
+        tr:last-child td { border-bottom: none; }
+        .value-mono { font-family: monospace; color: #f97316; }
+    </style>
+</head>
+<body>
+    <h1>Wayle Button Styling System</h1>
+    <p class="subtitle">Complete architecture map for theme/style system in wayle-settings</p>
+
+    <section>
+        <h2>1. Crate Location</h2>
+        <div class="framework-box">
+            <strong>Path:</strong> <span class="file-ref">/home/stubbe/git/private/wayle/crates/wayle-settings</span>
+            <p style="margin-top: 0.5rem;">Button rendering uses the <span class="status">wayle-widgets</span> component library and <span class="status">wayle-styling</span> for CSS/themes.</p>
+        </div>
+    </section>
+
+    <section>
+        <h2>2. UI Framework</h2>
+        <div class="framework-box">
+            <strong>Framework:</strong> <span class="status">Relm4</span> (Elm-inspired reactive UI library)
+            <p style="margin-top: 0.5rem;"><strong>Rendering:</strong> GTK4</p>
+            <p style="margin-top: 0.5rem;"><strong>Styling:</strong> CSS (via GTK's CSS provider system)</p>
+        </div>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-settings/Cargo.toml</div>
+gtk4.workspace = true
+relm4.workspace = true
+wayle-widgets = { path = "../wayle-widgets" }
+wayle-styling = { path = "../wayle-styling" }
+        </div>
+    </section>
+
+    <section>
+        <h2>3. Theme System Architecture</h2>
+        <h3>Dynamic Theme Generation (Runtime CSS Variables)</h3>
+        <p>At startup, Rust generates CSS custom properties (variables) based on config values. These are injected as a <code>:root { ... }</code> block.</p>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-styling/src/lib.rs:54–151</div>
+pub fn theme_css(palette, general, bar, styling) → String {
+    // Generates :root { 
+    //   --palette-bg, --palette-surface, etc.
+    //   --bar-btn-icon-size, --bar-btn-icon-padding, etc.
+    //   --cfg-rounding-element, --cfg-bar-button-rounding-element
+    // }
+}
+        </div>
+
+        <h3>Static SCSS Compiled at Build Time</h3>
+        <p>Base CSS is compiled from SCSS source once, embedded in binary, enhanced by runtime theme variables.</p>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-styling/src/lib.rs:39</div>
+pub const STATIC_CSS: &str = include_str!(concat!(env!("OUT_DIR"), "/style.css"));
+        </div>
+    </section>
+
+    <section>
+        <h2>4. Button Colors & Theme Tokens</h2>
+        <h3>Palette Colors (Runtime CSS Variables)</h3>
+        <p>Generated dynamically from active palette (Wayle, Matugen, Wallust, or Pywal):</p>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-styling/src/lib.rs:99–150</div>
+:root {
+    --palette-bg: #1a1a2e;
+    --palette-surface: #16213e;
+    --palette-elevated: #0f3460;
+    --palette-fg: #eaeaea;
+    --palette-fg-muted: #a8a8a8;
+    --palette-primary: #e94560;
+    --palette-red: #e74c3c;
+    --palette-yellow: #f39c12;
+    --palette-green: #27ae60;
+    --palette-blue: #3498db;
+    --dropdown-surface: rgba(10, 20, 34, 0.95);
+}
+        </div>
+
+        <h3>Button-Specific Colors (Per-Button CSS Variables)</h3>
+        <p>Set inline by the BarButton component for each button instance:</p>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-widgets/src/components/bar_buttons/styling.rs:84–95</div>
+format!(
+    "* {{ \
+     --bar-btn-icon-color: {}; \
+     --bar-btn-label-color: {}; \
+     --bar-btn-icon-bg: {}; \
+     --bar-btn-bg: {}; \
+     --bar-btn-border-color: {}; \
+     --bar-btn-border-width: {}px; \
+     }}",
+    icon_color, label_color, icon_bg, button_bg, border_color, border_width
+)
+        </div>
+    </section>
+
+    <section>
+        <h2>5. Border Radius & Rounding Configuration</h2>
+        <h3>Configurable Rounding Levels</h3>
+        <p>User selects global rounding preference; translates to semantic tokens:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rounding Level</th>
+                    <th>Element Value</th>
+                    <th>Container Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="value-mono">none</span></td>
+                    <td><span class="value-mono">--radius-none</span> (0px)</td>
+                    <td><span class="value-mono">--radius-none</span> (0px)</td>
+                </tr>
+                <tr>
+                    <td><span class="value-mono">sm</span></td>
+                    <td><span class="value-mono">--radius-sm</span> (0.375rem ≈ 6px)</td>
+                    <td><span class="value-mono">--radius-md</span> (0.625rem ≈ 10px)</td>
+                </tr>
+                <tr>
+                    <td><span class="value-mono">md</span> (default)</td>
+                    <td><span class="value-mono">--radius-md</span> (0.625rem ≈ 10px)</td>
+                    <td><span class="value-mono">--radius-lg</span> (0.875rem ≈ 14px)</td>
+                </tr>
+                <tr>
+                    <td><span class="value-mono">lg</span></td>
+                    <td><span class="value-mono">--radius-lg</span> (0.875rem ≈ 14px)</td>
+                    <td><span class="value-mono">--radius-xl</span> (1.125rem ≈ 18px)</td>
+                </tr>
+                <tr>
+                    <td><span class="value-mono">full</span></td>
+                    <td><span class="value-mono">--radius-full</span> (9999px, pill shape)</td>
+                    <td><span class="value-mono">--radius-xl</span> (1.125rem ≈ 18px)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Bar Button Rounding (Independent Override)</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-config/src/schemas/bar/mod.rs:170–233</div>
+pub button_rounding: ConfigProperty&lt;RoundingLevel&gt;,
+pub button_group_rounding: ConfigProperty&lt;RoundingLevel&gt;,
+        </div>
+        <p>Maps to CSS variables at runtime:</p>
+        <div class="code-block">
+--cfg-bar-button-rounding-element: var(--bar-button-radius-md);
+--cfg-bar-group-rounding-element: var(--radius-full);
+        </div>
+        <p style="margin-top: 1rem;"><strong>Applied in SCSS:</strong></p>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-styling/scss/components/bar_button/_base.scss:17</div>
+border-radius: var(--bar-button-rounding-element);
+        </div>
+    </section>
+
+    <section>
+        <h2>6. Button Sizing Configuration</h2>
+        <h3>Base Pixel Values (SCSS Constants)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Dimension</th>
+                    <th>Value</th>
+                    <th>In Pixels (Global Scale × 1.0)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Icon Size</td>
+                    <td><span class="value-mono">$base-btn-icon-size: 1.6rem</span></td>
+                    <td>≈ 25.6px</td>
+                </tr>
+                <tr>
+                    <td>Label Size</td>
+                    <td><span class="value-mono">$base-btn-label-size: 1.04rem</span></td>
+                    <td>≈ 16.6px</td>
+                </tr>
+                <tr>
+                    <td>Button Padding</td>
+                    <td><span class="value-mono">$base-btn-padding: 0.5rem</span></td>
+                    <td>≈ 8px</td>
+                </tr>
+                <tr>
+                    <td>Icon-Label Gap</td>
+                    <td><span class="value-mono">$base-btn-gap: 0.5rem</span></td>
+                    <td>≈ 8px</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Runtime CSS Variables (with Bar Scale)</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-styling/scss/tokens/_index.scss:185–207</div>
+--bar-btn-icon-size: var(
+    --bar-btn-icon-size-override,
+    calc(1.6rem * var(--bar-scale) * var(--bar-btn-icon-scale))
+);
+--bar-btn-icon-padding: var(
+    --bar-btn-icon-padding-override,
+    calc(0.5rem * var(--bar-scale) * var(--bar-btn-icon-padding-scale))
+);
+--bar-btn-label-size: var(
+    --bar-btn-label-size-override,
+    calc(1.04rem * var(--bar-scale) * var(--bar-btn-label-size-scale))
+);
+--bar-btn-label-padding: var(
+    --bar-btn-label-padding-override,
+    calc(0.5rem * var(--bar-scale) * var(--bar-btn-label-padding-scale))
+);
+--bar-btn-gap: var(
+    --bar-btn-gap-override,
+    calc(0.5rem * var(--bar-scale) * var(--bar-btn-gap-scale))
+);
+        </div>
+
+        <h3>Config Properties (Settable by User)</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-config/src/schemas/bar/mod.rs:147–178</div>
+pub button_icon_size: ConfigProperty&lt;Size&gt;,          // Scale or px
+pub button_icon_padding: ConfigProperty&lt;Size&gt;,      // Scale or px
+pub button_label_size: ConfigProperty&lt;Size&gt;,       // Scale or px
+pub button_label_padding: ConfigProperty&lt;Size&gt;,    // Scale or px
+pub button_gap: ConfigProperty&lt;Size&gt;,              // Scale or px
+        </div>
+    </section>
+
+    <section>
+        <h2>7. Button Variants (Visual Styles)</h2>
+        <p>Three mutually exclusive rendering modes, each with distinct styling:</p>
+
+        <div class="variant-box">
+            <h4>Basic Variant</h4>
+            <p><strong>Structure:</strong> Padding applied to content box; gap as margin on label</p>
+            <div class="code-block">
+            <div class="file-path">crates/wayle-styling/scss/components/bar_button/_base.scss:45–86</div>
+&.basic .bar-button-content {
+    margin: var(--bar-btn-label-padding);
+}
+&.basic .bar-button-label {
+    margin-left: var(--bar-btn-gap);
+}
+            </div>
+            <p style="margin-top: 1rem;"><strong>Colors applied:</strong> Icon color, label color, button background</p>
+        </div>
+
+        <div class="variant-box">
+            <h4>IconSquare Variant</h4>
+            <p><strong>Structure:</strong> Icon in colored square inside button padding</p>
+            <div class="code-block">
+            <div class="file-path">crates/wayle-styling/scss/components/bar_button/_icon_square.scss:4–59</div>
+.icon-container {
+    background-color: var(--bar-btn-icon-bg);
+    border-radius: var(--bar-button-rounding-element);
+    transition: background-color var(--duration-fast);
+    margin: calc(var(--bar-btn-icon-padding) * 0.3);
+}
+.icon-container image {
+    color: var(--bar-btn-icon-color);
+}
+&:hover .icon-container {
+    filter: brightness(1.2);
+}
+            </div>
+            <p style="margin-top: 1rem;"><strong>Hover state:</strong> brightness(1.2) on icon container</p>
+        </div>
+
+        <div class="variant-box">
+            <h4>BlockPrefix Variant</h4>
+            <p><strong>Structure:</strong> Icon in colored container bleeding to button edge</p>
+            <div class="code-block">
+            <div class="file-path">crates/wayle-styling/scss/components/bar_button/_block_prefix.scss:5–55</div>
+.icon-container {
+    background-color: var(--bar-btn-icon-bg);
+    border-top-left-radius: var(--bar-button-rounding-element);
+    border-bottom-left-radius: var(--bar-button-rounding-element);
+}
+.icon-container image {
+    color: var(--bar-btn-icon-color);
+    margin: var(--bar-btn-icon-padding);
+}
+&:hover .icon-container {
+    filter: brightness(1.1);
+}
+            </div>
+            <p style="margin-top: 1rem;"><strong>Hover state:</strong> brightness(1.1) on icon container</p>
+            <p><strong>Note:</strong> Radius adapts to orientation (vertical) and icon position (end)</p>
+        </div>
+    </section>
+
+    <section>
+        <h2>8. Hover & Active States</h2>
+        <p>Defined via CSS filters and brightness modulation:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Variant</th>
+                    <th>Hover Filter</th>
+                    <th>Active (:checked) Filter</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Basic</td>
+                    <td><span class="value-mono">brightness(1.15)</span></td>
+                    <td><span class="value-mono">brightness(0.95)</span></td>
+                </tr>
+                <tr>
+                    <td>IconSquare</td>
+                    <td><span class="value-mono">brightness(1.2)</span> on icon-container</td>
+                    <td>—</td>
+                </tr>
+                <tr>
+                    <td>BlockPrefix</td>
+                    <td><span class="value-mono">brightness(1.1)</span> on icon-container</td>
+                    <td>—</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Focus Ring</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-styling/scss/components/bar_button/_base.scss:28–31</div>
+&:focus-visible > button.toggle {
+    outline: var(--focus-ring-width) solid var(--fg-muted);
+    outline-offset: calc(0.125rem * var(--bar-scale));
+}
+        </div>
+    </section>
+
+    <section>
+        <h2>9. Button Component (Rust Implementation)</h2>
+        <h3>Component Constructor</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-widgets/src/components/bar_buttons/component.rs:25–40</div>
+#[derive(Debug, Clone)]
+pub struct BarButtonInit {
+    pub icon: String,
+    pub label: String,
+    pub tooltip: Option&lt;String&gt;,
+    pub colors: BarButtonColors,
+    pub behavior: BarButtonBehavior,
+    pub settings: BarSettings,
+}
+        </div>
+
+        <h3>View Template (Relm4)</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-widgets/src/components/bar_buttons/component.rs:93–176</div>
+view! {
+    #[root]
+    gtk::MenuButton {
+        set_css_classes: &model.css_classes(),
+        #[wrap(Some)]
+        set_child = &gtk::Box {
+            add_css_class: "bar-button-content",
+            set_orientation: model.orientation(),
+            gtk::Box { add_css_class: "icon-container", ... },
+            gtk::Box { add_css_class: "label-container", ... },
+        },
+    }
+}
+        </div>
+
+        <h3>CSS Classes Applied Dynamically</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-widgets/src/components/bar_buttons/component.rs:281–308</div>
+fn css_classes(&self) -> Vec&lt;&'static str&gt; {
+    let mut classes = vec!["bar-button"];
+    
+    classes.push(match self.variant {
+        BarButtonVariant::Basic => "basic",
+        BarButtonVariant::BlockPrefix => "block-prefix",
+        BarButtonVariant::IconSquare => "icon-square",
+    });
+    
+    if !self.behavior.show_label.get() { classes.push("icon-only"); }
+    if !self.behavior.show_icon.get() { classes.push("label-only"); }
+    if self.settings.is_vertical.get() { classes.push("vertical"); }
+    if self.behavior.show_border.get() { classes.push(border_class); }
+    if let Some(pos_class) = self.settings.icon_position.get().css_class() {
+        classes.push(pos_class);
+    }
+    classes
+}
+        </div>
+    </section>
+
+    <section>
+        <h2>10. Shared Theme Token Modules</h2>
+        <h3>Design Tokens (Global Palette & Semantic Tokens)</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-styling/scss/tokens/_index.scss</div>
+// Compiled at build time; enhanced at runtime by Rust
+$base-space-xs: 0.25rem;
+$base-space-sm: 0.5rem;
+$base-space-md: 1rem;
+
+:root {
+    // Color tokens
+    --palette-bg, --palette-surface, --palette-fg, --palette-primary
+    
+    // Spacing (scaled by global-scale)
+    --space-xs: calc(0.25rem * var(--global-scale));
+    --space-md: calc(1rem * var(--global-scale));
+    
+    // Rounding
+    --radius-sm: calc(0.375rem * var(--global-scale));
+    --radius-md: calc(0.625rem * var(--global-scale));
+    
+    // Button-specific
+    --bar-btn-icon-color, --bar-btn-label-color, --bar-btn-bg
+}
+        </div>
+
+        <h3>Palette Definition</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-styling/scss/_palette.scss</div>
+// Maps palette colors via CSS custom properties
+// Values come from Rust at :root level
+        </div>
+
+        <h3>Theme Generation (Rust)</h3>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-styling/src/lib.rs:54–151 (theme_css function)</div>
+Generates :root block with:
+- Palette colors (--palette-*)
+- Rounding tokens (--cfg-rounding-element, --cfg-bar-button-rounding-element)
+- Size scale multipliers (--bar-scale, --bar-btn-icon-scale)
+- Font family tokens (--cfg-font-sans, --cfg-font-mono)
+        </div>
+    </section>
+
+    <section>
+        <h2>11. CSS Loading & Priority</h2>
+        <div class="code-block">
+            <div class="file-path">crates/wayle-settings/src/app/css.rs:10–46</div>
+pub fn load_css(config_service: &ConfigService) -> CssProvider {
+    let provider = CssProvider::new();
+    let css = build_css(config_service);  // Combines STATIC_CSS + theme_css + user_css
+    provider.load_from_string(&css);
+    style_context_add_provider_for_display(
+        &display,
+        &provider,
+        STYLE_PROVIDER_PRIORITY_USER + 100  // User+100 priority
+    );
+    provider
+}
+
+pub fn build_css(config_service: &ConfigService) -> String {
+    let palette = config.styling.palette();
+    let theme = theme_css(&palette, &config.general, &config.bar, &config.styling);
+    let user = user_css(config_dir);
+    format!("{STATIC_CSS}\n{theme}\n{user}")
+}
+        </div>
+    </section>
+
+    <section>
+        <h2>12. Key File References</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Purpose</th>
+                    <th>File Path</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Button component (Relm4)</td>
+                    <td><span class="file-path">crates/wayle-widgets/src/components/bar_buttons/component.rs</span></td>
+                </tr>
+                <tr>
+                    <td>Button styling (CSS generation)</td>
+                    <td><span class="file-path">crates/wayle-widgets/src/components/bar_buttons/styling.rs</span></td>
+                </tr>
+                <tr>
+                    <td>Button SCSS (all variants)</td>
+                    <td><span class="file-path">crates/wayle-styling/scss/components/bar_button/</span> (4 files)</td>
+                </tr>
+                <tr>
+                    <td>Design tokens (SCSS)</td>
+                    <td><span class="file-path">crates/wayle-styling/scss/tokens/_index.scss</span></td>
+                </tr>
+                <tr>
+                    <td>Theme generation (Rust)</td>
+                    <td><span class="file-path">crates/wayle-styling/src/lib.rs:54–151</span></td>
+                </tr>
+                <tr>
+                    <td>CSS loading (app startup)</td>
+                    <td><span class="file-path">crates/wayle-settings/src/app/css.rs</span></td>
+                </tr>
+                <tr>
+                    <td>Rounding config types</td>
+                    <td><span class="file-path">crates/wayle-config/src/schemas/styling/types/rounding.rs</span></td>
+                </tr>
+                <tr>
+                    <td>Bar config schema</td>
+                    <td><span class="file-path">crates/wayle-config/src/schemas/bar/mod.rs</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+</body>
+</html>

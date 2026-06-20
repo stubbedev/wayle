@@ -40,6 +40,9 @@ settings-animations-toast = Toast
 settings-animations-dropdown = Dropdown
     .description = Per-surface animation override for bar widget dropdown foldouts
 
+settings-animations-share-picker = Animation
+    .description = Per-surface animation override for the screen-share picker overlay
+
 
 ## AnimationType variants
 enum-animation-type-none = None

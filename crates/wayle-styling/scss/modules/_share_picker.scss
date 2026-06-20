@@ -2,17 +2,22 @@
 // choose a window / output / region to capture. The widget tree is built in
 // `shell/share_picker/views.rs` and `mod.rs`.
 
+// The window itself stays transparent so the surface inside the revealer is
+// what paints — that way the enter/exit transition (crossfade or slide)
+// animates the entire panel, not just its inner content.
 .share-picker-window {
+    background: transparent;
+}
+
+// The actual panel: lives inside the revealer so it animates as one piece.
+.share-picker-surface {
     background: var(--bg-base);
     color: var(--fg-default);
     font-family: var(--font-sans);
     border: 1px solid var(--border-default);
     border-radius: var(--rounding-container);
     box-shadow: var(--shadow);
-
-    > box {
-        padding: var(--space-lg);
-    }
+    padding: var(--space-lg);
 }
 
 // --- Notebook + tabs -------------------------------------------------------
@@ -24,17 +29,19 @@
         margin-bottom: var(--space-md);
 
         tabs {
-            // Pill-style tab strip so the active page reads clearly.
+            // Segmented tab strip. Roundness follows the theme's element/
+            // container rounding tokens (same as the buttons) rather than a
+            // hardcoded pill, so it adheres to the configured button roundness.
             background: var(--bg-surface);
             border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-full);
+            border-radius: var(--rounding-container);
             padding: var(--space-xs);
 
             tab {
                 all: unset;
                 min-height: calc(1.75rem * var(--global-scale));
                 padding: var(--space-xs) var(--space-lg);
-                border-radius: var(--radius-full);
+                border-radius: var(--rounding-element);
                 transition:
                     background var(--duration-fast),
                     color var(--duration-fast);
@@ -47,12 +54,19 @@
                     background: var(--bg-hover);
                 }
 
+                // Active tab reads like a primary button: accent fill with
+                // on-accent label, matching the shared button design.
                 &:checked {
                     background: var(--accent);
 
                     .share-picker-tab-label {
                         color: var(--fg-on-accent);
                     }
+                }
+
+                &:focus-visible {
+                    outline: var(--focus-ring-width) solid var(--accent);
+                    outline-offset: calc(0.125rem * var(--global-scale));
                 }
             }
         }
@@ -132,31 +146,23 @@
 
 // --- Region button + empty state ------------------------------------------
 
+// The region CTA is a shared `.primary` button (see primitives/buttons),
+// sized up for prominence in the otherwise-empty page. Background, colors,
+// roundness, hover and focus all come from the button primitive, so any
+// wayle-settings theme adjustment to button roundness/colors flows through
+// automatically. Only the size and the hover lift are layered on here.
 .share-picker-region-button {
-    all: unset;
     min-height: calc(2.25rem * var(--global-scale));
-    padding: var(--space-sm) var(--space-xl);
-    background: var(--accent);
-    color: var(--fg-on-accent);
-    font-size: var(--text-md);
     font-weight: var(--weight-semibold);
-    border-radius: var(--rounding-element);
-    transition:
-        background var(--duration-fast),
-        box-shadow var(--duration-fast);
+
+    // Compound with `.primary` to outrank the primitive's
+    // `button.primary > label` child-margin rule and widen the CTA.
+    &.primary > label {
+        margin: var(--space-sm) var(--space-xl);
+    }
 
     &:hover {
-        background: var(--accent-hover);
         box-shadow: var(--shadow-sm);
-    }
-
-    &:active {
-        background: var(--accent);
-    }
-
-    &:focus-visible {
-        outline: var(--focus-ring-width) solid var(--accent);
-        outline-offset: calc(0.125rem * var(--global-scale));
     }
 }
 
@@ -168,37 +174,16 @@
 
 // --- Restore-token checkbox row -------------------------------------------
 
+// Restore-token toggle. The check box itself is styled by the shared
+// `checkbutton` primitive (primitives/checkbox) so its roundness and accent
+// match every other checkbox; only the row layout and the muted
+// secondary-text treatment live here.
 .share-picker-restore-button {
     margin-top: var(--space-md);
     padding: var(--space-sm) var(--space-xs);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    color: var(--fg-muted);
 
-    check {
-        min-width: calc(1.125rem * var(--global-scale));
-        min-height: calc(1.125rem * var(--global-scale));
-        margin-right: var(--space-sm);
-        border-radius: var(--rounding-element);
-        background: var(--bg-overlay);
-        border: 1px solid var(--border-strong);
-        transition: background var(--duration-fast);
-        -gtk-icon-source: none;
-
-        &:checked {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: var(--fg-on-accent);
-            -gtk-icon-source: -gtk-icontheme("object-select-symbolic");
-            -gtk-icon-size: calc(0.75rem * var(--global-scale));
-        }
-    }
-
-    &:hover check {
-        background: var(--bg-hover);
-
-        &:checked {
-            background: var(--accent-hover);
-        }
+    label {
+        font-size: var(--text-sm);
+        color: var(--fg-muted);
     }
 }

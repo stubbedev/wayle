@@ -1,24 +1,16 @@
-//! Static configuration for the share picker surface.
+//! Resolved configuration for the share picker surface.
 //!
-//! Mirrors the tunables of the standalone `hyprland-preview-share-picker` but
-//! ships sensible defaults baked in. CSS classes are namespaced with a
-//! `share-picker-` prefix so they never collide with the bar's own styles.
+//! [`PickerConfig`] is a plain snapshot the view builders read from. It is
+//! resolved from the user's `[share-picker]` config section
+//! ([`SharePickerConfig`]) each time the picker opens, so live edits in
+//! wayle-settings take effect on the next request. CSS classes are namespaced
+//! with a `share-picker-` prefix so they never collide with the bar's own
+//! styles.
 
-/// Notebook page shown first when the picker opens.
-// `Outputs`/`Region` are not selected by the baked-in default yet; they exist
-// so the default page becomes configurable without reshaping this enum.
-#[allow(dead_code)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum Page {
-    /// Per-window previews.
-    Windows,
-    /// Per-output previews.
-    Outputs,
-    /// Region selection via an external tool (e.g. `slurp`).
-    Region,
-}
+use wayle_config::Config;
+pub(super) use wayle_config::schemas::share_picker::SharePickerPage as Page;
 
-/// Resolved picker configuration.
+/// Resolved picker configuration snapshot.
 pub(super) struct PickerConfig {
     /// Target window width in pixels.
     pub(super) width: i32,
@@ -50,23 +42,25 @@ pub(super) struct PickerConfig {
     pub(super) region_command: String,
 }
 
-impl Default for PickerConfig {
-    fn default() -> Self {
+impl PickerConfig {
+    /// Resolves a snapshot from the live `[share-picker]` config section.
+    pub(super) fn from_config(config: &Config) -> Self {
+        let sp = &config.share_picker;
         Self {
-            width: 1000,
-            height: 500,
-            resize_size: 640,
-            widget_size: 150,
-            default_page: Page::Windows,
-            hide_token_restore: false,
-            clicks: 2,
-            windows_spacing: 12,
-            windows_min_per_row: 3,
-            windows_max_per_row: 4,
-            outputs_spacing: 6,
-            outputs_show_label: false,
-            outputs_respect_scaling: true,
-            region_command: String::from("slurp -f '%o@%x,%y,%w,%h'"),
+            width: sp.width.get() as i32,
+            height: sp.height.get() as i32,
+            resize_size: sp.resize_size.get(),
+            widget_size: sp.widget_size.get() as i32,
+            default_page: sp.default_page.get(),
+            hide_token_restore: sp.hide_token_restore.get(),
+            clicks: sp.clicks.get(),
+            windows_spacing: sp.windows_spacing.get(),
+            windows_min_per_row: sp.windows_min_per_row.get(),
+            windows_max_per_row: sp.windows_max_per_row.get(),
+            outputs_spacing: sp.outputs_spacing.get(),
+            outputs_show_label: sp.outputs_show_label.get(),
+            outputs_respect_scaling: sp.outputs_respect_scaling.get(),
+            region_command: sp.region_command.get(),
         }
     }
 }

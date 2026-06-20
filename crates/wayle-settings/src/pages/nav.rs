@@ -4,8 +4,8 @@
 use wayle_config::Config;
 
 use super::{
-    animations, bar, dropdowns, general, modules, notifications, osd, spec::PageSpec, styling,
-    toasts, wallpaper,
+    animations, bar, dropdowns, general, modules, notifications, osd, share_picker,
+    spec::PageSpec, styling, toasts, wallpaper,
 };
 
 pub(crate) struct LeafEntry {
@@ -42,6 +42,7 @@ pub(crate) fn layout() -> Vec<NavSectionLayout> {
                 notifications::entry,
                 osd::entry,
                 toasts::entry,
+                share_picker::entry,
                 dropdowns::entry,
             ],
         },

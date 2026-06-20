@@ -33,8 +33,15 @@ inspect-settings *args:
     WAYLE_DEV=1 GTK_DEBUG=interactive {{cargo}} run --bin wayle-settings -- {{args}}
 
 # Run the shell with SCSS hot-reload (watches crates/wayle-styling/scss/**).
+# Pass the subcommand: `just dev shell`.
 dev *args:
     WAYLE_DEV=1 {{cargo}} run --bin wayle -- {{args}}
+
+# Like dev, plus the GTK inspector for the bar/overlays — pick any widget to see
+# its CSS node names + classes. (Ctrl+Shift+D toggles the inspector in-app too.)
+# Pass the subcommand: `just inspect shell`.
+inspect *args:
+    WAYLE_DEV=1 GTK_DEBUG=interactive {{cargo}} run --bin wayle -- {{args}}
 
 # Remove target/ build artifacts.
 clean:

@@ -669,7 +669,7 @@ pub(super) fn build_region_page(
 
     let button = Button::builder()
         .label("Select region")
-        .css_classes(["share-picker-region-button"])
+        .css_classes(["primary", "share-picker-region-button"])
         .build();
     container.insert_child_after(&button, Option::<&Box>::None);
 

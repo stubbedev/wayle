@@ -80,6 +80,11 @@ pub struct AnimationsConfig {
     /// Per-surface override for bar widget dropdown foldouts.
     #[default(SurfaceAnimation::default())]
     pub dropdown: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for the screen-share picker overlay.
+    #[serde(rename = "share-picker")]
+    #[default(SurfaceAnimation::default())]
+    pub share_picker: ConfigProperty<SurfaceAnimation>,
 }
 
 /// Transient surface an animation applies to.
@@ -93,6 +98,8 @@ pub enum AnimSurface {
     Toast,
     /// Bar widget dropdown foldouts.
     Dropdown,
+    /// The screen-share picker overlay.
+    SharePicker,
 }
 
 impl AnimationsConfig {
@@ -102,6 +109,7 @@ impl AnimationsConfig {
             AnimSurface::Osd => self.osd.get(),
             AnimSurface::Toast => self.toast.get(),
             AnimSurface::Dropdown => self.dropdown.get(),
+            AnimSurface::SharePicker => self.share_picker.get(),
         }
     }
 

@@ -101,7 +101,9 @@ impl Component for Shell {
 
         let osd = create_osd(&init.services);
 
-        let share_picker = SharePicker::builder().launch(()).detach();
+        let share_picker = SharePicker::builder()
+            .launch(init.services.config.clone())
+            .detach();
         crate::services::share_picker::register_sender(share_picker.sender().clone());
 
         let model = Shell {

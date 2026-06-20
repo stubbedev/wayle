@@ -11,6 +11,7 @@ pub(crate) mod notifications;
 pub(crate) mod osd;
 pub(crate) mod page;
 pub(crate) mod sections;
+pub(crate) mod share_picker;
 pub(crate) mod spec;
 pub(crate) mod styling;
 pub(crate) mod toasts;
