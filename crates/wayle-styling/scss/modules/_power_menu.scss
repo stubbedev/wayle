@@ -15,6 +15,10 @@
 
 .power-menu-button {
     all: unset;
+    // Homogeneous row equalizes width; these keep every button the same,
+    // comfortably-sized square regardless of label length.
+    min-width: calc(5rem * var(--global-scale));
+    min-height: calc(5rem * var(--global-scale));
     padding: var(--space-lg);
     border-radius: var(--rounding-container);
     background: var(--bg-surface);

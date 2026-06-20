@@ -21,11 +21,15 @@ use wayle_config::{
 
 use crate::process;
 
-/// One power action: its icon, label, and the config command it runs.
+type PowerConfig = wayle_config::schemas::modules::PowerConfig;
+
+/// One power action: its icon, label, the config command it runs, and whether
+/// it is shown.
 struct PowerAction {
     icon: &'static str,
     label: &'static str,
-    command: fn(&wayle_config::schemas::modules::PowerConfig) -> String,
+    command: fn(&PowerConfig) -> String,
+    visible: fn(&PowerConfig) -> bool,
 }
 
 const ACTIONS: &[PowerAction] = &[
@@ -33,26 +37,31 @@ const ACTIONS: &[PowerAction] = &[
         icon: "ld-lock-symbolic",
         label: "Lock",
         command: |c| c.lock_command.get(),
+        visible: |c| c.show_lock.get(),
     },
     PowerAction {
         icon: "ld-log-out-symbolic",
         label: "Log out",
         command: |c| c.logout_command.get(),
+        visible: |c| c.show_logout.get(),
     },
     PowerAction {
         icon: "ld-moon-symbolic",
         label: "Suspend",
         command: |c| c.suspend_command.get(),
+        visible: |c| c.show_suspend.get(),
     },
     PowerAction {
         icon: "ld-rotate-ccw-symbolic",
         label: "Reboot",
         command: |c| c.reboot_command.get(),
+        visible: |c| c.show_reboot.get(),
     },
     PowerAction {
         icon: "ld-power-symbolic",
         label: "Shut down",
         command: |c| c.shutdown_command.get(),
+        visible: |c| c.show_shutdown.get(),
     },
 ];
 
@@ -123,33 +132,8 @@ impl Component for PowerMenu {
             root.set_anchor(edge, true);
         }
 
-        // Build the action buttons once; commands are re-read from config on click.
-        for action in ACTIONS {
-            let button = gtk::Button::builder()
-                .css_classes(["power-menu-button"])
-                .build();
-            button.set_cursor_from_name(Some("pointer"));
-
-            let content = gtk::Box::builder()
-                .orientation(gtk::Orientation::Vertical)
-                .spacing(6)
-                .build();
-            let icon = gtk::Image::from_icon_name(action.icon);
-            icon.add_css_class("power-menu-icon");
-            let label = gtk::Label::new(Some(action.label));
-            label.add_css_class("power-menu-label");
-            content.append(&icon);
-            content.append(&label);
-            button.set_child(Some(&content));
-
-            let config = model.config.clone();
-            let input = sender.input_sender().clone();
-            let command = action.command;
-            button.connect_clicked(move |_| {
-                input.emit(PowerMenuInput::Run(command(&config.config().modules.power)));
-            });
-            widgets.surface.append(&button);
-        }
+        // Equal-width buttons across the row.
+        widgets.surface.set_homogeneous(true);
 
         // Escape cancels.
         let input = sender.input_sender().clone();
@@ -177,11 +161,14 @@ impl Component for PowerMenu {
         &mut self,
         widgets: &mut Self::Widgets,
         msg: PowerMenuInput,
-        _sender: ComponentSender<Self>,
+        sender: ComponentSender<Self>,
         root: &Self::Root,
     ) {
         match msg {
-            PowerMenuInput::Show => self.reveal(widgets, root),
+            PowerMenuInput::Show => {
+                self.populate(widgets, &sender);
+                self.reveal(widgets, root);
+            }
             PowerMenuInput::Run(command) => {
                 process::run_if_set(&command);
                 self.hide_animated(widgets, root);
@@ -192,6 +179,45 @@ impl Component for PowerMenu {
 }
 
 impl PowerMenu {
+    /// Rebuilds the button row from the current config: one equal-sized button
+    /// per enabled action, commands re-read on click.
+    fn populate(&self, widgets: &PowerMenuWidgets, sender: &ComponentSender<Self>) {
+        while let Some(child) = widgets.surface.first_child() {
+            widgets.surface.remove(&child);
+        }
+
+        let cfg = self.config.config();
+        for action in ACTIONS.iter().filter(|a| (a.visible)(&cfg.modules.power)) {
+            let button = gtk::Button::builder()
+                .css_classes(["power-menu-button"])
+                .build();
+            button.set_cursor_from_name(Some("pointer"));
+
+            let content = gtk::Box::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .spacing(6)
+                .halign(gtk::Align::Center)
+                .valign(gtk::Align::Center)
+                .vexpand(true)
+                .build();
+            let icon = gtk::Image::from_icon_name(action.icon);
+            icon.add_css_class("power-menu-icon");
+            let label = gtk::Label::new(Some(action.label));
+            label.add_css_class("power-menu-label");
+            content.append(&icon);
+            content.append(&label);
+            button.set_child(Some(&content));
+
+            let config = self.config.clone();
+            let input = sender.input_sender().clone();
+            let command = action.command;
+            button.connect_clicked(move |_| {
+                input.emit(PowerMenuInput::Run(command(&config.config().modules.power)));
+            });
+            widgets.surface.append(&button);
+        }
+    }
+
     fn animation(&self, exiting: bool) -> (gtk::RevealerTransitionType, u32) {
         let animations = &self.config.config().animations;
         (

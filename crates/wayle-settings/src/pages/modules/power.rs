@@ -39,10 +39,15 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-power-menu",
                     items: vec![
+                        toggle(&module.show_lock),
                         text(&module.lock_command),
+                        toggle(&module.show_logout),
                         text(&module.logout_command),
+                        toggle(&module.show_suspend),
                         text(&module.suspend_command),
+                        toggle(&module.show_reboot),
                         text(&module.reboot_command),
+                        toggle(&module.show_shutdown),
                         text(&module.shutdown_command),
                     ],
                 },

@@ -42,3 +42,14 @@ settings-modules-power-reboot-command = Reboot Command
     .description = Command run by the power menu's Reboot button
 settings-modules-power-shutdown-command = Shut Down Command
     .description = Command run by the power menu's Shut down button
+
+settings-modules-power-show-lock = Show Lock
+    .description = Show the Lock button in the power menu
+settings-modules-power-show-logout = Show Log Out
+    .description = Show the Log out button in the power menu
+settings-modules-power-show-suspend = Show Suspend
+    .description = Show the Suspend button in the power menu
+settings-modules-power-show-reboot = Show Reboot
+    .description = Show the Reboot button in the power menu
+settings-modules-power-show-shutdown = Show Shut Down
+    .description = Show the Shut down button in the power menu

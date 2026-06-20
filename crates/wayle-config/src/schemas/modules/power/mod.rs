@@ -85,6 +85,31 @@ pub struct PowerConfig {
     #[default(String::from("systemctl poweroff"))]
     pub shutdown_command: ConfigProperty<String>,
 
+    /// Show the Lock button in the power menu.
+    #[serde(rename = "show-lock")]
+    #[default(true)]
+    pub show_lock: ConfigProperty<bool>,
+
+    /// Show the Log out button in the power menu.
+    #[serde(rename = "show-logout")]
+    #[default(true)]
+    pub show_logout: ConfigProperty<bool>,
+
+    /// Show the Suspend button in the power menu.
+    #[serde(rename = "show-suspend")]
+    #[default(true)]
+    pub show_suspend: ConfigProperty<bool>,
+
+    /// Show the Reboot button in the power menu.
+    #[serde(rename = "show-reboot")]
+    #[default(true)]
+    pub show_reboot: ConfigProperty<bool>,
+
+    /// Show the Shut down button in the power menu.
+    #[serde(rename = "show-shutdown")]
+    #[default(true)]
+    pub show_shutdown: ConfigProperty<bool>,
+
     /// Hidden: icon always shown.
     #[serde(skip)]
     #[schemars(skip)]
