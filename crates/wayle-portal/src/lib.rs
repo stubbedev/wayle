@@ -17,7 +17,9 @@
 //! …) are delegated to `xdg-desktop-portal-gtk` via `portals.conf`.
 
 mod error;
+mod globalshortcuts;
 mod lockdown;
+mod protocol;
 mod remotedesktop;
 mod request;
 mod response;
@@ -34,8 +36,8 @@ use zbus::Connection;
 
 pub use self::error::Error;
 use self::{
-    lockdown::Lockdown, remotedesktop::RemoteDesktop, screencast::ScreenCast,
-    screenshot::Screenshot, settings::Settings,
+    globalshortcuts::GlobalShortcuts, lockdown::Lockdown, remotedesktop::RemoteDesktop,
+    screencast::ScreenCast, screenshot::Screenshot, settings::Settings,
 };
 
 /// The backend's well-known D-Bus name (matches `wayle.portal`'s `DBusName`).
@@ -79,6 +81,10 @@ pub async fn run() -> Result<(), Error> {
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
         .at(path, RemoteDesktop::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, GlobalShortcuts::new(connection.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
 
