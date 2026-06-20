@@ -43,6 +43,13 @@
     margin-right: var(--space-xs);
 }
 
+/* The shared entry base gives `> text` a left margin; in the search field that
+   reads as a big gap between the search icon and the cursor. Pull it back so
+   typing starts right after the icon. */
+.setting-control dropdown popover entry.search > text {
+    margin-left: 0;
+}
+
 .setting-control dropdown listview row {
     padding: var(--space-xs) var(--space-sm);
     border-radius: var(--rounding-element);

@@ -8,9 +8,9 @@
 //!
 //! [`RegionOverlay`]: crate::shell::region_overlay::RegionOverlay
 
-use std::sync::OnceLock;
+use std::{collections::HashMap, sync::OnceLock};
 
-use relm4::Sender;
+use relm4::{Sender, gtk::gdk};
 use tokio::sync::oneshot;
 use tracing::warn;
 
@@ -29,11 +29,21 @@ pub(crate) fn register_sender(sender: Sender<RegionOverlayInput>) {
 
 /// Shows the region overlay and awaits the user's selection.
 ///
+/// `frames` carries frozen per-output frames (keyed by connector) for the
+/// freeze-frame screenshot path; pass an empty map for the live path (share
+/// picker), where the overlay stays transparent and the live screen shows
+/// through.
+///
 /// Returns `None` if the user cancels (Escape), makes no selection, or the
 /// shell UI has not registered its sender yet.
-pub(crate) async fn request_region() -> Option<RegionSelection> {
+pub(crate) async fn request_region(
+    frames: HashMap<String, gdk::Texture>,
+) -> Option<RegionSelection> {
     let sender = OVERLAY_SENDER.get()?.clone();
     let (reply_tx, reply_rx) = oneshot::channel();
-    sender.emit(RegionOverlayInput::Show { reply: reply_tx });
+    sender.emit(RegionOverlayInput::Show {
+        reply: reply_tx,
+        frames,
+    });
     reply_rx.await.unwrap_or(None)
 }

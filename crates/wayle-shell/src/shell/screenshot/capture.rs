@@ -1,17 +1,22 @@
 //! Compositor-agnostic capture for the screenshot host.
 //!
-//! Region and output capture use wlr-screencopy (`OutputManager`); the output
-//! transform is read straight from the `wl_output` geometry, so no
-//! compositor-specific socket is involved. Window capture prefers Hyprland's
-//! toplevel-export when a Hyprland handle is supplied, otherwise falls back to
-//! the generic `ext-image-copy-capture` path (`ExtToplevelManager`), matching
-//! the target window by app_id/title.
+//! Output capture uses wlr-screencopy (`OutputManager`); the output transform
+//! is read straight from the `wl_output` geometry, so no compositor-specific
+//! socket is involved. Region capture is a freeze-frame crop: every output is
+//! captured up front (before the region overlay maps, so transient popups are
+//! preserved) and the selection is cropped from the in-memory frame. Window
+//! capture prefers Hyprland's toplevel-export when a Hyprland handle is
+//! supplied, otherwise falls back to the generic `ext-image-copy-capture` path
+//! (`ExtToplevelManager`), matching the target window by app_id/title.
 //!
 //! All functions here block (the underlying capture drives a Wayland event loop
 //! synchronously); callers run them on the GTK thread where a brief stall is
 //! acceptable.
 
+use std::time::Instant;
+
 use image::RgbImage;
+use tracing::info;
 use wayland_client::{Connection, protocol::wl_output::WlOutput};
 use wayle_share_preview::{
     buffer::Buffer,
@@ -25,12 +30,17 @@ use crate::shell::region_overlay::RegionSelection;
 
 /// What to capture.
 pub(super) enum CaptureKind {
-    /// An output-relative rectangle selected via the region overlay.
-    Region(RegionSelection),
     /// A whole output by connector name, or the first output when `None`.
     Output(Option<String>),
     /// A toplevel window, identified by the caller from compositor focus state.
     Window(WindowTarget),
+}
+
+/// A whole output captured up front for the freeze-frame region flow: the
+/// connector name plus the full-resolution, transform-corrected frame.
+pub(super) struct FrozenOutput {
+    pub(super) connector: String,
+    pub(super) image: RgbImage,
 }
 
 /// Identifies the window to capture. The caller resolves this from whatever
@@ -50,19 +60,107 @@ pub(super) fn capture(kind: CaptureKind) -> Result<RgbImage, String> {
     let connection =
         Connection::connect_to_env().map_err(|e| format!("cannot connect to wayland: {e}"))?;
     match kind {
-        CaptureKind::Region(sel) => capture_region(&connection, &sel),
         CaptureKind::Output(name) => capture_output(&connection, name.as_deref()),
         CaptureKind::Window(target) => capture_window(&connection, &target),
     }
 }
 
-fn capture_region(connection: &Connection, sel: &RegionSelection) -> Result<RgbImage, String> {
-    let mut manager = OutputManager::new(connection).map_err(|e| e.to_string())?;
-    let (output, transform) = find_output(&manager, &sel.output)?;
-    let buffer = manager
-        .capture_output_region(&output, sel.x, sel.y, sel.width, sel.height)
-        .map_err(|e| format!("region capture failed: {e}"))?;
-    to_rgb(buffer, transform)
+/// Captures every output to a full-resolution frame for the freeze-frame region
+/// flow. Run before the region overlay maps so any transient popups on screen
+/// are baked into the frames.
+pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
+    let setup = Instant::now();
+    let connection =
+        Connection::connect_to_env().map_err(|e| format!("cannot connect to wayland: {e}"))?;
+    let mut manager = OutputManager::new(&connection).map_err(|e| e.to_string())?;
+
+    // Snapshot the output list so the manager stays free to borrow mutably for
+    // each capture call.
+    let targets: Vec<(WlOutput, String, Transforms)> = manager
+        .outputs
+        .iter()
+        .filter_map(|(wl_output, output)| {
+            output
+                .name
+                .clone()
+                .map(|name| (wl_output.clone(), name, output_transform(output)))
+        })
+        .collect();
+    if cfg!(debug_assertions) {
+        info!(setup_ms = setup.elapsed().as_millis(), outputs = targets.len(), "screenshot freeze: wl manager ready");
+    }
+
+    // Phase 1 (Wayland thread): screencopy each output and read its buffer into
+    // a `Send` `Image`. Kept sequential because it drives one event loop.
+    let copy = Instant::now();
+    let mut raw: Vec<(String, Image, Transforms)> = Vec::with_capacity(targets.len());
+    for (wl_output, connector, transform) in targets {
+        let buffer = manager
+            .capture_output(&wl_output)
+            .map_err(|e| format!("output capture failed: {e}"))?;
+        let image = Image::new(buffer).map_err(|e| format!("cannot decode capture: {e}"))?;
+        raw.push((connector, image, transform));
+    }
+    if cfg!(debug_assertions) {
+        info!(copy_ms = copy.elapsed().as_millis(), "screenshot freeze: screencopy done");
+    }
+
+    // Phase 2 (parallel): the XRGB->RGB conversion plus any rotation is pure CPU
+    // on owned buffers, so fan it out one thread per output.
+    let convert = Instant::now();
+    let frozen = std::thread::scope(|scope| {
+        let handles: Vec<_> = raw
+            .into_iter()
+            .map(|(connector, image, transform)| {
+                scope.spawn(move || -> Result<FrozenOutput, String> {
+                    let image = image
+                        .into_rgb()
+                        .map_err(|e| format!("cannot decode capture: {e}"))?
+                        .transform(transform);
+                    match image.buffer {
+                        ImageKind::Rgb(rgb) => Ok(FrozenOutput {
+                            connector,
+                            image: rgb,
+                        }),
+                        ImageKind::Xrgb(_) => Err("capture did not convert to rgb".to_owned()),
+                    }
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().map_err(|_| "capture worker panicked".to_owned())?)
+            .collect::<Result<Vec<_>, _>>()
+    })?;
+    if cfg!(debug_assertions) {
+        info!(convert_ms = convert.elapsed().as_millis(), "screenshot freeze: convert done");
+    }
+    Ok(frozen)
+}
+
+/// Crops the selection out of a frozen output frame. `logical` is the output's
+/// logical (compositor) size; the frame is at physical resolution, so the
+/// selection is scaled by the frame/logical ratio and clamped to the frame.
+pub(super) fn crop_frozen(
+    image: &RgbImage,
+    logical_width: i32,
+    logical_height: i32,
+    sel: &RegionSelection,
+) -> RgbImage {
+    let scale_x = image.width() as f64 / f64::from(logical_width.max(1));
+    let scale_y = image.height() as f64 / f64::from(logical_height.max(1));
+
+    let x = (f64::from(sel.x) * scale_x).round() as u32;
+    let y = (f64::from(sel.y) * scale_y).round() as u32;
+    let w = (f64::from(sel.width) * scale_x).round() as u32;
+    let h = (f64::from(sel.height) * scale_y).round() as u32;
+
+    let x = x.min(image.width());
+    let y = y.min(image.height());
+    let w = w.min(image.width() - x);
+    let h = h.min(image.height() - y);
+
+    image::imageops::crop_imm(image, x, y, w, h).to_image()
 }
 
 fn capture_output(connection: &Connection, name: Option<&str>) -> Result<RgbImage, String> {

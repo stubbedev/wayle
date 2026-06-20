@@ -524,7 +524,11 @@ pub(super) fn build_region_page(input: &Sender<SharePickerInput>) -> ScrolledWin
                 #[strong]
                 root,
                 async move {
-                    match crate::services::region_overlay::request_region().await {
+                    match crate::services::region_overlay::request_region(
+                        std::collections::HashMap::new(),
+                    )
+                    .await
+                    {
                         Some(sel) => {
                             input.emit(SharePickerInput::Select(format!(
                                 "region:{}@{},{},{},{}",

@@ -13,6 +13,7 @@
 mod capture;
 
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     process::Stdio,
     sync::Arc,
@@ -20,6 +21,7 @@ use std::{
 
 use capture::{CaptureKind, WindowTarget, capture};
 use hyprland::shared::{HyprData, HyprDataActiveOptional};
+use image::RgbImage;
 use relm4::{
     gtk,
     gtk::{gdk, glib, prelude::*},
@@ -31,6 +33,8 @@ use wayle_config::{ConfigService, schemas::modules::ScreenshotConfig};
 use wayle_hyprland::HyprlandService;
 use wayle_mango::MangoService;
 use wayle_niri::NiriService;
+
+use crate::shell::helpers::monitors::current_monitors;
 
 /// Messages driving the screenshot host.
 pub(crate) enum ScreenshotInput {
@@ -190,9 +194,9 @@ async fn run(
     focused_output: Option<String>,
     window_target: WindowTarget,
 ) -> Result<String, String> {
-    let kind = match mode.as_str() {
-        "region" => match crate::services::region_overlay::request_region().await {
-            Some(selection) => CaptureKind::Region(selection),
+    let image = match mode.as_str() {
+        "region" => match capture_region().await? {
+            Some(image) => image,
             // Cancelled — not an error; report an empty path.
             None => return Ok(String::new()),
         },
@@ -202,13 +206,11 @@ async fn run(
             } else {
                 Some(target)
             };
-            CaptureKind::Output(name)
+            capture(CaptureKind::Output(name))?
         }
-        "window" => CaptureKind::Window(window_target),
+        "window" => capture(CaptureKind::Window(window_target))?,
         other => return Err(format!("unknown screenshot mode: {other}")),
     };
-
-    let image = capture(kind)?;
 
     let settings = config.config().modules.screenshot.snapshot();
     let dir = resolve_dir(&settings.output_directory);
@@ -216,9 +218,7 @@ async fn run(
         return Err(format!("cannot create {}: {err}", dir.display()));
     }
     let path = dir.join(filename(&settings.filename_format));
-    image
-        .save(&path)
-        .map_err(|e| format!("cannot save {}: {e}", path.display()))?;
+    save_png(&image, &path)?;
     let path_str = path.to_string_lossy().into_owned();
 
     if settings.copy_to_clipboard {
@@ -229,6 +229,96 @@ async fn run(
     }
 
     Ok(path_str)
+}
+
+/// Freeze-frame region capture.
+///
+/// Captures every output up front (before the region overlay maps, so any
+/// transient popups on screen survive), shows the overlay painting those frozen
+/// frames, then crops the selection out of the in-memory frame for its output.
+/// Returns `None` when the user cancels.
+async fn capture_region() -> Result<Option<RgbImage>, String> {
+    let frozen = capture::capture_all_outputs()?;
+
+    // Logical size per connector, to scale the logical selection back to the
+    // frame's physical resolution when cropping.
+    let logical: HashMap<String, (i32, i32)> = current_monitors()
+        .into_iter()
+        .map(|(connector, monitor)| {
+            let geometry = monitor.geometry();
+            (connector, (geometry.width(), geometry.height()))
+        })
+        .collect();
+
+    // Textures for the overlay to paint (display only); the host keeps the
+    // frames for cropping.
+    let texture = std::time::Instant::now();
+    let frames: HashMap<String, gdk::Texture> = frozen
+        .iter()
+        .map(|frame| (frame.connector.clone(), rgb_to_texture(&frame.image)))
+        .collect();
+    if cfg!(debug_assertions) {
+        tracing::info!(
+            texture_ms = texture.elapsed().as_millis(),
+            "screenshot freeze: textures built, showing overlay"
+        );
+    }
+
+    let Some(selection) = crate::services::region_overlay::request_region(frames).await else {
+        return Ok(None);
+    };
+
+    let frame = frozen
+        .iter()
+        .find(|frame| frame.connector == selection.output)
+        .ok_or("captured output for selection no longer present")?;
+    let (logical_width, logical_height) = logical
+        .get(&selection.output)
+        .copied()
+        .ok_or("no logical geometry for the selected output")?;
+
+    Ok(Some(capture::crop_frozen(
+        &frame.image,
+        logical_width,
+        logical_height,
+        &selection,
+    )))
+}
+
+/// Wraps an RGB frame in a `gdk::Texture` for the overlay to paint. The image is
+/// packed `R8G8B8`, so the stride is `width * 3`.
+fn rgb_to_texture(image: &RgbImage) -> gdk::Texture {
+    let stride = image.width() as usize * 3;
+    let bytes = glib::Bytes::from(image.as_raw().as_slice());
+    gdk::MemoryTexture::new(
+        image.width() as i32,
+        image.height() as i32,
+        gdk::MemoryFormat::R8g8b8,
+        &bytes,
+        stride,
+    )
+    .upcast()
+}
+
+/// Encodes the frame as PNG with fast compression — screenshots favour a snappy
+/// save over the smallest possible file.
+fn save_png(image: &RgbImage, path: &Path) -> Result<(), String> {
+    use image::{
+        ExtendedColorType, ImageEncoder,
+        codecs::png::{CompressionType, FilterType, PngEncoder},
+    };
+
+    let file = std::fs::File::create(path)
+        .map_err(|e| format!("cannot create {}: {e}", path.display()))?;
+    let writer = std::io::BufWriter::new(file);
+    PngEncoder::new_with_quality(writer, CompressionType::Fast, FilterType::Adaptive)
+        .write_image(
+            image.as_raw(),
+            image.width(),
+            image.height(),
+            ExtendedColorType::Rgb8,
+        )
+        .map_err(|e| format!("cannot save {}: {e}", path.display()))
 }
 
 /// Plain snapshot of the `[screenshot]` options used per capture.

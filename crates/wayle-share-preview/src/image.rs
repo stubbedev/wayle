@@ -166,10 +166,17 @@ impl Image {
         let width = buffer.width();
 
         let raw = buffer.into_vec();
-        let bytes = raw
-            .chunks_exact(4)
-            .flat_map(|chunk| chunk.iter().take(3).rev().copied())
-            .collect::<Vec<u8>>();
+        // XRGB8888 is stored little-endian as [B, G, R, X]; pack to [R, G, B].
+        // Allocate the ~25 MB output once and fill it with fixed-size chunk
+        // writes: `collect` from a `flat_map` size-hints poorly and reallocs the
+        // whole buffer repeatedly, which dominated capture time, and per-byte
+        // `push` adds avoidable bounds/length churn.
+        let mut bytes = vec![0u8; raw.len() / 4 * 3];
+        for (dst, src) in bytes.chunks_exact_mut(3).zip(raw.chunks_exact(4)) {
+            dst[0] = src[2];
+            dst[1] = src[1];
+            dst[2] = src[0];
+        }
         match RgbImage::from_vec(width, height, bytes) {
             Some(img) => Ok(img),
             None => Err(Box::from("failed to convert xrgb image to rgb image")),

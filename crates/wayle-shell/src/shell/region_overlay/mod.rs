@@ -11,12 +11,12 @@
 //! shared across all surfaces in global (compositor-layout) logical
 //! coordinates so a drag can start on one monitor and end on another.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use relm4::{
     gtk,
-    gtk::{cairo, gdk, glib, prelude::*, EventControllerKey, GestureDrag},
+    gtk::{cairo, gdk, glib, prelude::*, ContentFit, EventControllerKey, GestureDrag},
     prelude::*,
 };
 use tokio::sync::oneshot;
@@ -41,6 +41,10 @@ pub(crate) enum RegionOverlayInput {
     Show {
         /// Channel the selection is delivered on.
         reply: oneshot::Sender<Option<RegionSelection>>,
+        /// Frozen per-output frames, keyed by connector. When a connector has a
+        /// frame the surface paints it (freeze-frame, screenshot path); empty
+        /// for the live path (share picker).
+        frames: HashMap<String, gdk::Texture>,
     },
     /// Drag finished (`Some`) or cancelled (`None`); tears down the surfaces.
     Finish(Option<RegionSelection>),
@@ -49,7 +53,10 @@ pub(crate) enum RegionOverlayInput {
 impl std::fmt::Debug for RegionOverlayInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Show { .. } => f.write_str("Show"),
+            Self::Show { frames, .. } => f
+                .debug_struct("Show")
+                .field("frozen_outputs", &frames.len())
+                .finish_non_exhaustive(),
             Self::Finish(sel) => f.debug_tuple("Finish").field(sel).finish(),
         }
     }
@@ -129,14 +136,14 @@ impl Component for RegionOverlay {
 
     fn update(&mut self, msg: RegionOverlayInput, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            RegionOverlayInput::Show { reply } => {
+            RegionOverlayInput::Show { reply, frames } => {
                 // Drop any previous, unanswered request.
                 if let Some(prev) = self.reply.take() {
                     let _ = prev.send(None);
                 }
                 self.close();
                 self.reply = Some(reply);
-                self.open(&sender);
+                self.open(&sender, &frames);
             }
             RegionOverlayInput::Finish(selection) => {
                 if let Some(reply) = self.reply.take() {
@@ -149,8 +156,11 @@ impl Component for RegionOverlay {
 }
 
 impl RegionOverlay {
-    /// Builds and shows one transparent layer-shell surface per monitor.
-    fn open(&mut self, sender: &ComponentSender<Self>) {
+    /// Builds and shows one layer-shell surface per monitor. When `frames` has
+    /// a frozen frame for a connector the surface paints it behind the dim wash
+    /// (freeze-frame); otherwise the surface is transparent and the live screen
+    /// shows through the punched hole.
+    fn open(&mut self, sender: &ComponentSender<Self>, frames: &HashMap<String, gdk::Texture>) {
         let monitors = current_monitors();
         let geoms: Rc<Vec<MonitorGeom>> = Rc::new(
             monitors
@@ -192,7 +202,21 @@ impl RegionOverlay {
             area.set_cursor_from_name(Some("crosshair"));
             Self::attach_draw_func(&area, &self.drag, offset);
 
-            window.set_child(Some(&area));
+            // Freeze-frame path: paint the captured frame behind the dim wash.
+            // The draw func clears the selection to transparent, revealing the
+            // bright frame underneath. Without a frame the surface stays
+            // transparent and the live screen shows through (share picker).
+            match frames.get(&connector) {
+                Some(texture) => {
+                    let picture = gtk::Picture::for_paintable(texture);
+                    picture.set_content_fit(ContentFit::Fill);
+                    let stack = gtk::Overlay::new();
+                    stack.set_child(Some(&picture));
+                    stack.add_overlay(&area);
+                    window.set_child(Some(&stack));
+                }
+                None => window.set_child(Some(&area)),
+            }
             self.areas.borrow_mut().push(area.clone());
 
             self.attach_drag_gesture(&area, sender, offset, &geoms);
