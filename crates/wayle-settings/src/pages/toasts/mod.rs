@@ -4,7 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select, number::number_u32, size::size, text::text_like,
+        enum_select::enum_select, number::number_u32, size::size,
+        surface_animation::surface_animation_rows, text::text_like,
         toast_preset_list::toast_preset_list, toggle::toggle,
     },
     pages::{
@@ -45,6 +46,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-presets",
                     items: vec![presets_editor],
+                },
+                SectionSpec {
+                    title_key: "settings-section-animation",
+                    items: surface_animation_rows(&config.animations.toast),
                 },
             ],
         ),

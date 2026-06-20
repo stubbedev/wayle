@@ -4,7 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        enum_select::enum_select, number::number_u32, size::size, text::text_like, toggle::toggle,
+        enum_select::enum_select, number::number_u32, size::size,
+        surface_animation::surface_animation_rows, text::text_like, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -37,6 +38,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         size(&osd.margin),
                         toggle(&osd.border),
                     ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-animation",
+                    items: surface_animation_rows(&config.animations.osd),
                 },
             ],
         ),

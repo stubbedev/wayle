@@ -59,7 +59,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     ],
                 },
                 SectionSpec {
-                    title_key: "settings-animations-share-picker",
+                    title_key: "settings-section-animation",
                     items: surface_animation_rows(&config.animations.share_picker),
                 },
             ],

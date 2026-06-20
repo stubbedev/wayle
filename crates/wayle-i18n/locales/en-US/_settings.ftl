@@ -272,6 +272,7 @@ settings-section-engine = Engine
 settings-section-transition = Transition
 settings-section-cycling = Cycling
 settings-section-display = Display
+settings-section-animation = Animation
 settings-section-share-picker-windows = Windows Page
 settings-section-share-picker-outputs = Outputs Page
 settings-section-popup-display = Popup Display

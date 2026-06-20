@@ -7,7 +7,6 @@ use crate::{
         enum_select::enum_select,
         number::number_u32,
         optional::{enum_select_optional, number_u32_optional},
-        surface_animation::surface_animation_rows,
         toggle::toggle,
     },
     pages::{
@@ -69,22 +68,6 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         number_u32(&anim.interaction_duration),
                         toggle(&anim.indicators),
                     ],
-                },
-                SectionSpec {
-                    title_key: "settings-animations-notifications",
-                    items: surface_animation_rows(&anim.notifications),
-                },
-                SectionSpec {
-                    title_key: "settings-animations-osd",
-                    items: surface_animation_rows(&anim.osd),
-                },
-                SectionSpec {
-                    title_key: "settings-animations-toast",
-                    items: surface_animation_rows(&anim.toast),
-                },
-                SectionSpec {
-                    title_key: "settings-animations-dropdown",
-                    items: surface_animation_rows(&anim.dropdown),
                 },
             ],
         ),

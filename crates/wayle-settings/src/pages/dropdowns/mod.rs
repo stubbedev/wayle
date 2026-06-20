@@ -3,7 +3,7 @@
 use wayle_config::{Config, ConfigProperty, schemas::dropdowns::DropdownSize};
 
 use crate::{
-    editors::dropdown_size::dropdown_size_rows,
+    editors::{dropdown_size::dropdown_size_rows, surface_animation::surface_animation_rows},
     pages::{
         nav::LeafEntry,
         spec::{SectionSpec, page_spec},
@@ -30,6 +30,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 size_section(&dropdowns.network),
                 size_section(&dropdowns.notification),
                 size_section(&dropdowns.weather),
+                SectionSpec {
+                    title_key: "settings-section-animation",
+                    items: surface_animation_rows(&config.animations.dropdown),
+                },
             ],
         ),
     }

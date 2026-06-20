@@ -5,7 +5,7 @@ use wayle_config::Config;
 use crate::{
     editors::{
         enum_select::enum_select, number::number_u32, size::size, string_list::string_list,
-        text::text_like, toggle::toggle,
+        surface_animation::surface_animation_rows, text::text_like, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -56,6 +56,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         enum_select(&notif.icon_source),
                         string_list(&notif.blocklist),
                     ],
+                },
+                SectionSpec {
+                    title_key: "settings-section-animation",
+                    items: surface_animation_rows(&config.animations.notifications),
                 },
             ],
         ),
