@@ -17,10 +17,34 @@ pub(crate) fn spawn(services: &ShellServices) {
     let config = services.config.config().wallpaper.clone();
 
     spawn_single_file_watcher(&config, &wallpaper);
+    spawn_fit_mode_watcher(&config, &wallpaper);
     spawn_cycling_watcher(&config, &wallpaper);
     spawn_cycling_interval_watcher(&config, &wallpaper);
     spawn_shared_cycle_watcher(&config, &wallpaper);
     spawn_monitors_watcher(&config, &wallpaper);
+}
+
+/// Applies the global `fit-mode` to all monitors when it changes. The render
+/// surfaces re-read the fit from config; setting it on the service is what
+/// pokes the `monitors` property so a re-render happens.
+fn spawn_fit_mode_watcher(config: &WallpaperConfig, wallpaper: &Arc<WallpaperService>) {
+    let fit_mode = config.fit_mode.clone();
+    let wallpaper = wallpaper.clone();
+
+    let mut stream = fit_mode.watch();
+
+    tokio::spawn(async move {
+        stream.next().await;
+
+        while let Some(mode) = stream.next().await {
+            if let Err(e) = wallpaper
+                .set_fit_mode(wallpaper_map::fit_mode(mode), None)
+                .await
+            {
+                warn!(error = %e, "cannot apply fit mode from config change");
+            }
+        }
+    });
 }
 
 /// Applies the global single-file `wallpaper` to all monitors when it changes

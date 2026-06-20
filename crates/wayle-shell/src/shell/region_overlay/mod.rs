@@ -186,6 +186,7 @@ impl RegionOverlay {
             }
 
             let area = gtk::DrawingArea::new();
+            area.add_css_class("region-overlay-area");
             area.set_hexpand(true);
             area.set_vexpand(true);
             area.set_cursor_from_name(Some("crosshair"));
@@ -218,7 +219,7 @@ impl RegionOverlay {
         offset: (f64, f64),
     ) {
         let drag = drag.clone();
-        area.set_draw_func(move |_, cr, _w, _h| {
+        area.set_draw_func(move |area, cr, _w, _h| {
             // Dim wash across the whole monitor.
             cr.set_operator(cairo::Operator::Source);
             cr.set_source_rgba(0.0, 0.0, 0.0, 0.35);
@@ -236,12 +237,51 @@ impl RegionOverlay {
             cr.rectangle(lx, ly, gw, gh);
             let _ = cr.fill();
 
-            // Accent border around the selection.
+            // Accent border around the selection. The accent is the area's
+            // themed `color` (set via `.region-overlay-area` in SCSS), so it
+            // follows the active palette/theme provider.
+            let accent = area.color();
             cr.set_operator(cairo::Operator::Over);
-            cr.set_source_rgba(0.40, 0.70, 1.0, 1.0);
+            cr.set_source_rgba(
+                f64::from(accent.red()),
+                f64::from(accent.green()),
+                f64::from(accent.blue()),
+                f64::from(accent.alpha()),
+            );
             cr.set_line_width(2.0);
             cr.rectangle(lx, ly, gw, gh);
             let _ = cr.stroke();
+
+            // Size label: "<width> × <height>" in logical pixels, drawn in the
+            // accent color on a dark backing box near the selection's top-left.
+            let label = format!("{} × {}", gw.round() as i32, gh.round() as i32);
+            cr.select_font_face("monospace", cairo::FontSlant::Normal, cairo::FontWeight::Bold);
+            cr.set_font_size(14.0);
+            if let Ok(ext) = cr.text_extents(&label) {
+                let pad = 6.0;
+                let box_w = ext.width() + pad * 2.0;
+                let box_h = ext.height() + pad * 2.0;
+                let bx = lx;
+                // Above the rectangle if there is room, otherwise just inside it.
+                let by = if ly - box_h - 4.0 >= 0.0 {
+                    ly - box_h - 4.0
+                } else {
+                    ly + 4.0
+                };
+
+                cr.set_source_rgba(0.0, 0.0, 0.0, 0.75);
+                cr.rectangle(bx, by, box_w, box_h);
+                let _ = cr.fill();
+
+                cr.set_source_rgba(
+                    f64::from(accent.red()),
+                    f64::from(accent.green()),
+                    f64::from(accent.blue()),
+                    f64::from(accent.alpha()),
+                );
+                cr.move_to(bx + pad - ext.x_bearing(), by + pad - ext.y_bearing());
+                let _ = cr.show_text(&label);
+            }
         });
     }
 

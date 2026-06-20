@@ -1,10 +1,7 @@
 mod types;
 
 use schemars::schema_for;
-pub use types::{
-    CyclingInterval, CyclingMode, FitMode, MonitorWallpaperConfig, TransitionDuration,
-    WallpaperTransition,
-};
+pub use types::{CyclingInterval, CyclingMode, FitMode, MonitorWallpaperConfig};
 use wayle_derive::wayle_config;
 
 use crate::{
@@ -21,16 +18,14 @@ pub struct WallpaperConfig {
     #[default(String::new())]
     pub wallpaper: ConfigProperty<String>,
 
-    /// Animation used when the wallpaper changes (crossfade or none).
-    #[serde(rename = "transition")]
-    #[default(WallpaperTransition::Crossfade)]
-    pub transition: ConfigProperty<WallpaperTransition>,
+    /// How the wallpaper is scaled to the screen. Per-monitor entries in
+    /// `[[wallpaper.monitors]]` override this.
+    #[serde(rename = "fit-mode")]
+    #[default(FitMode::Fill)]
+    pub fit_mode: ConfigProperty<FitMode>,
 
-    /// Transition animation duration in seconds.
-    #[serde(rename = "transition-duration")]
-    #[default(TransitionDuration::DEFAULT)]
-    pub transition_duration: ConfigProperty<TransitionDuration>,
-
+    // The wallpaper change animation is configured under `[animations]`
+    // (`AnimSurface::Wallpaper`), shared with every other surface.
     /// Enable automatic wallpaper cycling.
     #[serde(rename = "cycling-enabled")]
     #[default(false)]
@@ -91,7 +86,6 @@ impl ModuleInfoProvider for WallpaperConfig {
     fn groups() -> Vec<ConfigGroup> {
         vec![
             ConfigGroup::general(),
-            ConfigGroup::prefix("Transitions", "transition-"),
             ConfigGroup::prefix("Cycling", "cycling-"),
             ConfigGroup::standalone("Per-monitor overrides", "monitors"),
         ]

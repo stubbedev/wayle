@@ -43,6 +43,9 @@ settings-animations-dropdown = Dropdown
 settings-animations-share-picker = Animation
     .description = Per-surface animation override for the screen-share picker overlay
 
+settings-animations-wallpaper = Wallpaper
+    .description = Per-surface animation override for the wallpaper crossfade
+
 
 ## AnimationType variants
 enum-animation-type-none = None

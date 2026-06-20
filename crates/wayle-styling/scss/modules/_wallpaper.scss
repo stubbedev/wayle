@@ -1,0 +1,6 @@
+// Native wallpaper surface: a transparent Layer::Background window holding the
+// image. A black backdrop fills any letterbox/pillarbox area left by the Fit
+// and Center scaling modes (rendered in `shell/wallpaper/mod.rs`).
+.wallpaper-window {
+    background: black;
+}

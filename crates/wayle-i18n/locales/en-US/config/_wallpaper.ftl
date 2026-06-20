@@ -5,13 +5,8 @@
 settings-wallpaper-wallpaper = Wallpaper Image
     .description = A single image file to use on all monitors (leave empty for cycling / per-monitor)
 
-## Transition
-
-settings-wallpaper-transition = Transition
-    .description = Animation when the wallpaper changes (crossfade or none)
-
-settings-wallpaper-transition-duration = Transition Duration
-    .description = Animation duration in seconds
+settings-wallpaper-fit-mode = Scaling
+    .description = How the wallpaper is scaled to the screen (fill, fit, center, stretch)
 
 ## Cycling
 
@@ -39,10 +34,6 @@ enum-fit-mode-fill = Fill
 enum-fit-mode-fit = Fit
 enum-fit-mode-center = Center
 enum-fit-mode-stretch = Stretch
-
-## WallpaperTransition variants
-enum-wallpaper-transition-crossfade = Crossfade
-enum-wallpaper-transition-none = None
 
 ## CyclingMode variants
 enum-cycling-mode-sequential = Sequential

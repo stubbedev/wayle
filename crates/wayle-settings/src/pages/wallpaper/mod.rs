@@ -1,14 +1,11 @@
 //! Wallpaper settings page: single image, transitions, cycling, per-monitor.
 
-use wayle_config::{
-    Config,
-    schemas::wallpaper::{CyclingInterval, TransitionDuration},
-};
+use wayle_config::{Config, schemas::wallpaper::CyclingInterval};
 
 use crate::{
     editors::{
         enum_select::enum_select, file_picker::file_path, monitor_wallpaper::monitor_wallpaper,
-        number::number_newtype, toggle::toggle,
+        number::number_newtype, surface_animation::surface_animation_rows, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -28,22 +25,11 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
             vec![
                 SectionSpec {
                     title_key: "settings-section-general",
-                    items: vec![file_path(&wp.wallpaper)],
+                    items: vec![file_path(&wp.wallpaper), enum_select(&wp.fit_mode)],
                 },
                 SectionSpec {
-                    title_key: "settings-section-transition",
-                    items: vec![
-                        enum_select(&wp.transition),
-                        number_newtype(
-                            &wp.transition_duration,
-                            0.0,
-                            30.0,
-                            0.1,
-                            1,
-                            |v: &TransitionDuration| v.value() as f64,
-                            |seconds| TransitionDuration::new(seconds as f32),
-                        ),
-                    ],
+                    title_key: "settings-section-animation",
+                    items: surface_animation_rows(&config.animations.wallpaper),
                 },
                 SectionSpec {
                     title_key: "settings-section-cycling",

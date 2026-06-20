@@ -5,4 +5,10 @@
 // transparent so the cairo surface is what the compositor composites.
 .region-overlay-window {
     background: transparent;
+
+    // The cairo draw func reads this `color` as the accent for the selection
+    // border and size label, so the overlay follows the active palette.
+    .region-overlay-area {
+        color: var(--palette-primary);
+    }
 }

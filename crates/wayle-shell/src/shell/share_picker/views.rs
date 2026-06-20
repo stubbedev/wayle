@@ -175,7 +175,10 @@ fn request_window_frame(
     let class = toplevel.class.clone();
     let title = toplevel.title.clone();
 
-    relm4::spawn(async move {
+    // Captures block on a busy Wayland dispatch loop; run them on the blocking
+    // thread pool so every window/output is captured concurrently rather than
+    // starving the few async worker threads and draining serially.
+    relm4::spawn_blocking(move || {
         let buffer = match capture_window_buffer(address, &class, &title) {
             Ok(buffer) => buffer,
             Err(err) => return error!(%err, id, "unable to capture window frame"),
@@ -405,7 +408,7 @@ fn request_output_frame(
     let wl_output = output.wl_output.clone();
     let transform = output.transform;
 
-    relm4::spawn(async move {
+    relm4::spawn_blocking(move || {
         // capture_output needs `&mut self`; clone per concurrent capture.
         let mut manager = (*manager).clone();
         let buffer = match manager.capture_output(&wl_output) {

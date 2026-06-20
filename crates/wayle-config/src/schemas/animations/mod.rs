@@ -85,6 +85,10 @@ pub struct AnimationsConfig {
     #[serde(rename = "share-picker")]
     #[default(SurfaceAnimation::default())]
     pub share_picker: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for the wallpaper crossfade between images.
+    #[default(SurfaceAnimation::default())]
+    pub wallpaper: ConfigProperty<SurfaceAnimation>,
 }
 
 /// Transient surface an animation applies to.
@@ -100,6 +104,8 @@ pub enum AnimSurface {
     Dropdown,
     /// The screen-share picker overlay.
     SharePicker,
+    /// The wallpaper crossfade between images.
+    Wallpaper,
 }
 
 impl AnimationsConfig {
@@ -110,6 +116,7 @@ impl AnimationsConfig {
             AnimSurface::Toast => self.toast.get(),
             AnimSurface::Dropdown => self.dropdown.get(),
             AnimSurface::SharePicker => self.share_picker.get(),
+            AnimSurface::Wallpaper => self.wallpaper.get(),
         }
     }
 

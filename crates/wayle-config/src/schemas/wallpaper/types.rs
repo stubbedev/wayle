@@ -20,17 +20,6 @@ pub enum FitMode {
     Stretch,
 }
 
-/// Wallpaper change animation, rendered natively by wayle.
-#[wayle_enum(default)]
-#[serde(rename_all = "lowercase")]
-pub enum WallpaperTransition {
-    /// Crossfade between the old and new image.
-    #[default]
-    Crossfade,
-    /// Instant change with no animation.
-    None,
-}
-
 /// Wallpaper cycling order.
 #[wayle_enum(default)]
 #[serde(rename_all = "lowercase")]
@@ -40,65 +29,6 @@ pub enum CyclingMode {
     Sequential,
     /// Random order.
     Shuffle,
-}
-
-const DURATION_MIN: f32 = 0.0;
-
-/// Transition duration in seconds, clamped to >= 0.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
-#[serde(transparent)]
-#[schemars(transparent)]
-pub struct TransitionDuration(#[schemars(range(min = DURATION_MIN))] f32);
-
-impl TransitionDuration {
-    /// Default duration (0.7 seconds).
-    pub const DEFAULT: Self = Self(0.7);
-
-    /// Creates a duration, clamping to >= 0.
-    #[must_use]
-    pub fn new(value: f32) -> Self {
-        Self(value.max(DURATION_MIN))
-    }
-
-    /// Returns the inner f32 value.
-    #[must_use]
-    pub fn value(self) -> f32 {
-        self.0
-    }
-}
-
-impl Default for TransitionDuration {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-impl Display for TransitionDuration {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<f32> for TransitionDuration {
-    fn from(value: f32) -> Self {
-        Self::new(value)
-    }
-}
-
-impl<'de> Deserialize<'de> for TransitionDuration {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = f32::deserialize(deserializer)?;
-        if raw < DURATION_MIN {
-            warn!(
-                "transition duration {} below minimum ({}), clamped",
-                raw, DURATION_MIN
-            );
-        }
-        Ok(Self::new(raw))
-    }
 }
 
 const INTERVAL_MIN: u64 = 1;
@@ -177,16 +107,6 @@ pub struct MonitorWallpaperConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn transition_duration_clamps_negative() {
-        assert_eq!(TransitionDuration::new(-1.0).value(), DURATION_MIN);
-    }
-
-    #[test]
-    fn transition_duration_preserves_valid() {
-        assert!((TransitionDuration::new(1.5).value() - 1.5).abs() < f32::EPSILON);
-    }
 
     #[test]
     fn cycling_interval_clamps_zero() {
