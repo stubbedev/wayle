@@ -245,11 +245,10 @@ impl<T: ActionValue> SimpleComponent for ActionControl<T> {
             }
             ActionMsg::Refresh => {
                 let current = self.property.get().to_command();
-                if index_of_choice(&self.choices, &current).is_some() || current.is_empty() {
-                    if !(self.custom_mode && current.is_empty()) {
+                if (index_of_choice(&self.choices, &current).is_some() || current.is_empty())
+                    && !(self.custom_mode && current.is_empty()) {
                         self.custom_mode = false;
                     }
-                }
                 let index = selection_index(&self.choices, &current, self.custom_mode);
 
                 self.dropdown.block_signal(&self.dropdown_handler);

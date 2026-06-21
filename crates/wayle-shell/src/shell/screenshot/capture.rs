@@ -74,9 +74,30 @@ pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
         Connection::connect_to_env().map_err(|e| format!("cannot connect to wayland: {e}"))?;
     let mut manager = OutputManager::new(&connection).map_err(|e| e.to_string())?;
 
-    // Snapshot the output list so the manager stays free to borrow mutably for
-    // each capture call.
-    let targets: Vec<(WlOutput, String, Transforms)> = manager
+    let targets = snapshot_targets(&manager);
+    if cfg!(debug_assertions) {
+        info!(setup_ms = setup.elapsed().as_millis(), outputs = targets.len(), "screenshot freeze: wl manager ready");
+    }
+
+    let copy = Instant::now();
+    let raw = copy_outputs(&mut manager, targets)?;
+    if cfg!(debug_assertions) {
+        info!(copy_ms = copy.elapsed().as_millis(), "screenshot freeze: screencopy done");
+    }
+
+    // Phase 2 (parallel): convert/rotate each frame off the Wayland thread.
+    let convert = Instant::now();
+    let frozen = convert_outputs(raw)?;
+    if cfg!(debug_assertions) {
+        info!(convert_ms = convert.elapsed().as_millis(), "screenshot freeze: convert done");
+    }
+    Ok(frozen)
+}
+
+/// Snapshots the named outputs and their transforms so the manager stays free
+/// to borrow mutably during capture.
+fn snapshot_targets(manager: &OutputManager) -> Vec<(WlOutput, String, Transforms)> {
+    manager
         .outputs
         .iter()
         .filter_map(|(wl_output, output)| {
@@ -85,15 +106,17 @@ pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
                 .clone()
                 .map(|name| (wl_output.clone(), name, output_transform(output)))
         })
-        .collect();
-    if cfg!(debug_assertions) {
-        info!(setup_ms = setup.elapsed().as_millis(), outputs = targets.len(), "screenshot freeze: wl manager ready");
-    }
+        .collect()
+}
 
-    // Phase 1 (Wayland thread): screencopy each output and read its buffer into
-    // a `Send` `Image`. Kept sequential because it drives one event loop.
-    let copy = Instant::now();
-    let mut raw: Vec<(String, Image, Transforms)> = Vec::with_capacity(targets.len());
+/// Phase 1 of [`capture_all_outputs`] (Wayland thread): screencopy each output
+/// and read its buffer into a `Send` [`Image`]. Sequential — it drives one
+/// event loop.
+fn copy_outputs(
+    manager: &mut OutputManager,
+    targets: Vec<(WlOutput, String, Transforms)>,
+) -> Result<Vec<(String, Image, Transforms)>, String> {
+    let mut raw = Vec::with_capacity(targets.len());
     for (wl_output, connector, transform) in targets {
         let buffer = manager
             .capture_output(&wl_output)
@@ -101,14 +124,13 @@ pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
         let image = Image::new(buffer).map_err(|e| format!("cannot decode capture: {e}"))?;
         raw.push((connector, image, transform));
     }
-    if cfg!(debug_assertions) {
-        info!(copy_ms = copy.elapsed().as_millis(), "screenshot freeze: screencopy done");
-    }
+    Ok(raw)
+}
 
-    // Phase 2 (parallel): the XRGB->RGB conversion plus any rotation is pure CPU
-    // on owned buffers, so fan it out one thread per output.
-    let convert = Instant::now();
-    let frozen = std::thread::scope(|scope| {
+/// Phase 2 of [`capture_all_outputs`]: the XRGB→RGB conversion plus any
+/// rotation is pure CPU on owned buffers, so fan it out one thread per output.
+fn convert_outputs(raw: Vec<(String, Image, Transforms)>) -> Result<Vec<FrozenOutput>, String> {
+    std::thread::scope(|scope| {
         let handles: Vec<_> = raw
             .into_iter()
             .map(|(connector, image, transform)| {
@@ -131,11 +153,7 @@ pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
             .into_iter()
             .map(|handle| handle.join().map_err(|_| "capture worker panicked".to_owned())?)
             .collect::<Result<Vec<_>, _>>()
-    })?;
-    if cfg!(debug_assertions) {
-        info!(convert_ms = convert.elapsed().as_millis(), "screenshot freeze: convert done");
-    }
-    Ok(frozen)
+    })
 }
 
 /// Crops the selection out of a frozen output frame. `logical` is the output's

@@ -187,7 +187,7 @@ impl Component for SharePicker {
                 self.reply = Some(reply);
 
                 // Re-resolve config so live settings edits apply per request.
-                self.config = PickerConfig::from_config(&self.config_service.config());
+                self.config = PickerConfig::from_config(self.config_service.config());
                 widgets
                     .surface
                     .set_size_request(self.config.width, self.config.height);
