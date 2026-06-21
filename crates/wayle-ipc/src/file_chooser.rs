@@ -16,11 +16,27 @@ pub const SERVICE_PATH: &str = "/com/wayle/FileChooser";
     gen_blocking = false
 )]
 pub trait FileChooser {
-    /// Opens existing file(s) or a directory. Returns the chosen `file://`
-    /// URIs, or an empty list if the user cancelled.
-    async fn open_file(&self, title: &str, multiple: bool, directory: bool) -> Result<Vec<String>>;
+    /// Opens existing file(s) or a directory. `filters` is a list of
+    /// `(name, [(kind, value)])` where kind 0 = glob pattern, 1 = MIME type;
+    /// `current_folder` seeds the starting directory (empty = default). Returns
+    /// the chosen `file://` URIs, or an empty list if the user cancelled.
+    async fn open_file(
+        &self,
+        title: &str,
+        multiple: bool,
+        directory: bool,
+        filters: Vec<(String, Vec<(u32, String)>)>,
+        current_folder: &str,
+    ) -> Result<Vec<String>>;
 
-    /// Chooses a save destination seeded with `current_name`. Returns the
-    /// chosen `file://` URI (single-element list), or empty on cancel.
-    async fn save_file(&self, title: &str, current_name: &str) -> Result<Vec<String>>;
+    /// Chooses a save destination seeded with `current_name` (and optionally
+    /// `current_folder` + `filters`). Returns the chosen `file://` URI
+    /// (single-element list), or empty on cancel.
+    async fn save_file(
+        &self,
+        title: &str,
+        current_name: &str,
+        filters: Vec<(String, Vec<(u32, String)>)>,
+        current_folder: &str,
+    ) -> Result<Vec<String>>;
 }

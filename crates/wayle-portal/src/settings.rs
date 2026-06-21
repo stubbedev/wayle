@@ -24,6 +24,7 @@ pub const PORTAL_PATH: &str = "/org/freedesktop/portal/desktop";
 const KEY_COLOR_SCHEME: &str = "color-scheme";
 const KEY_ACCENT_COLOR: &str = "accent-color";
 const KEY_CONTRAST: &str = "contrast";
+const KEY_REDUCED_MOTION: &str = "reduced-motion";
 
 /// Settings portal interface state.
 pub struct Settings {
@@ -58,12 +59,18 @@ impl Settings {
         u32::from(self.config.config().styling.matugen_contrast.get().value() > 0.0)
     }
 
+    /// `reduced-motion`: 0 = no preference, 1 = reduce (animations disabled).
+    fn reduced_motion(&self) -> u32 {
+        u32::from(!self.config.config().animations.enabled.get())
+    }
+
     /// The full `org.freedesktop.appearance` key map for `ReadAll`.
     fn appearance_map(&self) -> Result<HashMap<String, OwnedValue>, zbus::fdo::Error> {
         let mut map = HashMap::new();
         map.insert(KEY_COLOR_SCHEME.to_owned(), owned(Value::from(self.color_scheme()))?);
         map.insert(KEY_ACCENT_COLOR.to_owned(), owned(accent_value(self.accent_color()))?);
         map.insert(KEY_CONTRAST.to_owned(), owned(Value::from(self.contrast()))?);
+        map.insert(KEY_REDUCED_MOTION.to_owned(), owned(Value::from(self.reduced_motion()))?);
         Ok(map)
     }
 
@@ -73,6 +80,7 @@ impl Settings {
             KEY_COLOR_SCHEME => Some(owned(Value::from(self.color_scheme()))),
             KEY_ACCENT_COLOR => Some(owned(accent_value(self.accent_color()))),
             KEY_CONTRAST => Some(owned(Value::from(self.contrast()))),
+            KEY_REDUCED_MOTION => Some(owned(Value::from(self.reduced_motion()))),
             _ => None,
         }
     }
@@ -155,7 +163,14 @@ pub fn spawn_watcher(connection: &Connection, config: Arc<ConfigService>) {
             .watch()
             .map(|_| KEY_CONTRAST)
             .boxed();
-        let mut changes = select_all([scheme, accent, contrast]);
+        let reduced_motion = config
+            .config()
+            .animations
+            .enabled
+            .watch()
+            .map(|_| KEY_REDUCED_MOTION)
+            .boxed();
+        let mut changes = select_all([scheme, accent, contrast, reduced_motion]);
 
         // The interface struct is cheap to rebuild for each read.
         let settings = Settings::new(config.clone());

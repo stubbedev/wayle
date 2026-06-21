@@ -13,6 +13,10 @@ use relm4::{
 };
 use tokio::sync::oneshot;
 
+/// A file filter: a display name and `(kind, value)` rules where kind 0 = glob
+/// pattern, 1 = MIME type.
+pub(crate) type Filter = (String, Vec<(u32, String)>);
+
 /// Messages driving the file chooser host.
 pub(crate) enum FileChooserInput {
     /// Open one or more existing files (or a directory).
@@ -20,12 +24,16 @@ pub(crate) enum FileChooserInput {
         title: String,
         multiple: bool,
         directory: bool,
+        filters: Vec<Filter>,
+        current_folder: String,
         reply: oneshot::Sender<Vec<String>>,
     },
     /// Choose a save destination, seeded with `current_name`.
     Save {
         title: String,
         current_name: String,
+        filters: Vec<Filter>,
+        current_folder: String,
         reply: oneshot::Sender<Vec<String>>,
     },
 }
@@ -86,20 +94,33 @@ impl Component for FileChooser {
                 title,
                 multiple,
                 directory,
+                filters,
+                current_folder,
                 reply,
-            } => open(&title, multiple, directory, reply),
+            } => open(&title, multiple, directory, &filters, &current_folder, reply),
             FileChooserInput::Save {
                 title,
                 current_name,
+                filters,
+                current_folder,
                 reply,
-            } => save(&title, &current_name, reply),
+            } => save(&title, &current_name, &filters, &current_folder, reply),
         }
     }
 }
 
 /// Runs an open/select-folder dialog.
-fn open(title: &str, multiple: bool, directory: bool, reply: oneshot::Sender<Vec<String>>) {
+fn open(
+    title: &str,
+    multiple: bool,
+    directory: bool,
+    filters: &[Filter],
+    current_folder: &str,
+    reply: oneshot::Sender<Vec<String>>,
+) {
     let dialog = gtk::FileDialog::builder().title(title).modal(true).build();
+    apply_filters(&dialog, filters);
+    apply_folder(&dialog, current_folder);
     let parent = gtk::Window::NONE;
 
     if directory {
@@ -118,16 +139,52 @@ fn open(title: &str, multiple: bool, directory: bool, reply: oneshot::Sender<Vec
 }
 
 /// Runs a save dialog.
-fn save(title: &str, current_name: &str, reply: oneshot::Sender<Vec<String>>) {
+fn save(
+    title: &str,
+    current_name: &str,
+    filters: &[Filter],
+    current_folder: &str,
+    reply: oneshot::Sender<Vec<String>>,
+) {
     let builder = gtk::FileDialog::builder().title(title).modal(true);
     let dialog = if current_name.is_empty() {
         builder.build()
     } else {
         builder.initial_name(current_name).build()
     };
+    apply_filters(&dialog, filters);
+    apply_folder(&dialog, current_folder);
     dialog.save(gtk::Window::NONE, gio::Cancellable::NONE, move |result| {
         let _ = reply.send(result.ok().and_then(file_uri).into_iter().collect());
     });
+}
+
+/// Builds GTK file filters from the portal spec and sets them on the dialog.
+fn apply_filters(dialog: &gtk::FileDialog, filters: &[Filter]) {
+    if filters.is_empty() {
+        return;
+    }
+    let store = gio::ListStore::new::<gtk::FileFilter>();
+    for (name, rules) in filters {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(name));
+        for (kind, value) in rules {
+            if *kind == 1 {
+                filter.add_mime_type(value);
+            } else {
+                filter.add_pattern(value);
+            }
+        }
+        store.append(&filter);
+    }
+    dialog.set_filters(Some(&store));
+}
+
+/// Seeds the dialog's starting directory.
+fn apply_folder(dialog: &gtk::FileDialog, current_folder: &str) {
+    if !current_folder.is_empty() {
+        dialog.set_initial_folder(Some(&gio::File::for_path(current_folder)));
+    }
 }
 
 /// The `file://` URI of a chosen file, if it has one.

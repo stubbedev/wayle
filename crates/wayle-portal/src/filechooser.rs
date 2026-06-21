@@ -62,7 +62,10 @@ impl FileChooser {
         let Some(proxy) = self.proxy().await else {
             return (Response::Other.code(), HashMap::new());
         };
-        match proxy.open_file(&title, multiple, directory).await {
+        match proxy
+            .open_file(&title, multiple, directory, filters(&options), &current_folder(&options))
+            .await
+        {
             Ok(uris) => uris_response(uris),
             Err(err) => {
                 warn!(%err, "filechooser: open failed");
@@ -85,7 +88,10 @@ impl FileChooser {
         let Some(proxy) = self.proxy().await else {
             return (Response::Other.code(), HashMap::new());
         };
-        match proxy.save_file(&title, &current_name).await {
+        match proxy
+            .save_file(&title, &current_name, filters(&options), &current_folder(&options))
+            .await
+        {
             Ok(uris) => uris_response(uris),
             Err(err) => {
                 warn!(%err, "filechooser: save failed");
@@ -107,7 +113,10 @@ impl FileChooser {
         let Some(proxy) = self.proxy().await else {
             return (Response::Other.code(), HashMap::new());
         };
-        let folder = match proxy.open_file(&title, false, true).await {
+        let folder = match proxy
+            .open_file(&title, false, true, Vec::new(), &current_folder(&options))
+            .await
+        {
             Ok(uris) => match uris.into_iter().next() {
                 Some(folder) => folder,
                 None => return (Response::Cancelled.code(), HashMap::new()),
@@ -123,6 +132,27 @@ impl FileChooser {
             .collect();
         uris_response(uris)
     }
+}
+
+/// Decodes the `filters` option (`a(sa(us))`) into `(name, [(kind, value)])`.
+fn filters(options: &Vardict) -> Vec<(String, Vec<(u32, String)>)> {
+    options
+        .get("filters")
+        .and_then(|v| Vec::<(String, Vec<(u32, String)>)>::try_from(v.try_clone().ok()?).ok())
+        .unwrap_or_default()
+}
+
+/// Decodes the `current_folder` option (`ay` — a NUL-terminated path).
+fn current_folder(options: &Vardict) -> String {
+    options
+        .get("current_folder")
+        .and_then(|v| Vec::<u8>::try_from(v.try_clone().ok()?).ok())
+        .map(|bytes| {
+            String::from_utf8_lossy(&bytes)
+                .trim_end_matches('\0')
+                .to_owned()
+        })
+        .unwrap_or_default()
 }
 
 /// Builds the `(response, results)` pair from chosen URIs (empty = cancelled).

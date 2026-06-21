@@ -134,13 +134,22 @@ impl ScreenCast {
         let sessions = self.sessions.clone();
         #[cfg(feature = "pipewire")]
         let streams = self.streams.clone();
+        #[cfg(feature = "pipewire")]
+        let stream_sizes = self.stream_sizes.clone();
         let key = session_handle.clone();
         let on_close = move || {
             sessions.remove(&key);
-            // Dropping the StreamHandles stops their PipeWire loops.
+            // Dropping the StreamHandles stops their PipeWire loops; also drop
+            // their entries from the shared size registry so stale node ids
+            // don't accumulate / mislead RemoteDesktop absolute motion.
             #[cfg(feature = "pipewire")]
-            if let Ok(mut map) = streams.lock() {
-                map.remove(&key);
+            if let Ok(mut map) = streams.lock()
+                && let Some(handles) = map.remove(&key)
+                && let Ok(mut sizes) = stream_sizes.lock()
+            {
+                for handle in &handles {
+                    sizes.remove(&handle.node_id);
+                }
             }
         };
 
@@ -178,9 +187,10 @@ impl ScreenCast {
 
     /// Shows the picker (unless restoring), starts the PipeWire stream(s), and
     /// returns the stream node ids.
+    #[allow(clippy::cognitive_complexity)]
     async fn start(
         &self,
-        _handle: OwnedObjectPath,
+        handle: OwnedObjectPath,
         session_handle: OwnedObjectPath,
         _app_id: String,
         _parent_window: String,
@@ -188,15 +198,34 @@ impl ScreenCast {
     ) -> (u32, HashMap<String, OwnedValue>) {
         let config = self.sessions.get(&session_handle).unwrap_or_default();
 
+        // Export a Request so the app can cancel the picker via Close().
+        let guard = crate::request::RequestGuard::mount(&self.connection, handle)
+            .await
+            .ok();
+        let cancel = guard.as_ref().map(crate::request::RequestGuard::cancel);
+
         let selection = match config.restore_target.clone() {
             Some(target) => PickerSelection {
                 allow_token: config.persist_mode > 0,
                 target,
             },
-            None => match self.run_picker(config.persist_mode > 0).await {
-                Some(selection) => selection,
-                None => return (Response::Cancelled.code(), HashMap::new()),
-            },
+            None => {
+                let picked = match cancel {
+                    Some(cancel) => {
+                        let picker = self.run_picker(config.persist_mode > 0);
+                        tokio::pin!(picker);
+                        tokio::select! {
+                            selection = &mut picker => selection,
+                            () = cancel.cancelled() => None,
+                        }
+                    }
+                    None => self.run_picker(config.persist_mode > 0).await,
+                };
+                match picked {
+                    Some(selection) => selection,
+                    None => return (Response::Cancelled.code(), HashMap::new()),
+                }
+            }
         };
 
         let stream = match self

@@ -19,12 +19,16 @@ impl FileChooserDaemon {
         title: &str,
         multiple: bool,
         directory: bool,
+        filters: Vec<(String, Vec<(u32, String)>)>,
+        current_folder: &str,
     ) -> zbus::fdo::Result<Vec<String>> {
         let (reply_tx, reply_rx) = oneshot::channel();
         self.dispatch(FileChooserInput::Open {
             title: title.to_owned(),
             multiple,
             directory,
+            filters,
+            current_folder: current_folder.to_owned(),
             reply: reply_tx,
         })?;
         reply_rx.await.map_err(|_| dropped())
@@ -32,11 +36,19 @@ impl FileChooserDaemon {
 
     /// Chooses a save destination, returning the chosen `file://` URI.
     #[instrument(skip(self))]
-    pub async fn save_file(&self, title: &str, current_name: &str) -> zbus::fdo::Result<Vec<String>> {
+    pub async fn save_file(
+        &self,
+        title: &str,
+        current_name: &str,
+        filters: Vec<(String, Vec<(u32, String)>)>,
+        current_folder: &str,
+    ) -> zbus::fdo::Result<Vec<String>> {
         let (reply_tx, reply_rx) = oneshot::channel();
         self.dispatch(FileChooserInput::Save {
             title: title.to_owned(),
             current_name: current_name.to_owned(),
+            filters,
+            current_folder: current_folder.to_owned(),
             reply: reply_tx,
         })?;
         reply_rx.await.map_err(|_| dropped())

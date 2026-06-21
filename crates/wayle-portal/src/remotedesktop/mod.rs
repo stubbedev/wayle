@@ -76,6 +76,28 @@ impl RemoteDesktop {
             input.send(command);
         }
     }
+
+    /// Asks the user to confirm granting pointer/keyboard control. Denies if the
+    /// dialog host is unavailable (fail-closed — never inject input silently).
+    async fn confirm_control(&self) -> bool {
+        let proxy = match wayle_ipc::portal_dialogs::PortalDialogsProxy::new(&self.connection).await {
+            Ok(proxy) => proxy,
+            Err(err) => {
+                warn!(%err, "remotedesktop: consent dialog unavailable; denying");
+                return false;
+            }
+        };
+        proxy
+            .access(
+                "Remote control",
+                "",
+                "An application is requesting control of your pointer and keyboard.",
+                "Allow",
+                "Deny",
+            )
+            .await
+            .unwrap_or(false)
+    }
 }
 
 #[interface(name = "org.freedesktop.impl.portal.RemoteDesktop")]
@@ -148,6 +170,12 @@ impl RemoteDesktop {
         } else {
             config.device_types & (DEVICE_KEYBOARD | DEVICE_POINTER)
         };
+
+        // Input injection is dangerous; require explicit consent. Deny by
+        // default if the prompt can't be shown.
+        if !self.confirm_control().await {
+            return (Response::Cancelled.code(), HashMap::new());
+        }
 
         // Binding the virtual devices blocks on a Wayland roundtrip; keep it off
         // the async executor.
