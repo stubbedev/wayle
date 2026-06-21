@@ -105,7 +105,12 @@ impl Component for BrightnessModule {
             dropdowns: init.dropdowns,
         };
 
-        model.refresh_display(brightness_config);
+        // Re-borrow config from the moved service; the earlier snapshot is
+        // tied to `init.config`, now owned by `model`.
+        {
+            let config = model.config.config();
+            model.refresh_display(&config.modules.brightness);
+        }
         let token = model.active_device_watcher_token.reset();
         watchers::spawn_device_watchers(&sender, &model.devices, token);
 
