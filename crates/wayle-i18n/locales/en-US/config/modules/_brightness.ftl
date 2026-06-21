@@ -32,6 +32,9 @@ settings-modules-brightness-label-max-length = Label Max Length
 settings-modules-brightness-min-brightness = Minimum Brightness
     .description = Floor (%) for the adjust action so a dimmer never scrolls fully dark; use the blackout toggle to reach 0%
 
+settings-modules-brightness-enable-external = External Monitors
+    .description = Control external monitors over DDC/CI; needs the i2c-dev module and access to /dev/i2c-*
+
 settings-modules-brightness-button-bg-color = Button Background
     .description = Button background color
 

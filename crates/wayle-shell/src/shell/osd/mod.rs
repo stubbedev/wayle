@@ -233,8 +233,8 @@ impl Component for Osd {
                 self.handle_volume_changed(&sender, root);
             }
 
-            OsdCmd::BrightnessDeviceChanged(device) => {
-                self.handle_brightness_device_changed(device, &sender);
+            OsdCmd::BrightnessDevicesChanged(devices) => {
+                self.handle_brightness_devices_changed(devices, &sender);
             }
 
             OsdCmd::BrightnessChanged => {

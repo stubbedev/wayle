@@ -658,9 +658,10 @@ fn dispatch_action(
             }
         }
         ClickAction::Brightness(delta) => {
-            let Some(device) = primary_backlight(registry) else {
+            let devices = backlight_devices(registry);
+            if devices.is_empty() {
                 return;
-            };
+            }
             // Floor at the configured minimum so a dimmer never scrolls fully
             // dark; reaching 0% is reserved for BrightnessToggle.
             let min = f64::from(
@@ -674,23 +675,34 @@ fn dispatch_action(
                     .get(),
             )
             .clamp(0.0, 100.0);
-            let delta = *delta;
-            debug!(delta, min, "click: brightness");
+            let delta = f64::from(*delta);
+            debug!(delta, min, count = devices.len(), "click: brightness (all monitors)");
             relm4::spawn(async move {
-                let target = (device.percentage().value() + f64::from(delta)).clamp(min, 100.0);
-                if let Err(error) = device.set_percentage(Percentage::new(target)).await {
-                    warn!(%error, "brightness action failed");
+                // Each monitor steps relative to its own level, preserving any
+                // intentional per-monitor offset set from the dropdown sliders.
+                for device in devices {
+                    let target = (device.percentage().value() + delta).clamp(min, 100.0);
+                    if let Err(error) = device.set_percentage(Percentage::new(target)).await {
+                        warn!(%error, "brightness action failed");
+                    }
                 }
             });
         }
         ClickAction::BrightnessToggle => {
-            let Some(device) = primary_backlight(registry) else {
+            let devices = backlight_devices(registry);
+            if devices.is_empty() {
                 return;
-            };
-            debug!("click: brightness toggle");
+            }
+            // Master toggle: decide one target state from the whole set (any
+            // monitor lit -> blackout all; all dark -> restore all) so the
+            // monitors stay in lockstep instead of drifting per-device.
+            let go_dark = devices.iter().any(|device| device.brightness.get() > 0);
+            debug!(count = devices.len(), go_dark, "click: brightness toggle (all monitors)");
             relm4::spawn(async move {
-                if let Err(error) = device.toggle_blackout().await {
-                    warn!(%error, "brightness toggle failed");
+                for device in devices {
+                    if let Err(error) = device.set_blackout(go_dark).await {
+                        warn!(%error, "brightness toggle failed");
+                    }
                 }
             });
         }
@@ -698,18 +710,18 @@ fn dispatch_action(
     }
 }
 
-/// Resolves the primary backlight device for native brightness actions,
-/// logging the reason when unavailable so the caller can bail quietly.
-fn primary_backlight(registry: &DropdownRegistry) -> Option<Arc<BacklightDevice>> {
+/// Returns every backlight device (internal panels and external DDC monitors)
+/// so brightness actions drive all monitors at once, logging when none exist.
+fn backlight_devices(registry: &DropdownRegistry) -> Vec<Arc<BacklightDevice>> {
     let Some(brightness) = registry.services.brightness.as_ref() else {
         warn!("brightness action dropped: brightness service unavailable");
-        return None;
+        return Vec::new();
     };
-    let device = brightness.primary.get();
-    if device.is_none() {
-        warn!("brightness action dropped: no primary backlight device");
+    let devices = brightness.devices.get();
+    if devices.is_empty() {
+        warn!("brightness action dropped: no backlight devices");
     }
-    device
+    devices
 }
 
 /// Routes recognized `wayle …` commands to their in-process service instead of

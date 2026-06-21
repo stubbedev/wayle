@@ -173,15 +173,15 @@ impl Osd {
         self.show_event(event, sender, root);
     }
 
-    pub(super) fn handle_brightness_device_changed(
+    pub(super) fn handle_brightness_devices_changed(
         &mut self,
-        device: Option<Arc<BacklightDevice>>,
+        devices: Vec<Arc<BacklightDevice>>,
         sender: &ComponentSender<Self>,
     ) {
         let token = self.brightness_watcher.reset();
 
-        if let Some(device) = &device {
-            watchers::spawn_brightness_watcher(sender, device, token);
+        if !devices.is_empty() {
+            watchers::spawn_brightness_watchers(sender, &devices, token);
         }
     }
 
@@ -194,11 +194,14 @@ impl Osd {
             return;
         };
 
-        let Some(device) = brightness.primary.get() else {
+        // Show the average across all monitors, matching the bar label, since
+        // a brightness action drives every monitor at once.
+        let devices = brightness.devices.get();
+        if devices.is_empty() {
             return;
-        };
-
-        let percentage = device.percentage().value();
+        }
+        let sum: f64 = devices.iter().map(|device| device.percentage().value()).sum();
+        let percentage = sum / devices.len() as f64;
         let rounded = percentage.round() as u32;
 
         if self.last_brightness == Some(rounded) {
@@ -208,7 +211,7 @@ impl Osd {
         self.last_brightness = Some(rounded);
 
         let event = OsdEvent::Slider {
-            label: device.name.to_string(),
+            label: t!("osd-brightness"),
             icon: BRIGHTNESS_ICON.to_string(),
             percentage,
             muted: false,

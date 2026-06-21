@@ -50,7 +50,7 @@ pub(crate) enum OsdCmd {
     VolumeChanged,
     InputDeviceChanged(Option<Arc<InputDevice>>),
     InputVolumeChanged,
-    BrightnessDeviceChanged(Option<Arc<BacklightDevice>>),
+    BrightnessDevicesChanged(Vec<Arc<BacklightDevice>>),
     BrightnessChanged,
     ToggleChanged(ToggleEvent),
     ShowToast(crate::services::widget_ipc::ToastRequest),

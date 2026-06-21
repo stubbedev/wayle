@@ -25,11 +25,9 @@ pub struct BrightnessService {
     #[debug(skip)]
     pub(crate) backend_handle: Mutex<Option<JoinHandle<Result<(), Error>>>>,
 
-    /// Updates automatically as devices appear/disappear via udev.
+    /// Updates automatically as devices appear/disappear via udev and DDC
+    /// hotplug. Internal panels and external DDC monitors alike.
     pub devices: Property<Vec<Arc<BacklightDevice>>>,
-
-    /// Highest-priority device by [`BacklightType`] ordering.
-    pub primary: Property<Option<Arc<BacklightDevice>>>,
 }
 
 impl BrightnessService {

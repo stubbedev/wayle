@@ -104,23 +104,45 @@ impl BacklightDevice {
         self.set_brightness(raw).await
     }
 
-    /// Toggles between full darkness (raw `0`) and the last non-zero brightness.
+    /// Drives the device to full darkness (raw `0`) or back to the last
+    /// non-zero brightness.
     ///
-    /// Going dark stores the current value first; toggling back restores it,
-    /// falling back to `max_brightness` when nothing was stored yet.
+    /// Going dark stores the current value first; restoring uses it, falling
+    /// back to `max_brightness` when nothing was stored yet. Idempotent: a
+    /// no-op if already in the requested state.
+    ///
+    /// Use this for a synchronized multi-monitor blackout (decide the target
+    /// state once, apply it to every device) so monitors cannot drift out of
+    /// step the way independent per-device toggles would.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the write fails via both logind and sysfs.
+    pub async fn set_blackout(&self, dark: bool) -> Result<(), Error> {
+        let current = self.brightness.get();
+
+        if dark {
+            if current == 0 {
+                return Ok(());
+            }
+            self.restore_brightness.set(Some(current));
+            self.set_brightness(0).await
+        } else {
+            if current > 0 {
+                return Ok(());
+            }
+            let restore = self.restore_brightness.get().unwrap_or(self.max_brightness);
+            self.set_brightness(restore).await
+        }
+    }
+
+    /// Toggles a single device between darkness and its last brightness.
     ///
     /// # Errors
     ///
     /// Returns error if the write fails via both logind and sysfs.
     pub async fn toggle_blackout(&self) -> Result<(), Error> {
-        let current = self.brightness.get();
-        if current > 0 {
-            self.restore_brightness.set(Some(current));
-            self.set_brightness(0).await
-        } else {
-            let restore = self.restore_brightness.get().unwrap_or(self.max_brightness);
-            self.set_brightness(restore).await
-        }
+        self.set_blackout(self.brightness.get() > 0).await
     }
 }
 
