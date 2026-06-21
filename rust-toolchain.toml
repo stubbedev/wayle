@@ -1,0 +1,12 @@
+# Single source of truth for the Rust toolchain across local dev and CI.
+#
+# Both the `nix develop` shell (rustup is on its PATH) and the CI containers
+# (rustup-based) honor this file, so `cargo fmt`, `cargo clippy`, and the test
+# build run on the exact same compiler everywhere — no more local/CI skew on
+# rustfmt or lint output.
+#
+# Pinned to a dated nightly because the workspace formats with unstable rustfmt
+# options and its Cargo.toml rust-version is ahead of nixpkgs' stable.
+[toolchain]
+channel = "nightly-2026-06-18"
+components = ["rustfmt", "clippy"]
