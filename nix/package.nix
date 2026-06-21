@@ -1,12 +1,12 @@
 {
   lib,
   craneLib,
+  rustPlatform,
   pkg-config,
   cmake,
   clang,
   mold,
   wrapGAppsHook4,
-  llvmPackages,
   gtk4,
   gtk4-layer-shell,
   gtksourceview5,
@@ -71,6 +71,11 @@ let
       cmake
       clang
       mold
+      # Sets LIBCLANG_PATH and BINDGEN_EXTRA_CLANG_ARGS so the bindgen build
+      # scripts (wayle-cava, and libspa-sys, which needs them for its
+      # clang-macro-fallback to const-evaluate cast macros like SPA_ID_INVALID)
+      # find clang's builtin headers and libc inside the sandbox.
+      rustPlatform.bindgenHook
     ];
 
     buildInputs = [
@@ -89,12 +94,6 @@ let
       systemd # libudev
       wayland
     ] ++ gstPlugins;
-
-    # wayle-cava's build script runs bindgen, which needs libclang — required
-    # in the deps layer too. wayle-cava is now a path member (folded in from the
-    # former wayle-services repo), and its `vendored` feature compiles the
-    # bundled C sources under crates/wayle-cava/cava.
-    env.LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
 
     # Link with mold via clang (matches the devShell). Linking 30 crates + GTK
     # with the default bfd linker is a chunk of the final-crate build time; mold

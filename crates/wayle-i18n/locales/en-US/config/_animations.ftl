@@ -46,6 +46,15 @@ settings-animations-wallpaper = Wallpaper
 settings-animations-power = Power Menu
     .description = Per-surface animation override for the power menu overlay
 
+settings-animations-dialog = Portal Dialog
+    .description = Per-surface animation override for portal dialogs (access/account/app-chooser/launcher-install prompts)
+
+settings-animations-file-chooser = Portal File Chooser
+    .description = Per-surface animation override for the portal file-chooser surface
+
+settings-animations-print = Portal Print
+    .description = Per-surface animation override for the portal print surface
+
 
 ## AnimationType variants
 enum-animation-type-none = None
