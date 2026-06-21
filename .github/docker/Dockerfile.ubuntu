@@ -23,6 +23,7 @@ RUN apt-get update \
         libgtk-4-dev \
         libgtk4-layer-shell-dev \
         libgtksourceview-5-dev \
+        libpam0g-dev \
         libpipewire-0.3-dev \
         libpulse-dev \
         libudev-dev \

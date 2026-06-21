@@ -14,6 +14,7 @@ RUN pacman --noconfirm --needed -Syu \
         gtksourceview5 \
         libpulse \
         fftw \
+        pam \
         libpipewire \
         mold \
         systemd-libs \
