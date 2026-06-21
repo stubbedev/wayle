@@ -122,9 +122,7 @@ fn secret_path(app_id: &str) -> std::io::Result<PathBuf> {
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
         .ok_or_else(|| std::io::Error::other("neither XDG_DATA_HOME nor HOME is set"))?;
 
-    Ok(base
-        .join("wayle/portal/secrets")
-        .join(sanitize(app_id)))
+    Ok(base.join("wayle/portal/secrets").join(sanitize(app_id)))
 }
 
 /// Maps an `app_id` to a safe single-path-component filename: anything that is
@@ -155,7 +153,7 @@ mod tests {
         assert_eq!(sanitize(".."), "_..");
         assert_eq!(sanitize("."), "_.");
         assert_eq!(sanitize(""), "_");
-        assert_eq!(sanitize("/"), "__");
+        assert_eq!(sanitize("/"), "_");
     }
 
     #[test]

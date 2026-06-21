@@ -30,6 +30,7 @@ const MOUNTED_INTERFACES: &[&str] = &[
     "AppChooser",
     "DynamicLauncher",
     "Print",
+    "Secret",
 ];
 
 #[cfg(test)]
