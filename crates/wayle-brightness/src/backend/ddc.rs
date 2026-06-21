@@ -5,18 +5,24 @@
 //! the `i2c-dev` kernel module and read/write access to `/dev/i2c-*` (usually
 //! membership in the `i2c` group).
 //!
-//! All DDC I/O is **blocking and slow** (tens of milliseconds per call, and
-//! enumeration can take seconds). Every public method here must therefore be
+//! Built on the low-level `ddc-i2c` crate rather than `ddc-hi`: we only need
+//! raw VCP luminance get/set, and `ddc-hi`'s EDID/MCCS capability layer drags
+//! in unmaintained, future-incompatible dependencies.
+//!
+//! All DDC I/O is **blocking and slow** (tens of milliseconds per call, and a
+//! full bus scan can take a while). Every public method here must therefore be
 //! invoked from a blocking context (`tokio::task::spawn_blocking`).
 
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     sync::Mutex,
     thread,
     time::Duration,
 };
 
-use ddc_hi::{Ddc, Display};
+use ddc::Ddc;
+use ddc_i2c::I2cDeviceDdc;
 use tracing::{debug, warn};
 
 use crate::{
@@ -28,22 +34,26 @@ use crate::{
 const VCP_LUMINANCE: u8 = 0x10;
 
 /// DDC/CI is unreliable: a transaction can be corrupted or NAK'd and needs a
-/// retry. Total attempts per read/write, with a short pause between.
+/// retry. Total attempts per write, with a short pause between.
 const DDC_ATTEMPTS: u32 = 3;
 const DDC_RETRY_DELAY: Duration = Duration::from_millis(40);
+
+/// Where Linux exposes i2c buses, and the per-bus node prefix.
+const DEV_DIR: &str = "/dev";
+const I2C_NODE_PREFIX: &str = "i2c-";
 
 /// Prefix for synthesized DDC device names. Includes `ddc` and `i2c` so the
 /// shell's `friendly_device_name` resolves these to the "external" label.
 const DDC_NAME_PREFIX: &str = "ddci2c-";
 
 struct DdcDisplay {
-    display: Display,
+    handle: I2cDeviceDdc,
     /// VCP-reported maximum luminance, cached so brightness changes can be
     /// reported without a second (slow) DDC read.
     max: u32,
 }
 
-/// Owns the open DDC/CI display handles and serializes access to them.
+/// Owns the open DDC/CI handles and serializes access to them.
 ///
 /// Handles are stateful (they hold open I²C file descriptors) and DDC writes
 /// to the same bus must not overlap, so all access goes through the mutex.
@@ -82,7 +92,7 @@ impl DdcManager {
 
         let mut added = Vec::new();
         let mut next = HashMap::with_capacity(scanned.len());
-        for (info, display) in scanned {
+        for (info, handle) in scanned {
             let name = info.name.to_string();
             if !previous.contains(&name) {
                 added.push(info.clone());
@@ -90,7 +100,7 @@ impl DdcManager {
             next.insert(
                 name,
                 DdcDisplay {
-                    display,
+                    handle,
                     max: info.max_brightness,
                 },
             );
@@ -131,12 +141,16 @@ impl DdcManager {
         let raw = u16::try_from(clamped).unwrap_or(u16::MAX);
         let max = display.max;
 
-        with_retry(|| display.display.handle.set_vcp_feature(VCP_LUMINANCE, raw)).map_err(
-            |detail| Error::Ddc {
-                device: name.to_owned(),
-                detail,
-            },
-        )?;
+        with_retry(|| {
+            display
+                .handle
+                .set_vcp_feature(VCP_LUMINANCE, raw)
+                .map_err(|err| format!("{err:?}"))
+        })
+        .map_err(|detail| Error::Ddc {
+            device: name.to_owned(),
+            detail,
+        })?;
 
         Ok(max)
     }
@@ -164,24 +178,37 @@ fn with_retry<T, E: std::fmt::Display>(
     Err(last)
 }
 
-/// Probes every DDC/CI display and returns the readable ones paired with a
-/// freshly built [`BacklightInfo`]. Unreadable monitors (no DDC support, bad
-/// permissions, missing `i2c-dev`) are skipped with a warning.
+/// Probes every `/dev/i2c-*` bus and returns the ones that answer the DDC/CI
+/// luminance query, paired with a freshly built [`BacklightInfo`] and an open
+/// handle. Buses with no DDC monitor (sensors, HDMI-audio, …) fail the probe
+/// and are silently skipped; missing `i2c-dev` or permissions yields nothing.
+///
+/// The probe is single-attempt on purpose: most non-monitor buses never
+/// answer, and retrying each would make the scan needlessly slow. Retries are
+/// reserved for writes to a known monitor.
 ///
 /// **Blocking and slow** — only call from a blocking context.
-fn scan() -> Vec<(BacklightInfo, Display)> {
-    let displays = Display::enumerate();
-    debug!(
-        count = displays.len(),
-        "DDC displays returned by enumeration"
-    );
+fn scan() -> Vec<(BacklightInfo, I2cDeviceDdc)> {
+    let mut buses = i2c_buses();
+    buses.sort_unstable();
 
-    displays
+    buses
         .into_iter()
-        .filter_map(|mut display| {
-            let name = device_name(&display);
-            match read_luminance(&mut display) {
-                Ok((current, max)) => {
+        .filter_map(|bus| {
+            let path = format!("{DEV_DIR}/{I2C_NODE_PREFIX}{bus}");
+            let mut handle = match ddc_i2c::from_i2c_device(&path) {
+                Ok(handle) => handle,
+                Err(err) => {
+                    debug!(%path, error = %err, "cannot open i2c bus");
+                    return None;
+                }
+            };
+
+            match handle.get_vcp_feature(VCP_LUMINANCE) {
+                Ok(value) => {
+                    let current = u32::from(value.value());
+                    let max = u32::from(value.maximum());
+                    let name = format!("{DDC_NAME_PREFIX}{bus}");
                     debug!(device = %name, current, max, "external monitor found");
                     let info = BacklightInfo {
                         name: DeviceName::new(name),
@@ -189,10 +216,10 @@ fn scan() -> Vec<(BacklightInfo, Display)> {
                         brightness: current,
                         max_brightness: max,
                     };
-                    Some((info, display))
+                    Some((info, handle))
                 }
-                Err(detail) => {
-                    warn!(device = %name, %detail, "skipping monitor: DDC luminance unreadable");
+                Err(err) => {
+                    debug!(%path, error = ?err, "no DDC monitor on bus");
                     None
                 }
             }
@@ -200,32 +227,67 @@ fn scan() -> Vec<(BacklightInfo, Display)> {
         .collect()
 }
 
-/// Reads `(current, maximum)` luminance from a display. Returns the error as a
-/// string because the DDC handle's error type is not `Clone`/`'static`-bound.
-fn read_luminance(display: &mut Display) -> Result<(u32, u32), String> {
-    let value = with_retry(|| display.handle.get_vcp_feature(VCP_LUMINANCE))?;
-    Ok((u32::from(value.value()), u32::from(value.maximum())))
-}
-
-/// Builds a stable, recognizable device name from the display's backend id,
-/// falling back to the model name. The result is sanitized to the same shape
-/// as sysfs names (alphanumeric plus `-`).
-fn device_name(display: &Display) -> String {
-    let raw = if display.info.id.is_empty() {
-        display
-            .info
-            .model_name
-            .clone()
-            .unwrap_or_else(|| String::from("unknown"))
-    } else {
-        display.info.id.clone()
+/// Bus numbers of every `/dev/i2c-N` node. Empty when `i2c-dev` is not loaded.
+fn i2c_buses() -> Vec<u32> {
+    let entries = match fs::read_dir(DEV_DIR) {
+        Ok(entries) => entries,
+        Err(err) => {
+            warn!(error = %err, "cannot read {DEV_DIR} to find i2c buses");
+            return Vec::new();
+        }
     };
 
-    format!("{DDC_NAME_PREFIX}{}", sanitize(&raw))
+    entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .and_then(|name| name.strip_prefix(I2C_NODE_PREFIX))
+                .and_then(|n| n.parse::<u32>().ok())
+        })
+        .collect()
 }
 
-fn sanitize(raw: &str) -> String {
-    raw.chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-        .collect()
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::*;
+
+    #[test]
+    fn retry_returns_first_success_without_retrying() {
+        let calls = Cell::new(0);
+        let result = with_retry(|| {
+            calls.set(calls.get() + 1);
+            Ok::<u32, String>(42)
+        });
+
+        assert_eq!(result, Ok(42));
+        assert_eq!(calls.get(), 1, "should not retry after success");
+    }
+
+    #[test]
+    fn retry_recovers_after_transient_failure() {
+        let calls = Cell::new(0);
+        let result = with_retry(|| {
+            calls.set(calls.get() + 1);
+            if calls.get() < 2 { Err("nak") } else { Ok(7) }
+        });
+
+        assert_eq!(result, Ok(7));
+        assert_eq!(calls.get(), 2);
+    }
+
+    #[test]
+    fn retry_exhausts_and_reports_last_error() {
+        let calls = Cell::new(0);
+        let result: Result<u32, String> = with_retry(|| {
+            calls.set(calls.get() + 1);
+            Err(format!("fail {}", calls.get()))
+        });
+
+        assert_eq!(result, Err(format!("fail {DDC_ATTEMPTS}")));
+        assert_eq!(calls.get(), DDC_ATTEMPTS);
+    }
 }

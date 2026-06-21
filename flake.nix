@@ -78,13 +78,16 @@
           ]) ++ gstPlugins;
           # `nix develop` provides every native dependency `cargo build`,
           # `just check`, and the `release-*` recipes need. The Rust toolchain
-          # is intentionally NOT pinned here — Cargo.toml's rust-version is ahead
-          # of nixpkgs, so use your own rustup toolchain from PATH.
+          # itself comes from `rustup`, which reads the repo's
+          # `rust-toolchain.toml` — the same pin CI honors. nixpkgs' own rust is
+          # not used here because Cargo.toml's rust-version is ahead of it; this
+          # keeps local and CI on a byte-identical compiler with no skew.
           default = pkgs.mkShell {
             # Build tools. pkg-config + each buildInput below populate
             # PKG_CONFIG_PATH automatically, so `just release-patch` works
             # straight out of `nix develop` with no manual env setup.
             nativeBuildInputs = with pkgs; [
+              rustup # honors rust-toolchain.toml; matches CI's pinned toolchain
               pkg-config
               cmake
               clang

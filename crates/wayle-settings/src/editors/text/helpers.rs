@@ -105,6 +105,10 @@ impl TextLike for ClickAction {
             return Self::None;
         }
 
+        if let Some(name) = text.strip_prefix("dropdown:") {
+            return Self::Dropdown(name.to_owned());
+        }
+
         if let Some(rest) = text.strip_prefix("brightness:") {
             return match rest {
                 "toggle" => Self::BrightnessToggle,
@@ -112,10 +116,7 @@ impl TextLike for ClickAction {
             };
         }
 
-        match text.strip_prefix("dropdown:") {
-            Some(name) => Self::Dropdown(name.to_owned()),
-            None => Self::Shell(text.to_owned()),
-        }
+        Self::Shell(text.to_owned())
     }
 }
 

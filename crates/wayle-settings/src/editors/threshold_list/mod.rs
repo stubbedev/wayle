@@ -152,14 +152,17 @@ impl ThresholdState {
         });
 
         self.list.append(&cw.root);
-        // `card_titled` always sets a title; fall back to an empty label rather
-        // than panic if that ever changes.
-        let title = cw.title.unwrap_or_else(|| gtk::Label::new(None));
-        self.cards.borrow_mut().push(ThresholdCard {
-            index,
-            title,
-            controls,
-        });
+
+        // `card_titled` always sets a title label; guard rather than unwrap to
+        // satisfy the no-panic lint. If it were ever absent the card is simply
+        // left untracked instead of crashing the settings window.
+        if let Some(title) = cw.title {
+            self.cards.borrow_mut().push(ThresholdCard {
+                index,
+                title,
+                controls,
+            });
+        }
     }
 
     fn number_field(

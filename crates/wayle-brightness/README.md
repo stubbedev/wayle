@@ -4,7 +4,7 @@
 
 # wayle-brightness
 
-Backlight control for internal displays with reactive state.
+Backlight control for internal and external (DDC/CI) displays with reactive state.
 
 [![Crates.io](https://img.shields.io/crates/v/wayle-brightness)](https://crates.io/crates/wayle-brightness)
 [![docs.rs](https://img.shields.io/docsrs/wayle-brightness)](https://docs.rs/wayle-brightness)
@@ -16,7 +16,7 @@ cargo add wayle-brightness
 
 ## Usage
 
-`BrightnessService::new()` returns `None` when no backlight devices are found. The `primary` field tracks the main display's backlight device.
+`BrightnessService::new()` returns `None` when no backlight devices are found. The `devices` field tracks every backlight device — internal panels and external DDC/CI monitors alike.
 
 ```rust,no_run
 use wayle_brightness::{BrightnessService, Percentage};
@@ -27,14 +27,14 @@ async fn example() -> Result<(), wayle_brightness::Error> {
         return Ok(());
     };
 
-    if let Some(device) = brightness.primary.get() {
+    for device in brightness.devices.get() {
         println!("{}: {}", device.name, device.percentage());
         device.set_percentage(Percentage::new(50.0)).await?;
     }
 
-    let mut stream = brightness.primary.watch();
-    while let Some(maybe_device) = stream.next().await {
-        if let Some(device) = maybe_device {
+    let mut stream = brightness.devices.watch();
+    while let Some(devices) = stream.next().await {
+        for device in devices {
             println!("Brightness: {}", device.percentage());
         }
     }
