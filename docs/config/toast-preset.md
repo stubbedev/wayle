@@ -31,11 +31,11 @@ class = "success"
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `id` | string | required | Unique identifier. Trigger with `wayle toast --preset <id>`. |
-| `label` | unknown | `null` | Toast text. An explicit label on the command line overrides this. |
-| `icon` | unknown | `null` | Symbolic icon name shown beside the text. |
-| `percentage` | unknown | `null` | Progress percentage (0-100). When set, renders a progress bar instead of a plain icon + label toast. |
-| `duration-ms` | unknown | `null` | Auto-dismiss duration in milliseconds. Unset falls back to the toast config duration. |
-| `class` | unknown | `null` | Extra CSS class applied to the toast for custom styling. |
+| `label` | string or null | `null` | Toast text. An explicit label on the command line overrides this. |
+| `icon` | string or null | `null` | Symbolic icon name shown beside the text. |
+| `percentage` | number or null | `null` | Progress percentage (0-100). When set, renders a progress bar instead of a plain icon + label toast. |
+| `duration-ms` | u32 or null | `null` | Auto-dismiss duration in milliseconds. Unset falls back to the toast config duration. |
+| `class` | string or null | `null` | Extra CSS class applied to the toast for custom styling. |
 
 ## Default configuration
 

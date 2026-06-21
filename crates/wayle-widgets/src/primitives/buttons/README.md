@@ -4,18 +4,18 @@ Button variants for actions and navigation.
 
 ## Available
 
-| Template           | CSS Classes            | Use Case                  |
-| ------------------ | ---------------------- | ------------------------- |
-| `PrimaryButton`    | `.btn .btn-primary`    | Main actions, CTAs        |
-| `SecondaryButton`  | `.btn .btn-secondary`  | Secondary actions         |
-| `DangerButton`     | `.btn .btn-danger`     | Destructive actions       |
-| `GhostButton`      | `.btn .btn-ghost`      | Subtle actions, toolbars  |
-| `GhostIconButton`  | `.btn .btn-ghost-icon` | Icon-only ghost buttons   |
-| `IconButton`       | `.btn .btn-icon`       | Icon-only with background |
-| `LinkButton`       | `.btn-link`            | Text links                |
-| `MutedLinkButton`  | `.btn-link .muted`     | De-emphasized links       |
-| `DangerLinkButton` | `.btn-link .danger`    | Destructive text links    |
-| `MenuButton`       | `.btn-menu`            | Dropdown menu trigger     |
+| Template           | CSS Classes        | Use Case                  |
+| ------------------ | ------------------ | ------------------------- |
+| `PrimaryButton`    | `.primary`         | Main actions, CTAs        |
+| `SecondaryButton`  | `.secondary`       | Secondary actions         |
+| `DangerButton`     | `.danger`          | Destructive actions       |
+| `GhostButton`      | `.ghost`           | Subtle actions, toolbars  |
+| `GhostIconButton`  | `.ghost-icon`      | Icon-only ghost buttons   |
+| `IconButton`       | `.icon`            | Icon-only with background |
+| `LinkButton`       | `.link`            | Text links                |
+| `MutedLinkButton`  | `.link .muted`     | De-emphasized links       |
+| `DangerLinkButton` | `.link .danger`    | Destructive text links    |
+| `MenuButton`       | `.menu`            | Dropdown menu trigger     |
 
 ## Import
 

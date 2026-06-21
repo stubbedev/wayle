@@ -48,7 +48,7 @@ button-icon-size = "20px"   # absolute pixels, ignores bar scale
 button-gap = 1.5            # scale multiplier (default form)
 ```
 
-Pixel values are logical pixels: GTK scales them for HiDPI displays automatically, so `"20px"` renders at the correct physical size on a 2× monitor while ignoring the configurable `global-scale`.
+Pixel values are logical pixels: GTK scales them for HiDPI displays automatically, so `"20px"` renders at the correct physical size on a 2× monitor while ignoring the configurable `bar.scale` multiplier.
 
 ## Imports
 

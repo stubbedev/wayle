@@ -1,8 +1,11 @@
 use std::fmt::{self, Display, Formatter};
 
-/// Kernel backlight device type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Backlight device type. Distinguishes external DDC/CI monitors from the
+/// kernel-backed internal panel types (used for display labels).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BacklightType {
+    /// External monitor driven over DDC/CI (I²C), not kernel-backed.
+    Ddc,
     /// Controlled using hardware registers.
     Raw,
     /// Controlled using a platform-specific interface.

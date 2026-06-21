@@ -148,10 +148,10 @@ fn spawn_brightness_service_watcher(
     sender: &ComponentSender<Osd>,
     brightness: &Arc<BrightnessService>,
 ) {
-    let primary = brightness.primary.clone();
+    let devices = brightness.devices.clone();
 
-    watch!(sender, [primary.watch()], |out| {
-        let _ = out.send(OsdCmd::BrightnessDeviceChanged(primary.get()));
+    watch!(sender, [devices.watch()], |out| {
+        let _ = out.send(OsdCmd::BrightnessDevicesChanged(devices.get()));
     });
 }
 
@@ -195,14 +195,16 @@ fn spawn_toggle_watchers(sender: &ComponentSender<Osd>) {
     }
 }
 
-pub(super) fn spawn_brightness_watcher(
+pub(super) fn spawn_brightness_watchers(
     sender: &ComponentSender<Osd>,
-    device: &Arc<BacklightDevice>,
+    devices: &[Arc<BacklightDevice>],
     token: CancellationToken,
 ) {
-    let brightness = device.brightness.clone();
+    for device in devices {
+        let brightness = device.brightness.clone();
 
-    watch_cancellable!(sender, token, [brightness.watch()], |out| {
-        let _ = out.send(OsdCmd::BrightnessChanged);
-    });
+        watch_cancellable!(sender, token.clone(), [brightness.watch()], |out| {
+            let _ = out.send(OsdCmd::BrightnessChanged);
+        });
+    }
 }

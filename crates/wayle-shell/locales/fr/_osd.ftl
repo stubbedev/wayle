@@ -1,5 +1,8 @@
 ### Affichage à l'écran
 
+## Libellés des curseurs
+osd-brightness = Luminosité
+
 ## Libellés des bascules
 osd-caps-lock = Verr. maj.
 osd-num-lock = Verr. num.

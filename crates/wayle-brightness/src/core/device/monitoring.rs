@@ -21,6 +21,7 @@ use crate::{
         sysfs,
         types::{BrightnessEvent, EventSender},
     },
+    types::BacklightType,
 };
 
 const POLL_TIMEOUT_MS: u16 = 1000;
@@ -33,6 +34,12 @@ impl ModelMonitoring for BacklightDevice {
     /// inotify doesn't work on sysfs - the kernel uses `sysfs_notify()`
     /// which only triggers `POLLPRI`, not filesystem change events.
     async fn start_monitoring(self: Arc<Self>) -> Result<(), Error> {
+        // External DDC monitors have no sysfs `actual_brightness` file to
+        // poll; their state is refreshed by the backend on each write.
+        if self.backlight_type == BacklightType::Ddc {
+            return Ok(());
+        }
+
         let Some(ref token) = self.cancellation_token else {
             return Ok(());
         };

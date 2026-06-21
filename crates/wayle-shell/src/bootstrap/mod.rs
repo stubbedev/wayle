@@ -299,7 +299,13 @@ async fn init_core_services(
     let startup_duration = modules.idle_inhibit.startup_duration.get();
 
     let battery_task = tokio::spawn(BatteryService::new());
-    let brightness_task = tokio::spawn(BrightnessService::new());
+    let brightness_external = modules.brightness.enable_external.get();
+    let brightness_task = tokio::spawn(async move {
+        BrightnessService::builder()
+            .external_monitors(brightness_external)
+            .build()
+            .await
+    });
     let network_task = tokio::spawn(NetworkService::new());
     let wallpaper_cfg = config.wallpaper.clone();
     let wallpaper_task = tokio::spawn(async move {

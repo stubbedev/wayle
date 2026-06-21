@@ -13,8 +13,15 @@ Install Rust via [rustup](https://rustup.rs), then the system libraries:
 ```sh
 sudo dnf install git cmake pkgconf-pkg-config gtk4-devel gtk4-layer-shell-devel \
   gtksourceview5-devel pulseaudio-libs-devel fftw-devel pipewire-devel \
-  systemd-devel clang gcc
+  systemd-devel clang gcc \
+  gstreamer1-devel gstreamer1-plugins-base-devel gstreamer1-plugins-good \
+  gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free gstreamer1-libav
 ```
+
+The `gstreamer1*-devel` packages are required to build, and the
+`gstreamer1-plugins-*` packages back the screen recorder at runtime.
+`gstreamer1-plugins-ugly-free` and `gstreamer1-libav` come from
+[RPM Fusion](https://rpmfusion.org).
 
 Fedora Workstation already ships the runtime daemons for battery, bluetooth, network, power, and audio. Minimal and Server installs need:
 

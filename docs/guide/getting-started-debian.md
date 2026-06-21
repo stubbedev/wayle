@@ -17,8 +17,14 @@ Install Rust via [rustup](https://rustup.rs), then the system libraries:
 ```sh
 sudo apt install git pkg-config cmake libgtk-4-dev libgtk4-layer-shell-dev \
   libgtksourceview-5-dev libpulse-dev libfftw3-dev libpipewire-0.3-dev \
-  libudev-dev clang build-essential
+  libudev-dev clang build-essential \
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+  gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+  gstreamer1.0-plugins-ugly gstreamer1.0-libav
 ```
+
+The `libgstreamer*-dev` packages are required to build, and the
+`gstreamer1.0-plugins-*` packages back the screen recorder at runtime.
 
 If you want the battery, bluetooth, network, power, or audio modules, install their daemons (skip any you don't need):
 

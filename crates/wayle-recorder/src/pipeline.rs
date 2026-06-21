@@ -101,14 +101,32 @@ fn build_with(opts: &RecordOptions, cast: &ScreenCast, allow_hardware: bool) -> 
             format!(" device={}", quote(&cam.device))
         };
 
+        // Cap the webcam at its own sane rate instead of forcing the screen
+        // framerate onto it: most cameras top out at 30fps, so demanding 60
+        // makes videorate duplicate every frame, doubling the work through
+        // videoconvert / videoscale / compositor / encoder for no visible gain.
+        // `videorate max-rate` caps without forcing a fixed rate, so an odd
+        // camera (15/24fps) still negotiates and the compositor re-times it.
+        let cam_fps = fps.min(30);
+
         // `add-borders=true` letterboxes the webcam into the box, so a camera
         // that isn't 16:9 keeps its aspect instead of being stretched.
+        //
+        // The webcam branch is wrapped in `leaky=downstream` queues on both
+        // sides: a camera that briefly stalls or runs faster than the
+        // compositor consumes must never backpressure `v4l2src`. Blocking the
+        // source starves its kernel V4L2 buffer pool, which posts a fatal error
+        // a second or two in and ends the recording. Dropping a stale webcam
+        // frame is invisible — the compositor just repeats the last one — so
+        // leaking is always the right trade. `do-timestamp=true` stamps frames
+        // against the pipeline clock (same basis as the screen source), so the
+        // compositor doesn't discard them as arriving late.
         desc.push_str(&format!(
             "compositor name=comp background=black \
              sink_1::xpos={xpos} sink_1::ypos={ypos} sink_1::width={cam_w} sink_1::height={cam_h} \
              ! videoconvert n-threads=0 ! queue leaky=downstream ! {video_encoder} ! queue ! {parser}{muxer} name=mux ! filesink location={path} \
              pipewiresrc fd={fd} path={node} do-timestamp=true ! videorate ! video/x-raw,framerate={fps}/1 ! videoconvert n-threads=0 ! queue ! comp.sink_0 \
-             v4l2src{device} ! videorate ! videoconvert n-threads=0 ! videoscale add-borders=true ! video/x-raw,width={cam_w},height={cam_h},framerate={fps}/1 ! queue ! comp.sink_1 "
+             v4l2src{device} do-timestamp=true ! queue leaky=downstream max-size-buffers=4 ! videorate max-rate={cam_fps} ! videoconvert n-threads=0 ! videoscale add-borders=true ! video/x-raw,width={cam_w},height={cam_h} ! queue leaky=downstream max-size-buffers=4 ! comp.sink_1 "
         ));
     } else {
         desc.push_str(&format!(

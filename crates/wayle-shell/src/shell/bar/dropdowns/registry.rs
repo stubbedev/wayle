@@ -3,6 +3,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
+    sync::Arc,
     time::Duration,
 };
 
@@ -11,6 +12,7 @@ use gtk4_layer_shell::{KeyboardMode, LayerShell};
 use relm4::{gtk, prelude::*};
 use tracing::{debug, warn};
 use wayle_audio::volume::types::Volume;
+use wayle_brightness::{BacklightDevice, Percentage};
 use wayle_config::{
     ClickAction,
     schemas::{
@@ -655,8 +657,79 @@ fn dispatch_action(
                 process::run_if_set(cmd);
             }
         }
+        ClickAction::Brightness(delta) => {
+            let devices = backlight_devices(registry);
+            if devices.is_empty() {
+                return;
+            }
+            // Floor at the configured minimum so a dimmer never scrolls fully
+            // dark; reaching 0% is reserved for BrightnessToggle.
+            let min = f64::from(
+                registry
+                    .services
+                    .config
+                    .config()
+                    .modules
+                    .brightness
+                    .min_brightness
+                    .get(),
+            )
+            .clamp(0.0, 100.0);
+            let delta = f64::from(*delta);
+            debug!(
+                delta,
+                min,
+                count = devices.len(),
+                "click: brightness (all monitors)"
+            );
+            relm4::spawn(async move {
+                // Each monitor steps relative to its own level, preserving any
+                // intentional per-monitor offset set from the dropdown sliders.
+                for device in devices {
+                    let target = (device.percentage().value() + delta).clamp(min, 100.0);
+                    if let Err(error) = device.set_percentage(Percentage::new(target)).await {
+                        warn!(%error, "brightness action failed");
+                    }
+                }
+            });
+        }
+        ClickAction::BrightnessToggle => {
+            let devices = backlight_devices(registry);
+            if devices.is_empty() {
+                return;
+            }
+            // Master toggle: decide one target state from the whole set (any
+            // monitor lit -> blackout all; all dark -> restore all) so the
+            // monitors stay in lockstep instead of drifting per-device.
+            let go_dark = devices.iter().any(|device| device.brightness.get() > 0);
+            debug!(
+                count = devices.len(),
+                go_dark, "click: brightness toggle (all monitors)"
+            );
+            relm4::spawn(async move {
+                for device in devices {
+                    if let Err(error) = device.set_blackout(go_dark).await {
+                        warn!(%error, "brightness toggle failed");
+                    }
+                }
+            });
+        }
         ClickAction::None => debug!("click: none"),
     }
+}
+
+/// Returns every backlight device (internal panels and external DDC monitors)
+/// so brightness actions drive all monitors at once, logging when none exist.
+fn backlight_devices(registry: &DropdownRegistry) -> Vec<Arc<BacklightDevice>> {
+    let Some(brightness) = registry.services.brightness.as_ref() else {
+        warn!("brightness action dropped: brightness service unavailable");
+        return Vec::new();
+    };
+    let devices = brightness.devices.get();
+    if devices.is_empty() {
+        warn!("brightness action dropped: no backlight devices");
+    }
+    devices
 }
 
 /// Routes recognized `wayle …` commands to their in-process service instead of
@@ -673,176 +746,188 @@ fn try_builtin(cmd: &str, registry: &DropdownRegistry) -> bool {
     let verb = parts.get(2).copied();
 
     match parts.get(1).copied() {
-        Some("screenshot") => {
-            let Some(sender) = crate::services::screenshot::host_sender() else {
-                return false;
-            };
-            let mode = parts.get(2).copied().unwrap_or("region").to_owned();
-            let target = parts.get(3).copied().unwrap_or("").to_owned();
-            let (reply, _rx) = tokio::sync::oneshot::channel();
-            sender.emit(crate::shell::screenshot::ScreenshotInput::Capture {
-                mode,
-                target,
-                reply,
-            });
-            true
-        }
-        Some("recorder") => {
-            let Some(recorder) = services.recorder.as_ref() else {
-                return false;
-            };
-            let state = recorder.state();
-            match verb {
-                Some("toggle") => {
-                    relm4::spawn(async move {
-                        state.toggle().await;
-                    });
-                }
-                Some("start") => {
-                    relm4::spawn(async move {
-                        state.start().await;
-                    });
-                }
-                Some("stop") => state.stop(),
-                Some("pause") => state.set_paused(true),
-                Some("resume") => state.set_paused(false),
-                _ => return false,
-            }
-            true
-        }
-        Some("audio") => {
-            let Some(audio) = services.audio.as_ref() else {
-                return false;
-            };
-            match verb {
-                Some("output-mute") => {
-                    let Some(device) = audio.default_output.get() else {
-                        return false;
-                    };
-                    relm4::spawn(async move {
-                        let _ = device.set_mute(!device.muted.get()).await;
-                    });
-                }
-                Some("input-mute") => {
-                    let Some(device) = audio.default_input.get() else {
-                        return false;
-                    };
-                    relm4::spawn(async move {
-                        let _ = device.set_mute(!device.muted.get()).await;
-                    });
-                }
-                Some("output-volume") => {
-                    let (Some(level), Some(device)) =
-                        (parts.get(3).copied(), audio.default_output.get())
-                    else {
-                        return false;
-                    };
-                    let level = level.to_owned();
-                    relm4::spawn(async move {
-                        let current = device.volume.get();
-                        if let Some(pct) = adjusted_pct(&level, current.average() * 100.0) {
-                            let vol = Volume::from_percentage(pct, current.channels());
-                            let _ = device.set_volume(vol).await;
-                        }
-                    });
-                }
-                Some("input-volume") => {
-                    let (Some(level), Some(device)) =
-                        (parts.get(3).copied(), audio.default_input.get())
-                    else {
-                        return false;
-                    };
-                    let level = level.to_owned();
-                    relm4::spawn(async move {
-                        let current = device.volume.get();
-                        if let Some(pct) = adjusted_pct(&level, current.average() * 100.0) {
-                            let vol = Volume::from_percentage(pct, current.channels());
-                            let _ = device.set_volume(vol).await;
-                        }
-                    });
-                }
-                _ => return false,
-            }
-            true
-        }
-        Some("media") => {
-            let Some(media) = services.media.as_ref() else {
-                return false;
-            };
-            let Some(player) = media.active_player() else {
-                return false;
-            };
-            match verb {
-                Some("play-pause") => {
-                    relm4::spawn(async move {
-                        let _ = player.play_pause().await;
-                    });
-                }
-                Some("next") => {
-                    relm4::spawn(async move {
-                        let _ = player.next().await;
-                    });
-                }
-                Some("previous") => {
-                    relm4::spawn(async move {
-                        let _ = player.previous().await;
-                    });
-                }
-                _ => return false,
-            }
-            true
-        }
-        Some("idle") => {
-            let state = services.idle_inhibit.state();
-            let indefinite = parts.contains(&"--indefinite");
-            match verb {
-                Some("toggle") => {
-                    if state.active.get() {
-                        state.disable();
-                    } else {
-                        state.enable(indefinite);
-                    }
-                }
-                Some("on") => state.enable(indefinite),
-                Some("off") => state.disable(),
-                _ => return false,
-            }
-            true
-        }
-        Some("notify") => {
-            let Some(notification) = services.notification.as_ref() else {
-                return false;
-            };
-            match verb {
-                Some("dnd") => notification.set_dnd(!notification.dnd.get()),
-                _ => return false,
-            }
-            true
-        }
-        Some("wallpaper") => {
-            let Some(wallpaper) = services.wallpaper.as_ref() else {
-                return false;
-            };
-            match verb {
-                Some("next") => {
-                    let wallpaper = wallpaper.clone();
-                    relm4::spawn(async move {
-                        let _ = wallpaper.advance_cycle().await;
-                    });
-                }
-                Some("previous") => {
-                    let wallpaper = wallpaper.clone();
-                    relm4::spawn(async move {
-                        let _ = wallpaper.rewind_cycle().await;
-                    });
-                }
-                Some("stop") => wallpaper.stop_cycling(),
-                _ => return false,
-            }
-            true
-        }
+        Some("screenshot") => try_screenshot(&parts),
+        Some("recorder") => try_recorder(verb, services),
+        Some("audio") => try_audio(verb, &parts, services),
+        Some("media") => try_media(verb, services),
+        Some("idle") => try_idle(verb, &parts, services),
+        Some("notify") => try_notify(verb, services),
+        Some("wallpaper") => try_wallpaper(verb, services),
         _ => false,
     }
+}
+
+fn try_screenshot(parts: &[&str]) -> bool {
+    let Some(sender) = crate::services::screenshot::host_sender() else {
+        return false;
+    };
+    let mode = parts.get(2).copied().unwrap_or("region").to_owned();
+    let target = parts.get(3).copied().unwrap_or("").to_owned();
+    let (reply, _rx) = tokio::sync::oneshot::channel();
+    sender.emit(crate::shell::screenshot::ScreenshotInput::Capture {
+        mode,
+        target,
+        reply,
+    });
+    true
+}
+
+fn try_recorder(verb: Option<&str>, services: &ShellServices) -> bool {
+    let Some(recorder) = services.recorder.as_ref() else {
+        return false;
+    };
+    let state = recorder.state();
+    match verb {
+        Some("toggle") => {
+            relm4::spawn(async move {
+                state.toggle().await;
+            });
+        }
+        Some("start") => {
+            relm4::spawn(async move {
+                state.start().await;
+            });
+        }
+        Some("stop") => state.stop(),
+        Some("pause") => state.set_paused(true),
+        Some("resume") => state.set_paused(false),
+        _ => return false,
+    }
+    true
+}
+
+fn try_audio(verb: Option<&str>, parts: &[&str], services: &ShellServices) -> bool {
+    let Some(audio) = services.audio.as_ref() else {
+        return false;
+    };
+    match verb {
+        Some("output-mute") => {
+            let Some(device) = audio.default_output.get() else {
+                return false;
+            };
+            relm4::spawn(async move {
+                let _ = device.set_mute(!device.muted.get()).await;
+            });
+        }
+        Some("input-mute") => {
+            let Some(device) = audio.default_input.get() else {
+                return false;
+            };
+            relm4::spawn(async move {
+                let _ = device.set_mute(!device.muted.get()).await;
+            });
+        }
+        Some("output-volume") => {
+            let (Some(level), Some(device)) = (parts.get(3).copied(), audio.default_output.get())
+            else {
+                return false;
+            };
+            let level = level.to_owned();
+            relm4::spawn(async move {
+                let current = device.volume.get();
+                if let Some(pct) = adjusted_pct(&level, current.average() * 100.0) {
+                    let vol = Volume::from_percentage(pct, current.channels());
+                    let _ = device.set_volume(vol).await;
+                }
+            });
+        }
+        Some("input-volume") => {
+            let (Some(level), Some(device)) = (parts.get(3).copied(), audio.default_input.get())
+            else {
+                return false;
+            };
+            let level = level.to_owned();
+            relm4::spawn(async move {
+                let current = device.volume.get();
+                if let Some(pct) = adjusted_pct(&level, current.average() * 100.0) {
+                    let vol = Volume::from_percentage(pct, current.channels());
+                    let _ = device.set_volume(vol).await;
+                }
+            });
+        }
+        _ => return false,
+    }
+    true
+}
+
+fn try_media(verb: Option<&str>, services: &ShellServices) -> bool {
+    let Some(media) = services.media.as_ref() else {
+        return false;
+    };
+    let Some(player) = media.active_player() else {
+        return false;
+    };
+    match verb {
+        Some("play-pause") => {
+            relm4::spawn(async move {
+                let _ = player.play_pause().await;
+            });
+        }
+        Some("next") => {
+            relm4::spawn(async move {
+                let _ = player.next().await;
+            });
+        }
+        Some("previous") => {
+            relm4::spawn(async move {
+                let _ = player.previous().await;
+            });
+        }
+        _ => return false,
+    }
+    true
+}
+
+fn try_idle(verb: Option<&str>, parts: &[&str], services: &ShellServices) -> bool {
+    let state = services.idle_inhibit.state();
+    let indefinite = parts.contains(&"--indefinite");
+    match verb {
+        Some("toggle") => {
+            if state.active.get() {
+                state.disable();
+            } else {
+                state.enable(indefinite);
+            }
+        }
+        Some("on") => state.enable(indefinite),
+        Some("off") => state.disable(),
+        _ => return false,
+    }
+    true
+}
+
+fn try_notify(verb: Option<&str>, services: &ShellServices) -> bool {
+    let Some(notification) = services.notification.as_ref() else {
+        return false;
+    };
+    match verb {
+        Some("dnd") => notification.set_dnd(!notification.dnd.get()),
+        _ => return false,
+    }
+    true
+}
+
+fn try_wallpaper(verb: Option<&str>, services: &ShellServices) -> bool {
+    let Some(wallpaper) = services.wallpaper.as_ref() else {
+        return false;
+    };
+    match verb {
+        Some("next") => {
+            let wallpaper = wallpaper.clone();
+            relm4::spawn(async move {
+                let _ = wallpaper.advance_cycle().await;
+            });
+        }
+        Some("previous") => {
+            let wallpaper = wallpaper.clone();
+            relm4::spawn(async move {
+                let _ = wallpaper.rewind_cycle().await;
+            });
+        }
+        Some("stop") => wallpaper.stop_cycling(),
+        _ => return false,
+    }
+    true
 }
 
 /// Resolves a volume level string (`"+5"`, `"-10"`, or `"50"`) against the

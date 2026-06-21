@@ -1,8 +1,26 @@
+use std::sync::Arc;
+
 use serde_json::json;
+use wayle_brightness::BacklightDevice;
 
 pub(crate) struct IconContext<'a> {
     pub(crate) percentage: f64,
     pub(crate) level_icons: &'a [String],
+}
+
+/// Mean brightness percentage across all monitors, or `None` when there are
+/// none. The bar shows a single representative figure while actions drive
+/// every monitor together.
+pub(crate) fn average_percentage(devices: &[Arc<BacklightDevice>]) -> Option<f64> {
+    if devices.is_empty() {
+        return None;
+    }
+
+    let sum: f64 = devices
+        .iter()
+        .map(|device| device.percentage().value())
+        .sum();
+    Some(sum / devices.len() as f64)
 }
 
 pub(crate) fn select_icon(ctx: &IconContext<'_>) -> String {

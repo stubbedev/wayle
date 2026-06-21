@@ -1,12 +1,12 @@
-//! Editor for the toasts `Vec<ToastPreset>` field: a card per preset with an
-//! id, optional label/icon/class text, optional percentage, and optional
-//! duration. Replaces the raw-TOML fallback.
+//! Editor for the toasts `Vec<ToastPreset>` field: a card per preset with a
+//! unique id, an optional label, and an optional icon (icon picker). Percentage,
+//! duration, and CSS class are runtime-only invoke args, not stored on presets.
+//! Replaces the raw-TOML fallback.
 //!
-//! Rows hold their own widget state (text via entries, optional numbers via
-//! cells the widgets write); any edit rebuilds the whole `Vec` and writes it
-//! back.
+//! Cards hold their own widget state; any edit rebuilds the whole `Vec` and
+//! writes it back. Duplicate ids are flagged inline as you type.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use relm4::gtk::{self, prelude::*};
 use wayle_config::{ConfigProperty, schemas::osd::ToastPreset};
@@ -14,17 +14,15 @@ use wayle_i18n::t;
 
 use crate::{
     editors::{
-        list_controls::{add_button, remove_button},
-        optional::{optional_number_f64_widget, optional_number_widget},
+        card_form::{card, entry, field_row},
+        icon::{IconPickerWidget, icon_picker_widget},
+        list_controls::add_button,
         spawn_property_watcher,
     },
     pages::spec::SettingRowInit,
     property_handle::PropertyHandle,
     row::RowBehavior,
 };
-
-const MAX_DURATION_MS: u32 = 600_000;
-const DURATION_FALLBACK_MS: u32 = 3000;
 
 fn non_empty(text: &str) -> Option<String> {
     (!text.is_empty()).then(|| text.to_owned())
@@ -33,10 +31,10 @@ fn non_empty(text: &str) -> Option<String> {
 struct Card {
     id: gtk::Entry,
     label: gtk::Entry,
-    icon: gtk::Entry,
-    class: gtk::Entry,
-    percentage: Rc<RefCell<Option<f64>>>,
-    duration: Rc<RefCell<Option<u32>>>,
+    /// Current icon name, written by the picker's `set` callback.
+    icon: Rc<RefCell<String>>,
+    /// Kept alive so the picker's popover + signal closures outlive the card.
+    _icon_picker: IconPickerWidget,
 }
 
 struct State {
@@ -54,16 +52,42 @@ impl State {
             .map(|card| ToastPreset {
                 id: card.id.text().to_string(),
                 label: non_empty(&card.label.text()),
-                icon: non_empty(&card.icon.text()),
-                percentage: *card.percentage.borrow(),
-                duration_ms: *card.duration.borrow(),
-                class: non_empty(&card.class.text()),
+                icon: non_empty(card.icon.borrow().as_str()),
             })
             .collect()
     }
 
+    /// Flags every id entry whose (non-empty) id collides with another card's,
+    /// so duplicates are communicated as the user types.
+    fn validate(&self) {
+        let cards = self.cards.borrow();
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        for card in cards.iter() {
+            let id = card.id.text().to_string();
+            if !id.is_empty() {
+                *counts.entry(id).or_default() += 1;
+            }
+        }
+        for card in cards.iter() {
+            let id = card.id.text().to_string();
+            let duplicate = !id.is_empty() && counts.get(&id).copied().unwrap_or(0) > 1;
+            if duplicate {
+                card.id.add_css_class("error");
+                card.id
+                    .set_secondary_icon_name(Some("ld-alert-triangle-symbolic"));
+                card.id.set_secondary_icon_tooltip_text(Some(&t(
+                    "settings-toast-preset-id-duplicate",
+                )));
+            } else {
+                card.id.remove_css_class("error");
+                card.id.set_secondary_icon_name(None);
+            }
+        }
+    }
+
     fn commit(&self) {
         self.property.set(self.collected());
+        self.validate();
     }
 
     fn rebuild(self: &Rc<Self>) {
@@ -74,93 +98,48 @@ impl State {
         for preset in self.property.get() {
             self.append_card(&preset);
         }
+        self.validate();
     }
 
     fn append_card(self: &Rc<Self>, preset: &ToastPreset) {
-        let root = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .css_classes(["card-form-card"])
-            .build();
-
         let id = entry(&preset.id, "id");
         let label = entry(preset.label.as_deref().unwrap_or(""), "label");
-        let icon = entry(preset.icon.as_deref().unwrap_or(""), "icon");
-        let class = entry(preset.class.as_deref().unwrap_or(""), "css class");
-        for e in [&id, &label, &icon, &class] {
+        for e in [&id, &label] {
             let commit_state = Rc::clone(self);
             e.connect_changed(move |_| commit_state.commit());
         }
 
-        let percentage = Rc::new(RefCell::new(preset.percentage));
-        let pct_get = Rc::clone(&percentage);
-        let pct_cell = Rc::clone(&percentage);
-        let pct_state = Rc::clone(self);
-        let pct_widget = optional_number_f64_widget(
-            Rc::new(move || *pct_get.borrow()),
-            Rc::new(move |value| {
-                *pct_cell.borrow_mut() = value;
-                pct_state.commit();
-            }),
-            0.0,
-            100.0,
-            1.0,
-            0,
-            50.0,
-        );
+        let icon_value = Rc::new(RefCell::new(preset.icon.clone().unwrap_or_default()));
+        let set_icon = Rc::clone(&icon_value);
+        let icon_state = Rc::clone(self);
+        let set: Rc<dyn Fn(&str)> = Rc::new(move |name: &str| {
+            *set_icon.borrow_mut() = name.to_string();
+            icon_state.commit();
+        });
+        let icon_picker = icon_picker_widget(&icon_value.borrow(), set);
+        icon_picker.widget.set_hexpand(true);
 
-        let duration = Rc::new(RefCell::new(preset.duration_ms));
-        let dur_get = Rc::clone(&duration);
-        let dur_cell = Rc::clone(&duration);
-        let dur_state = Rc::clone(self);
-        let dur_widget = optional_number_widget(
-            Rc::new(move || *dur_get.borrow()),
-            Rc::new(move |value| {
-                *dur_cell.borrow_mut() = value;
-                dur_state.commit();
-            }),
-            0.0,
-            f64::from(MAX_DURATION_MS),
-            10.0,
-            DURATION_FALLBACK_MS,
-        );
-
-        root.append(&field_row("settings-toast-preset-id", &id.clone().upcast()));
-        root.append(&field_row(
+        let cw = card("settings-toast-preset-id", &id.clone().upcast());
+        cw.body.append(&field_row(
             "settings-toast-preset-label",
             &label.clone().upcast(),
         ));
-        root.append(&field_row(
+        cw.body.append(&field_row(
             "settings-toast-preset-icon",
-            &icon.clone().upcast(),
-        ));
-        root.append(&field_row(
-            "settings-toast-preset-class",
-            &class.clone().upcast(),
-        ));
-        root.append(&field_row(
-            "settings-toast-preset-percentage",
-            &pct_widget.widget,
-        ));
-        root.append(&field_row(
-            "settings-toast-preset-duration",
-            &dur_widget.widget,
+            &icon_picker.widget.clone().upcast(),
         ));
 
-        let remove = remove_button("settings-list-remove");
-        remove.set_halign(gtk::Align::End);
         let remove_state = Rc::clone(self);
         let remove_id = id.clone();
-        remove.connect_clicked(move |_| remove_state.remove_card(&remove_id));
-        root.append(&remove);
+        cw.delete
+            .connect_clicked(move |_| remove_state.remove_card(&remove_id));
 
-        self.list.append(&root);
+        self.list.append(&cw.root);
         self.cards.borrow_mut().push(Card {
             id,
             label,
-            icon,
-            class,
-            percentage,
-            duration,
+            icon: icon_value,
+            _icon_picker: icon_picker,
         });
     }
 
@@ -172,33 +151,6 @@ impl State {
             self.rebuild();
         }
     }
-}
-
-fn entry(text: &str, placeholder: &str) -> gtk::Entry {
-    gtk::Entry::builder()
-        .text(text)
-        .placeholder_text(placeholder)
-        .hexpand(true)
-        .build()
-}
-
-fn field_row(label_key: &str, control: &gtk::Widget) -> gtk::Box {
-    let row = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .spacing(8)
-        .css_classes(["card-form-row"])
-        .build();
-    // Fixed-width label on the left so every control starts at the same x; the
-    // control fills the rest of the row.
-    let label = gtk::Label::builder()
-        .label(t(label_key))
-        .halign(gtk::Align::Start)
-        .css_classes(["card-form-label"])
-        .build();
-    control.set_hexpand(true);
-    row.append(&label);
-    row.append(control);
-    row
 }
 
 /// Full-width row that edits the toasts `Vec<ToastPreset>` property.
@@ -223,9 +175,6 @@ pub(crate) fn toast_preset_list(property: &ConfigProperty<Vec<ToastPreset>>) -> 
             id: String::new(),
             label: None,
             icon: None,
-            percentage: None,
-            duration_ms: None,
-            class: None,
         });
     });
 

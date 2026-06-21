@@ -29,9 +29,9 @@ right = ["mail"]
 | `query` | string | `"tag:unread"` | notmuch search query whose match count is shown. |
 | `accounts` | array of [`MailAccount`](/config/types#mail-account) | `[]` | Per-account unread breakdown shown in the mail dropdown. Each account has its own notmuch query and a provider (for its icon). When set, the bar count/label is the sum across accounts and `query` is ignored. |
 | `hide-when-zero` | bool | `true` | Hide the module entirely while the count is zero. |
-| `notify` | bool | `false` | Fire a desktop notification (via `notify-send`) when the unread count rises — i.e. new mail arrives. The module icon is used as the notification icon. The single notmuch query means this is not per-account; it reports the change in the total match count. |
-| `notify-summary` | string | `"New mail"` | Notification summary when new mail arrives. |
-| `notify-body` | string | `"{{ new }} new ({{ count }} unread)"` | Notification body when new mail arrives. Same placeholders as `notify-summary`. |
+| `notify` | bool | `false` | Fire a desktop notification (via `notify-send`) when the unread count rises — i.e. new mail arrives. One notification per newly-arrived message (capped per burst), showing its sender and subject. With `accounts` configured, each notification uses that account's provider icon; otherwise the module icon is used. |
+| `notify-summary` | string | `"{{ sender }}"` | Notification summary when new mail arrives. |
+| `notify-body` | string | `"{{ subject }}"` | Notification body when new mail arrives. Same placeholders as `notify-summary`. |
 | `icon-name` | string | `"ld-mail-symbolic"` | Module icon. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
@@ -64,6 +64,8 @@ the per-account queries.
 
 #### Placeholders
 
+- `{{ sender }}` - Message sender (name or address)
+- `{{ subject }}` - Message subject
 - `{{ count }}` - Total messages matching the query
 - `{{ new }}` - How many arrived since the last count
 
@@ -98,8 +100,8 @@ query = "tag:unread"
 accounts = []
 hide-when-zero = true
 notify = false
-notify-summary = "New mail"
-notify-body = "{{ new }} new ({{ count }} unread)"
+notify-summary = "{{ sender }}"
+notify-body = "{{ subject }}"
 icon-name = "ld-mail-symbolic"
 border-show = false
 border-color = "blue"

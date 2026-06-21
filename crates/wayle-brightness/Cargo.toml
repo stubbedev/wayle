@@ -1,6 +1,6 @@
 [package]
 name = "wayle-brightness"
-description = "Backlight control for internal displays"
+description = "Backlight control for internal and external (DDC/CI) displays"
 version = "0.1.2"
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,11 @@ license.workspace = true
 readme = "README.md"
 
 [dependencies]
+# Low-level DDC/CI over Linux i2c-dev. Deliberately NOT ddc-hi: its EDID +
+# MCCS capability layer pulls unmaintained crates (edid, mccs-caps, mccs-db)
+# that depend on a future-incompatible nom 3.x. We only need raw VCP get/set.
+ddc = "0.2"
+ddc-i2c = { version = "0.2", features = ["with-linux"] }
 derive_more.workspace = true
 futures.workspace = true
 nix = { version = "0.30", features = ["poll", "fs"] }

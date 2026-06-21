@@ -354,17 +354,6 @@ the built-in base (e.g. `1.5`) or an absolute pixel length (e.g. `"480px"`).
 | `width` | Panel width override. Unset uses the built-in default width. |
 | `height` | Panel height override. Unset uses the built-in default height. Has no |
 
-## EncoderPreset {#encoder-preset}
-
-Encoder speed/quality trade-off. Slower presets produce smaller files at
-the same bitrate, using more CPU.
-
-| Value | Meaning |
-|---|---|
-| `"speed"` | Fastest, lowest CPU, largest files. |
-| `"balanced"` | Balanced size and CPU (default). |
-| `"quality"` | Slowest, best compression / smallest files. |
-
 ## ExecutionMode {#execution-mode}
 
 Execution mode for custom module commands.

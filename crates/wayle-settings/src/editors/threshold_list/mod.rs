@@ -21,8 +21,9 @@ use wayle_i18n::t;
 
 use crate::{
     editors::{
-        list_controls::{add_button, remove_button},
-        optional::{OptionalWidget, optional_color_widget, optional_number_f64_widget},
+        card_form::card_titled,
+        list_controls::add_button,
+        optional::{OptionalWidget, color_value_widget, optional_number_f64_widget},
         spawn_property_watcher,
     },
     pages::spec::SettingRowInit,
@@ -43,11 +44,36 @@ const CARD_FIELDS: [&str; 7] = [
     "settings-threshold-border-color",
 ];
 
+/// One rendered card: its live position, header title label (retitled from the
+/// bounds as they change), and inner controls in `CARD_FIELDS` order.
+struct ThresholdCard {
+    index: Rc<Cell<usize>>,
+    title: gtk::Label,
+    controls: Vec<OptionalWidget>,
+}
+
 struct ThresholdState {
     property: ConfigProperty<Vec<ThresholdEntry>>,
     list: gtk::Box,
-    /// Inner controls of each card, in `CARD_FIELDS` order, for refresh.
-    cards: RefCell<Vec<Vec<OptionalWidget>>>,
+    cards: RefCell<Vec<ThresholdCard>>,
+}
+
+/// A card header title derived from the entry's bounds, so it reads as what it
+/// matches: a range, a single-sided bound, or a numbered fallback when unbounded.
+fn card_title(entry: &ThresholdEntry, number: usize) -> String {
+    fn fmt(value: f64) -> String {
+        if value.fract() == 0.0 {
+            (value as i64).to_string()
+        } else {
+            value.to_string()
+        }
+    }
+    match (entry.above, entry.below) {
+        (Some(above), Some(below)) => format!("{} – {}", fmt(above), fmt(below)),
+        (Some(above), None) => format!("≥ {}", fmt(above)),
+        (None, Some(below)) => format!("≤ {}", fmt(below)),
+        (None, None) => format!("{} {}", t("settings-threshold-card-title"), number),
+    }
 }
 
 impl ThresholdState {
@@ -76,11 +102,8 @@ impl ThresholdState {
     }
 
     fn append_card(self: &Rc<Self>, index: usize) {
+        let card_number = index + 1;
         let index = Rc::new(Cell::new(index));
-        let root = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .css_classes(["threshold-card"])
-            .build();
 
         let controls = vec![
             self.number_field(&index, |e| e.above, |e, v| e.above = v),
@@ -106,15 +129,19 @@ impl ThresholdState {
             ),
         ];
 
+        let entries = self.entries();
+        let title = entries.get(index.get()).map_or_else(
+            || format!("{} {}", t("settings-threshold-card-title"), card_number),
+            |entry| card_title(entry, card_number),
+        );
+        let cw = card_titled(&title);
         for (label_key, control) in CARD_FIELDS.iter().zip(controls.iter()) {
-            root.append(&field_row(label_key, &control.widget));
+            cw.body.append(&field_row(label_key, &control.widget));
         }
 
-        let remove = remove_button("settings-list-remove");
-        remove.set_halign(gtk::Align::End);
         let remove_state = Rc::clone(self);
         let remove_index = Rc::clone(&index);
-        remove.connect_clicked(move |_| {
+        cw.delete.connect_clicked(move |_| {
             let mut entries = remove_state.entries();
             let i = remove_index.get();
             if i < entries.len() {
@@ -123,10 +150,19 @@ impl ThresholdState {
                 remove_state.rebuild();
             }
         });
-        root.append(&remove);
 
-        self.list.append(&root);
-        self.cards.borrow_mut().push(controls);
+        self.list.append(&cw.root);
+
+        // `card_titled` always sets a title label; guard rather than unwrap to
+        // satisfy the no-panic lint. If it were ever absent the card is simply
+        // left untracked instead of crashing the settings window.
+        if let Some(title) = cw.title {
+            self.cards.borrow_mut().push(ThresholdCard {
+                index,
+                title,
+                controls,
+            });
+        }
     }
 
     fn number_field(
@@ -162,7 +198,7 @@ impl ThresholdState {
         let get_index = Rc::clone(index);
         let set_state = Rc::clone(self);
         let set_index = Rc::clone(index);
-        optional_color_widget(
+        color_value_widget(
             Rc::new(move || get_state.entries().get(get_index.get()).and_then(get)),
             Rc::new(move |value| {
                 set_state.update_entry(set_index.get(), |entry| set(entry, value))
@@ -215,7 +251,7 @@ pub(crate) fn threshold_list(property: &ConfigProperty<Vec<ThresholdEntry>>) -> 
         .orientation(gtk::Orientation::Vertical)
         .spacing(8)
         .hexpand(true)
-        .css_classes(["threshold-editor"])
+        .css_classes(["card-form-editor", "threshold-editor"])
         .build();
     container.append(&list);
     container.append(&add);
@@ -225,9 +261,14 @@ pub(crate) fn threshold_list(property: &ConfigProperty<Vec<ThresholdEntry>>) -> 
         if watcher_state.entries().len() != watcher_state.cards.borrow().len() {
             watcher_state.rebuild();
         } else {
+            let entries = watcher_state.entries();
             for card in watcher_state.cards.borrow().iter() {
-                for control in card {
+                for control in &card.controls {
                     control.refresh();
+                }
+                if let Some(entry) = entries.get(card.index.get()) {
+                    card.title
+                        .set_label(&card_title(entry, card.index.get() + 1));
                 }
             }
         }

@@ -32,10 +32,7 @@ right = ["recorder"]
 | `microphone` | bool | `false` | Capture the microphone in the recording. |
 | `microphone-device` | string | `""` | Microphone PipeWire/PulseAudio source name. Empty uses the default source. |
 | `system-audio` | bool | `true` | Capture desktop (system) audio in the recording. |
-| `audio-bitrate-kbps` | u32 | `128` | Audio bitrate per track in kilobits per second. |
 | `separate-audio-tracks` | bool | `true` | Keep microphone and system audio as separate, individually editable tracks instead of mixing them into one. |
-| `bitrate-kbps` | u32 | `8000` | Video bitrate in kilobits per second. |
-| `encoder-preset` | [`EncoderPreset`](/config/types#encoder-preset) | `"balanced"` | Encoder speed/quality trade-off (smaller files vs less CPU). |
 | `framerate` | u32 | `30` | Capture framerate in frames per second. |
 | `webcam-enabled` | bool | `false` | Overlay a webcam picture-in-picture frame into the recording. |
 | `webcam-device` | string | `""` | Webcam V4L2 device path. Empty auto-selects the first camera. |
@@ -89,10 +86,7 @@ format = "{{ elapsed }}"
 microphone = false
 microphone-device = ""
 system-audio = true
-audio-bitrate-kbps = 128
 separate-audio-tracks = true
-bitrate-kbps = 8000
-encoder-preset = "balanced"
 framerate = 30
 webcam-enabled = false
 webcam-device = ""

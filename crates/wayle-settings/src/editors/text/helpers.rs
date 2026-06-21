@@ -94,6 +94,8 @@ impl TextLike for ClickAction {
         match self {
             Self::None => String::new(),
             Self::Dropdown(name) => format!("dropdown:{name}"),
+            Self::Brightness(delta) => format!("brightness:{delta}"),
+            Self::BrightnessToggle => String::from("brightness:toggle"),
             Self::Shell(cmd) => cmd.clone(),
         }
     }
@@ -103,10 +105,18 @@ impl TextLike for ClickAction {
             return Self::None;
         }
 
-        match text.strip_prefix("dropdown:") {
-            Some(name) => Self::Dropdown(name.to_owned()),
-            None => Self::Shell(text.to_owned()),
+        if let Some(name) = text.strip_prefix("dropdown:") {
+            return Self::Dropdown(name.to_owned());
         }
+
+        if let Some(rest) = text.strip_prefix("brightness:") {
+            return match rest {
+                "toggle" => Self::BrightnessToggle,
+                _ => rest.parse::<i32>().map_or(Self::None, Self::Brightness),
+            };
+        }
+
+        Self::Shell(text.to_owned())
     }
 }
 

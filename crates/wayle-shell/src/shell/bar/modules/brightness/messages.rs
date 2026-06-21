@@ -23,9 +23,8 @@ pub(crate) enum BrightnessMsg {
 }
 
 #[derive(Debug)]
-#[allow(clippy::enum_variant_names)]
 pub(crate) enum BrightnessCmd {
-    DeviceChanged(Option<Arc<BacklightDevice>>),
+    DevicesChanged(Vec<Arc<BacklightDevice>>),
     BrightnessChanged,
     ConfigChanged,
     UpdateThresholdColors(ThresholdColors),

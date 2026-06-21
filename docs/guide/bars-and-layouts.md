@@ -58,7 +58,7 @@ On `*`, `left` and `center` come from the `"HDMI-1"` layout; `right` is this ent
 
 ## Groups and classes
 
-A **group** renders its modules inside a shared GTK container. The group's `name` becomes the container's CSS ID, addressable as `#name` in a stylesheet (custom CSS coming soon). Use groups when several modules should share a visual container (padding, background, border radius) targetable by one selector.
+A **group** renders its modules inside a shared GTK container. The group's `name` becomes the container's CSS ID, addressable as `#name` in a stylesheet (see [custom styles](/guide/custom-styles)). Use groups when several modules should share a visual container (padding, background, border radius) targetable by one selector.
 
 A **class** attaches to a single module instance. Use it when the same module appears twice on a bar and each instance needs different styling, or when one instance should diverge from the module's default look.
 

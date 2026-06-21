@@ -43,6 +43,22 @@ pub enum Error {
         source: io::Error,
     },
 
+    /// A DDC/CI operation on an external monitor failed.
+    #[error("DDC/CI operation failed for {device}: {detail}")]
+    Ddc {
+        /// Synthesized DDC device name.
+        device: String,
+        /// Underlying DDC/I²C error description.
+        detail: String,
+    },
+
+    /// A DDC monitor handle is no longer available (removed or never opened).
+    #[error("DDC monitor unavailable: {device}")]
+    DdcUnavailable {
+        /// Synthesized DDC device name.
+        device: String,
+    },
+
     /// Backend command channel closed unexpectedly.
     #[error("command channel disconnected")]
     CommandChannelDisconnected,

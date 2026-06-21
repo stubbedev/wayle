@@ -196,9 +196,9 @@
             "exit": null,
             "exit-duration": null
           },
-          "description": "Per-surface override for the OSD (volume/brightness/toggle)."
+          "description": "Per-surface override for the OSD (volume/brightness/toggle/toast)."
         },
-        "toast": {
+        "power": {
           "$ref": "#/$defs/SurfaceAnimation",
           "default": {
             "enter": null,
@@ -206,7 +206,17 @@
             "exit": null,
             "exit-duration": null
           },
-          "description": "Per-surface override for toasts (`wayle toast`)."
+          "description": "Per-surface override for the power menu overlay."
+        },
+        "share-picker": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for the screen-share picker overlay."
         },
         "transition": {
           "$ref": "#/$defs/AnimationType",
@@ -217,6 +227,16 @@
           "$ref": "#/$defs/uint32",
           "default": 250,
           "description": "Base duration in ms for general UI micro-transitions (hover, focus, and\ncolor fades) driven by the CSS `--duration-*` token family. Fast,\nnormal, and slow speeds are derived from this. `enabled = false` zeroes\nthem for an instant UI."
+        },
+        "wallpaper": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for the wallpaper crossfade between images."
         }
       },
       "type": "object"
@@ -692,6 +712,7 @@
             "power-profiles",
             "ram",
             "recorder",
+            "screenshot",
             "separator",
             "storage",
             "systray",
@@ -969,6 +990,11 @@
           "default": "bg-surface-elevated",
           "description": "Button background color token."
         },
+        "enable-external": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Discover and control external monitors over DDC/CI (I²C).\n\nExternal monitors appear as extra sliders in the brightness panel.\nRequires the `i2c-dev` kernel module and read/write access to\n`/dev/i2c-*` (usually membership in the `i2c` group). Disable to skip\nthe slow DDC scan if you only have an internal panel."
+        },
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ percent }}%",
@@ -1023,6 +1049,11 @@
           "default": "",
           "description": "Action on middle click."
         },
+        "min-brightness": {
+          "$ref": "#/$defs/uint32",
+          "default": 1,
+          "description": "Lower bound (percent) for the native brightness-adjust action.\n\nScrolling or clicking down never drops below this, so a dimmer cannot\nreach a fully dark screen by accident. Use the brightness-toggle action\nto intentionally blackout to 0%."
+        },
         "right-click": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
@@ -1030,13 +1061,13 @@
         },
         "scroll-down": {
           "$ref": "#/$defs/ClickAction",
-          "default": "",
-          "description": "Action on scroll down."
+          "default": "brightness:-5",
+          "description": "Action on scroll down. Default lowers brightness by 5%, floored at\n`min-brightness`."
         },
         "scroll-up": {
           "$ref": "#/$defs/ClickAction",
-          "default": "",
-          "description": "Action on scroll up."
+          "default": "brightness:5",
+          "description": "Action on scroll up. Default raises brightness by 5%."
         },
         "thresholds": {
           "$ref": "#/$defs/Array_of_ThresholdEntry",
@@ -2179,6 +2210,31 @@
         }
       ]
     },
+    "FitMode2": {
+      "description": "Image scaling mode.",
+      "oneOf": [
+        {
+          "const": "fill",
+          "description": "Scale to cover entire display, cropping excess.",
+          "type": "string"
+        },
+        {
+          "const": "fit",
+          "description": "Scale to fit within display, letterboxing if needed.",
+          "type": "string"
+        },
+        {
+          "const": "center",
+          "description": "Display at original size, centered.",
+          "type": "string"
+        },
+        {
+          "const": "stretch",
+          "description": "Stretch to exactly fill, ignoring aspect ratio.",
+          "type": "string"
+        }
+      ]
+    },
     "FontWeightClass": {
       "description": "Font weight class for typography.\n\nMaps to CSS classes like `.weight-normal`, `.weight-bold`, etc.\nUses the existing `--weight-*` tokens defined in SCSS.",
       "oneOf": [
@@ -2341,6 +2397,16 @@
           "default": false,
           "description": "Use workspace name instead of number when displaying labels.\n\nOnly applies when `display-mode = \"label\"` or as fallback for unmapped\nworkspaces in `display-mode = \"icon\"`."
         },
+        "left-click": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "focus:this",
+          "description": "Action on left-clicking a workspace. Default focuses it."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "",
+          "description": "Action on middle-clicking a workspace."
+        },
         "min-workspace-count": {
           "$ref": "#/$defs/uint8",
           "default": 0,
@@ -2360,6 +2426,21 @@
           "$ref": "#/$defs/ColorValue",
           "default": "fg-muted",
           "description": "Color for occupied workspaces (has windows but not focused).\n\nApplied to icons and labels."
+        },
+        "right-click": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "",
+          "description": "Action on right-clicking a workspace."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "focus:next",
+          "description": "Action on scrolling down over the module. Default focuses the next workspace."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "focus:previous",
+          "description": "Action on scrolling up over the module. Default focuses the previous workspace."
         },
         "show-special": {
           "$ref": "#/$defs/boolean",
@@ -3600,6 +3681,7 @@
             "border-color": "yellow",
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
+            "enable-external": true,
             "format": "{{ percent }}%",
             "icon-bg-color": "yellow",
             "icon-color": "auto",
@@ -3614,9 +3696,10 @@
               "ld-sun-symbolic"
             ],
             "middle-click": "",
+            "min-brightness": 1,
             "right-click": "",
-            "scroll-down": "",
-            "scroll-up": "",
+            "scroll-down": "brightness:-5",
+            "scroll-up": "brightness:5",
             "thresholds": []
           },
           "description": "Backlight brightness module."
@@ -3761,10 +3844,15 @@
             "icon-size": 1.0,
             "label-size": 1.0,
             "label-use-name": false,
+            "left-click": "focus:this",
+            "middle-click": "",
             "min-workspace-count": 0,
             "monitor-specific": true,
             "numbering": "absolute",
             "occupied-color": "fg-muted",
+            "right-click": "",
+            "scroll-down": "focus:next",
+            "scroll-up": "focus:previous",
             "show-special": true,
             "urgent-mode": "workspace",
             "urgent-show": true,
@@ -4099,7 +4187,7 @@
             "middle-click": "",
             "popup-close-behavior": "dismiss",
             "popup-duration": 5000,
-            "popup-gap": 8.0,
+            "popup-gap": 1.0,
             "popup-hover-pause": true,
             "popup-layer": "overlay",
             "popup-margin-x": 0.0,
@@ -4125,11 +4213,21 @@
             "icon-bg-color": "red",
             "icon-color": "auto",
             "icon-name": "ld-power-symbolic",
-            "left-click": "",
+            "left-click": ":menu",
+            "lock-command": "loginctl lock-session",
+            "logout-command": "loginctl terminate-session $XDG_SESSION_ID",
             "middle-click": "",
+            "reboot-command": "systemctl reboot",
             "right-click": "",
             "scroll-down": "",
-            "scroll-up": ""
+            "scroll-up": "",
+            "show-lock": true,
+            "show-logout": true,
+            "show-reboot": true,
+            "show-shutdown": true,
+            "show-suspend": true,
+            "shutdown-command": "systemctl poweroff",
+            "suspend-command": "systemctl suspend"
           },
           "description": "Power menu module."
         },
@@ -4191,7 +4289,7 @@
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
             "format": "{{ elapsed }}",
-            "framerate": 30,
+            "framerate": 60,
             "icon-bg-color": "red",
             "icon-color": "auto",
             "icon-idle": "ld-video-symbolic",
@@ -4206,19 +4304,45 @@
             "microphone-device": "",
             "middle-click": "",
             "output-directory": "",
-            "output-format": "mp4",
+            "output-format": "mkv",
             "right-click": "dropdown:recorder",
             "scroll-down": "",
             "scroll-up": "",
-            "separate-audio-tracks": true,
             "show-cursor": true,
             "system-audio": true,
             "webcam-device": "",
             "webcam-enabled": false,
-            "webcam-position": "bottom-right",
-            "webcam-size": 20
+            "webcam-size": 20,
+            "webcam-x": 100,
+            "webcam-y": 100
           },
           "description": "Screen recorder module."
+        },
+        "screenshot": {
+          "$ref": "#/$defs/ScreenshotConfig",
+          "default": {
+            "border-color": "accent",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "copy-to-clipboard": true,
+            "filename-format": "Screenshot_%Y-%m-%d_%H-%M-%S.png",
+            "icon": "ld-camera-symbolic",
+            "icon-bg-color": "accent",
+            "icon-color": "auto",
+            "icon-show": true,
+            "label": "",
+            "label-color": "accent",
+            "label-max-length": 0,
+            "label-show": false,
+            "left-click": "wayle screenshot region",
+            "middle-click": "wayle screenshot window",
+            "notify": true,
+            "output-directory": "",
+            "right-click": "wayle screenshot output",
+            "scroll-down": "",
+            "scroll-up": ""
+          },
+          "description": "Screenshot capture module."
         },
         "separator": {
           "$ref": "#/$defs/SeparatorConfig",
@@ -4378,7 +4502,7 @@
       "description": "Per-monitor wallpaper configuration.",
       "properties": {
         "fit-mode": {
-          "$ref": "#/$defs/FitMode",
+          "$ref": "#/$defs/FitMode2",
           "default": "fill",
           "description": "Image scaling mode for this monitor."
         },
@@ -4877,8 +5001,8 @@
         },
         "popup-gap": {
           "$ref": "#/$defs/Size",
-          "default": 8.0,
-          "description": "Gap between stacked popups. Accepts a scale multiplier or pixels (e.g.\n`\"8px\"`)."
+          "default": 1.0,
+          "description": "Gap between stacked popups: a multiplier of the default 8px (`1.0` =\ndefault) or absolute pixels."
         },
         "popup-hover-pause": {
           "$ref": "#/$defs/boolean",
@@ -5017,8 +5141,8 @@
         },
         "margin": {
           "$ref": "#/$defs/Size",
-          "default": 150.0,
-          "description": "Margin from screen edges. Accepts a scale multiplier or pixels (e.g.\n`\"150px\"`)."
+          "default": 1.0,
+          "description": "Margin from screen edges: a multiplier of the default 150px (`1.0` =\ndefault) or absolute pixels (e.g. `\"150px\"`)."
         },
         "monitor": {
           "$ref": "#/$defs/OsdMonitor",
@@ -5029,6 +5153,11 @@
           "$ref": "#/$defs/OsdPosition",
           "default": "bottom",
           "description": "Screen anchor position."
+        },
+        "presets": {
+          "$ref": "#/$defs/Array_of_ToastPreset",
+          "default": [],
+          "description": "Reusable toast presets, each triggerable with `wayle toast --preset <id>`."
         },
         "text-align": {
           "$ref": "#/$defs/OsdTextAlign",
@@ -5266,13 +5395,28 @@
         },
         "left-click": {
           "$ref": "#/$defs/ClickAction",
-          "default": "",
-          "description": "Action on left click."
+          "default": ":menu",
+          "description": "Action on left click. Default opens wayle's native power menu (`:menu`)."
+        },
+        "lock-command": {
+          "$ref": "#/$defs/string",
+          "default": "loginctl lock-session",
+          "description": "Command run by the power menu's Lock button."
+        },
+        "logout-command": {
+          "$ref": "#/$defs/string",
+          "default": "loginctl terminate-session $XDG_SESSION_ID",
+          "description": "Command run by the power menu's Log out button."
         },
         "middle-click": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
           "description": "Action on middle click."
+        },
+        "reboot-command": {
+          "$ref": "#/$defs/string",
+          "default": "systemctl reboot",
+          "description": "Command run by the power menu's Reboot button."
         },
         "right-click": {
           "$ref": "#/$defs/ClickAction",
@@ -5288,6 +5432,41 @@
           "$ref": "#/$defs/ClickAction",
           "default": "",
           "description": "Action on scroll up."
+        },
+        "show-lock": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the Lock button in the power menu."
+        },
+        "show-logout": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the Log out button in the power menu."
+        },
+        "show-reboot": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the Reboot button in the power menu."
+        },
+        "show-shutdown": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the Shut down button in the power menu."
+        },
+        "show-suspend": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the Suspend button in the power menu."
+        },
+        "shutdown-command": {
+          "$ref": "#/$defs/string",
+          "default": "systemctl poweroff",
+          "description": "Command run by the power menu's Shut down button."
+        },
+        "suspend-command": {
+          "$ref": "#/$defs/string",
+          "default": "systemctl suspend",
+          "description": "Command run by the power menu's Suspend button."
         }
       },
       "type": "object"
@@ -5531,7 +5710,7 @@
         },
         "framerate": {
           "$ref": "#/$defs/uint32",
-          "default": 30,
+          "default": 60,
           "description": "Capture framerate in frames per second."
         },
         "icon-bg-color": {
@@ -5606,7 +5785,7 @@
         },
         "output-format": {
           "$ref": "#/$defs/RecorderFormat",
-          "default": "mp4",
+          "default": "mkv",
           "description": "Container format / codec preset."
         },
         "right-click": {
@@ -5623,11 +5802,6 @@
           "$ref": "#/$defs/ClickAction",
           "default": "",
           "description": "Action on scroll up."
-        },
-        "separate-audio-tracks": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Keep microphone and system audio as separate, individually editable\ntracks instead of mixing them into one."
         },
         "show-cursor": {
           "$ref": "#/$defs/boolean",
@@ -5649,15 +5823,20 @@
           "default": false,
           "description": "Overlay a webcam picture-in-picture frame into the recording."
         },
-        "webcam-position": {
-          "$ref": "#/$defs/WebcamPosition",
-          "default": "bottom-right",
-          "description": "Corner the webcam frame is anchored to."
-        },
         "webcam-size": {
           "$ref": "#/$defs/Percentage",
           "default": 20,
           "description": "Webcam frame width as a percentage of the recording width."
+        },
+        "webcam-x": {
+          "$ref": "#/$defs/Percentage",
+          "default": 100,
+          "description": "Webcam frame horizontal position, as a percentage of the free\nhorizontal space (0 = flush left, 100 = flush right). Stored relative so\nit stays correct across monitors of different resolutions."
+        },
+        "webcam-y": {
+          "$ref": "#/$defs/Percentage",
+          "default": 100,
+          "description": "Webcam frame vertical position, as a percentage of the free vertical\nspace (0 = flush top, 100 = flush bottom). Stored relative so it stays\ncorrect across monitors of different resolutions."
         }
       },
       "type": "object"
@@ -5745,6 +5924,112 @@
       "minimum": 0.25,
       "type": "number"
     },
+    "ScreenshotConfig": {
+      "description": "Screenshot capture button.\n\nClick the bar button to capture a region, output, or window. Controllable\nfrom the CLI / RPC socket: `wayle screenshot region|output|window`.",
+      "properties": {
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "accent",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "copy-to-clipboard": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Copy the captured image to the clipboard."
+        },
+        "filename-format": {
+          "$ref": "#/$defs/string",
+          "default": "Screenshot_%Y-%m-%d_%H-%M-%S.png",
+          "description": "Saved file name, formatted with `chrono`/`strftime` specifiers."
+        },
+        "icon": {
+          "$ref": "#/$defs/string",
+          "default": "ld-camera-symbolic",
+          "description": "Bar button icon."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "accent",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Static label text shown beside the icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "accent",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display label."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "wayle screenshot region",
+          "description": "Action on left click. Default captures a region."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "wayle screenshot window",
+          "description": "Action on middle click. Default captures the active window."
+        },
+        "notify": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show a desktop notification after capturing."
+        },
+        "output-directory": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Output directory for screenshots. Empty uses the XDG Pictures directory."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "wayle screenshot output",
+          "description": "Action on right click. Default captures the focused output."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        }
+      },
+      "type": "object"
+    },
     "SeparatorConfig": {
       "description": "A vertical rule between bar modules.",
       "properties": {
@@ -5807,6 +6092,92 @@
         {
           "const": "floating",
           "description": "All-around shadow.",
+          "type": "string"
+        }
+      ]
+    },
+    "SharePickerConfig": {
+      "description": "Screen-share picker shown by xdg-desktop-portal when an app requests a\nwindow, output, or region to capture.",
+      "properties": {
+        "default-page": {
+          "$ref": "#/$defs/SharePickerPage",
+          "default": "windows",
+          "description": "Page selected when the picker opens."
+        },
+        "height": {
+          "$ref": "#/$defs/Size",
+          "default": 1.0,
+          "description": "Picker window height: a multiplier of the default 500px (`1.0` = default)\nor absolute pixels."
+        },
+        "hide-token-restore": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Hide the \"allow a restore token\" checkbox."
+        },
+        "outputs-respect-scaling": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Scale output cards by their fractional scale."
+        },
+        "outputs-show-label": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Show the output name label under each output card."
+        },
+        "outputs-spacing": {
+          "$ref": "#/$defs/Size",
+          "default": 1.0,
+          "description": "Spacing between output cards (applied per side): a multiplier of the\ndefault 6px (`1.0` = default) or absolute pixels."
+        },
+        "resize-size": {
+          "$ref": "#/$defs/uint32",
+          "default": 640,
+          "description": "Downscale every captured frame to at most this height in pixels."
+        },
+        "widget-size": {
+          "$ref": "#/$defs/Size",
+          "default": 1.0,
+          "description": "Height of each card's preview image: a multiplier of the default 150px\n(`1.0` = default) or absolute pixels."
+        },
+        "width": {
+          "$ref": "#/$defs/Size",
+          "default": 1.0,
+          "description": "Picker window width: a multiplier of the default 1000px (`1.0` = default)\nor absolute pixels (e.g. `\"1200px\"`)."
+        },
+        "windows-max-per-row": {
+          "$ref": "#/$defs/uint32",
+          "default": 4,
+          "description": "Maximum window cards per row."
+        },
+        "windows-min-per-row": {
+          "$ref": "#/$defs/uint32",
+          "default": 3,
+          "description": "Minimum window cards per row."
+        },
+        "windows-spacing": {
+          "$ref": "#/$defs/Size",
+          "default": 1.0,
+          "description": "Spacing between window cards: a multiplier of the default 12px\n(`1.0` = default) or absolute pixels."
+        }
+      },
+      "type": "object"
+    },
+    "SharePickerPage": {
+      "description": "Page shown when the screen-share picker opens.",
+      "oneOf": [
+        {
+          "const": "windows",
+          "description": "Per-window previews.",
+          "type": "string"
+        },
+        {
+          "const": "outputs",
+          "description": "Per-output (monitor) previews.",
+          "type": "string"
+        },
+        {
+          "const": "region",
+          "description": "Region selection via an external tool (e.g. `slurp`).",
           "type": "string"
         }
       ]
@@ -6387,26 +6758,8 @@
       ]
     },
     "ToastPreset": {
-      "description": "A reusable toast preset, triggerable by id with `wayle toast --preset <id>`.\n\nA preset captures a toast's text, icon, optional progress bar, duration, and\nCSS class so it can be fired by name. Any field can still be overridden per\ninvocation on the command line (or over the widget socket).\n\n## Example\n\n```toml\n[[toasts.presets]]\nid = \"saved\"\nlabel = \"Saved\"\nicon = \"ld-check-symbolic\"\nduration-ms = 1500\nclass = \"success\"\n\n# Fire it: wayle toast --preset saved\n```",
+      "description": "A reusable toast preset, triggerable by id with `wayle toast --preset <id>`.\n\nA preset captures a toast's text and icon so it can be fired by name. The\nlabel/icon can still be overridden per invocation, and runtime-only fields\n(`--percentage`, `--duration`, `--class`) are supplied at invoke time, not\nstored on the preset. Duration always follows the OSD config.\n\n## Example\n\n```toml\n[[osd.presets]]\nid = \"saved\"\nlabel = \"Saved\"\nicon = \"ld-check-symbolic\"\n\n# Fire it: wayle toast --preset saved\n# With a progress bar: wayle toast --preset saved --percentage 80\n```",
       "properties": {
-        "class": {
-          "default": null,
-          "description": "Extra CSS class applied to the toast for custom styling.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "duration-ms": {
-          "default": null,
-          "description": "Auto-dismiss duration in milliseconds. Unset falls back to the toast\nconfig duration.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "icon": {
           "default": null,
           "description": "Symbolic icon name shown beside the text.",
@@ -6426,160 +6779,12 @@
             "string",
             "null"
           ]
-        },
-        "percentage": {
-          "default": null,
-          "description": "Progress percentage (0-100). When set, renders a progress bar instead\nof a plain icon + label toast.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         }
       },
       "required": [
         "id"
       ],
       "type": "object"
-    },
-    "ToastsConfig": {
-      "description": "Toast overlays shown via `wayle toast`.\n\nToasts are independent of the OSD: they have their own screen position,\nmonitor, layer, duration, alignment, and a list of reusable presets.",
-      "properties": {
-        "border": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Show a border around the toast."
-        },
-        "duration": {
-          "$ref": "#/$defs/uint32",
-          "default": 2500,
-          "description": "Auto-dismiss delay in milliseconds."
-        },
-        "enabled": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Show toast overlays pushed via `wayle toast`."
-        },
-        "layer": {
-          "$ref": "#/$defs/Layer",
-          "default": "overlay",
-          "description": "Layer-shell layer toasts are placed on."
-        },
-        "margin": {
-          "$ref": "#/$defs/Size",
-          "default": 150.0,
-          "description": "Margin from screen edges. Accepts a scale multiplier or pixels (e.g.\n`\"150px\"`)."
-        },
-        "monitor": {
-          "$ref": "#/$defs/OsdMonitor",
-          "default": "primary",
-          "description": "Target monitor: \"primary\" or a connector name like \"DP-1\"."
-        },
-        "position": {
-          "$ref": "#/$defs/OsdPosition",
-          "default": "bottom",
-          "description": "Screen anchor position."
-        },
-        "presets": {
-          "$ref": "#/$defs/Array_of_ToastPreset",
-          "default": [],
-          "description": "Reusable toast presets, each triggerable with `wayle toast --preset <id>`."
-        },
-        "text-align": {
-          "$ref": "#/$defs/OsdTextAlign",
-          "default": "center",
-          "description": "Horizontal alignment of toast content."
-        }
-      },
-      "type": "object"
-    },
-    "TransitionDuration": {
-      "description": "Transition duration in seconds, clamped to >= 0.",
-      "format": "float",
-      "minimum": 0.0,
-      "type": "number"
-    },
-    "TransitionFps": {
-      "description": "Transition frame rate clamped to 1-360 fps.",
-      "format": "uint32",
-      "maximum": 360,
-      "minimum": 1,
-      "type": "integer"
-    },
-    "TransitionType": {
-      "description": "Transition animation type.",
-      "oneOf": [
-        {
-          "const": "none",
-          "description": "Instant change with no animation.",
-          "type": "string"
-        },
-        {
-          "const": "simple",
-          "description": "Basic crossfade.",
-          "type": "string"
-        },
-        {
-          "const": "fade",
-          "description": "Fade with bezier-controlled easing.",
-          "type": "string"
-        },
-        {
-          "const": "left",
-          "description": "Wipe from left edge to right.",
-          "type": "string"
-        },
-        {
-          "const": "right",
-          "description": "Wipe from right edge to left.",
-          "type": "string"
-        },
-        {
-          "const": "top",
-          "description": "Wipe from top edge to bottom.",
-          "type": "string"
-        },
-        {
-          "const": "bottom",
-          "description": "Wipe from bottom edge to top.",
-          "type": "string"
-        },
-        {
-          "const": "wipe",
-          "description": "Wipe at configurable angle.",
-          "type": "string"
-        },
-        {
-          "const": "wave",
-          "description": "Wavy wipe effect.",
-          "type": "string"
-        },
-        {
-          "const": "grow",
-          "description": "Growing circle from a position.",
-          "type": "string"
-        },
-        {
-          "const": "center",
-          "description": "Growing circle from center.",
-          "type": "string"
-        },
-        {
-          "const": "outer",
-          "description": "Shrinking circle from edges inward.",
-          "type": "string"
-        },
-        {
-          "const": "any",
-          "description": "Growing circle from random position.",
-          "type": "string"
-        },
-        {
-          "const": "random",
-          "description": "Randomly selects from all transition types.",
-          "type": "string"
-        }
-      ]
     },
     "TrayItemOverride": {
       "description": "Custom icon and color override for tray items matching a pattern.",
@@ -6779,12 +6984,7 @@
         "cycling-directory": {
           "$ref": "#/$defs/string",
           "default": "",
-          "description": "Directory containing wallpaper images for cycling."
-        },
-        "cycling-enabled": {
-          "$ref": "#/$defs/boolean",
-          "default": false,
-          "description": "Enable automatic wallpaper cycling."
+          "description": "Directory of images to cycle through. Set it to enable cycling; leave\nempty to disable. Takes precedence over the single `wallpaper` image."
         },
         "cycling-interval-mins": {
           "$ref": "#/$defs/CyclingInterval",
@@ -6801,30 +7001,20 @@
           "default": false,
           "description": "Show the same cycling wallpaper on all monitors. Only affects shuffle\nmode since sequential already displays the same image."
         },
-        "engine-enabled": {
-          "$ref": "#/$defs/boolean",
-          "default": true,
-          "description": "Enable the awww wallpaper engine. Disable to use an external wallpaper\ntool while keeping color extraction and theming."
+        "fit-mode": {
+          "$ref": "#/$defs/FitMode",
+          "default": "fill",
+          "description": "How the wallpaper is scaled to the screen. Per-monitor entries in\n`[[wallpaper.monitors]]` override this."
         },
         "monitors": {
           "$ref": "#/$defs/Array_of_MonitorWallpaperConfig",
           "default": [],
           "description": "Per-monitor wallpaper and fit mode settings. Each entry targets a\nmonitor by connector name. See [`MonitorWallpaperConfig`] for the\navailable fields.\n\n## Example\n\n```toml\n[[wallpaper.monitors]]\nname = \"DP-1\"\nwallpaper = \"/home/me/pictures/wall-primary.png\"\nfit-mode = \"fill\"\n\n[[wallpaper.monitors]]\nname = \"HDMI-1\"\nwallpaper = \"/home/me/pictures/wall-secondary.png\"\nfit-mode = \"fit\"\n```"
         },
-        "transition-duration": {
-          "$ref": "#/$defs/TransitionDuration",
-          "default": 0.699999988079071,
-          "description": "Transition animation duration in seconds."
-        },
-        "transition-fps": {
-          "$ref": "#/$defs/TransitionFps",
-          "default": 60,
-          "description": "Transition animation frame rate."
-        },
-        "transition-type": {
-          "$ref": "#/$defs/TransitionType",
-          "default": "simple",
-          "description": "Transition animation type."
+        "wallpaper": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "A single image file to use as the wallpaper on all monitors. Leave empty\nto use cycling and/or per-monitor overrides instead."
         }
       },
       "type": "object"
@@ -7146,31 +7336,6 @@
         {
           "const": "weather-api",
           "description": "WeatherAPI.com (requires API key).",
-          "type": "string"
-        }
-      ]
-    },
-    "WebcamPosition": {
-      "description": "Corner the webcam picture-in-picture frame is anchored to in the recording.",
-      "oneOf": [
-        {
-          "const": "top-left",
-          "description": "Top-left corner.",
-          "type": "string"
-        },
-        {
-          "const": "top-right",
-          "description": "Top-right corner.",
-          "type": "string"
-        },
-        {
-          "const": "bottom-left",
-          "description": "Bottom-left corner.",
-          "type": "string"
-        },
-        {
-          "const": "bottom-right",
-          "description": "Bottom-right corner.",
           "type": "string"
         }
       ]
@@ -7501,14 +7666,26 @@
           "exit": null,
           "exit-duration": null
         },
-        "toast": {
+        "power": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
+        "share-picker": {
           "enter": null,
           "enter-duration": null,
           "exit": null,
           "exit-duration": null
         },
         "transition": "fade",
-        "ui-duration": 250
+        "ui-duration": 250,
+        "wallpaper": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        }
       },
       "description": "Animation settings."
     },
@@ -7703,6 +7880,7 @@
           "border-color": "yellow",
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
+          "enable-external": true,
           "format": "{{ percent }}%",
           "icon-bg-color": "yellow",
           "icon-color": "auto",
@@ -7717,9 +7895,10 @@
             "ld-sun-symbolic"
           ],
           "middle-click": "",
+          "min-brightness": 1,
           "right-click": "",
-          "scroll-down": "",
-          "scroll-up": "",
+          "scroll-down": "brightness:-5",
+          "scroll-up": "brightness:5",
           "thresholds": []
         },
         "cava": {
@@ -7840,10 +8019,15 @@
           "icon-size": 1.0,
           "label-size": 1.0,
           "label-use-name": false,
+          "left-click": "focus:this",
+          "middle-click": "",
           "min-workspace-count": 0,
           "monitor-specific": true,
           "numbering": "absolute",
           "occupied-color": "fg-muted",
+          "right-click": "",
+          "scroll-down": "focus:next",
+          "scroll-up": "focus:previous",
           "show-special": true,
           "urgent-mode": "workspace",
           "urgent-show": true,
@@ -8130,7 +8314,7 @@
           "middle-click": "",
           "popup-close-behavior": "dismiss",
           "popup-duration": 5000,
-          "popup-gap": 8.0,
+          "popup-gap": 1.0,
           "popup-hover-pause": true,
           "popup-layer": "overlay",
           "popup-margin-x": 0.0,
@@ -8152,11 +8336,21 @@
           "icon-bg-color": "red",
           "icon-color": "auto",
           "icon-name": "ld-power-symbolic",
-          "left-click": "",
+          "left-click": ":menu",
+          "lock-command": "loginctl lock-session",
+          "logout-command": "loginctl terminate-session $XDG_SESSION_ID",
           "middle-click": "",
+          "reboot-command": "systemctl reboot",
           "right-click": "",
           "scroll-down": "",
-          "scroll-up": ""
+          "scroll-up": "",
+          "show-lock": true,
+          "show-logout": true,
+          "show-reboot": true,
+          "show-shutdown": true,
+          "show-suspend": true,
+          "shutdown-command": "systemctl poweroff",
+          "suspend-command": "systemctl suspend"
         },
         "power-profiles": {
           "border-color": "blue",
@@ -8206,7 +8400,7 @@
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
           "format": "{{ elapsed }}",
-          "framerate": 30,
+          "framerate": 60,
           "icon-bg-color": "red",
           "icon-color": "auto",
           "icon-idle": "ld-video-symbolic",
@@ -8221,17 +8415,39 @@
           "microphone-device": "",
           "middle-click": "",
           "output-directory": "",
-          "output-format": "mp4",
+          "output-format": "mkv",
           "right-click": "dropdown:recorder",
           "scroll-down": "",
           "scroll-up": "",
-          "separate-audio-tracks": true,
           "show-cursor": true,
           "system-audio": true,
           "webcam-device": "",
           "webcam-enabled": false,
-          "webcam-position": "bottom-right",
-          "webcam-size": 20
+          "webcam-size": 20,
+          "webcam-x": 100,
+          "webcam-y": 100
+        },
+        "screenshot": {
+          "border-color": "accent",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "copy-to-clipboard": true,
+          "filename-format": "Screenshot_%Y-%m-%d_%H-%M-%S.png",
+          "icon": "ld-camera-symbolic",
+          "icon-bg-color": "accent",
+          "icon-color": "auto",
+          "icon-show": true,
+          "label": "",
+          "label-color": "accent",
+          "label-max-length": 0,
+          "label-show": false,
+          "left-click": "wayle screenshot region",
+          "middle-click": "wayle screenshot window",
+          "notify": true,
+          "output-directory": "",
+          "right-click": "wayle screenshot output",
+          "scroll-down": "",
+          "scroll-up": ""
         },
         "separator": {
           "color": "fg-subtle",
@@ -8366,12 +8582,31 @@
         "duration": 2500,
         "enabled": true,
         "layer": "overlay",
-        "margin": 150.0,
+        "margin": 1.0,
         "monitor": "primary",
         "position": "bottom",
+        "presets": [],
         "text-align": "center"
       },
       "description": "On-screen display settings."
+    },
+    "share-picker": {
+      "$ref": "#/$defs/SharePickerConfig",
+      "default": {
+        "default-page": "windows",
+        "height": 1.0,
+        "hide-token-restore": false,
+        "outputs-respect-scaling": true,
+        "outputs-show-label": false,
+        "outputs-spacing": 1.0,
+        "resize-size": 640,
+        "widget-size": 1.0,
+        "width": 1.0,
+        "windows-max-per-row": 4,
+        "windows-min-per-row": 3,
+        "windows-spacing": 1.0
+      },
+      "description": "Screen-share picker settings."
     },
     "styling": {
       "$ref": "#/$defs/StylingConfig",
@@ -8411,34 +8646,16 @@
       },
       "description": "Styling configuration (theme, fonts, scale)."
     },
-    "toasts": {
-      "$ref": "#/$defs/ToastsConfig",
-      "default": {
-        "border": true,
-        "duration": 2500,
-        "enabled": true,
-        "layer": "overlay",
-        "margin": 150.0,
-        "monitor": "primary",
-        "position": "bottom",
-        "presets": [],
-        "text-align": "center"
-      },
-      "description": "Toast overlay settings."
-    },
     "wallpaper": {
       "$ref": "#/$defs/WallpaperConfig",
       "default": {
         "cycling-directory": "",
-        "cycling-enabled": false,
         "cycling-interval-mins": 15,
         "cycling-mode": "sequential",
         "cycling-same-image": false,
-        "engine-enabled": true,
+        "fit-mode": "fill",
         "monitors": [],
-        "transition-duration": 0.699999988079071,
-        "transition-fps": 60,
-        "transition-type": "simple"
+        "wallpaper": ""
       },
       "description": "Wallpaper service settings."
     }
