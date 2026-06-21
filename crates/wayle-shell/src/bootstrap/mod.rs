@@ -115,6 +115,7 @@ pub async fn is_already_running() -> bool {
     result
 }
 
+#[allow(clippy::cognitive_complexity)]
 pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Error>> {
     let mut timer = StartupTimer::new();
 
@@ -161,6 +162,12 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
     init_share_picker().await;
 
     init_screenshot().await;
+
+    init_file_chooser().await;
+
+    init_portal_dialogs().await;
+
+    init_print().await;
 
     let recorder = init_recorder(config_service.clone(), toast_bus.clone()).await;
 
@@ -209,6 +216,28 @@ async fn init_share_picker() {
 async fn init_screenshot() {
     if let Err(err) = screenshot::start().await {
         warn!(error = %err, "Screenshot service unavailable");
+    }
+}
+
+/// Registers the file chooser D-Bus service. Non-fatal: a failure just leaves
+/// the shell usable without the native portal file dialog.
+async fn init_file_chooser() {
+    if let Err(err) = crate::services::file_chooser::start().await {
+        warn!(error = %err, "File chooser service unavailable");
+    }
+}
+
+/// Registers the portal dialog D-Bus service (access/account/appchooser/launcher).
+async fn init_portal_dialogs() {
+    if let Err(err) = crate::services::portal_dialogs::start().await {
+        warn!(error = %err, "Portal dialogs service unavailable");
+    }
+}
+
+/// Registers the print D-Bus service. Non-fatal.
+async fn init_print() {
+    if let Err(err) = crate::services::print::start().await {
+        warn!(error = %err, "Print service unavailable");
     }
 }
 

@@ -17,6 +17,8 @@ pub mod media;
 pub mod notify;
 /// Panel management commands
 pub mod panel;
+/// xdg-desktop-portal backend
+pub mod portal;
 /// Power profile commands
 pub mod power;
 /// Screen recorder control commands

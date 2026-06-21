@@ -12,6 +12,7 @@ RUN pacman --noconfirm --needed -Syu \
         gtk4 \
         gtk4-layer-shell \
         gtksourceview5 \
+        libxkbcommon \
         libpulse \
         fftw \
         pam \

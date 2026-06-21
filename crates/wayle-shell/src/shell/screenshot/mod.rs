@@ -45,6 +45,11 @@ pub(crate) enum ScreenshotInput {
         target: String,
         reply: oneshot::Sender<Result<String, String>>,
     },
+    /// Pick a single screen color via the region overlay, replying with the
+    /// sampled sRGB `(r, g, b)` in `[0, 1]`.
+    PickColor {
+        reply: oneshot::Sender<Result<(f64, f64, f64), String>>,
+    },
 }
 
 impl std::fmt::Debug for ScreenshotInput {
@@ -55,6 +60,7 @@ impl std::fmt::Debug for ScreenshotInput {
                 .field("mode", mode)
                 .field("target", target)
                 .finish_non_exhaustive(),
+            Self::PickColor { .. } => f.write_str("PickColor"),
         }
     }
 }
@@ -108,23 +114,31 @@ impl Component for Screenshot {
     }
 
     fn update(&mut self, msg: ScreenshotInput, _sender: ComponentSender<Self>, _root: &Self::Root) {
-        let ScreenshotInput::Capture {
-            mode,
-            target,
-            reply,
-        } = msg;
-        let config = self.config.clone();
-        // Resolve compositor-specific focus up front (sync, GTK thread).
-        let focused_output = self.focused_output_name();
-        let window_target = if mode == "window" {
-            self.active_window_target()
-        } else {
-            Default::default()
-        };
-        glib::spawn_future_local(async move {
-            let result = run(config, mode, target, focused_output, window_target).await;
-            let _ = reply.send(result);
-        });
+        match msg {
+            ScreenshotInput::Capture {
+                mode,
+                target,
+                reply,
+            } => {
+                let config = self.config.clone();
+                // Resolve compositor-specific focus up front (sync, GTK thread).
+                let focused_output = self.focused_output_name();
+                let window_target = if mode == "window" {
+                    self.active_window_target()
+                } else {
+                    WindowTarget::default()
+                };
+                glib::spawn_future_local(async move {
+                    let result = run(config, mode, target, focused_output, window_target).await;
+                    let _ = reply.send(result);
+                });
+            }
+            ScreenshotInput::PickColor { reply } => {
+                glib::spawn_future_local(async move {
+                    let _ = reply.send(pick_color().await);
+                });
+            }
+        }
     }
 }
 
@@ -285,6 +299,24 @@ async fn capture_region() -> Result<Option<RgbImage>, String> {
         logical_height,
         &selection,
     )))
+}
+
+/// Picks a single color: runs the same region selection as a screenshot, then
+/// samples the center pixel of the selected area. Returns sRGB channels in
+/// `[0, 1]`. Errors on cancel or an empty selection.
+async fn pick_color() -> Result<(f64, f64, f64), String> {
+    let Some(image) = capture_region().await? else {
+        return Err("color pick cancelled".to_owned());
+    };
+    if image.width() == 0 || image.height() == 0 {
+        return Err("empty color selection".to_owned());
+    }
+    let pixel = image.get_pixel(image.width() / 2, image.height() / 2);
+    Ok((
+        f64::from(pixel[0]) / 255.0,
+        f64::from(pixel[1]) / 255.0,
+        f64::from(pixel[2]) / 255.0,
+    ))
 }
 
 /// Wraps an RGB frame in a `gdk::Texture` for the overlay to paint. The image is

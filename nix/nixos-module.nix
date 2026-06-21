@@ -43,6 +43,24 @@ in
         description = "Systemd target the wayle user service binds to.";
       };
     };
+
+    portal = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Register wayle as the xdg-desktop-portal backend so screen sharing,
+          screenshots, remote control, global shortcuts, appearance settings,
+          notifications, wallpaper, idle-inhibit, file/app/print dialogs and the
+          rest work on any Wayland compositor. wayle implements every interface
+          natively, so this enables `xdg.portal`, adds only wayle to
+          `extraPortals`, routes everything to it via `xdg.portal.config.common`
+          (with `mkDefault`, so your own routing wins), and defines the
+          `xdg-desktop-portal-wayle` user service the frontend activates. No
+          xdg-desktop-portal-gtk needed.
+        '';
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable (lib.mkMerge [
@@ -73,6 +91,38 @@ in
         };
       };
     }
+
+    (lib.mkIf cfg.portal.enable {
+      xdg.portal = {
+        enable = true;
+        # Wayle implements every interface natively — no xdg-desktop-portal-gtk.
+        extraPortals = [ cfg.package ];
+        # Route everything to wayle regardless of XDG_CURRENT_DESKTOP. mkDefault
+        # so a user's own xdg.portal.config wins.
+        config.common = lib.mkDefault {
+          default = [ "wayle" ];
+        };
+      };
+
+      # The frontend D-Bus-activates this via the .portal's DBusName /
+      # SystemdService; it is not wantedBy the session (started on demand).
+      systemd.user.services.xdg-desktop-portal-wayle = {
+        description = "Wayle xdg-desktop-portal backend";
+        partOf = [ "graphical-session.target" ];
+        after = [
+          "graphical-session.target"
+          "xdg-desktop-portal.service"
+        ];
+        serviceConfig = {
+          Type = "dbus";
+          BusName = "org.freedesktop.impl.portal.desktop.wayle";
+          ExecStart = "${lib.getExe cfg.package} portal";
+          Restart = "on-failure";
+          RestartSec = 3;
+          Slice = "session.slice";
+        };
+      };
+    })
 
     (lib.mkIf cfg.autoInstallDependencies {
       services.upower.enable = lib.mkDefault true;

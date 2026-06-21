@@ -122,6 +122,7 @@ fn ext_fallback_toplevels(con: &Connection) -> Vec<Toplevel> {
             class: toplevel.app_id.clone().unwrap_or_default(),
             title: toplevel.title.clone().unwrap_or_default(),
             window_address: None,
+            identifier: toplevel.identifier.clone(),
         })
         .collect()
 }
@@ -191,7 +192,13 @@ fn build_window_card(
         .build();
     container.set_tooltip_text(Some(&format!("{}\n{}", toplevel.title, toplevel.class)));
 
-    let payload = format!("window:{}", toplevel.id);
+    // Prefer the stable ext identifier (generic enumeration fallback) so a
+    // consumer that owns its own capture can re-resolve the toplevel; fall back
+    // to the XDPH numeric id, which only XDPH itself can resolve.
+    let payload = match &toplevel.identifier {
+        Some(identifier) => format!("window:{identifier}"),
+        None => format!("window:{}", toplevel.id),
+    };
     container.set_cursor_from_name(Some("pointer"));
     let gesture = GestureClick::new();
     gesture.connect_released(clone!(

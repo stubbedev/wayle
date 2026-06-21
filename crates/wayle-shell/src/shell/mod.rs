@@ -1,9 +1,12 @@
 mod bar;
+pub(crate) mod file_chooser;
 mod helpers;
 pub(crate) mod lock;
 mod notification_popup;
 mod osd;
+pub(crate) mod portal_dialogs;
 pub(crate) mod power_menu;
+pub(crate) mod print;
 pub(crate) mod region_overlay;
 pub(crate) mod screenshot;
 pub(crate) mod services;
@@ -21,10 +24,13 @@ pub(crate) use services::ShellServices;
 use tracing::{debug, info};
 
 use self::{
+    file_chooser::FileChooser,
     lock::Lock,
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
+    portal_dialogs::PortalDialogs,
     power_menu::PowerMenu,
+    print::Print,
     region_overlay::RegionOverlay,
     screenshot::{Screenshot, ScreenshotInit},
     share_picker::SharePicker,
@@ -133,6 +139,21 @@ impl Component for Shell {
             })
             .detach();
         crate::services::screenshot::register_sender(screenshot.sender().clone());
+
+        let file_chooser = FileChooser::builder()
+            .launch(init.services.config.clone())
+            .detach();
+        crate::services::file_chooser::register_sender(file_chooser.sender().clone());
+
+        let portal_dialogs = PortalDialogs::builder()
+            .launch(init.services.config.clone())
+            .detach();
+        crate::services::portal_dialogs::register_sender(portal_dialogs.sender().clone());
+
+        let print = Print::builder()
+            .launch(init.services.config.clone())
+            .detach();
+        crate::services::print::register_sender(print.sender().clone());
 
         let power_menu = PowerMenu::builder()
             .launch(init.services.config.clone())

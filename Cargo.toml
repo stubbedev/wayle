@@ -26,6 +26,7 @@ members = [
 	"crates/wayle-network",
 	"crates/wayle-niri",
 	"crates/wayle-notification",
+	"crates/wayle-portal",
 	"crates/wayle-power-profiles",
 	"crates/wayle-sysinfo",
 	"crates/wayle-systray",
@@ -81,6 +82,8 @@ inventory = "0.3"
 libc = "0.2.176"
 libpulse-binding = { version = "2.30.1", features = ["pa_v13"] }
 niri-ipc = "=25.11.0"
+pipewire = "0.10"
+libspa = "0.10"
 minijinja = { version = "2.15", default-features = false, features = [
 	"builtins",
 	"serde",
@@ -145,6 +148,7 @@ wayle-niri = { path = "crates/wayle-niri" }
 wayle-media = { path = "crates/wayle-media" }
 wayle-network = { path = "crates/wayle-network" }
 wayle-notification = { path = "crates/wayle-notification" }
+wayle-portal = { path = "crates/wayle-portal" }
 wayle-power-profiles = { path = "crates/wayle-power-profiles" }
 wayle-sysinfo = { path = "crates/wayle-sysinfo" }
 wayle-systray = { path = "crates/wayle-systray" }

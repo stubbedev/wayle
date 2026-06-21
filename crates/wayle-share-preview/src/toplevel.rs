@@ -8,6 +8,11 @@ pub struct Toplevel {
     pub title: String,
     /// address of the window associated with the toplevel
     pub window_address: Option<u64>,
+    /// Stable `ext_foreign_toplevel_list_v1` identifier, when this entry came
+    /// from the generic enumeration fallback rather than the XDPH list. Lets a
+    /// consumer that owns its own capture (the portal backend) re-resolve the
+    /// toplevel; `None` for XDPH-sourced entries, which use [`Self::id`].
+    pub identifier: Option<String>,
 }
 
 impl Toplevel {
@@ -64,6 +69,7 @@ impl Toplevel {
                 class,
                 title,
                 window_address,
+                identifier: None,
             });
         }
 

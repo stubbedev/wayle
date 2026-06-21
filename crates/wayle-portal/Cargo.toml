@@ -1,0 +1,60 @@
+[package]
+name = "wayle-portal"
+description = "xdg-desktop-portal backend (org.freedesktop.impl.portal.*) for the Wayle shell"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[features]
+# `pipewire` gates the ScreenCast PipeWire producer and `keysym` gates the
+# libxkbcommon-backed keysym injection — the only parts needing C libraries.
+# Everything else (D-Bus interfaces, wlr/ext Wayland capture, the pure-Rust EIS
+# server, all pure logic) builds without them, so
+# `cargo test -p wayle-portal --no-default-features` runs the unit tests with no
+# system PipeWire/xkbcommon present.
+default = ["pipewire", "keysym"]
+pipewire = ["dep:pipewire", "dep:libspa"]
+keysym = ["dep:xkbcommon"]
+
+[dependencies]
+futures.workspace = true
+libc.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+zbus.workspace = true
+wayland-client.workspace = true
+wayland-backend = "0.3.15"
+wayland-scanner = "0.31.10"
+wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
+wayland-protocols-misc = { version = "0.3.12", features = ["client"] }
+reis = { version = "0.7", features = ["calloop"] }
+calloop = "0.14"
+wayle-config.workspace = true
+wayle-ipc.workspace = true
+wayle-share-preview.workspace = true
+pipewire = { workspace = true, optional = true }
+libspa = { workspace = true, optional = true }
+xkbcommon = { version = "0.9", optional = true }
+
+[lints.clippy]
+cognitive_complexity = "warn"
+expect_used = "deny"
+inefficient_to_string = "warn"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+semicolon_if_nothing_returned = "warn"
+unnecessary_wraps = "warn"
+# zbus interface methods have a fixed shape: deserialized args arrive by value,
+# handlers take &self and are async by convention even when stateless / awaitless.
+needless_pass_by_value = "allow"
+unused_async = "allow"
+unused_self = "allow"
+# Portal method signatures are fixed by the spec (handle, app_id, parent, …).
+too_many_arguments = "allow"
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "allow"

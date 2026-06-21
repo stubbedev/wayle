@@ -41,4 +41,28 @@ impl ScreenshotDaemon {
             }
         }
     }
+
+    /// Picks a single screen color interactively, returning sRGB `(r, g, b)`
+    /// in `[0, 1]`. Errors on cancel or when the shell UI is not ready.
+    #[instrument(skip(self))]
+    pub async fn pick_color(&self) -> zbus::fdo::Result<(f64, f64, f64)> {
+        let Some(sender) = host_sender() else {
+            warn!("color pick requested before the shell UI registered its sender");
+            return Err(zbus::fdo::Error::Failed("shell UI not ready".to_owned()));
+        };
+
+        let (reply_tx, reply_rx) = oneshot::channel();
+        sender.emit(ScreenshotInput::PickColor { reply: reply_tx });
+
+        match reply_rx.await {
+            Ok(Ok(color)) => Ok(color),
+            Ok(Err(err)) => Err(zbus::fdo::Error::Failed(err)),
+            Err(_) => {
+                warn!("color pick reply channel dropped");
+                Err(zbus::fdo::Error::Failed(
+                    "screenshot host unavailable".to_owned(),
+                ))
+            }
+        }
+    }
 }

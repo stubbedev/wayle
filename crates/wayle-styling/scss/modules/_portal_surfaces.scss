@@ -1,0 +1,82 @@
+// Portal surfaces — the layer-shell overlays the xdg-desktop-portal backend
+// pops up for the GTK-dialog tier we reimplemented natively: the generic
+// grant/deny + app-chooser dialog (`shell/portal_dialogs`), the file browser
+// (`shell/file_chooser`), and the printer picker (`shell/print`). They mirror
+// the share picker so the whole portal experience is visually congruent and
+// rides the same `[animations]` enter/exit transitions.
+
+// Each window stays transparent so the surface inside the revealer paints —
+// that way the enter/exit transition animates the whole panel as one piece.
+.portal-dialog-window,
+.file-chooser-window,
+.print-window {
+    background: transparent;
+}
+
+// Shared panel chrome: surface fill, border, rounding, shadow, padding — same
+// tokens as `.share-picker-surface`.
+.portal-dialog-surface,
+.file-chooser-surface,
+.print-surface {
+    background: var(--bg-base);
+    color: var(--fg-default);
+    font-family: var(--font-sans);
+    border: 1px solid var(--border-default);
+    border-radius: var(--rounding-container);
+    box-shadow: var(--shadow);
+    padding: var(--space-lg);
+}
+
+// --- Titles / secondary text ----------------------------------------------
+
+.portal-dialog-title,
+.file-chooser-title,
+.print-title {
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--fg-default);
+}
+
+.portal-dialog-body,
+.file-chooser-path {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+}
+
+// --- List boxes (apps / files / printers) ---------------------------------
+
+// Selectable rows read like the share-picker cards: surface rows that lift to
+// the accent border on hover and fill on selection. Roundness follows the
+// element token so theme changes flow through.
+.portal-dialog-app-list,
+.file-chooser-list,
+.print-printer-list {
+    background: transparent;
+
+    row {
+        border-radius: var(--rounding-element);
+        transition:
+            background var(--duration-fast),
+            box-shadow var(--duration-fast);
+
+        &:hover {
+            background: var(--bg-hover);
+        }
+
+        &:selected {
+            background: var(--accent);
+            color: var(--fg-on-accent);
+        }
+
+        &:focus-visible {
+            outline: var(--focus-ring-width) solid var(--accent);
+            outline-offset: calc(-0.125rem * var(--global-scale));
+        }
+    }
+}
+
+// --- File-chooser save-name entry -----------------------------------------
+
+.file-chooser-name {
+    margin-top: var(--space-xs);
+}
