@@ -64,6 +64,7 @@ fn provider_dropdown(selected: MailProvider) -> gtk::DropDown {
     let model = gtk::StringList::new(&refs);
     let dropdown = gtk::DropDown::new(Some(model), gtk::Expression::NONE);
     dropdown.set_selected(index_of(selected));
+    dropdown.set_cursor_from_name(Some("pointer"));
     dropdown
 }
 
