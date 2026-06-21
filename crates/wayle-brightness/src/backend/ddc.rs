@@ -217,3 +217,51 @@ fn sanitize(raw: &str) -> String {
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::*;
+
+    #[test]
+    fn retry_returns_first_success_without_retrying() {
+        let calls = Cell::new(0);
+        let result = with_retry(|| {
+            calls.set(calls.get() + 1);
+            Ok::<u32, String>(42)
+        });
+
+        assert_eq!(result, Ok(42));
+        assert_eq!(calls.get(), 1, "should not retry after success");
+    }
+
+    #[test]
+    fn retry_recovers_after_transient_failure() {
+        let calls = Cell::new(0);
+        let result = with_retry(|| {
+            calls.set(calls.get() + 1);
+            if calls.get() < 2 { Err("nak") } else { Ok(7) }
+        });
+
+        assert_eq!(result, Ok(7));
+        assert_eq!(calls.get(), 2);
+    }
+
+    #[test]
+    fn retry_exhausts_and_reports_last_error() {
+        let calls = Cell::new(0);
+        let result: Result<u32, String> = with_retry(|| {
+            calls.set(calls.get() + 1);
+            Err(format!("fail {}", calls.get()))
+        });
+
+        assert_eq!(result, Err(format!("fail {DDC_ATTEMPTS}")));
+        assert_eq!(calls.get(), DDC_ATTEMPTS);
+    }
+
+    #[test]
+    fn sanitize_keeps_alphanumerics_only() {
+        assert_eq!(sanitize("i2c:/dev/i2c-5"), "i2c--dev-i2c-5");
+    }
+}
