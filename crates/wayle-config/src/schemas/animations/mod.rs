@@ -89,6 +89,20 @@ pub struct AnimationsConfig {
     /// Per-surface override for the power menu overlay.
     #[default(SurfaceAnimation::default())]
     pub power: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for portal dialogs (access/account/app-chooser/
+    /// launcher-install prompts).
+    #[default(SurfaceAnimation::default())]
+    pub dialog: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for the portal file-chooser surface.
+    #[serde(rename = "file-chooser")]
+    #[default(SurfaceAnimation::default())]
+    pub file_chooser: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for the portal print surface.
+    #[default(SurfaceAnimation::default())]
+    pub print: ConfigProperty<SurfaceAnimation>,
 }
 
 /// Transient surface an animation applies to.
@@ -106,6 +120,12 @@ pub enum AnimSurface {
     Wallpaper,
     /// The power menu overlay.
     Power,
+    /// Portal dialogs (access / account / app-chooser / launcher install).
+    Dialog,
+    /// The portal file-chooser surface.
+    FileChooser,
+    /// The portal print surface.
+    Print,
 }
 
 impl AnimationsConfig {
@@ -117,6 +137,9 @@ impl AnimationsConfig {
             AnimSurface::SharePicker => self.share_picker.get(),
             AnimSurface::Wallpaper => self.wallpaper.get(),
             AnimSurface::Power => self.power.get(),
+            AnimSurface::Dialog => self.dialog.get(),
+            AnimSurface::FileChooser => self.file_chooser.get(),
+            AnimSurface::Print => self.print.get(),
         }
     }
 

@@ -1,40 +1,47 @@
-//! Print host.
+//! Print — a custom animated layer-shell surface.
 //!
-//! Native printing for the portal backend's `org.freedesktop.impl.portal.Print`
-//! via GTK's own `PrintUnixDialog` + `PrintJob` — no xdg-desktop-portal-gtk.
-//! `Prepare` shows the dialog and stashes the chosen printer/settings under a
-//! token; `Spool` sends the document fd to that printer.
+//! Replaces `GtkPrintUnixDialog` with our own printer picker so the portal print
+//! prompt animates congruently (`AnimSurface::Print`). `Prepare` shows the
+//! picker and stashes the chosen printer under a token; `Spool` re-resolves that
+//! printer and sends the document fd via `GtkPrintJob`. Backs `com.wayle.Print1`.
 
-use std::{cell::RefCell, collections::HashMap, os::fd::AsRawFd, rc::Rc};
+use std::{
+    collections::HashMap,
+    os::fd::{IntoRawFd, OwnedFd},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
+use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 use relm4::{gtk, gtk::prelude::*, prelude::*};
 use tokio::sync::oneshot;
 use tracing::warn;
+use wayle_config::{ConfigService, schemas::animations::AnimSurface};
 
-/// A prepared print target.
-#[derive(Clone)]
-struct Prepared {
-    printer: gtk::Printer,
-    settings: gtk::PrintSettings,
-    page_setup: gtk::PageSetup,
-}
+use crate::shell::helpers::surface_anim;
 
-/// Flat GTK print-setting key/value pairs.
+/// Flat GTK print-setting key/value pairs (we use printer defaults, so empty).
 pub(crate) type SettingsPairs = Vec<(String, String)>;
 /// Reply for a prepare request: `Some((settings, token))` or `None` on cancel.
 type PrepareReply = oneshot::Sender<Option<(SettingsPairs, u32)>>;
 
 /// Messages driving the print host.
 pub(crate) enum PrintInput {
-    /// Show the print dialog; reply `Some((settings, token))` or `None` on cancel.
+    /// Show the printer picker; reply with `(settings, token)` or `None`.
     Prepare { title: String, reply: PrepareReply },
     /// Spool `document` to the printer prepared under `token`.
     Spool {
         title: String,
-        document: std::os::fd::OwnedFd,
+        document: OwnedFd,
         token: u32,
         reply: oneshot::Sender<bool>,
     },
+    /// Internal: the user confirmed the selected printer.
+    Confirm,
+    /// Internal: cancel.
+    Cancel,
 }
 
 impl std::fmt::Debug for PrintInput {
@@ -48,19 +55,24 @@ impl std::fmt::Debug for PrintInput {
                 .debug_struct("Spool")
                 .field("token", token)
                 .finish_non_exhaustive(),
+            Self::Confirm => f.write_str("Confirm"),
+            Self::Cancel => f.write_str("Cancel"),
         }
     }
 }
 
 /// The print host component.
 pub(crate) struct Print {
-    prepared: Rc<RefCell<HashMap<u32, Prepared>>>,
-    next_token: Rc<RefCell<u32>>,
+    config: Arc<ConfigService>,
+    printers: Vec<String>,
+    tokens: HashMap<u32, String>,
+    next_token: u32,
+    pending: Option<PrepareReply>,
 }
 
 #[relm4::component(pub(crate))]
 impl Component for Print {
-    type Init = ();
+    type Init = Arc<ConfigService>;
     type Input = PrintInput;
     type Output = ();
     type CommandOutput = ();
@@ -69,137 +81,210 @@ impl Component for Print {
         #[root]
         gtk::Window {
             set_decorated: false,
+            add_css_class: "print-window",
             set_visible: false,
+
+            #[name = "revealer"]
+            gtk::Revealer {
+                set_reveal_child: false,
+
+                gtk::Box {
+                    add_css_class: "print-surface",
+                    set_orientation: gtk::Orientation::Vertical,
+                    set_spacing: 12,
+                    set_width_request: 460,
+
+                    gtk::Label {
+                        add_css_class: "print-title",
+                        set_xalign: 0.0,
+                        set_label: "Print",
+                    },
+                    gtk::ScrolledWindow {
+                        set_vexpand: true,
+                        set_min_content_height: 320,
+                        #[name = "printer_list"]
+                        gtk::ListBox {
+                            add_css_class: "print-printer-list",
+                            set_selection_mode: gtk::SelectionMode::Single,
+                        },
+                    },
+                    gtk::Box {
+                        set_orientation: gtk::Orientation::Horizontal,
+                        set_halign: gtk::Align::End,
+                        set_spacing: 8,
+                        #[name = "cancel_button"]
+                        gtk::Button {
+                            set_label: "Cancel",
+                            connect_clicked => PrintInput::Cancel,
+                        },
+                        #[name = "confirm_button"]
+                        gtk::Button {
+                            set_label: "Print",
+                            add_css_class: "suggested-action",
+                            connect_clicked => PrintInput::Confirm,
+                        },
+                    },
+                },
+            }
         }
     }
 
     fn init(
-        _init: Self::Init,
+        init: Self::Init,
         root: Self::Root,
-        _sender: ComponentSender<Self>,
+        sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let model = Print {
-            prepared: Rc::new(RefCell::new(HashMap::new())),
-            next_token: Rc::new(RefCell::new(1)),
+            config: init,
+            printers: Vec::new(),
+            tokens: HashMap::new(),
+            next_token: 1,
+            pending: None,
         };
         let widgets = view_output!();
+
+        root.init_layer_shell();
+        root.set_namespace(Some("wayle-print"));
+        root.set_layer(Layer::Overlay);
+        root.set_keyboard_mode(KeyboardMode::OnDemand);
+        root.set_exclusive_zone(-1);
+        surface_anim::play_on_map(&root, &widgets.revealer);
+
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: PrintInput, _sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update_with_view(
+        &mut self,
+        widgets: &mut Self::Widgets,
+        msg: PrintInput,
+        _sender: ComponentSender<Self>,
+        root: &Self::Root,
+    ) {
         match msg {
-            PrintInput::Prepare { title, reply } => self.prepare(&title, reply),
+            PrintInput::Prepare { title: _, reply } => {
+                if let Some(prev) = self.pending.take() {
+                    let _ = prev.send(None);
+                }
+                self.pending = Some(reply);
+                self.printers = enumerate_printer_names();
+
+                clear_list(&widgets.printer_list);
+                for name in &self.printers {
+                    let label = gtk::Label::builder()
+                        .label(name)
+                        .xalign(0.0)
+                        .margin_top(6)
+                        .margin_bottom(6)
+                        .margin_start(10)
+                        .margin_end(10)
+                        .build();
+                    widgets.printer_list.append(&label);
+                }
+                if let Some(first) = widgets.printer_list.row_at_index(0) {
+                    widgets.printer_list.select_row(Some(&first));
+                }
+                surface_anim::reveal(&widgets.revealer, root, &self.config, AnimSurface::Print);
+            }
+            PrintInput::Confirm => {
+                let selected = widgets
+                    .printer_list
+                    .selected_row()
+                    .and_then(|row| usize::try_from(row.index()).ok())
+                    .and_then(|i| self.printers.get(i).cloned());
+                match (self.pending.take(), selected) {
+                    (Some(reply), Some(printer)) => {
+                        let token = self.next_token;
+                        self.next_token = self.next_token.wrapping_add(1).max(1);
+                        self.tokens.insert(token, printer);
+                        let _ = reply.send(Some((Vec::new(), token)));
+                    }
+                    (Some(reply), None) => {
+                        let _ = reply.send(None);
+                    }
+                    _ => {}
+                }
+                surface_anim::hide(&widgets.revealer, root, &self.config, AnimSurface::Print);
+            }
+            PrintInput::Cancel => {
+                if let Some(reply) = self.pending.take() {
+                    let _ = reply.send(None);
+                }
+                surface_anim::hide(&widgets.revealer, root, &self.config, AnimSurface::Print);
+            }
             PrintInput::Spool {
                 title,
                 document,
                 token,
                 reply,
-            } => self.spool(&title, document, token, reply),
+            } => {
+                let printer = self.tokens.remove(&token);
+                let _ = reply.send(match printer {
+                    Some(name) => spool(&title, document, &name),
+                    None => {
+                        warn!(token, "print: no prepared printer for token");
+                        false
+                    }
+                });
+            }
         }
     }
 }
 
-impl Print {
-    /// Shows the print dialog and stores the selection under a fresh token.
-    // PrintUnixDialog subclasses GtkDialog (response API deprecated since 4.10),
-    // but it is still the only native print dialog GTK4 ships.
-    #[allow(deprecated)]
-    fn prepare(&self, title: &str, reply: PrepareReply) {
-        let dialog = gtk::PrintUnixDialog::new(Some(title), gtk::Window::NONE);
-        dialog.set_modal(true);
-
-        let prepared = self.prepared.clone();
-        let next_token = self.next_token.clone();
-        let reply = Rc::new(RefCell::new(Some(reply)));
-
-        dialog.connect_response(move |dialog, response| {
-            let take = || reply.borrow_mut().take();
-            match response {
-                gtk::ResponseType::Ok | gtk::ResponseType::Apply => {
-                    if let Some(printer) = dialog.selected_printer() {
-                        let settings = dialog.settings();
-                        let page_setup = dialog.page_setup();
-                        let token = {
-                            let mut counter = next_token.borrow_mut();
-                            let token = *counter;
-                            *counter = counter.wrapping_add(1).max(1);
-                            token
-                        };
-                        let pairs = settings_pairs(&settings);
-                        prepared.borrow_mut().insert(
-                            token,
-                            Prepared {
-                                printer,
-                                settings,
-                                page_setup,
-                            },
-                        );
-                        if let Some(reply) = take() {
-                            let _ = reply.send(Some((pairs, token)));
-                        }
-                    } else if let Some(reply) = take() {
-                        let _ = reply.send(None);
-                    }
-                }
-                _ => {
-                    if let Some(reply) = take() {
-                        let _ = reply.send(None);
-                    }
-                }
+/// Enumerates available printer names (synchronous).
+fn enumerate_printer_names() -> Vec<String> {
+    let names = Arc::new(Mutex::new(Vec::new()));
+    let collector = Arc::clone(&names);
+    gtk::enumerate_printers(
+        move |printer| {
+            if let Ok(mut names) = collector.lock() {
+                names.push(printer.name().to_string());
             }
-            dialog.destroy();
-        });
-
-        dialog.present();
-    }
-
-    /// Spools the document fd to the printer prepared under `token`.
-    fn spool(
-        &self,
-        title: &str,
-        document: std::os::fd::OwnedFd,
-        token: u32,
-        reply: oneshot::Sender<bool>,
-    ) {
-        let Some(prepared) = self.prepared.borrow_mut().remove(&token) else {
-            warn!(token, "print: no prepared job for token");
-            let _ = reply.send(false);
-            return;
-        };
-
-        let job = gtk::PrintJob::new(
-            title,
-            &prepared.printer,
-            &prepared.settings,
-            &prepared.page_setup,
-        );
-        if let Err(err) = job.set_source_fd(document.as_raw_fd()) {
-            warn!(%err, "print: cannot set document source");
-            let _ = reply.send(false);
-            return;
-        }
-
-        // Keep the fd alive until the job finishes sending.
-        let reply = RefCell::new(Some(reply));
-        job.send(move |_job, result| {
-            let _ = &document;
-            if let Some(reply) = reply.borrow_mut().take() {
-                let _ = reply.send(result.is_ok());
-            }
-        });
-    }
-}
-
-/// Flattens `GtkPrintSettings` into key/value string pairs for the portal.
-fn settings_pairs(settings: &gtk::PrintSettings) -> Vec<(String, String)> {
-    let pairs = Rc::new(RefCell::new(Vec::new()));
-    let collector = pairs.clone();
-    settings.foreach(move |key, value| {
-        collector
-            .borrow_mut()
-            .push((key.to_owned(), value.to_owned()));
-    });
-    Rc::try_unwrap(pairs)
-        .map(RefCell::into_inner)
+            true
+        },
+        true,
+    );
+    Arc::try_unwrap(names)
+        .ok()
+        .and_then(|m| m.into_inner().ok())
         .unwrap_or_default()
+}
+
+/// Spools `document` to the named printer with default settings via a
+/// `GtkPrintJob`. Returns whether a matching printer was found and queued.
+fn spool(title: &str, document: OwnedFd, printer_name: &str) -> bool {
+    // The print job reads the fd asynchronously while spooling, so hand it the
+    // raw fd and let the job own it (leaked from our side intentionally).
+    let raw = document.into_raw_fd();
+    let title = title.to_owned();
+    let target = printer_name.to_owned();
+    let sent = Arc::new(AtomicBool::new(false));
+    let sent_cb = Arc::clone(&sent);
+
+    gtk::enumerate_printers(
+        move |printer| {
+            if printer.name() != target.as_str() {
+                return true;
+            }
+            let job = gtk::PrintJob::new(
+                &title,
+                printer,
+                &gtk::PrintSettings::new(),
+                &gtk::PageSetup::new(),
+            );
+            if job.set_source_fd(raw).is_ok() {
+                job.send(|_, _| {});
+                sent_cb.store(true, Ordering::SeqCst);
+            }
+            false
+        },
+        true,
+    );
+    sent.load(Ordering::SeqCst)
+}
+
+/// Removes all rows from a list box.
+fn clear_list(list: &gtk::ListBox) {
+    while let Some(child) = list.first_child() {
+        list.remove(&child);
+    }
 }

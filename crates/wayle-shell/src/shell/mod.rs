@@ -137,13 +137,19 @@ impl Component for Shell {
             .detach();
         crate::services::screenshot::register_sender(screenshot.sender().clone());
 
-        let file_chooser = FileChooser::builder().launch(()).detach();
+        let file_chooser = FileChooser::builder()
+            .launch(init.services.config.clone())
+            .detach();
         crate::services::file_chooser::register_sender(file_chooser.sender().clone());
 
-        let portal_dialogs = PortalDialogs::builder().launch(()).detach();
+        let portal_dialogs = PortalDialogs::builder()
+            .launch(init.services.config.clone())
+            .detach();
         crate::services::portal_dialogs::register_sender(portal_dialogs.sender().clone());
 
-        let print = Print::builder().launch(()).detach();
+        let print = Print::builder()
+            .launch(init.services.config.clone())
+            .detach();
         crate::services::print::register_sender(print.sender().clone());
 
         let power_menu = PowerMenu::builder()
