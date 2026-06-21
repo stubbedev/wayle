@@ -103,6 +103,10 @@ pub struct AnimationsConfig {
     /// Per-surface override for the portal print surface.
     #[default(SurfaceAnimation::default())]
     pub print: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for the lock screen reveal.
+    #[default(SurfaceAnimation::default())]
+    pub lock: ConfigProperty<SurfaceAnimation>,
 }
 
 /// Transient surface an animation applies to.
@@ -126,6 +130,8 @@ pub enum AnimSurface {
     FileChooser,
     /// The portal print surface.
     Print,
+    /// The lock screen reveal.
+    Lock,
 }
 
 impl AnimationsConfig {
@@ -140,6 +146,7 @@ impl AnimationsConfig {
             AnimSurface::Dialog => self.dialog.get(),
             AnimSurface::FileChooser => self.file_chooser.get(),
             AnimSurface::Print => self.print.get(),
+            AnimSurface::Lock => self.lock.get(),
         }
     }
 

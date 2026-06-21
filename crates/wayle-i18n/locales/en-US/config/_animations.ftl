@@ -55,6 +55,9 @@ settings-animations-file-chooser = Portal File Chooser
 settings-animations-print = Portal Print
     .description = Per-surface animation override for the portal print surface
 
+settings-animations-lock = Lock Screen
+    .description = Per-surface animation override for the lock screen reveal
+
 
 ## AnimationType variants
 enum-animation-type-none = None

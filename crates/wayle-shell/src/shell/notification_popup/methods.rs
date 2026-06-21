@@ -5,7 +5,7 @@ use gtk4_layer_shell::{Edge, LayerShell};
 use relm4::{Component, ComponentController, gtk};
 use tracing::debug;
 use wayle_config::schemas::{
-    animations::{AnimSurface, AnimationType},
+    animations::AnimSurface,
     modules::notification::{PopupMonitor, PopupPosition, StackingOrder},
 };
 use wayle_notification::core::notification::Notification;
@@ -110,18 +110,9 @@ impl NotificationPopupHost {
     /// fallback cascade; disabled animations collapse to `(0, None)`.
     fn animation(&self, exiting: bool) -> (u32, gtk::RevealerTransitionType) {
         let animations = &self.config.config().animations;
-        let transition = match animations.transition_for(AnimSurface::Notifications, exiting) {
-            AnimationType::None => gtk::RevealerTransitionType::None,
-            AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
-            AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
-            AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
-            AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
-            AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
-            AnimationType::SwingUp => gtk::RevealerTransitionType::SwingUp,
-            AnimationType::SwingDown => gtk::RevealerTransitionType::SwingDown,
-            AnimationType::SwingLeft => gtk::RevealerTransitionType::SwingLeft,
-            AnimationType::SwingRight => gtk::RevealerTransitionType::SwingRight,
-        };
+        let transition = crate::shell::helpers::animation::revealer_transition(
+            animations.transition_for(AnimSurface::Notifications, exiting),
+        );
         (
             animations.duration_for(AnimSurface::Notifications, exiting),
             transition,

@@ -1,0 +1,47 @@
+// Lock screen: full-output ext-session-lock surfaces built in
+// `shell/lock/mod.rs`. The background widget (solid color or image) is the
+// window child; the credential box and the blank scrim are overlays on top.
+.lock-window {
+    background: transparent;
+
+    // Solid-color background drawn with cairo (DrawingArea).
+    .lock-bg {
+        background: transparent;
+    }
+
+    // Dark scrim over image/wallpaper backgrounds for legibility.
+    .lock-bg-scrim {
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    .lock-center {
+        padding: 2rem;
+        border-radius: var(--rounding-lg, 12px);
+        background: rgba(0, 0, 0, 0.35);
+    }
+
+    .lock-clock {
+        color: var(--palette-fg);
+        font-size: 4rem;
+        font-weight: 700;
+    }
+
+    .lock-date {
+        color: var(--palette-fg-muted);
+        font-size: 1.25rem;
+    }
+
+    .lock-entry {
+        margin-top: 1rem;
+    }
+
+    .lock-error {
+        margin-top: 0.5rem;
+        color: var(--palette-red);
+    }
+
+    // Opaque blackout shown after `blank-timeout-ms` of inactivity.
+    .lock-scrim {
+        background: #000000;
+    }
+}

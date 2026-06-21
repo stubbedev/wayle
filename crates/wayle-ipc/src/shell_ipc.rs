@@ -22,6 +22,9 @@ pub trait ShellIpc {
 
     async fn bar_toggle(&self, monitor: &str) -> Result<()>;
 
+    /// Locks the session via Wayle's lock screen.
+    async fn lock(&self) -> Result<()>;
+
     #[zbus(property)]
     fn bar_hidden(&self) -> Result<Vec<String>>;
 

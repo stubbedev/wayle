@@ -105,10 +105,12 @@ settings-reset-all-cancel = Cancel
 settings-nav-appearance = Appearance
 settings-nav-bar-section = Bar
 settings-nav-overlays = Overlays
+settings-nav-lock = Lock
 settings-nav-modules = Modules
 settings-nav-system = System
 
 ## Navigation items
+settings-nav-lock-page = Lock Screen
 settings-nav-theme = Theme
 settings-nav-wallpaper = Wallpaper
 settings-nav-animations = Animations
@@ -157,6 +159,8 @@ settings-nav-world-clock = World Clock
 ## Page titles
 settings-page-general = General
     .breadcrumb = Settings
+settings-page-lock = Lock Screen
+    .breadcrumb = Lock
 settings-page-theme = Theme
     .breadcrumb = Appearance
 settings-page-wallpaper = Wallpaper
@@ -270,6 +274,9 @@ settings-section-transition = Transition
 settings-section-cycling = Cycling
 settings-section-display = Display
 settings-section-animation = Animation
+settings-section-background = Background
+settings-section-clock = Clock
+settings-section-security = Security
 settings-section-share-picker-windows = Windows Page
 settings-section-share-picker-outputs = Outputs Page
 settings-section-popup-display = Popup Display

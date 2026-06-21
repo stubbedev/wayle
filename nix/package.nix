@@ -21,6 +21,7 @@
   fftw,
   systemd,
   wayland,
+  pam,
   gst_all_1,
 }:
 let
@@ -92,6 +93,7 @@ let
       fftw
       systemd # libudev
       wayland
+      pam # lock screen authenticates via libpam
     ] ++ gstPlugins;
 
     # libspa-sys defines cast macros like `SPA_ID_INVALID ((uint32_t)0xffffffff)`

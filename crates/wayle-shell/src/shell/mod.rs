@@ -1,6 +1,7 @@
 mod bar;
 pub(crate) mod file_chooser;
 mod helpers;
+pub(crate) mod lock;
 mod notification_popup;
 mod osd;
 pub(crate) mod portal_dialogs;
@@ -24,6 +25,7 @@ use tracing::{debug, info};
 
 use self::{
     file_chooser::FileChooser,
+    lock::Lock,
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
     portal_dialogs::PortalDialogs,
@@ -46,6 +48,7 @@ pub(crate) struct Shell {
     _region_overlay: Controller<RegionOverlay>,
     _screenshot: Controller<Screenshot>,
     _power_menu: Controller<PowerMenu>,
+    _lock: Controller<Lock>,
     _wallpaper: Option<Wallpaper>,
 }
 
@@ -157,6 +160,12 @@ impl Component for Shell {
             .detach();
         crate::services::power_menu::register_sender(power_menu.sender().clone());
 
+        // Lock screen registers its own sender (CLI/IPC bridge) and logind
+        // listener in its init; it stays idle until a lock is requested.
+        let lock = Lock::builder()
+            .launch(init.services.config.clone())
+            .detach();
+
         let wallpaper = init
             .services
             .wallpaper
@@ -173,6 +182,7 @@ impl Component for Shell {
             _region_overlay: region_overlay,
             _screenshot: screenshot,
             _power_menu: power_menu,
+            _lock: lock,
             _wallpaper: wallpaper,
         };
         let widgets = view_output!();

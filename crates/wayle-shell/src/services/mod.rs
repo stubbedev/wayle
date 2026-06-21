@@ -2,6 +2,7 @@
 
 pub mod file_chooser;
 pub mod idle_inhibit;
+pub mod lock;
 pub mod mail;
 pub mod portal_dialogs;
 pub mod power_menu;

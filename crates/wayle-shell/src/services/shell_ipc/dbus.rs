@@ -36,6 +36,17 @@ impl ShellIpcDaemon {
         self.bar.toggle(monitor)
     }
 
+    /// Locks the session via Wayle's lock screen.
+    pub async fn lock(&self) -> fdo::Result<()> {
+        if crate::services::lock::lock() {
+            Ok(())
+        } else {
+            Err(fdo::Error::Failed(
+                "lock screen not ready (shell UI not initialized)".to_string(),
+            ))
+        }
+    }
+
     /// Currently hidden monitor connectors.
     #[zbus(property)]
     pub async fn bar_hidden(&self) -> Vec<String> {

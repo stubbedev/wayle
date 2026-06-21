@@ -23,10 +23,7 @@ use relm4::{gtk, gtk::prelude::*, prelude::*};
 use tokio::sync::oneshot;
 use tracing::error;
 use wayland_client::Connection;
-use wayle_config::{
-    ConfigService,
-    schemas::animations::{AnimSurface, AnimationType},
-};
+use wayle_config::{ConfigService, schemas::animations::AnimSurface};
 use wayle_share_preview::toplevel::Toplevel;
 
 /// Messages driving the picker.
@@ -272,21 +269,7 @@ impl SharePicker {
     }
 }
 
-/// Maps an [`AnimationType`] onto its GTK revealer transition.
-fn revealer_transition(anim: AnimationType) -> gtk::RevealerTransitionType {
-    match anim {
-        AnimationType::None => gtk::RevealerTransitionType::None,
-        AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
-        AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
-        AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
-        AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
-        AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
-        AnimationType::SwingUp => gtk::RevealerTransitionType::SwingUp,
-        AnimationType::SwingDown => gtk::RevealerTransitionType::SwingDown,
-        AnimationType::SwingLeft => gtk::RevealerTransitionType::SwingLeft,
-        AnimationType::SwingRight => gtk::RevealerTransitionType::SwingRight,
-    }
-}
+use crate::shell::helpers::animation::revealer_transition;
 
 /// Builds the `connect_toggled` handler that forwards checkbox state.
 fn glib_clone_toggle(
