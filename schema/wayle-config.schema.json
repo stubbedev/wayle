@@ -7764,7 +7764,7 @@
       "type": "integer"
     }
   },
-  "$id": "wayle-config-0.7.13",
+  "$id": "wayle-config-0.8.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for Wayle.\n\nRepresents the complete configuration schema that can be loaded\nfrom TOML files. All fields have sensible defaults.",
   "properties": {
