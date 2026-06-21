@@ -16,7 +16,7 @@ use wayle_brightness::{BacklightDevice, Percentage};
 use wayle_config::{
     ClickAction,
     schemas::{
-        animations::{AnimSurface, AnimationType},
+        animations::AnimSurface,
         bar::Location,
     },
 };
