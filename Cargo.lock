@@ -5880,6 +5880,7 @@ name = "wayle-portal"
 version = "0.7.13"
 dependencies = [
  "futures",
+ "libc",
  "libspa",
  "pipewire",
  "thiserror 2.0.18",

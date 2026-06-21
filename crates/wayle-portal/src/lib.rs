@@ -16,10 +16,13 @@
 //! Wallpaper, Access). The generic GTK-dialog interfaces (FileChooser, Print,
 //! …) are delegated to `xdg-desktop-portal-gtk` via `portals.conf`.
 
+mod background;
+mod clipboard;
 mod dbus_util;
 mod error;
 mod globalshortcuts;
 mod inhibit;
+mod inputcapture;
 mod lockdown;
 mod notification;
 mod protocol;
@@ -29,19 +32,29 @@ mod screencast;
 mod screenshot;
 mod session;
 mod settings;
+mod usb;
 mod wallpaper;
 
-use std::future::pending;
+use std::{
+    collections::HashMap,
+    future::pending,
+    sync::{Arc, Mutex},
+};
 
 use tracing::info;
 use wayle_config::ConfigService;
 use zbus::Connection;
 
+/// Shared registry mapping a ScreenCast PipeWire node id to its pixel size, so
+/// RemoteDesktop can map absolute pointer coordinates onto the right extent.
+pub(crate) type StreamSizes = Arc<Mutex<HashMap<u32, (u32, u32)>>>;
+
 pub use self::error::Error;
 use self::{
-    globalshortcuts::GlobalShortcuts, inhibit::Inhibit, lockdown::Lockdown,
-    notification::Notification, remotedesktop::RemoteDesktop, screencast::ScreenCast,
-    screenshot::Screenshot, settings::Settings, wallpaper::WallpaperPortal,
+    background::Background, clipboard::Clipboard, globalshortcuts::GlobalShortcuts,
+    inhibit::Inhibit, inputcapture::InputCapture, lockdown::Lockdown, notification::Notification,
+    remotedesktop::RemoteDesktop, screencast::ScreenCast, screenshot::Screenshot,
+    settings::Settings, usb::Usb, wallpaper::WallpaperPortal,
 };
 
 /// The backend's well-known D-Bus name (matches `wayle.portal`'s `DBusName`).
@@ -65,6 +78,8 @@ pub async fn run() -> Result<(), Error> {
         .await
         .map_err(|err| Error::Connection(err.to_string()))?;
 
+    let stream_sizes: StreamSizes = Arc::new(Mutex::new(HashMap::new()));
+
     let server = connection.object_server();
     let path = settings::PORTAL_PATH;
     server
@@ -76,7 +91,7 @@ pub async fn run() -> Result<(), Error> {
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
-        .at(path, ScreenCast::new(connection.clone()))
+        .at(path, ScreenCast::new(connection.clone(), stream_sizes.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
@@ -84,7 +99,7 @@ pub async fn run() -> Result<(), Error> {
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
-        .at(path, RemoteDesktop::new(connection.clone()))
+        .at(path, RemoteDesktop::new(connection.clone(), stream_sizes.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
@@ -103,6 +118,22 @@ pub async fn run() -> Result<(), Error> {
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
         .at(path, Inhibit::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Background::new())
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Usb::new())
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Clipboard::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, InputCapture::new(connection.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
 

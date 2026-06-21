@@ -33,6 +33,7 @@ use self::source::{CaptureTarget, PickerSelection, SourceType, parse_picker_repl
 #[cfg(feature = "pipewire")]
 use self::pipewire::StreamHandle;
 use crate::{
+    StreamSizes,
     dbus_util::{Vardict, opt_bool, opt_u32, owned},
     response::Response,
     session,
@@ -58,18 +59,23 @@ struct SessionConfig {
 pub struct ScreenCast {
     connection: Connection,
     sessions: session::SessionStore<SessionConfig>,
+    /// node id -> stream size, shared with RemoteDesktop for absolute motion.
+    /// Only populated when streaming (the `pipewire` feature).
+    #[cfg_attr(not(feature = "pipewire"), allow(dead_code))]
+    stream_sizes: StreamSizes,
     #[cfg(feature = "pipewire")]
     streams: Arc<Mutex<HashMap<OwnedObjectPath, Vec<StreamHandle>>>>,
 }
 
 impl ScreenCast {
     /// Builds the interface over the backend's session-bus connection (used to
-    /// reach the picker).
+    /// reach the picker) and the shared stream-size registry.
     #[must_use]
-    pub fn new(connection: Connection) -> Self {
+    pub fn new(connection: Connection, stream_sizes: StreamSizes) -> Self {
         Self {
             connection,
             sessions: session::SessionStore::default(),
+            stream_sizes,
             #[cfg(feature = "pipewire")]
             streams: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -263,6 +269,9 @@ impl ScreenCast {
         };
         if let Ok(mut map) = self.streams.lock() {
             map.entry(session_handle.clone()).or_default().push(handle);
+        }
+        if let Ok(mut sizes) = self.stream_sizes.lock() {
+            sizes.insert(info.node_id, info.size);
         }
         Ok(info)
     }

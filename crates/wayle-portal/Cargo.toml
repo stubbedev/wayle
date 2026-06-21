@@ -18,6 +18,7 @@ pipewire = ["dep:pipewire", "dep:libspa"]
 
 [dependencies]
 futures.workspace = true
+libc.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true

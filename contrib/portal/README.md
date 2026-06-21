@@ -17,21 +17,31 @@ Implemented natively by `wayle portal`:
 | Interface | Backed by |
 |---|---|
 | `ScreenCast` | native PipeWire producer + wlr-screencopy / ext-image-copy capture |
-| `RemoteDesktop` | `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1` |
+| `RemoteDesktop` | `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1` (relative+absolute pointer, evdev keys) |
 | `Screenshot` (+ PickColor) | the shell's `com.wayle.Screenshot1` overlay |
 | `GlobalShortcuts` | `hyprland-global-shortcuts-v1` (where the compositor implements it) |
 | `Settings` | `wayle-config` (`org.freedesktop.appearance`: color-scheme, accent, contrast) |
-| `Notification` | the shell's notification daemon |
+| `Notification` | the shell's notification daemon (incl. action buttons + ActionInvoked) |
 | `Wallpaper` | `com.wayle.Wallpaper1` |
 | `Inhibit` | a systemd-logind inhibitor lock |
+| `Clipboard` | `zwlr_data_control` (read/own the Wayland selection for RemoteDesktop sessions) |
+| `Background` | autostart `.desktop` entries + permission |
+| `Usb` | device-access permission grant (enumeration is frontend-side) |
+| `InputCapture` | output zones from `wl_output`; capture itself unsupported (see below) |
 | `Lockdown` | static policy (nothing locked down) |
 
-Generic desktop-independent dialogs — `FileChooser`, `Print`, `Account`,
-`AppChooser`, `Email`, and the permission `Access` dialog — are **delegated to
-`xdg-desktop-portal-gtk`** via `portals.conf`. This is the standard wlroots-world
-arrangement (xdg-desktop-portal-hyprland delegates everything except three
-interfaces too); reimplementing GTK's file/print dialogs would duplicate it for
-no gain.
+That is full interface parity with xdg-desktop-portal-kde (the most complete
+backend). Generic desktop-independent dialogs — `FileChooser`, `Print`,
+`Account`, `AppChooser`, `Email`, `DynamicLauncher`, and the permission
+`Access` dialog — are **delegated to `xdg-desktop-portal-gtk`** via the
+`default=gtk` fallback in `portals.conf`. Reimplementing GTK's file/print
+dialogs would duplicate it for no gain.
+
+`InputCapture` is declared and answers `GetZones` from the live output layout,
+but reports **zero capabilities** and performs no grab: real input capture
+needs the compositor to redirect local input to the portal, which wlroots
+compositors and niri do not expose (only KWin/Mutter back it). Clients detect
+the zero capabilities and fall back cleanly.
 
 ## Installing (non-Nix)
 

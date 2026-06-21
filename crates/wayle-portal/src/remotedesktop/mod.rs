@@ -26,6 +26,7 @@ use zbus::{
 
 use self::input::{InputCommand, VirtualInput};
 use crate::{
+    StreamSizes,
     dbus_util::{opt_u32, owned},
     response::Response,
     session,
@@ -46,16 +47,20 @@ pub struct RemoteDesktop {
     connection: Connection,
     sessions: session::SessionStore<RdConfig>,
     inputs: Arc<Mutex<HashMap<OwnedObjectPath, Arc<VirtualInput>>>>,
+    /// node id -> stream size, populated by ScreenCast; maps absolute coords.
+    stream_sizes: StreamSizes,
 }
 
 impl RemoteDesktop {
-    /// Builds the interface over the backend's session-bus connection.
+    /// Builds the interface over the backend's session-bus connection and the
+    /// shared stream-size registry.
     #[must_use]
-    pub fn new(connection: Connection) -> Self {
+    pub fn new(connection: Connection, stream_sizes: StreamSizes) -> Self {
         Self {
             connection,
             sessions: session::SessionStore::default(),
             inputs: Arc::new(Mutex::new(HashMap::new())),
+            stream_sizes,
         }
     }
 
@@ -179,17 +184,25 @@ impl RemoteDesktop {
         self.send(&session_handle, InputCommand::PointerMotion { dx, dy });
     }
 
-    /// Absolute pointer motion (within a stream). Not yet injected: needs the
-    /// stream's coordinate extent.
+    /// Absolute pointer motion, mapped onto the source stream's pixel extent.
     fn notify_pointer_motion_absolute(
         &self,
-        _session_handle: OwnedObjectPath,
+        session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
-        _stream: u32,
-        _x: f64,
-        _y: f64,
+        stream: u32,
+        x: f64,
+        y: f64,
     ) {
-        debug!("remotedesktop: absolute pointer motion not yet supported");
+        let Some((width, height)) =
+            self.stream_sizes.lock().ok().and_then(|m| m.get(&stream).copied())
+        else {
+            debug!(stream, "remotedesktop: unknown stream extent for absolute motion");
+            return;
+        };
+        self.send(
+            &session_handle,
+            InputCommand::PointerMotionAbsolute { x, y, width, height },
+        );
     }
 
     /// Pointer button press/release (evdev button code).

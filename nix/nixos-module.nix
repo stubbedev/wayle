@@ -116,6 +116,10 @@ in
           "org.freedesktop.impl.portal.Wallpaper" = [ "wayle" ];
           "org.freedesktop.impl.portal.Inhibit" = [ "wayle" ];
           "org.freedesktop.impl.portal.Lockdown" = [ "wayle" ];
+          "org.freedesktop.impl.portal.Background" = [ "wayle" ];
+          "org.freedesktop.impl.portal.Usb" = [ "wayle" ];
+          "org.freedesktop.impl.portal.Clipboard" = [ "wayle" ];
+          "org.freedesktop.impl.portal.InputCapture" = [ "wayle" ];
           "org.freedesktop.impl.portal.FileChooser" = [ "gtk" ];
           "org.freedesktop.impl.portal.AppChooser" = [ "gtk" ];
           "org.freedesktop.impl.portal.Print" = [ "gtk" ];
