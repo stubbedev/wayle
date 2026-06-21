@@ -172,10 +172,32 @@ fn run_loop_inner(
         }
     };
 
+    // Report the node id to the caller only once the stream has reached PAUSED.
+    // `pw_stream_get_node_id` returns SPA_ID_INVALID until the server has
+    // exported the node, which happens on a loop roundtrip after `connect` —
+    // reading it eagerly hands the client a bogus id and no consumer ever links.
+    let ready_state = ready.clone();
+    let mut reported = false;
     let _listener = stream
         .add_local_listener::<()>()
-        .state_changed(|_, _, old, new| {
+        .state_changed(move |stream, _, old, new| {
             debug!(?old, ?new, "screencast stream state changed");
+            if reported {
+                return;
+            }
+            match new {
+                pw::stream::StreamState::Paused => {
+                    reported = true;
+                    let node_id = stream.node_id();
+                    debug!(node_id, width, height, "screencast: node id assigned");
+                    let _ = ready_state.send(Ok((node_id, width, height)));
+                }
+                pw::stream::StreamState::Error(ref err) => {
+                    reported = true;
+                    let _ = ready_state.send(Err(format!("stream error: {err}")));
+                }
+                _ => {}
+            }
         })
         // The consumer drives the cycle; we fill a buffer whenever PipeWire asks.
         .process(move |stream, _user_data| produce(stream))
@@ -192,11 +214,8 @@ fn run_loop_inner(
         )
         .map_err(|e| format!("pipewire stream connect: {e}"))?;
 
-    // The node id is assigned during connect.
-    let node_id = stream.node_id();
-    ready
-        .send(Ok((node_id, width, height)))
-        .map_err(|_| "caller dropped before node id delivery".to_owned())?;
+    // The node id is reported from the state_changed callback once the stream
+    // reaches PAUSED (the server has exported the node by then); see above.
 
     // Quit the loop when asked to stop. The timer borrows `main_loop` (via
     // loop_()), which lives to the end of the function; the closure owns a
