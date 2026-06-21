@@ -68,6 +68,7 @@ pub(super) fn capture(kind: CaptureKind) -> Result<RgbImage, String> {
 /// Captures every output to a full-resolution frame for the freeze-frame region
 /// flow. Run before the region overlay maps so any transient popups on screen
 /// are baked into the frames.
+#[allow(clippy::cognitive_complexity)]
 pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
     let setup = Instant::now();
     let connection =

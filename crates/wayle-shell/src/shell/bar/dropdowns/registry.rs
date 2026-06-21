@@ -15,10 +15,7 @@ use wayle_audio::volume::types::Volume;
 use wayle_brightness::{BacklightDevice, Percentage};
 use wayle_config::{
     ClickAction,
-    schemas::{
-        animations::{AnimSurface, AnimationType},
-        bar::Location,
-    },
+    schemas::{animations::AnimSurface, bar::Location},
 };
 use wayle_widgets::prelude::{BarButton, BarButtonInput};
 
@@ -474,20 +471,7 @@ struct DropdownStyle {
     exit: (u32, gtk::RevealerTransitionType),
 }
 
-fn revealer_transition(anim: AnimationType) -> gtk::RevealerTransitionType {
-    match anim {
-        AnimationType::None => gtk::RevealerTransitionType::None,
-        AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
-        AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
-        AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
-        AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
-        AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
-        AnimationType::SwingUp => gtk::RevealerTransitionType::SwingUp,
-        AnimationType::SwingDown => gtk::RevealerTransitionType::SwingDown,
-        AnimationType::SwingLeft => gtk::RevealerTransitionType::SwingLeft,
-        AnimationType::SwingRight => gtk::RevealerTransitionType::SwingRight,
-    }
-}
+use crate::shell::helpers::animation::revealer_transition;
 
 const REM_PX: f32 = 16.0;
 
@@ -736,6 +720,7 @@ fn backlight_devices(registry: &DropdownRegistry) -> Vec<Arc<BacklightDevice>> {
 /// spawning a subprocess (no `wayle`-on-$PATH dependency). Each arm mirrors the
 /// corresponding D-Bus daemon's call. Returns `true` when handled; anything not
 /// recognized falls through to a shell-out.
+#[allow(clippy::too_many_lines)]
 fn try_builtin(cmd: &str, registry: &DropdownRegistry) -> bool {
     let parts: Vec<&str> = cmd.split_whitespace().collect();
     if parts.first() != Some(&"wayle") {

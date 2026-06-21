@@ -99,6 +99,8 @@ pub enum Commands {
         #[command(subcommand)]
         command: IdleCommands,
     },
+    /// Lock the session via Wayle's lock screen
+    Lock,
     /// Screen recorder control commands
     Recorder {
         /// Recorder subcommand to execute.

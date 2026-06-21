@@ -32,6 +32,8 @@ pub mod schemas {
     pub mod dropdowns;
     /// General Wayle configuration.
     pub mod general;
+    /// Lock screen configuration.
+    pub mod lock;
     /// Module-specific configurations.
     pub mod modules;
     /// On-screen display configuration.
@@ -79,7 +81,7 @@ pub use infrastructure::{
     watcher::FileWatcher,
 };
 use schemas::{
-    animations::AnimationsConfig, bar::BarConfig, dropdowns::DropdownsConfig,
+    animations::AnimationsConfig, bar::BarConfig, dropdowns::DropdownsConfig, lock::LockConfig,
     modules::ModulesConfig, osd::OsdConfig, share_picker::SharePickerConfig,
     styling::StylingConfig, wallpaper::WallpaperConfig,
 };
@@ -122,6 +124,9 @@ pub struct Config {
 
     /// On-screen display settings.
     pub osd: OsdConfig,
+
+    /// Lock screen settings.
+    pub lock: LockConfig,
 
     /// Screen-share picker settings.
     #[serde(rename = "share-picker")]

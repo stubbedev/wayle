@@ -5,7 +5,7 @@ use relm4::{ComponentSender, gtk};
 use wayle_audio::core::device::{input::InputDevice, output::OutputDevice};
 use wayle_brightness::BacklightDevice;
 use wayle_config::schemas::{
-    animations::{AnimSurface, AnimationType},
+    animations::AnimSurface,
     osd::{OsdMonitor, OsdPosition, OsdTextAlign},
 };
 
@@ -387,20 +387,7 @@ impl Osd {
     }
 }
 
-fn revealer_transition(anim: AnimationType) -> gtk::RevealerTransitionType {
-    match anim {
-        AnimationType::None => gtk::RevealerTransitionType::None,
-        AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
-        AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
-        AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
-        AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
-        AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
-        AnimationType::SwingUp => gtk::RevealerTransitionType::SwingUp,
-        AnimationType::SwingDown => gtk::RevealerTransitionType::SwingDown,
-        AnimationType::SwingLeft => gtk::RevealerTransitionType::SwingLeft,
-        AnimationType::SwingRight => gtk::RevealerTransitionType::SwingRight,
-    }
-}
+use crate::shell::helpers::animation::revealer_transition;
 
 /// Revealer transition for the current direction. `revealed` means entering;
 /// otherwise exiting. Resolved per-surface with the global fallback cascade.

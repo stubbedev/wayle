@@ -21,6 +21,7 @@
   fftw,
   systemd,
   wayland,
+  pam,
   gst_all_1,
 }:
 let
@@ -88,6 +89,7 @@ let
       fftw
       systemd # libudev
       wayland
+      pam # lock screen authenticates via libpam
     ] ++ gstPlugins;
 
     # wayle-cava's build script runs bindgen, which needs libclang — required
