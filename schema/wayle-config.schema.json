@@ -128,6 +128,16 @@
     "AnimationsConfig": {
       "description": "Enter/exit and change animations for transient surfaces.",
       "properties": {
+        "dialog": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for portal dialogs (access/account/app-chooser/\nlauncher-install prompts)."
+        },
         "dropdown": {
           "$ref": "#/$defs/SurfaceAnimation",
           "default": {
@@ -168,6 +178,16 @@
           "default": null,
           "description": "Global exit duration in ms. Unset → `duration`."
         },
+        "file-chooser": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for the portal file-chooser surface."
+        },
         "indicators": {
           "$ref": "#/$defs/boolean",
           "default": true,
@@ -207,6 +227,16 @@
             "exit-duration": null
           },
           "description": "Per-surface override for the power menu overlay."
+        },
+        "print": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for the portal print surface."
         },
         "share-picker": {
           "$ref": "#/$defs/SurfaceAnimation",
@@ -7640,6 +7670,12 @@
     "animations": {
       "$ref": "#/$defs/AnimationsConfig",
       "default": {
+        "dialog": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
         "dropdown": {
           "enter": null,
           "enter-duration": null,
@@ -7652,6 +7688,12 @@
         "enter-duration": null,
         "exit": null,
         "exit-duration": null,
+        "file-chooser": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
         "indicators": true,
         "interaction-duration": 150,
         "notifications": {
@@ -7667,6 +7709,12 @@
           "exit-duration": null
         },
         "power": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
+        "print": {
           "enter": null,
           "enter-duration": null,
           "exit": null,

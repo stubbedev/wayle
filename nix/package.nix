@@ -71,10 +71,9 @@ let
       cmake
       clang
       mold
-      # Sets LIBCLANG_PATH and BINDGEN_EXTRA_CLANG_ARGS so the bindgen build
-      # scripts (wayle-cava, and libspa-sys, which needs them for its
-      # clang-macro-fallback to const-evaluate cast macros like SPA_ID_INVALID)
-      # find clang's builtin headers and libc inside the sandbox.
+      # Sets LIBCLANG_PATH + BINDGEN_EXTRA_CLANG_ARGS (clang builtin headers and
+      # libc) so the bindgen build scripts (wayle-cava, libspa-sys) work in the
+      # sandbox. See the libspa-sys note in postConfigure for the rest.
       rustPlatform.bindgenHook
     ];
 
@@ -94,6 +93,30 @@ let
       systemd # libudev
       wayland
     ] ++ gstPlugins;
+
+    # libspa-sys defines cast macros like `SPA_ID_INVALID ((uint32_t)0xffffffff)`
+    # that bindgen's cexpr can't const-evaluate, so it relies on bindgen's
+    # clang-macro-fallback. That fallback writes a `.macro_eval.c` + `.pch` into
+    # its build dir, which defaults to the build script's CWD — under crane the
+    # crate's vendored manifest dir, a read-only /nix/store path. The write
+    # fails silently, the constant is dropped, and libspa fails to compile
+    # (`cannot find value SPA_ID_INVALID`). rustPlatform.buildRustPackage dodges
+    # this because its cargoSetupHook copies the vendor dir writable; crane uses
+    # it in place. So copy the vendor dir writable, repoint cargo at it, and
+    # patch libspa-sys to point the fallback at $OUT_DIR (always writable).
+    postConfigure = ''
+      rwVendor="$NIX_BUILD_TOP/vendor-rw"
+      cp -rL --no-preserve=mode,ownership "$cargoVendorDir" "$rwVendor"
+      chmod -R u+rwX "$rwVendor"
+      for brs in "$rwVendor"/*/libspa-sys-*/build.rs; do
+        substituteInPlace "$brs" \
+          --replace-fail ".clang_macro_fallback()" \
+          ".clang_macro_fallback().clang_macro_fallback_build_dir(std::env::var(\"OUT_DIR\").unwrap())"
+      done
+      for cfg in $(find . -name config.toml -path '*cargo*' 2>/dev/null); do
+        substituteInPlace "$cfg" --replace "$cargoVendorDir" "$rwVendor" || true
+      done
+    '';
 
     # Link with mold via clang (matches the devShell). Linking 30 crates + GTK
     # with the default bfd linker is a chunk of the final-crate build time; mold
