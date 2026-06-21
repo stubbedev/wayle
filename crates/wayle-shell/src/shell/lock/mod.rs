@@ -50,6 +50,8 @@ struct BgConfig {
     color: wayle_config::schemas::styling::HexColor,
     /// Image path for `Image`/`Wallpaper` modes; empty for `Color`.
     image: String,
+    /// Gaussian blur radius for image/wallpaper backgrounds (0 = none).
+    blur: u32,
 }
 
 /// Lock screen component. Owns the session-lock instance and surfaces.
@@ -168,6 +170,7 @@ impl Lock {
             mode,
             color: cfg.lock.background_color.get(),
             image,
+            blur: cfg.lock.blur.get(),
         }
     }
 
@@ -437,7 +440,7 @@ fn build_surface(
     window.add_css_class("lock-window");
 
     let overlay = gtk::Overlay::new();
-    overlay.set_child(Some(&build_background(&bg.mode, &bg.color, &bg.image)));
+    overlay.set_child(Some(&build_background(bg)));
 
     // Centered credential box.
     let center = gtk::Box::new(gtk::Orientation::Vertical, 12);
@@ -521,32 +524,18 @@ fn build_surface(
 /// Builds the background widget for a surface.
 ///
 /// `Color` paints a solid fill; `Image`/`Wallpaper` show the file scaled to
-/// cover, with a dark scrim for legibility. (Gaussian `blur` is configured but
-/// not yet applied — tracked as a follow-up.)
-fn build_background(
-    mode: &LockBackground,
-    color: &wayle_config::schemas::styling::HexColor,
-    image: &str,
-) -> gtk::Widget {
-    match mode {
-        LockBackground::Color => {
-            let area = gtk::DrawingArea::new();
-            area.add_css_class("lock-bg");
-            let rgba = gdk::RGBA::parse(color.as_str()).unwrap_or(gdk::RGBA::BLACK);
-            area.set_draw_func(move |_, cr, _, _| {
-                cr.set_source_rgba(
-                    f64::from(rgba.red()),
-                    f64::from(rgba.green()),
-                    f64::from(rgba.blue()),
-                    f64::from(rgba.alpha()),
-                );
-                let _ = cr.paint();
-            });
-            area.upcast()
-        }
-        LockBackground::Image | LockBackground::Wallpaper if !image.is_empty() => {
+/// cover, with a dark scrim for legibility. A non-zero `blur` applies a real
+/// gaussian blur to the image up front (see [`blurred_texture`]).
+fn build_background(bg: &BgConfig) -> gtk::Widget {
+    match bg.mode {
+        LockBackground::Color => solid_fill(gdk::RGBA::parse(bg.color.as_str()).ok()),
+        LockBackground::Image | LockBackground::Wallpaper if !bg.image.is_empty() => {
             let overlay = gtk::Overlay::new();
-            let picture = gtk::Picture::for_filename(image);
+            let picture = match (bg.blur > 0).then(|| blurred_texture(&bg.image, bg.blur)) {
+                Some(Some(texture)) => gtk::Picture::for_paintable(&texture),
+                // blur disabled, or load/blur failed: GPU-scale the file directly.
+                _ => gtk::Picture::for_filename(&bg.image),
+            };
             picture.set_content_fit(gtk::ContentFit::Cover);
             overlay.set_child(Some(&picture));
             let scrim = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -555,14 +544,41 @@ fn build_background(
             overlay.upcast()
         }
         // Image/Wallpaper mode with no path falls back to a black fill.
-        _ => {
-            let area = gtk::DrawingArea::new();
-            area.add_css_class("lock-bg");
-            area.set_draw_func(|_, cr, _, _| {
-                cr.set_source_rgba(0.0, 0.0, 0.0, 1.0);
-                let _ = cr.paint();
-            });
-            area.upcast()
-        }
+        _ => solid_fill(None),
     }
+}
+
+/// A `DrawingArea` that fills with `rgba` (black when `None`).
+fn solid_fill(rgba: Option<gdk::RGBA>) -> gtk::Widget {
+    let area = gtk::DrawingArea::new();
+    area.add_css_class("lock-bg");
+    let rgba = rgba.unwrap_or(gdk::RGBA::BLACK);
+    area.set_draw_func(move |_, cr, _, _| {
+        cr.set_source_rgba(
+            f64::from(rgba.red()),
+            f64::from(rgba.green()),
+            f64::from(rgba.blue()),
+            f64::from(rgba.alpha()),
+        );
+        let _ = cr.paint();
+    });
+    area.upcast()
+}
+
+/// Loads `path` and returns a gaussian-blurred texture, or `None` if the file
+/// can't be read/decoded. Runs synchronously on the GTK thread during lock
+/// acquisition (a one-off cost, like the screenshot freeze capture).
+fn blurred_texture(path: &str, radius: u32) -> Option<gdk::Texture> {
+    let rgba = image::open(path).ok()?.blur(radius as f32).to_rgba8();
+    let (width, height) = rgba.dimensions();
+    let stride = width as usize * 4;
+    let bytes = gtk::glib::Bytes::from_owned(rgba.into_raw());
+    let texture = gdk::MemoryTexture::new(
+        width as i32,
+        height as i32,
+        gdk::MemoryFormat::R8g8b8a8,
+        &bytes,
+        stride,
+    );
+    Some(texture.upcast())
 }

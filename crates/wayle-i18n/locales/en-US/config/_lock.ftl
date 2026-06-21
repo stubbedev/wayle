@@ -34,7 +34,7 @@ settings-lock-show-failed-attempts = Show Failed Attempts
     .description = Show the failed-attempt count on the lock screen
 
 settings-lock-blank-timeout-ms = Blank Timeout
-    .description = Turn displays off after this idle time on the lock screen (ms, 0 = never)
+    .description = Black out the lock screen after this idle time (ms, 0 = never; visual only — DPMS is the idle daemon's job)
 
 settings-lock-pam-service = PAM Service
     .description = PAM service used to verify the password (e.g. system-auth, login)

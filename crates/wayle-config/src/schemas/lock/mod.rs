@@ -78,8 +78,9 @@ pub struct LockConfig {
     #[default(true)]
     pub show_failed_attempts: ConfigProperty<bool>,
 
-    /// Turn the displays off after this idle time on the lock screen
-    /// (milliseconds, `0` = never blank).
+    /// Black out the lock screen after this idle time (milliseconds, `0` =
+    /// never). This is a visual blank that hides the clock/prompt and dismisses
+    /// on any key; true display power-off (DPMS) is left to your idle daemon.
     #[serde(rename = "blank-timeout-ms")]
     #[default(0u32)]
     pub blank_timeout_ms: ConfigProperty<u32>,
