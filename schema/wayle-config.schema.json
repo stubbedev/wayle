@@ -178,6 +178,16 @@
           "default": 150,
           "description": "Duration in ms for in-place dropdown transitions: hover highlights and\nthe page/stack crossfades inside dropdowns. `enabled = false` removes\nthem entirely."
         },
+        "lock": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for the lock screen reveal."
+        },
         "notifications": {
           "$ref": "#/$defs/SurfaceAnimation",
           "default": {
@@ -2978,6 +2988,97 @@
           "type": "string"
         }
       ]
+    },
+    "LockBackground": {
+      "description": "How the lock screen background is rendered.",
+      "oneOf": [
+        {
+          "const": "color",
+          "description": "Solid color fill (`background-color`).",
+          "type": "string"
+        },
+        {
+          "const": "image",
+          "description": "A specific image file (`background-image`).",
+          "type": "string"
+        },
+        {
+          "const": "wallpaper",
+          "description": "Reuse the current desktop wallpaper.",
+          "type": "string"
+        }
+      ]
+    },
+    "LockConfig": {
+      "description": "Lock screen: a secure session lock rendered by Wayle via `ext-session-lock-v1`.\n\nWhen `enabled`, Wayle locks the session in response to the logind `Lock`\nsignal (`loginctl lock-session`), the `wayle lock` CLI, or the shell IPC\n`lock()` method. The lock surface grabs all input and survives client\ncrashes (the compositor shows a solid color), unlike a layer-shell overlay.",
+      "properties": {
+        "background-color": {
+          "$ref": "#/$defs/HexColor",
+          "default": "#000000",
+          "description": "Background fill color (used when `background-mode = \"color\"`)."
+        },
+        "background-image": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Background image path (used when `background-mode = \"image\"`)."
+        },
+        "background-mode": {
+          "$ref": "#/$defs/LockBackground",
+          "default": "color",
+          "description": "How the background is drawn: solid color, an image, or the wallpaper."
+        },
+        "blank-timeout-ms": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Black out the lock screen after this idle time (milliseconds, `0` =\nnever). This is a visual blank that hides the clock/prompt and dismisses\non any key; true display power-off (DPMS) is left to your idle daemon."
+        },
+        "blur": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Gaussian blur radius applied to image/wallpaper backgrounds (0 = none)."
+        },
+        "clock-format": {
+          "$ref": "#/$defs/string",
+          "default": "%H:%M",
+          "description": "`strftime` format for the lock-screen time."
+        },
+        "date-format": {
+          "$ref": "#/$defs/string",
+          "default": "%A, %B %-d",
+          "description": "`strftime` format for the lock-screen date."
+        },
+        "enabled": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Let Wayle handle session locking. When off, lock requests are ignored\nand an external locker (e.g. hyprlock) stays responsible."
+        },
+        "grace-period-ms": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Grace window after locking during which the screen unlocks without a\npassword (milliseconds, `0` = always require the password)."
+        },
+        "max-attempts": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Maximum failed password attempts before further input is blocked\n(`0` = unlimited). The screen stays locked regardless."
+        },
+        "pam-service": {
+          "$ref": "#/$defs/string",
+          "default": "system-auth",
+          "description": "PAM service name used to authenticate the unlock. Distro-dependent:\n`system-auth` (Arch/Fedora), `login`, or a custom `/etc/pam.d` entry."
+        },
+        "show-clock": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show a clock on the lock screen."
+        },
+        "show-failed-attempts": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the failed-attempt count on the lock screen."
+        }
+      },
+      "type": "object"
     },
     "MailAccount": {
       "description": "One mail account in the `[modules.mail]` per-account breakdown.\n\nEach account has its own notmuch query; the dropdown shows the per-account\nunread counts and the bar shows their sum.\n\n## Example\n\n```toml\n[[modules.mail.accounts]]\nname = \"Work\"\nquery = \"folder:work/INBOX and tag:unread\"\nprovider = \"gmail\"\n```",
@@ -7654,6 +7755,12 @@
         "exit-duration": null,
         "indicators": true,
         "interaction-duration": 150,
+        "lock": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
         "notifications": {
           "enter": null,
           "enter-duration": null,
@@ -7822,6 +7929,25 @@
         "type": "string"
       },
       "type": "array"
+    },
+    "lock": {
+      "$ref": "#/$defs/LockConfig",
+      "default": {
+        "background-color": "#000000",
+        "background-image": "",
+        "background-mode": "color",
+        "blank-timeout-ms": 0,
+        "blur": 0,
+        "clock-format": "%H:%M",
+        "date-format": "%A, %B %-d",
+        "enabled": true,
+        "grace-period-ms": 0,
+        "max-attempts": 0,
+        "pam-service": "system-auth",
+        "show-clock": true,
+        "show-failed-attempts": true
+      },
+      "description": "Lock screen settings."
     },
     "modules": {
       "$ref": "#/$defs/ModulesConfig",
