@@ -11,10 +11,12 @@
 //!
 //! # Interface coverage
 //!
-//! Implemented natively: Settings, Lockdown, ScreenCast (more land per phase:
-//! RemoteDesktop, Screenshot, GlobalShortcuts, Inhibit, Notification,
-//! Wallpaper, Access). The generic GTK-dialog interfaces (FileChooser, Print,
-//! …) are delegated to `xdg-desktop-portal-gtk` via `portals.conf`.
+//! Every `org.freedesktop.impl.portal.*` interface the frontend can route to a
+//! backend is implemented natively: Access, Account, AppChooser, Background,
+//! Clipboard, DynamicLauncher, Email, FileChooser, GlobalShortcuts, Inhibit,
+//! InputCapture, Lockdown, Notification, Print, RemoteDesktop, ScreenCast,
+//! Screenshot, Secret, Settings, Usb, and Wallpaper. Nothing is delegated to
+//! `xdg-desktop-portal-gtk`.
 
 mod access;
 mod account;
@@ -39,6 +41,7 @@ mod request;
 mod response;
 mod screencast;
 mod screenshot;
+mod secret;
 mod session;
 mod settings;
 mod usb;
@@ -64,7 +67,7 @@ use self::{
     clipboard::Clipboard, dynamiclauncher::DynamicLauncher, email::Email, filechooser::FileChooser,
     globalshortcuts::GlobalShortcuts, inhibit::Inhibit, inputcapture::InputCapture,
     lockdown::Lockdown, notification::Notification, print::Print, remotedesktop::RemoteDesktop,
-    screencast::ScreenCast, screenshot::Screenshot, settings::Settings, usb::Usb,
+    screencast::ScreenCast, screenshot::Screenshot, secret::Secret, settings::Settings, usb::Usb,
     wallpaper::WallpaperPortal,
 };
 
@@ -180,6 +183,10 @@ pub async fn run() -> Result<(), Error> {
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
         .at(path, Print::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Secret::new())
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
 
