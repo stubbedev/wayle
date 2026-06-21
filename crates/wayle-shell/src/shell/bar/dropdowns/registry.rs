@@ -15,10 +15,7 @@ use wayle_audio::volume::types::Volume;
 use wayle_brightness::{BacklightDevice, Percentage};
 use wayle_config::{
     ClickAction,
-    schemas::{
-        animations::AnimSurface,
-        bar::Location,
-    },
+    schemas::{animations::AnimSurface, bar::Location},
 };
 use wayle_widgets::prelude::{BarButton, BarButtonInput};
 
