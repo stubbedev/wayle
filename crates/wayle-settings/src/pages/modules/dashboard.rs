@@ -4,12 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        color_value::color_value,
-        enum_list::enum_list,
-        icon::icon,
-        number::number_newtype,
-        text::text,
-        toggle::toggle,
+        color_value::color_value, enum_list::enum_list, icon::icon, number::number_newtype,
+        text::text, toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -80,11 +76,26 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 SectionSpec {
                     title_key: "settings-section-actions",
                     items: vec![
-                        crate::editors::action::action(&module.left_click, crate::pages::sections::action_choices::choices_for("dashboard")),
-                        crate::editors::action::action(&module.right_click, crate::pages::sections::action_choices::choices_for("dashboard")),
-                        crate::editors::action::action(&module.middle_click, crate::pages::sections::action_choices::choices_for("dashboard")),
-                        crate::editors::action::action(&module.scroll_up, crate::pages::sections::action_choices::choices_for("dashboard")),
-                        crate::editors::action::action(&module.scroll_down, crate::pages::sections::action_choices::choices_for("dashboard")),
+                        crate::editors::action::action(
+                            &module.left_click,
+                            crate::pages::sections::action_choices::choices_for("dashboard"),
+                        ),
+                        crate::editors::action::action(
+                            &module.right_click,
+                            crate::pages::sections::action_choices::choices_for("dashboard"),
+                        ),
+                        crate::editors::action::action(
+                            &module.middle_click,
+                            crate::pages::sections::action_choices::choices_for("dashboard"),
+                        ),
+                        crate::editors::action::action(
+                            &module.scroll_up,
+                            crate::pages::sections::action_choices::choices_for("dashboard"),
+                        ),
+                        crate::editors::action::action(
+                            &module.scroll_down,
+                            crate::pages::sections::action_choices::choices_for("dashboard"),
+                        ),
                     ],
                 },
             ],

@@ -477,7 +477,6 @@ impl RecorderState {
     }
 }
 
-
 /// Builds a timestamped output path in the configured (or default) directory.
 fn output_path(configured_dir: &str, format: OutputFormat) -> String {
     let dir = if configured_dir.is_empty() {

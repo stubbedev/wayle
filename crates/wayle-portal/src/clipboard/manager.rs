@@ -23,7 +23,7 @@ use wayland_client::{
     protocol::{wl_registry, wl_seat::WlSeat},
 };
 use wayland_protocols_wlr::data_control::v1::client::{
-    zwlr_data_control_device_v1::{self, ZwlrDataControlDeviceV1, EVT_DATA_OFFER_OPCODE},
+    zwlr_data_control_device_v1::{self, EVT_DATA_OFFER_OPCODE, ZwlrDataControlDeviceV1},
     zwlr_data_control_manager_v1::ZwlrDataControlManagerV1,
     zwlr_data_control_offer_v1::{self, ZwlrDataControlOfferV1},
     zwlr_data_control_source_v1::{self, ZwlrDataControlSourceV1},
@@ -286,7 +286,11 @@ impl Dispatch<ZwlrDataControlSourceV1, ()> for ClipState {
     ) {
         match event {
             zwlr_data_control_source_v1::Event::Send { mime_type, fd } => {
-                let serial = state.shared.serial.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
+                let serial = state
+                    .shared
+                    .serial
+                    .fetch_add(1, Ordering::SeqCst)
+                    .wrapping_add(1);
                 if let Ok(mut map) = state.shared.transfer_fds.lock() {
                     map.insert(serial, fd);
                 }

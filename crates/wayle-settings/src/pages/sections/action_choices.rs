@@ -64,7 +64,10 @@ pub(crate) fn choices_for(module_id: &str) -> Vec<ActionChoice<ClickAction>> {
         "power" => vec![shell("Open power menu", ":menu")],
         "idle-inhibit" => vec![
             shell("Toggle idle inhibit", "wayle idle toggle"),
-            shell("Toggle idle inhibit (indefinite)", "wayle idle toggle --indefinite"),
+            shell(
+                "Toggle idle inhibit (indefinite)",
+                "wayle idle toggle --indefinite",
+            ),
         ],
         "volume" => vec![
             shell("Toggle output mute", "wayle audio output-mute"),

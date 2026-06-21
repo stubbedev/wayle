@@ -116,7 +116,10 @@ mod tests {
 
     #[test]
     fn decodes_plain_file_uri() {
-        assert_eq!(uri_to_path("file:///home/u/bg.png").as_deref(), Some("/home/u/bg.png"));
+        assert_eq!(
+            uri_to_path("file:///home/u/bg.png").as_deref(),
+            Some("/home/u/bg.png")
+        );
     }
 
     #[test]

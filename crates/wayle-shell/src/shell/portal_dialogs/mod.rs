@@ -46,12 +46,19 @@ pub(crate) enum PortalDialogInput {
 impl std::fmt::Debug for PortalDialogInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Access { title, .. } => f.debug_struct("Access").field("title", title).finish_non_exhaustive(),
+            Self::Access { title, .. } => f
+                .debug_struct("Access")
+                .field("title", title)
+                .finish_non_exhaustive(),
             Self::Account { .. } => f.write_str("Account"),
-            Self::ChooseApp { uri, .. } => f.debug_struct("ChooseApp").field("uri", uri).finish_non_exhaustive(),
-            Self::ConfirmInstall { name, .. } => {
-                f.debug_struct("ConfirmInstall").field("name", name).finish_non_exhaustive()
-            }
+            Self::ChooseApp { uri, .. } => f
+                .debug_struct("ChooseApp")
+                .field("uri", uri)
+                .finish_non_exhaustive(),
+            Self::ConfirmInstall { name, .. } => f
+                .debug_struct("ConfirmInstall")
+                .field("name", name)
+                .finish_non_exhaustive(),
         }
     }
 }
@@ -86,7 +93,12 @@ impl Component for PortalDialogs {
         }
     }
 
-    fn update(&mut self, msg: PortalDialogInput, _sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update(
+        &mut self,
+        msg: PortalDialogInput,
+        _sender: ComponentSender<Self>,
+        _root: &Self::Root,
+    ) {
         match msg {
             PortalDialogInput::Access {
                 title,
@@ -109,10 +121,22 @@ impl Component for PortalDialogs {
                 } else {
                     reason
                 };
-                confirm("Share account information?", &detail, "Cancel", "Share", reply);
+                confirm(
+                    "Share account information?",
+                    &detail,
+                    "Cancel",
+                    "Share",
+                    reply,
+                );
             }
             PortalDialogInput::ConfirmInstall { name, reply } => {
-                confirm(&format!("Install “{name}”?"), "", "Cancel", "Install", reply);
+                confirm(
+                    &format!("Install “{name}”?"),
+                    "",
+                    "Cancel",
+                    "Install",
+                    reply,
+                );
             }
             PortalDialogInput::ChooseApp {
                 choices,
@@ -152,7 +176,9 @@ fn choose_app(choices: &[String], content_type: &str, _uri: &str, reply: oneshot
         .default_width(420)
         .default_height(520)
         .build();
-    let list = gtk::ListBox::builder().css_classes(["portal-app-list"]).build();
+    let list = gtk::ListBox::builder()
+        .css_classes(["portal-app-list"])
+        .build();
     for app in &apps {
         let row = gtk::Label::builder()
             .label(app.display_name().as_str())
@@ -164,7 +190,10 @@ fn choose_app(choices: &[String], content_type: &str, _uri: &str, reply: oneshot
             .build();
         list.append(&row);
     }
-    let scrolled = gtk::ScrolledWindow::builder().vexpand(true).child(&list).build();
+    let scrolled = gtk::ScrolledWindow::builder()
+        .vexpand(true)
+        .child(&list)
+        .build();
     let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
     container.append(&scrolled);
     window.set_child(Some(&container));

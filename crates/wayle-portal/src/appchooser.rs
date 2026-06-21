@@ -12,7 +12,10 @@ use zbus::{
     zvariant::{OwnedObjectPath, OwnedValue},
 };
 
-use crate::{dbus_util::{opt_string, owned}, response::Response};
+use crate::{
+    dbus_util::{opt_string, owned},
+    response::Response,
+};
 
 /// AppChooser portal interface.
 pub struct AppChooser {
@@ -55,7 +58,10 @@ impl AppChooser {
             }
         };
         let choice_refs: Vec<&str> = choices.iter().map(String::as_str).collect();
-        match proxy.choose_application(choice_refs, &content_type, &uri).await {
+        match proxy
+            .choose_application(choice_refs, &content_type, &uri)
+            .await
+        {
             Ok(choice) if !choice.is_empty() => {
                 let mut results = HashMap::new();
                 if let Some(value) = owned(choice) {

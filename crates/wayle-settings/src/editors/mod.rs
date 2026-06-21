@@ -30,8 +30,8 @@ pub(crate) mod threshold_list;
 pub(crate) mod toast_preset_list;
 pub(crate) mod toggle;
 pub(crate) mod toml_editor;
-pub(crate) mod wallpaper_cycling;
 pub(crate) mod tray_override_list;
+pub(crate) mod wallpaper_cycling;
 pub(crate) mod workspace_style_map;
 
 use futures::StreamExt;

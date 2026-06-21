@@ -67,10 +67,22 @@ impl Settings {
     /// The full `org.freedesktop.appearance` key map for `ReadAll`.
     fn appearance_map(&self) -> Result<HashMap<String, OwnedValue>, zbus::fdo::Error> {
         let mut map = HashMap::new();
-        map.insert(KEY_COLOR_SCHEME.to_owned(), owned(Value::from(self.color_scheme()))?);
-        map.insert(KEY_ACCENT_COLOR.to_owned(), owned(accent_value(self.accent_color()))?);
-        map.insert(KEY_CONTRAST.to_owned(), owned(Value::from(self.contrast()))?);
-        map.insert(KEY_REDUCED_MOTION.to_owned(), owned(Value::from(self.reduced_motion()))?);
+        map.insert(
+            KEY_COLOR_SCHEME.to_owned(),
+            owned(Value::from(self.color_scheme()))?,
+        );
+        map.insert(
+            KEY_ACCENT_COLOR.to_owned(),
+            owned(accent_value(self.accent_color()))?,
+        );
+        map.insert(
+            KEY_CONTRAST.to_owned(),
+            owned(Value::from(self.contrast()))?,
+        );
+        map.insert(
+            KEY_REDUCED_MOTION.to_owned(),
+            owned(Value::from(self.reduced_motion()))?,
+        );
         Ok(map)
     }
 
@@ -147,11 +159,7 @@ pub fn spawn_watcher(connection: &Connection, config: Arc<ConfigService>) {
         };
 
         let styling = &config.config().styling;
-        let scheme = styling
-            .appearance
-            .watch()
-            .map(|_| KEY_COLOR_SCHEME)
-            .boxed();
+        let scheme = styling.appearance.watch().map(|_| KEY_COLOR_SCHEME).boxed();
         let accent = styling
             .palette
             .primary
@@ -228,5 +236,9 @@ fn parse_hex_rgb(hex: &str) -> Option<(f64, f64, f64)> {
         }
         _ => return None,
     };
-    Some((f64::from(r) / 255.0, f64::from(g) / 255.0, f64::from(b) / 255.0))
+    Some((
+        f64::from(r) / 255.0,
+        f64::from(g) / 255.0,
+        f64::from(b) / 255.0,
+    ))
 }

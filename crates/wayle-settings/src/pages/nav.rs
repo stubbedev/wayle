@@ -4,8 +4,8 @@
 use wayle_config::Config;
 
 use super::{
-    animations, bar, dropdowns, general, modules, notifications, osd, share_picker,
-    spec::PageSpec, styling, wallpaper,
+    animations, bar, dropdowns, general, modules, notifications, osd, share_picker, spec::PageSpec,
+    styling, wallpaper,
 };
 
 pub(crate) struct LeafEntry {

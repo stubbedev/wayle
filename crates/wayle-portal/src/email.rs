@@ -6,8 +6,10 @@
 //! not expressible in `mailto:` and are dropped, matching what most handlers
 //! do.)
 
-use std::collections::HashMap;
-use std::process::{Command, Stdio};
+use std::{
+    collections::HashMap,
+    process::{Command, Stdio},
+};
 
 use tracing::warn;
 use zbus::{
@@ -134,8 +136,9 @@ fn encode(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use zbus::zvariant::Value;
+
+    use super::*;
 
     fn opts(pairs: &[(&str, Value<'static>)]) -> Vardict {
         pairs

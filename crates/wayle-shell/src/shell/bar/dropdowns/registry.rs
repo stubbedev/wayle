@@ -10,6 +10,7 @@ use gtk::prelude::*;
 use gtk4_layer_shell::{KeyboardMode, LayerShell};
 use relm4::{gtk, prelude::*};
 use tracing::{debug, warn};
+use wayle_audio::volume::types::Volume;
 use wayle_config::{
     ClickAction,
     schemas::{
@@ -17,7 +18,6 @@ use wayle_config::{
         bar::Location,
     },
 };
-use wayle_audio::volume::types::Volume;
 use wayle_widgets::prelude::{BarButton, BarButtonInput};
 
 use crate::{process, shell::services::ShellServices};
@@ -663,6 +663,7 @@ fn dispatch_action(
 /// spawning a subprocess (no `wayle`-on-$PATH dependency). Each arm mirrors the
 /// corresponding D-Bus daemon's call. Returns `true` when handled; anything not
 /// recognized falls through to a shell-out.
+#[allow(clippy::too_many_lines)]
 fn try_builtin(cmd: &str, registry: &DropdownRegistry) -> bool {
     let parts: Vec<&str> = cmd.split_whitespace().collect();
     if parts.first() != Some(&"wayle") {
@@ -793,7 +794,7 @@ fn try_builtin(cmd: &str, registry: &DropdownRegistry) -> bool {
         }
         Some("idle") => {
             let state = services.idle_inhibit.state();
-            let indefinite = parts.iter().any(|p| *p == "--indefinite");
+            let indefinite = parts.contains(&"--indefinite");
             match verb {
                 Some("toggle") => {
                     if state.active.get() {
@@ -848,9 +849,15 @@ fn try_builtin(cmd: &str, registry: &DropdownRegistry) -> bool {
 /// current percentage, clamped to 0–100.
 fn adjusted_pct(level: &str, current_pct: f64) -> Option<f64> {
     if let Some(delta) = level.strip_prefix('+') {
-        delta.parse::<f64>().ok().map(|d| (current_pct + d).clamp(0.0, 100.0))
+        delta
+            .parse::<f64>()
+            .ok()
+            .map(|d| (current_pct + d).clamp(0.0, 100.0))
     } else if let Some(delta) = level.strip_prefix('-') {
-        delta.parse::<f64>().ok().map(|d| (current_pct - d).clamp(0.0, 100.0))
+        delta
+            .parse::<f64>()
+            .ok()
+            .map(|d| (current_pct - d).clamp(0.0, 100.0))
     } else {
         level.parse::<f64>().ok().map(|v| v.clamp(0.0, 100.0))
     }

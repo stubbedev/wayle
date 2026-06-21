@@ -60,7 +60,10 @@ mod tests {
         PORTALS_CONF
             .lines()
             .filter_map(|line| line.strip_prefix(PREFIX))
-            .filter_map(|rest| rest.split_once('=').map(|(iface, target)| (iface, target.trim())))
+            .filter_map(|rest| {
+                rest.split_once('=')
+                    .map(|(iface, target)| (iface, target.trim()))
+            })
             .filter(|(_, target)| *target == "wayle")
             .map(|(iface, _)| iface.to_owned())
             .collect()

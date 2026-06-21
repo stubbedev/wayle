@@ -63,7 +63,13 @@ impl FileChooser {
             return (Response::Other.code(), HashMap::new());
         };
         match proxy
-            .open_file(&title, multiple, directory, filters(&options), &current_folder(&options))
+            .open_file(
+                &title,
+                multiple,
+                directory,
+                filters(&options),
+                &current_folder(&options),
+            )
             .await
         {
             Ok(uris) => uris_response(uris),
@@ -89,7 +95,12 @@ impl FileChooser {
             return (Response::Other.code(), HashMap::new());
         };
         match proxy
-            .save_file(&title, &current_name, filters(&options), &current_folder(&options))
+            .save_file(
+                &title,
+                &current_name,
+                filters(&options),
+                &current_folder(&options),
+            )
             .await
         {
             Ok(uris) => uris_response(uris),

@@ -11,7 +11,9 @@ use wayle_config::{
 };
 
 use crate::{
-    editors::{enum_select::enum_select, number::number_newtype, spawn_property_watcher, toggle::toggle},
+    editors::{
+        enum_select::enum_select, number::number_newtype, spawn_property_watcher, toggle::toggle,
+    },
     pages::spec::SettingRowInit,
     property_handle::PropertyHandle,
     row::{RowBehavior, SettingRow},

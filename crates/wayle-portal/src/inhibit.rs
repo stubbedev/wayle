@@ -80,7 +80,10 @@ impl Inhibit {
                 return;
             }
         };
-        let fd = match proxy.inhibit(&what, "Wayle portal", "Application requested", "block").await {
+        let fd = match proxy
+            .inhibit(&what, "Wayle portal", "Application requested", "block")
+            .await
+        {
             Ok(fd) => fd,
             Err(err) => {
                 warn!(%err, "inhibit: logind Inhibit failed");

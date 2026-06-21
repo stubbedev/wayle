@@ -7,11 +7,7 @@
 
 use std::{cell::RefCell, collections::HashMap, os::fd::AsRawFd, rc::Rc};
 
-use relm4::{
-    gtk,
-    gtk::prelude::*,
-    prelude::*,
-};
+use relm4::{gtk, gtk::prelude::*, prelude::*};
 use tokio::sync::oneshot;
 use tracing::warn;
 
@@ -23,13 +19,15 @@ struct Prepared {
     page_setup: gtk::PageSetup,
 }
 
+/// Flat GTK print-setting key/value pairs.
+pub(crate) type SettingsPairs = Vec<(String, String)>;
+/// Reply for a prepare request: `Some((settings, token))` or `None` on cancel.
+type PrepareReply = oneshot::Sender<Option<(SettingsPairs, u32)>>;
+
 /// Messages driving the print host.
 pub(crate) enum PrintInput {
     /// Show the print dialog; reply `Some((settings, token))` or `None` on cancel.
-    Prepare {
-        title: String,
-        reply: oneshot::Sender<Option<(Vec<(String, String)>, u32)>>,
-    },
+    Prepare { title: String, reply: PrepareReply },
     /// Spool `document` to the printer prepared under `token`.
     Spool {
         title: String,
@@ -42,8 +40,14 @@ pub(crate) enum PrintInput {
 impl std::fmt::Debug for PrintInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Prepare { title, .. } => f.debug_struct("Prepare").field("title", title).finish_non_exhaustive(),
-            Self::Spool { token, .. } => f.debug_struct("Spool").field("token", token).finish_non_exhaustive(),
+            Self::Prepare { title, .. } => f
+                .debug_struct("Prepare")
+                .field("title", title)
+                .finish_non_exhaustive(),
+            Self::Spool { token, .. } => f
+                .debug_struct("Spool")
+                .field("token", token)
+                .finish_non_exhaustive(),
         }
     }
 }
@@ -74,14 +78,12 @@ impl Component for Print {
         root: Self::Root,
         _sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        let model = Print {
+            prepared: Rc::new(RefCell::new(HashMap::new())),
+            next_token: Rc::new(RefCell::new(1)),
+        };
         let widgets = view_output!();
-        ComponentParts {
-            model: Print {
-                prepared: Rc::new(RefCell::new(HashMap::new())),
-                next_token: Rc::new(RefCell::new(1)),
-            },
-            widgets,
-        }
+        ComponentParts { model, widgets }
     }
 
     fn update(&mut self, msg: PrintInput, _sender: ComponentSender<Self>, _root: &Self::Root) {
@@ -99,7 +101,10 @@ impl Component for Print {
 
 impl Print {
     /// Shows the print dialog and stores the selection under a fresh token.
-    fn prepare(&self, title: &str, reply: oneshot::Sender<Option<(Vec<(String, String)>, u32)>>) {
+    // PrintUnixDialog subclasses GtkDialog (response API deprecated since 4.10),
+    // but it is still the only native print dialog GTK4 ships.
+    #[allow(deprecated)]
+    fn prepare(&self, title: &str, reply: PrepareReply) {
         let dialog = gtk::PrintUnixDialog::new(Some(title), gtk::Window::NONE);
         dialog.set_modal(true);
 
@@ -149,14 +154,25 @@ impl Print {
     }
 
     /// Spools the document fd to the printer prepared under `token`.
-    fn spool(&self, title: &str, document: std::os::fd::OwnedFd, token: u32, reply: oneshot::Sender<bool>) {
+    fn spool(
+        &self,
+        title: &str,
+        document: std::os::fd::OwnedFd,
+        token: u32,
+        reply: oneshot::Sender<bool>,
+    ) {
         let Some(prepared) = self.prepared.borrow_mut().remove(&token) else {
             warn!(token, "print: no prepared job for token");
             let _ = reply.send(false);
             return;
         };
 
-        let job = gtk::PrintJob::new(title, &prepared.printer, &prepared.settings, &prepared.page_setup);
+        let job = gtk::PrintJob::new(
+            title,
+            &prepared.printer,
+            &prepared.settings,
+            &prepared.page_setup,
+        );
         if let Err(err) = job.set_source_fd(document.as_raw_fd()) {
             warn!(%err, "print: cannot set document source");
             let _ = reply.send(false);
@@ -179,7 +195,11 @@ fn settings_pairs(settings: &gtk::PrintSettings) -> Vec<(String, String)> {
     let pairs = Rc::new(RefCell::new(Vec::new()));
     let collector = pairs.clone();
     settings.foreach(move |key, value| {
-        collector.borrow_mut().push((key.to_owned(), value.to_owned()));
+        collector
+            .borrow_mut()
+            .push((key.to_owned(), value.to_owned()));
     });
-    Rc::try_unwrap(pairs).map(RefCell::into_inner).unwrap_or_default()
+    Rc::try_unwrap(pairs)
+        .map(RefCell::into_inner)
+        .unwrap_or_default()
 }

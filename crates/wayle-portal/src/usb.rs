@@ -7,14 +7,19 @@
 
 use std::collections::HashMap;
 
-use crate::{dbus_util::owned, response::Response};
 use zbus::{
     interface,
     zvariant::{OwnedObjectPath, OwnedValue},
 };
 
+use crate::{dbus_util::owned, response::Response};
+
 /// A device as passed to `AcquireDevices`: `(id, info, access_options)`.
-type RequestedDevice = (String, HashMap<String, OwnedValue>, HashMap<String, OwnedValue>);
+type RequestedDevice = (
+    String,
+    HashMap<String, OwnedValue>,
+    HashMap<String, OwnedValue>,
+);
 /// A granted device: `(id, access_options)`.
 type GrantedDevice = (String, HashMap<String, OwnedValue>);
 
@@ -77,14 +82,20 @@ fn clone_vardict(map: &HashMap<String, OwnedValue>) -> HashMap<String, OwnedValu
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use zbus::zvariant::Value;
+
+    use super::*;
 
     #[test]
     fn grant_keeps_id_and_access_drops_info() {
-        let info = HashMap::from([("vendor".to_owned(), OwnedValue::try_from(Value::from("acme")).unwrap())]);
-        let access =
-            HashMap::from([("writable".to_owned(), OwnedValue::try_from(Value::from(true)).unwrap())]);
+        let info = HashMap::from([(
+            "vendor".to_owned(),
+            OwnedValue::try_from(Value::from("acme")).unwrap(),
+        )]);
+        let access = HashMap::from([(
+            "writable".to_owned(),
+            OwnedValue::try_from(Value::from(true)).unwrap(),
+        )]);
         let devices = vec![("dev0".to_owned(), info, access)];
 
         let granted = grant(&devices);

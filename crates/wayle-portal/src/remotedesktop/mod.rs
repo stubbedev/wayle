@@ -80,7 +80,8 @@ impl RemoteDesktop {
     /// Asks the user to confirm granting pointer/keyboard control. Denies if the
     /// dialog host is unavailable (fail-closed — never inject input silently).
     async fn confirm_control(&self) -> bool {
-        let proxy = match wayle_ipc::portal_dialogs::PortalDialogsProxy::new(&self.connection).await {
+        let proxy = match wayle_ipc::portal_dialogs::PortalDialogsProxy::new(&self.connection).await
+        {
             Ok(proxy) => proxy,
             Err(err) => {
                 warn!(%err, "remotedesktop: consent dialog unavailable; denying");
@@ -222,15 +223,26 @@ impl RemoteDesktop {
         x: f64,
         y: f64,
     ) {
-        let Some((width, height)) =
-            self.stream_sizes.lock().ok().and_then(|m| m.get(&stream).copied())
+        let Some((width, height)) = self
+            .stream_sizes
+            .lock()
+            .ok()
+            .and_then(|m| m.get(&stream).copied())
         else {
-            debug!(stream, "remotedesktop: unknown stream extent for absolute motion");
+            debug!(
+                stream,
+                "remotedesktop: unknown stream extent for absolute motion"
+            );
             return;
         };
         self.send(
             &session_handle,
-            InputCommand::PointerMotionAbsolute { x, y, width, height },
+            InputCommand::PointerMotionAbsolute {
+                x,
+                y,
+                width,
+                height,
+            },
         );
     }
 
@@ -260,10 +272,16 @@ impl RemoteDesktop {
         dy: f64,
     ) {
         if dy != 0.0 {
-            self.send(&session_handle, InputCommand::PointerAxis { axis: 0, value: dy });
+            self.send(
+                &session_handle,
+                InputCommand::PointerAxis { axis: 0, value: dy },
+            );
         }
         if dx != 0.0 {
-            self.send(&session_handle, InputCommand::PointerAxis { axis: 1, value: dx });
+            self.send(
+                &session_handle,
+                InputCommand::PointerAxis { axis: 1, value: dx },
+            );
         }
     }
 
@@ -357,9 +375,9 @@ impl RemoteDesktop {
         _app_id: String,
         _options: HashMap<String, OwnedValue>,
     ) -> zbus::fdo::Result<zbus::zvariant::OwnedFd> {
-        let input = self
-            .input_for(&session_handle)
-            .ok_or_else(|| zbus::fdo::Error::Failed("no active remote-desktop session".to_owned()))?;
+        let input = self.input_for(&session_handle).ok_or_else(|| {
+            zbus::fdo::Error::Failed("no active remote-desktop session".to_owned())
+        })?;
         eis::connect(input)
             .map(zbus::zvariant::OwnedFd::from)
             .map_err(zbus::fdo::Error::Failed)

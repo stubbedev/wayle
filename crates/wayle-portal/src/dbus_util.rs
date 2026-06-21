@@ -14,9 +14,11 @@ pub type Vardict = HashMap<String, OwnedValue>;
 /// Reads a `u32` option, accepting `u32`/`u64` encodings.
 pub fn opt_u32(options: &Vardict, key: &str) -> Option<u32> {
     let value = options.get(key)?;
-    u32::try_from(value)
-        .ok()
-        .or_else(|| u64::try_from(value).ok().and_then(|v| u32::try_from(v).ok()))
+    u32::try_from(value).ok().or_else(|| {
+        u64::try_from(value)
+            .ok()
+            .and_then(|v| u32::try_from(v).ok())
+    })
 }
 
 /// Reads a `bool` option.

@@ -13,7 +13,10 @@ use zbus::{
     zvariant::{OwnedObjectPath, OwnedValue},
 };
 
-use crate::{dbus_util::{opt_string, owned}, response::Response};
+use crate::{
+    dbus_util::{opt_string, owned},
+    response::Response,
+};
 
 /// Account portal interface.
 pub struct Account {

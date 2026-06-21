@@ -33,11 +33,21 @@ pub(super) fn apply_styling(
     let bar_scale = config.bar.scale.get().value();
     let is_vertical = settings.is_vertical.get();
 
-    let icon_size_px = ws_config.icon_size.get().resolve_rem(ICON_BASE_REM, bar_scale).round() as i32;
-    let label_size_px =
-        ws_config.label_size.get().resolve_rem(LABEL_BASE_REM, bar_scale).round() as i32;
-    let workspace_padding_px =
-        ws_config.workspace_padding.get().resolve_rem(1.0, bar_scale).round() as i32;
+    let icon_size_px = ws_config
+        .icon_size
+        .get()
+        .resolve_rem(ICON_BASE_REM, bar_scale)
+        .round() as i32;
+    let label_size_px = ws_config
+        .label_size
+        .get()
+        .resolve_rem(LABEL_BASE_REM, bar_scale)
+        .round() as i32;
+    let workspace_padding_px = ws_config
+        .workspace_padding
+        .get()
+        .resolve_rem(1.0, bar_scale)
+        .round() as i32;
 
     let (margin_vertical_px, margin_horizontal_px) = if is_vertical {
         (workspace_padding_px, 0)

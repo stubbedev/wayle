@@ -21,8 +21,12 @@ use relm4::Sender;
 use tracing::{debug, error};
 use wayland_client::Connection;
 use wayle_share_preview::{
-    buffer::Buffer, ext_capture::ExtToplevelManager, frame::FrameManager, image::Image,
-    image::Transforms, output::OutputManager, toplevel::Toplevel,
+    buffer::Buffer,
+    ext_capture::ExtToplevelManager,
+    frame::FrameManager,
+    image::{Image, Transforms},
+    output::OutputManager,
+    toplevel::Toplevel,
 };
 
 use super::{SharePickerInput, config::PickerConfig, image::ImageExt, util::OutputInfo};
@@ -251,11 +255,7 @@ fn request_window_frame(
 
 /// Captures a window: Hyprland toplevel-export when a handle is present,
 /// otherwise the generic `ext` path matching by app_id/title.
-fn capture_window_buffer(
-    address: Option<u64>,
-    class: &str,
-    title: &str,
-) -> Result<Buffer, String> {
+fn capture_window_buffer(address: Option<u64>, class: &str, title: &str) -> Result<Buffer, String> {
     let connection =
         Connection::connect_to_env().map_err(|e| format!("cannot connect to wayland: {e}"))?;
 

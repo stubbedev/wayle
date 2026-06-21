@@ -118,8 +118,8 @@ fn run_loop_inner(
     let (width, height) = (first.width, first.height);
     drop(first);
 
-    let main_loop = pw::main_loop::MainLoop::new(None)
-        .map_err(|e| format!("pipewire main loop: {e}"))?;
+    let main_loop =
+        pw::main_loop::MainLoop::new(None).map_err(|e| format!("pipewire main loop: {e}"))?;
     let context =
         pw::context::Context::new(&main_loop).map_err(|e| format!("pipewire context: {e}"))?;
     let core = context
@@ -177,6 +177,7 @@ fn run_loop_inner(
         .state_changed(|_, _, old, new| {
             debug!(?old, ?new, "screencast stream state changed");
         })
+        // The consumer drives the cycle; we fill a buffer whenever PipeWire asks.
         .process(move |stream, _user_data| produce(stream))
         .register()
         .map_err(|e| format!("pipewire listener: {e}"))?;
@@ -186,7 +187,7 @@ fn run_loop_inner(
         .connect(
             pw::spa::utils::Direction::Output,
             None,
-            pw::stream::StreamFlags::DRIVER | pw::stream::StreamFlags::MAP_BUFFERS,
+            pw::stream::StreamFlags::MAP_BUFFERS,
             &mut params,
         )
         .map_err(|e| format!("pipewire stream connect: {e}"))?;
@@ -197,24 +198,15 @@ fn run_loop_inner(
         .send(Ok((node_id, width, height)))
         .map_err(|_| "caller dropped before node id delivery".to_owned())?;
 
-    // Pace frame production with a loop timer at the target rate.
-    let interval = Duration::from_nanos(1_000_000_000 / u64::from(fps));
-    let timer = main_loop.loop_().add_timer({
-        let stream = stream.clone();
-        move |_| stream.trigger_process().unwrap_or(())
-    });
-    timer
-        .update_timer(Some(interval), Some(interval))
-        .into_result()
-        .map_err(|e| format!("pipewire timer: {e}"))?;
-
-    // Quit the loop when asked to stop.
+    // Quit the loop when asked to stop. The timer borrows `main_loop` (via
+    // loop_()), which lives to the end of the function; the closure owns a
+    // separate clone for `.quit()`.
     let quit = {
-        let main_loop = main_loop.clone();
+        let quit_loop = main_loop.clone();
         let stop = stop.clone();
         main_loop.loop_().add_timer(move |_| {
             if stop.load(Ordering::SeqCst) {
-                main_loop.quit();
+                quit_loop.quit();
             }
         })
     };

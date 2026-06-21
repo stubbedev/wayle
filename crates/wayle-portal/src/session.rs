@@ -60,7 +60,11 @@ impl Session {
 /// # Errors
 ///
 /// Returns an error if the object cannot be registered.
-pub async fn mount<F>(connection: &Connection, path: &OwnedObjectPath, on_close: F) -> zbus::Result<()>
+pub async fn mount<F>(
+    connection: &Connection,
+    path: &OwnedObjectPath,
+    on_close: F,
+) -> zbus::Result<()>
 where
     F: Fn() + Send + Sync + 'static,
 {

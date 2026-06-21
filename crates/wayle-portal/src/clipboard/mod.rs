@@ -74,13 +74,19 @@ impl Clipboard {
                 return;
             };
             while let Some(event) = events.recv().await {
-                let sessions: Vec<OwnedObjectPath> =
-                    enabled.lock().map(|s| s.iter().cloned().collect()).unwrap_or_default();
+                let sessions: Vec<OwnedObjectPath> = enabled
+                    .lock()
+                    .map(|s| s.iter().cloned().collect())
+                    .unwrap_or_default();
                 for session in sessions {
                     let result = match &event {
                         ClipEvent::OwnerChanged => {
-                            Clipboard::selection_owner_changed(&emitter, session, std::collections::HashMap::new())
-                                .await
+                            Clipboard::selection_owner_changed(
+                                &emitter,
+                                session,
+                                std::collections::HashMap::new(),
+                            )
+                            .await
                         }
                         ClipEvent::Transfer { mime, serial } => {
                             Clipboard::selection_transfer(&emitter, session, mime, *serial).await

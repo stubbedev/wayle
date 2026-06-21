@@ -7,7 +7,7 @@ use tracing::{instrument, warn};
 use zbus::interface;
 
 use super::host_sender;
-use crate::shell::print::PrintInput;
+use crate::shell::print::{PrintInput, SettingsPairs};
 
 pub struct PrintDaemon;
 
@@ -15,7 +15,7 @@ pub struct PrintDaemon;
 impl PrintDaemon {
     /// Shows the print dialog. Returns `(granted, settings, token)`.
     #[instrument(skip(self))]
-    pub async fn prepare(&self, title: &str) -> zbus::fdo::Result<(bool, Vec<(String, String)>, u32)> {
+    pub async fn prepare(&self, title: &str) -> zbus::fdo::Result<(bool, SettingsPairs, u32)> {
         let (reply_tx, reply_rx) = oneshot::channel();
         self.dispatch(PrintInput::Prepare {
             title: title.to_owned(),

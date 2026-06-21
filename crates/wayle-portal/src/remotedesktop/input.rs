@@ -235,7 +235,10 @@ fn setup() -> Result<(Connection, Devices), String> {
 
     #[cfg(feature = "keysym")]
     let mut keysym_map = std::collections::HashMap::new();
-    if let Some((format, fd, size)) = &globals.keymap {
+    // Take the keymap out of `globals` so the roundtrip below can borrow it
+    // mutably without conflicting with the keymap reference.
+    let keymap = globals.keymap.take();
+    if let Some((format, fd, size)) = &keymap {
         keyboard.keymap(*format, fd.as_fd(), *size);
         queue
             .roundtrip(&mut globals)
@@ -274,7 +277,10 @@ fn build_keysym_map(fd: &OwnedFd, _size: u32) -> std::collections::HashMap<u32, 
         return map;
     };
     let mut text = String::new();
-    if std::fs::File::from(clone).read_to_string(&mut text).is_err() {
+    if std::fs::File::from(clone)
+        .read_to_string(&mut text)
+        .is_err()
+    {
         return map;
     }
     let text = text.trim_end_matches('\0').to_owned();

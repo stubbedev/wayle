@@ -61,11 +61,11 @@ pub(crate) type StreamSizes = Arc<Mutex<HashMap<u32, (u32, u32)>>>;
 pub use self::error::Error;
 use self::{
     access::Access, account::Account, appchooser::AppChooser, background::Background,
-    clipboard::Clipboard, dynamiclauncher::DynamicLauncher, email::Email,
-    filechooser::FileChooser, globalshortcuts::GlobalShortcuts, inhibit::Inhibit,
-    inputcapture::InputCapture, lockdown::Lockdown, notification::Notification, print::Print,
-    remotedesktop::RemoteDesktop, screencast::ScreenCast, screenshot::Screenshot,
-    settings::Settings, usb::Usb, wallpaper::WallpaperPortal,
+    clipboard::Clipboard, dynamiclauncher::DynamicLauncher, email::Email, filechooser::FileChooser,
+    globalshortcuts::GlobalShortcuts, inhibit::Inhibit, inputcapture::InputCapture,
+    lockdown::Lockdown, notification::Notification, print::Print, remotedesktop::RemoteDesktop,
+    screencast::ScreenCast, screenshot::Screenshot, settings::Settings, usb::Usb,
+    wallpaper::WallpaperPortal,
 };
 
 /// The backend's well-known D-Bus name (matches `wayle.portal`'s `DBusName`).
@@ -103,7 +103,10 @@ pub async fn run() -> Result<(), Error> {
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
-        .at(path, ScreenCast::new(connection.clone(), stream_sizes.clone()))
+        .at(
+            path,
+            ScreenCast::new(connection.clone(), stream_sizes.clone()),
+        )
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
@@ -111,7 +114,10 @@ pub async fn run() -> Result<(), Error> {
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
-        .at(path, RemoteDesktop::new(connection.clone(), stream_sizes.clone()))
+        .at(
+            path,
+            RemoteDesktop::new(connection.clone(), stream_sizes.clone()),
+        )
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
     server

@@ -6,7 +6,11 @@
 //! client emits (pointer, button, scroll, key, keysym) onto the session's
 //! [`VirtualInput`].
 
-use std::{os::fd::OwnedFd, os::unix::net::UnixStream, sync::Arc, time::Duration};
+use std::{
+    os::{fd::OwnedFd, unix::net::UnixStream},
+    sync::Arc,
+    time::Duration,
+};
 
 use calloop::EventLoop;
 use reis::{
@@ -40,7 +44,8 @@ pub fn connect(input: Arc<VirtualInput>) -> Result<OwnedFd, String> {
 /// Runs the EIS event loop until the client disconnects.
 fn run(stream: UnixStream, input: Arc<VirtualInput>) -> Result<(), String> {
     let context = eis::Context::new(stream).map_err(|e| format!("eis context: {e}"))?;
-    let mut event_loop = EventLoop::<ServerState>::try_new().map_err(|e| format!("calloop: {e}"))?;
+    let mut event_loop =
+        EventLoop::<ServerState>::try_new().map_err(|e| format!("calloop: {e}"))?;
     let source = EisRequestSource::new(context, 1);
 
     let mut ctx = ContextState {
@@ -91,7 +96,11 @@ struct ContextState {
 }
 
 impl ContextState {
-    fn handle(&mut self, connection: &Connection, event: EisRequestSourceEvent) -> calloop::PostAction {
+    fn handle(
+        &mut self,
+        connection: &Connection,
+        event: EisRequestSourceEvent,
+    ) -> calloop::PostAction {
         match event {
             EisRequestSourceEvent::Connected => {
                 self.seat = Some(connection.add_seat(
@@ -122,8 +131,12 @@ impl ContextState {
         }
         let caps = bind.capabilities;
         if caps.contains(DeviceCapability::Keyboard) {
-            bind.seat
-                .add_device(Some("wayle-keyboard"), DeviceType::Virtual, DeviceCapability::Keyboard.into(), |_| {});
+            bind.seat.add_device(
+                Some("wayle-keyboard"),
+                DeviceType::Virtual,
+                DeviceCapability::Keyboard.into(),
+                |_| {},
+            );
         }
         if caps.contains(DeviceCapability::Pointer) {
             bind.seat.add_device(
@@ -150,12 +163,16 @@ impl ContextState {
             }),
             EisRequest::ScrollDelta(scroll) => {
                 if scroll.dy != 0.0 {
-                    self.input
-                        .send(InputCommand::PointerAxis { axis: 0, value: f64::from(scroll.dy) });
+                    self.input.send(InputCommand::PointerAxis {
+                        axis: 0,
+                        value: f64::from(scroll.dy),
+                    });
                 }
                 if scroll.dx != 0.0 {
-                    self.input
-                        .send(InputCommand::PointerAxis { axis: 1, value: f64::from(scroll.dx) });
+                    self.input.send(InputCommand::PointerAxis {
+                        axis: 1,
+                        value: f64::from(scroll.dx),
+                    });
                 }
             }
             EisRequest::ScrollDiscrete(scroll) => {

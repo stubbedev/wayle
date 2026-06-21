@@ -74,7 +74,12 @@ impl RequestGuard {
         let cancel = Cancel::default();
         connection
             .object_server()
-            .at(&handle, Request { cancel: cancel.clone() })
+            .at(
+                &handle,
+                Request {
+                    cancel: cancel.clone(),
+                },
+            )
             .await?;
         Ok(Self {
             connection: connection.clone(),
@@ -95,7 +100,10 @@ impl Drop for RequestGuard {
         let connection = self.connection.clone();
         let handle = self.handle.clone();
         tokio::spawn(async move {
-            let _ = connection.object_server().remove::<Request, _>(&handle).await;
+            let _ = connection
+                .object_server()
+                .remove::<Request, _>(&handle)
+                .await;
         });
     }
 }

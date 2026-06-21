@@ -115,6 +115,7 @@ pub async fn is_already_running() -> bool {
     result
 }
 
+#[allow(clippy::cognitive_complexity)]
 pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Error>> {
     let mut timer = StartupTimer::new();
 

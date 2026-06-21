@@ -29,9 +29,9 @@ use zbus::{
     zvariant::{OwnedObjectPath, OwnedValue, Value},
 };
 
-use self::source::{CaptureTarget, PickerSelection, SourceType, parse_picker_reply};
 #[cfg(feature = "pipewire")]
 use self::pipewire::StreamHandle;
+use self::source::{CaptureTarget, PickerSelection, SourceType, parse_picker_reply};
 use crate::{
     StreamSizes,
     dbus_util::{Vardict, opt_bool, opt_u32, owned},
@@ -157,7 +157,8 @@ impl ScreenCast {
             error!(%err, "screencast: cannot mount session object");
             return (Response::Other.code(), HashMap::new());
         }
-        self.sessions.insert(session_handle, SessionConfig::default());
+        self.sessions
+            .insert(session_handle, SessionConfig::default());
         (Response::Success.code(), HashMap::new())
     }
 
@@ -287,10 +288,11 @@ impl ScreenCast {
         let show_cursor = source::CursorMode::from_bits(cursor_mode).show_cursor();
         let source_type = target.source_type();
         let target = target.clone();
-        let handle =
-            tokio::task::spawn_blocking(move || pipewire::start_stream(target, show_cursor, DEFAULT_FPS))
-                .await
-                .map_err(|err| format!("screencast stream task failed: {err}"))??;
+        let handle = tokio::task::spawn_blocking(move || {
+            pipewire::start_stream(target, show_cursor, DEFAULT_FPS)
+        })
+        .await
+        .map_err(|err| format!("screencast stream task failed: {err}"))??;
         let info = StreamInfo {
             node_id: handle.node_id,
             size: handle.size,

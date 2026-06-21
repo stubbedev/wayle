@@ -52,8 +52,7 @@ impl Osd {
         self.visible = true;
         self.revealed = true;
 
-        let duration =
-            duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
+        let duration = duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
         Self::schedule_dismiss(sender, duration, self.dismiss_id);
     }
 

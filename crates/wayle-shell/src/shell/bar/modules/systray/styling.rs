@@ -33,9 +33,16 @@ fn build_css(config_service: &Arc<ConfigService>) -> String {
 
     let bar_scale = bar_config.scale.get().value();
 
-    let item_gap_px = systray_config.item_gap.get().resolve_rem(1.0, bar_scale).round() as i32;
-    let icon_size_px =
-        systray_config.icon_scale.get().resolve_rem(ICON_BASE_REM, bar_scale).round() as i32;
+    let item_gap_px = systray_config
+        .item_gap
+        .get()
+        .resolve_rem(1.0, bar_scale)
+        .round() as i32;
+    let icon_size_px = systray_config
+        .icon_scale
+        .get()
+        .resolve_rem(ICON_BASE_REM, bar_scale)
+        .round() as i32;
     let internal_padding_px = systray_config
         .internal_padding
         .get()

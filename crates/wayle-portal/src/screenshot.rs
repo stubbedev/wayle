@@ -120,14 +120,9 @@ fn path_to_uri(path: &str) -> String {
     let mut uri = String::from("file://");
     for byte in path.bytes() {
         match byte {
-            b'A'..=b'Z'
-            | b'a'..=b'z'
-            | b'0'..=b'9'
-            | b'-'
-            | b'_'
-            | b'.'
-            | b'~'
-            | b'/' => uri.push(byte as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                uri.push(byte as char);
+            }
             _ => uri.push_str(&format!("%{byte:02X}")),
         }
     }

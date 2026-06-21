@@ -64,7 +64,12 @@ impl GlobalShortcuts {
     /// The manager setup blocks on a Wayland roundtrip, so it runs on the
     /// blocking pool rather than the async D-Bus executor.
     async fn ensure_manager(&self) -> bool {
-        if self.handle.lock().map(|guard| guard.is_some()).unwrap_or(false) {
+        if self
+            .handle
+            .lock()
+            .map(|guard| guard.is_some())
+            .unwrap_or(false)
+        {
             return true;
         }
         match tokio::task::spawn_blocking(manager::spawn).await {
@@ -96,8 +101,10 @@ impl GlobalShortcuts {
                 return;
             };
             while let Some(event) = events.recv().await {
-                let Some((session, shortcut_id)) =
-                    routes.lock().ok().and_then(|map| map.get(&event.key).cloned())
+                let Some((session, shortcut_id)) = routes
+                    .lock()
+                    .ok()
+                    .and_then(|map| map.get(&event.key).cloned())
                 else {
                     continue;
                 };
@@ -180,7 +187,10 @@ impl GlobalShortcuts {
         let session = self.sessions.get(&session_handle).unwrap_or_default();
         let available = self.ensure_manager().await;
 
-        if available && let Ok(guard) = self.handle.lock() && let Some(handle) = guard.as_ref() {
+        if available
+            && let Ok(guard) = self.handle.lock()
+            && let Some(handle) = guard.as_ref()
+        {
             for (id, props) in &shortcuts {
                 let key = route_key(&session.app_id, id);
                 let description = opt_string(props, "description").unwrap_or_default();

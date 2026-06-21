@@ -1,11 +1,11 @@
 mod bar;
-mod file_chooser;
+pub(crate) mod file_chooser;
 mod helpers;
 mod notification_popup;
 mod osd;
-mod portal_dialogs;
+pub(crate) mod portal_dialogs;
 pub(crate) mod power_menu;
-mod print;
+pub(crate) mod print;
 pub(crate) mod region_overlay;
 pub(crate) mod screenshot;
 pub(crate) mod services;
@@ -27,8 +27,8 @@ use self::{
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
     portal_dialogs::PortalDialogs,
-    print::Print,
     power_menu::PowerMenu,
+    print::Print,
     region_overlay::RegionOverlay,
     screenshot::{Screenshot, ScreenshotInit},
     share_picker::SharePicker,

@@ -6,9 +6,7 @@
 //! PipeWire producer drives the timing.
 
 use wayland_client::{Connection, protocol::wl_output::WlOutput};
-use wayle_share_preview::{
-    buffer::Buffer, ext_capture::ExtToplevelManager, output::OutputManager,
-};
+use wayle_share_preview::{buffer::Buffer, ext_capture::ExtToplevelManager, output::OutputManager};
 
 use super::source::CaptureTarget;
 

@@ -52,7 +52,10 @@ impl std::fmt::Debug for FileChooserInput {
                 .field("multiple", multiple)
                 .field("directory", directory)
                 .finish_non_exhaustive(),
-            Self::Save { title, .. } => f.debug_struct("Save").field("title", title).finish_non_exhaustive(),
+            Self::Save { title, .. } => f
+                .debug_struct("Save")
+                .field("title", title)
+                .finish_non_exhaustive(),
         }
     }
 }
@@ -88,7 +91,12 @@ impl Component for FileChooser {
         }
     }
 
-    fn update(&mut self, msg: FileChooserInput, _sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update(
+        &mut self,
+        msg: FileChooserInput,
+        _sender: ComponentSender<Self>,
+        _root: &Self::Root,
+    ) {
         match msg {
             FileChooserInput::Open {
                 title,
@@ -97,7 +105,14 @@ impl Component for FileChooser {
                 filters,
                 current_folder,
                 reply,
-            } => open(&title, multiple, directory, &filters, &current_folder, reply),
+            } => open(
+                &title,
+                multiple,
+                directory,
+                &filters,
+                &current_folder,
+                reply,
+            ),
             FileChooserInput::Save {
                 title,
                 current_name,

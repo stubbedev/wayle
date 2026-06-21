@@ -150,7 +150,16 @@ impl Notification {
             return;
         };
         match proxy
-            .notify(&app_id, 0, &icon, &summary, &body, action_refs, HashMap::new(), -1)
+            .notify(
+                &app_id,
+                0,
+                &icon,
+                &summary,
+                &body,
+                action_refs,
+                HashMap::new(),
+                -1,
+            )
             .await
         {
             Ok(daemon_id) => {
