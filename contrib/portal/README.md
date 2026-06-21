@@ -30,15 +30,23 @@ Implemented natively by `wayle portal`:
 | `InputCapture` | output zones from `wl_output`; capture itself unsupported (see below) |
 | `FileChooser` | the shell's native `gtk::FileDialog` via `com.wayle.FileChooser1` |
 | `Email` | builds a `mailto:` and launches the default mail handler |
+| `Access` | native GTK `AlertDialog` (grant/deny) via `com.wayle.PortalDialogs1` |
+| `Account` | consent dialog + local passwd/avatar lookup |
+| `AppChooser` | native app-list dialog via `com.wayle.PortalDialogs1` |
+| `DynamicLauncher` | install-confirm dialog; frontend writes the `.desktop` |
+| `Print` | native `GtkPrintUnixDialog` + `GtkPrintJob` via `com.wayle.Print1` |
 | `Lockdown` | static policy (nothing locked down) |
 
-That is full interface parity with xdg-desktop-portal-kde (the most complete
-backend). The remaining generic dialogs — `AppChooser`, `Print`, `Account`,
-`DynamicLauncher`, and the permission `Access` dialog — are still **delegated to
-`xdg-desktop-portal-gtk`** via the `default=gtk` fallback in `portals.conf`.
-They can be made native the same way `FileChooser` is (a shell-side
-`gtk`/Relm4 dialog behind a `com.wayle.*` service that the portal forwards to);
-until then gtk handles them.
+**Nothing is delegated** — wayle implements every `org.freedesktop.impl.portal.*`
+interface itself, using GTK's own widgets (`FileDialog`, `PrintUnixDialog`,
+`AlertDialog`) inside the shell, never the `xdg-desktop-portal-gtk` package. The
+backend has no other portal as a dependency or fallback.
+
+`InputCapture` is declared and answers `GetZones` from the live output layout,
+but reports **zero capabilities** and performs no grab: real input capture
+needs the compositor to redirect local input to the portal, which wlroots
+compositors and niri do not expose (only KWin/Mutter back it). Clients detect
+the zero capabilities and fall back cleanly.
 
 `InputCapture` is declared and answers `GetZones` from the live output layout,
 but reports **zero capabilities** and performs no grab: real input capture

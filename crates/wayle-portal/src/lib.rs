@@ -16,9 +16,13 @@
 //! Wallpaper, Access). The generic GTK-dialog interfaces (FileChooser, Print,
 //! …) are delegated to `xdg-desktop-portal-gtk` via `portals.conf`.
 
+mod access;
+mod account;
+mod appchooser;
 mod background;
 mod clipboard;
 mod dbus_util;
+mod dynamiclauncher;
 mod email;
 mod error;
 mod filechooser;
@@ -27,6 +31,7 @@ mod inhibit;
 mod inputcapture;
 mod lockdown;
 mod notification;
+mod print;
 mod protocol;
 mod remotedesktop;
 mod response;
@@ -53,11 +58,12 @@ pub(crate) type StreamSizes = Arc<Mutex<HashMap<u32, (u32, u32)>>>;
 
 pub use self::error::Error;
 use self::{
-    background::Background, clipboard::Clipboard, email::Email, filechooser::FileChooser,
-    globalshortcuts::GlobalShortcuts, inhibit::Inhibit, inputcapture::InputCapture,
-    lockdown::Lockdown, notification::Notification, remotedesktop::RemoteDesktop,
-    screencast::ScreenCast, screenshot::Screenshot, settings::Settings, usb::Usb,
-    wallpaper::WallpaperPortal,
+    access::Access, account::Account, appchooser::AppChooser, background::Background,
+    clipboard::Clipboard, dynamiclauncher::DynamicLauncher, email::Email,
+    filechooser::FileChooser, globalshortcuts::GlobalShortcuts, inhibit::Inhibit,
+    inputcapture::InputCapture, lockdown::Lockdown, notification::Notification, print::Print,
+    remotedesktop::RemoteDesktop, screencast::ScreenCast, screenshot::Screenshot,
+    settings::Settings, usb::Usb, wallpaper::WallpaperPortal,
 };
 
 /// The backend's well-known D-Bus name (matches `wayle.portal`'s `DBusName`).
@@ -146,6 +152,26 @@ pub async fn run() -> Result<(), Error> {
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
         .at(path, Email::new())
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Access::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Account::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, AppChooser::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, DynamicLauncher::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Print::new(connection.clone()))
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
 

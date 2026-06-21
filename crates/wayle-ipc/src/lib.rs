@@ -9,6 +9,12 @@ pub mod file_chooser;
 /// Idle inhibit D-Bus client proxy.
 pub mod idle_inhibit;
 
+/// Portal dialog host D-Bus client proxy (access/account/appchooser/launcher).
+pub mod portal_dialogs;
+
+/// Print host D-Bus client proxy.
+pub mod print;
+
 /// Screen recorder D-Bus client proxy.
 pub mod recorder;
 

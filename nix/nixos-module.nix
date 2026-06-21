@@ -49,14 +49,15 @@ in
         type = lib.types.bool;
         default = true;
         description = ''
-          Register wayle as an xdg-desktop-portal backend so screen sharing,
+          Register wayle as the xdg-desktop-portal backend so screen sharing,
           screenshots, remote control, global shortcuts, appearance settings,
-          notifications, wallpaper and idle-inhibit work on any Wayland
-          compositor. Enables `xdg.portal`, adds wayle (and
-          xdg-desktop-portal-gtk for the generic file/print/account dialogs) to
-          `extraPortals`, routes the interfaces in `xdg.portal.config.common`
+          notifications, wallpaper, idle-inhibit, file/app/print dialogs and the
+          rest work on any Wayland compositor. wayle implements every interface
+          natively, so this enables `xdg.portal`, adds only wayle to
+          `extraPortals`, routes everything to it via `xdg.portal.config.common`
           (with `mkDefault`, so your own routing wins), and defines the
-          `xdg-desktop-portal-wayle` user service the frontend activates.
+          `xdg-desktop-portal-wayle` user service the frontend activates. No
+          xdg-desktop-portal-gtk needed.
         '';
       };
     };
@@ -94,38 +95,12 @@ in
     (lib.mkIf cfg.portal.enable {
       xdg.portal = {
         enable = true;
-        # wayle provides the compositor-specific interfaces; gtk handles the
-        # generic file/print/account/appchooser dialogs wayle delegates to it.
-        extraPortals = [
-          cfg.package
-          pkgs.xdg-desktop-portal-gtk
-        ];
-        # Route each interface regardless of XDG_CURRENT_DESKTOP. mkDefault so a
-        # user's own xdg.portal.config wins.
+        # Wayle implements every interface natively — no xdg-desktop-portal-gtk.
+        extraPortals = [ cfg.package ];
+        # Route everything to wayle regardless of XDG_CURRENT_DESKTOP. mkDefault
+        # so a user's own xdg.portal.config wins.
         config.common = lib.mkDefault {
-          default = [
-            "wayle"
-            "gtk"
-          ];
-          "org.freedesktop.impl.portal.ScreenCast" = [ "wayle" ];
-          "org.freedesktop.impl.portal.RemoteDesktop" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Screenshot" = [ "wayle" ];
-          "org.freedesktop.impl.portal.GlobalShortcuts" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Settings" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Notification" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Wallpaper" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Inhibit" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Lockdown" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Background" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Usb" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Clipboard" = [ "wayle" ];
-          "org.freedesktop.impl.portal.InputCapture" = [ "wayle" ];
-          "org.freedesktop.impl.portal.FileChooser" = [ "wayle" ];
-          "org.freedesktop.impl.portal.Email" = [ "wayle" ];
-          "org.freedesktop.impl.portal.AppChooser" = [ "gtk" ];
-          "org.freedesktop.impl.portal.Print" = [ "gtk" ];
-          "org.freedesktop.impl.portal.Account" = [ "gtk" ];
-          "org.freedesktop.impl.portal.Access" = [ "gtk" ];
+          default = [ "wayle" ];
         };
       };
 

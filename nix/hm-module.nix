@@ -102,11 +102,11 @@ in
         type = lib.types.bool;
         default = false;
         description = ''
-          Install wayle as an xdg-desktop-portal backend at the user level: the
+          Install wayle as the xdg-desktop-portal backend at the user level: the
           `.portal` interface declaration, the D-Bus activation file, a
-          `xdg-desktop-portal-wayle` user service, and a generic
-          `portals.conf` routing wayle's interfaces (delegating the file/print/
-          account dialogs to xdg-desktop-portal-gtk, which must be installed).
+          `xdg-desktop-portal-wayle` user service, and a generic `portals.conf`
+          routing every interface to wayle (it implements them all natively — no
+          xdg-desktop-portal-gtk).
 
           Off by default: on NixOS use the system module's
           `programs.wayle.portal.enable` instead (it routes via

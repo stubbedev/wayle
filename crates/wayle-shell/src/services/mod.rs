@@ -3,7 +3,9 @@
 pub mod file_chooser;
 pub mod idle_inhibit;
 pub mod mail;
+pub mod portal_dialogs;
 pub mod power_menu;
+pub mod print;
 pub mod recorder;
 pub mod region_overlay;
 pub mod screenshot;

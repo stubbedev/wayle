@@ -164,6 +164,10 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 
     init_file_chooser().await;
 
+    init_portal_dialogs().await;
+
+    init_print().await;
+
     let recorder = init_recorder(config_service.clone(), toast_bus.clone()).await;
 
     let mail = crate::services::MailService::new(config_service.clone());
@@ -219,6 +223,20 @@ async fn init_screenshot() {
 async fn init_file_chooser() {
     if let Err(err) = crate::services::file_chooser::start().await {
         warn!(error = %err, "File chooser service unavailable");
+    }
+}
+
+/// Registers the portal dialog D-Bus service (access/account/appchooser/launcher).
+async fn init_portal_dialogs() {
+    if let Err(err) = crate::services::portal_dialogs::start().await {
+        warn!(error = %err, "Portal dialogs service unavailable");
+    }
+}
+
+/// Registers the print D-Bus service. Non-fatal.
+async fn init_print() {
+    if let Err(err) = crate::services::print::start().await {
+        warn!(error = %err, "Print service unavailable");
     }
 }
 

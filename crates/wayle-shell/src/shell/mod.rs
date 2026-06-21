@@ -3,7 +3,9 @@ mod file_chooser;
 mod helpers;
 mod notification_popup;
 mod osd;
+mod portal_dialogs;
 pub(crate) mod power_menu;
+mod print;
 pub(crate) mod region_overlay;
 pub(crate) mod screenshot;
 pub(crate) mod services;
@@ -24,6 +26,8 @@ use self::{
     file_chooser::FileChooser,
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
+    portal_dialogs::PortalDialogs,
+    print::Print,
     power_menu::PowerMenu,
     region_overlay::RegionOverlay,
     screenshot::{Screenshot, ScreenshotInit},
@@ -135,6 +139,12 @@ impl Component for Shell {
 
         let file_chooser = FileChooser::builder().launch(()).detach();
         crate::services::file_chooser::register_sender(file_chooser.sender().clone());
+
+        let portal_dialogs = PortalDialogs::builder().launch(()).detach();
+        crate::services::portal_dialogs::register_sender(portal_dialogs.sender().clone());
+
+        let print = Print::builder().launch(()).detach();
+        crate::services::print::register_sender(print.sender().clone());
 
         let power_menu = PowerMenu::builder()
             .launch(init.services.config.clone())
