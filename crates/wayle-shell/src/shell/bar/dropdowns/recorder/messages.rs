@@ -24,7 +24,10 @@ pub(crate) enum RecorderDropdownMsg {
     WebcamDeviceSelected(u32),
     /// Webcam frame dragged in the preview; carries the new relative position
     /// as percentages (0-100) of the free space.
-    WebcamMoved { x_percent: u8, y_percent: u8 },
+    WebcamMoved {
+        x_percent: u8,
+        y_percent: u8,
+    },
 }
 
 #[derive(Debug)]

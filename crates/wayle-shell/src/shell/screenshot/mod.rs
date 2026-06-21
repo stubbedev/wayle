@@ -116,7 +116,11 @@ impl Component for Screenshot {
         let config = self.config.clone();
         // Resolve compositor-specific focus up front (sync, GTK thread).
         let focused_output = self.focused_output_name();
-        let window_target = if mode == "window" { self.active_window_target() } else { Default::default() };
+        let window_target = if mode == "window" {
+            self.active_window_target()
+        } else {
+            Default::default()
+        };
         glib::spawn_future_local(async move {
             let result = run(config, mode, target, focused_output, window_target).await;
             let _ = reply.send(result);

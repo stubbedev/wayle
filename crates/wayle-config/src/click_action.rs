@@ -89,11 +89,26 @@ mod tests {
             ClickAction::from_str("dropdown:audio"),
             ClickAction::Dropdown("audio".to_owned())
         );
-        assert_eq!(ClickAction::from_str("brightness:5"), ClickAction::Brightness(5));
-        assert_eq!(ClickAction::from_str("brightness:+5"), ClickAction::Brightness(5));
-        assert_eq!(ClickAction::from_str("brightness:-5"), ClickAction::Brightness(-5));
-        assert_eq!(ClickAction::from_str("brightness:toggle"), ClickAction::BrightnessToggle);
-        assert_eq!(ClickAction::from_str("pavucontrol"), ClickAction::Shell("pavucontrol".to_owned()));
+        assert_eq!(
+            ClickAction::from_str("brightness:5"),
+            ClickAction::Brightness(5)
+        );
+        assert_eq!(
+            ClickAction::from_str("brightness:+5"),
+            ClickAction::Brightness(5)
+        );
+        assert_eq!(
+            ClickAction::from_str("brightness:-5"),
+            ClickAction::Brightness(-5)
+        );
+        assert_eq!(
+            ClickAction::from_str("brightness:toggle"),
+            ClickAction::BrightnessToggle
+        );
+        assert_eq!(
+            ClickAction::from_str("pavucontrol"),
+            ClickAction::Shell("pavucontrol".to_owned())
+        );
     }
 
     #[test]

@@ -16,7 +16,10 @@ pub(crate) fn average_percentage(devices: &[Arc<BacklightDevice>]) -> Option<f64
         return None;
     }
 
-    let sum: f64 = devices.iter().map(|device| device.percentage().value()).sum();
+    let sum: f64 = devices
+        .iter()
+        .map(|device| device.percentage().value())
+        .sum();
     Some(sum / devices.len() as f64)
 }
 

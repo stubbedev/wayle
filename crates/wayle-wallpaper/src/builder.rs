@@ -16,14 +16,12 @@ use crate::{
 };
 
 /// Builder for configuring a WallpaperService.
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct WallpaperServiceBuilder {
     color_extractor: ColorExtractorConfig,
     theming_monitor: Option<String>,
     shared_cycle: bool,
 }
-
 
 impl WallpaperServiceBuilder {
     /// Creates a new builder with default values.

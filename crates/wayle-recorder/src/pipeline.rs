@@ -87,8 +87,14 @@ fn build_with(opts: &RecordOptions, cast: &ScreenCast, allow_hardware: bool) -> 
             (f64::from(screen_w) * f64::from(cam.size_percent.clamp(1, 100)) / 100.0) as i32;
         let cam_w = cam_w.max(80);
         let cam_h = (cam_w * 9 / 16).max(60);
-        let (xpos, ypos) =
-            webcam_xy(cam.x_percent, cam.y_percent, screen_w, screen_h, cam_w, cam_h);
+        let (xpos, ypos) = webcam_xy(
+            cam.x_percent,
+            cam.y_percent,
+            screen_w,
+            screen_h,
+            cam_w,
+            cam_h,
+        );
         let device = if cam.device.is_empty() {
             String::new()
         } else {

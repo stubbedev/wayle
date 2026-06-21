@@ -11,7 +11,7 @@ use std::{sync::Arc, time::Duration};
 use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 use relm4::{
     gtk,
-    gtk::{glib, prelude::*, EventControllerKey},
+    gtk::{EventControllerKey, glib, prelude::*},
     prelude::*,
 };
 use wayle_config::{

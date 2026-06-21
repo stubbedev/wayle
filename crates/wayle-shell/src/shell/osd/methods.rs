@@ -52,8 +52,7 @@ impl Osd {
         self.visible = true;
         self.revealed = true;
 
-        let duration =
-            duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
+        let duration = duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
         Self::schedule_dismiss(sender, duration, self.dismiss_id);
     }
 
@@ -200,7 +199,10 @@ impl Osd {
         if devices.is_empty() {
             return;
         }
-        let sum: f64 = devices.iter().map(|device| device.percentage().value()).sum();
+        let sum: f64 = devices
+            .iter()
+            .map(|device| device.percentage().value())
+            .sum();
         let percentage = sum / devices.len() as f64;
         let rounded = percentage.round() as u32;
 

@@ -11,6 +11,8 @@ use gtk::prelude::*;
 use gtk4_layer_shell::{KeyboardMode, LayerShell};
 use relm4::{gtk, prelude::*};
 use tracing::{debug, warn};
+use wayle_audio::volume::types::Volume;
+use wayle_brightness::{BacklightDevice, Percentage};
 use wayle_config::{
     ClickAction,
     schemas::{
@@ -18,8 +20,6 @@ use wayle_config::{
         bar::Location,
     },
 };
-use wayle_audio::volume::types::Volume;
-use wayle_brightness::{BacklightDevice, Percentage};
 use wayle_widgets::prelude::{BarButton, BarButtonInput};
 
 use crate::{process, shell::services::ShellServices};
@@ -676,7 +676,12 @@ fn dispatch_action(
             )
             .clamp(0.0, 100.0);
             let delta = f64::from(*delta);
-            debug!(delta, min, count = devices.len(), "click: brightness (all monitors)");
+            debug!(
+                delta,
+                min,
+                count = devices.len(),
+                "click: brightness (all monitors)"
+            );
             relm4::spawn(async move {
                 // Each monitor steps relative to its own level, preserving any
                 // intentional per-monitor offset set from the dropdown sliders.
@@ -697,7 +702,10 @@ fn dispatch_action(
             // monitor lit -> blackout all; all dark -> restore all) so the
             // monitors stay in lockstep instead of drifting per-device.
             let go_dark = devices.iter().any(|device| device.brightness.get() > 0);
-            debug!(count = devices.len(), go_dark, "click: brightness toggle (all monitors)");
+            debug!(
+                count = devices.len(),
+                go_dark, "click: brightness toggle (all monitors)"
+            );
             relm4::spawn(async move {
                 for device in devices {
                     if let Err(error) = device.set_blackout(go_dark).await {
@@ -809,8 +817,7 @@ fn try_audio(verb: Option<&str>, parts: &[&str], services: &ShellServices) -> bo
             });
         }
         Some("output-volume") => {
-            let (Some(level), Some(device)) =
-                (parts.get(3).copied(), audio.default_output.get())
+            let (Some(level), Some(device)) = (parts.get(3).copied(), audio.default_output.get())
             else {
                 return false;
             };
@@ -824,8 +831,7 @@ fn try_audio(verb: Option<&str>, parts: &[&str], services: &ShellServices) -> bo
             });
         }
         Some("input-volume") => {
-            let (Some(level), Some(device)) =
-                (parts.get(3).copied(), audio.default_input.get())
+            let (Some(level), Some(device)) = (parts.get(3).copied(), audio.default_input.get())
             else {
                 return false;
             };
@@ -927,9 +933,15 @@ fn try_wallpaper(verb: Option<&str>, services: &ShellServices) -> bool {
 /// current percentage, clamped to 0–100.
 fn adjusted_pct(level: &str, current_pct: f64) -> Option<f64> {
     if let Some(delta) = level.strip_prefix('+') {
-        delta.parse::<f64>().ok().map(|d| (current_pct + d).clamp(0.0, 100.0))
+        delta
+            .parse::<f64>()
+            .ok()
+            .map(|d| (current_pct + d).clamp(0.0, 100.0))
     } else if let Some(delta) = level.strip_prefix('-') {
-        delta.parse::<f64>().ok().map(|d| (current_pct - d).clamp(0.0, 100.0))
+        delta
+            .parse::<f64>()
+            .ok()
+            .map(|d| (current_pct - d).clamp(0.0, 100.0))
     } else {
         level.parse::<f64>().ok().map(|v| v.clamp(0.0, 100.0))
     }

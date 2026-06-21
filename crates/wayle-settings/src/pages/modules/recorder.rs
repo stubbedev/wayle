@@ -7,7 +7,10 @@ use crate::{
         device_select::{microphone_device_select, webcam_device_select},
         enum_select::enum_select,
         icon::icon,
-        number::number_u32_range, slider::percentage, text::text, toggle::toggle,
+        number::number_u32_range,
+        slider::percentage,
+        text::text,
+        toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -91,7 +94,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 },
                 bar_display_section(&fields),
                 colors_section(&fields),
-                actions_section(&fields, &crate::pages::sections::action_choices::choices_for("recorder")),
+                actions_section(
+                    &fields,
+                    &crate::pages::sections::action_choices::choices_for("recorder"),
+                ),
             ],
         ),
     }

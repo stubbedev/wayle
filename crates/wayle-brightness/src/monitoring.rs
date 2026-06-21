@@ -76,7 +76,15 @@ async fn handle_event(
 ) {
     match event {
         BrightnessEvent::DeviceAdded(info) => {
-            upsert_device(info, devices_map, command_tx, event_tx, parent_token, devices).await;
+            upsert_device(
+                info,
+                devices_map,
+                command_tx,
+                event_tx,
+                parent_token,
+                devices,
+            )
+            .await;
         }
 
         BrightnessEvent::DeviceChanged(info) => {
@@ -85,7 +93,15 @@ async fn handle_event(
                 return;
             }
 
-            upsert_device(info, devices_map, command_tx, event_tx, parent_token, devices).await;
+            upsert_device(
+                info,
+                devices_map,
+                command_tx,
+                event_tx,
+                parent_token,
+                devices,
+            )
+            .await;
         }
 
         BrightnessEvent::DeviceRemoved(name) => {

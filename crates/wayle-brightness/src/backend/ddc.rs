@@ -72,8 +72,10 @@ impl DdcManager {
             return (Vec::new(), Vec::new());
         };
 
-        let present: HashSet<String> =
-            scanned.iter().map(|(info, _)| info.name.to_string()).collect();
+        let present: HashSet<String> = scanned
+            .iter()
+            .map(|(info, _)| info.name.to_string())
+            .collect();
         let previous: HashSet<String> = map.keys().cloned().collect();
 
         let removed: Vec<String> = previous.difference(&present).cloned().collect();
@@ -85,13 +87,23 @@ impl DdcManager {
             if !previous.contains(&name) {
                 added.push(info.clone());
             }
-            next.insert(name, DdcDisplay { display, max: info.max_brightness });
+            next.insert(
+                name,
+                DdcDisplay {
+                    display,
+                    max: info.max_brightness,
+                },
+            );
         }
 
         *map = next;
 
         if !added.is_empty() || !removed.is_empty() {
-            debug!(added = added.len(), removed = removed.len(), "DDC monitors reconciled");
+            debug!(
+                added = added.len(),
+                removed = removed.len(),
+                "DDC monitors reconciled"
+            );
         }
 
         (added, removed)
@@ -99,9 +111,7 @@ impl DdcManager {
 
     /// True if `name` refers to a managed DDC monitor.
     pub(crate) fn contains(&self, name: &str) -> bool {
-        self.displays
-            .lock()
-            .is_ok_and(|map| map.contains_key(name))
+        self.displays.lock().is_ok_and(|map| map.contains_key(name))
     }
 
     /// Writes raw luminance to a monitor via DDC/CI.
@@ -109,14 +119,13 @@ impl DdcManager {
     /// **Blocking and slow** — run inside `spawn_blocking`. Returns the cached
     /// VCP maximum on success so the caller can report the resulting state.
     pub(crate) fn set_brightness(&self, name: &str, value: u32) -> Result<u32, Error> {
-        let mut map = self
-            .displays
-            .lock()
-            .map_err(|_| Error::DdcUnavailable { device: name.to_owned() })?;
+        let mut map = self.displays.lock().map_err(|_| Error::DdcUnavailable {
+            device: name.to_owned(),
+        })?;
 
-        let display = map
-            .get_mut(name)
-            .ok_or_else(|| Error::DdcUnavailable { device: name.to_owned() })?;
+        let display = map.get_mut(name).ok_or_else(|| Error::DdcUnavailable {
+            device: name.to_owned(),
+        })?;
 
         let clamped = value.min(display.max);
         let raw = u16::try_from(clamped).unwrap_or(u16::MAX);
@@ -162,7 +171,10 @@ fn with_retry<T, E: std::fmt::Display>(
 /// **Blocking and slow** — only call from a blocking context.
 fn scan() -> Vec<(BacklightInfo, Display)> {
     let displays = Display::enumerate();
-    debug!(count = displays.len(), "DDC displays returned by enumeration");
+    debug!(
+        count = displays.len(),
+        "DDC displays returned by enumeration"
+    );
 
     displays
         .into_iter()

@@ -4,8 +4,8 @@ use wayle_config::Config;
 
 use crate::{
     editors::{
-        icon_list::icon_list, number::number_u32_range, text::text,
-        threshold_list::threshold_list, toggle::toggle,
+        icon_list::icon_list, number::number_u32_range, text::text, threshold_list::threshold_list,
+        toggle::toggle,
     },
     pages::{
         nav::LeafEntry,
@@ -55,7 +55,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 },
                 bar_display_section(&fields),
                 colors_section(&fields),
-                actions_section(&fields, &crate::pages::sections::action_choices::choices_for("brightness")),
+                actions_section(
+                    &fields,
+                    &crate::pages::sections::action_choices::choices_for("brightness"),
+                ),
             ],
         ),
     }

@@ -4,7 +4,10 @@ mod messages;
 use std::{rc::Rc, sync::Arc};
 
 use relm4::{gtk::prelude::*, prelude::*};
-use wayle_config::{ConfigProperty, ConfigService, schemas::modules::ScreenshotConfig, schemas::styling::CssToken};
+use wayle_config::{
+    ConfigProperty, ConfigService,
+    schemas::{modules::ScreenshotConfig, styling::CssToken},
+};
 use wayle_widgets::{
     prelude::{
         BarButton, BarButtonBehavior, BarButtonColors, BarButtonInit, BarButtonInput,

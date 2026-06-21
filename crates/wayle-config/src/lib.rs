@@ -80,8 +80,8 @@ pub use infrastructure::{
 };
 use schemas::{
     animations::AnimationsConfig, bar::BarConfig, dropdowns::DropdownsConfig,
-    modules::ModulesConfig, osd::OsdConfig, share_picker::SharePickerConfig, styling::StylingConfig,
-    wallpaper::WallpaperConfig,
+    modules::ModulesConfig, osd::OsdConfig, share_picker::SharePickerConfig,
+    styling::StylingConfig, wallpaper::WallpaperConfig,
 };
 use wayle_derive::wayle_config;
 

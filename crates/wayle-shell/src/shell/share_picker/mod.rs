@@ -237,9 +237,8 @@ impl SharePicker {
     /// Resolved revealer transition + duration for the share-picker surface.
     fn animation(&self, exiting: bool) -> (gtk::RevealerTransitionType, u32) {
         let animations = &self.config_service.config().animations;
-        let transition = revealer_transition(
-            animations.transition_for(AnimSurface::SharePicker, exiting),
-        );
+        let transition =
+            revealer_transition(animations.transition_for(AnimSurface::SharePicker, exiting));
         (
             transition,
             animations.duration_for(AnimSurface::SharePicker, exiting),

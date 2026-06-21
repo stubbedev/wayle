@@ -7,10 +7,16 @@ use wayle_config::{
 
 use crate::{
     editors::{
-        action::action, color_value::color_value, enum_select::enum_select, icon::icon,
+        action::action,
+        color_value::color_value,
+        enum_select::enum_select,
+        icon::icon,
         number::number_u8,
         size::{size, size_with_base},
-        string_list::string_list, string_map::string_map, text::text, toggle::toggle,
+        string_list::string_list,
+        string_map::string_map,
+        text::text,
+        toggle::toggle,
         workspace_style_map::workspace_style_map,
     },
     pages::{

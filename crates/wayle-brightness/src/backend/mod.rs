@@ -114,8 +114,7 @@ fn scan_ddc(ddc_manager: &Arc<DdcManager>, event_tx: &EventSender, settle: Durat
             tokio::time::sleep(settle).await;
         }
 
-        let Ok((added, removed)) =
-            tokio::task::spawn_blocking(move || manager.refresh()).await
+        let Ok((added, removed)) = tokio::task::spawn_blocking(move || manager.refresh()).await
         else {
             warn!("DDC scan task panicked");
             return;
@@ -151,7 +150,9 @@ async fn set_brightness(
 
     let max = tokio::task::spawn_blocking(move || manager.set_brightness(&owned_name, value))
         .await
-        .map_err(|_| Error::DdcUnavailable { device: name.to_owned() })??;
+        .map_err(|_| Error::DdcUnavailable {
+            device: name.to_owned(),
+        })??;
 
     let _ = event_tx.send(BrightnessEvent::DeviceChanged(BacklightInfo {
         name: DeviceName::new(name.to_owned()),

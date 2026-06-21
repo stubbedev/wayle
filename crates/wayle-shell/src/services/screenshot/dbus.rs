@@ -35,7 +35,9 @@ impl ScreenshotDaemon {
             Ok(Err(err)) => Err(zbus::fdo::Error::Failed(err)),
             Err(_) => {
                 warn!("screenshot reply channel dropped");
-                Err(zbus::fdo::Error::Failed("screenshot host unavailable".to_owned()))
+                Err(zbus::fdo::Error::Failed(
+                    "screenshot host unavailable".to_owned(),
+                ))
             }
         }
     }
