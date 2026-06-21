@@ -119,14 +119,14 @@ fn run_loop_inner(
     drop(first);
 
     let main_loop =
-        pw::main_loop::MainLoop::new(None).map_err(|e| format!("pipewire main loop: {e}"))?;
-    let context =
-        pw::context::Context::new(&main_loop).map_err(|e| format!("pipewire context: {e}"))?;
+        pw::main_loop::MainLoopRc::new(None).map_err(|e| format!("pipewire main loop: {e}"))?;
+    let context = pw::context::ContextRc::new(&main_loop, None)
+        .map_err(|e| format!("pipewire context: {e}"))?;
     let core = context
-        .connect(None)
+        .connect_rc(None)
         .map_err(|e| format!("pipewire connect: {e}"))?;
 
-    let stream = pw::stream::Stream::new(
+    let stream = pw::stream::StreamBox::new(
         &core,
         "wayle-screencast",
         pw::properties::properties! {
@@ -141,7 +141,7 @@ fn run_loop_inner(
     // Produce a frame on each timer tick.
     let produce = {
         let capturer = capturer.clone();
-        move |stream: &pw::stream::StreamRef| {
+        move |stream: &pw::stream::Stream| {
             let Some(mut pw_buffer) = stream.dequeue_buffer() else {
                 return;
             };
