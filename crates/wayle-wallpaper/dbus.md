@@ -19,11 +19,11 @@ Methods accepting `monitor`:
 | Method                | Arguments           | Returns | Description                      |
 | --------------------- | ------------------- | ------- | -------------------------------- |
 | `SetWallpaper`        | `s path, s monitor` | -       | Set wallpaper from file path     |
-| `SetFitMode`          | `s mode`            | -       | Set scaling mode                 |
+| `SetFitMode`          | `s mode, s monitor` | -       | Set scaling mode                 |
 | `WallpaperForMonitor` | `s monitor`         | `s`     | Get wallpaper path for a monitor |
-| `GetFitMode`          | -                   | `s`     | Get current fit mode             |
+| `GetFitMode`          | `s monitor`         | `s`     | Get fit mode for a monitor       |
 
-Fit modes: `fill`, `fit`, `stretch`, `center`, `tile`
+Fit modes: `fill`, `fit`, `center`, `stretch`
 
 ### Cycling Control
 
@@ -56,6 +56,11 @@ Cycling modes: `sequential`, `random`
 
 | Property         | Type | Access | Description                       |
 | ---------------- | ---- | ------ | --------------------------------- |
-| `FitMode`        | `s`  | read   | Current wallpaper scaling mode    |
 | `IsCycling`      | `b`  | read   | Whether cycling is active         |
 | `ThemingMonitor` | `s`  | read   | Monitor used for color extraction |
+
+## Signals
+
+| Signal            | Arguments | Description                       |
+| ----------------- | --------- | --------------------------------- |
+| `ColorsExtracted` | -         | Emitted when color extraction finishes |

@@ -74,11 +74,12 @@ Wayle is available as `pkgs.wayle` package, but if you use home-manager there is
 ```nix
 # put this directly into your home-manager config or into a home-manager import
 {
-  services.wayle = {
+  programs.wayle = {
     enable = true;
 
     # Whether to automatically install soft dependencies used by wayle that
-    # will be required based on your config.
+    # will be required based on your config (theme-provider tool, wl-clipboard,
+    # xdg-utils, and notmuch when the mail module is used).
     autoInstallDependencies = true;
 
     # tip: you can automatically translate your TOML config to Nix by running
@@ -119,15 +120,14 @@ Wayle is available as `pkgs.wayle` package, but if you use home-manager there is
           blue = "#8be9fd";
           # ...
         };
-        # wallust will be automatically installed if this is set
+        # wallust is installed automatically when this is set and
+        # autoInstallDependencies = true (likewise matugen / pywal)
         theme-provider = "wallust";
       };
-      # the following wallpaper option can be omitted if you're not using
-      # wayle's wallpaper engine
+      # the following wallpaper options can be omitted if you're not using
+      # wayle's built-in wallpaper engine. Setting cycling-directory enables
+      # cycling through that folder.
       wallpaper = {
-        # this will automatically install aww
-        engine-enabled = true;
-
         cycling-directory = "/home/horsey/Pictures/Backgrounds/1/";
         cycling-mode = "shuffle";
       };
@@ -145,7 +145,7 @@ wayle panel settings
 This launches `wayle-settings`, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.toml`.
 
 > [!WARNING]
-> If you configured theming using matugen/wallust/pywal or wallpapers using AWW, do not forget to install these dependencies! Home-manager module will do this automatically for you.
+> If you configured theming using matugen/wallust/pywal, do not forget to install these dependencies! With `autoInstallDependencies = true` the home-manager module installs the matching theme-provider tool for you.
 
 After configuring Wayle using GUI, there should be a new `.config/wayle/runtime.toml` file. To automatically convert it to Nix, run
 ```sh

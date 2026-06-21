@@ -15,8 +15,7 @@ Configurable button component for shell panels with three visual variants.
 ```rust
 use wayle_widgets::components::bar_buttons::{
     BarButton, BarButtonInit, BarButtonInput, BarButtonOutput,
-    BarButtonVariant, BarButtonVariantConfig,
-    BasicBarButtonConfig, BlockPrefixBarButtonConfig, IconSquareBarButtonConfig,
+    BarButtonBehavior, BarButtonClass, BarButtonColors, BarButtonVariant, BarSettings,
 };
 ```
 
@@ -29,7 +28,10 @@ let bar_button = BarButton::builder()
     .launch(BarButtonInit {
         icon: "audio-volume-high-symbolic".into(),
         label: "100%".into(),
-        ..Default::default()
+        tooltip: None,
+        colors: BarButtonColors { /* ... */ },
+        behavior: BarButtonBehavior { /* ... */ },
+        settings: BarSettings { /* ... */ },
     })
     .forward(sender.input_sender(), |output| match output {
         BarButtonOutput::LeftClick => Msg::ToggleMute,
@@ -41,15 +43,19 @@ let bar_button = BarButton::builder()
 
 ### With Variant
 
+The variant is set via `settings.variant` (a `ConfigProperty<BarButtonVariant>`), not on the init struct directly.
+
 ```rust
+let settings = BarSettings { /* ... */ };
+settings.variant.set(BarButtonVariant::BlockPrefix);
+
 BarButtonInit {
     icon: "network-wireless-symbolic".into(),
     label: "WiFi".into(),
-    variant: BarButtonVariant::BlockPrefix,
-    variant_config: BarButtonVariantConfig::BlockPrefix(
-        BlockPrefixBarButtonConfig::default()
-    ),
-    ..Default::default()
+    tooltip: None,
+    colors: BarButtonColors { /* ... */ },
+    behavior: BarButtonBehavior { /* ... */ },
+    settings,
 }
 ```
 
@@ -63,11 +69,10 @@ bar_button.emit(BarButtonInput::SetTooltip(Some("Click to unmute".into())));
 
 ### Variant Switching
 
+The variant switches reactively at runtime: update the `settings.variant` config property and the component's internal watcher rebuilds the button.
+
 ```rust
-bar_button.emit(BarButtonInput::SetVariant(
-    BarButtonVariant::IconSquare,
-    BarButtonVariantConfig::IconSquare(IconSquareBarButtonConfig::default()),
-));
+settings.variant.set(BarButtonVariant::IconSquare);
 ```
 
 ## Output Events
@@ -84,14 +89,16 @@ bar_button.emit(BarButtonInput::SetVariant(
 
 All variants share these config properties:
 
-| Property          | Type          | Default | Description                                 |
-| ----------------- | ------------- | ------- | ------------------------------------------- |
-| `show_label`      | `bool`        | `true`  | Show/hide label                             |
-| `visible`         | `bool`        | `true`  | Show/hide entire button                     |
-| `vertical`        | `bool`        | `false` | Vertical orientation                        |
-| `label_max_chars` | `Option<u32>` | `None`  | Max chars before truncation (None=disabled) |
-| `icon_color`      | `ColorValue`  | varies  | Icon foreground color                       |
-| `label_color`     | `ColorValue`  | varies  | Label text color                            |
+| Property                    | Type                       | Carrier             | Description                          |
+| --------------------------- | -------------------------- | ------------------- | ------------------------------------ |
+| `show_icon`                 | `ConfigProperty<bool>`     | `BarButtonBehavior` | Show/hide icon                       |
+| `show_label`                | `ConfigProperty<bool>`     | `BarButtonBehavior` | Show/hide label                      |
+| `show_border`               | `ConfigProperty<bool>`     | `BarButtonBehavior` | Show/hide border                     |
+| `visible`                   | `ConfigProperty<bool>`     | `BarButtonBehavior` | Show/hide entire button              |
+| `label_max_chars`           | `ConfigProperty<u32>`      | `BarButtonBehavior` | Max chars before truncation (0=off)  |
+| `icon_color`                | `ConfigProperty<ColorValue>` | `BarButtonColors` | Icon foreground color                |
+| `label_color`               | `ConfigProperty<ColorValue>` | `BarButtonColors` | Label text color                     |
+| `is_vertical`               | `ConfigProperty<bool>`     | `BarSettings`       | Vertical orientation                 |
 
 Config properties are reactive - changes trigger automatic UI updates.
 

@@ -28,14 +28,14 @@ provider = "gmail"
 | `name` | string | required | Display name shown in the dropdown. |
 | `query` | string | required | notmuch query whose match count is this account's unread total. |
 | `provider` | [`MailProvider`](/config/types#mail-provider) | `"generic"` | Provider, selecting the default brand icon. |
-| `icon` | unknown | `null` | Optional icon override. Empty uses the provider's default icon. |
+| `icon` | string or null | `null` | Optional icon override. Empty uses the provider's default icon. |
 
 ## Default configuration
 
 Required fields (must be set in your config): `name`, `query`.
 
 ```toml
-[[modules.mail-account]]
+[[modules.mail.accounts]]
 provider = "generic"
 ```
 

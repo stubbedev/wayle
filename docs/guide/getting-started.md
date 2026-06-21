@@ -39,6 +39,10 @@ You'll need these libraries plus their `-dev` / `-devel` headers:
 | fftw3            | 3               |
 | libpipewire      | 0.3             |
 | libudev          | any             |
+| GStreamer        | 1.0             |
+
+The screen recorder loads GStreamer's base, good, bad, ugly, and libav plugin
+sets at runtime, so install those alongside the core GStreamer development files.
 
 Plus a C toolchain: `clang`, `cmake`, `pkg-config`, `git`, and a C/C++ compiler.
 

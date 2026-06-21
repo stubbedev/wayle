@@ -41,7 +41,7 @@ async fn example() -> wayle_niri::Result<()> {
 
 ## Actions
 
-Send typed actions through the same service instance. `action(Action)` is the
+Send typed actions through the same service instance. `dispatch_action(Action)` is the
 generic entry point; convenience wrappers cover the common cases.
 
 ```rust,no_run

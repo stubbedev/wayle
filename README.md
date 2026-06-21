@@ -18,7 +18,7 @@ Configure it in `config.toml` or `config.yaml`, through the `wayle-settings` GUI
 ## Features
 
 - **Bar** with per-monitor layouts, groups, and CSS classes.
-- **Built-in modules** — clock, battery, bluetooth, network, audio/volume, brightness, power profiles, system tray, storage, CPU/RAM, notifications, weather, world clock, idle inhibit, and Hyprland / Niri / Mango workspaces.
+- **Built-in modules** — clock, battery, bluetooth, network, audio/volume, microphone, brightness, power, power profiles, system tray, storage, CPU/RAM, media player, audio visualizer (cava), notifications, weather, world clock, mail, screen recorder, idle inhibit, and Hyprland / Niri / Mango workspaces.
 - **Custom modules** — back any bar widget with a shell command (poll or watch), with [icon and color cycling by state](docs/guide/custom-modules.md) (`icon-map` / `color-map` keyed on the output's `alt`).
 - **Per-workspace icons** — give individual workspaces their own icon, shown even in label mode.
 - **Notifications, OSD, and custom toasts** — `wayle toast "…"` shows an on-screen toast (icon + label, or a progress bar) reusing the OSD styling.
@@ -60,7 +60,14 @@ Install Rust via [rustup](https://rustup.rs), then the system libraries:
 
 ```sh
 sudo pacman -S --needed git gtk4 gtk4-layer-shell gtksourceview5 \
-  libpulse fftw libpipewire systemd-libs clang base-devel
+  libpulse fftw libpipewire systemd-libs gst-plugins-base clang base-devel
+```
+
+The screen recorder also needs GStreamer plugins at runtime:
+
+```sh
+sudo pacman -S --needed gst-plugins-base gst-plugins-good gst-plugins-bad \
+  gst-plugins-ugly gst-libav
 ```
 
 Runtime daemons for the battery, bluetooth, network, power, and audio modules (skip any you don't need):
@@ -83,7 +90,15 @@ Install Rust via [rustup](https://rustup.rs), then the system libraries:
 ```sh
 sudo apt install git pkg-config cmake libgtk-4-dev libgtk4-layer-shell-dev \
   libgtksourceview-5-dev libpulse-dev libfftw3-dev libpipewire-0.3-dev \
-  libudev-dev clang build-essential
+  libudev-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+  clang build-essential
+```
+
+The screen recorder also needs GStreamer plugins at runtime:
+
+```sh
+sudo apt install gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
 ```
 
 Runtime daemons:
@@ -106,7 +121,14 @@ Install Rust via [rustup](https://rustup.rs), then the system libraries:
 ```sh
 sudo dnf install git cmake pkgconf-pkg-config gtk4-devel gtk4-layer-shell-devel \
   gtksourceview5-devel pulseaudio-libs-devel fftw-devel pipewire-devel \
-  systemd-devel clang gcc
+  systemd-devel gstreamer1-devel gstreamer1-plugins-base-devel clang gcc
+```
+
+The screen recorder also needs GStreamer plugins at runtime:
+
+```sh
+sudo dnf install gstreamer1-plugins-base gstreamer1-plugins-good \
+  gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free gstreamer1-libav
 ```
 
 Fedora Workstation already ships the runtime daemons. Minimal and Server installs need:
@@ -155,7 +177,7 @@ Every field is documented in the [config reference](docs/config/).
 
 ## Requirements
 
-A Wayland compositor that implements the `wlr-layer-shell` protocol. Compositor-specific modules currently target Hyprland, Niri and Mango; Sway support is in planned soon.
+A Wayland compositor that implements the `wlr-layer-shell` protocol. Compositor-specific modules (such as workspaces) currently target Hyprland, Niri, and Mango; Sway support is planned.
 
 ## Credits
 

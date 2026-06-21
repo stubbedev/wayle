@@ -10,7 +10,8 @@ Two clock modules on the same bar share every config-level styling option. To st
 
 ```toml
 # config.toml
-[bar.layout]
+[[bar.layout]]
+monitor = "*"
 center = [
   { module = "clock", class = "primary-clock" },
   "clock",
