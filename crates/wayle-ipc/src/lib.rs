@@ -3,6 +3,9 @@
 /// Shell D-Bus interface for GTK actions and IPC.
 pub mod shell;
 
+/// File chooser D-Bus client proxy.
+pub mod file_chooser;
+
 /// Idle inhibit D-Bus client proxy.
 pub mod idle_inhibit;
 

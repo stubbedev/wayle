@@ -120,11 +120,11 @@ in
           "org.freedesktop.impl.portal.Usb" = [ "wayle" ];
           "org.freedesktop.impl.portal.Clipboard" = [ "wayle" ];
           "org.freedesktop.impl.portal.InputCapture" = [ "wayle" ];
-          "org.freedesktop.impl.portal.FileChooser" = [ "gtk" ];
+          "org.freedesktop.impl.portal.FileChooser" = [ "wayle" ];
+          "org.freedesktop.impl.portal.Email" = [ "wayle" ];
           "org.freedesktop.impl.portal.AppChooser" = [ "gtk" ];
           "org.freedesktop.impl.portal.Print" = [ "gtk" ];
           "org.freedesktop.impl.portal.Account" = [ "gtk" ];
-          "org.freedesktop.impl.portal.Email" = [ "gtk" ];
           "org.freedesktop.impl.portal.Access" = [ "gtk" ];
         };
       };

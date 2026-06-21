@@ -1,4 +1,5 @@
 mod bar;
+mod file_chooser;
 mod helpers;
 mod notification_popup;
 mod osd;
@@ -20,6 +21,7 @@ pub(crate) use services::ShellServices;
 use tracing::{debug, info};
 
 use self::{
+    file_chooser::FileChooser,
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
     power_menu::PowerMenu,
@@ -130,6 +132,9 @@ impl Component for Shell {
             })
             .detach();
         crate::services::screenshot::register_sender(screenshot.sender().clone());
+
+        let file_chooser = FileChooser::builder().launch(()).detach();
+        crate::services::file_chooser::register_sender(file_chooser.sender().clone());
 
         let power_menu = PowerMenu::builder()
             .launch(init.services.config.clone())

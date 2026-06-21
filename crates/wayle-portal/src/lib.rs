@@ -19,7 +19,9 @@
 mod background;
 mod clipboard;
 mod dbus_util;
+mod email;
 mod error;
+mod filechooser;
 mod globalshortcuts;
 mod inhibit;
 mod inputcapture;
@@ -51,10 +53,11 @@ pub(crate) type StreamSizes = Arc<Mutex<HashMap<u32, (u32, u32)>>>;
 
 pub use self::error::Error;
 use self::{
-    background::Background, clipboard::Clipboard, globalshortcuts::GlobalShortcuts,
-    inhibit::Inhibit, inputcapture::InputCapture, lockdown::Lockdown, notification::Notification,
-    remotedesktop::RemoteDesktop, screencast::ScreenCast, screenshot::Screenshot,
-    settings::Settings, usb::Usb, wallpaper::WallpaperPortal,
+    background::Background, clipboard::Clipboard, email::Email, filechooser::FileChooser,
+    globalshortcuts::GlobalShortcuts, inhibit::Inhibit, inputcapture::InputCapture,
+    lockdown::Lockdown, notification::Notification, remotedesktop::RemoteDesktop,
+    screencast::ScreenCast, screenshot::Screenshot, settings::Settings, usb::Usb,
+    wallpaper::WallpaperPortal,
 };
 
 /// The backend's well-known D-Bus name (matches `wayle.portal`'s `DBusName`).
@@ -69,6 +72,7 @@ const BUS_NAME: &str = "org.freedesktop.impl.portal.desktop.wayle";
 /// Returns an error if the config cannot be loaded, the session bus is
 /// unreachable, an interface cannot be registered, or the name is already
 /// claimed by another backend.
+#[allow(clippy::cognitive_complexity)]
 pub async fn run() -> Result<(), Error> {
     let config = ConfigService::load()
         .await
@@ -134,6 +138,14 @@ pub async fn run() -> Result<(), Error> {
         .map_err(|err| Error::Registration(err.to_string()))?;
     server
         .at(path, InputCapture::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, FileChooser::new(connection.clone()))
+        .await
+        .map_err(|err| Error::Registration(err.to_string()))?;
+    server
+        .at(path, Email::new())
         .await
         .map_err(|err| Error::Registration(err.to_string()))?;
 

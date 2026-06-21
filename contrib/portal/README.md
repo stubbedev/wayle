@@ -28,14 +28,17 @@ Implemented natively by `wayle portal`:
 | `Background` | autostart `.desktop` entries + permission |
 | `Usb` | device-access permission grant (enumeration is frontend-side) |
 | `InputCapture` | output zones from `wl_output`; capture itself unsupported (see below) |
+| `FileChooser` | the shell's native `gtk::FileDialog` via `com.wayle.FileChooser1` |
+| `Email` | builds a `mailto:` and launches the default mail handler |
 | `Lockdown` | static policy (nothing locked down) |
 
 That is full interface parity with xdg-desktop-portal-kde (the most complete
-backend). Generic desktop-independent dialogs — `FileChooser`, `Print`,
-`Account`, `AppChooser`, `Email`, `DynamicLauncher`, and the permission
-`Access` dialog — are **delegated to `xdg-desktop-portal-gtk`** via the
-`default=gtk` fallback in `portals.conf`. Reimplementing GTK's file/print
-dialogs would duplicate it for no gain.
+backend). The remaining generic dialogs — `AppChooser`, `Print`, `Account`,
+`DynamicLauncher`, and the permission `Access` dialog — are still **delegated to
+`xdg-desktop-portal-gtk`** via the `default=gtk` fallback in `portals.conf`.
+They can be made native the same way `FileChooser` is (a shell-side
+`gtk`/Relm4 dialog behind a `com.wayle.*` service that the portal forwards to);
+until then gtk handles them.
 
 `InputCapture` is declared and answers `GetZones` from the live output layout,
 but reports **zero capabilities** and performs no grab: real input capture

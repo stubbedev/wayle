@@ -162,6 +162,8 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 
     init_screenshot().await;
 
+    init_file_chooser().await;
+
     let recorder = init_recorder(config_service.clone(), toast_bus.clone()).await;
 
     let mail = crate::services::MailService::new(config_service.clone());
@@ -209,6 +211,14 @@ async fn init_share_picker() {
 async fn init_screenshot() {
     if let Err(err) = screenshot::start().await {
         warn!(error = %err, "Screenshot service unavailable");
+    }
+}
+
+/// Registers the file chooser D-Bus service. Non-fatal: a failure just leaves
+/// the shell usable without the native portal file dialog.
+async fn init_file_chooser() {
+    if let Err(err) = crate::services::file_chooser::start().await {
+        warn!(error = %err, "File chooser service unavailable");
     }
 }
 
