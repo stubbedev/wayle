@@ -3,6 +3,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
+    sync::Arc,
     time::Duration,
 };
 
@@ -18,6 +19,7 @@ use wayle_config::{
     },
 };
 use wayle_audio::volume::types::Volume;
+use wayle_brightness::{BacklightDevice, Percentage};
 use wayle_widgets::prelude::{BarButton, BarButtonInput};
 
 use crate::{process, shell::services::ShellServices};
@@ -655,8 +657,59 @@ fn dispatch_action(
                 process::run_if_set(cmd);
             }
         }
+        ClickAction::Brightness(delta) => {
+            let Some(device) = primary_backlight(registry) else {
+                return;
+            };
+            // Floor at the configured minimum so a dimmer never scrolls fully
+            // dark; reaching 0% is reserved for BrightnessToggle.
+            let min = f64::from(
+                registry
+                    .services
+                    .config
+                    .config()
+                    .modules
+                    .brightness
+                    .min_brightness
+                    .get(),
+            )
+            .clamp(0.0, 100.0);
+            let delta = *delta;
+            debug!(delta, min, "click: brightness");
+            relm4::spawn(async move {
+                let target = (device.percentage().value() + f64::from(delta)).clamp(min, 100.0);
+                if let Err(error) = device.set_percentage(Percentage::new(target)).await {
+                    warn!(%error, "brightness action failed");
+                }
+            });
+        }
+        ClickAction::BrightnessToggle => {
+            let Some(device) = primary_backlight(registry) else {
+                return;
+            };
+            debug!("click: brightness toggle");
+            relm4::spawn(async move {
+                if let Err(error) = device.toggle_blackout().await {
+                    warn!(%error, "brightness toggle failed");
+                }
+            });
+        }
         ClickAction::None => debug!("click: none"),
     }
+}
+
+/// Resolves the primary backlight device for native brightness actions,
+/// logging the reason when unavailable so the caller can bail quietly.
+fn primary_backlight(registry: &DropdownRegistry) -> Option<Arc<BacklightDevice>> {
+    let Some(brightness) = registry.services.brightness.as_ref() else {
+        warn!("brightness action dropped: brightness service unavailable");
+        return None;
+    };
+    let device = brightness.primary.get();
+    if device.is_none() {
+        warn!("brightness action dropped: no primary backlight device");
+    }
+    device
 }
 
 /// Routes recognized `wayle …` commands to their in-process service instead of

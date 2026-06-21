@@ -36,6 +36,8 @@ impl ActionValue for ClickAction {
         match self {
             ClickAction::Shell(cmd) => cmd.clone(),
             ClickAction::Dropdown(name) => format!("dropdown:{name}"),
+            ClickAction::Brightness(delta) => format!("brightness:{delta}"),
+            ClickAction::BrightnessToggle => "brightness:toggle".to_owned(),
             ClickAction::None => String::new(),
         }
     }
@@ -45,6 +47,11 @@ impl ActionValue for ClickAction {
             ClickAction::None
         } else if let Some(name) = value.strip_prefix("dropdown:") {
             ClickAction::Dropdown(name.to_owned())
+        } else if let Some(rest) = value.strip_prefix("brightness:") {
+            match rest {
+                "toggle" => ClickAction::BrightnessToggle,
+                _ => rest.parse::<i32>().map_or(ClickAction::None, ClickAction::Brightness),
+            }
         } else {
             ClickAction::Shell(value.to_owned())
         }

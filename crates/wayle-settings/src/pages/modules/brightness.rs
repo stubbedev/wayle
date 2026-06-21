@@ -3,7 +3,10 @@
 use wayle_config::Config;
 
 use crate::{
-    editors::{icon_list::icon_list, text::text, threshold_list::threshold_list},
+    editors::{
+        icon_list::icon_list, number::number_u32_range, text::text,
+        threshold_list::threshold_list,
+    },
     pages::{
         nav::LeafEntry,
         sections::bar_button::{
@@ -45,6 +48,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         text(&module.format),
                         icon_list(&module.level_icons),
+                        number_u32_range(&module.min_brightness, 0, 100, 1),
                         threshold_list(&module.thresholds),
                     ],
                 },

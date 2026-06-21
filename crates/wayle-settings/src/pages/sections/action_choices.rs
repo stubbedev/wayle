@@ -20,6 +20,13 @@ fn dropdown(label: &str, id: &str) -> ActionChoice<ClickAction> {
     }
 }
 
+fn brightness(label: &str, delta: i32) -> ActionChoice<ClickAction> {
+    ActionChoice {
+        label: label.to_owned(),
+        action: ClickAction::Brightness(delta),
+    }
+}
+
 /// Predefined actions for a module's click/scroll fields, keyed by the module's
 /// page id. Unknown ids get no predefined choices (just None + Custom).
 pub(crate) fn choices_for(module_id: &str) -> Vec<ActionChoice<ClickAction>> {
@@ -39,7 +46,15 @@ pub(crate) fn choices_for(module_id: &str) -> Vec<ActionChoice<ClickAction>> {
         ],
         "battery" => vec![dropdown("Open battery panel", "battery")],
         "bluetooth" => vec![dropdown("Open bluetooth panel", "bluetooth")],
-        "brightness" => vec![dropdown("Open brightness panel", "brightness")],
+        "brightness" => vec![
+            brightness("Brightness up (+5%)", 5),
+            brightness("Brightness down (-5%)", -5),
+            ActionChoice {
+                label: "Toggle blackout (0% ⇄ last)".to_owned(),
+                action: ClickAction::BrightnessToggle,
+            },
+            dropdown("Open brightness panel", "brightness"),
+        ],
         "network" => vec![dropdown("Open network panel", "network")],
         "media" => vec![
             shell("Play / pause", "wayle media play-pause"),

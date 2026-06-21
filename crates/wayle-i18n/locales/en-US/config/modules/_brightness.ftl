@@ -29,6 +29,9 @@ settings-modules-brightness-label-color = Label Color
 settings-modules-brightness-label-max-length = Label Max Length
     .description = Max characters before truncation
 
+settings-modules-brightness-min-brightness = Minimum Brightness
+    .description = Floor (%) for the adjust action so a dimmer never scrolls fully dark; use the blackout toggle to reach 0%
+
 settings-modules-brightness-button-bg-color = Button Background
     .description = Button background color
 

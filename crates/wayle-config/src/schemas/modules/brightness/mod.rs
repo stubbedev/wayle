@@ -75,6 +75,15 @@ pub struct BrightnessConfig {
     #[default(0)]
     pub label_max_length: ConfigProperty<u32>,
 
+    /// Lower bound (percent) for the native brightness-adjust action.
+    ///
+    /// Scrolling or clicking down never drops below this, so a dimmer cannot
+    /// reach a fully dark screen by accident. Use the brightness-toggle action
+    /// to intentionally blackout to 0%.
+    #[serde(rename = "min-brightness")]
+    #[default(1)]
+    pub min_brightness: ConfigProperty<u32>,
+
     /// Button background color token.
     #[serde(rename = "button-bg-color")]
     #[default(ColorValue::Token(CssToken::BgSurfaceElevated))]
@@ -95,14 +104,15 @@ pub struct BrightnessConfig {
     #[default(ClickAction::None)]
     pub middle_click: ConfigProperty<ClickAction>,
 
-    /// Action on scroll up.
+    /// Action on scroll up. Default raises brightness by 5%.
     #[serde(rename = "scroll-up")]
-    #[default(ClickAction::None)]
+    #[default(ClickAction::Brightness(5))]
     pub scroll_up: ConfigProperty<ClickAction>,
 
-    /// Action on scroll down.
+    /// Action on scroll down. Default lowers brightness by 5%, floored at
+    /// `min-brightness`.
     #[serde(rename = "scroll-down")]
-    #[default(ClickAction::None)]
+    #[default(ClickAction::Brightness(-5))]
     pub scroll_down: ConfigProperty<ClickAction>,
 
     /// Dynamic color thresholds based on brightness percentage.
