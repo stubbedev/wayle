@@ -4,7 +4,7 @@
 use wayle_config::Config;
 
 use super::{
-    animations, bar, dropdowns, general, modules, notifications, osd, share_picker,
+    animations, bar, dropdowns, general, lock, modules, notifications, osd, share_picker,
     spec::PageSpec, styling, wallpaper,
 };
 
@@ -44,6 +44,10 @@ pub(crate) fn layout() -> Vec<NavSectionLayout> {
                 share_picker::entry,
                 dropdowns::entry,
             ],
+        },
+        NavSectionLayout {
+            i18n_key: "settings-nav-lock",
+            factories: vec![lock::entry],
         },
         NavSectionLayout {
             i18n_key: "settings-nav-modules",

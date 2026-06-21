@@ -53,6 +53,7 @@ fn main() {
             Commands::Systray { command } => cli::systray::execute(command).await,
             Commands::Wallpaper { command } => cli::wallpaper::execute(command).await,
             Commands::Idle { command } => cli::idle::execute(command).await,
+            Commands::Lock => cli::lock::execute().await,
             Commands::Recorder { command } => cli::recorder::execute(command).await,
             Commands::Screenshot { command } => cli::screenshot::execute(command).await,
             Commands::Widget { command } => cli::widget::execute(command).await,

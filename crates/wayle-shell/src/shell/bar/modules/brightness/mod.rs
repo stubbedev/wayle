@@ -8,7 +8,7 @@ use std::{rc::Rc, sync::Arc};
 
 use gtk::prelude::*;
 use relm4::prelude::*;
-use wayle_brightness::BrightnessService;
+use wayle_brightness::BacklightDevice;
 use wayle_config::{ConfigProperty, ConfigService, schemas::styling::CssToken};
 use wayle_widgets::{
     WatcherToken,
@@ -27,8 +27,8 @@ use crate::shell::bar::dropdowns::{self, DropdownRegistry};
 pub(crate) struct BrightnessModule {
     bar_button: Controller<BarButton>,
     config: Arc<ConfigService>,
+    devices: Vec<Arc<BacklightDevice>>,
     active_device_watcher_token: WatcherToken,
-    brightness: Arc<BrightnessService>,
     dropdowns: Rc<DropdownRegistry>,
 }
 
@@ -93,15 +93,22 @@ impl Component for BrightnessModule {
                 BarButtonOutput::ScrollDown => BrightnessMsg::ScrollDown,
             });
 
+        let devices = init.brightness.devices.get();
+
         watchers::spawn_watchers(&sender, brightness_config, &init.brightness);
 
-        let model = Self {
+        let mut model = Self {
             bar_button,
             config: init.config,
+            devices,
             active_device_watcher_token: WatcherToken::new(),
-            brightness: init.brightness,
             dropdowns: init.dropdowns,
         };
+
+        model.refresh_display(&model.config.config().modules.brightness);
+        let token = model.active_device_watcher_token.reset();
+        watchers::spawn_device_watchers(&sender, &model.devices, token);
+
         let bar_button = model.bar_button.widget();
         let widgets = view_output!();
 
@@ -131,22 +138,15 @@ impl Component for BrightnessModule {
         let brightness_config = &self.config.config().modules.brightness;
 
         match msg {
-            BrightnessCmd::DeviceChanged(device) => {
-                let Some(device) = device else {
-                    return;
-                };
-                self.update_display(brightness_config, &device);
-                self.apply_thresholds(brightness_config, &device);
+            BrightnessCmd::DevicesChanged(devices) => {
+                self.devices = devices;
+                self.refresh_display(brightness_config);
 
                 let token = self.active_device_watcher_token.reset();
-                watchers::spawn_device_watchers(&sender, &device, token);
+                watchers::spawn_device_watchers(&sender, &self.devices, token);
             }
             BrightnessCmd::BrightnessChanged | BrightnessCmd::ConfigChanged => {
-                let Some(device) = self.brightness.primary.get() else {
-                    return;
-                };
-                self.update_display(brightness_config, &device);
-                self.apply_thresholds(brightness_config, &device);
+                self.refresh_display(brightness_config);
             }
             BrightnessCmd::UpdateThresholdColors(colors) => {
                 self.bar_button

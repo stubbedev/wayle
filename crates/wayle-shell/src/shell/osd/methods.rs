@@ -5,7 +5,7 @@ use relm4::{ComponentSender, gtk};
 use wayle_audio::core::device::{input::InputDevice, output::OutputDevice};
 use wayle_brightness::BacklightDevice;
 use wayle_config::schemas::{
-    animations::{AnimSurface, AnimationType},
+    animations::AnimSurface,
     osd::{OsdMonitor, OsdPosition, OsdTextAlign},
 };
 
@@ -52,8 +52,7 @@ impl Osd {
         self.visible = true;
         self.revealed = true;
 
-        let duration =
-            duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
+        let duration = duration_override.unwrap_or_else(|| self.config.config().osd.duration.get());
         Self::schedule_dismiss(sender, duration, self.dismiss_id);
     }
 
@@ -173,15 +172,15 @@ impl Osd {
         self.show_event(event, sender, root);
     }
 
-    pub(super) fn handle_brightness_device_changed(
+    pub(super) fn handle_brightness_devices_changed(
         &mut self,
-        device: Option<Arc<BacklightDevice>>,
+        devices: Vec<Arc<BacklightDevice>>,
         sender: &ComponentSender<Self>,
     ) {
         let token = self.brightness_watcher.reset();
 
-        if let Some(device) = &device {
-            watchers::spawn_brightness_watcher(sender, device, token);
+        if !devices.is_empty() {
+            watchers::spawn_brightness_watchers(sender, &devices, token);
         }
     }
 
@@ -194,11 +193,17 @@ impl Osd {
             return;
         };
 
-        let Some(device) = brightness.primary.get() else {
+        // Show the average across all monitors, matching the bar label, since
+        // a brightness action drives every monitor at once.
+        let devices = brightness.devices.get();
+        if devices.is_empty() {
             return;
-        };
-
-        let percentage = device.percentage().value();
+        }
+        let sum: f64 = devices
+            .iter()
+            .map(|device| device.percentage().value())
+            .sum();
+        let percentage = sum / devices.len() as f64;
         let rounded = percentage.round() as u32;
 
         if self.last_brightness == Some(rounded) {
@@ -208,7 +213,7 @@ impl Osd {
         self.last_brightness = Some(rounded);
 
         let event = OsdEvent::Slider {
-            label: device.name.to_string(),
+            label: t!("osd-brightness"),
             icon: BRIGHTNESS_ICON.to_string(),
             percentage,
             muted: false,
@@ -382,20 +387,7 @@ impl Osd {
     }
 }
 
-fn revealer_transition(anim: AnimationType) -> gtk::RevealerTransitionType {
-    match anim {
-        AnimationType::None => gtk::RevealerTransitionType::None,
-        AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
-        AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
-        AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
-        AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
-        AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
-        AnimationType::SwingUp => gtk::RevealerTransitionType::SwingUp,
-        AnimationType::SwingDown => gtk::RevealerTransitionType::SwingDown,
-        AnimationType::SwingLeft => gtk::RevealerTransitionType::SwingLeft,
-        AnimationType::SwingRight => gtk::RevealerTransitionType::SwingRight,
-    }
-}
+use crate::shell::helpers::animation::revealer_transition;
 
 /// Revealer transition for the current direction. `revealed` means entering;
 /// otherwise exiting. Resolved per-surface with the global fallback cascade.

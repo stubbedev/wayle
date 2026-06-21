@@ -68,6 +68,7 @@ pub(super) fn capture(kind: CaptureKind) -> Result<RgbImage, String> {
 /// Captures every output to a full-resolution frame for the freeze-frame region
 /// flow. Run before the region overlay maps so any transient popups on screen
 /// are baked into the frames.
+#[allow(clippy::cognitive_complexity)]
 pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
     let setup = Instant::now();
     let connection =
@@ -87,7 +88,11 @@ pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
         })
         .collect();
     if cfg!(debug_assertions) {
-        info!(setup_ms = setup.elapsed().as_millis(), outputs = targets.len(), "screenshot freeze: wl manager ready");
+        info!(
+            setup_ms = setup.elapsed().as_millis(),
+            outputs = targets.len(),
+            "screenshot freeze: wl manager ready"
+        );
     }
 
     // Phase 1 (Wayland thread): screencopy each output and read its buffer into
@@ -102,7 +107,10 @@ pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
         raw.push((connector, image, transform));
     }
     if cfg!(debug_assertions) {
-        info!(copy_ms = copy.elapsed().as_millis(), "screenshot freeze: screencopy done");
+        info!(
+            copy_ms = copy.elapsed().as_millis(),
+            "screenshot freeze: screencopy done"
+        );
     }
 
     // Phase 2 (parallel): the XRGB->RGB conversion plus any rotation is pure CPU
@@ -129,11 +137,18 @@ pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
             .collect();
         handles
             .into_iter()
-            .map(|handle| handle.join().map_err(|_| "capture worker panicked".to_owned())?)
+            .map(|handle| {
+                handle
+                    .join()
+                    .map_err(|_| "capture worker panicked".to_owned())?
+            })
             .collect::<Result<Vec<_>, _>>()
     })?;
     if cfg!(debug_assertions) {
-        info!(convert_ms = convert.elapsed().as_millis(), "screenshot freeze: convert done");
+        info!(
+            convert_ms = convert.elapsed().as_millis(),
+            "screenshot freeze: convert done"
+        );
     }
     Ok(frozen)
 }

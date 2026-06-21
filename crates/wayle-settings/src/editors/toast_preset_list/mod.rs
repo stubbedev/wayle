@@ -6,11 +6,7 @@
 //! Cards hold their own widget state; any edit rebuilds the whole `Vec` and
 //! writes it back. Duplicate ids are flagged inline as you type.
 
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use relm4::gtk::{self, prelude::*};
 use wayle_config::{ConfigProperty, schemas::osd::ToastPreset};
@@ -79,8 +75,9 @@ impl State {
                 card.id.add_css_class("error");
                 card.id
                     .set_secondary_icon_name(Some("ld-alert-triangle-symbolic"));
-                card.id
-                    .set_secondary_icon_tooltip_text(Some(&t("settings-toast-preset-id-duplicate")));
+                card.id.set_secondary_icon_tooltip_text(Some(&t(
+                    "settings-toast-preset-id-duplicate",
+                )));
             } else {
                 card.id.remove_css_class("error");
                 card.id.set_secondary_icon_name(None);

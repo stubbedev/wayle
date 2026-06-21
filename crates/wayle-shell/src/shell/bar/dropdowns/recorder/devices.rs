@@ -86,7 +86,11 @@ fn capture_card(path: &str) -> Option<String> {
     if caps & V4L2_CAP_VIDEO_CAPTURE == 0 {
         return None;
     }
-    let end = cap.card.iter().position(|&b| b == 0).unwrap_or(cap.card.len());
+    let end = cap
+        .card
+        .iter()
+        .position(|&b| b == 0)
+        .unwrap_or(cap.card.len());
     let card = String::from_utf8_lossy(&cap.card[..end]).trim().to_owned();
     (!card.is_empty()).then_some(card)
 }

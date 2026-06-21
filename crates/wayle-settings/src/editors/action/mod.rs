@@ -14,9 +14,7 @@ use relm4::{
     prelude::*,
 };
 pub(crate) use row::action;
-use wayle_config::{
-    ClickAction, ConfigProperty, schemas::modules::WorkspaceClickAction,
-};
+use wayle_config::{ClickAction, ConfigProperty, schemas::modules::WorkspaceClickAction};
 use wayle_widgets::prelude::ellipsizing_string_factory;
 
 use super::{WatcherHandle, spawn_property_watcher};
@@ -50,7 +48,9 @@ impl ActionValue for ClickAction {
         } else if let Some(rest) = value.strip_prefix("brightness:") {
             match rest {
                 "toggle" => ClickAction::BrightnessToggle,
-                _ => rest.parse::<i32>().map_or(ClickAction::None, ClickAction::Brightness),
+                _ => rest
+                    .parse::<i32>()
+                    .map_or(ClickAction::None, ClickAction::Brightness),
             }
         } else {
             ClickAction::Shell(value.to_owned())
@@ -245,10 +245,10 @@ impl<T: ActionValue> SimpleComponent for ActionControl<T> {
             }
             ActionMsg::Refresh => {
                 let current = self.property.get().to_command();
-                if index_of_choice(&self.choices, &current).is_some() || current.is_empty() {
-                    if !(self.custom_mode && current.is_empty()) {
-                        self.custom_mode = false;
-                    }
+                if (index_of_choice(&self.choices, &current).is_some() || current.is_empty())
+                    && !(self.custom_mode && current.is_empty())
+                {
+                    self.custom_mode = false;
                 }
                 let index = selection_index(&self.choices, &current, self.custom_mode);
 

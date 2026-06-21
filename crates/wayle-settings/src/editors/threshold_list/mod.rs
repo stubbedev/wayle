@@ -130,12 +130,10 @@ impl ThresholdState {
         ];
 
         let entries = self.entries();
-        let title = entries
-            .get(index.get())
-            .map_or_else(
-                || format!("{} {}", t("settings-threshold-card-title"), card_number),
-                |entry| card_title(entry, card_number),
-            );
+        let title = entries.get(index.get()).map_or_else(
+            || format!("{} {}", t("settings-threshold-card-title"), card_number),
+            |entry| card_title(entry, card_number),
+        );
         let cw = card_titled(&title);
         for (label_key, control) in CARD_FIELDS.iter().zip(controls.iter()) {
             cw.body.append(&field_row(label_key, &control.widget));
@@ -154,7 +152,9 @@ impl ThresholdState {
         });
 
         self.list.append(&cw.root);
-        let title = cw.title.expect("card_titled always sets a title label");
+        // `card_titled` always sets a title; fall back to an empty label rather
+        // than panic if that ever changes.
+        let title = cw.title.unwrap_or_else(|| gtk::Label::new(None));
         self.cards.borrow_mut().push(ThresholdCard {
             index,
             title,
@@ -264,7 +264,8 @@ pub(crate) fn threshold_list(property: &ConfigProperty<Vec<ThresholdEntry>>) -> 
                     control.refresh();
                 }
                 if let Some(entry) = entries.get(card.index.get()) {
-                    card.title.set_label(&card_title(entry, card.index.get() + 1));
+                    card.title
+                        .set_label(&card_title(entry, card.index.get() + 1));
                 }
             }
         }

@@ -15,9 +15,7 @@ use wayle_config::{
 use wayle_i18n::t;
 
 use crate::{
-    editors::{
-        list_controls::add_button, optional::optional_color_widget, spawn_property_watcher,
-    },
+    editors::{list_controls::add_button, optional::optional_color_widget, spawn_property_watcher},
     pages::spec::SettingRowInit,
     property_handle::PropertyHandle,
     row::RowBehavior,

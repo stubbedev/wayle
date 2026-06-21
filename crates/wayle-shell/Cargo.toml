@@ -11,6 +11,7 @@ build = "build.rs"
 [dependencies]
 # gtk4-layer-shell MUST be first - it shims libwayland calls
 gtk4-layer-shell.workspace = true
+gtk4-session-lock.workspace = true
 gtk4.workspace = true
 gdk4.workspace = true
 gdk-pixbuf.workspace = true
@@ -36,6 +37,8 @@ tracing-appender.workspace = true
 tracing-subscriber.workspace = true
 evdev = { version = "0.13", features = ["stream-trait"] }
 libc.workspace = true
+pam.workspace = true
+zeroize.workspace = true
 
 # Service dependencies
 wayle-audio.workspace = true

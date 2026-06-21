@@ -60,6 +60,7 @@ pub(crate) fn device_subtitle(
 
 pub(crate) fn backlight_type_label(kind: BacklightType) -> &'static str {
     match kind {
+        BacklightType::Ddc => "external",
         BacklightType::Raw => "raw",
         BacklightType::Platform => "platform",
         BacklightType::Firmware => "firmware",

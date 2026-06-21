@@ -1,4 +1,8 @@
-//! Backlight control for internal displays.
+//! Backlight control for internal and external displays.
+//!
+//! Internal panels are driven through sysfs / logind; external monitors are
+//! driven over DDC/CI (I²C) and discovered when external support is enabled on
+//! the [builder](builder::BrightnessServiceBuilder::external_monitors).
 //!
 //! All state is exposed via [`Property`](wayle_core::Property) fields that
 //! update automatically when brightness changes.
@@ -13,7 +17,7 @@
 //!     return Ok(());
 //! };
 //!
-//! if let Some(device) = brightness.primary.get() {
+//! for device in brightness.devices.get() {
 //!     println!("{}: {}", device.name, device.percentage());
 //!     device.set_percentage(Percentage::new(50.0)).await?;
 //! }
@@ -29,10 +33,10 @@
 //!
 //! # async fn example() -> Result<(), wayle_brightness::Error> {
 //! # let Some(brightness) = BrightnessService::new().await? else { return Ok(()) };
-//! let mut stream = brightness.primary.watch();
+//! let mut stream = brightness.devices.watch();
 //!
-//! while let Some(maybe_device) = stream.next().await {
-//!     if let Some(device) = maybe_device {
+//! while let Some(devices) = stream.next().await {
+//!     for device in devices {
 //!         println!("brightness: {}", device.percentage());
 //!     }
 //! }

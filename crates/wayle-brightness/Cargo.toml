@@ -1,6 +1,6 @@
 [package]
 name = "wayle-brightness"
-description = "Backlight control for internal displays"
+description = "Backlight control for internal and external (DDC/CI) displays"
 version = "0.1.2"
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,7 @@ license.workspace = true
 readme = "README.md"
 
 [dependencies]
+ddc-hi = { version = "0.4", default-features = false, features = ["ddc-i2c"] }
 derive_more.workspace = true
 futures.workspace = true
 nix = { version = "0.30", features = ["poll", "fs"] }

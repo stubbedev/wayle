@@ -9,6 +9,8 @@ mod dbus;
 pub mod icons;
 /// Idle inhibit control commands
 pub mod idle;
+/// Lock screen command
+pub mod lock;
 /// Media control commands
 pub mod media;
 /// Notification control commands

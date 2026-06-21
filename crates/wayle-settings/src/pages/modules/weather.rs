@@ -66,7 +66,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 },
                 bar_display_section(&fields),
                 colors_section(&fields),
-                actions_section(&fields, &crate::pages::sections::action_choices::choices_for("weather")),
+                actions_section(
+                    &fields,
+                    &crate::pages::sections::action_choices::choices_for("weather"),
+                ),
             ],
         ),
     }

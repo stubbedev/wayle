@@ -115,9 +115,9 @@ impl Component for NotificationPopupHost {
                 let notif_config = &config.modules.notifications;
                 let scale = config.styling.scale.get().value();
                 let gap = notif_config.popup_gap.get().resolve_rem(
-            wayle_config::schemas::modules::notification::POPUP_GAP_BASE_REM,
-            scale,
-        ) as i32;
+                    wayle_config::schemas::modules::notification::POPUP_GAP_BASE_REM,
+                    scale,
+                ) as i32;
                 self.card_container.set_spacing(gap);
 
                 self.notification

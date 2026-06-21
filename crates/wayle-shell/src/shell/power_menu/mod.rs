@@ -11,13 +11,10 @@ use std::{sync::Arc, time::Duration};
 use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 use relm4::{
     gtk,
-    gtk::{glib, prelude::*, EventControllerKey},
+    gtk::{EventControllerKey, glib, prelude::*},
     prelude::*,
 };
-use wayle_config::{
-    ConfigService,
-    schemas::animations::{AnimSurface, AnimationType},
-};
+use wayle_config::{ConfigService, schemas::animations::AnimSurface};
 
 use crate::process;
 
@@ -248,17 +245,4 @@ impl PowerMenu {
     }
 }
 
-fn revealer_transition(anim: AnimationType) -> gtk::RevealerTransitionType {
-    match anim {
-        AnimationType::None => gtk::RevealerTransitionType::None,
-        AnimationType::Fade => gtk::RevealerTransitionType::Crossfade,
-        AnimationType::SlideUp => gtk::RevealerTransitionType::SlideUp,
-        AnimationType::SlideDown => gtk::RevealerTransitionType::SlideDown,
-        AnimationType::SlideLeft => gtk::RevealerTransitionType::SlideLeft,
-        AnimationType::SlideRight => gtk::RevealerTransitionType::SlideRight,
-        AnimationType::SwingUp => gtk::RevealerTransitionType::SwingUp,
-        AnimationType::SwingDown => gtk::RevealerTransitionType::SwingDown,
-        AnimationType::SwingLeft => gtk::RevealerTransitionType::SwingLeft,
-        AnimationType::SwingRight => gtk::RevealerTransitionType::SwingRight,
-    }
-}
+use crate::shell::helpers::animation::revealer_transition;

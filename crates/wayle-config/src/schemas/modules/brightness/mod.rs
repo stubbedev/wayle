@@ -84,6 +84,16 @@ pub struct BrightnessConfig {
     #[default(1)]
     pub min_brightness: ConfigProperty<u32>,
 
+    /// Discover and control external monitors over DDC/CI (I²C).
+    ///
+    /// External monitors appear as extra sliders in the brightness panel.
+    /// Requires the `i2c-dev` kernel module and read/write access to
+    /// `/dev/i2c-*` (usually membership in the `i2c` group). Disable to skip
+    /// the slow DDC scan if you only have an internal panel.
+    #[serde(rename = "enable-external")]
+    #[default(true)]
+    pub enable_external: ConfigProperty<bool>,
+
     /// Button background color token.
     #[serde(rename = "button-bg-color")]
     #[default(ColorValue::Token(CssToken::BgSurfaceElevated))]

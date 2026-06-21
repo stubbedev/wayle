@@ -89,6 +89,10 @@ pub struct AnimationsConfig {
     /// Per-surface override for the power menu overlay.
     #[default(SurfaceAnimation::default())]
     pub power: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for the lock screen reveal.
+    #[default(SurfaceAnimation::default())]
+    pub lock: ConfigProperty<SurfaceAnimation>,
 }
 
 /// Transient surface an animation applies to.
@@ -106,6 +110,8 @@ pub enum AnimSurface {
     Wallpaper,
     /// The power menu overlay.
     Power,
+    /// The lock screen reveal.
+    Lock,
 }
 
 impl AnimationsConfig {
@@ -117,6 +123,7 @@ impl AnimationsConfig {
             AnimSurface::SharePicker => self.share_picker.get(),
             AnimSurface::Wallpaper => self.wallpaper.get(),
             AnimSurface::Power => self.power.get(),
+            AnimSurface::Lock => self.lock.get(),
         }
     }
 

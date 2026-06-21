@@ -25,7 +25,6 @@ impl ServiceMonitoring for BrightnessService {
         let command_tx = self.command_tx.clone();
         let event_tx = self.event_tx.clone();
         let devices = self.devices.clone();
-        let primary = self.primary.clone();
         let cancellation_token = self.cancellation_token.clone();
 
         tokio::spawn(async move {
@@ -47,7 +46,6 @@ impl ServiceMonitoring for BrightnessService {
                                 &event_tx,
                                 &cancellation_token,
                                 &devices,
-                                &primary,
                             ).await,
 
                             Err(RecvError::Lagged(count)) => {
@@ -75,7 +73,6 @@ async fn handle_event(
     event_tx: &EventSender,
     parent_token: &CancellationToken,
     devices: &Property<Vec<Arc<BacklightDevice>>>,
-    primary: &Property<Option<Arc<BacklightDevice>>>,
 ) {
     match event {
         BrightnessEvent::DeviceAdded(info) => {
@@ -86,7 +83,6 @@ async fn handle_event(
                 event_tx,
                 parent_token,
                 devices,
-                primary,
             )
             .await;
         }
@@ -104,7 +100,6 @@ async fn handle_event(
                 event_tx,
                 parent_token,
                 devices,
-                primary,
             )
             .await;
         }
@@ -113,7 +108,7 @@ async fn handle_event(
             let key = DeviceName::new(name);
             cancel_existing(devices_map, &key);
             devices_map.remove(&key);
-            update_properties(devices_map, devices, primary);
+            publish_devices(devices_map, devices);
         }
     }
 }
@@ -125,7 +120,6 @@ async fn upsert_device(
     event_tx: &EventSender,
     parent_token: &CancellationToken,
     devices: &Property<Vec<Arc<BacklightDevice>>>,
-    primary: &Property<Option<Arc<BacklightDevice>>>,
 ) {
     cancel_existing(devices_map, &info.name);
 
@@ -136,7 +130,7 @@ async fn upsert_device(
     }
 
     devices_map.insert(info.name, device);
-    update_properties(devices_map, devices, primary);
+    publish_devices(devices_map, devices);
 }
 
 fn create_device(
@@ -163,18 +157,6 @@ fn cancel_existing(devices_map: &DeviceMap, name: &DeviceName) {
     }
 }
 
-fn update_properties(
-    devices_map: &DeviceMap,
-    devices: &Property<Vec<Arc<BacklightDevice>>>,
-    primary: &Property<Option<Arc<BacklightDevice>>>,
-) {
-    let device_list: Vec<_> = devices_map.values().cloned().collect();
-    devices.set(device_list);
-
-    let best = devices_map
-        .values()
-        .max_by_key(|device| device.backlight_type)
-        .cloned();
-
-    primary.set(best);
+fn publish_devices(devices_map: &DeviceMap, devices: &Property<Vec<Arc<BacklightDevice>>>) {
+    devices.set(devices_map.values().cloned().collect());
 }

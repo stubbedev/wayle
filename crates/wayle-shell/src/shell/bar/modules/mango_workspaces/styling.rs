@@ -14,7 +14,6 @@ use wayle_widgets::{prelude::BarSettings, styling::resolve_color};
 
 use super::helpers;
 
-
 /// CSS class for a tag-map key, or `None` when the key is not a tag index.
 fn tag_map_css_class(key: &str) -> Option<String> {
     let index: u32 = key.parse().ok()?;
@@ -40,11 +39,21 @@ pub(super) fn apply_styling(
     let bar_scale = config.bar.scale.get().value();
     let is_vertical = settings.is_vertical.get();
 
-    let icon_size_px =
-        tags_config.icon_size.get().resolve_rem(ICON_BASE_REM, bar_scale).round() as i32;
-    let label_size_px =
-        tags_config.label_size.get().resolve_rem(LABEL_BASE_REM, bar_scale).round() as i32;
-    let tag_padding_px = tags_config.tag_padding.get().resolve_rem(1.0, bar_scale).round() as i32;
+    let icon_size_px = tags_config
+        .icon_size
+        .get()
+        .resolve_rem(ICON_BASE_REM, bar_scale)
+        .round() as i32;
+    let label_size_px = tags_config
+        .label_size
+        .get()
+        .resolve_rem(LABEL_BASE_REM, bar_scale)
+        .round() as i32;
+    let tag_padding_px = tags_config
+        .tag_padding
+        .get()
+        .resolve_rem(1.0, bar_scale)
+        .round() as i32;
 
     let (margin_vertical_px, margin_horizontal_px) = if is_vertical {
         (tag_padding_px, 0)

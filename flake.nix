@@ -73,6 +73,7 @@
             libpulseaudio
             pipewire
             fftw
+            pam # libpam, linked by the lock screen's PAM auth
             systemd # provides libudev
           ]) ++ gstPlugins;
           # `nix develop` provides every native dependency `cargo build`,

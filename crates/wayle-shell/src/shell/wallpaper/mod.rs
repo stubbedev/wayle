@@ -75,8 +75,7 @@ fn reconcile(
     let gdk_monitors: HashMap<String, gdk::Monitor> = current_monitors().into_iter().collect();
 
     let cfg = config.config();
-    let transition =
-        stack_transition(cfg.animations.transition_for(AnimSurface::Wallpaper, false));
+    let transition = stack_transition(cfg.animations.transition_for(AnimSurface::Wallpaper, false));
     let duration_ms = cfg.animations.duration_for(AnimSurface::Wallpaper, false);
 
     // Global single-file wallpaper, used for monitors that have no wallpaper of
@@ -184,7 +183,9 @@ impl Surface {
 
             let decoded = match rx.await {
                 Ok(Ok(decoded)) => decoded,
-                Ok(Err(err)) => return warn!(path = %path.display(), %err, "cannot decode wallpaper"),
+                Ok(Err(err)) => {
+                    return warn!(path = %path.display(), %err, "cannot decode wallpaper");
+                }
                 Err(_) => return,
             };
 

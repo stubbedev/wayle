@@ -16,7 +16,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use relm4::{
     gtk,
-    gtk::{cairo, gdk, glib, prelude::*, ContentFit, EventControllerKey, GestureDrag},
+    gtk::{ContentFit, EventControllerKey, GestureDrag, cairo, gdk, glib, prelude::*},
     prelude::*,
 };
 use tokio::sync::oneshot;
@@ -134,7 +134,12 @@ impl Component for RegionOverlay {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: RegionOverlayInput, sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update(
+        &mut self,
+        msg: RegionOverlayInput,
+        sender: ComponentSender<Self>,
+        _root: &Self::Root,
+    ) {
         match msg {
             RegionOverlayInput::Show { reply, frames } => {
                 // Drop any previous, unanswered request.
@@ -279,7 +284,11 @@ impl RegionOverlay {
             // Size label: "<width> × <height>" in logical pixels, drawn in the
             // accent color on a dark backing box near the selection's top-left.
             let label = format!("{} × {}", gw.round() as i32, gh.round() as i32);
-            cr.select_font_face("monospace", cairo::FontSlant::Normal, cairo::FontWeight::Bold);
+            cr.select_font_face(
+                "monospace",
+                cairo::FontSlant::Normal,
+                cairo::FontWeight::Bold,
+            );
             cr.set_font_size(14.0);
             if let Ok(ext) = cr.text_extents(&label) {
                 let pad = 6.0;
