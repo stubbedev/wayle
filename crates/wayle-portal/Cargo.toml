@@ -8,13 +8,15 @@ repository.workspace = true
 license.workspace = true
 
 [features]
-# `pipewire` gates the ScreenCast PipeWire producer, the only part that needs
-# the libpipewire/libspa C libraries. Everything else (D-Bus interfaces,
-# wlr/ext Wayland capture, all pure logic) builds without it, so
-# `cargo test -p wayle-portal --no-default-features` runs the unit tests with
-# no system PipeWire present.
-default = ["pipewire"]
+# `pipewire` gates the ScreenCast PipeWire producer and `keysym` gates the
+# libxkbcommon-backed keysym injection — the only parts needing C libraries.
+# Everything else (D-Bus interfaces, wlr/ext Wayland capture, the pure-Rust EIS
+# server, all pure logic) builds without them, so
+# `cargo test -p wayle-portal --no-default-features` runs the unit tests with no
+# system PipeWire/xkbcommon present.
+default = ["pipewire", "keysym"]
 pipewire = ["dep:pipewire", "dep:libspa"]
+keysym = ["dep:xkbcommon"]
 
 [dependencies]
 futures.workspace = true
@@ -28,11 +30,14 @@ wayland-backend = "0.3.15"
 wayland-scanner = "0.31.10"
 wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
 wayland-protocols-misc = { version = "0.3.12", features = ["client"] }
+reis = { version = "0.7", features = ["calloop"] }
+calloop = "0.14"
 wayle-config.workspace = true
 wayle-ipc.workspace = true
 wayle-share-preview.workspace = true
 pipewire = { workspace = true, optional = true }
 libspa = { workspace = true, optional = true }
+xkbcommon = { version = "0.9", optional = true }
 
 [lints.clippy]
 cognitive_complexity = "warn"

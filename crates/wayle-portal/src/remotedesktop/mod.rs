@@ -11,6 +11,7 @@
 //! injected (logged), pending stream-coordinate mapping and a virtual-touch
 //! protocol.
 
+mod eis;
 mod input;
 
 use std::{
@@ -269,15 +270,21 @@ impl RemoteDesktop {
         );
     }
 
-    /// Key by keysym. Not yet injected: needs keysym→keycode resolution.
+    /// Key by keysym, resolved to a keycode via the active keymap.
     fn notify_keyboard_keysym(
         &self,
-        _session_handle: OwnedObjectPath,
+        session_handle: OwnedObjectPath,
         _options: HashMap<String, OwnedValue>,
-        _keysym: i32,
-        _state: u32,
+        keysym: i32,
+        state: u32,
     ) {
-        debug!("remotedesktop: keysym input not yet supported");
+        self.send(
+            &session_handle,
+            InputCommand::Keysym {
+                keysym: keysym as u32,
+                pressed: state != 0,
+            },
+        );
     }
 
     /// Touch down. Not supported (no virtual-touch protocol).
@@ -312,5 +319,21 @@ impl RemoteDesktop {
         _options: HashMap<String, OwnedValue>,
         _slot: u32,
     ) {
+    }
+
+    /// Returns an EIS socket fd the app can use to stream input events instead
+    /// of the `Notify*` methods (the modern libei transport).
+    async fn connect_to_eis(
+        &self,
+        session_handle: OwnedObjectPath,
+        _app_id: String,
+        _options: HashMap<String, OwnedValue>,
+    ) -> zbus::fdo::Result<zbus::zvariant::OwnedFd> {
+        let input = self
+            .input_for(&session_handle)
+            .ok_or_else(|| zbus::fdo::Error::Failed("no active remote-desktop session".to_owned()))?;
+        eis::connect(input)
+            .map(zbus::zvariant::OwnedFd::from)
+            .map_err(zbus::fdo::Error::Failed)
     }
 }

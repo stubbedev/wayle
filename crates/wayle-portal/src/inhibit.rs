@@ -52,6 +52,7 @@ impl Inhibit {
 
     /// Takes a logind inhibitor matching `flags` and exports a Request at
     /// `handle` that releases it on close.
+    #[allow(clippy::cognitive_complexity)]
     async fn inhibit(
         &self,
         handle: OwnedObjectPath,

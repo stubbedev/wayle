@@ -3681,6 +3681,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
+name = "reis"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81f3fedd2777cde52c1be5e572efbec485eac7b801c47820eda388d4f13b9c4b"
+dependencies = [
+ "calloop",
+ "enumflags2",
+ "log",
+ "rustix",
+]
+
+[[package]]
 name = "relm4"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4343,7 +4355,7 @@ dependencies = [
  "wayland-protocols-misc",
  "wayland-protocols-wlr",
  "wayland-scanner",
- "xkbcommon",
+ "xkbcommon 0.8.0",
  "xkeysym",
 ]
 
@@ -5879,10 +5891,12 @@ dependencies = [
 name = "wayle-portal"
 version = "0.7.13"
 dependencies = [
+ "calloop",
  "futures",
  "libc",
  "libspa",
  "pipewire",
+ "reis",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -5894,6 +5908,7 @@ dependencies = [
  "wayle-config",
  "wayle-ipc",
  "wayle-share-preview",
+ "xkbcommon 0.9.0",
  "zbus",
 ]
 
@@ -6751,6 +6766,17 @@ name = "xkbcommon"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d66ca9352cbd4eecbbc40871d8a11b4ac8107cfc528a6e14d7c19c69d0e1ac9"
+dependencies = [
+ "libc",
+ "memmap2",
+ "xkeysym",
+]
+
+[[package]]
+name = "xkbcommon"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7a974f48060a14e95705c01f24ad9c3345022f4d97441b8a36beb7ed5c4a02d"
 dependencies = [
  "libc",
  "memmap2",

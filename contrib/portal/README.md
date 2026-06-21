@@ -17,7 +17,7 @@ Implemented natively by `wayle portal`:
 | Interface | Backed by |
 |---|---|
 | `ScreenCast` | native PipeWire producer + wlr-screencopy / ext-image-copy capture |
-| `RemoteDesktop` | `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1` (relative+absolute pointer, evdev keys) |
+| `RemoteDesktop` | `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1`: relative+absolute pointer, scroll, evdev + keysym keys (libxkbcommon), and an `ConnectToEIS` libei socket (`reis`) |
 | `Screenshot` (+ PickColor) | the shell's `com.wayle.Screenshot1` overlay |
 | `GlobalShortcuts` | `hyprland-global-shortcuts-v1` (where the compositor implements it) |
 | `Settings` | `wayle-config` (`org.freedesktop.appearance`: color-scheme, accent, contrast) |
@@ -85,3 +85,15 @@ NixOS / home-manager module alongside the shell.
 - **GlobalShortcuts**: requires `hyprland-global-shortcuts-v1`. Compositors that
   do not implement it (currently niri, mango) accept binds but never deliver
   activations — there is no portal-agnostic global-shortcut mechanism.
+
+## Platform limitations (not stubs — no Wayland mechanism exists)
+
+- **RemoteDesktop touch injection**: there is no virtual-touchscreen protocol on
+  wlroots, so touch events are accepted but dropped. Pointer + keyboard (incl.
+  keysym + EIS) are fully injected.
+- **InputCapture grab**: real input capture needs the compositor to redirect
+  local input to the portal, which wlroots/niri do not expose (only KWin/Mutter
+  do). The interface reports zero capabilities and answers `GetZones`.
+- **ScreenCast dmabuf**: frames are copied through SHM. dmabuf zero-copy is a
+  performance optimization (needs GPU/gbm), not a missing feature — capture
+  works on every GPU today.

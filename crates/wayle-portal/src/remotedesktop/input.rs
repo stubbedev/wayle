@@ -52,6 +52,8 @@ pub enum InputCommand {
     PointerAxisDiscrete { axis: u32, steps: i32 },
     /// Key (evdev keycode) press/release.
     Key { keycode: u32, pressed: bool },
+    /// Key by keysym press/release (resolved to a keycode via the keymap).
+    Keysym { keysym: u32, pressed: bool },
 }
 
 /// Handle to the virtual-input thread; dropping it tears the thread down.
@@ -119,9 +121,16 @@ fn run(rx: &mpsc::Receiver<InputCommand>, ready: &mpsc::Sender<Result<(), String
 }
 
 /// The created virtual devices.
+/// `KEY_LEFTSHIFT` evdev keycode, for typing shifted keysyms.
+#[cfg(feature = "keysym")]
+const KEY_LEFTSHIFT: u32 = 42;
+
 struct Devices {
     pointer: ZwlrVirtualPointerV1,
     keyboard: ZwpVirtualKeyboardV1,
+    /// keysym -> (evdev keycode, needs shift), from the seat keymap.
+    #[cfg(feature = "keysym")]
+    keysym_map: std::collections::HashMap<u32, (u32, bool)>,
 }
 
 impl Devices {
@@ -164,6 +173,32 @@ impl Devices {
             InputCommand::Key { keycode, pressed } => {
                 self.keyboard.key(time, keycode, u32::from(pressed));
             }
+            InputCommand::Keysym { keysym, pressed } => self.inject_keysym(keysym, pressed, time),
+        }
+    }
+
+    /// Types a keysym by resolving it to a keycode (+ Shift) via the keymap.
+    fn inject_keysym(&self, keysym: u32, pressed: bool, time: u32) {
+        #[cfg(feature = "keysym")]
+        if let Some(&(keycode, needs_shift)) = self.keysym_map.get(&keysym) {
+            if pressed {
+                if needs_shift {
+                    self.keyboard.key(time, KEY_LEFTSHIFT, 1);
+                }
+                self.keyboard.key(time, keycode, 1);
+            } else {
+                self.keyboard.key(time, keycode, 0);
+                if needs_shift {
+                    self.keyboard.key(time, KEY_LEFTSHIFT, 0);
+                }
+            }
+        } else {
+            tracing::debug!(keysym, "no keycode for keysym in the active keymap");
+        }
+        #[cfg(not(feature = "keysym"))]
+        {
+            let _ = (keysym, pressed, time);
+            tracing::debug!("keysym injection needs the `keysym` feature");
         }
     }
 }
@@ -198,16 +233,79 @@ fn setup() -> Result<(Connection, Devices), String> {
     let pointer = pointer_manager.create_virtual_pointer(Some(&seat), &handle, ());
     let keyboard = keyboard_manager.create_virtual_keyboard(&seat, &handle, ());
 
+    #[cfg(feature = "keysym")]
+    let mut keysym_map = std::collections::HashMap::new();
     if let Some((format, fd, size)) = &globals.keymap {
         keyboard.keymap(*format, fd.as_fd(), *size);
         queue
             .roundtrip(&mut globals)
             .map_err(|e| format!("wayland roundtrip failed: {e}"))?;
+        #[cfg(feature = "keysym")]
+        {
+            keysym_map = build_keysym_map(fd, *size);
+        }
     } else {
         warn!("no seat keymap captured; virtual keyboard may not map keys");
     }
 
-    Ok((connection, Devices { pointer, keyboard }))
+    Ok((
+        connection,
+        Devices {
+            pointer,
+            keyboard,
+            #[cfg(feature = "keysym")]
+            keysym_map,
+        },
+    ))
+}
+
+/// Builds a `keysym -> (evdev keycode, needs shift)` map from the seat's xkb
+/// keymap (read from the keymap memfd). Lower levels win, so unshifted bindings
+/// take precedence.
+#[cfg(feature = "keysym")]
+#[allow(clippy::cognitive_complexity)]
+fn build_keysym_map(fd: &OwnedFd, _size: u32) -> std::collections::HashMap<u32, (u32, bool)> {
+    use std::io::Read;
+
+    use xkbcommon::xkb;
+
+    let mut map = std::collections::HashMap::new();
+    let Ok(clone) = fd.try_clone() else {
+        return map;
+    };
+    let mut text = String::new();
+    if std::fs::File::from(clone).read_to_string(&mut text).is_err() {
+        return map;
+    }
+    let text = text.trim_end_matches('\0').to_owned();
+
+    let context = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
+    let Some(keymap) = xkb::Keymap::new_from_string(
+        &context,
+        text,
+        xkb::KEYMAP_FORMAT_TEXT_V1,
+        xkb::KEYMAP_COMPILE_NO_FLAGS,
+    ) else {
+        return map;
+    };
+
+    for raw_kc in keymap.min_keycode().raw()..=keymap.max_keycode().raw() {
+        // wl_keyboard / virtual-keyboard use evdev codes = xkb keycode - 8.
+        let Some(evdev) = raw_kc.checked_sub(8) else {
+            continue;
+        };
+        let keycode = xkb::Keycode::new(raw_kc);
+        let levels = keymap.num_levels_for_key(keycode, 0);
+        for level in 0..levels {
+            for sym in keymap.key_get_syms_by_level(keycode, 0, level) {
+                let raw = sym.raw();
+                if raw != 0 {
+                    map.entry(raw).or_insert((evdev, level >= 1));
+                }
+            }
+        }
+    }
+    map
 }
 
 /// Milliseconds since the first call (lazily started).
