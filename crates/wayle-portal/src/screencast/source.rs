@@ -42,6 +42,10 @@ pub fn spa_video_transform(t: Transform) -> u32 {
 ///   its fixed damage array overflows).
 ///
 /// Rectangles are `(x, y, w, h)`.
+///
+/// Production uses [`clamp_damage_into`] (reused scratch buffer); this
+/// allocating wrapper exists for the unit tests.
+#[cfg(test)]
 #[must_use]
 pub fn clamp_damage(
     rects: &[(u32, u32, u32, u32)],
@@ -90,7 +94,7 @@ pub fn clamp_damage_into(
     // No usable damage survived clamping, or more than we can carry -> report the
     // whole frame rather than silently truncating real damage.
     if out.is_empty() || out.len() > max {
-        return full(out);
+        full(out);
     }
 }
 
@@ -108,6 +112,11 @@ pub fn clamp_damage_into(
 ///
 /// Never returns empty — the caller always has at least `INVALID` to try before
 /// giving up on dmabuf and falling back to SHM.
+///
+/// Currently unused by the producer (which offers exactly the modifier the bo
+/// was allocated with, so no candidate ordering is needed); kept and unit-tested
+/// as the reference strategy for a future offer-many/let-consumer-pick path.
+#[cfg(test)]
 #[must_use]
 pub fn dmabuf_modifier_candidates(advertised: &[u64]) -> Vec<u64> {
     /// `DRM_FORMAT_MOD_INVALID` — "let the driver choose an implicit modifier".
@@ -301,6 +310,10 @@ impl CaptureTarget {
 /// The parsed result of a [`SharePicker`] reply.
 ///
 /// [`SharePicker`]: wayle_ipc::share_picker
+///
+/// Single-target form, superseded in production by the multi-target
+/// [`parse_picker_reply_multi`]; retained for the parser unit tests.
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PickerSelection {
     /// Whether the user opted to allow a restore token.
@@ -317,6 +330,7 @@ pub struct PickerSelection {
 /// cancelled.
 ///
 /// Returns `None` on cancel or a malformed reply.
+#[cfg(test)]
 #[must_use]
 pub fn parse_picker_reply(reply: &str) -> Option<PickerSelection> {
     if reply.is_empty() {

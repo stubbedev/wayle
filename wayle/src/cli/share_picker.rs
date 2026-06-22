@@ -35,7 +35,8 @@ pub async fn execute(allow_token: bool) -> i32 {
         }
     };
 
-    match proxy.pick(&window_list, allow_token).await {
+    // Legacy single-select CLI path: never multi-select.
+    match proxy.pick(&window_list, allow_token, false).await {
         Ok(selection) if !selection.is_empty() => {
             println!("[SELECTION]{selection}");
             0

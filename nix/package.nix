@@ -22,6 +22,8 @@
   systemd,
   wayland,
   pam,
+  libgbm,
+  libdrm,
   gst_all_1,
 }:
 let
@@ -94,6 +96,8 @@ let
       systemd # libudev
       wayland
       pam # lock screen authenticates via libpam
+      libgbm # portal screencast dmabuf path links libgbm
+      libdrm # pulled in by gbm/drm-ffi
     ] ++ gstPlugins;
 
     # libspa-sys defines cast macros like `SPA_ID_INVALID ((uint32_t)0xffffffff)`

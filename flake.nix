@@ -75,6 +75,8 @@
             fftw
             pam # libpam, linked by the lock screen's PAM auth
             systemd # provides libudev
+            libgbm # libgbm, linked by the portal screencast dmabuf path
+            libdrm # libdrm, pulled in by gbm/drm-ffi
           ]) ++ gstPlugins;
           # `nix develop` provides every native dependency `cargo build`,
           # `just check`, and the `release-*` recipes need. The Rust toolchain

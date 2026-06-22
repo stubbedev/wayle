@@ -99,39 +99,39 @@ pub async fn run() -> Result<(), Error> {
 
     let server = connection.object_server();
     let path = settings::PORTAL_PATH;
-    mount(&server, path, Settings::new(config.clone())).await?;
-    mount(&server, path, Lockdown).await?;
+    mount(server, path, Settings::new(config.clone())).await?;
+    mount(server, path, Lockdown).await?;
     mount(
-        &server,
+        server,
         path,
         ScreenCast::new(connection.clone(), stream_sizes.clone()),
     )
     .await?;
-    mount(&server, path, Screenshot::new(connection.clone())).await?;
+    mount(server, path, Screenshot::new(connection.clone())).await?;
     mount(
-        &server,
+        server,
         path,
         RemoteDesktop::new(connection.clone(), stream_sizes.clone()),
     )
     .await?;
-    mount(&server, path, GlobalShortcuts::new(connection.clone())).await?;
+    mount(server, path, GlobalShortcuts::new(connection.clone())).await?;
     let notification = Notification::new(connection.clone());
     notification.spawn_action_forwarder();
-    mount(&server, path, notification).await?;
-    mount(&server, path, WallpaperPortal::new(connection.clone())).await?;
-    mount(&server, path, Inhibit::new(connection.clone())).await?;
-    mount(&server, path, Background::new()).await?;
-    mount(&server, path, Usb::new()).await?;
-    mount(&server, path, Clipboard::new(connection.clone())).await?;
-    mount(&server, path, InputCapture::new(connection.clone())).await?;
-    mount(&server, path, FileChooser::new(connection.clone())).await?;
-    mount(&server, path, Email::new()).await?;
-    mount(&server, path, Access::new(connection.clone())).await?;
-    mount(&server, path, Account::new(connection.clone())).await?;
-    mount(&server, path, AppChooser::new(connection.clone())).await?;
-    mount(&server, path, DynamicLauncher::new(connection.clone())).await?;
-    mount(&server, path, Print::new(connection.clone())).await?;
-    mount(&server, path, Secret::new()).await?;
+    mount(server, path, notification).await?;
+    mount(server, path, WallpaperPortal::new(connection.clone())).await?;
+    mount(server, path, Inhibit::new(connection.clone())).await?;
+    mount(server, path, Background::new()).await?;
+    mount(server, path, Usb::new()).await?;
+    mount(server, path, Clipboard::new(connection.clone())).await?;
+    mount(server, path, InputCapture::new(connection.clone())).await?;
+    mount(server, path, FileChooser::new(connection.clone())).await?;
+    mount(server, path, Email::new()).await?;
+    mount(server, path, Access::new(connection.clone())).await?;
+    mount(server, path, Account::new(connection.clone())).await?;
+    mount(server, path, AppChooser::new(connection.clone())).await?;
+    mount(server, path, DynamicLauncher::new(connection.clone())).await?;
+    mount(server, path, Print::new(connection.clone())).await?;
+    mount(server, path, Secret::new()).await?;
 
     // Request the name with `DoNotQueue` so that, if another backend already
     // owns it, we fail loudly instead of silently queueing and idling forever.
