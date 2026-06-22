@@ -1,4 +1,5 @@
 pub mod buffer;
+pub mod dmabuf;
 pub mod error;
 pub mod ext_capture;
 pub mod frame;

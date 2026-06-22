@@ -72,6 +72,8 @@
             libxkbcommon
             libpulseaudio
             pipewire
+            libgbm # libgbm — GPU buffer allocation for zero-copy screencast dmabufs
+            libdrm # DRM format/modifier helpers paired with libgbm
             fftw
             pam # libpam, linked by the lock screen's PAM auth
             systemd # provides libudev

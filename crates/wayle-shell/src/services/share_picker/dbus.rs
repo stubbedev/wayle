@@ -15,9 +15,11 @@ impl SharePickerDaemon {
     /// Shows the picker and blocks until the user selects or cancels.
     ///
     /// Returns the XDPH selection suffix (printed after `[SELECTION]`), or an
-    /// empty string when cancelled or when the shell UI is not yet ready.
+    /// empty string when cancelled or when the shell UI is not yet ready. When
+    /// `multiple` is set the user may pick several sources (newline-separated
+    /// payloads in the reply).
     #[instrument(skip(self))]
-    pub async fn pick(&self, window_list: &str, allow_token: bool) -> String {
+    pub async fn pick(&self, window_list: &str, allow_token: bool, multiple: bool) -> String {
         let Some(sender) = picker_sender() else {
             warn!("share picker requested before the shell UI registered its sender");
             return String::new();
@@ -29,6 +31,7 @@ impl SharePickerDaemon {
         sender.emit(SharePickerInput::Show {
             toplevels,
             allow_token,
+            multiple,
             reply: reply_tx,
         });
 

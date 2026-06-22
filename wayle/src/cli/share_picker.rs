@@ -35,7 +35,8 @@ pub async fn execute(allow_token: bool) -> i32 {
         }
     };
 
-    match proxy.pick(&window_list, allow_token).await {
+    // The legacy XDPH path only ever requests a single source.
+    match proxy.pick(&window_list, allow_token, false).await {
         Ok(selection) if !selection.is_empty() => {
             println!("[SELECTION]{selection}");
             0

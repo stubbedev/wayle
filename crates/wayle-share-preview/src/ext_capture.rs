@@ -140,12 +140,16 @@ impl ExtToplevelManager {
 
     /// Captures a single frame of `handle` into an SHM [`Buffer`].
     ///
+    /// `overlay_cursor` asks the compositor to composite the pointer cursor
+    /// into the frame (via the `paint_cursors` session option).
+    ///
     /// # Errors
     ///
     /// Returns an error if session negotiation or the frame copy fails.
     pub fn capture_toplevel(
         &mut self,
         handle: &ExtForeignToplevelHandleV1,
+        overlay_cursor: bool,
     ) -> Result<Buffer, Error> {
         let (Some(source_manager), Some(capture_manager)) =
             (self.source_manager.clone(), self.capture_manager.clone())
@@ -158,11 +162,16 @@ impl ExtToplevelManager {
         let mut event_queue = self.connection.new_event_queue();
         let qh = event_queue.handle();
 
+        let options = if overlay_cursor {
+            ext_image_copy_capture_manager_v1::Options::PaintCursors
+        } else {
+            ext_image_copy_capture_manager_v1::Options::empty()
+        };
         let source = source_manager.create_source(handle, &qh, ());
         let session_state = Arc::new(Mutex::new(SessionState::default()));
         let session = capture_manager.create_session(
             &source,
-            ext_image_copy_capture_manager_v1::Options::empty(),
+            options,
             &qh,
             Arc::downgrade(&session_state),
         );

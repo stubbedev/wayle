@@ -120,18 +120,20 @@ impl CaptureTarget {
 pub struct PickerSelection {
     /// Whether the user opted to allow a restore token.
     pub allow_token: bool,
-    /// The chosen capture target.
-    pub target: CaptureTarget,
+    /// The chosen capture targets. Always at least one; more than one only
+    /// when the portal requested multiple sources and the user picked several.
+    pub targets: Vec<CaptureTarget>,
 }
 
 /// Parses a `com.wayle.SharePicker1.pick` reply.
 ///
 /// The reply is the XDPH selection suffix: an optional leading flag segment
-/// (`r` = allow restore token) before the first `/`, then a
-/// `screen:`/`window:`/`region:` payload. An empty string means the user
+/// (`r` = allow restore token) before the first `/`, then one or more
+/// newline-separated `screen:`/`window:`/`region:` payloads (multiple only when
+/// the portal asked for multiple sources). An empty string means the user
 /// cancelled.
 ///
-/// Returns `None` on cancel or a malformed reply.
+/// Returns `None` on cancel or when no payload parses.
 #[must_use]
 pub fn parse_picker_reply(reply: &str) -> Option<PickerSelection> {
     if reply.is_empty() {
@@ -139,12 +141,18 @@ pub fn parse_picker_reply(reply: &str) -> Option<PickerSelection> {
     }
     let slash = reply.find('/')?;
     let flags = &reply[..slash];
-    let payload = &reply[slash + 1..];
     let allow_token = flags.contains('r');
-    let target = parse_target(payload)?;
+    let targets: Vec<CaptureTarget> = reply[slash + 1..]
+        .split('\n')
+        .filter(|payload| !payload.is_empty())
+        .filter_map(parse_target)
+        .collect();
+    if targets.is_empty() {
+        return None;
+    }
     Some(PickerSelection {
         allow_token,
-        target,
+        targets,
     })
 }
 
@@ -193,8 +201,8 @@ mod tests {
     fn parses_screen() {
         let sel = parse_picker_reply("/screen:DP-1").unwrap();
         assert!(!sel.allow_token);
-        assert_eq!(sel.target, CaptureTarget::Output("DP-1".to_owned()));
-        assert_eq!(sel.target.source_type(), SourceType::Monitor);
+        assert_eq!(sel.targets, vec![CaptureTarget::Output("DP-1".to_owned())]);
+        assert_eq!(sel.targets[0].source_type(), SourceType::Monitor);
     }
 
     #[test]
@@ -202,8 +210,8 @@ mod tests {
         let sel = parse_picker_reply("r/window:firefox@instance-3").unwrap();
         assert!(sel.allow_token);
         assert_eq!(
-            sel.target,
-            CaptureTarget::Window("firefox@instance-3".to_owned())
+            sel.targets,
+            vec![CaptureTarget::Window("firefox@instance-3".to_owned())]
         );
     }
 
@@ -211,16 +219,42 @@ mod tests {
     fn parses_region() {
         let sel = parse_picker_reply("/region:DP-1@10,20,800,600").unwrap();
         assert_eq!(
-            sel.target,
-            CaptureTarget::Region {
+            sel.targets,
+            vec![CaptureTarget::Region {
                 output: "DP-1".to_owned(),
                 x: 10,
                 y: 20,
                 width: 800,
                 height: 600,
-            }
+            }]
         );
-        assert_eq!(sel.target.source_type(), SourceType::Virtual);
+        assert_eq!(sel.targets[0].source_type(), SourceType::Virtual);
+    }
+
+    #[test]
+    fn parses_multiple_targets() {
+        let sel = parse_picker_reply("r/screen:DP-1\nwindow:firefox@3\nscreen:DP-2").unwrap();
+        assert!(sel.allow_token);
+        assert_eq!(
+            sel.targets,
+            vec![
+                CaptureTarget::Output("DP-1".to_owned()),
+                CaptureTarget::Window("firefox@3".to_owned()),
+                CaptureTarget::Output("DP-2".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
+    fn skips_blank_payloads_between_targets() {
+        let sel = parse_picker_reply("/screen:DP-1\n\nscreen:DP-2\n").unwrap();
+        assert_eq!(
+            sel.targets,
+            vec![
+                CaptureTarget::Output("DP-1".to_owned()),
+                CaptureTarget::Output("DP-2".to_owned()),
+            ]
+        );
     }
 
     #[test]

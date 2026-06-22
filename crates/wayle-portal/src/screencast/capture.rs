@@ -5,8 +5,13 @@
 //! once for a [`CaptureTarget`] and re-captures a fresh frame on demand; the
 //! PipeWire producer drives the timing.
 
-use wayland_client::{Connection, protocol::wl_output::WlOutput};
-use wayle_share_preview::{buffer::Buffer, ext_capture::ExtToplevelManager, output::OutputManager};
+use wayland_client::{
+    Connection,
+    protocol::{wl_buffer::WlBuffer, wl_output::WlOutput},
+};
+use wayle_share_preview::{
+    buffer::Buffer, dmabuf::DmaBuffer, ext_capture::ExtToplevelManager, output::OutputManager,
+};
 
 use super::source::CaptureTarget;
 
@@ -18,6 +23,8 @@ pub enum Capturer {
         manager: OutputManager,
         /// The bound output.
         output: WlOutput,
+        /// Composite the hardware cursor into each frame.
+        cursor: bool,
     },
     /// Output-region capture via wlr-screencopy.
     Region {
@@ -33,6 +40,8 @@ pub enum Capturer {
         width: i32,
         /// Region height.
         height: i32,
+        /// Composite the hardware cursor into each frame.
+        cursor: bool,
     },
     /// Toplevel capture via ext-image-copy.
     Window {
@@ -40,6 +49,8 @@ pub enum Capturer {
         manager: ExtToplevelManager,
         /// The bound toplevel handle.
         handle: wayle_share_preview::ext_capture::ExtToplevel,
+        /// Composite the hardware cursor into each frame.
+        cursor: bool,
     },
 }
 
@@ -51,7 +62,11 @@ impl Capturer {
     ///
     /// Returns an error if the Wayland connection fails, the required capture
     /// protocol is unavailable, or the target output/window no longer exists.
-    pub fn open(target: &CaptureTarget) -> Result<Self, String> {
+    ///
+    /// `cursor` requests the hardware cursor be composited into each frame
+    /// (output/region targets only; the ext-image-copy window path has no
+    /// equivalent overlay flag).
+    pub fn open(target: &CaptureTarget, cursor: bool) -> Result<Self, String> {
         let connection =
             Connection::connect_to_env().map_err(|e| format!("cannot connect to wayland: {e}"))?;
 
@@ -60,7 +75,11 @@ impl Capturer {
                 let manager = OutputManager::new(&connection)
                     .map_err(|e| format!("screencopy unavailable: {e}"))?;
                 let output = find_output(&manager, name)?;
-                Ok(Self::Output { manager, output })
+                Ok(Self::Output {
+                    manager,
+                    output,
+                    cursor,
+                })
             }
             CaptureTarget::Region {
                 output,
@@ -79,6 +98,7 @@ impl Capturer {
                     y: *y,
                     width: *width,
                     height: *height,
+                    cursor,
                 })
             }
             CaptureTarget::Window(identifier) => {
@@ -90,7 +110,11 @@ impl Capturer {
                     .find(|t| t.identifier.as_deref() == Some(identifier.as_str()))
                     .cloned()
                     .ok_or_else(|| format!("window '{identifier}' is gone"))?;
-                Ok(Self::Window { manager, handle })
+                Ok(Self::Window {
+                    manager,
+                    handle,
+                    cursor,
+                })
             }
         }
     }
@@ -103,8 +127,12 @@ impl Capturer {
     /// error, …).
     pub fn capture(&mut self) -> Result<Buffer, String> {
         match self {
-            Self::Output { manager, output } => manager
-                .capture_output(output)
+            Self::Output {
+                manager,
+                output,
+                cursor,
+            } => manager
+                .capture_output(output, *cursor)
                 .map_err(|e| format!("output capture failed: {e}")),
             Self::Region {
                 manager,
@@ -113,12 +141,76 @@ impl Capturer {
                 y,
                 width,
                 height,
+                cursor,
             } => manager
-                .capture_output_region(output, *x, *y, *width, *height)
+                .capture_output_region(output, *x, *y, *width, *height, *cursor)
                 .map_err(|e| format!("region capture failed: {e}")),
-            Self::Window { manager, handle } => manager
-                .capture_toplevel(&handle.handle)
+            Self::Window {
+                manager,
+                handle,
+                cursor,
+            } => manager
+                .capture_toplevel(&handle.handle, *cursor)
                 .map_err(|e| format!("window capture failed: {e}")),
+        }
+    }
+
+    /// Whether this target can capture into a dmabuf (zero-copy). Only the
+    /// wlr-screencopy output/region paths support it; the ext-image-copy window
+    /// path stays on SHM.
+    #[must_use]
+    pub fn supports_dmabuf(&self) -> bool {
+        match self {
+            Self::Output { manager, .. } | Self::Region { manager, .. } => {
+                manager.supports_dmabuf()
+            }
+            Self::Window { .. } => false,
+        }
+    }
+
+    /// Imports an allocated GPU buffer as a `wl_buffer` for reuse across
+    /// captures.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the target does not support dmabuf or the import
+    /// fails.
+    pub fn import_dmabuf(&mut self, dma: &DmaBuffer) -> Result<WlBuffer, String> {
+        match self {
+            Self::Output { manager, .. } | Self::Region { manager, .. } => manager
+                .import_dmabuf(dma)
+                .map_err(|e| format!("dmabuf import failed: {e}")),
+            Self::Window { .. } => Err("dmabuf capture not supported for windows".to_owned()),
+        }
+    }
+
+    /// Captures one frame straight into a dmabuf `wl_buffer` (zero-copy).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the target does not support dmabuf or the capture
+    /// fails.
+    pub fn capture_into(&mut self, buffer: &WlBuffer) -> Result<(), String> {
+        match self {
+            Self::Output {
+                manager,
+                output,
+                cursor,
+            } => manager
+                .capture_output_into(output, buffer, *cursor)
+                .map_err(|e| format!("output dmabuf capture failed: {e}")),
+            Self::Region {
+                manager,
+                output,
+                x,
+                y,
+                width,
+                height,
+                cursor,
+            } => manager
+                .capture_output_region_into(output, *x, *y, *width, *height, buffer, *cursor)
+                .map_err(|e| format!("region dmabuf capture failed: {e}")),
+            Self::Window { .. } => Err("dmabuf capture not supported for windows".to_owned()),
         }
     }
 }

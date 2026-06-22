@@ -275,7 +275,7 @@ fn capture_window_buffer(address: Option<u64>, class: &str, title: &str) -> Resu
         .map(|t| t.handle.clone())
         .ok_or("could not match the window to capture")?;
     manager
-        .capture_toplevel(&handle)
+        .capture_toplevel(&handle, false)
         .map_err(|e| format!("window capture failed: {e}"))
 }
 
@@ -465,7 +465,7 @@ fn request_output_frame(
     relm4::spawn_blocking(move || {
         // capture_output needs `&mut self`; clone per concurrent capture.
         let mut manager = (*manager).clone();
-        let buffer = match manager.capture_output(&wl_output) {
+        let buffer = match manager.capture_output(&wl_output, false) {
             Ok(buffer) => buffer,
             Err(err) => return error!(%err, name, "unable to capture output"),
         };

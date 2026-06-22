@@ -56,8 +56,10 @@ derive_more = { version = "2.0.1", default-features = false, features = [
 	"debug",
 ] }
 dotenvy = "0.15"
+drm-fourcc = "2.2"
 fnv = "1.0"
 futures = "0.3.31"
+gbm = { version = "0.18", default-features = false }
 gdk-pixbuf = "0.22"
 gdk4 = "0.11"
 glib = "0.22"
@@ -82,7 +84,9 @@ inventory = "0.3"
 libc = "0.2.176"
 libpulse-binding = { version = "2.30.1", features = ["pa_v13"] }
 niri-ipc = "=25.11.0"
-pipewire = "0.10"
+# v0_3_34 exposes `pw_stream_trigger_process`, used to drive the screencast
+# producer (the system PipeWire is far newer, so this is always available).
+pipewire = { version = "0.10", features = ["v0_3_34"] }
 libspa = "0.10"
 minijinja = { version = "2.15", default-features = false, features = [
 	"builtins",

@@ -47,7 +47,7 @@ const DEFAULT_FPS: u32 = 30;
 struct SessionConfig {
     /// `cursor_mode` bitmask from `SelectSources`.
     cursor_mode: u32,
-    /// Whether multiple sources were requested (we currently stream one).
+    /// Whether the client allows selecting multiple sources.
     multiple: bool,
     /// `persist_mode` from `SelectSources` (0 = no persistence).
     persist_mode: u32,
@@ -83,7 +83,7 @@ impl ScreenCast {
 
     /// Shows the picker and parses the user's selection. `None` = cancelled or
     /// the shell UI is unavailable.
-    async fn run_picker(&self, allow_token: bool) -> Option<PickerSelection> {
+    async fn run_picker(&self, allow_token: bool, multiple: bool) -> Option<PickerSelection> {
         let proxy = match SharePickerProxy::new(&self.connection).await {
             Ok(proxy) => proxy,
             Err(err) => {
@@ -93,7 +93,7 @@ impl ScreenCast {
         };
         // Empty window list → the picker enumerates toplevels generically and
         // returns a stable ext identifier we can re-resolve when capturing.
-        match proxy.pick("", allow_token).await {
+        match proxy.pick("", allow_token, multiple).await {
             Ok(reply) => parse_picker_reply(&reply),
             Err(err) => {
                 warn!(%err, "screencast: picker call failed");
@@ -208,19 +208,22 @@ impl ScreenCast {
         let selection = match config.restore_target.clone() {
             Some(target) => PickerSelection {
                 allow_token: config.persist_mode > 0,
-                target,
+                targets: vec![target],
             },
             None => {
                 let picked = match cancel {
                     Some(cancel) => {
-                        let picker = self.run_picker(config.persist_mode > 0);
+                        let picker = self.run_picker(config.persist_mode > 0, config.multiple);
                         tokio::pin!(picker);
                         tokio::select! {
                             selection = &mut picker => selection,
                             () = cancel.cancelled() => None,
                         }
                     }
-                    None => self.run_picker(config.persist_mode > 0).await,
+                    None => {
+                        self.run_picker(config.persist_mode > 0, config.multiple)
+                            .await
+                    }
                 };
                 match picked {
                     Some(selection) => selection,
@@ -229,19 +232,23 @@ impl ScreenCast {
             }
         };
 
-        let stream = match self
-            .begin_stream(&session_handle, &selection.target, config.cursor_mode)
-            .await
-        {
-            Ok(stream) => stream,
-            Err(err) => {
-                error!(%err, "screencast: failed to start stream");
-                return (Response::Other.code(), HashMap::new());
+        // One PipeWire producer per selected source.
+        let mut streams = Vec::with_capacity(selection.targets.len());
+        for target in &selection.targets {
+            match self
+                .begin_stream(&session_handle, target, config.cursor_mode)
+                .await
+            {
+                Ok(stream) => streams.push(stream),
+                Err(err) => {
+                    error!(%err, "screencast: failed to start stream");
+                    return (Response::Other.code(), HashMap::new());
+                }
             }
-        };
+        }
 
         let mut results = HashMap::new();
-        match build_streams_value(&stream) {
+        match build_streams_value(&streams) {
             Ok(value) => {
                 results.insert("streams".to_owned(), value);
             }
@@ -251,9 +258,12 @@ impl ScreenCast {
             }
         }
 
+        // A restore token captures a single source; only persist when exactly
+        // one was selected.
         if config.persist_mode > 0
             && selection.allow_token
-            && let Ok(restore_data) = restore::encode(&selection.target)
+            && let [target] = selection.targets.as_slice()
+            && let Ok(restore_data) = restore::encode(target)
         {
             results.insert("restore_data".to_owned(), restore_data);
             if let Some(mode) = owned(config.persist_mode) {
@@ -319,19 +329,21 @@ impl ScreenCast {
     }
 }
 
-/// Builds the `a(ua{sv})` streams result from one started stream.
-fn build_streams_value(stream: &StreamInfo) -> Result<OwnedValue, zbus::zvariant::Error> {
-    let mut props: HashMap<String, OwnedValue> = HashMap::new();
-    props.insert(
-        "source_type".to_owned(),
-        OwnedValue::try_from(Value::from(stream.source_type.bit()))?,
-    );
-    let size = (
-        i32::try_from(stream.size.0).unwrap_or(i32::MAX),
-        i32::try_from(stream.size.1).unwrap_or(i32::MAX),
-    );
-    props.insert("size".to_owned(), OwnedValue::try_from(Value::from(size))?);
-
-    let streams: Vec<(u32, Vardict)> = vec![(stream.node_id, props)];
+/// Builds the `a(ua{sv})` streams result, one entry per started stream.
+fn build_streams_value(infos: &[StreamInfo]) -> Result<OwnedValue, zbus::zvariant::Error> {
+    let mut streams: Vec<(u32, Vardict)> = Vec::with_capacity(infos.len());
+    for info in infos {
+        let mut props: HashMap<String, OwnedValue> = HashMap::new();
+        props.insert(
+            "source_type".to_owned(),
+            OwnedValue::try_from(Value::from(info.source_type.bit()))?,
+        );
+        let size = (
+            i32::try_from(info.size.0).unwrap_or(i32::MAX),
+            i32::try_from(info.size.1).unwrap_or(i32::MAX),
+        );
+        props.insert("size".to_owned(), OwnedValue::try_from(Value::from(size))?);
+        streams.push((info.node_id, props));
+    }
     OwnedValue::try_from(Value::from(streams))
 }

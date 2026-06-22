@@ -19,10 +19,13 @@ pub const SERVICE_PATH: &str = "/com/wayle/SharePicker";
 pub trait SharePicker {
     /// Shows the picker for a portal request and returns the XDPH selection
     /// suffix (the part printed after `[SELECTION]`): e.g. `r/window:123`,
-    /// `/screen:DP-1`, `/region:DP-1@0,0,800,600`. Returns an empty string if
-    /// the user cancels.
+    /// `/screen:DP-1`, `/region:DP-1@0,0,800,600`. When `multiple` is set the
+    /// user can pick several sources, returned as newline-separated payloads
+    /// after the flag segment. Returns an empty string if the user cancels.
     ///
     /// `window_list` is the raw `XDPH_WINDOW_SHARING_LIST` value;
-    /// `allow_token` seeds the restore-token checkbox.
-    async fn pick(&self, window_list: &str, allow_token: bool) -> Result<String>;
+    /// `allow_token` seeds the restore-token checkbox; `multiple` enables
+    /// multi-source selection.
+    async fn pick(&self, window_list: &str, allow_token: bool, multiple: bool)
+    -> Result<String>;
 }

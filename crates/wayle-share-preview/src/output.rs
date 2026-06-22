@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex, Weak};
+use std::{
+    os::fd::AsFd,
+    sync::{Arc, Mutex, Weak},
+};
 
 use wayland_client::{
     Connection, Dispatch, EventQueue, delegate_noop,
@@ -10,12 +13,30 @@ use wayland_client::{
         wl_shm_pool::WlShmPool,
     },
 };
+use wayland_protocols::wp::linux_dmabuf::zv1::client::{
+    zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
+    zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
+};
 use wayland_protocols_wlr::screencopy::v1::client::{
     zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1},
     zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
 };
 
-use crate::{Frame, buffer::Buffer, error::Error};
+use crate::{Frame, buffer::Buffer, dmabuf::DmaBuffer, error::Error};
+
+/// State for one dmabuf `capture_into` round-trip: the compositor signals
+/// `buffer_done` (we may copy), then `ready`/`failed`.
+#[derive(Default)]
+struct DmaCapture {
+    /// The compositor finished advertising buffer constraints; safe to `copy`.
+    can_copy: bool,
+    /// We already issued the `copy`.
+    requested: bool,
+    /// The copy completed.
+    ready: bool,
+    /// The copy failed.
+    failed: bool,
+}
 
 #[derive(Debug, Clone)]
 pub struct Geometry {
@@ -50,6 +71,9 @@ pub struct Output {
 pub struct OutputManager {
     shm: Option<WlShm>,
     manager: Option<ZwlrScreencopyManagerV1>,
+    /// `zwp_linux_dmabuf_v1`, when the compositor offers it — enables the
+    /// zero-copy capture path.
+    linux_dmabuf: Option<ZwpLinuxDmabufV1>,
     pub outputs: Vec<(WlOutput, Output)>,
     intialized_outputs: u32,
     connection: Connection,
@@ -66,6 +90,7 @@ impl OutputManager {
         let mut manager = Self {
             shm: None,
             manager: None,
+            linux_dmabuf: None,
             outputs: Vec::new(),
             intialized_outputs: 0,
             connection: connection.clone(),
@@ -94,7 +119,13 @@ impl OutputManager {
     }
 
     /// capture a single frame buffer of an output
-    pub fn capture_output(&mut self, output: &WlOutput) -> Result<Buffer, Error> {
+    ///
+    /// `overlay_cursor` composites the hardware cursor into the frame.
+    pub fn capture_output(
+        &mut self,
+        output: &WlOutput,
+        overlay_cursor: bool,
+    ) -> Result<Buffer, Error> {
         let Some(zwlr_manager) = &self.manager else {
             Err(Error::ProtocolNotAvailable(std::any::type_name::<
                 ZwlrScreencopyManagerV1,
@@ -104,11 +135,18 @@ impl OutputManager {
         let frame = Arc::new(Mutex::new(Frame::default()));
         let mut event_queue = self.connection.new_event_queue();
         let handle = event_queue.handle();
-        let zwlr_frame = zwlr_manager.capture_output(0, output, &handle, Arc::downgrade(&frame));
+        let zwlr_frame = zwlr_manager.capture_output(
+            i32::from(overlay_cursor),
+            output,
+            &handle,
+            Arc::downgrade(&frame),
+        );
         self.finish_capture(frame, zwlr_frame, &mut event_queue)
     }
 
     /// capture a selected region of an output
+    ///
+    /// `overlay_cursor` composites the hardware cursor into the frame.
     pub fn capture_output_region(
         &mut self,
         output: &WlOutput,
@@ -116,6 +154,7 @@ impl OutputManager {
         y: i32,
         width: i32,
         height: i32,
+        overlay_cursor: bool,
     ) -> Result<Buffer, Error> {
         let Some(zwlr_manager) = &self.manager else {
             Err(Error::ProtocolNotAvailable(std::any::type_name::<
@@ -127,7 +166,7 @@ impl OutputManager {
         let mut event_queue = self.connection.new_event_queue();
         let handle = event_queue.handle();
         let zwlr_frame = zwlr_manager.capture_output_region(
-            0,
+            i32::from(overlay_cursor),
             output,
             x,
             y,
@@ -137,6 +176,151 @@ impl OutputManager {
             Arc::downgrade(&frame),
         );
         self.finish_capture(frame, zwlr_frame, &mut event_queue)
+    }
+
+    /// Whether the compositor advertised `zwp_linux_dmabuf_v1`, i.e. whether
+    /// the zero-copy [`capture_output_into`](Self::capture_output_into) path is
+    /// usable.
+    #[must_use]
+    pub fn supports_dmabuf(&self) -> bool {
+        self.linux_dmabuf.is_some()
+    }
+
+    /// Imports an allocated [`DmaBuffer`] as a `wl_buffer` the compositor can
+    /// blit a captured frame into. The returned buffer can be reused across
+    /// many captures.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if dmabuf is unavailable or the import round-trip fails.
+    pub fn import_dmabuf(&mut self, dma: &DmaBuffer) -> Result<WlBuffer, Error> {
+        let Some(dmabuf) = self.linux_dmabuf.clone() else {
+            return Err(Error::ProtocolNotAvailable(std::any::type_name::<
+                ZwpLinuxDmabufV1,
+            >()));
+        };
+
+        let mut event_queue = self.connection.new_event_queue();
+        let handle = event_queue.handle();
+
+        let modifier: u64 = dma.modifier.into();
+        let params = dmabuf.create_params(&handle, ());
+        params.add(
+            dma.fd.as_fd(),
+            0,
+            dma.offset,
+            dma.stride,
+            (modifier >> 32) as u32,
+            (modifier & 0xFFFF_FFFF) as u32,
+        );
+        let buffer = params.create_immed(
+            dma.width as i32,
+            dma.height as i32,
+            dma.format as u32,
+            zwp_linux_buffer_params_v1::Flags::empty(),
+            &handle,
+            (),
+        );
+        params.destroy();
+        // Flush the import requests so the buffer exists server-side before the
+        // first capture references it.
+        event_queue
+            .roundtrip(self)
+            .map_err(Error::WaylandDispatch)?;
+        Ok(buffer)
+    }
+
+    /// Captures `output` straight into a caller-provided dmabuf `wl_buffer`
+    /// (from [`import_dmabuf`](Self::import_dmabuf)). The compositor blits into
+    /// GPU memory — no pixel copy crosses the CPU.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Failed`] if the compositor reports the copy failed.
+    pub fn capture_output_into(
+        &mut self,
+        output: &WlOutput,
+        buffer: &WlBuffer,
+        overlay_cursor: bool,
+    ) -> Result<(), Error> {
+        let Some(zwlr_manager) = &self.manager else {
+            return Err(Error::ProtocolNotAvailable(std::any::type_name::<
+                ZwlrScreencopyManagerV1,
+            >()));
+        };
+        let state = Arc::new(Mutex::new(DmaCapture::default()));
+        let mut event_queue = self.connection.new_event_queue();
+        let handle = event_queue.handle();
+        let weak: Weak<Mutex<DmaCapture>> = Arc::downgrade(&state);
+        let zwlr_frame = zwlr_manager.capture_output(i32::from(overlay_cursor), output, &handle, weak);
+        self.finish_capture_into(&state, buffer, zwlr_frame, &mut event_queue)
+    }
+
+    /// Region variant of [`capture_output_into`](Self::capture_output_into).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Failed`] if the compositor reports the copy failed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn capture_output_region_into(
+        &mut self,
+        output: &WlOutput,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        buffer: &WlBuffer,
+        overlay_cursor: bool,
+    ) -> Result<(), Error> {
+        let Some(zwlr_manager) = &self.manager else {
+            return Err(Error::ProtocolNotAvailable(std::any::type_name::<
+                ZwlrScreencopyManagerV1,
+            >()));
+        };
+        let state = Arc::new(Mutex::new(DmaCapture::default()));
+        let mut event_queue = self.connection.new_event_queue();
+        let handle = event_queue.handle();
+        let weak: Weak<Mutex<DmaCapture>> = Arc::downgrade(&state);
+        let zwlr_frame = zwlr_manager.capture_output_region(
+            i32::from(overlay_cursor),
+            output,
+            x,
+            y,
+            width,
+            height,
+            &handle,
+            weak,
+        );
+        self.finish_capture_into(&state, buffer, zwlr_frame, &mut event_queue)
+    }
+
+    /// Drives a `capture_*_into` frame to completion: wait for `buffer_done`,
+    /// issue the `copy` into `buffer`, wait for `ready`/`failed`.
+    fn finish_capture_into(
+        &mut self,
+        state: &Arc<Mutex<DmaCapture>>,
+        buffer: &WlBuffer,
+        zwlr_frame: ZwlrScreencopyFrameV1,
+        event_queue: &mut EventQueue<OutputManager>,
+    ) -> Result<(), Error> {
+        let result = loop {
+            if let Err(err) = event_queue.blocking_dispatch(self) {
+                break Err(Error::WaylandDispatch(err));
+            }
+            let mut current = state.lock().expect("lock should not be poisoned");
+            if current.failed {
+                break Err(Error::Failed);
+            }
+            if current.ready {
+                break Ok(());
+            }
+            if current.can_copy && !current.requested {
+                zwlr_frame.copy(buffer);
+                current.requested = true;
+            }
+        };
+        zwlr_frame.destroy();
+        result
     }
 
     fn finish_capture(
@@ -211,6 +395,13 @@ impl Dispatch<wl_registry::WlRegistry, ()> for OutputManager {
                 "zwlr_screencopy_manager_v1" => {
                     let manager: ZwlrScreencopyManagerV1 = registry.bind(name, version, handle, ());
                     state.manager = Some(manager);
+                }
+                "zwp_linux_dmabuf_v1" => {
+                    // v3+ for `create_immed` with a modifier; cap at the
+                    // protocol's max so newer compositors still bind.
+                    let dmabuf: ZwpLinuxDmabufV1 =
+                        registry.bind(name, version.min(4), handle, ());
+                    state.linux_dmabuf = Some(dmabuf);
                 }
                 "wl_output" => {
                     let output: WlOutput = registry.bind(name, version, handle, ());
@@ -328,7 +519,38 @@ impl Dispatch<ZwlrScreencopyFrameV1, Weak<Mutex<Frame>>> for OutputManager {
     }
 }
 
+impl Dispatch<ZwlrScreencopyFrameV1, Weak<Mutex<DmaCapture>>> for OutputManager {
+    fn event(
+        _state: &mut Self,
+        _proxy: &ZwlrScreencopyFrameV1,
+        event: <ZwlrScreencopyFrameV1 as wayland_client::Proxy>::Event,
+        data: &Weak<Mutex<DmaCapture>>,
+        _conn: &wayland_client::Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
+    ) {
+        let Some(data) = data.upgrade() else {
+            return;
+        };
+        let mut capture = data.lock().expect("lock should not be poisoned");
+        match event {
+            // Any of these means constraints are advertised; `buffer_done` is
+            // the canonical "ready to copy" signal, but copying after the first
+            // constraint event is safe and also works on pre-v3 compositors.
+            zwlr_screencopy_frame_v1::Event::Buffer { .. }
+            | zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. }
+            | zwlr_screencopy_frame_v1::Event::BufferDone => capture.can_copy = true,
+            zwlr_screencopy_frame_v1::Event::Ready { .. } => capture.ready = true,
+            zwlr_screencopy_frame_v1::Event::Failed => capture.failed = true,
+            zwlr_screencopy_frame_v1::Event::Flags { .. }
+            | zwlr_screencopy_frame_v1::Event::Damage { .. } => {}
+            _ => {}
+        }
+    }
+}
+
 delegate_noop!(OutputManager: ignore WlShm);
 delegate_noop!(OutputManager: ignore WlShmPool);
 delegate_noop!(OutputManager: ignore WlBuffer);
 delegate_noop!(OutputManager: ignore ZwlrScreencopyManagerV1);
+delegate_noop!(OutputManager: ignore ZwpLinuxDmabufV1);
+delegate_noop!(OutputManager: ignore ZwpLinuxBufferParamsV1);

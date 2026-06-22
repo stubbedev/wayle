@@ -130,7 +130,7 @@ fn copy_outputs(
     let mut raw = Vec::with_capacity(targets.len());
     for (wl_output, connector, transform) in targets {
         let buffer = manager
-            .capture_output(&wl_output)
+            .capture_output(&wl_output, false)
             .map_err(|e| format!("output capture failed: {e}"))?;
         let image = Image::new(buffer).map_err(|e| format!("cannot decode capture: {e}"))?;
         raw.push((connector, image, transform));
@@ -207,7 +207,7 @@ fn capture_output(connection: &Connection, name: Option<&str>) -> Result<RgbImag
             .ok_or("no outputs available")?,
     };
     let buffer = manager
-        .capture_output(&output)
+        .capture_output(&output, false)
         .map_err(|e| format!("output capture failed: {e}"))?;
     to_rgb(buffer, transform)
 }
@@ -233,7 +233,7 @@ fn capture_window(connection: &Connection, target: &WindowTarget) -> Result<RgbI
         .map(|t| t.handle.clone())
         .ok_or("could not find the target window to capture")?;
     let buffer = manager
-        .capture_toplevel(&handle)
+        .capture_toplevel(&handle, false)
         .map_err(|e| format!("window capture failed: {e}"))?;
     to_rgb(buffer, Transforms::Normal)
 }
