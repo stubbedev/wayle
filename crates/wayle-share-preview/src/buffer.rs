@@ -241,8 +241,8 @@ impl Buffer {
 /// A reusable SHM capture target kept across frames.
 ///
 /// The continuous-capture path (the portal's PipeWire producer) captures at the
-/// stream's fixed geometry every frame. Allocating a fresh memfd + `wl_shm_pool`
-/// + `wl_buffer` per frame is wasteful; an [`ShmSlot`] allocates that backing
+/// stream's fixed geometry every frame. Allocating a fresh memfd, `wl_shm_pool`,
+/// and `wl_buffer` per frame is wasteful; an [`ShmSlot`] allocates that backing
 /// once and hands out a cheap [`Buffer`] lease ([`lease`](Self::lease)) each
 /// frame that shares the same `wl_buffer` and memfd. Reuse is sound because
 /// capture is synchronous — the previous frame's copy has completed (the
@@ -315,7 +315,10 @@ impl ShmSlot {
     /// Whether this slot matches the requested capture geometry/format.
     #[must_use]
     pub fn matches(&self, width: u32, height: u32, stride: u32, format: Format) -> bool {
-        self.width == width && self.height == height && self.stride == stride && self.format == format
+        self.width == width
+            && self.height == height
+            && self.stride == stride
+            && self.format == format
     }
 
     /// A cheap per-frame [`Buffer`] sharing this slot's `wl_buffer` + memfd.

@@ -422,9 +422,12 @@ impl OutputManager {
                 "recapture target is not dmabuf-backed".into(),
             ));
         }
-        let zwlr_manager = self.manager.clone().ok_or(Error::ProtocolNotAvailable(
-            std::any::type_name::<ZwlrScreencopyManagerV1>(),
-        ))?;
+        let zwlr_manager =
+            self.manager
+                .clone()
+                .ok_or(Error::ProtocolNotAvailable(std::any::type_name::<
+                    ZwlrScreencopyManagerV1,
+                >()))?;
         let wl_buffer = buf.buffer.clone();
 
         let frame = Arc::new(Mutex::new(Frame::default()));
@@ -743,7 +746,13 @@ impl Dispatch<ZwlrScreencopyFrameV1, Weak<Mutex<Frame>>> for OutputManager {
                             old.destroy();
                         }
                         match crate::buffer::ShmSlot::new(
-                            &shm, width, height, stride, format, qhandle, (),
+                            &shm,
+                            width,
+                            height,
+                            stride,
+                            format,
+                            qhandle,
+                            (),
                         ) {
                             Ok(slot) => state.shm_cache = Some(slot),
                             Err(err) => {

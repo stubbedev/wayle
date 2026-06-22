@@ -115,6 +115,70 @@ pub fn start_stream(
     }
 }
 
+/// Acquire one capture frame for the process callback.
+///
+/// dmabuf: once the pool is full, recycle the oldest pooled buffer by
+/// recapturing into its existing bo (zero allocation); otherwise allocate one
+/// to warm the pool. SHM: the capturer leases the pooled `ShmSlot` (also zero
+/// allocation in steady state). Returns `None` when the frame should be skipped
+/// (capture/recapture failed); a recycled buffer is returned to the pool so it
+/// is not lost.
+fn acquire_frame(
+    prefer_dmabuf: bool,
+    capturer: &RefCell<Capturer>,
+    dmabuf_pool: &RefCell<VecDeque<wayle_share_preview::buffer::Buffer>>,
+) -> Option<wayle_share_preview::buffer::Buffer> {
+    if prefer_dmabuf {
+        acquire_dmabuf_frame(capturer, dmabuf_pool)
+    } else {
+        capture_frame(capturer, false)
+    }
+}
+
+/// Capture a fresh frame, logging and swallowing the error as a skip.
+fn capture_frame(
+    capturer: &RefCell<Capturer>,
+    prefer_dmabuf: bool,
+) -> Option<wayle_share_preview::buffer::Buffer> {
+    match capturer.borrow_mut().capture(prefer_dmabuf) {
+        Ok(frame) => Some(frame),
+        Err(err) => {
+            debug!(%err, "screencast: frame capture failed (skipped)");
+            None
+        }
+    }
+}
+
+/// dmabuf acquisition: recycle the oldest pooled buffer once the pool is full,
+/// else allocate one to warm the pool.
+fn acquire_dmabuf_frame(
+    capturer: &RefCell<Capturer>,
+    dmabuf_pool: &RefCell<VecDeque<wayle_share_preview::buffer::Buffer>>,
+) -> Option<wayle_share_preview::buffer::Buffer> {
+    let recycled = {
+        let mut pool = dmabuf_pool.borrow_mut();
+        if pool.len() >= KEEPALIVE_FRAMES {
+            pool.pop_front()
+        } else {
+            None
+        }
+    };
+
+    let Some(mut buf) = recycled else {
+        return capture_frame(capturer, true);
+    };
+
+    match capturer.borrow_mut().recapture_dmabuf(&mut buf) {
+        Ok(()) => Some(buf),
+        Err(err) => {
+            debug!(%err, "screencast: dmabuf recapture failed (skipped)");
+            // Keep the buffer in the pool so we don't lose it.
+            dmabuf_pool.borrow_mut().push_back(buf);
+            None
+        }
+    }
+}
+
 /// Body of the per-stream thread: sets up PipeWire and runs its loop until
 /// `stop` is set.
 fn run_loop(
@@ -234,41 +298,8 @@ fn run_loop_inner(
             // its bo via recapture — zero allocation) once the pool is full,
             // else allocate one to warm the pool. SHM: the capturer leases the
             // pooled ShmSlot (also zero allocation in steady state).
-            let frame = if prefer_dmabuf {
-                let recycled = {
-                    let mut pool = dmabuf_pool.borrow_mut();
-                    if pool.len() >= KEEPALIVE_FRAMES {
-                        pool.pop_front()
-                    } else {
-                        None
-                    }
-                };
-                match recycled {
-                    Some(mut buf) => match capturer.borrow_mut().recapture_dmabuf(&mut buf) {
-                        Ok(()) => buf,
-                        Err(err) => {
-                            debug!(%err, "screencast: dmabuf recapture failed (skipped)");
-                            // Keep the buffer in the pool so we don't lose it.
-                            dmabuf_pool.borrow_mut().push_back(buf);
-                            return;
-                        }
-                    },
-                    None => match capturer.borrow_mut().capture(true) {
-                        Ok(frame) => frame,
-                        Err(err) => {
-                            debug!(%err, "screencast: frame capture failed (skipped)");
-                            return;
-                        }
-                    },
-                }
-            } else {
-                match capturer.borrow_mut().capture(false) {
-                    Ok(frame) => frame,
-                    Err(err) => {
-                        debug!(%err, "screencast: frame capture failed (skipped)");
-                        return;
-                    }
-                }
+            let Some(frame) = acquire_frame(prefer_dmabuf, &capturer, &dmabuf_pool) else {
+                return;
             };
 
             // Move the captured pixels into the PipeWire buffer. Scoped so the
