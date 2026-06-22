@@ -19,8 +19,10 @@ RUN dnf -y install \
         gtk4-layer-shell-devel \
         gtksourceview5-devel \
         gstreamer1-devel \
+        libdrm-devel \
         libxkbcommon-devel \
         make \
+        mesa-libgbm-devel \
         mold \
         pam-devel \
         pipewire-devel \

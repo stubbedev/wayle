@@ -18,7 +18,9 @@ RUN apt-get update \
         dpkg-dev \
         gh \
         git \
+        libdrm-dev \
         libfftw3-dev \
+        libgbm-dev \
         libgstreamer1.0-dev \
         libgtk-4-dev \
         libgtk4-layer-shell-dev \
