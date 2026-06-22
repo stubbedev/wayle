@@ -21,4 +21,9 @@ struct Frame {
     /// event: `(drm_fourcc, width, height)`. Present only when the compositor
     /// advertises a dmabuf path for this frame.
     pub dmabuf_format: Option<(u32, u32, u32)>,
+    /// Set on the `buffer_done` event (screencopy v3+): the compositor has
+    /// finished advertising every buffer format (`buffer` + `linux_dmabuf`).
+    /// Only after this is it sound to decide SHM-vs-dmabuf or send a copy; both
+    /// format events arrive before `buffer_done`, in unspecified order.
+    pub buffer_done: bool,
 }

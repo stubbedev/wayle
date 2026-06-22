@@ -1,6 +1,8 @@
 use std::{
-    io::Read,
-    os::fd::{AsFd, OwnedFd},
+    os::{
+        fd::{AsFd, OwnedFd},
+        unix::fs::FileExt,
+    },
     sync::Arc,
 };
 
@@ -122,15 +124,20 @@ impl Buffer {
         handle: &QueueHandle<T>,
         udata: K,
     ) -> Result<Self, Error> {
+        // Size the pool by `stride * height`, not `width * 4 * height`: the
+        // compositor may pad the stride past `width * 4`, and the `wl_buffer`
+        // is created with that stride, so a pool sized to the unpadded width is
+        // too small and the compositor raises a protocol error.
+        let pool_size = (stride * height) as u64;
         let mfd = memfd::MemfdOptions::default()
             .create("buffer")
             .map_err(|err| Error::BufferCreate(err.into()))?;
         mfd.as_file()
-            .set_len((width * height * 4) as u64)
+            .set_len(pool_size)
             .map_err(|err| Error::BufferCreate(err.into()))?;
         let pool = shm.create_pool(
             mfd.as_file().as_fd(),
-            (width * height * 4) as i32,
+            pool_size as i32,
             handle,
             udata.clone(),
         );
@@ -192,11 +199,10 @@ impl Buffer {
     /// Returns [`Error::NoShmBacking`] for a dmabuf buffer (which has no
     /// host-readable memfd), or [`Error::BufferRead`] if the read fails.
     pub fn get_bytes(&self) -> Result<Vec<u8>, Error> {
-        let fd = self.fd.as_ref().ok_or(Error::NoShmBacking)?;
-        let mut bytes = Vec::new();
-        fd.as_file()
-            .read_to_end(&mut bytes)
-            .map_err(Error::BufferRead)?;
+        let len = (self.stride as usize).saturating_mul(self.height as usize);
+        let mut bytes = vec![0u8; len];
+        let read = self.read_into(&mut bytes)?;
+        bytes.truncate(read);
         Ok(bytes)
     }
 
@@ -212,10 +218,14 @@ impl Buffer {
     /// [`Error::BufferRead`] if reading the backing memfd fails.
     pub fn read_into(&self, dst: &mut [u8]) -> Result<usize, Error> {
         let fd = self.fd.as_ref().ok_or(Error::NoShmBacking)?;
-        let mut file = fd.as_file();
+        let file = fd.as_file();
         let mut written = 0;
+        // Positioned reads (pread): the memfd is shared across frames via a
+        // pooled `ShmSlot` lease, so we must NOT advance the file's offset.
+        // `read`/`read_to_end` would leave the offset at EOF after the first
+        // frame, making every later frame read 0 bytes (a frozen stream).
         while written < dst.len() {
-            match file.read(&mut dst[written..]) {
+            match file.read_at(&mut dst[written..], written as u64) {
                 Ok(0) => break,
                 Ok(n) => written += n,
                 Err(err) => return Err(Error::BufferRead(err)),
@@ -280,15 +290,17 @@ impl ShmSlot {
         handle: &QueueHandle<T>,
         udata: K,
     ) -> Result<Self, Error> {
+        // See `Buffer::new`: size by `stride * height` to tolerate padded strides.
+        let pool_size = (stride * height) as u64;
         let mfd = memfd::MemfdOptions::default()
             .create("buffer")
             .map_err(|err| Error::BufferCreate(err.into()))?;
         mfd.as_file()
-            .set_len((width * height * 4) as u64)
+            .set_len(pool_size)
             .map_err(|err| Error::BufferCreate(err.into()))?;
         let pool = shm.create_pool(
             mfd.as_file().as_fd(),
-            (width * height * 4) as i32,
+            pool_size as i32,
             handle,
             udata.clone(),
         );

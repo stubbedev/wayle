@@ -84,7 +84,10 @@ pub struct OutputManager {
     /// geometry/format changes; `None` until the first SHM capture.
     shm_cache: Option<crate::buffer::ShmSlot>,
     pub outputs: Vec<(WlOutput, Output)>,
-    intialized_outputs: u32,
+    /// Bound `zwlr_screencopy_manager_v1` version. `buffer_done` /
+    /// `linux_dmabuf` are v3+; below that we decide on the first `buffer` event
+    /// (no dmabuf path exists pre-v3 anyway).
+    screencopy_version: u32,
     connection: Connection,
 }
 
@@ -105,7 +108,7 @@ impl OutputManager {
             dmabuf_probed: None,
             shm_cache: None,
             outputs: Vec::new(),
-            intialized_outputs: 0,
+            screencopy_version: 0,
             connection: connection.clone(),
         };
 
@@ -413,32 +416,14 @@ impl OutputManager {
             Arc::downgrade(&frame),
         );
 
-        // Same drive loop as the allocate path's "Pass 2", but copying into the
-        // caller's existing dmabuf wl_buffer.
-        let mut requested = false;
-        loop {
-            copy_queue
-                .blocking_dispatch(self)
-                .map_err(Error::WaylandDispatch)?;
-            let mut f = frame.lock().expect("lock should not be poisoned");
-            if let Some(err) = &f.error {
-                let err = format!("dmabuf recapture failed: {err}");
-                drop(f);
-                zwlr_frame.destroy();
-                return Err(Error::DmabufUnavailable(err));
-            }
-            if f.ready {
-                buf.damage = std::mem::take(&mut f.damage);
-                break;
-            }
-            if !requested && (f.buffer.is_some() || f.dmabuf_format.is_some()) {
-                drop(f);
-                zwlr_frame.copy_with_damage(&wl_buffer);
-                requested = true;
-                continue;
-            }
-        }
+        // Copy into the caller's existing dmabuf wl_buffer (already allocated),
+        // so the target is fixed regardless of the advertised frame state.
+        let res = self.drive_screencopy(&frame, &zwlr_frame, &mut copy_queue, move |_| {
+            Some(wl_buffer)
+        });
         zwlr_frame.destroy();
+        res.map_err(|e| Error::DmabufUnavailable(format!("dmabuf recapture failed: {e}")))?;
+        buf.damage = std::mem::take(&mut frame.lock().expect("lock should not be poisoned").damage);
         Ok(())
     }
 
@@ -458,8 +443,8 @@ impl OutputManager {
             return Ok(cached);
         }
 
-        // Probe pass: capture but never copy; read the metadata events then drop
-        // the frame object.
+        // Probe pass: capture but never copy; once the formats are advertised,
+        // read whether a dmabuf format was offered, then drop the frame object.
         let probe = Arc::new(Mutex::new(Frame::default()));
         let mut probe_queue = self.connection.new_event_queue();
         let probe_handle = probe_queue.handle();
@@ -469,29 +454,15 @@ impl OutputManager {
             &probe_handle,
             Arc::downgrade(&probe),
         );
-        // Drain until either a dmabuf format arrives or the SHM Buffer event
-        // shows the compositor offered no dmabuf format.
-        let result = loop {
-            probe_queue
-                .blocking_dispatch(self)
-                .map_err(Error::WaylandDispatch)?;
-            let f = probe.lock().expect("lock should not be poisoned");
-            if let Some(err) = &f.error {
-                let err = format!("probe failed: {err}");
-                drop(f);
-                probe_frame.destroy();
-                // A probe error is transient; do not cache it.
-                return Err(Error::DmabufUnavailable(err));
-            }
-            if let Some(fmt) = f.dmabuf_format {
-                break Some(fmt);
-            }
-            if f.buffer.is_some() {
-                break None;
-            }
-        };
+        let res = self.drive_until_advertised(&probe, &mut probe_queue);
         probe_frame.destroy();
+        // A probe error is transient; do not cache it.
+        res.map_err(|e| Error::DmabufUnavailable(format!("probe failed: {e}")))?;
 
+        let result = probe
+            .lock()
+            .expect("lock should not be poisoned")
+            .dmabuf_format;
         self.dmabuf_probed = Some(result);
         Ok(result)
     }
@@ -518,57 +489,98 @@ impl OutputManager {
         }
     }
 
+    /// Dispatch `queue` until the compositor finishes advertising buffer
+    /// formats (`buffer_done` on v3+, else the `buffer` event) or reports an
+    /// error. Shared prelude of every screencopy drive loop: deciding before
+    /// this point races the `buffer`/`linux_dmabuf`/`buffer_done` sequence (the
+    /// two format events arrive in unspecified order), which can miss the
+    /// dmabuf format and silently disable the zero-copy path. On return the
+    /// frame's `dmabuf_format` / `buffer` state is final.
+    fn drive_until_advertised(
+        &mut self,
+        frame: &Arc<Mutex<Frame>>,
+        queue: &mut EventQueue<OutputManager>,
+    ) -> Result<(), Error> {
+        let v3 = self.screencopy_version >= 3;
+        loop {
+            queue
+                .blocking_dispatch(self)
+                .map_err(Error::WaylandDispatch)?;
+            let mut f = frame.lock().expect("lock should not be poisoned");
+            if let Some(err) = f.error.take() {
+                return Err(err);
+            }
+            let advertised = if v3 {
+                f.buffer_done
+            } else {
+                f.buffer.is_some()
+            };
+            if advertised {
+                return Ok(());
+            }
+        }
+    }
+
+    /// Drive a full screencopy capture: wait for format advertisement
+    /// ([`drive_until_advertised`](Self::drive_until_advertised)), send one
+    /// `copy_with_damage` into the buffer `target` selects from the advertised
+    /// frame state, then dispatch until the frame is `Ready`.
+    ///
+    /// `target` picks the destination `wl_buffer` — the frame's own SHM lease
+    /// or a caller-owned dmabuf buffer. `copy_with_damage` (v2+) is required for
+    /// the compositor to emit `damage` events; a plain `copy` never reports any.
+    fn drive_screencopy<F>(
+        &mut self,
+        frame: &Arc<Mutex<Frame>>,
+        zwlr_frame: &ZwlrScreencopyFrameV1,
+        queue: &mut EventQueue<OutputManager>,
+        target: F,
+    ) -> Result<(), Error>
+    where
+        F: FnOnce(&Frame) -> Option<WlBuffer>,
+    {
+        self.drive_until_advertised(frame, queue)?;
+
+        let wl_buffer = {
+            let f = frame.lock().expect("lock should not be poisoned");
+            target(&f).ok_or(Error::Failed)?
+        };
+        zwlr_frame.copy_with_damage(&wl_buffer);
+
+        loop {
+            queue
+                .blocking_dispatch(self)
+                .map_err(Error::WaylandDispatch)?;
+            let mut f = frame.lock().expect("lock should not be poisoned");
+            if let Some(err) = f.error.take() {
+                return Err(err);
+            }
+            if f.ready {
+                return Ok(());
+            }
+        }
+    }
+
     fn finish_capture(
         &mut self,
         frame: Arc<Mutex<Frame>>,
         zwlr_frame: ZwlrScreencopyFrameV1,
         event_queue: &mut EventQueue<OutputManager>,
     ) -> Result<Buffer, Error> {
-        loop {
-            if let Err(err) = event_queue.blocking_dispatch(self) {
-                Err(Error::WaylandDispatch(err))?;
-            }
-            let frame = frame.clone();
-            let mut current = frame.lock().expect("lock should not be poisoned");
-            match (
-                current.ready,
-                current.requested,
-                &current.error,
-                &current.buffer,
-            ) {
-                (_, _, Some(_), _) | (true, _, _, Some(_)) => {
-                    zwlr_frame.destroy();
-                    break;
-                }
-                (false, false, _, Some(buffer)) => {
-                    // copy_with_damage (screencopy v2+) is required for the
-                    // compositor to emit `damage` events; a plain `copy` never
-                    // reports damage. The frames are otherwise identical.
-                    zwlr_frame.copy_with_damage(&buffer.buffer);
-                    current.requested = true;
-                }
-                _ => continue,
-            };
-        }
+        let res = self.drive_screencopy(&frame, &zwlr_frame, event_queue, |f| {
+            f.buffer.as_ref().map(|b| b.buffer.clone())
+        });
+        zwlr_frame.destroy();
+        res?;
 
-        match Arc::into_inner(frame) {
-            Some(frame) => {
-                let frame = frame.into_inner().expect("lock should not be poisoned");
-                if let Some(err) = frame.error {
-                    return Err(err);
-                }
-                if let Some(mut buffer) = frame.buffer {
-                    // Carry the per-frame damage rects onto the returned buffer.
-                    buffer.damage = frame.damage;
-                    Ok(buffer)
-                } else {
-                    unreachable!("we only exit the loop when buffer or error is some")
-                }
-            }
-            None => {
-                unreachable!("we only exit the loop after waiting blockingly for all dispatchers")
-            }
-        }
+        let mut frame = Arc::into_inner(frame)
+            .expect("sole owner after capture")
+            .into_inner()
+            .expect("lock should not be poisoned");
+        let mut buffer = frame.buffer.take().expect("Ready implies a buffer");
+        // Carry the per-frame damage rects onto the returned buffer.
+        buffer.damage = frame.damage;
+        Ok(buffer)
     }
 }
 
@@ -603,6 +615,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for OutputManager {
                 "zwlr_screencopy_manager_v1" => {
                     let manager: ZwlrScreencopyManagerV1 = registry.bind(name, version, handle, ());
                     state.manager = Some(manager);
+                    state.screencopy_version = version;
                 }
                 "zwp_linux_dmabuf_v1" => {
                     // Bind at most v3 (the version we rely on: create_immed is
@@ -624,13 +637,19 @@ impl Dispatch<wl_registry::WlRegistry, ()> for OutputManager {
 impl Dispatch<wl_output::WlOutput, ()> for OutputManager {
     fn event(
         state: &mut Self,
-        _proxy: &wl_output::WlOutput,
+        proxy: &wl_output::WlOutput,
         event: <wl_output::WlOutput as wayland_client::Proxy>::Event,
         _data: &(),
         _conn: &wayland_client::Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        let (_, output) = &mut state.outputs[state.intialized_outputs as usize];
+        // Route by the event's own proxy. Indexing by a `Done`-counter assumed
+        // every output's events arrive strictly grouped in bind order and that
+        // no output ever emits a later event (mode/scale change, hotplug) — a
+        // late event would corrupt a sibling's data or panic out of bounds.
+        let Some((_, output)) = state.outputs.iter_mut().find(|(o, _)| o == proxy) else {
+            return;
+        };
 
         match event {
             wl_output::Event::Geometry {
@@ -672,7 +691,7 @@ impl Dispatch<wl_output::WlOutput, ()> for OutputManager {
             wl_output::Event::Scale { factor } => output.scale = Some(factor),
             wl_output::Event::Name { name } => output.name = Some(name),
             wl_output::Event::Description { description } => output.description = Some(description),
-            wl_output::Event::Done => state.intialized_outputs += 1,
+            wl_output::Event::Done => {}
             _ => {}
         }
     }
@@ -765,7 +784,9 @@ impl Dispatch<ZwlrScreencopyFrameV1, Weak<Mutex<Frame>>> for OutputManager {
                 // DRM fourcc.
                 frame.dmabuf_format = Some((format, width, height));
             }
-            zwlr_screencopy_frame_v1::Event::BufferDone => {}
+            zwlr_screencopy_frame_v1::Event::BufferDone => {
+                frame.buffer_done = true;
+            }
             _ => {}
         }
     }

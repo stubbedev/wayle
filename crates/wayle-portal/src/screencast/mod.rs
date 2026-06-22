@@ -154,9 +154,18 @@ impl ScreenCast {
     }
 
     /// Interface version.
+    ///
+    /// We report 4, the highest version whose stream contract we actually
+    /// fulfil: cursor_mode (v2), the `source_type` stream property (v3), and
+    /// `restore_data` / `persist_mode` (v4) are all implemented. We do NOT emit
+    /// the `mapping_id` stream property (v5) nor `pipewire-serial` (v6), so
+    /// claiming 5/6 would advertise a contract clients could rely on but we
+    /// don't honour — the frontend negotiates `min(frontend, impl)`, so 4 keeps
+    /// clients on the node-id path we do provide. Raise this only alongside the
+    /// matching stream properties.
     #[zbus(property, name = "version")]
     fn version(&self) -> u32 {
-        6
+        4
     }
 
     /// Creates a session: mounts the Session object and records default config.
