@@ -171,10 +171,12 @@ in
       Unit = {
         Description = "Wayle xdg-desktop-portal backend";
         PartOf = [ cfg.systemd.target ];
-        After = [
-          cfg.systemd.target
-          "xdg-desktop-portal.service"
-        ];
+        # MUST NOT be After/Requires xdg-desktop-portal.service: the frontend
+        # activates this backend (StartServiceByName) while still activating
+        # itself, so ordering the backend after the frontend deadlocks both
+        # until 25s D-Bus timeouts break it and the frontend fails. The session
+        # target ordering is enough.
+        After = [ cfg.systemd.target ];
       };
       # D-Bus-activated by the frontend via the .portal's DBusName; no WantedBy.
       Service = {

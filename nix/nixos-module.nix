@@ -106,13 +106,17 @@ in
 
       # The frontend D-Bus-activates this via the .portal's DBusName /
       # SystemdService; it is not wantedBy the session (started on demand).
+      #
+      # MUST NOT be After/Requires xdg-desktop-portal.service: the frontend
+      # activates this backend (StartServiceByName) while it is still itself
+      # activating, so ordering the backend after the frontend deadlocks both
+      # — the frontend blocks on the backend's interfaces, the backend blocks
+      # on the frontend finishing — until 25s D-Bus timeouts break it and the
+      # frontend fails. graphical-session.target ordering is enough.
       systemd.user.services.xdg-desktop-portal-wayle = {
         description = "Wayle xdg-desktop-portal backend";
         partOf = [ "graphical-session.target" ];
-        after = [
-          "graphical-session.target"
-          "xdg-desktop-portal.service"
-        ];
+        after = [ "graphical-session.target" ];
         serviceConfig = {
           Type = "dbus";
           BusName = "org.freedesktop.impl.portal.desktop.wayle";
