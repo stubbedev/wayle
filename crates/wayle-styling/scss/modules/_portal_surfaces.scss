@@ -224,6 +224,24 @@
     color: var(--fg-muted);
 }
 
+// Side preview pane (toggle) — selected item preview on the right.
+.file-chooser-preview {
+    background: var(--bg-subtle, var(--bg-base));
+    border-left: 1px solid var(--border-subtle, var(--border-default));
+    padding: var(--space-lg);
+}
+
+.file-chooser-preview-name {
+    font-size: var(--text-md, var(--text-sm));
+    font-weight: var(--weight-semibold);
+    color: var(--fg-default);
+}
+
+.file-chooser-preview-info {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+}
+
 // Clickable column headers (list view).
 .file-chooser-colheader {
     padding: 2px var(--space-sm);

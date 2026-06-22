@@ -68,6 +68,10 @@ pub(crate) enum FileChooserInput {
     ToggleView,
     /// Internal: toggle the Quick Look preview of the selected file (spacebar).
     ToggleQuickLook,
+    /// Internal: toggle the persistent side preview pane.
+    TogglePreview,
+    /// Internal: the file selection changed — refresh the preview pane.
+    SelectionChanged,
     /// Internal: a path was dropped on the surface — navigate to it.
     Dropped(PathBuf),
     /// Internal: confirm the current selection.
@@ -98,6 +102,8 @@ impl std::fmt::Debug for FileChooserInput {
             Self::Sort(_) => f.write_str("Sort"),
             Self::ToggleView => f.write_str("ToggleView"),
             Self::ToggleQuickLook => f.write_str("ToggleQuickLook"),
+            Self::TogglePreview => f.write_str("TogglePreview"),
+            Self::SelectionChanged => f.write_str("SelectionChanged"),
             Self::Dropped(p) => f.debug_tuple("Dropped").field(p).finish(),
             Self::Confirm => f.write_str("Confirm"),
             Self::Cancel => f.write_str("Cancel"),
@@ -226,6 +232,14 @@ impl Component for FileChooser {
                                 set_icon_name: "view-grid-symbolic",
                                 set_tooltip_text: Some("Toggle grid view"),
                                 connect_clicked => FileChooserInput::ToggleView,
+                            },
+                            #[name = "preview_toggle"]
+                            gtk::ToggleButton {
+                                add_css_class: "file-chooser-nav",
+                                add_css_class: "flat",
+                                set_icon_name: "view-paged-symbolic",
+                                set_tooltip_text: Some("Preview pane"),
+                                connect_toggled => FileChooserInput::TogglePreview,
                             },
                             #[name = "hidden_toggle"]
                             gtk::ToggleButton {
@@ -413,6 +427,36 @@ impl Component for FileChooser {
                                 },
                             },
                         },
+
+                        // Optional preview pane (right) — selected item preview.
+                        #[name = "preview_pane"]
+                        gtk::Box {
+                            add_css_class: "file-chooser-preview",
+                            set_orientation: gtk::Orientation::Vertical,
+                            set_spacing: 12,
+                            set_width_request: 220,
+                            set_valign: gtk::Align::Center,
+                            set_halign: gtk::Align::Center,
+                            set_visible: false,
+                            #[name = "preview_icon"]
+                            gtk::Box {
+                                add_css_class: "file-chooser-preview-icon",
+                                set_halign: gtk::Align::Center,
+                            },
+                            #[name = "preview_name"]
+                            gtk::Label {
+                                add_css_class: "file-chooser-preview-name",
+                                set_justify: gtk::Justification::Center,
+                                set_wrap: true,
+                                set_max_width_chars: 22,
+                            },
+                            #[name = "preview_info"]
+                            gtk::Label {
+                                add_css_class: "file-chooser-preview-info",
+                                set_justify: gtk::Justification::Center,
+                                set_wrap: true,
+                            },
+                        },
                     },
 
                     #[name = "name_entry"]
@@ -506,6 +550,14 @@ impl Component for FileChooser {
             let input = sender.input_sender().clone();
             move |_, child| input.emit(FileChooserInput::Activate(child.index().max(0) as u32))
         });
+        widgets.file_list.connect_selected_rows_changed({
+            let input = sender.input_sender().clone();
+            move |_| input.emit(FileChooserInput::SelectionChanged)
+        });
+        widgets.file_grid.connect_selected_children_changed({
+            let input = sender.input_sender().clone();
+            move |_| input.emit(FileChooserInput::SelectionChanged)
+        });
         widgets.name_entry.connect_activate({
             let input = sender.input_sender().clone();
             move |_| input.emit(FileChooserInput::Confirm)
@@ -528,6 +580,7 @@ impl Component for FileChooser {
             widgets.cancel_button.upcast_ref(),
             widgets.confirm_button.upcast_ref(),
             widgets.view_toggle.upcast_ref(),
+            widgets.preview_toggle.upcast_ref(),
             widgets.sort_name_btn.upcast_ref(),
             widgets.sort_size_btn.upcast_ref(),
             widgets.sort_modified_btn.upcast_ref(),
@@ -634,6 +687,13 @@ impl Component for FileChooser {
             FileChooserInput::Sort(column) => self.sort_by(widgets, column),
             FileChooserInput::ToggleView => self.toggle_view(widgets),
             FileChooserInput::ToggleQuickLook => self.toggle_quicklook(widgets),
+            FileChooserInput::TogglePreview => {
+                widgets
+                    .preview_pane
+                    .set_visible(widgets.preview_toggle.is_active());
+                self.refresh_preview(widgets);
+            }
+            FileChooserInput::SelectionChanged => self.refresh_preview(widgets),
             FileChooserInput::Dropped(path) => self.drop_path(widgets, path),
             FileChooserInput::Confirm => self.confirm(widgets, root),
             FileChooserInput::Cancel => self.cancel(widgets, root),
@@ -823,12 +883,8 @@ impl FileChooser {
         }
     }
 
-    /// Toggles the Quick Look preview card for the selected entry (spacebar).
-    fn toggle_quicklook(&mut self, widgets: &FileChooserWidgets) {
-        if widgets.quicklook.is_visible() {
-            widgets.quicklook.set_visible(false);
-            return;
-        }
+    /// Index of the first selected entry in the active view, if any.
+    fn selected_index(&self, widgets: &FileChooserWidgets) -> Option<usize> {
         let idx = match self.view {
             ViewMode::List => widgets.file_list.selected_rows().first().map(|r| r.index()),
             ViewMode::Grid => widgets
@@ -837,37 +893,47 @@ impl FileChooser {
                 .first()
                 .map(|c| c.index()),
         };
-        let Some(i) = idx.filter(|i| *i >= 0).map(|i| i as usize) else {
+        idx.filter(|i| *i >= 0).map(|i| i as usize)
+    }
+
+    /// Toggles the Quick Look preview card for the selected entry (spacebar).
+    fn toggle_quicklook(&mut self, widgets: &FileChooserWidgets) {
+        if widgets.quicklook.is_visible() {
+            widgets.quicklook.set_visible(false);
             return;
-        };
-        let Some(active) = self.active.as_ref() else {
-            return;
-        };
-        let Some(entry) = active.entries.get(i) else {
-            return;
-        };
-        let name = entry_name(&entry.path);
-        while let Some(child) = widgets.ql_icon.first_child() {
-            widgets.ql_icon.remove(&child);
         }
-        widgets
-            .ql_icon
-            .append(&entry_icon_widget(&name, &entry.path, entry.is_dir, 96));
-        widgets.ql_name.set_label(&name);
-        let info = if entry.is_dir {
-            format!("Folder · {}", format_time(entry.modified))
-        } else {
-            let (ct, _) = gio::content_type_guess(Some(name.as_str()), &[] as &[u8]);
-            let desc = gio::content_type_get_description(&ct);
-            format!(
-                "{} · {} · {}",
-                human_size(entry.size),
-                desc,
-                format_time(entry.modified)
-            )
+        let Some(i) = self.selected_index(widgets) else {
+            return;
         };
-        widgets.ql_info.set_label(&info);
+        let Some(entry) = self.active.as_ref().and_then(|a| a.entries.get(i)) else {
+            return;
+        };
+        fill_preview(&widgets.ql_icon, &widgets.ql_name, &widgets.ql_info, entry);
         widgets.quicklook.set_visible(true);
+    }
+
+    /// Refreshes the side preview pane (if visible) for the current selection.
+    fn refresh_preview(&self, widgets: &FileChooserWidgets) {
+        if !widgets.preview_pane.is_visible() {
+            return;
+        }
+        let entry = self
+            .selected_index(widgets)
+            .and_then(|i| self.active.as_ref().and_then(|a| a.entries.get(i)));
+        if let Some(entry) = entry {
+            fill_preview(
+                &widgets.preview_icon,
+                &widgets.preview_name,
+                &widgets.preview_info,
+                entry,
+            );
+        } else {
+            while let Some(child) = widgets.preview_icon.first_child() {
+                widgets.preview_icon.remove(&child);
+            }
+            widgets.preview_name.set_label("No selection");
+            widgets.preview_info.set_label("");
+        }
     }
 
     /// Handles a row activation: descend into dirs, or pick/seed for files.
@@ -1300,6 +1366,40 @@ fn is_raster_image(path: &Path) -> bool {
                 | "qoi"
         )
     )
+}
+
+/// Fills a preview area (icon box + name + info labels) with an entry's details.
+/// Shared by Quick Look and the side preview pane.
+fn fill_preview(
+    icon_box: &gtk::Box,
+    name_label: &gtk::Label,
+    info_label: &gtk::Label,
+    entry: &Entry,
+) {
+    let name = entry_name(&entry.path);
+    while let Some(child) = icon_box.first_child() {
+        icon_box.remove(&child);
+    }
+    icon_box.append(&entry_icon_widget(&name, &entry.path, entry.is_dir, 96));
+    name_label.set_label(&name);
+    let info = if entry.is_dir {
+        format!("Folder · {}", format_time(entry.modified))
+    } else {
+        // Type from extension (robust without a shared-MIME database).
+        let kind = entry
+            .path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| format!("{} file", e.to_uppercase()))
+            .unwrap_or_else(|| "File".to_owned());
+        format!(
+            "{} · {} · {}",
+            kind,
+            human_size(entry.size),
+            format_time(entry.modified)
+        )
+    };
+    info_label.set_label(&info);
 }
 
 /// Loads an image file as a downscaled CPU-side `gdk::MemoryTexture` (same path
