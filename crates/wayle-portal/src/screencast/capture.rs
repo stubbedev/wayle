@@ -5,7 +5,10 @@
 //! once for a [`CaptureTarget`] and re-captures a fresh frame on demand; the
 //! PipeWire producer drives the timing.
 
-use wayland_client::{Connection, protocol::wl_output::WlOutput};
+use wayland_client::{
+    Connection,
+    protocol::wl_output::{Transform, WlOutput},
+};
 use wayle_share_preview::{buffer::Buffer, ext_capture::ExtToplevelManager, output::OutputManager};
 
 use super::source::CaptureTarget;
@@ -18,6 +21,8 @@ pub enum Capturer {
         manager: OutputManager,
         /// The bound output.
         output: WlOutput,
+        /// Whether to composite the cursor into captured frames.
+        show_cursor: bool,
     },
     /// Output-region capture via wlr-screencopy.
     Region {
@@ -33,6 +38,8 @@ pub enum Capturer {
         width: i32,
         /// Region height.
         height: i32,
+        /// Whether to composite the cursor into captured frames.
+        show_cursor: bool,
     },
     /// Toplevel capture via ext-image-copy.
     Window {
@@ -51,7 +58,7 @@ impl Capturer {
     ///
     /// Returns an error if the Wayland connection fails, the required capture
     /// protocol is unavailable, or the target output/window no longer exists.
-    pub fn open(target: &CaptureTarget) -> Result<Self, String> {
+    pub fn open(target: &CaptureTarget, show_cursor: bool) -> Result<Self, String> {
         let connection =
             Connection::connect_to_env().map_err(|e| format!("cannot connect to wayland: {e}"))?;
 
@@ -60,7 +67,11 @@ impl Capturer {
                 let manager = OutputManager::new(&connection)
                     .map_err(|e| format!("screencopy unavailable: {e}"))?;
                 let output = find_output(&manager, name)?;
-                Ok(Self::Output { manager, output })
+                Ok(Self::Output {
+                    manager,
+                    output,
+                    show_cursor,
+                })
             }
             CaptureTarget::Region {
                 output,
@@ -79,6 +90,7 @@ impl Capturer {
                     y: *y,
                     width: *width,
                     height: *height,
+                    show_cursor,
                 })
             }
             CaptureTarget::Window(identifier) => {
@@ -95,17 +107,39 @@ impl Capturer {
         }
     }
 
-    /// Captures one frame into an SHM [`Buffer`].
+    /// Captures one frame into a [`Buffer`].
+    ///
+    /// When `prefer_dmabuf` is set and this is a whole-output capture, the
+    /// dmabuf zero-copy path is tried, transparently falling back to SHM if
+    /// anything in that path is unavailable or fails (see
+    /// [`OutputManager::capture_output_dmabuf_or_shm`]). The caller sets
+    /// `prefer_dmabuf` only when the PipeWire stream actually negotiated a
+    /// dmabuf buffer, so a stream that negotiated SHM always gets a readable SHM
+    /// buffer and never regresses. Region and window capture always use SHM. The
+    /// returned buffer carries its damage rects and, when zero-copy succeeded,
+    /// its dmabuf import parameters.
     ///
     /// # Errors
     ///
     /// Returns an error if the capture fails (output disappeared, protocol
     /// error, …).
-    pub fn capture(&mut self) -> Result<Buffer, String> {
+    pub fn capture(&mut self, prefer_dmabuf: bool) -> Result<Buffer, String> {
         match self {
-            Self::Output { manager, output } => manager
-                .capture_output(output)
-                .map_err(|e| format!("output capture failed: {e}")),
+            Self::Output {
+                manager,
+                output,
+                show_cursor,
+            } => {
+                if prefer_dmabuf {
+                    manager
+                        .capture_output_dmabuf_or_shm(output, *show_cursor)
+                        .map_err(|e| format!("output capture failed: {e}"))
+                } else {
+                    manager
+                        .capture_output_with_cursor(output, *show_cursor)
+                        .map_err(|e| format!("output capture failed: {e}"))
+                }
+            }
             Self::Region {
                 manager,
                 output,
@@ -113,13 +147,52 @@ impl Capturer {
                 y,
                 width,
                 height,
+                show_cursor,
             } => manager
-                .capture_output_region(output, *x, *y, *width, *height)
+                .capture_output_region_with_cursor(output, *x, *y, *width, *height, *show_cursor)
                 .map_err(|e| format!("region capture failed: {e}")),
             Self::Window { manager, handle } => manager
                 .capture_toplevel(&handle.handle)
                 .map_err(|e| format!("window capture failed: {e}")),
         }
+    }
+
+    /// The bound output's refresh rate in mHz (millihertz), if known. `None`
+    /// for window capture, where there is no single output refresh.
+    #[must_use]
+    pub fn refresh_mhz(&self) -> Option<i32> {
+        let (manager, output) = match self {
+            Self::Output { manager, output, .. } | Self::Region { manager, output, .. } => {
+                (manager, output)
+            }
+            Self::Window { .. } => return None,
+        };
+        manager
+            .outputs
+            .iter()
+            .find(|(o, _)| o == output)
+            .and_then(|(_, info)| info.mode.as_ref())
+            .map(|mode| mode.refresh)
+    }
+
+    /// The bound output's rotation/flip, from its `wl_output` geometry. Used to
+    /// emit the `SPA_META_VideoTransform` so a rotated monitor streams the right
+    /// way up. Window capture has no single output transform, so it reports
+    /// [`Transform::Normal`] (identity).
+    #[must_use]
+    pub fn transform(&self) -> Transform {
+        let (manager, output) = match self {
+            Self::Output { manager, output, .. } | Self::Region { manager, output, .. } => {
+                (manager, output)
+            }
+            Self::Window { .. } => return Transform::Normal,
+        };
+        manager
+            .outputs
+            .iter()
+            .find(|(o, _)| o == output)
+            .and_then(|(_, info)| info.geometry.as_ref())
+            .map_or(Transform::Normal, |geo| geo.transform)
     }
 }
 

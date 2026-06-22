@@ -19,6 +19,10 @@ wayland-protocols = { version = "0.32.12", features = ["client", "staging"] }
 wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
 wayland-scanner = "0.31.10"
 hyprland = { version = "0.4.0-beta.2", optional = true }
+# dmabuf zero-copy capture is best-effort with a guaranteed SHM fallback (see
+# output.rs). Both crates are pulled from the workspace.
+gbm = { workspace = true }
+drm-fourcc = { workspace = true }
 
 [features]
 hyprland-rs = ["dep:hyprland"]

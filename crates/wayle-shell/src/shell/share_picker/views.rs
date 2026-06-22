@@ -584,6 +584,12 @@ pub(super) fn build_region_page(input: &Sender<SharePickerInput>) -> ScrolledWin
                     .await
                     {
                         Some(sel) => {
+                            // Restore the picker before emitting: in single
+                            // select the `Select` handler re-hides it as it
+                            // confirms, but in multi-select the picker stays up
+                            // to accept more sources / the Share button, so it
+                            // must be back on screen either way.
+                            root.set_visible(true);
                             input.emit(SharePickerInput::Select(format!(
                                 "region:{}@{},{},{},{}",
                                 sel.output, sel.x, sel.y, sel.width, sel.height

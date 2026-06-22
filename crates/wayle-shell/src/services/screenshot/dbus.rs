@@ -13,9 +13,10 @@ pub struct ScreenshotDaemon;
 impl ScreenshotDaemon {
     /// Captures a screenshot and blocks until it is saved or cancelled.
     ///
-    /// `mode` is `region`, `output`, or `window`; `target` is an optional
-    /// output connector name (used by `output` mode). Returns the saved PNG
-    /// path, or an empty string when the user cancels a region selection.
+    /// `mode` is `region`, `output`, `screen`, or `window`; `target` is an
+    /// optional output connector name (used by `output` mode). `screen`
+    /// composites every output into one whole-layout image. Returns the saved
+    /// PNG path, or an empty string when the user cancels a region selection.
     #[instrument(skip(self))]
     pub async fn capture(&self, mode: &str, target: &str) -> zbus::fdo::Result<String> {
         let Some(sender) = host_sender() else {

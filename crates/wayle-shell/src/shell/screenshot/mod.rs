@@ -19,7 +19,7 @@ use std::{
     sync::Arc,
 };
 
-use capture::{CaptureKind, WindowTarget, capture};
+use capture::{CaptureKind, LogicalGeometry, PlacedFrame, WindowTarget, capture, composite_outputs};
 use hyprland::shared::{HyprData, HyprDataActiveOptional};
 use image::RgbImage;
 use relm4::{
@@ -38,8 +38,9 @@ use crate::shell::helpers::monitors::current_monitors;
 
 /// Messages driving the screenshot host.
 pub(crate) enum ScreenshotInput {
-    /// Capture a screenshot. `mode` is `region`/`output`/`window`; `target` is
-    /// an optional output name. The saved path (empty on cancel) is returned.
+    /// Capture a screenshot. `mode` is `region`/`output`/`screen`/`window`;
+    /// `target` is an optional output name (used by `output`). The saved path
+    /// (empty on cancel) is returned.
     Capture {
         mode: String,
         target: String,
@@ -224,6 +225,9 @@ async fn run(
             };
             capture(CaptureKind::Output(name))?
         }
+        // Whole multi-monitor space: composite every output into one image
+        // spanning the layout bounding box (matches grim's whole-screen grab).
+        "screen" => capture_full_screen()?,
         "window" => capture(CaptureKind::Window(window_target))?,
         other => return Err(format!("unknown screenshot mode: {other}")),
     };
@@ -299,6 +303,52 @@ async fn capture_region() -> Result<Option<RgbImage>, String> {
         logical_height,
         &selection,
     )))
+}
+
+/// Captures the entire compositor space across every output and composites it
+/// into a single image spanning the bounding box of all monitor geometries
+/// (matching `grim`'s whole-screen grab). Each output's physical frame is placed
+/// at its logical position in the layout. Falls back to the lone frame when only
+/// one output is present.
+fn capture_full_screen() -> Result<RgbImage, String> {
+    let frozen = capture::capture_all_outputs()?;
+
+    // Logical geometry (position + size) per connector, from the compositor
+    // layout. Physical frame resolution can differ under fractional scaling, so
+    // compositing scales each frame to its logical size.
+    let geometry: HashMap<String, LogicalGeometry> = current_monitors()
+        .into_iter()
+        .map(|(connector, monitor)| {
+            let g = monitor.geometry();
+            (
+                connector,
+                LogicalGeometry {
+                    x: g.x(),
+                    y: g.y(),
+                    width: g.width(),
+                    height: g.height(),
+                },
+            )
+        })
+        .collect();
+
+    let placed: Vec<PlacedFrame> = frozen
+        .iter()
+        .filter_map(|frame| {
+            geometry
+                .get(&frame.connector)
+                .map(|logical| PlacedFrame {
+                    logical: *logical,
+                    image: &frame.image,
+                })
+        })
+        .collect();
+
+    if placed.is_empty() {
+        return Err("no outputs available".to_owned());
+    }
+
+    Ok(composite_outputs(&placed))
 }
 
 /// Picks a single color: runs the same region selection as a screenshot, then

@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex, Weak};
+use std::{
+    os::fd::AsFd,
+    sync::{Arc, Mutex, Weak},
+};
 
 use wayland_client::{
     Connection, Dispatch, EventQueue, delegate_noop,
@@ -10,12 +13,21 @@ use wayland_client::{
         wl_shm_pool::WlShmPool,
     },
 };
+use wayland_protocols::wp::linux_dmabuf::zv1::client::{
+    zwp_linux_buffer_params_v1::{self, ZwpLinuxBufferParamsV1},
+    zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1,
+};
 use wayland_protocols_wlr::screencopy::v1::client::{
     zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1},
     zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
 };
 
-use crate::{Frame, buffer::Buffer, error::Error};
+use crate::{
+    Frame,
+    buffer::{Buffer, DmabufBacking},
+    dmabuf::{self, GbmDevice},
+    error::Error,
+};
 
 #[derive(Debug, Clone)]
 pub struct Geometry {
@@ -50,6 +62,22 @@ pub struct Output {
 pub struct OutputManager {
     shm: Option<WlShm>,
     manager: Option<ZwlrScreencopyManagerV1>,
+    /// `zwp_linux_dmabuf_v1`, bound when the compositor exposes it. Required for
+    /// the dmabuf zero-copy path; its absence forces the SHM fallback.
+    linux_dmabuf: Option<ZwpLinuxDmabufV1>,
+    /// gbm device opened lazily on the first dmabuf capture attempt, on a DRM
+    /// render node. Shared across captures. `None` until first use; an opened
+    /// device is wrapped in `Arc` so the `Clone` impl stays cheap.
+    gbm: Option<Arc<GbmDevice>>,
+    /// Set once we have tried (and failed) to open a gbm device, so we don't
+    /// retry every frame and keep falling back to SHM cleanly.
+    gbm_failed: bool,
+    /// Cached dmabuf format `(drm_fourcc, width, height)` learned from the first
+    /// dmabuf probe. `Some(Some(..))` = probed and dmabuf offered; `Some(None)`
+    /// = probed and no dmabuf offered (stay on SHM forever); `None` = not yet
+    /// probed. The format is stable per output, so we probe once and skip the
+    /// extra screencopy pass on every later frame.
+    dmabuf_probed: Option<Option<(u32, u32, u32)>>,
     pub outputs: Vec<(WlOutput, Output)>,
     intialized_outputs: u32,
     connection: Connection,
@@ -66,6 +94,10 @@ impl OutputManager {
         let mut manager = Self {
             shm: None,
             manager: None,
+            linux_dmabuf: None,
+            gbm: None,
+            gbm_failed: false,
+            dmabuf_probed: None,
             outputs: Vec::new(),
             intialized_outputs: 0,
             connection: connection.clone(),
@@ -93,8 +125,19 @@ impl OutputManager {
         Ok(manager)
     }
 
-    /// capture a single frame buffer of an output
+    /// capture a single frame buffer of an output (cursor not composited)
     pub fn capture_output(&mut self, output: &WlOutput) -> Result<Buffer, Error> {
+        self.capture_output_with_cursor(output, false)
+    }
+
+    /// capture a single frame buffer of an output, optionally compositing the
+    /// cursor into the frame (`overlay_cursor`). The wlr-screencopy
+    /// `overlay_cursor` argument is `1` when the cursor should be embedded.
+    pub fn capture_output_with_cursor(
+        &mut self,
+        output: &WlOutput,
+        overlay_cursor: bool,
+    ) -> Result<Buffer, Error> {
         let Some(zwlr_manager) = &self.manager else {
             Err(Error::ProtocolNotAvailable(std::any::type_name::<
                 ZwlrScreencopyManagerV1,
@@ -104,11 +147,16 @@ impl OutputManager {
         let frame = Arc::new(Mutex::new(Frame::default()));
         let mut event_queue = self.connection.new_event_queue();
         let handle = event_queue.handle();
-        let zwlr_frame = zwlr_manager.capture_output(0, output, &handle, Arc::downgrade(&frame));
+        let zwlr_frame = zwlr_manager.capture_output(
+            i32::from(overlay_cursor),
+            output,
+            &handle,
+            Arc::downgrade(&frame),
+        );
         self.finish_capture(frame, zwlr_frame, &mut event_queue)
     }
 
-    /// capture a selected region of an output
+    /// capture a selected region of an output (cursor not composited)
     pub fn capture_output_region(
         &mut self,
         output: &WlOutput,
@@ -116,6 +164,19 @@ impl OutputManager {
         y: i32,
         width: i32,
         height: i32,
+    ) -> Result<Buffer, Error> {
+        self.capture_output_region_with_cursor(output, x, y, width, height, false)
+    }
+
+    /// capture a selected region of an output, optionally compositing the cursor.
+    pub fn capture_output_region_with_cursor(
+        &mut self,
+        output: &WlOutput,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        overlay_cursor: bool,
     ) -> Result<Buffer, Error> {
         let Some(zwlr_manager) = &self.manager else {
             Err(Error::ProtocolNotAvailable(std::any::type_name::<
@@ -127,7 +188,7 @@ impl OutputManager {
         let mut event_queue = self.connection.new_event_queue();
         let handle = event_queue.handle();
         let zwlr_frame = zwlr_manager.capture_output_region(
-            0,
+            i32::from(overlay_cursor),
             output,
             x,
             y,
@@ -137,6 +198,256 @@ impl OutputManager {
             Arc::downgrade(&frame),
         );
         self.finish_capture(frame, zwlr_frame, &mut event_queue)
+    }
+
+    /// Attempt a dmabuf (zero-copy) capture of `output`, falling back to SHM on
+    /// any failure.
+    ///
+    /// This is **best-effort and unverified on hardware**: if `zwp_linux_dmabuf`
+    /// is unavailable, no gbm render node can be opened, the compositor never
+    /// advertises a dmabuf format for the frame, or allocation / import /
+    /// copy fails at any point, this returns a plain SHM [`Buffer`] captured the
+    /// same way [`capture_output_with_cursor`](Self::capture_output_with_cursor)
+    /// would — so capture never regresses.
+    ///
+    /// The returned [`Buffer`] has `dmabuf: Some(..)` only when the zero-copy
+    /// path fully succeeded; otherwise it is a normal SHM buffer.
+    pub fn capture_output_dmabuf_or_shm(
+        &mut self,
+        output: &WlOutput,
+        overlay_cursor: bool,
+    ) -> Result<Buffer, Error> {
+        match self.try_capture_output_dmabuf(output, overlay_cursor) {
+            Ok(buffer) => Ok(buffer),
+            Err(err) => {
+                log::debug!("dmabuf capture unavailable ({err}); falling back to SHM");
+                self.capture_output_with_cursor(output, overlay_cursor)
+            }
+        }
+    }
+
+    /// One dmabuf capture attempt. Errors (rather than falling back internally)
+    /// so the caller can cleanly drop to SHM.
+    ///
+    /// The dmabuf format is learned (and cached) once via
+    /// [`probe_dmabuf_format`](Self::probe_dmabuf_format); thereafter each frame
+    /// allocates a fresh gbm bo, imports it as a `wl_buffer`, has the compositor
+    /// copy into it, and returns it.
+    ///
+    /// **Best-effort and unverified on hardware.** Known limitation: a new bo is
+    /// allocated per frame rather than recycling a small pool (the PipeWire
+    /// stream here uses the MAP_BUFFERS/server-allocated model for SHM, so the
+    /// dmabuf buffers are produced on our side per frame). This is correct but
+    /// not optimal; it is acceptable for a first dmabuf path whose contract is
+    /// "never regress SHM" — any failure here returns an error and the caller
+    /// uses SHM.
+    fn try_capture_output_dmabuf(
+        &mut self,
+        output: &WlOutput,
+        overlay_cursor: bool,
+    ) -> Result<Buffer, Error> {
+        // Protocol + device preconditions; any miss -> SHM fallback.
+        let zwlr_manager = self
+            .manager
+            .clone()
+            .ok_or(Error::ProtocolNotAvailable(std::any::type_name::<
+                ZwlrScreencopyManagerV1,
+            >()))?;
+        let linux_dmabuf = self
+            .linux_dmabuf
+            .clone()
+            .ok_or_else(|| Error::DmabufUnavailable("zwp_linux_dmabuf_v1 not bound".into()))?;
+        let gbm = self.ensure_gbm()?;
+
+        // Learn (and cache) the dmabuf format the compositor offers for this
+        // output. The format is stable per output, so we probe once with an
+        // extra screencopy pass and reuse it for every later frame.
+        let (drm_fourcc, width, height) = match self.probe_dmabuf_format(&zwlr_manager, output, overlay_cursor)? {
+            Some(fmt) => fmt,
+            None => {
+                return Err(Error::DmabufUnavailable(
+                    "compositor advertised no dmabuf format".into(),
+                ));
+            }
+        };
+
+        // Allocate a gbm bo for the advertised format and import it as a
+        // dmabuf-backed wl_buffer. The empty modifier list lets the helper use
+        // its safe fallbacks (driver-chosen / linear); we have no compositor
+        // modifier list from wlr-screencopy.
+        let alloc = dmabuf::allocate(&gbm, drm_fourcc, width, height, &[])?;
+
+        let mut params_queue = self.connection.new_event_queue();
+        let params_handle = params_queue.handle();
+        let params_state = Arc::new(Mutex::new(ParamsState::default()));
+        let params = linux_dmabuf.create_params(&params_handle, Arc::downgrade(&params_state));
+        let modifier = alloc.modifier;
+        for (idx, fd) in alloc.owned_fds.iter().enumerate() {
+            params.add(
+                fd.as_fd(),
+                idx as u32,
+                alloc.offsets.get(idx).copied().unwrap_or(0),
+                alloc.strides.get(idx).copied().unwrap_or(0),
+                (modifier >> 32) as u32,
+                (modifier & 0xffff_ffff) as u32,
+            );
+        }
+        let shm_format = dmabuf::shm_format_from_fourcc(drm_fourcc).ok_or_else(|| {
+            Error::DmabufUnavailable(format!("no wl_shm format for fourcc {drm_fourcc:#x}"))
+        })?;
+        // create_immed (since v2) builds the wl_buffer synchronously; a bad
+        // import is reported with a `failed` event on the params object, which
+        // we drain with one roundtrip below before trusting the buffer.
+        let wl_buffer = params.create_immed(
+            width as i32,
+            height as i32,
+            drm_fourcc,
+            zwp_linux_buffer_params_v1::Flags::empty(),
+            &params_handle,
+            (),
+        );
+        params_queue
+            .roundtrip(self)
+            .map_err(Error::WaylandDispatch)?;
+        params.destroy();
+        if params_state.lock().expect("lock should not be poisoned").failed {
+            wl_buffer.destroy();
+            return Err(Error::DmabufUnavailable("dmabuf import was rejected".into()));
+        }
+
+        let stride0 = alloc.strides.first().copied().unwrap_or(width * 4);
+        let backing = DmabufBacking::new(
+            drm_fourcc,
+            alloc.modifier,
+            alloc.owned_fds,
+            &alloc.offsets,
+            &alloc.strides,
+            alloc.bo,
+        );
+        let mut buffer =
+            Buffer::from_dmabuf(wl_buffer.clone(), width, height, stride0, shm_format, backing);
+
+        // Pass 2: capture into the dmabuf buffer. Reuse the same wl_buffer.
+        let frame = Arc::new(Mutex::new(Frame::default()));
+        let mut copy_queue = self.connection.new_event_queue();
+        let copy_handle = copy_queue.handle();
+        let zwlr_frame = zwlr_manager.capture_output(
+            i32::from(overlay_cursor),
+            output,
+            &copy_handle,
+            Arc::downgrade(&frame),
+        );
+
+        // Drive: wait for the compositor's Buffer event then issue copy() once,
+        // then wait for Ready / Failed. Mirrors finish_capture but copies into
+        // our pre-built dmabuf buffer instead of an SHM one.
+        let mut requested = false;
+        loop {
+            copy_queue
+                .blocking_dispatch(self)
+                .map_err(Error::WaylandDispatch)?;
+            let mut f = frame.lock().expect("lock should not be poisoned");
+            if let Some(err) = &f.error {
+                let err = format!("dmabuf copy failed: {err}");
+                drop(f);
+                zwlr_frame.destroy();
+                buffer.destroy();
+                return Err(Error::DmabufUnavailable(err));
+            }
+            if f.ready {
+                // Carry this frame's damage rects onto the dmabuf buffer.
+                buffer.damage = std::mem::take(&mut f.damage);
+                break;
+            }
+            // Once the compositor has described the frame (Buffer event arrived
+            // -> f.buffer is set, or the dmabuf format is known), request the
+            // copy exactly once.
+            if !requested && (f.buffer.is_some() || f.dmabuf_format.is_some()) {
+                drop(f);
+                // copy_with_damage so the compositor emits damage for this frame.
+                zwlr_frame.copy_with_damage(&wl_buffer);
+                requested = true;
+                continue;
+            }
+        }
+        zwlr_frame.destroy();
+        Ok(buffer)
+    }
+
+    /// Learns the dmabuf format the compositor offers for `output`, caching the
+    /// result so the extra screencopy pass runs at most once per manager.
+    ///
+    /// Returns `Some((fourcc, w, h))` when a dmabuf format is offered, `None`
+    /// when the compositor advertises only SHM (so the caller should stay on the
+    /// SHM path for good).
+    fn probe_dmabuf_format(
+        &mut self,
+        zwlr_manager: &ZwlrScreencopyManagerV1,
+        output: &WlOutput,
+        overlay_cursor: bool,
+    ) -> Result<Option<(u32, u32, u32)>, Error> {
+        if let Some(cached) = self.dmabuf_probed {
+            return Ok(cached);
+        }
+
+        // Probe pass: capture but never copy; read the metadata events then drop
+        // the frame object.
+        let probe = Arc::new(Mutex::new(Frame::default()));
+        let mut probe_queue = self.connection.new_event_queue();
+        let probe_handle = probe_queue.handle();
+        let probe_frame = zwlr_manager.capture_output(
+            i32::from(overlay_cursor),
+            output,
+            &probe_handle,
+            Arc::downgrade(&probe),
+        );
+        // Drain until either a dmabuf format arrives or the SHM Buffer event
+        // shows the compositor offered no dmabuf format.
+        let result = loop {
+            probe_queue
+                .blocking_dispatch(self)
+                .map_err(Error::WaylandDispatch)?;
+            let f = probe.lock().expect("lock should not be poisoned");
+            if let Some(err) = &f.error {
+                let err = format!("probe failed: {err}");
+                drop(f);
+                probe_frame.destroy();
+                // A probe error is transient; do not cache it.
+                return Err(Error::DmabufUnavailable(err));
+            }
+            if let Some(fmt) = f.dmabuf_format {
+                break Some(fmt);
+            }
+            if f.buffer.is_some() {
+                break None;
+            }
+        };
+        probe_frame.destroy();
+
+        self.dmabuf_probed = Some(result);
+        Ok(result)
+    }
+
+    /// Open the gbm device on a DRM render node lazily, caching success and
+    /// failure so we try at most once.
+    fn ensure_gbm(&mut self) -> Result<Arc<GbmDevice>, Error> {
+        if let Some(gbm) = &self.gbm {
+            return Ok(gbm.clone());
+        }
+        if self.gbm_failed {
+            return Err(Error::DmabufUnavailable("gbm device unavailable".into()));
+        }
+        match dmabuf::open_gbm_device() {
+            Ok(dev) => {
+                let dev = Arc::new(dev);
+                self.gbm = Some(dev.clone());
+                Ok(dev)
+            }
+            Err(err) => {
+                self.gbm_failed = true;
+                Err(err)
+            }
+        }
     }
 
     fn finish_capture(
@@ -162,7 +473,10 @@ impl OutputManager {
                     break;
                 }
                 (false, false, _, Some(buffer)) => {
-                    zwlr_frame.copy(&buffer.buffer);
+                    // copy_with_damage (screencopy v2+) is required for the
+                    // compositor to emit `damage` events; a plain `copy` never
+                    // reports damage. The frames are otherwise identical.
+                    zwlr_frame.copy_with_damage(&buffer.buffer);
                     current.requested = true;
                 }
                 _ => continue,
@@ -175,7 +489,9 @@ impl OutputManager {
                 if let Some(err) = frame.error {
                     return Err(err);
                 }
-                if let Some(buffer) = frame.buffer {
+                if let Some(mut buffer) = frame.buffer {
+                    // Carry the per-frame damage rects onto the returned buffer.
+                    buffer.damage = frame.damage;
                     Ok(buffer)
                 } else {
                     unreachable!("we only exit the loop when buffer or error is some")
@@ -186,6 +502,14 @@ impl OutputManager {
             }
         }
     }
+}
+
+/// Tracks the outcome of a `zwp_linux_buffer_params_v1` import. With
+/// `create_immed` the success path is silent; only a `failed` event is
+/// meaningful (it means the wl_buffer is invalid and we must fall back).
+#[derive(Default)]
+struct ParamsState {
+    failed: bool,
 }
 
 impl Dispatch<wl_registry::WlRegistry, ()> for OutputManager {
@@ -211,6 +535,13 @@ impl Dispatch<wl_registry::WlRegistry, ()> for OutputManager {
                 "zwlr_screencopy_manager_v1" => {
                     let manager: ZwlrScreencopyManagerV1 = registry.bind(name, version, handle, ());
                     state.manager = Some(manager);
+                }
+                "zwp_linux_dmabuf_v1" => {
+                    // Bind at most v3 (the version we rely on: create_immed is
+                    // v2, modifier event is v3). Binding the advertised version
+                    // is fine since we only use v2 requests.
+                    let dmabuf: ZwpLinuxDmabufV1 = registry.bind(name, version.min(4), handle, ());
+                    state.linux_dmabuf = Some(dmabuf);
                 }
                 "wl_output" => {
                     let output: WlOutput = registry.bind(name, version, handle, ());
@@ -320,10 +651,48 @@ impl Dispatch<ZwlrScreencopyFrameV1, Weak<Mutex<Frame>>> for OutputManager {
                 frame.ready = true;
             }
             zwlr_screencopy_frame_v1::Event::Failed => frame.error = Some(Error::Failed),
-            zwlr_screencopy_frame_v1::Event::Damage { .. } => {}
-            zwlr_screencopy_frame_v1::Event::LinuxDmabuf { .. } => {}
+            zwlr_screencopy_frame_v1::Event::Damage {
+                x,
+                y,
+                width,
+                height,
+            } => {
+                // Accumulate the damaged region; the consumer maps these to the
+                // SPA_META_VideoDamage meta. Falls back to whole-frame downstream
+                // when none are reported.
+                frame.damage.push((x, y, width, height));
+            }
+            zwlr_screencopy_frame_v1::Event::LinuxDmabuf {
+                format,
+                width,
+                height,
+            } => {
+                // Learn the dmabuf format the compositor offers for this frame so
+                // the dmabuf path can allocate a matching gbm bo. `format` is a
+                // DRM fourcc.
+                frame.dmabuf_format = Some((format, width, height));
+            }
             zwlr_screencopy_frame_v1::Event::BufferDone => {}
             _ => {}
+        }
+    }
+}
+
+impl Dispatch<ZwpLinuxBufferParamsV1, Weak<Mutex<ParamsState>>> for OutputManager {
+    fn event(
+        _state: &mut Self,
+        _proxy: &ZwpLinuxBufferParamsV1,
+        event: <ZwpLinuxBufferParamsV1 as wayland_client::Proxy>::Event,
+        data: &Weak<Mutex<ParamsState>>,
+        _conn: &wayland_client::Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
+    ) {
+        let Some(data) = data.upgrade() else {
+            return;
+        };
+        let mut state = data.lock().expect("lock should not be poisoned");
+        if let zwp_linux_buffer_params_v1::Event::Failed = event {
+            state.failed = true;
         }
     }
 }
@@ -332,3 +701,4 @@ delegate_noop!(OutputManager: ignore WlShm);
 delegate_noop!(OutputManager: ignore WlShmPool);
 delegate_noop!(OutputManager: ignore WlBuffer);
 delegate_noop!(OutputManager: ignore ZwlrScreencopyManagerV1);
+delegate_noop!(OutputManager: ignore ZwpLinuxDmabufV1);

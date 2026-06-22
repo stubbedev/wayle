@@ -21,7 +21,8 @@ pub struct ShortcutEvent {
     pub key: String,
     /// `true` = pressed, `false` = released.
     pub pressed: bool,
-    /// Event timestamp in milliseconds.
+    /// Event timestamp in seconds (matches xdg-desktop-portal-hyprland, which
+    /// forwards `tv_sec`).
     pub timestamp: u64,
 }
 
@@ -34,8 +35,20 @@ pub struct GsHandle {
 
 impl GsHandle {
     /// Registers a global shortcut. The compositor delivers activations for it
-    /// tagged with `key`.
-    pub fn register(&self, key: String, id: &str, app_id: &str, description: &str, trigger: &str) {
+    /// tagged with `key`. Returns the compositor object so the caller can
+    /// destroy it when the registration is dropped or replaced.
+    ///
+    /// The `app_id` + `id` pair must be unique: the compositor raises the
+    /// `already_taken` protocol error on a duplicate, so callers must not
+    /// re-register a pair they already hold an object for.
+    pub fn register(
+        &self,
+        key: String,
+        id: &str,
+        app_id: &str,
+        description: &str,
+        trigger: &str,
+    ) -> HyprlandGlobalShortcutV1 {
         self.manager.register_shortcut(
             id.to_owned(),
             app_id.to_owned(),
@@ -43,7 +56,7 @@ impl GsHandle {
             trigger.to_owned(),
             &self.qh,
             key,
-        );
+        )
     }
 }
 
@@ -166,13 +179,13 @@ impl Dispatch<HyprlandGlobalShortcutV1, String> for GsState {
             hyprland_global_shortcut_v1::Event::Pressed {
                 tv_sec_hi,
                 tv_sec_lo,
-                tv_nsec,
-            } => (true, millis(tv_sec_hi, tv_sec_lo, tv_nsec)),
+                tv_nsec: _,
+            } => (true, seconds(tv_sec_hi, tv_sec_lo)),
             hyprland_global_shortcut_v1::Event::Released {
                 tv_sec_hi,
                 tv_sec_lo,
-                tv_nsec,
-            } => (false, millis(tv_sec_hi, tv_sec_lo, tv_nsec)),
+                tv_nsec: _,
+            } => (false, seconds(tv_sec_hi, tv_sec_lo)),
         };
         let _ = state.events.send(ShortcutEvent {
             key: key.clone(),
@@ -182,8 +195,24 @@ impl Dispatch<HyprlandGlobalShortcutV1, String> for GsState {
     }
 }
 
-/// Combines the split-second + nanosecond Wayland timestamp into milliseconds.
-fn millis(tv_sec_hi: u32, tv_sec_lo: u32, tv_nsec: u32) -> u64 {
-    let secs = (u64::from(tv_sec_hi) << 32) | u64::from(tv_sec_lo);
-    secs.wrapping_mul(1000) + u64::from(tv_nsec) / 1_000_000
+/// Combines the split high/low halves of the Wayland timestamp into whole
+/// seconds. xdg-desktop-portal-hyprland forwards `tv_sec` as the signal
+/// timestamp, so the nanosecond component is intentionally dropped.
+fn seconds(tv_sec_hi: u32, tv_sec_lo: u32) -> u64 {
+    (u64::from(tv_sec_hi) << 32) | u64::from(tv_sec_lo)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seconds_combines_hi_and_lo_halves() {
+        assert_eq!(seconds(0, 0), 0);
+        assert_eq!(seconds(0, 42), 42);
+        // High word contributes the upper 32 bits.
+        assert_eq!(seconds(1, 0), 1u64 << 32);
+        assert_eq!(seconds(1, 5), (1u64 << 32) + 5);
+        assert_eq!(seconds(u32::MAX, u32::MAX), u64::MAX);
+    }
 }

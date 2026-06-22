@@ -17,4 +17,8 @@ pub enum Error {
     BufferRead(std::io::Error),
     #[error("unable to create buffer: {0}")]
     BufferCreate(Box<dyn std::error::Error + Sync + Send>),
+    #[error("buffer is dmabuf-backed and has no host-readable SHM mapping")]
+    NoShmBacking,
+    #[error("dmabuf capture path unavailable: {0}")]
+    DmabufUnavailable(String),
 }

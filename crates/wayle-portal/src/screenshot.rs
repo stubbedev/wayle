@@ -2,9 +2,11 @@
 //!
 //! Delegates to the running shell's `com.wayle.Screenshot1` service (the same
 //! one the `wayle screenshot` CLI uses): `Screenshot` runs a region selection
-//! (interactive) or grabs the focused output, and `PickColor` runs the picker
-//! and samples one pixel. The shell owns all the GTK overlay UI; this interface
-//! is a thin bridge plus the portal's result encoding.
+//! (interactive) or grabs the whole multi-monitor screen (non-interactive,
+//! matching xdg-desktop-portal-hyprland's `grim` whole-screen grab), and
+//! `PickColor` runs the picker and samples one pixel. The shell owns all the
+//! GTK overlay UI; this interface is a thin bridge plus the portal's result
+//! encoding.
 
 use std::collections::HashMap;
 
@@ -110,8 +112,10 @@ impl Screenshot {
 }
 
 /// The shell capture mode for an interactive vs. whole-screen request.
+/// Non-interactive captures the entire compositor space across all outputs
+/// (like `grim` with no geometry), not a single output.
 fn screenshot_mode(interactive: bool) -> &'static str {
-    if interactive { "region" } else { "output" }
+    if interactive { "region" } else { "screen" }
 }
 
 /// Converts an absolute filesystem path to a `file://` URI, percent-encoding
@@ -136,7 +140,7 @@ mod tests {
     #[test]
     fn mode_selection() {
         assert_eq!(screenshot_mode(true), "region");
-        assert_eq!(screenshot_mode(false), "output");
+        assert_eq!(screenshot_mode(false), "screen");
     }
 
     #[test]

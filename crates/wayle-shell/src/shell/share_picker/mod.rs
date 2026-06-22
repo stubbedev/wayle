@@ -36,12 +36,17 @@ pub(crate) enum SharePickerInput {
         toplevels: Vec<Toplevel>,
         /// Initial state of the restore-token checkbox.
         allow_token: bool,
+        /// Whether several sources may be selected before confirming.
+        multiple: bool,
         /// Channel the chosen selection is sent back on.
         reply: oneshot::Sender<String>,
     },
     /// A card/region was chosen; payload is `window:<id>`/`screen:<name>`/
-    /// `region:<spec>`.
+    /// `region:<spec>`. In single-select mode this confirms immediately; in
+    /// multi-select mode it toggles the payload in the pending set.
     Select(String),
+    /// Confirm the accumulated multi-select set (the "Share" button).
+    Confirm,
     /// Restore-token checkbox toggled.
     ToggleToken(bool),
     /// Picker dismissed without a selection.
@@ -54,13 +59,16 @@ impl std::fmt::Debug for SharePickerInput {
             Self::Show {
                 toplevels,
                 allow_token,
+                multiple,
                 ..
             } => f
                 .debug_struct("Show")
                 .field("toplevels", &toplevels.len())
                 .field("allow_token", allow_token)
+                .field("multiple", multiple)
                 .finish_non_exhaustive(),
             Self::Select(payload) => f.debug_tuple("Select").field(payload).finish(),
+            Self::Confirm => f.write_str("Confirm"),
             Self::ToggleToken(active) => f.debug_tuple("ToggleToken").field(active).finish(),
             Self::Cancel => f.write_str("Cancel"),
         }
@@ -73,6 +81,11 @@ pub(crate) struct SharePicker {
     /// Snapshot of `[share-picker]`, refreshed each time the picker opens.
     config: PickerConfig,
     allow_token: bool,
+    /// Whether the current request allows selecting several sources.
+    multiple: bool,
+    /// Payloads accumulated in multi-select mode, in selection order. Empty in
+    /// single-select mode (selections confirm immediately there).
+    pending: Vec<String>,
     reply: Option<oneshot::Sender<String>>,
 }
 
@@ -117,6 +130,17 @@ impl Component for SharePicker {
                         add_css_class: "share-picker-restore-button",
                         set_visible: !model.config.hide_token_restore,
                     },
+
+                    // Only shown in multi-select mode: confirms the set of
+                    // sources accumulated by tapping cards. Single-select
+                    // confirms on the card tap itself, so it stays hidden.
+                    #[name = "confirm_button"]
+                    gtk::Button {
+                        set_label: "Share",
+                        add_css_class: "share-picker-confirm-button",
+                        set_visible: false,
+                        set_sensitive: false,
+                    },
                 },
             }
         }
@@ -132,6 +156,8 @@ impl Component for SharePicker {
             config_service: init,
             config,
             allow_token: false,
+            multiple: false,
+            pending: Vec::new(),
             reply: None,
         };
         let widgets = view_output!();
@@ -148,6 +174,9 @@ impl Component for SharePicker {
         widgets
             .token_check
             .connect_toggled(glib_clone_toggle(&sender));
+
+        widgets.confirm_button.set_cursor_from_name(Some("pointer"));
+        widgets.confirm_button.connect_clicked(glib_clone_confirm(&sender));
 
         // Play the enter transition only once the freshly-mapped window is on
         // screen. Flipping `reveal_child` before the map (e.g. on an idle right
@@ -174,6 +203,7 @@ impl Component for SharePicker {
             SharePickerInput::Show {
                 toplevels,
                 allow_token,
+                multiple,
                 reply,
             } => {
                 // Drop any previous, unanswered request.
@@ -181,6 +211,8 @@ impl Component for SharePicker {
                     let _ = prev.send(String::new());
                 }
                 self.allow_token = allow_token;
+                self.multiple = multiple;
+                self.pending.clear();
                 self.reply = Some(reply);
 
                 // Re-resolve config so live settings edits apply per request.
@@ -192,6 +224,12 @@ impl Component for SharePicker {
                 widgets
                     .token_check
                     .set_visible(!self.config.hide_token_restore);
+
+                // The confirm button only exists for multi-select; it starts
+                // disabled until the user has picked at least one source.
+                widgets.confirm_button.set_visible(multiple);
+                widgets.confirm_button.set_sensitive(false);
+                widgets.confirm_button.set_label("Share");
 
                 while widgets.notebook.n_pages() > 0 {
                     widgets.notebook.remove_page(Some(0));
@@ -211,8 +249,36 @@ impl Component for SharePicker {
             }
 
             SharePickerInput::Select(payload) => {
+                if self.multiple {
+                    // Toggle the payload in the pending set instead of
+                    // confirming, so the user can keep adding sources.
+                    if let Some(pos) = self.pending.iter().position(|p| *p == payload) {
+                        self.pending.remove(pos);
+                    } else {
+                        self.pending.push(payload);
+                    }
+                    widgets
+                        .confirm_button
+                        .set_sensitive(!self.pending.is_empty());
+                    widgets
+                        .confirm_button
+                        .set_label(&confirm_label(self.pending.len()));
+                } else if let Some(reply) = self.reply.take() {
+                    let prefix = if self.allow_token { "r" } else { "" };
+                    let _ = reply.send(format!("{prefix}/{payload}"));
+                    self.hide_animated(widgets, root);
+                }
+            }
+
+            SharePickerInput::Confirm => {
+                // Multi-select only: join the accumulated payloads with the
+                // `;` separator the portal's `parse_picker_reply_multi` expects.
+                if self.pending.is_empty() {
+                    return;
+                }
                 if let Some(reply) = self.reply.take() {
                     let prefix = if self.allow_token { "r" } else { "" };
+                    let payload = self.pending.join(";");
                     let _ = reply.send(format!("{prefix}/{payload}"));
                 }
                 self.hide_animated(widgets, root);
@@ -277,4 +343,18 @@ fn glib_clone_toggle(
 ) -> impl Fn(&gtk::CheckButton) + 'static {
     let sender = sender.input_sender().clone();
     move |btn| sender.emit(SharePickerInput::ToggleToken(btn.is_active()))
+}
+
+/// Builds the `connect_clicked` handler for the multi-select confirm button.
+fn glib_clone_confirm(sender: &ComponentSender<SharePicker>) -> impl Fn(&gtk::Button) + 'static {
+    let sender = sender.input_sender().clone();
+    move |_| sender.emit(SharePickerInput::Confirm)
+}
+
+/// Label for the multi-select confirm button reflecting the pending count.
+fn confirm_label(count: usize) -> String {
+    match count {
+        0 | 1 => "Share".to_owned(),
+        n => format!("Share {n} sources"),
+    }
 }

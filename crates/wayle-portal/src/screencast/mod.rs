@@ -31,7 +31,7 @@ use zbus::{
 
 #[cfg(feature = "pipewire")]
 use self::pipewire::StreamHandle;
-use self::source::{CaptureTarget, PickerSelection, SourceType, parse_picker_reply};
+use self::source::{CaptureTarget, SourceType, parse_picker_reply_multi};
 use crate::{
     StreamSizes,
     dbus_util::{Vardict, opt_bool, opt_u32, owned},
@@ -47,7 +47,8 @@ const DEFAULT_FPS: u32 = 30;
 struct SessionConfig {
     /// `cursor_mode` bitmask from `SelectSources`.
     cursor_mode: u32,
-    /// Whether multiple sources were requested (we currently stream one).
+    /// Whether the client requested multiple sources; when set the picker runs
+    /// in multi-select mode and we start one stream per chosen target.
     multiple: bool,
     /// `persist_mode` from `SelectSources` (0 = no persistence).
     persist_mode: u32,
@@ -82,8 +83,9 @@ impl ScreenCast {
     }
 
     /// Shows the picker and parses the user's selection. `None` = cancelled or
-    /// the shell UI is unavailable.
-    async fn run_picker(&self, allow_token: bool) -> Option<PickerSelection> {
+    /// the shell UI is unavailable. `multiple` lets the user pick several
+    /// sources at once; the reply then carries several targets.
+    async fn run_picker(&self, allow_token: bool, multiple: bool) -> Option<PickerSelection> {
         let proxy = match SharePickerProxy::new(&self.connection).await {
             Ok(proxy) => proxy,
             Err(err) => {
@@ -93,14 +95,48 @@ impl ScreenCast {
         };
         // Empty window list → the picker enumerates toplevels generically and
         // returns a stable ext identifier we can re-resolve when capturing.
-        match proxy.pick("", allow_token).await {
-            Ok(reply) => parse_picker_reply(&reply),
+        match proxy.pick("", allow_token, multiple).await {
+            Ok(reply) => {
+                let (allow_token, targets) = parse_picker_reply_multi(&reply)?;
+                Some(PickerSelection {
+                    allow_token,
+                    targets,
+                })
+            }
             Err(err) => {
                 warn!(%err, "screencast: picker call failed");
                 None
             }
         }
     }
+
+    /// Runs the picker, racing it against the request's `Close()` when a cancel
+    /// handle is available. `None` = cancelled or the shell UI is unavailable.
+    async fn prompt(
+        &self,
+        cancel: Option<&crate::request::Cancel>,
+        allow_token: bool,
+        multiple: bool,
+    ) -> Option<PickerSelection> {
+        match cancel {
+            Some(cancel) => {
+                let picker = self.run_picker(allow_token, multiple);
+                tokio::pin!(picker);
+                tokio::select! {
+                    selection = &mut picker => selection,
+                    () = cancel.cancelled() => None,
+                }
+            }
+            None => self.run_picker(allow_token, multiple).await,
+        }
+    }
+}
+
+/// A resolved picker selection: the restore-token flag plus one or more chosen
+/// capture targets (always at least one).
+struct PickerSelection {
+    allow_token: bool,
+    targets: Vec<CaptureTarget>,
 }
 
 #[interface(name = "org.freedesktop.impl.portal.ScreenCast")]
@@ -120,7 +156,7 @@ impl ScreenCast {
     /// Interface version.
     #[zbus(property, name = "version")]
     fn version(&self) -> u32 {
-        5
+        6
     }
 
     /// Creates a session: mounts the Session object and records default config.
@@ -205,43 +241,62 @@ impl ScreenCast {
             .ok();
         let cancel = guard.as_ref().map(crate::request::RequestGuard::cancel);
 
-        let selection = match config.restore_target.clone() {
+        // Resolve the capture target(s): replay a restore token if present,
+        // otherwise prompt with the picker. A restore token only ever stores a
+        // single target (the `(suv)` token format owned by `restore.rs`), so
+        // restoring always yields exactly one target even when `multiple`.
+        let restoring = config.restore_target.is_some();
+        let mut selection = match config.restore_target.clone() {
             Some(target) => PickerSelection {
                 allow_token: config.persist_mode > 0,
-                target,
+                targets: vec![target],
             },
-            None => {
-                let picked = match cancel {
-                    Some(cancel) => {
-                        let picker = self.run_picker(config.persist_mode > 0);
-                        tokio::pin!(picker);
-                        tokio::select! {
-                            selection = &mut picker => selection,
-                            () = cancel.cancelled() => None,
+            None => match self
+                .prompt(cancel.as_ref(), config.persist_mode > 0, config.multiple)
+                .await
+            {
+                Some(selection) => selection,
+                None => return (Response::Cancelled.code(), HashMap::new()),
+            },
+        };
+
+        // Start a producer per target. A restored target may name an
+        // output/window that no longer exists; rather than returning an error,
+        // fall back to the picker once (matching xdph's restore-data
+        // validation). For a fresh multi-select prompt, if any target fails to
+        // start we fail the whole Start with `Other` (and tear down whatever
+        // already started for this session) — a partial set of streams would
+        // silently differ from what the user picked.
+        let mut reprompted = false;
+        let streams = loop {
+            match self
+                .begin_streams(&session_handle, &selection.targets, config.cursor_mode)
+                .await
+            {
+                Ok(streams) => break streams,
+                Err(err) if restoring && !reprompted => {
+                    warn!(%err, "screencast: restored target unavailable, re-prompting");
+                    reprompted = true;
+                    match self
+                        .prompt(cancel.as_ref(), config.persist_mode > 0, config.multiple)
+                        .await
+                    {
+                        Some(new_selection) => {
+                            selection = new_selection;
+                            continue;
                         }
+                        None => return (Response::Cancelled.code(), HashMap::new()),
                     }
-                    None => self.run_picker(config.persist_mode > 0).await,
-                };
-                match picked {
-                    Some(selection) => selection,
-                    None => return (Response::Cancelled.code(), HashMap::new()),
+                }
+                Err(err) => {
+                    error!(%err, "screencast: failed to start stream");
+                    return (Response::Other.code(), HashMap::new());
                 }
             }
         };
 
-        let stream = match self
-            .begin_stream(&session_handle, &selection.target, config.cursor_mode)
-            .await
-        {
-            Ok(stream) => stream,
-            Err(err) => {
-                error!(%err, "screencast: failed to start stream");
-                return (Response::Other.code(), HashMap::new());
-            }
-        };
-
         let mut results = HashMap::new();
-        match build_streams_value(&stream) {
+        match build_streams_value(&streams) {
             Ok(value) => {
                 results.insert("streams".to_owned(), value);
             }
@@ -251,9 +306,13 @@ impl ScreenCast {
             }
         }
 
+        // A restore token persists only the first target (single-target token
+        // format); multi-select sessions can therefore only restore their first
+        // source automatically.
         if config.persist_mode > 0
             && selection.allow_token
-            && let Ok(restore_data) = restore::encode(&selection.target)
+            && let Some(target) = selection.targets.first()
+            && let Ok(restore_data) = restore::encode(target)
         {
             results.insert("restore_data".to_owned(), restore_data);
             if let Some(mode) = owned(config.persist_mode) {
@@ -273,6 +332,58 @@ struct StreamInfo {
 }
 
 impl ScreenCast {
+    /// Starts a producer for every target, returning one [`StreamInfo`] each in
+    /// target order.
+    ///
+    /// If any target fails to start, every producer started by *this* call is
+    /// torn down (its handle dropped, its size deregistered) before returning
+    /// the error, so a failed multi-select Start leaves no orphaned streams.
+    async fn begin_streams(
+        &self,
+        session_handle: &OwnedObjectPath,
+        targets: &[CaptureTarget],
+        cursor_mode: u32,
+    ) -> Result<Vec<StreamInfo>, String> {
+        let mut streams = Vec::with_capacity(targets.len());
+        for target in targets {
+            match self.begin_stream(session_handle, target, cursor_mode).await {
+                Ok(info) => streams.push(info),
+                Err(err) => {
+                    self.rollback_streams(session_handle, &streams);
+                    return Err(err);
+                }
+            }
+        }
+        Ok(streams)
+    }
+
+    /// Drops the handles started during a failed [`Self::begin_streams`] and
+    /// deregisters their sizes. The handles for `started` are the most recently
+    /// pushed entries on the session, so popping that many off the tail removes
+    /// exactly them; dropping a [`StreamHandle`] stops its PipeWire loop.
+    #[cfg(feature = "pipewire")]
+    fn rollback_streams(&self, session_handle: &OwnedObjectPath, started: &[StreamInfo]) {
+        if started.is_empty() {
+            return;
+        }
+        if let Ok(mut map) = self.streams.lock()
+            && let Some(handles) = map.get_mut(session_handle)
+        {
+            let keep = handles.len().saturating_sub(started.len());
+            handles.truncate(keep);
+        }
+        if let Ok(mut sizes) = self.stream_sizes.lock() {
+            for info in started {
+                sizes.remove(&info.node_id);
+            }
+        }
+    }
+
+    /// Without the `pipewire` feature nothing was started, so rollback is a
+    /// no-op.
+    #[cfg(not(feature = "pipewire"))]
+    fn rollback_streams(&self, _session_handle: &OwnedObjectPath, _started: &[StreamInfo]) {}
+
     /// Starts the PipeWire producer and stores its handle on the session.
     ///
     /// PipeWire/Wayland setup blocks (it waits for the producer thread to
@@ -319,19 +430,21 @@ impl ScreenCast {
     }
 }
 
-/// Builds the `a(ua{sv})` streams result from one started stream.
-fn build_streams_value(stream: &StreamInfo) -> Result<OwnedValue, zbus::zvariant::Error> {
-    let mut props: HashMap<String, OwnedValue> = HashMap::new();
-    props.insert(
-        "source_type".to_owned(),
-        OwnedValue::try_from(Value::from(stream.source_type.bit()))?,
-    );
-    let size = (
-        i32::try_from(stream.size.0).unwrap_or(i32::MAX),
-        i32::try_from(stream.size.1).unwrap_or(i32::MAX),
-    );
-    props.insert("size".to_owned(), OwnedValue::try_from(Value::from(size))?);
-
-    let streams: Vec<(u32, Vardict)> = vec![(stream.node_id, props)];
-    OwnedValue::try_from(Value::from(streams))
+/// Builds the `a(ua{sv})` streams result, one entry per started stream.
+fn build_streams_value(streams: &[StreamInfo]) -> Result<OwnedValue, zbus::zvariant::Error> {
+    let mut entries: Vec<(u32, Vardict)> = Vec::with_capacity(streams.len());
+    for stream in streams {
+        let mut props: HashMap<String, OwnedValue> = HashMap::new();
+        props.insert(
+            "source_type".to_owned(),
+            OwnedValue::try_from(Value::from(stream.source_type.bit()))?,
+        );
+        let size = (
+            i32::try_from(stream.size.0).unwrap_or(i32::MAX),
+            i32::try_from(stream.size.1).unwrap_or(i32::MAX),
+        );
+        props.insert("size".to_owned(), OwnedValue::try_from(Value::from(size))?);
+        entries.push((stream.node_id, props));
+    }
+    OwnedValue::try_from(Value::from(entries))
 }
