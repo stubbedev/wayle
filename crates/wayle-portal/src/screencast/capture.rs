@@ -162,9 +162,12 @@ impl Capturer {
     #[must_use]
     pub fn refresh_mhz(&self) -> Option<i32> {
         let (manager, output) = match self {
-            Self::Output { manager, output, .. } | Self::Region { manager, output, .. } => {
-                (manager, output)
+            Self::Output {
+                manager, output, ..
             }
+            | Self::Region {
+                manager, output, ..
+            } => (manager, output),
             Self::Window { .. } => return None,
         };
         manager
@@ -182,9 +185,12 @@ impl Capturer {
     #[must_use]
     pub fn transform(&self) -> Transform {
         let (manager, output) = match self {
-            Self::Output { manager, output, .. } | Self::Region { manager, output, .. } => {
-                (manager, output)
+            Self::Output {
+                manager, output, ..
             }
+            | Self::Region {
+                manager, output, ..
+            } => (manager, output),
             Self::Window { .. } => return Transform::Normal,
         };
         manager

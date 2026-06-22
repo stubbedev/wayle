@@ -247,12 +247,12 @@ impl OutputManager {
         overlay_cursor: bool,
     ) -> Result<Buffer, Error> {
         // Protocol + device preconditions; any miss -> SHM fallback.
-        let zwlr_manager = self
-            .manager
-            .clone()
-            .ok_or(Error::ProtocolNotAvailable(std::any::type_name::<
-                ZwlrScreencopyManagerV1,
-            >()))?;
+        let zwlr_manager =
+            self.manager
+                .clone()
+                .ok_or(Error::ProtocolNotAvailable(std::any::type_name::<
+                    ZwlrScreencopyManagerV1,
+                >()))?;
         let linux_dmabuf = self
             .linux_dmabuf
             .clone()
@@ -262,14 +262,15 @@ impl OutputManager {
         // Learn (and cache) the dmabuf format the compositor offers for this
         // output. The format is stable per output, so we probe once with an
         // extra screencopy pass and reuse it for every later frame.
-        let (drm_fourcc, width, height) = match self.probe_dmabuf_format(&zwlr_manager, output, overlay_cursor)? {
-            Some(fmt) => fmt,
-            None => {
-                return Err(Error::DmabufUnavailable(
-                    "compositor advertised no dmabuf format".into(),
-                ));
-            }
-        };
+        let (drm_fourcc, width, height) =
+            match self.probe_dmabuf_format(&zwlr_manager, output, overlay_cursor)? {
+                Some(fmt) => fmt,
+                None => {
+                    return Err(Error::DmabufUnavailable(
+                        "compositor advertised no dmabuf format".into(),
+                    ));
+                }
+            };
 
         // Allocate a gbm bo for the advertised format and import it as a
         // dmabuf-backed wl_buffer. The empty modifier list lets the helper use
@@ -310,9 +311,15 @@ impl OutputManager {
             .roundtrip(self)
             .map_err(Error::WaylandDispatch)?;
         params.destroy();
-        if params_state.lock().expect("lock should not be poisoned").failed {
+        if params_state
+            .lock()
+            .expect("lock should not be poisoned")
+            .failed
+        {
             wl_buffer.destroy();
-            return Err(Error::DmabufUnavailable("dmabuf import was rejected".into()));
+            return Err(Error::DmabufUnavailable(
+                "dmabuf import was rejected".into(),
+            ));
         }
 
         let stride0 = alloc.strides.first().copied().unwrap_or(width * 4);
@@ -322,10 +329,19 @@ impl OutputManager {
             alloc.owned_fds,
             &alloc.offsets,
             &alloc.strides,
-            alloc.bo,
         );
-        let mut buffer =
-            Buffer::from_dmabuf(wl_buffer.clone(), width, height, stride0, shm_format, backing);
+        // `alloc.bo` is deliberately left owned by `alloc` (dropped at function
+        // end, after the capture below): the dmabuf fds + `wl_buffer` keep the
+        // kernel buffer alive, and the bo is `!Send` so it must not enter the
+        // `Buffer`/`Frame` graph used as Wayland dispatch userdata.
+        let mut buffer = Buffer::from_dmabuf(
+            wl_buffer.clone(),
+            width,
+            height,
+            stride0,
+            shm_format,
+            backing,
+        );
 
         // Pass 2: capture into the dmabuf buffer. Reuse the same wl_buffer.
         let frame = Arc::new(Mutex::new(Frame::default()));

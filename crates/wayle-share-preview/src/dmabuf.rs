@@ -17,10 +17,7 @@
 //! `zwp_linux_dmabuf` import wiring follow xdph's `Screencopy.cpp` but have not
 //! been exercised against a live compositor in this tree.
 
-use std::{
-    fs::OpenOptions,
-    os::fd::OwnedFd,
-};
+use std::{fs::OpenOptions, os::fd::OwnedFd};
 
 use drm_fourcc::{DrmFourcc, DrmModifier};
 use gbm::{BufferObjectFlags, Device as GbmDeviceInner};
@@ -123,10 +120,12 @@ pub fn allocate(
     }
 
     // Fall back to the legacy non-modifier API: let the driver choose.
-    match device
-        .inner
-        .create_buffer_object::<()>(width, height, format, BufferObjectFlags::RENDERING)
-    {
+    match device.inner.create_buffer_object::<()>(
+        width,
+        height,
+        format,
+        BufferObjectFlags::RENDERING,
+    ) {
         Ok(bo) => finish_bo(bo),
         Err(err) => Err(Error::DmabufUnavailable(format!(
             "gbm bo alloc failed for {format:?} {width}x{height}: {err}"

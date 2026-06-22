@@ -82,11 +82,7 @@ impl Session {
         let _ = Session::closed(&emitter).await;
         // Await the removal directly: we are already async, and awaiting avoids
         // the handle-reuse race a fire-and-forget spawn would leave open.
-        if let Err(err) = connection
-            .object_server()
-            .remove::<Session, _>(&path)
-            .await
-        {
+        if let Err(err) = connection.object_server().remove::<Session, _>(&path).await {
             warn!(%err, "cannot unmount session object");
         }
     }

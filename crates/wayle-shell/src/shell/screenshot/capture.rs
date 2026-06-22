@@ -247,7 +247,12 @@ pub(super) fn composite_outputs(frames: &[PlacedFrame]) -> RgbImage {
         };
         let dst_x = (frame.logical.x - origin_x).max(0) as u32;
         let dst_y = (frame.logical.y - origin_y).max(0) as u32;
-        image::imageops::replace(&mut canvas, scaled.as_ref(), i64::from(dst_x), i64::from(dst_y));
+        image::imageops::replace(
+            &mut canvas,
+            scaled.as_ref(),
+            i64::from(dst_x),
+            i64::from(dst_y),
+        );
     }
     canvas
 }

@@ -29,6 +29,5 @@ pub trait SharePicker {
     ///
     /// `window_list` is the raw `XDPH_WINDOW_SHARING_LIST` value;
     /// `allow_token` seeds the restore-token checkbox.
-    async fn pick(&self, window_list: &str, allow_token: bool, multiple: bool)
-    -> Result<String>;
+    async fn pick(&self, window_list: &str, allow_token: bool, multiple: bool) -> Result<String>;
 }

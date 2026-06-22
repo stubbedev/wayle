@@ -27,9 +27,7 @@ use self::manager::{GsHandle, ShortcutEvent};
 use crate::{
     dbus_util::opt_string,
     protocol::hyprland_global_shortcuts_v1::hyprland_global_shortcut_v1::HyprlandGlobalShortcutV1,
-    response::Response,
-    session,
-    settings::PORTAL_PATH,
+    response::Response, session, settings::PORTAL_PATH,
 };
 
 /// A bound shortcut: its id and the properties echoed back to the app.
@@ -352,7 +350,10 @@ fn parse_shortcuts(value: Option<&OwnedValue>) -> Option<Vec<Shortcut>> {
 /// re-bind of an existing id as an update rather than a duplicate.
 fn merge_shortcuts(existing: &mut Vec<Shortcut>, incoming: &[Shortcut]) {
     for (id, props) in incoming {
-        if let Some(slot) = existing.iter_mut().find(|(existing_id, _)| existing_id == id) {
+        if let Some(slot) = existing
+            .iter_mut()
+            .find(|(existing_id, _)| existing_id == id)
+        {
             slot.1 = clone_props(props);
         } else {
             existing.push((id.clone(), clone_props(props)));

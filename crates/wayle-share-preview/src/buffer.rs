@@ -43,16 +43,19 @@ pub struct DmabufBacking {
     /// Per-plane import parameters (fd/offset/stride).
     pub planes: Vec<DmabufPlane>,
     /// Keeps the plane fds alive; the `i32` fds in `planes` borrow from these.
+    /// `OwnedFd` is `Send + Sync`, so a [`Buffer`] (and the capture
+    /// [`crate::Frame`] used as Wayland dispatch userdata) stays `Send + Sync`.
     _owned_fds: Vec<OwnedFd>,
-    /// Keeps the gbm buffer object alive while the wl_buffer references it.
-    /// Boxed as `dyn` so [`Buffer`] does not have to name the gbm device type.
-    /// Not `Send`: a [`Buffer`] lives entirely on the capture thread that built
-    /// it, so the gbm bo never crosses threads.
-    _bo: Box<dyn std::any::Any>,
 }
 
 impl DmabufBacking {
-    /// Builds a backing from owned plane fds + the gbm bo to keep alive.
+    /// Builds a backing from owned plane fds.
+    ///
+    /// The gbm buffer object is intentionally NOT stored here: `fd_for_plane`
+    /// dups an independent dmabuf fd and the imported `wl_buffer` holds the
+    /// kernel reference, so the bo only needs to outlive `wl_buffer` creation
+    /// (it stays a local in the capture function). Keeping it out makes this
+    /// type `Send` — the gbm bo (`*mut` ffi handle) is not.
     #[must_use]
     pub fn new(
         format: u32,
@@ -60,7 +63,6 @@ impl DmabufBacking {
         owned_fds: Vec<OwnedFd>,
         offsets: &[u32],
         strides: &[u32],
-        bo: Box<dyn std::any::Any>,
     ) -> Self {
         let planes = owned_fds
             .iter()
@@ -76,7 +78,6 @@ impl DmabufBacking {
             modifier,
             planes,
             _owned_fds: owned_fds,
-            _bo: bo,
         }
     }
 }

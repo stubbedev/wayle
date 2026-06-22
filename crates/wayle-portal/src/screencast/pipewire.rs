@@ -210,8 +210,7 @@ fn run_loop_inner(
         // this callback. Bounded to the max negotiated buffer count so memory
         // stays flat. (A true reuse pool keyed by the pw buffer is the remaining
         // perf optimization; this just makes the dmabuf path memory-safe.)
-        let dmabuf_keepalive =
-            RefCell::new(VecDeque::<wayle_share_preview::buffer::Buffer>::new());
+        let dmabuf_keepalive = RefCell::new(VecDeque::<wayle_share_preview::buffer::Buffer>::new());
         move |stream: &pw::stream::Stream| {
             let Some(mut pw_buffer) = stream.dequeue_buffer() else {
                 return;

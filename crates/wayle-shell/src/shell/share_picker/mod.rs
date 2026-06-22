@@ -176,7 +176,9 @@ impl Component for SharePicker {
             .connect_toggled(glib_clone_toggle(&sender));
 
         widgets.confirm_button.set_cursor_from_name(Some("pointer"));
-        widgets.confirm_button.connect_clicked(glib_clone_confirm(&sender));
+        widgets
+            .confirm_button
+            .connect_clicked(glib_clone_confirm(&sender));
 
         // Play the enter transition only once the freshly-mapped window is on
         // screen. Flipping `reveal_child` before the map (e.g. on an idle right

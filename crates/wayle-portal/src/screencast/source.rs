@@ -547,10 +547,22 @@ mod tests {
 
     #[test]
     fn pixel_format_maps_known_wl_shm_formats() {
-        assert_eq!(PixelFormat::from_wl(ShmFormat::Xrgb8888), Some(PixelFormat::Bgrx));
-        assert_eq!(PixelFormat::from_wl(ShmFormat::Argb8888), Some(PixelFormat::Bgra));
-        assert_eq!(PixelFormat::from_wl(ShmFormat::Xbgr8888), Some(PixelFormat::Rgbx));
-        assert_eq!(PixelFormat::from_wl(ShmFormat::Abgr8888), Some(PixelFormat::Rgba));
+        assert_eq!(
+            PixelFormat::from_wl(ShmFormat::Xrgb8888),
+            Some(PixelFormat::Bgrx)
+        );
+        assert_eq!(
+            PixelFormat::from_wl(ShmFormat::Argb8888),
+            Some(PixelFormat::Bgra)
+        );
+        assert_eq!(
+            PixelFormat::from_wl(ShmFormat::Xbgr8888),
+            Some(PixelFormat::Rgbx)
+        );
+        assert_eq!(
+            PixelFormat::from_wl(ShmFormat::Abgr8888),
+            Some(PixelFormat::Rgba)
+        );
         // A planar/unsupported format is rejected so the caller can fall back.
         assert_eq!(PixelFormat::from_wl(ShmFormat::Nv12), None);
     }
@@ -592,9 +604,15 @@ mod tests {
         );
         // A rect fully outside the frame is dropped, and with nothing left we
         // fall back to the whole frame.
-        assert_eq!(clamp_damage(&[(200, 0, 10, 10)], 100, 100, 4), vec![(0, 0, 100, 100)]);
+        assert_eq!(
+            clamp_damage(&[(200, 0, 10, 10)], 100, 100, 4),
+            vec![(0, 0, 100, 100)]
+        );
         // A zero-area rect is dropped (then full-frame fallback).
-        assert_eq!(clamp_damage(&[(0, 0, 0, 10)], 100, 100, 4), vec![(0, 0, 100, 100)]);
+        assert_eq!(
+            clamp_damage(&[(0, 0, 0, 10)], 100, 100, 4),
+            vec![(0, 0, 100, 100)]
+        );
     }
 
     #[test]
@@ -602,9 +620,18 @@ mod tests {
         // No damage reported -> whole frame.
         assert_eq!(clamp_damage(&[], 64, 48, 4), vec![(0, 0, 64, 48)]);
         // Zero slots -> whole frame.
-        assert_eq!(clamp_damage(&[(1, 2, 3, 4)], 64, 48, 0), vec![(0, 0, 64, 48)]);
+        assert_eq!(
+            clamp_damage(&[(1, 2, 3, 4)], 64, 48, 0),
+            vec![(0, 0, 64, 48)]
+        );
         // More rects than slots -> collapse to whole frame rather than truncate.
-        let many = [(0, 0, 5, 5), (5, 5, 5, 5), (10, 10, 5, 5), (15, 15, 5, 5), (20, 20, 5, 5)];
+        let many = [
+            (0, 0, 5, 5),
+            (5, 5, 5, 5),
+            (10, 10, 5, 5),
+            (15, 15, 5, 5),
+            (20, 20, 5, 5),
+        ];
         assert_eq!(clamp_damage(&many, 64, 48, 4), vec![(0, 0, 64, 48)]);
     }
 
@@ -622,7 +649,10 @@ mod tests {
     #[test]
     fn clamp_damage_passes_valid_rects() {
         let rects = [(0, 0, 10, 10), (20, 20, 5, 5)];
-        assert_eq!(clamp_damage(&rects, 100, 100, 4), vec![(0, 0, 10, 10), (20, 20, 5, 5)]);
+        assert_eq!(
+            clamp_damage(&rects, 100, 100, 4),
+            vec![(0, 0, 10, 10), (20, 20, 5, 5)]
+        );
     }
 
     #[test]

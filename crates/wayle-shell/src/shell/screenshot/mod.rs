@@ -19,7 +19,9 @@ use std::{
     sync::Arc,
 };
 
-use capture::{CaptureKind, LogicalGeometry, PlacedFrame, WindowTarget, capture, composite_outputs};
+use capture::{
+    CaptureKind, LogicalGeometry, PlacedFrame, WindowTarget, capture, composite_outputs,
+};
 use hyprland::shared::{HyprData, HyprDataActiveOptional};
 use image::RgbImage;
 use relm4::{
@@ -335,12 +337,10 @@ fn capture_full_screen() -> Result<RgbImage, String> {
     let placed: Vec<PlacedFrame> = frozen
         .iter()
         .filter_map(|frame| {
-            geometry
-                .get(&frame.connector)
-                .map(|logical| PlacedFrame {
-                    logical: *logical,
-                    image: &frame.image,
-                })
+            geometry.get(&frame.connector).map(|logical| PlacedFrame {
+                logical: *logical,
+                image: &frame.image,
+            })
         })
         .collect();
 
