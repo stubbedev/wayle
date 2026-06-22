@@ -157,6 +157,30 @@ impl Capturer {
         }
     }
 
+    /// Re-capture into an existing dmabuf-backed [`Buffer`] without allocating a
+    /// new gbm bo / `wl_buffer` — a plain screencopy copy into the buffer the
+    /// producer is recycling. Only whole-output capture produces dmabuf buffers,
+    /// so region/window capture is rejected (they never take this path).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `buf` is not dmabuf-backed, the capture target is not
+    /// an output, or the copy fails.
+    pub fn recapture_dmabuf(&mut self, buf: &mut Buffer) -> Result<(), String> {
+        match self {
+            Self::Output {
+                manager,
+                output,
+                show_cursor,
+            } => manager
+                .recapture_output_dmabuf(output, *show_cursor, buf)
+                .map_err(|e| format!("dmabuf recapture failed: {e}")),
+            Self::Region { .. } | Self::Window { .. } => {
+                Err("dmabuf recapture is only supported for whole-output capture".to_owned())
+            }
+        }
+    }
+
     /// The bound output's refresh rate in mHz (millihertz), if known. `None`
     /// for window capture, where there is no single output refresh.
     #[must_use]

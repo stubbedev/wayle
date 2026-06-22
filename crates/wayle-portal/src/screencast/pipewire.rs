@@ -164,6 +164,8 @@ fn run_loop_inner(
     // offer the dmabuf format too, but every individual frame still falls back
     // to SHM if its own dmabuf backing is absent (see the process closure).
     let dmabuf_modifier = first.dmabuf.as_ref().map(|d| d.modifier);
+    // Release the probe frame's compositor-side buffer (Buffer has no Drop).
+    first.destroy();
     drop(first);
 
     // The output's rotation/flip, mapped to the SPA videotransform value. This
@@ -204,13 +206,15 @@ fn run_loop_inner(
         let seq = Cell::new(0u64);
         // Reused per-frame damage scratch (avoids a small alloc every frame).
         let damage_scratch = RefCell::new(Vec::<(u32, u32, u32, u32)>::new());
-        // Recently-enqueued dmabuf-backed frames, kept alive: the dmabuf fd/bo we
-        // attach to a PipeWire buffer must outlive the consumer's use of that
-        // buffer, but `frame` would otherwise drop (closing the fd) at the end of
-        // this callback. Bounded to the max negotiated buffer count so memory
-        // stays flat. (A true reuse pool keyed by the pw buffer is the remaining
-        // perf optimization; this just makes the dmabuf path memory-safe.)
-        let dmabuf_keepalive = RefCell::new(VecDeque::<wayle_share_preview::buffer::Buffer>::new());
+        // Reuse pool of dmabuf-backed capture buffers. The dmabuf fd/bo attached
+        // to a PipeWire buffer must outlive the consumer's use of it, so we keep
+        // up to KEEPALIVE_FRAMES of them. In steady state we RECYCLE the oldest
+        // (the consumer has long since cycled past it — the same buffer the
+        // previous design dropped at this point) by re-capturing into its
+        // existing gbm bo, so no `dmabuf::allocate` / `create_immed` runs per
+        // frame: the dmabuf path becomes a plain copy. SHM frames are leased
+        // from the pooled ShmSlot in the capturer, so they don't allocate either.
+        let dmabuf_pool = RefCell::new(VecDeque::<wayle_share_preview::buffer::Buffer>::new());
         move |stream: &pw::stream::Stream| {
             let Some(mut pw_buffer) = stream.dequeue_buffer() else {
                 return;
@@ -226,11 +230,44 @@ fn run_loop_inner(
                 .map(|d| d.type_().as_raw() == pw::spa::sys::SPA_DATA_DmaBuf)
                 .unwrap_or(false);
 
-            let frame = match capturer.borrow_mut().capture(prefer_dmabuf) {
-                Ok(frame) => frame,
-                Err(err) => {
-                    debug!(%err, "screencast: frame capture failed (skipped)");
-                    return;
+            // Acquire the frame. dmabuf: recycle the oldest pooled buffer (reuse
+            // its bo via recapture — zero allocation) once the pool is full,
+            // else allocate one to warm the pool. SHM: the capturer leases the
+            // pooled ShmSlot (also zero allocation in steady state).
+            let frame = if prefer_dmabuf {
+                let recycled = {
+                    let mut pool = dmabuf_pool.borrow_mut();
+                    if pool.len() >= KEEPALIVE_FRAMES {
+                        pool.pop_front()
+                    } else {
+                        None
+                    }
+                };
+                match recycled {
+                    Some(mut buf) => match capturer.borrow_mut().recapture_dmabuf(&mut buf) {
+                        Ok(()) => buf,
+                        Err(err) => {
+                            debug!(%err, "screencast: dmabuf recapture failed (skipped)");
+                            // Keep the buffer in the pool so we don't lose it.
+                            dmabuf_pool.borrow_mut().push_back(buf);
+                            return;
+                        }
+                    },
+                    None => match capturer.borrow_mut().capture(true) {
+                        Ok(frame) => frame,
+                        Err(err) => {
+                            debug!(%err, "screencast: frame capture failed (skipped)");
+                            return;
+                        }
+                    },
+                }
+            } else {
+                match capturer.borrow_mut().capture(false) {
+                    Ok(frame) => frame,
+                    Err(err) => {
+                        debug!(%err, "screencast: frame capture failed (skipped)");
+                        return;
+                    }
                 }
             };
 
@@ -312,11 +349,18 @@ fn run_loop_inner(
             // attached outlives the consumer's use of the buffer; SHM frames have
             // been fully copied and can drop now.
             if dmabuf_attached {
-                let mut ring = dmabuf_keepalive.borrow_mut();
-                ring.push_back(frame);
-                while ring.len() > KEEPALIVE_FRAMES {
-                    ring.pop_front();
-                }
+                // Return the dmabuf buffer to the reuse pool; its fd/bo must
+                // outlive the consumer's use of the PipeWire buffer. The pool is
+                // bounded by the recycle-on-acquire above (it stays at
+                // KEEPALIVE_FRAMES), so there is no eviction/destroy here — the
+                // bos live for the stream and are recycled, not reallocated.
+                dmabuf_pool.borrow_mut().push_back(frame);
+            } else {
+                // SHM frame: a lightweight lease over the pooled ShmSlot. The
+                // pixels are copied and damage is read, so just drop it —
+                // `destroy()` is a no-op for a lease (the slot owns and reuses
+                // the wl_buffer; the SHM pool fix lives in the capturer now).
+                frame.destroy();
             }
         }
     };

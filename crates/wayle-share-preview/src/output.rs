@@ -78,6 +78,11 @@ pub struct OutputManager {
     /// probed. The format is stable per output, so we probe once and skip the
     /// extra screencopy pass on every later frame.
     dmabuf_probed: Option<Option<(u32, u32, u32)>>,
+    /// Reusable SHM capture buffer for the continuous-capture (PipeWire) path,
+    /// so each frame leases a shared `wl_buffer`/memfd instead of allocating a
+    /// fresh memfd + pool + `wl_buffer`. Reallocated only when the frame
+    /// geometry/format changes; `None` until the first SHM capture.
+    shm_cache: Option<crate::buffer::ShmSlot>,
     pub outputs: Vec<(WlOutput, Output)>,
     intialized_outputs: u32,
     connection: Connection,
@@ -98,6 +103,7 @@ impl OutputManager {
             gbm: None,
             gbm_failed: false,
             dmabuf_probed: None,
+            shm_cache: None,
             outputs: Vec::new(),
             intialized_outputs: 0,
             connection: connection.clone(),
@@ -390,6 +396,76 @@ impl OutputManager {
         Ok(buffer)
     }
 
+    /// Re-capture into an already-allocated dmabuf [`Buffer`], reusing its gbm
+    /// bo + `wl_buffer` instead of allocating fresh ones. Runs a single
+    /// screencopy pass that copies into `buf`'s existing dmabuf `wl_buffer` and
+    /// refreshes its per-frame damage; no `dmabuf::allocate` / `create_immed`
+    /// occurs. This is the steady-state path for the continuous dmabuf producer,
+    /// turning per-frame GPU allocation + import into a plain copy.
+    ///
+    /// Fencing is the caller's responsibility: only reuse a buffer the consumer
+    /// has finished with (the producer recycles the oldest of `KEEPALIVE_FRAMES`
+    /// buffers, the same buffer the previous design dropped at that point).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the screencopy manager is unavailable, `buf` is not
+    /// dmabuf-backed, or the copy fails.
+    pub fn recapture_output_dmabuf(
+        &mut self,
+        output: &WlOutput,
+        overlay_cursor: bool,
+        buf: &mut Buffer,
+    ) -> Result<(), Error> {
+        if buf.dmabuf.is_none() {
+            return Err(Error::DmabufUnavailable(
+                "recapture target is not dmabuf-backed".into(),
+            ));
+        }
+        let zwlr_manager = self.manager.clone().ok_or(Error::ProtocolNotAvailable(
+            std::any::type_name::<ZwlrScreencopyManagerV1>(),
+        ))?;
+        let wl_buffer = buf.buffer.clone();
+
+        let frame = Arc::new(Mutex::new(Frame::default()));
+        let mut copy_queue = self.connection.new_event_queue();
+        let copy_handle = copy_queue.handle();
+        let zwlr_frame = zwlr_manager.capture_output(
+            i32::from(overlay_cursor),
+            output,
+            &copy_handle,
+            Arc::downgrade(&frame),
+        );
+
+        // Same drive loop as the allocate path's "Pass 2", but copying into the
+        // caller's existing dmabuf wl_buffer.
+        let mut requested = false;
+        loop {
+            copy_queue
+                .blocking_dispatch(self)
+                .map_err(Error::WaylandDispatch)?;
+            let mut f = frame.lock().expect("lock should not be poisoned");
+            if let Some(err) = &f.error {
+                let err = format!("dmabuf recapture failed: {err}");
+                drop(f);
+                zwlr_frame.destroy();
+                return Err(Error::DmabufUnavailable(err));
+            }
+            if f.ready {
+                buf.damage = std::mem::take(&mut f.damage);
+                break;
+            }
+            if !requested && (f.buffer.is_some() || f.dmabuf_format.is_some()) {
+                drop(f);
+                zwlr_frame.copy_with_damage(&wl_buffer);
+                requested = true;
+                continue;
+            }
+        }
+        zwlr_frame.destroy();
+        Ok(())
+    }
+
     /// Learns the dmabuf format the compositor offers for `output`, caching the
     /// result so the extra screencopy pass runs at most once per manager.
     ///
@@ -653,11 +729,30 @@ impl Dispatch<ZwlrScreencopyFrameV1, Weak<Mutex<Frame>>> for OutputManager {
                     Ok(format) => format,
                     Err(err) => return frame.error = Some(Error::ProtocolInvalidEnum(err)),
                 };
-                if let Some(shm) = &state.shm {
-                    match Buffer::new(shm, width, height, stride, format, qhandle, ()) {
-                        Ok(buffer) => frame.buffer = Some(buffer),
-                        Err(err) => frame.error = Some(err),
+                if let Some(shm) = state.shm.clone() {
+                    // Reuse the cached slot when the geometry/format is
+                    // unchanged; otherwise (dis)allocate and rebuild it. The
+                    // lease shares the slot's wl_buffer + memfd, so no per-frame
+                    // memfd/pool/wl_buffer allocation occurs in steady state.
+                    let reusable = state
+                        .shm_cache
+                        .as_ref()
+                        .is_some_and(|s| s.matches(width, height, stride, format));
+                    if !reusable {
+                        if let Some(old) = state.shm_cache.take() {
+                            old.destroy();
+                        }
+                        match crate::buffer::ShmSlot::new(
+                            &shm, width, height, stride, format, qhandle, (),
+                        ) {
+                            Ok(slot) => state.shm_cache = Some(slot),
+                            Err(err) => {
+                                frame.error = Some(err);
+                                return;
+                            }
+                        }
                     }
+                    frame.buffer = state.shm_cache.as_ref().map(crate::buffer::ShmSlot::lease);
                 } else {
                     frame.error = Some(Error::ProtocolNotAvailable(std::any::type_name::<WlShm>()));
                 }

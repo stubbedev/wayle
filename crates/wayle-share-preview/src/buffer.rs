@@ -1,6 +1,7 @@
 use std::{
     io::Read,
     os::fd::{AsFd, OwnedFd},
+    sync::Arc,
 };
 
 use wayland_client::{
@@ -98,8 +99,13 @@ pub struct Buffer {
     /// the SHM path. See [`DmabufBacking`].
     pub dmabuf: Option<DmabufBacking>,
     /// SHM memfd backing the [`WlBuffer`]; `None` for dmabuf buffers (whose
-    /// pixels live in GPU memory and are not read back here).
-    fd: Option<memfd::Memfd>,
+    /// pixels live in GPU memory and are not read back here). `Arc` so a pooled
+    /// [`ShmSlot`] and the per-frame [`Buffer`] leased from it share one memfd.
+    fd: Option<Arc<memfd::Memfd>>,
+    /// True when this `Buffer` is a lightweight lease over a pooled [`ShmSlot`]
+    /// (shares the slot's `wl_buffer`). [`destroy`](Self::destroy) is then a
+    /// no-op — the slot owns the compositor object and outlives the lease.
+    leased: bool,
 }
 
 impl Buffer {
@@ -147,7 +153,8 @@ impl Buffer {
             format,
             damage: Vec::new(),
             dmabuf: None,
-            fd: Some(mfd),
+            fd: Some(Arc::new(mfd)),
+            leased: false,
         })
     }
 
@@ -174,6 +181,7 @@ impl Buffer {
             damage: Vec::new(),
             dmabuf: Some(backing),
             fd: None,
+            leased: false,
         }
     }
 
@@ -216,9 +224,117 @@ impl Buffer {
         Ok(written)
     }
 
-    /// clear the wayland buffer and remove the temporary file
+    /// Destroy the compositor-side `wl_buffer`.
     ///
-    /// should only be called after [`get_bytes`] since all data gets deleted by this function
+    /// No-op for a leased buffer (one obtained from [`ShmSlot::lease`]): the
+    /// pooled [`ShmSlot`] owns the shared `wl_buffer` and is reused across
+    /// frames, so destroying it here would invalidate the next frame's reuse.
+    /// Owned buffers (SHM created via [`new`](Self::new), or per-frame dmabuf
+    /// buffers) destroy normally.
+    pub fn destroy(&self) {
+        if !self.leased {
+            self.buffer.destroy();
+        }
+    }
+}
+
+/// A reusable SHM capture target kept across frames.
+///
+/// The continuous-capture path (the portal's PipeWire producer) captures at the
+/// stream's fixed geometry every frame. Allocating a fresh memfd + `wl_shm_pool`
+/// + `wl_buffer` per frame is wasteful; an [`ShmSlot`] allocates that backing
+/// once and hands out a cheap [`Buffer`] lease ([`lease`](Self::lease)) each
+/// frame that shares the same `wl_buffer` and memfd. Reuse is sound because
+/// capture is synchronous — the previous frame's copy has completed (the
+/// screencopy `Ready` event fired) before the next capture reuses the slot.
+///
+/// `Clone` shares the underlying `wl_buffer` proxy + memfd (same shallow-share
+/// semantics as the other proxy fields on the owning manager); the slot is not
+/// cloned in the capture path.
+#[derive(Clone)]
+pub struct ShmSlot {
+    buffer: WlBuffer,
+    fd: Arc<memfd::Memfd>,
+    /// Geometry/format the slot was allocated for; reused only while these match.
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub format: Format,
+}
+
+impl ShmSlot {
+    /// Allocates a reusable memfd-backed `wl_buffer` for the given geometry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::BufferCreate`] if the memfd cannot be created or sized.
+    pub fn new<
+        K: Send + Sync + Clone + 'static,
+        T: Dispatch<WlBuffer, K> + Dispatch<WlShmPool, K> + Dispatch<WlShm, K> + 'static,
+    >(
+        shm: &WlShm,
+        width: u32,
+        height: u32,
+        stride: u32,
+        format: Format,
+        handle: &QueueHandle<T>,
+        udata: K,
+    ) -> Result<Self, Error> {
+        let mfd = memfd::MemfdOptions::default()
+            .create("buffer")
+            .map_err(|err| Error::BufferCreate(err.into()))?;
+        mfd.as_file()
+            .set_len((width * height * 4) as u64)
+            .map_err(|err| Error::BufferCreate(err.into()))?;
+        let pool = shm.create_pool(
+            mfd.as_file().as_fd(),
+            (width * height * 4) as i32,
+            handle,
+            udata.clone(),
+        );
+        let buffer = pool.create_buffer(
+            0,
+            width as i32,
+            height as i32,
+            stride as i32,
+            format,
+            handle,
+            udata,
+        );
+        pool.destroy();
+        Ok(Self {
+            buffer,
+            fd: Arc::new(mfd),
+            width,
+            height,
+            stride,
+            format,
+        })
+    }
+
+    /// Whether this slot matches the requested capture geometry/format.
+    #[must_use]
+    pub fn matches(&self, width: u32, height: u32, stride: u32, format: Format) -> bool {
+        self.width == width && self.height == height && self.stride == stride && self.format == format
+    }
+
+    /// A cheap per-frame [`Buffer`] sharing this slot's `wl_buffer` + memfd.
+    #[must_use]
+    pub fn lease(&self) -> Buffer {
+        Buffer {
+            buffer: self.buffer.clone(),
+            width: self.width,
+            height: self.height,
+            stride: self.stride,
+            format: self.format,
+            damage: Vec::new(),
+            dmabuf: None,
+            fd: Some(self.fd.clone()),
+            leased: true,
+        }
+    }
+
+    /// Destroy the pooled `wl_buffer` (call when discarding/replacing the slot).
     pub fn destroy(&self) {
         self.buffer.destroy();
     }
