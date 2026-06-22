@@ -50,7 +50,6 @@ use super::{
 /// rect (see [`clamp_damage`]).
 const MAX_DAMAGE_REGIONS: usize = 4;
 
-
 /// A running PipeWire stream; stops and joins its thread on drop.
 pub struct StreamHandle {
     /// Global PipeWire node id the client connects `pipewiresrc` to.
@@ -251,7 +250,15 @@ fn run_loop_inner(
     // dmabuf.
     if dmabuf_modifier.is_some() {
         return run_loop_dmabuf(
-            &capturer, width, height, stride, fps, transform, pixel_format, dmabuf_modifier, stop,
+            &capturer,
+            width,
+            height,
+            stride,
+            fps,
+            transform,
+            pixel_format,
+            dmabuf_modifier,
+            stop,
             ready,
         );
     }
@@ -292,7 +299,8 @@ fn run_loop_inner(
         // stable, so a bo never moves between pw_buffers (which stalled the
         // consumer). SHM frames lease the pooled ShmSlot, so they don't allocate
         // either. The map is bounded by the negotiated buffer count (~4–8).
-        let dmabuf_pool = RefCell::new(HashMap::<usize, wayle_share_preview::buffer::Buffer>::new());
+        let dmabuf_pool =
+            RefCell::new(HashMap::<usize, wayle_share_preview::buffer::Buffer>::new());
         move |stream: &pw::stream::Stream| {
             let Some(mut pw_buffer) = stream.dequeue_buffer() else {
                 return;
@@ -710,7 +718,15 @@ fn run_loop_dmabuf(
             let pts = i64::try_from(start.elapsed().as_nanos()).unwrap_or(i64::MAX);
             let seq_val = seq.get();
             seq.set(seq_val.wrapping_add(1));
-            stamp_metadata(&mut pw_buffer, transform, pts, seq_val, &buf.damage, width, height);
+            stamp_metadata(
+                &mut pw_buffer,
+                transform,
+                pts,
+                seq_val,
+                &buf.damage,
+                width,
+                height,
+            );
         })
         .register()
         .map_err(|e| format!("pipewire listener: {e}"))?;
