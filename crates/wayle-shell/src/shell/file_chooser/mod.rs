@@ -68,6 +68,8 @@ pub(crate) enum FileChooserInput {
     ToggleView,
     /// Internal: toggle the Quick Look preview of the selected file (spacebar).
     ToggleQuickLook,
+    /// Internal: a path was dropped on the surface — navigate to it.
+    Dropped(PathBuf),
     /// Internal: confirm the current selection.
     Confirm,
     /// Internal: cancel.
@@ -96,6 +98,7 @@ impl std::fmt::Debug for FileChooserInput {
             Self::Sort(_) => f.write_str("Sort"),
             Self::ToggleView => f.write_str("ToggleView"),
             Self::ToggleQuickLook => f.write_str("ToggleQuickLook"),
+            Self::Dropped(p) => f.debug_tuple("Dropped").field(p).finish(),
             Self::Confirm => f.write_str("Confirm"),
             Self::Cancel => f.write_str("Cancel"),
         }
@@ -537,27 +540,12 @@ impl Component for FileChooser {
             widget.set_cursor_from_name(Some("pointer"));
         }
 
-        // Escape cancels the dialog, like any native picker. Capture phase so it
-        // fires before a focused child (list/entry) can swallow the key.
-        let key = gtk::EventControllerKey::new();
-        key.set_propagation_phase(gtk::PropagationPhase::Capture);
-        key.connect_key_pressed({
-            let input = sender.input_sender().clone();
-            let search = widgets.search_entry.clone();
-            move |_, keyval, _, _| {
-                if keyval == gtk::gdk::Key::Escape {
-                    input.emit(FileChooserInput::Cancel);
-                    gtk::glib::Propagation::Stop
-                } else if keyval == gtk::gdk::Key::space && !search.has_focus() {
-                    // Spacebar Quick Look — but only when not typing in search.
-                    input.emit(FileChooserInput::ToggleQuickLook);
-                    gtk::glib::Propagation::Stop
-                } else {
-                    gtk::glib::Propagation::Proceed
-                }
-            }
-        });
-        root.add_controller(key);
+        install_controllers(
+            &root,
+            &widgets.revealer,
+            &widgets.search_entry,
+            sender.input_sender(),
+        );
 
         surface_anim::play_on_map(&root, &widgets.revealer);
 
@@ -646,6 +634,7 @@ impl Component for FileChooser {
             FileChooserInput::Sort(column) => self.sort_by(widgets, column),
             FileChooserInput::ToggleView => self.toggle_view(widgets),
             FileChooserInput::ToggleQuickLook => self.toggle_quicklook(widgets),
+            FileChooserInput::Dropped(path) => self.drop_path(widgets, path),
             FileChooserInput::Confirm => self.confirm(widgets, root),
             FileChooserInput::Cancel => self.cancel(widgets, root),
         }
@@ -819,6 +808,19 @@ impl FileChooser {
             &self.config,
             AnimSurface::FileChooser,
         );
+    }
+
+    /// Handles a dropped path: navigate into a dropped folder, or to a dropped
+    /// file's parent so it's revealed.
+    fn drop_path(&mut self, widgets: &FileChooserWidgets, path: PathBuf) {
+        let target = if path.is_dir() {
+            Some(path)
+        } else {
+            path.parent().map(Path::to_path_buf)
+        };
+        if let Some(target) = target {
+            self.goto_dir(widgets, target);
+        }
     }
 
     /// Toggles the Quick Look preview card for the selected entry (spacebar).
@@ -1285,7 +1287,16 @@ fn is_raster_image(path: &Path) -> bool {
             .map(str::to_ascii_lowercase)
             .as_deref(),
         Some(
-            "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "tiff" | "tif" | "ico" | "avif"
+            "png"
+                | "jpg"
+                | "jpeg"
+                | "gif"
+                | "webp"
+                | "bmp"
+                | "tiff"
+                | "tif"
+                | "ico"
+                | "avif"
                 | "qoi"
         )
     )
@@ -1409,6 +1420,55 @@ fn clear_list(list: &gtk::ListBox) {
     }
 }
 
+/// Installs the window's keyboard shortcuts (Escape cancels, spacebar Quick
+/// Look) and the drag-and-drop target (drop a path to navigate).
+fn install_controllers(
+    root: &gtk::Window,
+    revealer: &gtk::Revealer,
+    search: &gtk::SearchEntry,
+    input: &Sender<FileChooserInput>,
+) {
+    // Capture phase so Escape fires before a focused child swallows it.
+    let key = gtk::EventControllerKey::new();
+    key.set_propagation_phase(gtk::PropagationPhase::Capture);
+    key.connect_key_pressed({
+        let input = input.clone();
+        let search = search.clone();
+        move |_, keyval, _, _| {
+            if keyval == gtk::gdk::Key::Escape {
+                input.emit(FileChooserInput::Cancel);
+                gtk::glib::Propagation::Stop
+            } else if keyval == gtk::gdk::Key::space && !search.has_focus() {
+                // Spacebar Quick Look — but only when not typing in search.
+                input.emit(FileChooserInput::ToggleQuickLook);
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
+            }
+        }
+    });
+    root.add_controller(key);
+
+    // Drag a file/folder onto the dialog to navigate there (like Finder).
+    let drop = gtk::DropTarget::new(
+        gtk::gdk::FileList::static_type(),
+        gtk::gdk::DragAction::COPY,
+    );
+    drop.connect_drop({
+        let input = input.clone();
+        move |_, value, _, _| {
+            if let Ok(list) = value.get::<gtk::gdk::FileList>()
+                && let Some(path) = list.files().first().and_then(gtk::gio::File::path)
+            {
+                input.emit(FileChooserInput::Dropped(path));
+                return true;
+            }
+            false
+        }
+    });
+    revealer.add_controller(drop);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1493,5 +1553,54 @@ mod tests {
     fn entry_name_is_basename() {
         assert_eq!(entry_name(Path::new("/foo/bar/baz.txt")), "baz.txt");
         assert_eq!(entry_name(Path::new("solo")), "solo");
+    }
+
+    #[test]
+    fn detects_raster_images_by_extension() {
+        assert!(is_raster_image(Path::new("/x/a.png")));
+        assert!(is_raster_image(Path::new("/x/a.JPG")));
+        assert!(is_raster_image(Path::new("/x/photo.jpeg")));
+        assert!(is_raster_image(Path::new("/x/b.webp")));
+        assert!(!is_raster_image(Path::new("/x/a.txt")));
+        assert!(!is_raster_image(Path::new("/x/a.svg"))); // not a raster format we decode
+        assert!(!is_raster_image(Path::new("/x/noext")));
+    }
+
+    #[test]
+    fn thumbnail_decode_pipeline_produces_rgba() {
+        // Exercises the exact decode `load_texture` performs (image::open ->
+        // thumbnail -> to_rgba8) on a real PNG, so the thumbnail data path is
+        // verified without needing a display/GPU.
+        let path = std::env::temp_dir().join("wayle_fc_thumb_test.png");
+        let mut src = image::RgbaImage::new(16, 8);
+        for (x, _y, px) in src.enumerate_pixels_mut() {
+            *px = if x < 8 {
+                image::Rgba([200, 30, 40, 255])
+            } else {
+                image::Rgba([20, 60, 220, 255])
+            };
+        }
+        src.save(&path).expect("write test png");
+
+        let target = 24u32 * 2;
+        let rgba = image::open(&path)
+            .expect("open png")
+            .thumbnail(target, target)
+            .to_rgba8();
+        std::fs::remove_file(&path).ok();
+
+        // Non-empty, fits within the target box, RGBA8 (4 bytes/px), and the
+        // left half is reddish (decode preserved real pixels, not blank).
+        assert!(rgba.width() > 0 && rgba.height() > 0);
+        assert!(rgba.width() <= target && rgba.height() <= target);
+        assert_eq!(
+            rgba.as_raw().len(),
+            (rgba.width() * rgba.height() * 4) as usize
+        );
+        let left = rgba.get_pixel(0, 0);
+        assert!(
+            left[0] > left[2],
+            "left half should be reddish, got {left:?}"
+        );
     }
 }
