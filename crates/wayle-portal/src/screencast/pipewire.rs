@@ -24,7 +24,7 @@
 
 use std::{
     cell::{Cell, RefCell},
-    collections::VecDeque,
+    collections::HashMap,
     rc::Rc,
     sync::{
         Arc,
@@ -50,10 +50,6 @@ use super::{
 /// rect (see [`clamp_damage`]).
 const MAX_DAMAGE_REGIONS: usize = 4;
 
-/// How many recent dmabuf-backed frames to keep alive (>= the max buffer count
-/// we let the server negotiate in `buffer_blob`), so an attached dmabuf fd/bo
-/// outlives the consumer's use of the PipeWire buffer it was handed to.
-const KEEPALIVE_FRAMES: usize = 16;
 
 /// A running PipeWire stream; stops and joins its thread on drop.
 pub struct StreamHandle {
@@ -117,19 +113,18 @@ pub fn start_stream(
 
 /// Acquire one capture frame for the process callback.
 ///
-/// dmabuf: once the pool is full, recycle the oldest pooled buffer by
-/// recapturing into its existing bo (zero allocation); otherwise allocate one
-/// to warm the pool. SHM: the capturer leases the pooled `ShmSlot` (also zero
-/// allocation in steady state). Returns `None` when the frame should be skipped
-/// (capture/recapture failed); a recycled buffer is returned to the pool so it
-/// is not lost.
+/// dmabuf: reuse the buffer bound to THIS pw_buffer (`dmabuf_key`), recapturing
+/// into its existing bo (zero allocation); the first time a pw_buffer is seen,
+/// allocate one. SHM: the capturer leases the pooled `ShmSlot` (also zero
+/// allocation in steady state). Returns `None` when the frame should be skipped.
 fn acquire_frame(
     prefer_dmabuf: bool,
+    dmabuf_key: Option<usize>,
     capturer: &RefCell<Capturer>,
-    dmabuf_pool: &RefCell<VecDeque<wayle_share_preview::buffer::Buffer>>,
+    dmabuf_pool: &RefCell<HashMap<usize, wayle_share_preview::buffer::Buffer>>,
 ) -> Option<wayle_share_preview::buffer::Buffer> {
     if prefer_dmabuf {
-        acquire_dmabuf_frame(capturer, dmabuf_pool)
+        acquire_dmabuf_frame(capturer, dmabuf_pool, dmabuf_key)
     } else {
         capture_frame(capturer, false)
     }
@@ -149,31 +144,38 @@ fn capture_frame(
     }
 }
 
-/// dmabuf acquisition: recycle the oldest pooled buffer once the pool is full,
-/// else allocate one to warm the pool.
+/// dmabuf acquisition with a **stable per-pw_buffer** binding.
+///
+/// Each PipeWire buffer keeps its own dmabuf bo for the stream's life, keyed by
+/// the pw_buffer's `spa_data` address (`dmabuf_key`). We take that bound buffer
+/// out of the pool, recapture into its existing bo (zero allocation), and the
+/// caller reinserts it under the same key. The first time a pw_buffer is seen
+/// there is no entry, so we allocate one.
+///
+/// The binding must be stable: a bo that moves between pw_buffers stalls the
+/// consumer (it caches the dmabuf import per pw_buffer and can't follow a moved
+/// bo) — that was the freeze in the FIFO-recycle version. This is the same 1:1
+/// invariant the canonical `PW_STREAM_FLAG_ALLOC_BUFFERS` + `add_buffer` model
+/// enforces (xdg-desktop-portal-wlr / -hyprland), achieved here under
+/// MAP_BUFFERS by keying on the buffer rather than allocating producer buffers.
 fn acquire_dmabuf_frame(
     capturer: &RefCell<Capturer>,
-    dmabuf_pool: &RefCell<VecDeque<wayle_share_preview::buffer::Buffer>>,
+    dmabuf_pool: &RefCell<HashMap<usize, wayle_share_preview::buffer::Buffer>>,
+    key: Option<usize>,
 ) -> Option<wayle_share_preview::buffer::Buffer> {
-    let recycled = {
-        let mut pool = dmabuf_pool.borrow_mut();
-        if pool.len() >= KEEPALIVE_FRAMES {
-            pool.pop_front()
-        } else {
-            None
-        }
-    };
-
-    let Some(mut buf) = recycled else {
+    let existing = key.and_then(|k| dmabuf_pool.borrow_mut().remove(&k));
+    let Some(mut buf) = existing else {
+        // First time we see this pw_buffer: allocate its dmabuf bo.
         return capture_frame(capturer, true);
     };
-
     match capturer.borrow_mut().recapture_dmabuf(&mut buf) {
         Ok(()) => Some(buf),
         Err(err) => {
             debug!(%err, "screencast: dmabuf recapture failed (skipped)");
-            // Keep the buffer in the pool so we don't lose it.
-            dmabuf_pool.borrow_mut().push_back(buf);
+            // Keep the binding so a transient failure doesn't drop the buffer.
+            if let Some(k) = key {
+                dmabuf_pool.borrow_mut().insert(k, buf);
+            }
             None
         }
     }
@@ -241,6 +243,19 @@ fn run_loop_inner(
     // capture, where the refresh is unknown).
     let fps = effective_fps(fps, capturer.borrow().refresh_mhz());
 
+    // When the compositor offers dmabuf, take the zero-copy / zero-allocation
+    // path: PW_STREAM_FLAG_ALLOC_BUFFERS + add_buffer/remove_buffer binds one
+    // dmabuf bo to each PipeWire buffer for the stream's life and screencopy
+    // captures straight into it (the model xdg-desktop-portal-wlr / -hyprland
+    // use). The SHM path below is unchanged and serves compositors without
+    // dmabuf.
+    if dmabuf_modifier.is_some() {
+        return run_loop_dmabuf(
+            &capturer, width, height, stride, fps, transform, pixel_format, dmabuf_modifier, stop,
+            ready,
+        );
+    }
+
     let main_loop =
         pw::main_loop::MainLoopRc::new(None).map_err(|e| format!("pipewire main loop: {e}"))?;
     let context = pw::context::ContextRc::new(&main_loop, None)
@@ -270,15 +285,14 @@ fn run_loop_inner(
         let seq = Cell::new(0u64);
         // Reused per-frame damage scratch (avoids a small alloc every frame).
         let damage_scratch = RefCell::new(Vec::<(u32, u32, u32, u32)>::new());
-        // Reuse pool of dmabuf-backed capture buffers. The dmabuf fd/bo attached
-        // to a PipeWire buffer must outlive the consumer's use of it, so we keep
-        // up to KEEPALIVE_FRAMES of them. In steady state we RECYCLE the oldest
-        // (the consumer has long since cycled past it — the same buffer the
-        // previous design dropped at this point) by re-capturing into its
-        // existing gbm bo, so no `dmabuf::allocate` / `create_immed` runs per
-        // frame: the dmabuf path becomes a plain copy. SHM frames are leased
-        // from the pooled ShmSlot in the capturer, so they don't allocate either.
-        let dmabuf_pool = RefCell::new(VecDeque::<wayle_share_preview::buffer::Buffer>::new());
+        // Per-pw_buffer dmabuf reuse pool, keyed by the buffer's spa_data
+        // address (stable for that pw_buffer's lifetime). Each PipeWire buffer
+        // keeps its own dmabuf bo and we recapture into it every frame — no
+        // per-frame `dmabuf::allocate` / `create_immed`. The binding is 1:1 and
+        // stable, so a bo never moves between pw_buffers (which stalled the
+        // consumer). SHM frames lease the pooled ShmSlot, so they don't allocate
+        // either. The map is bounded by the negotiated buffer count (~4–8).
+        let dmabuf_pool = RefCell::new(HashMap::<usize, wayle_share_preview::buffer::Buffer>::new());
         move |stream: &pw::stream::Stream| {
             let Some(mut pw_buffer) = stream.dequeue_buffer() else {
                 return;
@@ -294,11 +308,23 @@ fn run_loop_inner(
                 .map(|d| d.type_().as_raw() == pw::spa::sys::SPA_DATA_DmaBuf)
                 .unwrap_or(false);
 
-            // Acquire the frame. dmabuf: recycle the oldest pooled buffer (reuse
-            // its bo via recapture — zero allocation) once the pool is full,
-            // else allocate one to warm the pool. SHM: the capturer leases the
-            // pooled ShmSlot (also zero allocation in steady state).
-            let Some(frame) = acquire_frame(prefer_dmabuf, &capturer, &dmabuf_pool) else {
+            // Stable key for THIS pw_buffer's dmabuf binding: the address of its
+            // first spa_data, fixed for the pw_buffer's lifetime. Only needed on
+            // the dmabuf path.
+            let dmabuf_key = if prefer_dmabuf {
+                pw_buffer
+                    .datas_mut()
+                    .first()
+                    .map(|d| std::ptr::from_ref(d.as_raw()) as usize)
+            } else {
+                None
+            };
+
+            // Acquire the frame. dmabuf: recapture into this pw_buffer's bound bo
+            // (zero allocation; first sighting allocates). SHM: the capturer
+            // leases the pooled ShmSlot (also zero allocation in steady state).
+            let Some(frame) = acquire_frame(prefer_dmabuf, dmabuf_key, &capturer, &dmabuf_pool)
+            else {
                 return;
             };
 
@@ -376,16 +402,19 @@ fn run_loop_inner(
                 write_damage(damage, &rects);
             }
 
-            // Keep dmabuf-backed frames alive past this callback so the fd/bo we
-            // attached outlives the consumer's use of the buffer; SHM frames have
-            // been fully copied and can drop now.
+            // Re-bind the dmabuf frame to its pw_buffer so the next dequeue of
+            // the same pw_buffer recaptures into it (stable 1:1). The fd/bo thus
+            // outlives the consumer's use of the buffer, and steady state does no
+            // allocation. SHM frames are leases and just drop.
             if dmabuf_attached {
-                // Return the dmabuf buffer to the reuse pool; its fd/bo must
-                // outlive the consumer's use of the PipeWire buffer. The pool is
-                // bounded by the recycle-on-acquire above (it stays at
-                // KEEPALIVE_FRAMES), so there is no eviction/destroy here — the
-                // bos live for the stream and are recycled, not reallocated.
-                dmabuf_pool.borrow_mut().push_back(frame);
+                match dmabuf_key {
+                    Some(k) => {
+                        dmabuf_pool.borrow_mut().insert(k, frame);
+                    }
+                    // No key (shouldn't happen on the dmabuf path); destroy
+                    // rather than leak the wl_buffer.
+                    None => frame.destroy(),
+                }
             } else {
                 // SHM frame: a lightweight lease over the pooled ShmSlot. The
                 // pixels are copied and damage is read, so just drop it —
@@ -502,6 +531,332 @@ fn run_loop_inner(
     main_loop.run();
     error!("screencast loop exited");
     Ok(())
+}
+
+/// dmabuf zero-copy / zero-allocation producer.
+///
+/// Connects with `PW_STREAM_FLAG_ALLOC_BUFFERS`: `add_buffer` allocates one
+/// dmabuf bo per PipeWire buffer and points the buffer's `spa_data` at its fd;
+/// `process` recaptures (screencopy) straight into that bo; `remove_buffer`
+/// frees it. One bo bound to each PipeWire buffer for the stream's life — no
+/// per-frame allocation and no copy (the canonical model used by
+/// xdg-desktop-portal-wlr / -hyprland).
+#[allow(clippy::too_many_arguments)]
+fn run_loop_dmabuf(
+    capturer: &Rc<RefCell<Capturer>>,
+    width: u32,
+    height: u32,
+    stride: u32,
+    fps: u32,
+    transform: u32,
+    pixel_format: PixelFormat,
+    dmabuf_modifier: Option<u64>,
+    stop: &Arc<AtomicBool>,
+    ready: &mpsc::Sender<Result<(u32, u32, u32), String>>,
+) -> Result<(), String> {
+    let main_loop =
+        pw::main_loop::MainLoopRc::new(None).map_err(|e| format!("pipewire main loop: {e}"))?;
+    let context = pw::context::ContextRc::new(&main_loop, None)
+        .map_err(|e| format!("pipewire context: {e}"))?;
+    let core = context
+        .connect_rc(None)
+        .map_err(|e| format!("pipewire connect: {e}"))?;
+
+    let stream = pw::stream::StreamBox::new(
+        &core,
+        "wayle-screencast",
+        pw::properties::properties! {
+            *pw::keys::MEDIA_TYPE => "Video",
+            *pw::keys::MEDIA_CATEGORY => "Capture",
+            *pw::keys::MEDIA_ROLE => "Screen",
+            *pw::keys::NODE_NAME => "wayle-screencast",
+        },
+    )
+    .map_err(|e| format!("pipewire stream: {e}"))?;
+
+    // pw_buffer first-spa_data address -> the dmabuf Buffer bound to it for the
+    // stream's life. Shared by add_buffer / remove_buffer / process; all run on
+    // this single thread, so Rc<RefCell> is sound.
+    let pool: Rc<RefCell<HashMap<usize, wayle_share_preview::buffer::Buffer>>> =
+        Rc::new(RefCell::new(HashMap::new()));
+
+    let ready_state = ready.clone();
+    let mut reported = false;
+
+    let cap_add = capturer.clone();
+    let pool_add = pool.clone();
+    let pool_rm = pool.clone();
+    let cap_proc = capturer.clone();
+    let pool_proc = pool.clone();
+    let start = Instant::now();
+    let seq = Cell::new(0u64);
+
+    let _listener = stream
+        .add_local_listener::<()>()
+        .state_changed(move |stream, _, old, new| {
+            debug!(?old, ?new, "screencast stream state changed");
+            if reported {
+                return;
+            }
+            match new {
+                pw::stream::StreamState::Paused => {
+                    reported = true;
+                    let node_id = stream.node_id();
+                    debug!(node_id, width, height, "screencast: node id assigned");
+                    let _ = ready_state.send(Ok((node_id, width, height)));
+                }
+                pw::stream::StreamState::Error(ref err) => {
+                    reported = true;
+                    let _ = ready_state.send(Err(format!("stream error: {err}")));
+                }
+                _ => {}
+            }
+        })
+        .param_changed(move |stream, _user_data, id, param| {
+            if param.is_none() || id != pw::spa::param::ParamType::Format.as_raw() {
+                return;
+            }
+            let blobs = param_blobs_dmabuf(stride, height);
+            let mut pods: Vec<&pw::spa::pod::Pod> = blobs
+                .iter()
+                .filter_map(|bytes| pw::spa::pod::Pod::from_bytes(bytes))
+                .collect();
+            if !pods.is_empty()
+                && let Err(err) = stream.update_params(&mut pods)
+            {
+                warn!(%err, "screencast: update_params failed");
+            }
+        })
+        // Allocate one dmabuf bo for this PipeWire buffer and point its data slot
+        // at the bo's fd. The bo lives (in `pool`) until remove_buffer.
+        .add_buffer(move |_stream, _user_data, pwb: *mut pw::sys::pw_buffer| {
+            // SAFETY: `pwb` is the buffer PipeWire just added; its spa_buffer and
+            // datas[0] are allocated (we asked for blocks=1). We are the sole
+            // writer on this thread.
+            unsafe {
+                let spa_buf = (*pwb).buffer;
+                if spa_buf.is_null() || (*spa_buf).n_datas < 1 {
+                    return;
+                }
+                let data = (*spa_buf).datas; // first spa_data
+                let buf = match cap_add.borrow_mut().allocate_dmabuf() {
+                    Ok(b) => b,
+                    Err(err) => {
+                        warn!(%err, "screencast: add_buffer dmabuf alloc failed");
+                        return;
+                    }
+                };
+                let Some(plane) = buf.dmabuf.as_ref().and_then(|d| d.planes.first()) else {
+                    warn!("screencast: allocated dmabuf has no plane");
+                    buf.destroy();
+                    return;
+                };
+                (*data).type_ = pw::spa::sys::SPA_DATA_DmaBuf;
+                (*data).flags = 0;
+                (*data).fd = i64::from(plane.fd);
+                (*data).mapoffset = 0;
+                (*data).maxsize = 0;
+                let chunk = (*data).chunk;
+                if !chunk.is_null() {
+                    (*chunk).offset = plane.offset;
+                    (*chunk).stride = buf.stride as i32;
+                    (*chunk).size = buf.stride.saturating_mul(buf.height);
+                    (*chunk).flags = 0;
+                }
+                pool_add.borrow_mut().insert(data as usize, buf);
+            }
+        })
+        .remove_buffer(move |_stream, _user_data, pwb: *mut pw::sys::pw_buffer| {
+            // SAFETY: as add_buffer; we only read the data pointer to key the map.
+            unsafe {
+                let spa_buf = (*pwb).buffer;
+                if spa_buf.is_null() || (*spa_buf).n_datas < 1 {
+                    return;
+                }
+                let key = (*spa_buf).datas as usize;
+                if let Some(buf) = pool_rm.borrow_mut().remove(&key) {
+                    buf.destroy();
+                }
+            }
+        })
+        .process(move |stream, _user_data| {
+            let Some(mut pw_buffer) = stream.dequeue_buffer() else {
+                return;
+            };
+            let Some(key) = pw_buffer
+                .datas_mut()
+                .first()
+                .map(|d| std::ptr::from_ref(d.as_raw()) as usize)
+            else {
+                return;
+            };
+            let mut pool = pool_proc.borrow_mut();
+            let Some(buf) = pool.get_mut(&key) else {
+                debug!("screencast: process with no bound dmabuf buffer");
+                return;
+            };
+            // Screencopy straight into the bound bo (no allocation, no copy).
+            if let Err(err) = cap_proc.borrow_mut().recapture_dmabuf(buf) {
+                debug!(%err, "screencast: dmabuf recapture failed (skipped)");
+                return;
+            }
+            // Refresh the chunk descriptor (the fd was set once in add_buffer).
+            if let Some(data) = pw_buffer.datas_mut().first_mut() {
+                let chunk = data.chunk_mut();
+                *chunk.offset_mut() = 0;
+                *chunk.stride_mut() = buf.stride as i32;
+                *chunk.size_mut() = buf.stride.saturating_mul(buf.height);
+            }
+            let pts = i64::try_from(start.elapsed().as_nanos()).unwrap_or(i64::MAX);
+            let seq_val = seq.get();
+            seq.set(seq_val.wrapping_add(1));
+            stamp_metadata(&mut pw_buffer, transform, pts, seq_val, &buf.damage, width, height);
+        })
+        .register()
+        .map_err(|e| format!("pipewire listener: {e}"))?;
+
+    let format_bytes = format_blobs(width, height, fps, pixel_format, dmabuf_modifier);
+    let mut params: Vec<&pw::spa::pod::Pod> = format_bytes
+        .iter()
+        .filter_map(|bytes| pw::spa::pod::Pod::from_bytes(bytes))
+        .collect();
+    stream
+        .connect(
+            pw::spa::utils::Direction::Output,
+            None,
+            pw::stream::StreamFlags::ALLOC_BUFFERS,
+            &mut params,
+        )
+        .map_err(|e| format!("pipewire stream connect: {e}"))?;
+
+    let quit = {
+        let quit_loop = main_loop.clone();
+        let stop = stop.clone();
+        main_loop.loop_().add_timer(move |_| {
+            if stop.load(Ordering::SeqCst) {
+                quit_loop.quit();
+            }
+        })
+    };
+    let poll = Duration::from_millis(100);
+    quit.update_timer(Some(poll), Some(poll))
+        .into_result()
+        .map_err(|e| format!("pipewire stop-timer: {e}"))?;
+
+    main_loop.run();
+    error!("screencast loop exited");
+
+    // Free any bos still bound (the connection teardown also reaps them).
+    for (_, buf) in pool.borrow_mut().drain() {
+        buf.destroy();
+    }
+    Ok(())
+}
+
+/// Stamp the per-frame metas (`Header` timestamp/seq, `VideoTransform`,
+/// `VideoDamage`) onto a dequeued PipeWire buffer, when the consumer negotiated
+/// them. Shared by the SHM and dmabuf producers.
+fn stamp_metadata(
+    pw_buffer: &mut pw::buffer::Buffer,
+    transform: u32,
+    pts: i64,
+    seq: u64,
+    frame_damage: &[(u32, u32, u32, u32)],
+    width: u32,
+    height: u32,
+) {
+    if let Some(header) = pw_buffer.find_meta::<MetaHeader>() {
+        let raw = std::ptr::from_ref(header.as_raw()).cast_mut();
+        // SAFETY: `raw` is this buffer's SPA_META_Header region (declared in
+        // param_changed); the buffer is uniquely held here.
+        unsafe {
+            (*raw).pts = pts;
+            (*raw).seq = seq;
+            (*raw).dts_offset = 0;
+            (*raw).flags = 0;
+        }
+    }
+    if let Some(vt) = pw_buffer.find_meta::<MetaVideoTransform>() {
+        let raw = std::ptr::from_ref(vt.as_raw()).cast_mut();
+        // SAFETY: as above for the SPA_META_VideoTransform region.
+        unsafe {
+            (*raw).transform = transform;
+        }
+    }
+    if let Some(damage) = pw_buffer.find_meta::<MetaVideoDamage>() {
+        let mut rects: Vec<(u32, u32, u32, u32)> = Vec::new();
+        clamp_damage_into(&mut rects, frame_damage, width, height, MAX_DAMAGE_REGIONS);
+        write_damage(damage, &rects);
+    }
+}
+
+/// dmabuf-only buffer-layout pod (+ the same metas) for the ALLOC_BUFFERS path:
+/// the producer hands the server dmabuf buffers, so only `SPA_DATA_DmaBuf` is
+/// advertised.
+fn param_blobs_dmabuf(stride: u32, height: u32) -> Vec<Vec<u8>> {
+    use pw::spa::pod::Value;
+
+    let header = std::mem::size_of::<pw::spa::sys::spa_meta_header>() as i32;
+    let transform = std::mem::size_of::<pw::spa::sys::spa_meta_videotransform>() as i32;
+    let region = std::mem::size_of::<pw::spa::sys::spa_meta_region>() as i32;
+    let max = MAX_DAMAGE_REGIONS as i32;
+
+    [
+        buffer_blob_dmabuf(stride, height),
+        meta_blob(pw::spa::sys::SPA_META_Header, Value::Int(header)),
+        meta_blob(pw::spa::sys::SPA_META_VideoTransform, Value::Int(transform)),
+        meta_blob(
+            pw::spa::sys::SPA_META_VideoDamage,
+            damage_size_choice(region, max),
+        ),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+/// Buffer-layout pod advertising `SPA_DATA_DmaBuf` only (producer-allocated).
+fn buffer_blob_dmabuf(stride: u32, height: u32) -> Option<Vec<u8>> {
+    use pw::spa::{
+        pod::{ChoiceValue, Object, Property, PropertyFlags, Value},
+        utils::{Choice, ChoiceEnum, ChoiceFlags},
+    };
+
+    let size = stride.saturating_mul(height);
+    let int_prop = |key, value| Property {
+        key,
+        flags: PropertyFlags::empty(),
+        value: Value::Int(value),
+    };
+
+    let object = Object {
+        type_: pw::spa::sys::SPA_TYPE_OBJECT_ParamBuffers,
+        id: pw::spa::sys::SPA_PARAM_Buffers,
+        properties: vec![
+            Property {
+                key: pw::spa::sys::SPA_PARAM_BUFFERS_buffers,
+                flags: PropertyFlags::empty(),
+                value: Value::Choice(ChoiceValue::Int(Choice(
+                    ChoiceFlags::empty(),
+                    ChoiceEnum::Range {
+                        default: 4,
+                        min: 2,
+                        max: 8,
+                    },
+                ))),
+            },
+            int_prop(pw::spa::sys::SPA_PARAM_BUFFERS_blocks, 1),
+            int_prop(pw::spa::sys::SPA_PARAM_BUFFERS_size, size as i32),
+            int_prop(pw::spa::sys::SPA_PARAM_BUFFERS_stride, stride as i32),
+            int_prop(pw::spa::sys::SPA_PARAM_BUFFERS_align, 16),
+            int_prop(
+                pw::spa::sys::SPA_PARAM_BUFFERS_dataType,
+                1i32 << pw::spa::sys::SPA_DATA_DmaBuf,
+            ),
+        ],
+    };
+
+    serialize_object(object)
 }
 
 /// Serializes a pod `Object` to owned bytes. The bytes must outlive any `&Pod`

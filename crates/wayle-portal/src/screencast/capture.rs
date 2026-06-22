@@ -157,6 +157,29 @@ impl Capturer {
         }
     }
 
+    /// Allocate a dmabuf-backed [`Buffer`] for this output WITHOUT capturing —
+    /// the bo + `wl_buffer` a PipeWire `add_buffer` callback binds to one
+    /// PipeWire buffer for the stream's life. Only whole-output capture supports
+    /// dmabuf.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if dmabuf is unavailable or the target is not an output.
+    pub fn allocate_dmabuf(&mut self) -> Result<Buffer, String> {
+        match self {
+            Self::Output {
+                manager,
+                output,
+                show_cursor,
+            } => manager
+                .allocate_output_dmabuf(output, *show_cursor)
+                .map_err(|e| format!("dmabuf allocate failed: {e}")),
+            Self::Region { .. } | Self::Window { .. } => {
+                Err("dmabuf allocate is only supported for whole-output capture".to_owned())
+            }
+        }
+    }
+
     /// Re-capture into an existing dmabuf-backed [`Buffer`] without allocating a
     /// new gbm bo / `wl_buffer` — a plain screencopy copy into the buffer the
     /// producer is recycling. Only whole-output capture produces dmabuf buffers,

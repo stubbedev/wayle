@@ -235,19 +235,20 @@ impl OutputManager {
     /// One dmabuf capture attempt. Errors (rather than falling back internally)
     /// so the caller can cleanly drop to SHM.
     ///
-    /// The dmabuf format is learned (and cached) once via
-    /// [`probe_dmabuf_format`](Self::probe_dmabuf_format); thereafter each frame
-    /// allocates a fresh gbm bo, imports it as a `wl_buffer`, has the compositor
-    /// copy into it, and returns it.
+    /// Allocate a dmabuf-backed [`Buffer`] for `output` WITHOUT capturing into
+    /// it — a gbm bo imported as a `wl_buffer`, ready to be the target of a
+    /// later [`recapture_output_dmabuf`](Self::recapture_output_dmabuf). This is
+    /// the allocation half used by the PipeWire `add_buffer` path, where one
+    /// such buffer is bound to each PipeWire buffer for the stream's lifetime.
     ///
-    /// **Best-effort and unverified on hardware.** Known limitation: a new bo is
-    /// allocated per frame rather than recycling a small pool (the PipeWire
-    /// stream here uses the MAP_BUFFERS/server-allocated model for SHM, so the
-    /// dmabuf buffers are produced on our side per frame). This is correct but
-    /// not optimal; it is acceptable for a first dmabuf path whose contract is
-    /// "never regress SHM" — any failure here returns an error and the caller
-    /// uses SHM.
-    fn try_capture_output_dmabuf(
+    /// The dmabuf format is learned (and cached) once via
+    /// [`probe_dmabuf_format`](Self::probe_dmabuf_format).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if dmabuf is unavailable, the gbm allocation fails, or
+    /// the `wl_buffer` import is rejected.
+    pub fn allocate_output_dmabuf(
         &mut self,
         output: &WlOutput,
         overlay_cursor: bool,
@@ -340,7 +341,7 @@ impl OutputManager {
         // end, after the capture below): the dmabuf fds + `wl_buffer` keep the
         // kernel buffer alive, and the bo is `!Send` so it must not enter the
         // `Buffer`/`Frame` graph used as Wayland dispatch userdata.
-        let mut buffer = Buffer::from_dmabuf(
+        let buffer = Buffer::from_dmabuf(
             wl_buffer.clone(),
             width,
             height,
@@ -348,51 +349,23 @@ impl OutputManager {
             shm_format,
             backing,
         );
+        // `alloc.bo` is deliberately left owned by `alloc` (dropped at function
+        // end): the dmabuf fds + `wl_buffer` keep the kernel buffer alive, and
+        // the bo is `!Send` so it must not enter the `Buffer`/`Frame` graph.
+        Ok(buffer)
+    }
 
-        // Pass 2: capture into the dmabuf buffer. Reuse the same wl_buffer.
-        let frame = Arc::new(Mutex::new(Frame::default()));
-        let mut copy_queue = self.connection.new_event_queue();
-        let copy_handle = copy_queue.handle();
-        let zwlr_frame = zwlr_manager.capture_output(
-            i32::from(overlay_cursor),
-            output,
-            &copy_handle,
-            Arc::downgrade(&frame),
-        );
-
-        // Drive: wait for the compositor's Buffer event then issue copy() once,
-        // then wait for Ready / Failed. Mirrors finish_capture but copies into
-        // our pre-built dmabuf buffer instead of an SHM one.
-        let mut requested = false;
-        loop {
-            copy_queue
-                .blocking_dispatch(self)
-                .map_err(Error::WaylandDispatch)?;
-            let mut f = frame.lock().expect("lock should not be poisoned");
-            if let Some(err) = &f.error {
-                let err = format!("dmabuf copy failed: {err}");
-                drop(f);
-                zwlr_frame.destroy();
-                buffer.destroy();
-                return Err(Error::DmabufUnavailable(err));
-            }
-            if f.ready {
-                // Carry this frame's damage rects onto the dmabuf buffer.
-                buffer.damage = std::mem::take(&mut f.damage);
-                break;
-            }
-            // Once the compositor has described the frame (Buffer event arrived
-            // -> f.buffer is set, or the dmabuf format is known), request the
-            // copy exactly once.
-            if !requested && (f.buffer.is_some() || f.dmabuf_format.is_some()) {
-                drop(f);
-                // copy_with_damage so the compositor emits damage for this frame.
-                zwlr_frame.copy_with_damage(&wl_buffer);
-                requested = true;
-                continue;
-            }
-        }
-        zwlr_frame.destroy();
+    /// Allocate a dmabuf-backed [`Buffer`] and capture one frame into it. The
+    /// per-frame fallback path ([`capture_output_dmabuf_or_shm`]); the PipeWire
+    /// producer instead allocates once via
+    /// [`allocate_output_dmabuf`](Self::allocate_output_dmabuf) and recaptures.
+    fn try_capture_output_dmabuf(
+        &mut self,
+        output: &WlOutput,
+        overlay_cursor: bool,
+    ) -> Result<Buffer, Error> {
+        let mut buffer = self.allocate_output_dmabuf(output, overlay_cursor)?;
+        self.recapture_output_dmabuf(output, overlay_cursor, &mut buffer)?;
         Ok(buffer)
     }
 
