@@ -57,6 +57,14 @@ pub(crate) fn reveal(
     revealer.set_reveal_child(false);
     root.set_visible(true);
     root.present();
+
+    // If the window is already mapped (e.g. a second request arrives before the
+    // previous one finished hiding), no fresh `map` fires, so `play_on_map`
+    // won't re-open the revealer — drive it directly.
+    if root.is_mapped() {
+        let revealer = revealer.clone();
+        gtk::glib::idle_add_local_once(move || revealer.set_reveal_child(true));
+    }
 }
 
 /// Plays the exit transition, then unmaps the window once it finishes.
