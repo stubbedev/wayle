@@ -7,12 +7,13 @@
 mod hyprland;
 mod mango;
 mod niri;
+mod sway;
 
 use futures::stream::BoxStream;
 
 pub(crate) use self::{
     hyprland::HyprlandKeyboardLayoutSource, mango::MangoKeyboardLayoutSource,
-    niri::NiriKeyboardLayoutSource,
+    niri::NiriKeyboardLayoutSource, sway::SwayKeyboardLayoutSource,
 };
 
 /// Currently active keyboard layout.

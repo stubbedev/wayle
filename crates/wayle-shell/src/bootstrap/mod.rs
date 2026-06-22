@@ -26,6 +26,7 @@ use wayle_network::NetworkService;
 use wayle_niri::NiriService;
 use wayle_notification::NotificationService;
 use wayle_power_profiles::PowerProfilesService;
+use wayle_sway::SwayService;
 use wayle_sysinfo::SysinfoService;
 use wayle_systray::{SystemTrayService, types::TrayMode};
 use wayle_wallpaper::WallpaperService;
@@ -90,6 +91,7 @@ struct OptionalServices {
     hyprland: Option<Arc<HyprlandService>>,
     mango: Option<Arc<MangoService>>,
     niri: Option<Arc<NiriService>>,
+    sway: Option<Arc<SwayService>>,
 }
 
 pub async fn is_already_running() -> bool {
@@ -189,6 +191,7 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
         mango: optional.mango,
         media: daemons.media,
         niri: optional.niri,
+        sway: optional.sway,
         network: core.network,
         notification: daemons.notification,
         sysinfo: core.sysinfo,
@@ -335,17 +338,20 @@ async fn init_optional_services(timer: &StartupTimer) -> OptionalServices {
     let hyprland_task = tokio::spawn(HyprlandService::new());
     let mango_task = tokio::spawn(MangoService::new());
     let niri_task = tokio::spawn(NiriService::new());
+    let sway_task = tokio::spawn(SwayService::new());
 
-    let (hyprland, mango, niri) = tokio::join!(
+    let (hyprland, mango, niri, sway) = tokio::join!(
         timer.time("Hyprland", spawned(hyprland_task)),
         timer.time("Mango", spawned(mango_task)),
         timer.time("Niri", spawned(niri_task)),
+        timer.time("Sway", spawned(sway_task)),
     );
 
     OptionalServices {
         hyprland: hyprland.ok(),
         mango: mango.ok(),
         niri: niri.ok(),
+        sway: sway.ok(),
     }
 }
 

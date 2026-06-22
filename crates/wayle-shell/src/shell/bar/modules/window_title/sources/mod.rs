@@ -8,12 +8,13 @@
 mod hyprland;
 mod mango;
 mod niri;
+mod sway;
 
 use futures::stream::BoxStream;
 
 pub(crate) use self::{
     hyprland::HyprlandFocusedWindowSource, mango::MangoFocusedWindowSource,
-    niri::NiriFocusedWindowSource,
+    niri::NiriFocusedWindowSource, sway::SwayFocusedWindowSource,
 };
 
 /// Title and app identifier of a focused window.

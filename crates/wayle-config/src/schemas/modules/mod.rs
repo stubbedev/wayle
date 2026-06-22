@@ -32,6 +32,8 @@ mod recorder;
 mod screenshot;
 mod separator;
 mod storage;
+/// sway workspaces module configuration and shared base sizes.
+pub mod sway_workspaces;
 /// System tray module configuration and shared base sizes.
 pub mod systray;
 mod volume;
@@ -78,6 +80,7 @@ pub use recorder::{RecorderConfig, RecorderFormat};
 pub use screenshot::ScreenshotConfig;
 pub use separator::SeparatorConfig;
 pub use storage::{StorageConfig, StorageMountPoint};
+pub use sway_workspaces::SwayWorkspacesConfig;
 pub use systray::{SystrayConfig, TrayItemOverride};
 pub use types::TimeFormat;
 pub use volume::{AppIconSource, VolumeConfig};
@@ -154,6 +157,9 @@ pub struct ModulesConfig {
     pub storage: StorageConfig,
     /// Separator module.
     pub separator: SeparatorConfig,
+    /// sway workspace switcher module.
+    #[serde(rename = "sway-workspaces")]
+    pub sway_workspaces: SwayWorkspacesConfig,
     /// System tray module.
     pub systray: SystrayConfig,
     /// Volume control module.

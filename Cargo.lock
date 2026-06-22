@@ -6045,6 +6045,7 @@ dependencies = [
  "wayle-recorder",
  "wayle-share-preview",
  "wayle-styling",
+ "wayle-sway",
  "wayle-sysinfo",
  "wayle-systray",
  "wayle-wallpaper",
@@ -6070,6 +6071,23 @@ dependencies = [
  "tokio",
  "tracing",
  "wayle-config",
+]
+
+[[package]]
+name = "wayle-sway"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "wayle-core",
+ "wayle-traits",
 ]
 
 [[package]]

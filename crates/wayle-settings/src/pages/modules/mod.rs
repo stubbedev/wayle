@@ -28,6 +28,7 @@ mod recorder;
 mod screenshot;
 mod separator;
 mod storage;
+mod sway_workspaces;
 mod systray;
 mod volume;
 mod weather;
@@ -68,6 +69,7 @@ pub(crate) fn factories() -> Vec<fn(&Config) -> LeafEntry> {
         screenshot::entry,
         separator::entry,
         storage::entry,
+        sway_workspaces::entry,
         systray::entry,
         volume::entry,
         weather::entry,
