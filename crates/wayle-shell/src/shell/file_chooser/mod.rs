@@ -347,7 +347,10 @@ impl Component for FileChooser {
                                     connect_clicked => FileChooserInput::Sort(SortColumn::Name),
                                 },
                                 #[name = "size_handle"]
-                                gtk::Box { add_css_class: "file-chooser-col-grip" },
+                                gtk::Box {
+                                    add_css_class: "file-chooser-col-grip",
+                                    set_vexpand: true,
+                                },
                                 #[name = "sort_size_btn"]
                                 gtk::Button {
                                     add_css_class: "file-chooser-col",
@@ -357,7 +360,10 @@ impl Component for FileChooser {
                                     connect_clicked => FileChooserInput::Sort(SortColumn::Size),
                                 },
                                 #[name = "mod_handle"]
-                                gtk::Box { add_css_class: "file-chooser-col-grip" },
+                                gtk::Box {
+                                    add_css_class: "file-chooser-col-grip",
+                                    set_vexpand: true,
+                                },
                                 #[name = "sort_modified_btn"]
                                 gtk::Button {
                                     add_css_class: "file-chooser-col",
