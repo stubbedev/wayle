@@ -269,6 +269,16 @@
     font-size: var(--text-sm);
 }
 
+// Draggable divider between resizable columns.
+.file-chooser-col-grip {
+    min-width: 5px;
+    background: transparent;
+
+    &:hover {
+        background: var(--border-default);
+    }
+}
+
 // Grid / icon view.
 .file-chooser-grid {
     padding: var(--space-sm);

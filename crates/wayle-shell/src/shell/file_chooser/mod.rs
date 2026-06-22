@@ -72,6 +72,8 @@ pub(crate) enum FileChooserInput {
     TogglePreview,
     /// Internal: the file selection changed — refresh the preview pane.
     SelectionChanged,
+    /// Internal: a column divider was dragged — re-lay the rows to match.
+    ColumnsResized,
     /// Internal: a path was dropped on the surface — navigate to it.
     Dropped(PathBuf),
     /// Internal: confirm the current selection.
@@ -104,6 +106,7 @@ impl std::fmt::Debug for FileChooserInput {
             Self::ToggleQuickLook => f.write_str("ToggleQuickLook"),
             Self::TogglePreview => f.write_str("TogglePreview"),
             Self::SelectionChanged => f.write_str("SelectionChanged"),
+            Self::ColumnsResized => f.write_str("ColumnsResized"),
             Self::Dropped(p) => f.debug_tuple("Dropped").field(p).finish(),
             Self::Confirm => f.write_str("Confirm"),
             Self::Cancel => f.write_str("Cancel"),
@@ -172,6 +175,8 @@ pub(crate) struct FileChooser {
     sort_key: SortColumn,
     sort_asc: bool,
     view: ViewMode,
+    size_col_w: i32,
+    mod_col_w: i32,
     input: Sender<FileChooserInput>,
 }
 
@@ -341,6 +346,8 @@ impl Component for FileChooser {
                                     set_label: "Name",
                                     connect_clicked => FileChooserInput::Sort(SortColumn::Name),
                                 },
+                                #[name = "size_handle"]
+                                gtk::Box { add_css_class: "file-chooser-col-grip" },
                                 #[name = "sort_size_btn"]
                                 gtk::Button {
                                     add_css_class: "file-chooser-col",
@@ -349,6 +356,8 @@ impl Component for FileChooser {
                                     set_label: "Size",
                                     connect_clicked => FileChooserInput::Sort(SortColumn::Size),
                                 },
+                                #[name = "mod_handle"]
+                                gtk::Box { add_css_class: "file-chooser-col-grip" },
                                 #[name = "sort_modified_btn"]
                                 gtk::Button {
                                     add_css_class: "file-chooser-col",
@@ -505,6 +514,8 @@ impl Component for FileChooser {
             sort_key: SortColumn::Name,
             sort_asc: true,
             view: ViewMode::List,
+            size_col_w: 90,
+            mod_col_w: 150,
             input: sender.input_sender().clone(),
         };
         let widgets = view_output!();
@@ -600,6 +611,8 @@ impl Component for FileChooser {
             sender.input_sender(),
         );
 
+        install_column_resize(&widgets, sender.input_sender());
+
         surface_anim::play_on_map(&root, &widgets.revealer);
 
         ComponentParts { model, widgets }
@@ -694,6 +707,11 @@ impl Component for FileChooser {
                 self.refresh_preview(widgets);
             }
             FileChooserInput::SelectionChanged => self.refresh_preview(widgets),
+            FileChooserInput::ColumnsResized => {
+                self.size_col_w = widgets.sort_size_btn.width_request().max(50);
+                self.mod_col_w = widgets.sort_modified_btn.width_request().max(50);
+                self.populate(widgets);
+            }
             FileChooserInput::Dropped(path) => self.drop_path(widgets, path),
             FileChooserInput::Confirm => self.confirm(widgets, root),
             FileChooserInput::Cancel => self.cancel(widgets, root),
@@ -773,6 +791,7 @@ impl FileChooser {
         let query = self.search.to_lowercase();
         let input = self.input.clone();
         let (sort_key, sort_asc, view) = (self.sort_key, self.sort_asc, self.view);
+        let (size_w, mod_w) = (self.size_col_w, self.mod_col_w);
 
         // View chrome: column headers + which surface is shown.
         update_sort_indicators(widgets, sort_key, sort_asc);
@@ -809,7 +828,9 @@ impl FileChooser {
         for entry in &active.entries {
             let name = entry_name(&entry.path);
             if list_mode {
-                widgets.file_list.append(&file_row(&name, entry));
+                widgets
+                    .file_list
+                    .append(&file_row(&name, entry, size_w, mod_w));
             } else {
                 widgets.file_grid.insert(&grid_cell(&name, entry), -1);
             }
@@ -1183,7 +1204,7 @@ fn place_row(label: &str, icon: &str) -> gtk::Box {
 
 /// Builds a list-view row: name column (icon/thumbnail + label), then size and
 /// modified columns aligned with the clickable headers.
-fn file_row(name: &str, entry: &Entry) -> gtk::Box {
+fn file_row(name: &str, entry: &Entry, size_w: i32, mod_w: i32) -> gtk::Box {
     let row = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(8)
@@ -1214,7 +1235,7 @@ fn file_row(name: &str, entry: &Entry) -> gtk::Box {
             human_size(entry.size)
         })
         .xalign(1.0)
-        .width_request(90)
+        .width_request(size_w)
         .build();
     size.add_css_class("file-chooser-cell");
     row.append(&size);
@@ -1222,7 +1243,7 @@ fn file_row(name: &str, entry: &Entry) -> gtk::Box {
     let modified = gtk::Label::builder()
         .label(format_time(entry.modified))
         .xalign(1.0)
-        .width_request(150)
+        .width_request(mod_w)
         .build();
     modified.add_css_class("file-chooser-cell");
     row.append(&modified);
@@ -1518,6 +1539,39 @@ fn clear_list(list: &gtk::ListBox) {
     while let Some(child) = list.first_child() {
         list.remove(&child);
     }
+}
+
+/// Wires both column dividers to drag-resize their columns + a resize cursor.
+fn install_column_resize(widgets: &FileChooserWidgets, input: &Sender<FileChooserInput>) {
+    setup_col_resize(&widgets.size_handle, &widgets.sort_size_btn, input);
+    setup_col_resize(&widgets.mod_handle, &widgets.sort_modified_btn, input);
+    widgets.size_handle.set_cursor_from_name(Some("col-resize"));
+    widgets.mod_handle.set_cursor_from_name(Some("col-resize"));
+}
+
+/// Makes a column divider drag-resize its column button (live), committing the
+/// new width on release so the rows re-lay to match.
+fn setup_col_resize(handle: &gtk::Box, col_btn: &gtk::Button, input: &Sender<FileChooserInput>) {
+    let drag = gtk::GestureDrag::new();
+    let base = std::rc::Rc::new(std::cell::Cell::new(0i32));
+    drag.connect_drag_begin({
+        let base = base.clone();
+        let btn = col_btn.clone();
+        move |_, _, _| base.set(btn.width().max(btn.width_request()))
+    });
+    drag.connect_drag_update({
+        let base = base.clone();
+        let btn = col_btn.clone();
+        move |_, offset_x, _| {
+            let new_w = (f64::from(base.get()) - offset_x).round() as i32;
+            btn.set_width_request(new_w.clamp(50, 400));
+        }
+    });
+    drag.connect_drag_end({
+        let input = input.clone();
+        move |_, _, _| input.emit(FileChooserInput::ColumnsResized)
+    });
+    handle.add_controller(drag);
 }
 
 /// Installs the window's keyboard shortcuts (Escape cancels, spacebar Quick
