@@ -194,17 +194,14 @@ pub(crate) struct FileChooser {
     size_col_w: i32,
     mod_col_w: i32,
     kind_col_w: i32,
+    // Sheet geometry (size/position) lives on the widgets during a drag, not on
+    // the model — the resize/move gestures mutate the surface + window directly
+    // so dragging stays smooth (no per-event message round-trip).
     /// Monotonic search generation. Bumped on every query change; the recursive
     /// walk captures its generation and bails the moment a newer keystroke
     /// supersedes it, so superseded walks don't keep pegging CPU/IO behind the
     /// debounce.
     search_gen: Arc<AtomicU64>,
-    /// Current sheet size in px (driven by the corner resize grip).
-    surface_w: i32,
-    surface_h: i32,
-    /// Top-left position in px (layer-shell margins; driven by the header drag).
-    surface_x: i32,
-    surface_y: i32,
     input: Sender<FileChooserInput>,
 }
 
@@ -226,6 +223,7 @@ impl Component for FileChooser {
             gtk::Revealer {
                 set_reveal_child: false,
 
+                #[name = "overlay"]
                 gtk::Overlay {
                 #[name = "surface"]
                 gtk::Box {
@@ -248,9 +246,17 @@ impl Component for FileChooser {
                             gtk::Button {
                                 add_css_class: "file-chooser-nav",
                                 add_css_class: "flat",
-                                set_icon_name: "go-up-symbolic",
                                 set_tooltip_text: Some("Up"),
                                 connect_clicked => FileChooserInput::GoUp,
+                                // Explicit centered image child — `set_icon_name`'s
+                                // internal image sat top-left in the square button;
+                                // GTK centres a child whose align is Center.
+                                #[wrap(Some)]
+                                set_child = &gtk::Image {
+                                    set_icon_name: Some("go-up-symbolic"),
+                                    set_halign: gtk::Align::Center,
+                                    set_valign: gtk::Align::Center,
+                                },
                             },
                         },
                         #[wrap(Some)]
@@ -443,6 +449,11 @@ impl Component for FileChooser {
                                     gtk::ListBox {
                                         add_css_class: "file-chooser-list",
                                         set_selection_mode: gtk::SelectionMode::Single,
+                                        // Single click selects (ctrl/shift extend in
+                                        // multi mode); double click activates (open /
+                                        // descend). Without this single click would
+                                        // both select and open, fighting multiselect.
+                                        set_activate_on_single_click: false,
                                     },
                                 },
                                 #[name = "empty_label"]
@@ -493,6 +504,7 @@ impl Component for FileChooser {
                                 gtk::FlowBox {
                                     add_css_class: "file-chooser-grid",
                                     set_selection_mode: gtk::SelectionMode::Single,
+                                    set_activate_on_single_click: false,
                                     set_homogeneous: true,
                                     set_min_children_per_line: 3,
                                     set_max_children_per_line: 8,
@@ -579,7 +591,7 @@ impl Component for FileChooser {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let mut model = FileChooser {
+        let model = FileChooser {
             config: init,
             active: None,
             places: user_places(),
@@ -593,10 +605,6 @@ impl Component for FileChooser {
             mod_col_w: 150,
             kind_col_w: 90,
             search_gen: Arc::new(AtomicU64::new(0)),
-            surface_w: 760,
-            surface_h: 520,
-            surface_x: 0,
-            surface_y: 0,
             input: sender.input_sender().clone(),
         };
         let widgets = view_output!();
@@ -612,9 +620,7 @@ impl Component for FileChooser {
         // sheet; seed the margins to a centred spot from the monitor geometry.
         root.set_anchor(Edge::Top, true);
         root.set_anchor(Edge::Left, true);
-        let (cx, cy) = center_margins(model.surface_w, model.surface_h);
-        model.surface_x = cx;
-        model.surface_y = cy;
+        let (cx, cy) = center_margins(760, 520);
         root.set_margin(Edge::Left, cx);
         root.set_margin(Edge::Top, cy);
 
@@ -660,7 +666,7 @@ impl Component for FileChooser {
         );
 
         install_column_resize(&widgets, sender.input_sender());
-        setup_surface_move(&widgets.header, &root, (model.surface_x, model.surface_y));
+        setup_surface_move(&widgets.header, &root);
 
         surface_anim::play_on_map(&root, &widgets.revealer);
 
@@ -690,7 +696,16 @@ impl Component for FileChooser {
                 } else {
                     Mode::OpenFile
                 };
-                self.begin(widgets, root, &title, mode, filters, &current_folder, "", reply);
+                self.begin(
+                    widgets,
+                    root,
+                    &title,
+                    mode,
+                    filters,
+                    &current_folder,
+                    "",
+                    reply,
+                );
             }
             FileChooserInput::Save {
                 title,
@@ -880,10 +895,10 @@ impl FileChooser {
             // In search mode show the path relative to the root for context;
             // in a plain listing the basename is the whole story.
             let name = if searching {
-                entry
-                    .path
-                    .strip_prefix(&root)
-                    .map_or_else(|_| entry_name(&entry.path), |rel| rel.to_string_lossy().into_owned())
+                entry.path.strip_prefix(&root).map_or_else(
+                    |_| entry_name(&entry.path),
+                    |rel| rel.to_string_lossy().into_owned(),
+                )
             } else {
                 entry_name(&entry.path)
             };
@@ -1086,25 +1101,33 @@ impl FileChooser {
         }
     }
 
-    /// Handles a row activation: descend into dirs, or pick/seed for files.
+    /// Handles a row activation (double-click / Enter): descend into dirs, seed
+    /// the Save name, or open the file(s) in open modes. Single click only
+    /// selects (so ctrl/shift multiselect works); activation is the explicit
+    /// "open this" gesture.
     fn activate(&mut self, widgets: &FileChooserWidgets, index: u32) {
-        let Some(active) = self.active.as_mut() else {
+        let Some(active) = self.active.as_ref() else {
             return;
         };
         let Some(entry) = active.entries.get(index as usize) else {
             return;
         };
-        if entry.is_dir {
+        let is_dir = entry.is_dir;
+        let mode = active.mode;
+        let path = entry.path.clone();
+        if is_dir {
             // goto_dir clears any active search so the opened directory lists in
             // full (search results may have come from elsewhere in the tree).
-            let path = entry.path.clone();
             self.goto_dir(widgets, path);
-        } else if active.mode == Mode::Save
-            && let Some(name) = entry.path.file_name()
-        {
-            widgets.name_entry.set_text(&name.to_string_lossy());
+        } else if mode == Mode::Save {
+            if let Some(name) = path.file_name() {
+                widgets.name_entry.set_text(&name.to_string_lossy());
+            }
+        } else {
+            // Open mode: double-clicking a file opens it (the activated row is
+            // selected, so Confirm picks it up — alongside any ctrl/shift set).
+            self.input.emit(FileChooserInput::Confirm);
         }
-        // For open modes a single click already selects the row; Confirm reads it.
     }
 
     fn go_up(&mut self, widgets: &FileChooserWidgets) {
@@ -1367,10 +1390,10 @@ fn search_rank(entry: &Entry, root: &Path, query_lower: &str) -> (u8, usize, usi
         2
     };
     // Depth = path components below the root (fewer = closer to where you are).
-    let depth = entry
-        .path
-        .strip_prefix(root)
-        .map_or_else(|_| entry.path.components().count(), |rel| rel.components().count());
+    let depth = entry.path.strip_prefix(root).map_or_else(
+        |_| entry.path.components().count(),
+        |rel| rel.components().count(),
+    );
     // Where the match falls in the name — earlier is tighter (e.g. "php" in
     // "php.ini" beats "php" in "my-php-helper").
     let pos = name.find(query_lower).unwrap_or(usize::MAX);
@@ -1540,7 +1563,7 @@ fn file_row(
 
     let kind = gtk::Label::builder()
         .label(entry_kind(entry))
-        .xalign(1.0)
+        .xalign(0.0)
         .width_request(kind_w)
         .ellipsize(gtk::pango::EllipsizeMode::End)
         .build();
@@ -1647,16 +1670,8 @@ fn clear_flowbox(flowbox: &gtk::FlowBox) {
 fn entry_icon_widget(name: &str, path: &Path, is_dir: bool, size: i32) -> gtk::Widget {
     if !is_dir {
         // Detect images by extension (robust without a shared-MIME database).
-        if is_raster_image(path)
-            && let Some(texture) = load_texture(path, size)
-        {
-            let picture = gtk::Picture::for_paintable(&texture);
-            picture.set_size_request(size, size);
-            picture.set_content_fit(gtk::ContentFit::Cover);
-            picture.set_halign(gtk::Align::Center);
-            picture.set_valign(gtk::Align::Center);
-            picture.add_css_class("file-chooser-thumb");
-            return picture.upcast();
+        if is_raster_image(path) {
+            return image_thumbnail_widget(path, size);
         }
         let (content_type, _) = gio::content_type_guess(Some(name), &[] as &[u8]);
         let image = gtk::Image::from_gicon(&gio::content_type_get_icon(&content_type));
@@ -1666,6 +1681,44 @@ fn entry_icon_widget(name: &str, path: &Path, is_dir: bool, size: i32) -> gtk::W
     let image = gtk::Image::from_icon_name("folder-symbolic");
     image.set_pixel_size(size);
     image.upcast()
+}
+
+/// A fixed `size`×`size` thumbnail for an image file. Returns *immediately* with
+/// a blank square placeholder (so opening a folder of images paints instantly),
+/// then decodes the thumbnail off the UI thread — bounded by [`thumb_semaphore`]
+/// — and swaps in the texture when ready. The square `size_request` + `Cover`
+/// fit + clipped overflow normalise every thumbnail to the same box regardless
+/// of the source aspect ratio, and reserve the slot so nothing reflows on load.
+fn image_thumbnail_widget(path: &Path, size: i32) -> gtk::Widget {
+    let picture = gtk::Picture::new();
+    picture.set_size_request(size, size);
+    picture.set_content_fit(gtk::ContentFit::Cover);
+    picture.set_halign(gtk::Align::Center);
+    picture.set_valign(gtk::Align::Center);
+    picture.set_overflow(gtk::Overflow::Hidden);
+    picture.add_css_class("file-chooser-thumb");
+
+    let path = path.to_path_buf();
+    let weak = picture.downgrade();
+    gtk::glib::spawn_future_local(async move {
+        // Hold a permit across the decode so at most N run at once. A raw thread
+        // (not tokio) keeps this independent of which executor polls the future.
+        let Ok(_permit) = thumb_semaphore().acquire().await else {
+            return;
+        };
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(decode_thumbnail(&path, size));
+        });
+        let Ok(Some(decoded)) = rx.await else {
+            return;
+        };
+        if let Some(picture) = weak.upgrade() {
+            picture.set_paintable(Some(&build_texture(decoded)));
+        }
+    });
+
+    picture.upcast()
 }
 
 /// Whether the path looks like a raster image the `image` crate can decode.
@@ -1725,28 +1778,57 @@ fn fill_preview(
     info_label.set_label(&info);
 }
 
-/// Loads an image file as a downscaled CPU-side `gdk::MemoryTexture` (same path
-/// the wallpaper uses, so it composites under software rendering too). Files
-/// above a size cap are skipped to keep directory listing snappy.
-fn load_texture(path: &Path, size: i32) -> Option<gtk::gdk::Texture> {
+/// A decoded thumbnail ready to upload: raw RGBA8 pixels + dimensions + stride.
+/// `Send` (unlike a `gdk::Texture`), so it can cross from a decode thread back
+/// to the GTK main thread.
+type DecodedThumb = (Vec<u8>, i32, i32, usize);
+
+/// Decodes + downscales an image to RGBA8 off the UI thread. Heavy part of
+/// thumbnailing (file read + decode + resize); returns `Send` data so the cheap
+/// GPU upload ([`build_texture`]) can happen back on the main thread. Files above
+/// a size cap are skipped to keep listing snappy.
+fn decode_thumbnail(path: &Path, size: i32) -> Option<DecodedThumb> {
     const MAX_BYTES: u64 = 32 * 1024 * 1024;
     if std::fs::metadata(path).ok()?.len() > MAX_BYTES {
         return None;
     }
-    // Decode and shrink to ~2x the display size for crisp thumbnails.
-    let target = (size.max(1) as u32) * 2;
-    let rgba = image::open(path).ok()?.thumbnail(target, target).to_rgba8();
+    // Resize-to-fill produces an exact square (centre-cropped) at the display
+    // size: every thumbnail is then identical dimensions, so rows align and
+    // labels start at a fixed offset regardless of the source aspect ratio. The
+    // texture matching the display size also avoids `gtk::Picture` rendering at
+    // its (larger) natural size and inflating row height.
+    let target = size.max(1) as u32;
+    let rgba = image::open(path)
+        .ok()?
+        .resize_to_fill(target, target, image::imageops::FilterType::Triangle)
+        .to_rgba8();
     let (width, height) = (rgba.width() as i32, rgba.height() as i32);
     let stride = (rgba.width() * 4) as usize;
-    let bytes = gtk::glib::Bytes::from_owned(rgba.into_raw());
-    let texture = gtk::gdk::MemoryTexture::new(
+    Some((rgba.into_raw(), width, height, stride))
+}
+
+/// Builds a CPU-side `gdk::MemoryTexture` from decoded RGBA (same path the
+/// wallpaper uses, so it composites under software rendering too). Cheap — call
+/// on the main thread.
+fn build_texture((pixels, width, height, stride): DecodedThumb) -> gtk::gdk::Texture {
+    let bytes = gtk::glib::Bytes::from_owned(pixels);
+    gtk::gdk::MemoryTexture::new(
         width,
         height,
         gtk::gdk::MemoryFormat::R8g8b8a8,
         &bytes,
         stride,
-    );
-    Some(texture.upcast())
+    )
+    .upcast()
+}
+
+/// Bounds concurrent thumbnail decodes so opening a folder full of images can't
+/// saturate every core / spawn a thread per file. Sized small — decoding is
+/// CPU-bound and we only need to keep a screenful flowing.
+fn thumb_semaphore() -> &'static tokio::sync::Semaphore {
+    static SEM: std::sync::LazyLock<tokio::sync::Semaphore> =
+        std::sync::LazyLock::new(|| tokio::sync::Semaphore::new(4));
+    &SEM
 }
 
 /// Sidebar "Locations": the filesystem root plus currently-mounted volumes.
@@ -1924,63 +2006,61 @@ fn install_column_resize(widgets: &FileChooserWidgets, input: &Sender<FileChoose
     widgets.size_handle.set_cursor_from_name(Some("col-resize"));
     widgets.mod_handle.set_cursor_from_name(Some("col-resize"));
     widgets.kind_handle.set_cursor_from_name(Some("col-resize"));
-    setup_surface_resize(&widgets.resize_grip, &widgets.surface);
+    setup_surface_resize(&widgets.overlay, &widgets.surface);
     widgets.resize_grip.set_cursor_from_name(Some("se-resize"));
 }
 
-/// Makes the bottom-right corner grip drag-resize the whole sheet live, clamped
-/// to a sane min/max so it can't shrink past its chrome or grow off-screen.
-fn setup_surface_resize(grip: &gtk::Box, surface: &gtk::Box) {
+/// Corner-drag resize. The gesture is attached to the **overlay**, not the grip:
+/// the overlay's top-left is fixed (the window is anchored top-left and grows
+/// down-right), so the press point + drag offset is the cursor's position in a
+/// stable frame — i.e. exactly the target width/height. Reading it off the grip
+/// instead would feed the grip's own movement back in, so the size would lag the
+/// cursor by a constant gap. Only starts when the press lands in the bottom-right
+/// corner zone (over the visible grip).
+fn setup_surface_resize(overlay: &gtk::Overlay, surface: &gtk::Box) {
+    const CORNER_ZONE: i32 = 28;
     let drag = gtk::GestureDrag::new();
-    let base = std::rc::Rc::new(std::cell::Cell::new((760i32, 520i32)));
     drag.connect_drag_begin({
-        let base = base.clone();
-        let surface = surface.clone();
-        move |_, _, _| {
-            base.set((
-                surface.width().max(surface.width_request()),
-                surface.height().max(surface.height_request()),
-            ));
+        let overlay = overlay.clone();
+        move |gesture, x, y| {
+            let in_corner = (x.round() as i32) >= overlay.width() - CORNER_ZONE
+                && (y.round() as i32) >= overlay.height() - CORNER_ZONE;
+            if !in_corner {
+                gesture.set_state(gtk::EventSequenceState::Denied);
+            }
         }
     });
     drag.connect_drag_update({
-        let base = base.clone();
         let surface = surface.clone();
-        // Apply the new size to the widget directly (not via a component
-        // message): the message round-trip per motion event is what made the
-        // drag jitter. GTK already coalesces motion, so this stays smooth.
-        move |_, dx, dy| {
-            let (bw, bh) = base.get();
-            let w = (bw + dx.round() as i32).clamp(520, 1600);
-            let h = (bh + dy.round() as i32).clamp(360, 1100);
+        // start_point + offset = the cursor's position relative to the overlay's
+        // (fixed) top-left, which is the size we want the sheet to be. No feedback
+        // from the surface growing, so it tracks the cursor 1:1.
+        move |gesture, ox, oy| {
+            let Some((sx, sy)) = gesture.start_point() else {
+                return;
+            };
+            let w = ((sx + ox).round() as i32).clamp(520, 1600);
+            let h = ((sy + oy).round() as i32).clamp(360, 1100);
             surface.set_width_request(w);
             surface.set_height_request(h);
         }
     });
-    grip.add_controller(drag);
+    overlay.add_controller(drag);
 }
 
-/// Makes the header act like a titlebar: drag it to move the whole sheet. Tracks
-/// the position across drags so each drag resumes from where the last left off.
-/// Applies the layer-shell margins directly for a smooth, message-free drag.
-fn setup_surface_move(header: &gtk::CenterBox, root: &gtk::Window, init_pos: (i32, i32)) {
+/// Header-drag to move the sheet (like a titlebar). The header moves with the
+/// window, so we add the gesture offset to the window's *live* margin each event
+/// rather than to a fixed start margin: after each move the compositor re-reports
+/// the pointer relative to the moved surface (offset collapses toward 0), so
+/// `live_margin + offset` settles instead of oscillating — that oscillation was
+/// the jank.
+fn setup_surface_move(header: &gtk::CenterBox, root: &gtk::Window) {
     let drag = gtk::GestureDrag::new();
-    let pos = std::rc::Rc::new(std::cell::Cell::new(init_pos));
-    let base = std::rc::Rc::new(std::cell::Cell::new(init_pos));
-    drag.connect_drag_begin({
-        let base = base.clone();
-        let pos = pos.clone();
-        move |_, _, _| base.set(pos.get())
-    });
     drag.connect_drag_update({
-        let base = base.clone();
-        let pos = pos.clone();
         let root = root.clone();
         move |_, dx, dy| {
-            let (bx, by) = base.get();
-            let x = (bx + dx.round() as i32).max(0);
-            let y = (by + dy.round() as i32).max(0);
-            pos.set((x, y));
+            let x = (root.margin(Edge::Left) + dx.round() as i32).max(0);
+            let y = (root.margin(Edge::Top) + dy.round() as i32).max(0);
             root.set_margin(Edge::Left, x);
             root.set_margin(Edge::Top, y);
         }
@@ -2203,9 +2283,8 @@ mod tests {
 
     #[test]
     fn thumbnail_decode_pipeline_produces_rgba() {
-        // Exercises the exact decode `load_texture` performs (image::open ->
-        // thumbnail -> to_rgba8) on a real PNG, so the thumbnail data path is
-        // verified without needing a display/GPU.
+        // Drives the real off-thread decode (`decode_thumbnail`) on a PNG, so the
+        // thumbnail data path is verified without a display/GPU.
         let path = std::env::temp_dir().join("wayle_fc_thumb_test.png");
         let mut src = image::RgbaImage::new(16, 8);
         for (x, _y, px) in src.enumerate_pixels_mut() {
@@ -2217,26 +2296,20 @@ mod tests {
         }
         src.save(&path).expect("write test png");
 
-        let target = 24u32 * 2;
-        let rgba = image::open(&path)
-            .expect("open png")
-            .thumbnail(target, target)
-            .to_rgba8();
+        let size = 24i32;
+        let (pixels, width, height, stride) =
+            decode_thumbnail(&path, size).expect("decode thumbnail");
         std::fs::remove_file(&path).ok();
 
-        // Non-empty, fits within the target box, RGBA8 (4 bytes/px), and the
-        // left half is reddish (decode preserved real pixels, not blank).
-        assert!(rgba.width() > 0 && rgba.height() > 0);
-        assert!(rgba.width() <= target && rgba.height() <= target);
-        assert_eq!(
-            rgba.as_raw().len(),
-            (rgba.width() * rgba.height() * 4) as usize
-        );
-        let left = rgba.get_pixel(0, 0);
-        assert!(
-            left[0] > left[2],
-            "left half should be reddish, got {left:?}"
-        );
+        // Fits within ~2x the display size, RGBA8 (4 bytes/px, stride = w*4), and
+        // Exactly a `size`×`size` square (centre-cropped, so every thumbnail is
+        // uniform), RGBA8 (4 bytes/px, stride = w*4), and the left edge is reddish
+        // (decode preserved real pixels, not blank).
+        assert_eq!(width, size);
+        assert_eq!(height, size);
+        assert_eq!(stride, (width * 4) as usize);
+        assert_eq!(pixels.len(), (width * height * 4) as usize);
+        assert!(pixels[0] > pixels[2], "left edge should be reddish");
     }
 
     #[test]

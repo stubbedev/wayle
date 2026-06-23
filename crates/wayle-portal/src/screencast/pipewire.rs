@@ -253,7 +253,11 @@ fn run_loop_inner(
     // - `cursor` (whether the client asked for an embedded cursor at all).
     // If CPU is high this should read `path=SHM`; the preceding `warn!` from
     // `capture_output_dmabuf_or_shm` then says why dmabuf was declined.
-    let path = if dmabuf_modifier.is_some() { "dmabuf" } else { "SHM" };
+    let path = if dmabuf_modifier.is_some() {
+        "dmabuf"
+    } else {
+        "SHM"
+    };
     tracing::info!(
         path,
         show_cursor,

@@ -47,9 +47,9 @@
 }
 
 // Square so the symbolic icon sits dead-centre. Qualified with `button` to beat
-// the theme's `button` padding (a single class loses on specificity, which left
-// the icon off-centre); equal min-width/height + zero padding + a centred,
-// non-expanding image keep the glyph in the middle.
+// the theme's `button` padding (a single class loses on specificity). The glyph
+// is centred by the explicit `Image` child in the view!; here we just keep the
+// button square with zero padding so there's no asymmetric offset.
 button.file-chooser-nav {
     min-width: 1.75rem;
     min-height: 1.75rem;
@@ -61,10 +61,9 @@ button.file-chooser-nav {
     box-shadow: none;
 
     image {
+        -gtk-icon-size: 1rem;
         margin: 0;
         padding: 0;
-        min-width: 1.75rem;
-        min-height: 1.75rem;
     }
 
     &:hover {
@@ -177,6 +176,15 @@ button.file-chooser-nav {
     color: var(--accent);
 }
 
+// On a selected place the accent-coloured icon would vanish into the accent
+// fill — flip icon + label to the on-accent foreground for contrast.
+.file-chooser-places row:selected {
+    .file-chooser-place-icon,
+    label {
+        color: var(--fg-on-accent);
+    }
+}
+
 .file-chooser-list-scroll {
     padding: var(--space-sm);
 }
@@ -199,13 +207,22 @@ button.file-chooser-nav {
     }
 }
 
-.file-chooser-list row:selected .file-chooser-icon {
-    color: var(--fg-on-accent);
+// On a selected row every piece flips to the on-accent foreground: the leading
+// icon AND the Size / Modified / Kind cells (which are otherwise muted and would
+// be near-illegible on the accent fill).
+.file-chooser-list row:selected {
+    .file-chooser-icon,
+    .file-chooser-cell {
+        color: var(--fg-on-accent);
+    }
 }
 
-// Rounded image thumbnails.
+// Rounded image thumbnails. A faint fill stands in as the placeholder square
+// while the thumbnail decodes off-thread, so the slot reads as "loading" rather
+// than blank and nothing reflows when the texture swaps in.
 .file-chooser-thumb {
     border-radius: 4px;
+    background: var(--bg-subtle, var(--bg-elevated));
 }
 
 // Empty-folder / no-results overlay.
