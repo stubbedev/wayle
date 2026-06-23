@@ -8,11 +8,14 @@
 use std::{
     cmp::Ordering,
     path::{Component as PathComponent, Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering as AtomicOrdering},
+    },
     time::SystemTime,
 };
 
-use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
+use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use relm4::{
     Sender, gtk,
     gtk::{gio, prelude::*},
@@ -54,6 +57,9 @@ pub(crate) enum FileChooserInput {
     Location(u32),
     /// Internal: the search query changed.
     Search(String),
+    /// Internal: a recursive search finished — `paths` matched `query` under the
+    /// search root (delivered async; dropped if the query has since changed).
+    SearchResults { query: String, paths: Vec<PathBuf> },
     /// Internal: a breadcrumb segment was activated — jump to that ancestor.
     Crumb(PathBuf),
     /// Internal: go to the parent directory.
@@ -97,6 +103,11 @@ impl std::fmt::Debug for FileChooserInput {
             Self::Place(i) => f.debug_tuple("Place").field(i).finish(),
             Self::Location(i) => f.debug_tuple("Location").field(i).finish(),
             Self::Search(q) => f.debug_tuple("Search").field(q).finish(),
+            Self::SearchResults { query, paths } => f
+                .debug_struct("SearchResults")
+                .field("query", query)
+                .field("matches", &paths.len())
+                .finish(),
             Self::Crumb(p) => f.debug_tuple("Crumb").field(p).finish(),
             Self::GoUp => f.write_str("GoUp"),
             Self::ToggleHidden => f.write_str("ToggleHidden"),
@@ -124,6 +135,7 @@ enum Mode {
 }
 
 /// An entry in the current directory listing.
+#[derive(Clone)]
 struct Entry {
     path: PathBuf,
     is_dir: bool,
@@ -137,6 +149,7 @@ pub(crate) enum SortColumn {
     Name,
     Size,
     Modified,
+    Kind,
 }
 
 /// How entries are currently displayed.
@@ -161,6 +174,9 @@ struct Active {
     /// Index into `filters` of the active file-type filter (ignored if empty).
     active_filter: usize,
     entries: Vec<Entry>,
+    /// Cached results of the active recursive search (empty when not searching),
+    /// kept so re-sorting / view toggles don't re-walk the tree.
+    search_entries: Vec<Entry>,
     reply: oneshot::Sender<Vec<String>>,
 }
 
@@ -177,6 +193,18 @@ pub(crate) struct FileChooser {
     view: ViewMode,
     size_col_w: i32,
     mod_col_w: i32,
+    kind_col_w: i32,
+    /// Monotonic search generation. Bumped on every query change; the recursive
+    /// walk captures its generation and bails the moment a newer keystroke
+    /// supersedes it, so superseded walks don't keep pegging CPU/IO behind the
+    /// debounce.
+    search_gen: Arc<AtomicU64>,
+    /// Current sheet size in px (driven by the corner resize grip).
+    surface_w: i32,
+    surface_h: i32,
+    /// Top-left position in px (layer-shell margins; driven by the header drag).
+    surface_x: i32,
+    surface_y: i32,
     input: Sender<FileChooserInput>,
 }
 
@@ -198,6 +226,8 @@ impl Component for FileChooser {
             gtk::Revealer {
                 set_reveal_child: false,
 
+                gtk::Overlay {
+                #[name = "surface"]
                 gtk::Box {
                     add_css_class: "file-chooser-surface",
                     set_orientation: gtk::Orientation::Vertical,
@@ -206,6 +236,8 @@ impl Component for FileChooser {
                     set_height_request: 520,
 
                     // --- Header: nav + centered title + hidden toggle ---
+                    // Doubles as the drag handle to move the sheet (like a titlebar).
+                    #[name = "header"]
                     gtk::CenterBox {
                         add_css_class: "file-chooser-header",
                         #[wrap(Some)]
@@ -276,9 +308,13 @@ impl Component for FileChooser {
                         #[name = "search_entry"]
                         gtk::SearchEntry {
                             add_css_class: "file-chooser-search",
-                            set_placeholder_text: Some("Search"),
+                            set_placeholder_text: Some("Search this folder"),
                             set_width_request: 150,
                             set_valign: gtk::Align::Center,
+                            // Debounce: only emit `search-changed` after typing
+                            // pauses, so a recursive walk fires once per pause
+                            // instead of once per keystroke.
+                            set_search_delay: 300,
                         },
                         #[name = "filter_dropdown"]
                         gtk::DropDown {
@@ -338,6 +374,15 @@ impl Component for FileChooser {
                                 add_css_class: "file-chooser-colheader",
                                 set_orientation: gtk::Orientation::Horizontal,
                                 set_spacing: 0,
+                                // The resize grips below set `vexpand: true` so
+                                // they're tall enough to grab. In GTK4 a child's
+                                // vexpand propagates up, which would make this
+                                // header claim half the vertical space (a tall
+                                // band with the labels floating mid-height).
+                                // Pin it off so the header hugs its text and the
+                                // list takes the slack; the grips still fill this
+                                // (now short) header height.
+                                set_vexpand: false,
                                 #[name = "sort_name_btn"]
                                 gtk::Button {
                                     add_css_class: "file-chooser-col",
@@ -371,6 +416,19 @@ impl Component for FileChooser {
                                     set_width_request: 150,
                                     set_label: "Modified",
                                     connect_clicked => FileChooserInput::Sort(SortColumn::Modified),
+                                },
+                                #[name = "kind_handle"]
+                                gtk::Box {
+                                    add_css_class: "file-chooser-col-grip",
+                                    set_vexpand: true,
+                                },
+                                #[name = "sort_kind_btn"]
+                                gtk::Button {
+                                    add_css_class: "file-chooser-col",
+                                    add_css_class: "flat",
+                                    set_width_request: 90,
+                                    set_label: "Kind",
+                                    connect_clicked => FileChooserInput::Sort(SortColumn::Kind),
                                 },
                             },
 
@@ -501,6 +559,17 @@ impl Component for FileChooser {
                         },
                     },
                 },
+                // Bottom-right corner grip — drag to resize the whole sheet
+                // (layer-shell has no window decorations, so we provide our own).
+                #[name = "resize_grip"]
+                add_overlay = &gtk::Box {
+                    add_css_class: "file-chooser-resize-grip",
+                    set_halign: gtk::Align::End,
+                    set_valign: gtk::Align::End,
+                    set_width_request: 18,
+                    set_height_request: 18,
+                },
+                }
             }
         }
     }
@@ -510,7 +579,7 @@ impl Component for FileChooser {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = FileChooser {
+        let mut model = FileChooser {
             config: init,
             active: None,
             places: user_places(),
@@ -522,6 +591,12 @@ impl Component for FileChooser {
             view: ViewMode::List,
             size_col_w: 90,
             mod_col_w: 150,
+            kind_col_w: 90,
+            search_gen: Arc::new(AtomicU64::new(0)),
+            surface_w: 760,
+            surface_h: 520,
+            surface_x: 0,
+            surface_y: 0,
             input: sender.input_sender().clone(),
         };
         let widgets = view_output!();
@@ -533,61 +608,27 @@ impl Component for FileChooser {
         // immediately — like a native modal picker.
         root.set_keyboard_mode(KeyboardMode::Exclusive);
         root.set_exclusive_zone(-1);
+        // Anchor top-left and position via margins so the header drag can move the
+        // sheet; seed the margins to a centred spot from the monitor geometry.
+        root.set_anchor(Edge::Top, true);
+        root.set_anchor(Edge::Left, true);
+        let (cx, cy) = center_margins(model.surface_w, model.surface_h);
+        model.surface_x = cx;
+        model.surface_y = cy;
+        root.set_margin(Edge::Left, cx);
+        root.set_margin(Edge::Top, cy);
 
         for place in &model.places {
             widgets
                 .places_list
                 .append(&place_row(&place.label, place.icon));
         }
-        widgets.places_list.connect_row_activated({
-            let input = sender.input_sender().clone();
-            move |_, row| input.emit(FileChooserInput::Place(row.index().max(0) as u32))
-        });
-
         for place in &model.locations {
             widgets
                 .locations_list
                 .append(&place_row(&place.label, place.icon));
         }
-        widgets.locations_list.connect_row_activated({
-            let input = sender.input_sender().clone();
-            move |_, row| input.emit(FileChooserInput::Location(row.index().max(0) as u32))
-        });
-
-        widgets.search_entry.connect_search_changed({
-            let input = sender.input_sender().clone();
-            move |entry| input.emit(FileChooserInput::Search(entry.text().to_string()))
-        });
-
-        widgets.file_list.connect_row_activated({
-            let input = sender.input_sender().clone();
-            move |_, row| input.emit(FileChooserInput::Activate(row.index().max(0) as u32))
-        });
-        widgets.file_grid.connect_child_activated({
-            let input = sender.input_sender().clone();
-            move |_, child| input.emit(FileChooserInput::Activate(child.index().max(0) as u32))
-        });
-        widgets.file_list.connect_selected_rows_changed({
-            let input = sender.input_sender().clone();
-            move |_| input.emit(FileChooserInput::SelectionChanged)
-        });
-        widgets.file_grid.connect_selected_children_changed({
-            let input = sender.input_sender().clone();
-            move |_| input.emit(FileChooserInput::SelectionChanged)
-        });
-        widgets.name_entry.connect_activate({
-            let input = sender.input_sender().clone();
-            move |_| input.emit(FileChooserInput::Confirm)
-        });
-        widgets.filter_dropdown.connect_selected_notify({
-            let input = sender.input_sender().clone();
-            move |dd| {
-                let i = dd.selected();
-                if i != u32::MAX {
-                    input.emit(FileChooserInput::SelectFilter(i));
-                }
-            }
-        });
+        wire_widget_signals(&widgets, sender.input_sender());
 
         // Hand cursor on every interactive element (GTK ignores CSS `cursor`).
         for widget in [
@@ -601,6 +642,7 @@ impl Component for FileChooser {
             widgets.sort_name_btn.upcast_ref(),
             widgets.sort_size_btn.upcast_ref(),
             widgets.sort_modified_btn.upcast_ref(),
+            widgets.sort_kind_btn.upcast_ref(),
             widgets.places_list.upcast_ref(),
             widgets.locations_list.upcast_ref(),
             widgets.file_list.upcast_ref(),
@@ -618,6 +660,7 @@ impl Component for FileChooser {
         );
 
         install_column_resize(&widgets, sender.input_sender());
+        setup_surface_move(&widgets.header, &root, (model.surface_x, model.surface_y));
 
         surface_anim::play_on_map(&root, &widgets.revealer);
 
@@ -647,16 +690,7 @@ impl Component for FileChooser {
                 } else {
                     Mode::OpenFile
                 };
-                self.begin(
-                    widgets,
-                    root,
-                    &title,
-                    mode,
-                    filters,
-                    &current_folder,
-                    "",
-                    reply,
-                );
+                self.begin(widgets, root, &title, mode, filters, &current_folder, "", reply);
             }
             FileChooserInput::Save {
                 title,
@@ -664,18 +698,16 @@ impl Component for FileChooser {
                 filters,
                 current_folder,
                 reply,
-            } => {
-                self.begin(
-                    widgets,
-                    root,
-                    &title,
-                    Mode::Save,
-                    filters,
-                    &current_folder,
-                    &current_name,
-                    reply,
-                );
-            }
+            } => self.begin(
+                widgets,
+                root,
+                &title,
+                Mode::Save,
+                filters,
+                &current_folder,
+                &current_name,
+                reply,
+            ),
             FileChooserInput::Activate(index) => self.activate(widgets, index),
             FileChooserInput::Place(index) => {
                 if let Some(place) = self.places.get(index as usize) {
@@ -687,21 +719,21 @@ impl Component for FileChooser {
                     self.goto_dir(widgets, place.path.clone());
                 }
             }
-            FileChooserInput::Search(query) => {
-                self.search = query;
-                self.populate(widgets);
+            FileChooserInput::Search(query) => self.set_search(widgets, query),
+            FileChooserInput::SearchResults { query, paths } => {
+                self.apply_search_results(widgets, &query, paths);
             }
             FileChooserInput::Crumb(path) => self.goto_dir(widgets, path),
             FileChooserInput::GoUp => self.go_up(widgets),
             FileChooserInput::ToggleHidden => {
                 self.show_hidden = widgets.hidden_toggle.is_active();
-                self.populate(widgets);
+                self.refresh_view(widgets);
             }
             FileChooserInput::SelectFilter(index) => {
                 if let Some(active) = self.active.as_mut() {
                     active.active_filter = index as usize;
                 }
-                self.populate(widgets);
+                self.refresh_view(widgets);
             }
             FileChooserInput::Sort(column) => self.sort_by(widgets, column),
             FileChooserInput::ToggleView => self.toggle_view(widgets),
@@ -716,6 +748,7 @@ impl Component for FileChooser {
             FileChooserInput::ColumnsResized => {
                 self.size_col_w = widgets.sort_size_btn.width_request().max(50);
                 self.mod_col_w = widgets.sort_modified_btn.width_request().max(50);
+                self.kind_col_w = widgets.sort_kind_btn.width_request().max(50);
                 self.populate(widgets);
             }
             FileChooserInput::Dropped(path) => self.drop_path(widgets, path),
@@ -760,6 +793,7 @@ impl FileChooser {
             filters,
             active_filter: 0,
             entries: Vec::new(),
+            search_entries: Vec::new(),
             reply,
         });
 
@@ -790,14 +824,17 @@ impl FileChooser {
         );
     }
 
-    /// Reads the active directory and repaints the breadcrumb + list, applying
-    /// the active search query (case-insensitive substring on the name).
+    /// Repaints the breadcrumb + list. When a search is active the rows come
+    /// from the recursive results ([`Self::apply_search_results`]) and are
+    /// labelled by their path relative to the search root; otherwise the current
+    /// directory is listed in full.
     fn populate(&mut self, widgets: &FileChooserWidgets) {
         let show_hidden = self.show_hidden;
-        let query = self.search.to_lowercase();
+        let searching = !self.search.is_empty();
+        let query = self.search.clone();
         let input = self.input.clone();
         let (sort_key, sort_asc, view) = (self.sort_key, self.sort_asc, self.view);
-        let (size_w, mod_w) = (self.size_col_w, self.mod_col_w);
+        let (size_w, mod_w, kind_w) = (self.size_col_w, self.mod_col_w, self.kind_col_w);
 
         // View chrome: column headers + which surface is shown.
         update_sort_indicators(widgets, sort_key, sort_asc);
@@ -818,25 +855,42 @@ impl FileChooser {
         clear_flowbox(&widgets.file_grid);
         build_breadcrumb(&widgets.crumb_bar, &active.dir, &input);
 
-        let mut entries = list_dir(
-            &active.dir,
-            &active.filters,
-            active.active_filter,
-            active.mode,
-            show_hidden,
-        );
-        sort_entries(&mut entries, sort_key, sort_asc);
-        if !query.is_empty() {
-            entries.retain(|entry| entry_name(&entry.path).to_lowercase().contains(&query));
+        let root = active.dir.clone();
+        let mut entries = if searching {
+            active.search_entries.clone()
+        } else {
+            list_dir(
+                &active.dir,
+                &active.filters,
+                active.active_filter,
+                active.mode,
+                show_hidden,
+            )
+        };
+        // Searching ranks by relevance (closest matches first) rather than the
+        // column sort; a plain listing honours the clicked column.
+        if searching {
+            sort_search_entries(&mut entries, &root, &query);
+        } else {
+            sort_entries(&mut entries, sort_key, sort_asc);
         }
         active.entries = entries;
 
         for entry in &active.entries {
-            let name = entry_name(&entry.path);
+            // In search mode show the path relative to the root for context;
+            // in a plain listing the basename is the whole story.
+            let name = if searching {
+                entry
+                    .path
+                    .strip_prefix(&root)
+                    .map_or_else(|_| entry_name(&entry.path), |rel| rel.to_string_lossy().into_owned())
+            } else {
+                entry_name(&entry.path)
+            };
             if list_mode {
                 widgets
                     .file_list
-                    .append(&file_row(&name, entry, size_w, mod_w));
+                    .append(&file_row(&name, entry, size_w, mod_w, kind_w, searching));
             } else {
                 widgets.file_grid.insert(&grid_cell(&name, entry), -1);
             }
@@ -846,11 +900,80 @@ impl FileChooser {
             .set_visible(list_mode && active.entries.is_empty());
     }
 
+    /// Handles a search-query change: empty clears search mode and re-lists the
+    /// directory; non-empty kicks off a recursive walk from the current folder
+    /// (off the UI thread) whose result arrives as [`FileChooserInput::SearchResults`].
+    ///
+    /// Every call bumps the search generation; the spawned walk carries that
+    /// generation and aborts as soon as a newer query supersedes it, so the
+    /// blocking pool isn't left grinding through stale full-tree walks (the
+    /// freeze). The `SearchEntry`'s `search-delay` already collapses bursts of
+    /// keystrokes into one call, so in steady state only the final query walks.
+    fn set_search(&mut self, widgets: &FileChooserWidgets, query: String) {
+        self.search = query;
+        // Supersede any in-flight walk regardless of empty/non-empty.
+        let generation = self.search_gen.fetch_add(1, AtomicOrdering::SeqCst) + 1;
+        if self.search.is_empty() {
+            if let Some(active) = self.active.as_mut() {
+                active.search_entries.clear();
+            }
+            self.populate(widgets);
+            return;
+        }
+        let Some(active) = self.active.as_ref() else {
+            return;
+        };
+        let root = active.dir.clone();
+        let query = self.search.clone();
+        let show_hidden = self.show_hidden;
+        let input = self.input.clone();
+        let cancel = self.search_gen.clone();
+        relm4::spawn(async move {
+            let walk_query = query.clone();
+            let paths = tokio::task::spawn_blocking(move || {
+                walk_search(&root, &walk_query, show_hidden, &cancel, generation)
+            })
+            .await
+            .unwrap_or_default();
+            let _ = input.send(FileChooserInput::SearchResults { query, paths });
+        });
+    }
+
+    /// Repaints, re-running the recursive walk first when a search is active
+    /// (since hidden-files / filter changes invalidate the cached results).
+    fn refresh_view(&mut self, widgets: &FileChooserWidgets) {
+        if self.search.is_empty() {
+            self.populate(widgets);
+        } else {
+            self.set_search(widgets, self.search.clone());
+        }
+    }
+
+    /// Applies async recursive-search results, ignoring them if the query has
+    /// moved on. Builds entries (stat + filter/mode rules) and repaints.
+    fn apply_search_results(
+        &mut self,
+        widgets: &FileChooserWidgets,
+        query: &str,
+        paths: Vec<PathBuf>,
+    ) {
+        if query != self.search {
+            return;
+        }
+        let Some(active) = self.active.as_mut() else {
+            return;
+        };
+        active.search_entries =
+            build_search_entries(paths, &active.filters, active.active_filter, active.mode);
+        self.populate(widgets);
+    }
+
     /// Navigates to an arbitrary directory (breadcrumb / place jump). Clears the
     /// active search so the new directory shows in full.
     fn goto_dir(&mut self, widgets: &FileChooserWidgets, path: PathBuf) {
         if let Some(active) = self.active.as_mut() {
             active.dir = path;
+            active.search_entries.clear();
         }
         if !self.search.is_empty() {
             self.search.clear();
@@ -972,8 +1095,10 @@ impl FileChooser {
             return;
         };
         if entry.is_dir {
-            active.dir = entry.path.clone();
-            self.populate(widgets);
+            // goto_dir clears any active search so the opened directory lists in
+            // full (search results may have come from elsewhere in the tree).
+            let path = entry.path.clone();
+            self.goto_dir(widgets, path);
         } else if active.mode == Mode::Save
             && let Some(name) = entry.path.file_name()
         {
@@ -983,12 +1108,12 @@ impl FileChooser {
     }
 
     fn go_up(&mut self, widgets: &FileChooserWidgets) {
-        if let Some(active) = self.active.as_mut()
-            && let Some(parent) = active.dir.parent()
-        {
-            let parent = parent.to_path_buf();
-            active.dir = parent;
-            self.populate(widgets);
+        let parent = self
+            .active
+            .as_ref()
+            .and_then(|active| active.dir.parent().map(Path::to_path_buf));
+        if let Some(parent) = parent {
+            self.goto_dir(widgets, parent);
         }
     }
 
@@ -1100,6 +1225,94 @@ fn list_dir(
     entries
 }
 
+/// Cap on recursive-search results — keeps the walk and the row build bounded
+/// on huge trees (and the UI responsive).
+const SEARCH_RESULT_CAP: usize = 1000;
+
+/// Recursively walks `root` (depth-first, bounded by [`SEARCH_RESULT_CAP`]),
+/// collecting every entry whose name contains `query` (case-insensitive). Honors
+/// the hidden-files setting: dot-entries are skipped, and their subtrees aren't
+/// descended into, unless `show_hidden`. Runs on a blocking thread.
+///
+/// `cancel`/`my_gen` make a superseded walk abort early: once
+/// `cancel.load() != my_gen` (a newer query bumped the generation) the walk
+/// stops, so the blocking pool isn't left grinding a stale full-tree scan.
+fn walk_search(
+    root: &Path,
+    query: &str,
+    show_hidden: bool,
+    cancel: &AtomicU64,
+    my_gen: u64,
+) -> Vec<PathBuf> {
+    let needle = query.to_lowercase();
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        if out.len() >= SEARCH_RESULT_CAP || cancel.load(AtomicOrdering::SeqCst) != my_gen {
+            break;
+        }
+        let Ok(read) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for dir_entry in read.flatten() {
+            // Bail mid-directory too — a single huge directory shouldn't pin the
+            // thread after the query already moved on.
+            if cancel.load(AtomicOrdering::SeqCst) != my_gen {
+                return out;
+            }
+            let name = dir_entry.file_name();
+            let name = name.to_string_lossy();
+            if !show_hidden && name.starts_with('.') {
+                continue;
+            }
+            let path = dir_entry.path();
+            if name.to_lowercase().contains(&needle) {
+                out.push(path.clone());
+                if out.len() >= SEARCH_RESULT_CAP {
+                    break;
+                }
+            }
+            if dir_entry.file_type().is_ok_and(|t| t.is_dir()) {
+                stack.push(path);
+            }
+        }
+    }
+    out
+}
+
+/// Builds list entries from recursive-search result paths, applying the same
+/// mode/filter rules as a normal listing (directories always shown; in `Folder`
+/// mode files are dropped; otherwise files must pass the active filter).
+fn build_search_entries(
+    paths: Vec<PathBuf>,
+    filters: &[Filter],
+    active_filter: usize,
+    mode: Mode,
+) -> Vec<Entry> {
+    let mut entries = Vec::new();
+    for path in paths {
+        let meta = std::fs::metadata(&path).ok();
+        let is_dir = meta.as_ref().is_some_and(std::fs::Metadata::is_dir);
+        if !is_dir {
+            if mode == Mode::Folder {
+                continue;
+            }
+            if !matches_filter(&entry_name(&path), filters, active_filter) {
+                continue;
+            }
+        }
+        let size = meta.as_ref().map_or(0, std::fs::Metadata::len);
+        let modified = meta.as_ref().and_then(|m| m.modified().ok());
+        entries.push(Entry {
+            path,
+            is_dir,
+            size,
+            modified,
+        });
+    }
+    entries
+}
+
 /// Sorts entries with directories first, then by the chosen column/direction.
 fn sort_entries(entries: &mut [Entry], key: SortColumn, asc: bool) {
     entries.sort_by(|a, b| {
@@ -1113,8 +1326,65 @@ fn sort_entries(entries: &mut [Entry], key: SortColumn, asc: bool) {
                 .cmp(&entry_name(&b.path).to_lowercase()),
             SortColumn::Size => a.size.cmp(&b.size),
             SortColumn::Modified => a.modified.cmp(&b.modified),
+            // Group by type (extension), then by name within a type.
+            SortColumn::Kind => entry_kind(a)
+                .to_lowercase()
+                .cmp(&entry_kind(b).to_lowercase())
+                .then_with(|| {
+                    entry_name(&a.path)
+                        .to_lowercase()
+                        .cmp(&entry_name(&b.path).to_lowercase())
+                }),
         };
         if asc { ord } else { ord.reverse() }
+    });
+}
+
+/// The displayed "kind" of an entry: `Folder` for directories, the uppercased
+/// extension (e.g. `PNG`) for files, or `File` when there's no extension.
+fn entry_kind(entry: &Entry) -> String {
+    if entry.is_dir {
+        return "Folder".to_owned();
+    }
+    entry
+        .path
+        .extension()
+        .map(|e| e.to_string_lossy().to_uppercase())
+        .unwrap_or_else(|| "File".to_owned())
+}
+
+/// A relevance score for a search hit (lower = better): how well the basename
+/// matches the query, then how shallow the result is under the search root.
+/// Exact name beats prefix beats substring; among equal matches, shallower
+/// paths win — so top-level hits sort above ones buried deep in nested subdirs.
+fn search_rank(entry: &Entry, root: &Path, query_lower: &str) -> (u8, usize, usize) {
+    let name = entry_name(&entry.path).to_lowercase();
+    let match_class = if name == query_lower {
+        0
+    } else if name.starts_with(query_lower) {
+        1
+    } else {
+        2
+    };
+    // Depth = path components below the root (fewer = closer to where you are).
+    let depth = entry
+        .path
+        .strip_prefix(root)
+        .map_or_else(|_| entry.path.components().count(), |rel| rel.components().count());
+    // Where the match falls in the name — earlier is tighter (e.g. "php" in
+    // "php.ini" beats "php" in "my-php-helper").
+    let pos = name.find(query_lower).unwrap_or(usize::MAX);
+    (match_class, depth, pos)
+}
+
+/// Orders recursive-search hits by relevance: closest/shallowest, best-matching
+/// names first, breaking ties by the path so the order is stable.
+fn sort_search_entries(entries: &mut [Entry], root: &Path, query: &str) {
+    let q = query.to_lowercase();
+    entries.sort_by(|a, b| {
+        search_rank(a, root, &q)
+            .cmp(&search_rank(b, root, &q))
+            .then_with(|| a.path.cmp(&b.path))
     });
 }
 
@@ -1210,7 +1480,14 @@ fn place_row(label: &str, icon: &str) -> gtk::Box {
 
 /// Builds a list-view row: name column (icon/thumbnail + label), then size and
 /// modified columns aligned with the clickable headers.
-fn file_row(name: &str, entry: &Entry, size_w: i32, mod_w: i32) -> gtk::Box {
+fn file_row(
+    name: &str,
+    entry: &Entry,
+    size_w: i32,
+    mod_w: i32,
+    kind_w: i32,
+    is_path: bool,
+) -> gtk::Box {
     let row = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(8)
@@ -1229,7 +1506,14 @@ fn file_row(name: &str, entry: &Entry, size_w: i32, mod_w: i32) -> gtk::Box {
             .label(name)
             .xalign(0.0)
             .hexpand(true)
-            .ellipsize(gtk::pango::EllipsizeMode::End)
+            // Search rows show a relative path — ellipsize the MIDDLE so both the
+            // leading dirs and the filename stay visible. Plain listings show a
+            // basename, where keeping the start (End ellipsize) reads better.
+            .ellipsize(if is_path {
+                gtk::pango::EllipsizeMode::Middle
+            } else {
+                gtk::pango::EllipsizeMode::End
+            })
             .build(),
     );
     row.append(&name_col);
@@ -1253,6 +1537,15 @@ fn file_row(name: &str, entry: &Entry, size_w: i32, mod_w: i32) -> gtk::Box {
         .build();
     modified.add_css_class("file-chooser-cell");
     row.append(&modified);
+
+    let kind = gtk::Label::builder()
+        .label(entry_kind(entry))
+        .xalign(1.0)
+        .width_request(kind_w)
+        .ellipsize(gtk::pango::EllipsizeMode::End)
+        .build();
+    kind.add_css_class("file-chooser-cell");
+    row.append(&kind);
 
     row
 }
@@ -1336,6 +1629,9 @@ fn update_sort_indicators(widgets: &FileChooserWidgets, key: SortColumn, asc: bo
     widgets
         .sort_modified_btn
         .set_label(&format!("Modified{}", arrow(key == SortColumn::Modified)));
+    widgets
+        .sort_kind_btn
+        .set_label(&format!("Kind{}", arrow(key == SortColumn::Kind)));
 }
 
 /// Removes all children from a flow box.
@@ -1494,25 +1790,47 @@ fn build_breadcrumb(bar: &gtk::Box, dir: &Path, input: &Sender<FileChooserInput>
         (PathBuf::from("/"), "/".to_owned(), rest)
     };
 
-    let components: Vec<PathComponent> = tail.components().collect();
-    append_crumb(bar, &base_label, &acc, input, components.is_empty());
-    for (i, component) in components.iter().enumerate() {
-        let PathComponent::Normal(name) = component else {
-            continue;
-        };
+    // Only the named segments matter for crumbs.
+    let names: Vec<_> = tail
+        .components()
+        .filter_map(|c| match c {
+            PathComponent::Normal(n) => Some(n.to_os_string()),
+            _ => None,
+        })
+        .collect();
+
+    append_crumb(bar, &base_label, &acc, input, names.is_empty());
+
+    // Keep the trail short: past this many segments, collapse the middle into a
+    // single `…` crumb (which jumps to that hidden ancestor) so the bar never
+    // grows wide enough to need scrolling — Home › … › parent › current.
+    const MAX_TAIL: usize = 3;
+    let collapse_at = names.len().saturating_sub(MAX_TAIL);
+    for (i, name) in names.iter().enumerate() {
         acc.push(name);
+        // The first time we cross into the kept tail, drop in the `…` crumb that
+        // targets everything collapsed before it.
+        if collapse_at > 0 && i + 1 == collapse_at {
+            bar.append(&crumb_separator());
+            append_crumb(bar, "…", &acc, input, false);
+            continue;
+        }
+        if i < collapse_at {
+            continue; // hidden behind the ellipsis
+        }
         bar.append(&crumb_separator());
         append_crumb(
             bar,
             &name.to_string_lossy(),
             &acc,
             input,
-            i + 1 == components.len(),
+            i + 1 == names.len(),
         );
     }
 }
 
-/// Appends one breadcrumb button targeting `target`.
+/// Appends one breadcrumb button targeting `target`. The label ellipsizes at a
+/// bounded width so a single long directory name can't blow out the bar.
 fn append_crumb(
     bar: &gtk::Box,
     label: &str,
@@ -1520,7 +1838,12 @@ fn append_crumb(
     input: &Sender<FileChooserInput>,
     is_current: bool,
 ) {
-    let button = gtk::Button::builder().label(label).build();
+    let lbl = gtk::Label::builder()
+        .label(label)
+        .ellipsize(gtk::pango::EllipsizeMode::End)
+        .max_width_chars(16)
+        .build();
+    let button = gtk::Button::builder().child(&lbl).build();
     button.add_css_class("file-chooser-crumb");
     button.add_css_class("flat");
     if is_current {
@@ -1548,11 +1871,134 @@ fn clear_list(list: &gtk::ListBox) {
 }
 
 /// Wires both column dividers to drag-resize their columns + a resize cursor.
+/// Wires the sidebar / list / search / filter widget signals to component
+/// messages. Split out of `init` to keep it under the line cap.
+fn wire_widget_signals(widgets: &FileChooserWidgets, input: &Sender<FileChooserInput>) {
+    widgets.places_list.connect_row_activated({
+        let input = input.clone();
+        move |_, row| input.emit(FileChooserInput::Place(row.index().max(0) as u32))
+    });
+    widgets.locations_list.connect_row_activated({
+        let input = input.clone();
+        move |_, row| input.emit(FileChooserInput::Location(row.index().max(0) as u32))
+    });
+    widgets.search_entry.connect_search_changed({
+        let input = input.clone();
+        move |entry| input.emit(FileChooserInput::Search(entry.text().to_string()))
+    });
+    widgets.file_list.connect_row_activated({
+        let input = input.clone();
+        move |_, row| input.emit(FileChooserInput::Activate(row.index().max(0) as u32))
+    });
+    widgets.file_grid.connect_child_activated({
+        let input = input.clone();
+        move |_, child| input.emit(FileChooserInput::Activate(child.index().max(0) as u32))
+    });
+    widgets.file_list.connect_selected_rows_changed({
+        let input = input.clone();
+        move |_| input.emit(FileChooserInput::SelectionChanged)
+    });
+    widgets.file_grid.connect_selected_children_changed({
+        let input = input.clone();
+        move |_| input.emit(FileChooserInput::SelectionChanged)
+    });
+    widgets.name_entry.connect_activate({
+        let input = input.clone();
+        move |_| input.emit(FileChooserInput::Confirm)
+    });
+    widgets.filter_dropdown.connect_selected_notify({
+        let input = input.clone();
+        move |dd| {
+            let i = dd.selected();
+            if i != u32::MAX {
+                input.emit(FileChooserInput::SelectFilter(i));
+            }
+        }
+    });
+}
+
 fn install_column_resize(widgets: &FileChooserWidgets, input: &Sender<FileChooserInput>) {
     setup_col_resize(&widgets.size_handle, &widgets.sort_size_btn, input);
     setup_col_resize(&widgets.mod_handle, &widgets.sort_modified_btn, input);
+    setup_col_resize(&widgets.kind_handle, &widgets.sort_kind_btn, input);
     widgets.size_handle.set_cursor_from_name(Some("col-resize"));
     widgets.mod_handle.set_cursor_from_name(Some("col-resize"));
+    widgets.kind_handle.set_cursor_from_name(Some("col-resize"));
+    setup_surface_resize(&widgets.resize_grip, &widgets.surface);
+    widgets.resize_grip.set_cursor_from_name(Some("se-resize"));
+}
+
+/// Makes the bottom-right corner grip drag-resize the whole sheet live, clamped
+/// to a sane min/max so it can't shrink past its chrome or grow off-screen.
+fn setup_surface_resize(grip: &gtk::Box, surface: &gtk::Box) {
+    let drag = gtk::GestureDrag::new();
+    let base = std::rc::Rc::new(std::cell::Cell::new((760i32, 520i32)));
+    drag.connect_drag_begin({
+        let base = base.clone();
+        let surface = surface.clone();
+        move |_, _, _| {
+            base.set((
+                surface.width().max(surface.width_request()),
+                surface.height().max(surface.height_request()),
+            ));
+        }
+    });
+    drag.connect_drag_update({
+        let base = base.clone();
+        let surface = surface.clone();
+        // Apply the new size to the widget directly (not via a component
+        // message): the message round-trip per motion event is what made the
+        // drag jitter. GTK already coalesces motion, so this stays smooth.
+        move |_, dx, dy| {
+            let (bw, bh) = base.get();
+            let w = (bw + dx.round() as i32).clamp(520, 1600);
+            let h = (bh + dy.round() as i32).clamp(360, 1100);
+            surface.set_width_request(w);
+            surface.set_height_request(h);
+        }
+    });
+    grip.add_controller(drag);
+}
+
+/// Makes the header act like a titlebar: drag it to move the whole sheet. Tracks
+/// the position across drags so each drag resumes from where the last left off.
+/// Applies the layer-shell margins directly for a smooth, message-free drag.
+fn setup_surface_move(header: &gtk::CenterBox, root: &gtk::Window, init_pos: (i32, i32)) {
+    let drag = gtk::GestureDrag::new();
+    let pos = std::rc::Rc::new(std::cell::Cell::new(init_pos));
+    let base = std::rc::Rc::new(std::cell::Cell::new(init_pos));
+    drag.connect_drag_begin({
+        let base = base.clone();
+        let pos = pos.clone();
+        move |_, _, _| base.set(pos.get())
+    });
+    drag.connect_drag_update({
+        let base = base.clone();
+        let pos = pos.clone();
+        let root = root.clone();
+        move |_, dx, dy| {
+            let (bx, by) = base.get();
+            let x = (bx + dx.round() as i32).max(0);
+            let y = (by + dy.round() as i32).max(0);
+            pos.set((x, y));
+            root.set_margin(Edge::Left, x);
+            root.set_margin(Edge::Top, y);
+        }
+    });
+    header.add_controller(drag);
+}
+
+/// Layer-shell margins (left, top) that centre a `w`×`h` sheet on the primary
+/// monitor; falls back to a fixed offset if no monitor geometry is available.
+fn center_margins(w: i32, h: i32) -> (i32, i32) {
+    let geo = gtk::gdk::Display::default()
+        .and_then(|d| d.monitors().item(0))
+        .and_downcast::<gtk::gdk::Monitor>()
+        .map(|m| m.geometry());
+    match geo {
+        Some(g) => (((g.width() - w) / 2).max(0), ((g.height() - h) / 2).max(0)),
+        None => (200, 150),
+    }
 }
 
 /// Makes a column divider drag-resize its column button (live), committing the
@@ -1716,6 +2162,35 @@ mod tests {
     }
 
     #[test]
+    fn entry_kind_labels_folder_extension_or_file() {
+        assert_eq!(entry_kind(&entry("/x/docs", true, 0)), "Folder");
+        assert_eq!(entry_kind(&entry("/x/a.png", false, 0)), "PNG");
+        assert_eq!(entry_kind(&entry("/x/archive.TAR", false, 0)), "TAR");
+        assert_eq!(entry_kind(&entry("/x/Makefile", false, 0)), "File");
+    }
+
+    #[test]
+    fn search_ranks_close_and_well_matched_first() {
+        let root = Path::new("/home/u");
+        let mk = |rel: &str| entry(&format!("/home/u/{rel}"), false, 0);
+        let mut entries = vec![
+            mk("a/b/c/d/deep-php-helper.rs"), // deep, substring
+            mk("php.ini"),                    // shallow, exact basename
+            mk("src/php-config.txt"),         // mid, prefix
+            mk("vendor/x/y/php"),             // deeper, exact basename
+        ];
+        sort_search_entries(&mut entries, root, "php");
+        let order: Vec<String> = entries.iter().map(|e| entry_name(&e.path)).collect();
+        // Match quality is primary (exact > prefix > substring); depth breaks
+        // ties so within a bucket shallower paths win. So: exact "php" first,
+        // then the two prefix matches shallow-first, then the deep substring.
+        assert_eq!(
+            order,
+            ["php", "php.ini", "php-config.txt", "deep-php-helper.rs"]
+        );
+    }
+
+    #[test]
     fn detects_raster_images_by_extension() {
         assert!(is_raster_image(Path::new("/x/a.png")));
         assert!(is_raster_image(Path::new("/x/a.JPG")));
@@ -1762,5 +2237,57 @@ mod tests {
             left[0] > left[2],
             "left half should be reddish, got {left:?}"
         );
+    }
+
+    #[test]
+    fn walk_search_recurses_and_honors_hidden() {
+        // Build: root/{top_match.txt, plain.txt, sub/nested_match.txt,
+        //              .hidden/buried_match.txt, .secret_match.txt}
+        let root = std::env::temp_dir().join("wayle_fc_walk_test");
+        std::fs::remove_dir_all(&root).ok();
+        std::fs::create_dir_all(root.join("sub")).expect("mk sub");
+        std::fs::create_dir_all(root.join(".hidden")).expect("mk hidden");
+        std::fs::write(root.join("top_match.txt"), b"").unwrap();
+        std::fs::write(root.join("plain.txt"), b"").unwrap();
+        std::fs::write(root.join("sub/nested_match.txt"), b"").unwrap();
+        std::fs::write(root.join(".hidden/buried_match.txt"), b"").unwrap();
+        std::fs::write(root.join(".secret_match.txt"), b"").unwrap();
+
+        // Generation 1 is "live" throughout these calls (cancel stays == my_gen).
+        let live = AtomicU64::new(1);
+
+        // Hidden excluded: finds the top + nested matches, descends subdirs, but
+        // skips the dot-file and never descends the dot-directory.
+        let mut got = walk_search(&root, "match", false, &live, 1)
+            .iter()
+            .map(|p| entry_name(p))
+            .collect::<Vec<_>>();
+        got.sort();
+        assert_eq!(got, ["nested_match.txt", "top_match.txt"]);
+
+        // Case-insensitive query also matches.
+        assert_eq!(walk_search(&root, "MATCH", false, &live, 1).len(), 2);
+
+        // With hidden shown: the dot-file and the buried-in-dot-dir match appear.
+        let mut got_hidden = walk_search(&root, "match", true, &live, 1)
+            .iter()
+            .map(|p| entry_name(p))
+            .collect::<Vec<_>>();
+        got_hidden.sort();
+        assert_eq!(
+            got_hidden,
+            [
+                ".secret_match.txt",
+                "buried_match.txt",
+                "nested_match.txt",
+                "top_match.txt"
+            ]
+        );
+
+        // A superseded generation aborts immediately (no matches collected).
+        let superseded = AtomicU64::new(2);
+        assert!(walk_search(&root, "match", false, &superseded, 1).is_empty());
+
+        std::fs::remove_dir_all(&root).ok();
     }
 }

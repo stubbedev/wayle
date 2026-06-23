@@ -215,7 +215,18 @@ impl ScreenCast {
         _app_id: String,
         options: HashMap<String, OwnedValue>,
     ) -> (u32, HashMap<String, OwnedValue>) {
-        let cursor_mode = opt_u32(&options, "cursor_mode").unwrap_or(1);
+        // Default omitted cursor_mode to Embedded (2), not Hidden (1): many
+        // clients (e.g. the one here) send no cursor_mode at all and expect the
+        // cursor in the stream. A client that genuinely wants no cursor sends 1
+        // explicitly, which we still honour. We only advertise 1|2, so 2 is the
+        // richest default we can fulfil.
+        let requested_cursor_mode = opt_u32(&options, "cursor_mode");
+        let cursor_mode = requested_cursor_mode.unwrap_or(2);
+        tracing::info!(
+            requested = ?requested_cursor_mode,
+            resolved = cursor_mode,
+            "screencast SelectSources cursor_mode"
+        );
         let multiple = opt_bool(&options, "multiple").unwrap_or(false);
         let persist_mode = opt_u32(&options, "persist_mode").unwrap_or(0);
         let restore_target = options

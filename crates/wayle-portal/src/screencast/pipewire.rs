@@ -248,6 +248,21 @@ fn run_loop_inner(
     // captures straight into it (the model xdg-desktop-portal-wlr / -hyprland
     // use). The SHM path below is unchanged and serves compositors without
     // dmabuf.
+    // One line that pins down both common screencast complaints:
+    // - path (`dmabuf` = zero-copy/low-CPU vs `SHM` = full readback+memcpy/high-CPU)
+    // - `cursor` (whether the client asked for an embedded cursor at all).
+    // If CPU is high this should read `path=SHM`; the preceding `warn!` from
+    // `capture_output_dmabuf_or_shm` then says why dmabuf was declined.
+    let path = if dmabuf_modifier.is_some() { "dmabuf" } else { "SHM" };
+    tracing::info!(
+        path,
+        show_cursor,
+        fps,
+        width,
+        height,
+        "screencast stream starting"
+    );
+
     if dmabuf_modifier.is_some() {
         return run_loop_dmabuf(
             &capturer,
@@ -598,6 +613,12 @@ fn run_loop_dmabuf(
     let pool_proc = pool.clone();
     let start = Instant::now();
     let seq = Cell::new(0u64);
+    // Pace capture to ~the target fps. If PipeWire already drives `process` at
+    // the negotiated rate this never trips (33ms spacing > the 28ms floor at
+    // 30fps); it only bites when the callback free-runs (e.g. a consumer pulling
+    // at the monitor's refresh), which is what pegs a core. Floor = 1/(1.2·fps).
+    let min_interval = Duration::from_nanos(1_000_000_000 * 10 / (u64::from(fps.max(1)) * 12));
+    let last_capture = Cell::new(start - min_interval);
 
     let _listener = stream
         .add_local_listener::<()>()
@@ -688,6 +709,12 @@ fn run_loop_dmabuf(
             }
         })
         .process(move |stream, _user_data| {
+            // Rate gate: drop this cycle if we captured too recently, so a
+            // free-running consumer can't drive captures past ~the target fps.
+            let now = Instant::now();
+            if now.duration_since(last_capture.get()) < min_interval {
+                return;
+            }
             let Some(mut pw_buffer) = stream.dequeue_buffer() else {
                 return;
             };
@@ -698,6 +725,7 @@ fn run_loop_dmabuf(
             else {
                 return;
             };
+            last_capture.set(now);
             let mut pool = pool_proc.borrow_mut();
             let Some(buf) = pool.get_mut(&key) else {
                 debug!("screencast: process with no bound dmabuf buffer");

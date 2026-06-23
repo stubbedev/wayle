@@ -229,7 +229,11 @@ impl OutputManager {
         match self.try_capture_output_dmabuf(output, overlay_cursor) {
             Ok(buffer) => Ok(buffer),
             Err(err) => {
-                log::debug!("dmabuf capture unavailable ({err}); falling back to SHM");
+                // SHM is the high-CPU path (full GPU readback + memcpy per frame),
+                // so make the reason dmabuf was declined visible by default rather
+                // than burying it at debug — it's the answer to "why is screencast
+                // pegging a core?".
+                log::warn!("dmabuf capture unavailable ({err}); falling back to SHM (higher CPU)");
                 self.capture_output_with_cursor(output, overlay_cursor)
             }
         }
