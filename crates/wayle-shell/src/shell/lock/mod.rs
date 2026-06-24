@@ -27,6 +27,7 @@ use wayle_config::{
     ConfigService,
     schemas::{animations::AnimSurface, lock::LockBackground},
 };
+use wayle_widgets::components::credential_box::{CredentialBox, CredentialOpts};
 
 use crate::shell::helpers::{animation::revealer_transition, monitors::current_monitors};
 
@@ -519,44 +520,20 @@ fn build_surface(
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&build_background(bg)));
 
-    // Centered credential box.
-    let center = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    center.add_css_class("lock-center");
-    center.set_halign(gtk::Align::Center);
-    center.set_valign(gtk::Align::Center);
-
-    let clock = gtk::Label::new(None);
-    clock.add_css_class("lock-clock");
-    clock.set_visible(show_clock);
-    let date = gtk::Label::new(None);
-    date.add_css_class("lock-date");
-    date.set_visible(show_clock);
-
-    let entry = gtk::PasswordEntry::new();
-    entry.add_css_class("lock-entry");
-    entry.set_show_peek_icon(true);
-    entry.set_width_chars(24);
-
-    let error = gtk::Label::new(None);
-    error.add_css_class("lock-error");
-    error.set_visible(false);
-
-    center.append(&clock);
-    center.append(&date);
-    center.append(&entry);
-    center.append(&error);
-
-    // Reveal the credential box through the shared animation framework; the
-    // background stays put so the screen is opaque the instant it locks.
+    // Shared credential box (clock, date, entry, error) wrapped in the reveal
+    // animation. The background stays put so the screen is opaque the instant
+    // it locks.
     let (transition, duration) = reveal;
-    let revealer = gtk::Revealer::new();
-    revealer.set_halign(gtk::Align::Center);
-    revealer.set_valign(gtk::Align::Center);
-    revealer.set_transition_type(transition);
-    revealer.set_transition_duration(duration);
-    revealer.set_reveal_child(false);
-    revealer.set_child(Some(&center));
-    overlay.add_overlay(&revealer);
+    let input = sender.input_sender().clone();
+    let cred = CredentialBox::build(
+        &CredentialOpts {
+            show_clock,
+            transition,
+            duration_ms: duration,
+        },
+        move |text| input.emit(LockInput::Submit(text)),
+    );
+    overlay.add_overlay(&cred.root);
 
     // Blank scrim: opaque black layer on top, hidden until the blank timer.
     let scrim = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -565,15 +542,6 @@ fn build_surface(
     overlay.add_overlay(&scrim);
 
     window.set_child(Some(&overlay));
-
-    // Entry submit → verify.
-    {
-        let input = sender.input_sender().clone();
-        let entry_ref = entry.clone();
-        entry.connect_activate(move |_| {
-            input.emit(LockInput::Submit(entry_ref.text().to_string()));
-        });
-    }
 
     // Any keypress counts as activity (unblank + reset blank timer).
     {
@@ -589,11 +557,11 @@ fn build_surface(
 
     Surface {
         window,
-        entry,
-        clock,
-        date,
-        error,
-        reveal: revealer,
+        entry: cred.entry,
+        clock: cred.clock,
+        date: cred.date,
+        error: cred.error,
+        reveal: cred.root,
         scrim,
     }
 }
