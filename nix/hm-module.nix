@@ -115,10 +115,63 @@ in
         '';
       };
     };
+
+    greeter = {
+      enable = lib.mkEnableOption ''
+        wayle greeter tooling: installs the kiosk compositor (cage) and writes a
+        themed greeter config. NOTE: greetd is a system service home-manager
+        cannot manage — on NixOS use the system module's
+        `programs.wayle.greeter`; elsewhere configure greetd yourself'';
+
+      cagePackage = lib.mkOption {
+        type = lib.types.package;
+        default = pkgs.cage;
+        defaultText = lib.literalExpression "pkgs.cage";
+        description = "Kiosk compositor that hosts the greeter under greetd.";
+      };
+
+      settings = lib.mkOption {
+        type = tomlFormat.type;
+        default = { };
+        example = lib.literalExpression ''
+          {
+            styling.appearance = "dark";
+            lock.background-mode = "color";
+            lock.background-color = "#1e1e2e";
+          }
+        '';
+        description = ''
+          Theme/background/clock config written to
+          {file}`$XDG_CONFIG_HOME/wayle/greeter.toml`. The greeter runs as the
+          greetd user, so copy this somewhere that user can read (e.g.
+          {file}`/etc/wayle/config.toml`) and point greetd's command at it:
+          {command}`cage -s -- wayle-greeter --config /etc/wayle/config.toml -- <session>`.
+        '';
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = [ cfg.package ] ++ lib.optionals cfg.autoInstallDependencies softDeps;
+    home.packages =
+      [ cfg.package ]
+      ++ lib.optionals cfg.autoInstallDependencies softDeps
+      ++ lib.optional cfg.greeter.enable cfg.greeter.cagePackage;
+
+    # greetd is system-level; home-manager can only ship the binary + cage and
+    # generate a themed config to copy somewhere the greetd user can read.
+    warnings = lib.optional cfg.greeter.enable ''
+      programs.wayle.greeter (home-manager) installs cage and writes
+      ~/.config/wayle/greeter.toml, but cannot configure greetd (a system
+      service). On NixOS use programs.wayle.greeter in the system module;
+      otherwise enable greetd yourself and point its command at:
+        cage -s -- wayle-greeter --config <path> -- <session>
+      The greeter runs as the greetd user, so place the config where that user
+      can read it (e.g. /etc/wayle/config.toml).
+    '';
+
+    xdg.configFile."wayle/greeter.toml" = lib.mkIf (cfg.greeter.enable && cfg.greeter.settings != { }) {
+      source = tomlFormat.generate "wayle-greeter-config.toml" cfg.greeter.settings;
+    };
 
     xdg.configFile."wayle/config.toml" = lib.mkIf (cfg.settings != { }) {
       source = tomlFormat.generate "wayle-config.toml" cfg.settings;
