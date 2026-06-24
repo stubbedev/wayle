@@ -5726,6 +5726,8 @@ name = "wayle-auth"
 version = "0.8.5"
 dependencies = [
  "pam",
+ "serde",
+ "serde_json",
  "tracing",
  "zeroize",
 ]

@@ -20,8 +20,10 @@ use std::sync::mpsc;
 
 use tracing::warn;
 
+mod greetd_backend;
 mod pam_backend;
 
+pub use greetd_backend::GreetdAuth;
 pub use pam_backend::{PamAuth, current_username};
 
 /// A single thing a backend wants from the user.
