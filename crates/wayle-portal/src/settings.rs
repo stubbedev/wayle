@@ -38,11 +38,24 @@ impl Settings {
     }
 
     /// `color-scheme`: 0 = no preference, 1 = dark, 2 = light.
+    ///
+    /// `Light`/`Dark` map directly. `Auto` carries no explicit preference, so we
+    /// infer the *effective* scheme from the active palette's background
+    /// luminance — otherwise apps would see "no preference" and stay light even
+    /// when the shell renders a dark palette. An unparseable background falls
+    /// back to 0 (no preference).
     fn color_scheme(&self) -> u32 {
         match self.config.config().styling.appearance.get() {
-            Appearance::Auto => 0,
             Appearance::Dark => 1,
             Appearance::Light => 2,
+            Appearance::Auto => {
+                let bg = self.config.config().styling.palette().bg;
+                match parse_hex_rgb(&bg) {
+                    Some((r, g, b)) if relative_luminance(r, g, b) < 0.5 => 1,
+                    Some(_) => 2,
+                    None => 0,
+                }
+            }
         }
     }
 
@@ -160,6 +173,14 @@ pub fn spawn_watcher(connection: &Connection, config: Arc<ConfigService>) {
 
         let styling = &config.config().styling;
         let scheme = styling.appearance.watch().map(|_| KEY_COLOR_SCHEME).boxed();
+        // Under `Auto` the scheme is derived from the palette background, so a
+        // palette swap (e.g. a dynamic provider) must also re-emit color-scheme.
+        let scheme_bg = styling
+            .palette
+            .bg
+            .watch()
+            .map(|_| KEY_COLOR_SCHEME)
+            .boxed();
         let accent = styling
             .palette
             .primary
@@ -178,7 +199,7 @@ pub fn spawn_watcher(connection: &Connection, config: Arc<ConfigService>) {
             .watch()
             .map(|_| KEY_REDUCED_MOTION)
             .boxed();
-        let mut changes = select_all([scheme, accent, contrast, reduced_motion]);
+        let mut changes = select_all([scheme, scheme_bg, accent, contrast, reduced_motion]);
 
         // The interface struct is cheap to rebuild for each read.
         let settings = Settings::new(config.clone());
@@ -215,6 +236,12 @@ fn owned(value: Value<'_>) -> Result<OwnedValue, zbus::fdo::Error> {
 /// Error for an unknown namespace/key pair.
 fn unknown(namespace: &str, key: &str) -> zbus::fdo::Error {
     zbus::fdo::Error::Failed(format!("unknown setting {namespace}/{key}"))
+}
+
+/// Perceptual luminance of an sRGB color in `[0, 1]` (Rec. 709 weights).
+/// Used only to classify a background as dark (`< 0.5`) or light.
+fn relative_luminance(r: f64, g: f64, b: f64) -> f64 {
+    0.2126f64.mul_add(r, 0.7152f64.mul_add(g, 0.0722 * b))
 }
 
 /// Parses `#rgb` or `#rrggbb` (ignoring any alpha) into sRGB floats in
