@@ -5858,6 +5858,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "wayle-greeter"
+version = "0.8.5"
+dependencies = [
+ "chrono",
+ "gdk4",
+ "glib",
+ "gtk4",
+ "relm4",
+ "tracing",
+ "tracing-subscriber",
+ "wayle-auth",
+ "wayle-config",
+ "wayle-styling",
+ "wayle-widgets",
+]
+
+[[package]]
 name = "wayle-hyprland"
 version = "0.8.5"
 dependencies = [

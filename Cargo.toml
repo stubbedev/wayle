@@ -4,6 +4,7 @@ members = [
 	"crates/wayle-auth",
 	"crates/wayle-config",
 	"crates/wayle-derive",
+	"crates/wayle-greeter",
 	"crates/wayle-i18n",
 	"crates/wayle-icons",
 	"crates/wayle-idle-inhibit",
