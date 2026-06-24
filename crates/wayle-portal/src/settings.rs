@@ -175,12 +175,7 @@ pub fn spawn_watcher(connection: &Connection, config: Arc<ConfigService>) {
         let scheme = styling.appearance.watch().map(|_| KEY_COLOR_SCHEME).boxed();
         // Under `Auto` the scheme is derived from the palette background, so a
         // palette swap (e.g. a dynamic provider) must also re-emit color-scheme.
-        let scheme_bg = styling
-            .palette
-            .bg
-            .watch()
-            .map(|_| KEY_COLOR_SCHEME)
-            .boxed();
+        let scheme_bg = styling.palette.bg.watch().map(|_| KEY_COLOR_SCHEME).boxed();
         let accent = styling
             .palette
             .primary
