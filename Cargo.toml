@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+	"crates/wayle-auth",
 	"crates/wayle-config",
 	"crates/wayle-derive",
 	"crates/wayle-i18n",
@@ -163,6 +164,7 @@ wayle-traits = { path = "crates/wayle-traits" }
 wayle-wallpaper = { path = "crates/wayle-wallpaper" }
 wayle-weather = { path = "crates/wayle-weather" }
 
+wayle-auth = { path = "crates/wayle-auth" }
 wayle-config = { path = "crates/wayle-config" }
 wayle-derive = { path = "crates/wayle-derive" }
 wayle-i18n = { path = "crates/wayle-i18n" }

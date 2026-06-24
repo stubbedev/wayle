@@ -1,14 +1,16 @@
 [package]
-name = "wayle-traits"
-description = "Shared traits for Wayle service monitoring and lifecycle"
+name = "wayle-auth"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+description = "Wayle authentication - backend-agnostic PAM/greetd conversation"
 repository.workspace = true
 license.workspace = true
-readme = "README.md"
 
 [dependencies]
+pam.workspace = true
+zeroize.workspace = true
+tracing.workspace = true
 
 [lints]
 workspace = true
