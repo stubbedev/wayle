@@ -28,6 +28,7 @@ mod registry;
 mod screenshot;
 mod separator;
 mod storage;
+mod sway_workspaces;
 mod systray;
 mod volume;
 pub(crate) mod weather;
@@ -91,6 +92,7 @@ register_modules! {
     Screenshot => screenshot::Factory,
     Separator => separator::Factory,
     Storage => storage::Factory,
+    SwayWorkspaces => sway_workspaces::Factory,
     Systray => systray::Factory,
     Volume => volume::Factory,
     Weather => weather::Factory,

@@ -30,6 +30,7 @@ members = [
 	"crates/wayle-notification",
 	"crates/wayle-portal",
 	"crates/wayle-power-profiles",
+	"crates/wayle-sway",
 	"crates/wayle-sysinfo",
 	"crates/wayle-systray",
 	"crates/wayle-traits",
@@ -154,6 +155,7 @@ wayle-core = { path = "crates/wayle-core" }
 wayle-hyprland = { path = "crates/wayle-hyprland" }
 wayle-mango = { path = "crates/wayle-mango" }
 wayle-niri = { path = "crates/wayle-niri" }
+wayle-sway = { path = "crates/wayle-sway" }
 wayle-media = { path = "crates/wayle-media" }
 wayle-network = { path = "crates/wayle-network" }
 wayle-notification = { path = "crates/wayle-notification" }

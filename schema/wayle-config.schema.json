@@ -805,6 +805,7 @@
             "screenshot",
             "separator",
             "storage",
+            "sway-workspaces",
             "systray",
             "updates",
             "volume",
@@ -4559,6 +4560,42 @@
           },
           "description": "Storage usage module."
         },
+        "sway-workspaces": {
+          "$ref": "#/$defs/SwayWorkspacesConfig",
+          "default": {
+            "active-color": "accent",
+            "active-indicator": "background",
+            "app-icon-map": {},
+            "app-icons-dedupe": true,
+            "app-icons-empty": "tb-minus-symbolic",
+            "app-icons-fallback": "ld-app-window-symbolic",
+            "app-icons-show": false,
+            "border-color": "border-default",
+            "border-show": false,
+            "container-bg-color": "bg-surface-elevated",
+            "display-mode": "label",
+            "divider": " ",
+            "empty-color": "fg-subtle",
+            "hide-trailing-empty": false,
+            "icon-gap": 0.30000001192092896,
+            "icon-size": 1.0,
+            "label-size": 1.0,
+            "label-strategy": "name-or-index",
+            "left-click": "focus:this",
+            "middle-click": "",
+            "monitor-specific": true,
+            "occupied-color": "fg-muted",
+            "right-click": "",
+            "scroll-down": "focus:next",
+            "scroll-up": "focus:previous",
+            "urgent-mode": "workspace",
+            "urgent-show": true,
+            "workspace-ignore": [],
+            "workspace-map": {},
+            "workspace-padding": 0.5
+          },
+          "description": "sway workspace switcher module."
+        },
         "systray": {
           "$ref": "#/$defs/SystrayConfig",
           "default": {
@@ -6753,6 +6790,162 @@
       },
       "type": "object"
     },
+    "SwayWorkspacesConfig": {
+      "description": "sway workspace indicators with click-to-switch.",
+      "properties": {
+        "active-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "accent",
+          "description": "Color for the active (visible on its output) workspace.\n\nIn `background` indicator mode, also used as the button background."
+        },
+        "active-indicator": {
+          "$ref": "#/$defs/ActiveIndicator",
+          "default": "background",
+          "description": "Visual indicator for the active workspace."
+        },
+        "app-icon-map": {
+          "$ref": "#/$defs/Map_of_string",
+          "default": {},
+          "description": "Application icon mapping with glob pattern support.\n\nMaps window `app_id` or title to symbolic icon names. Supports:\n- No prefix: matches `app_id` (e.g. `\"*firefox*\"`)\n- `app:` prefix: explicit `app_id` match (e.g. `\"app:org.mozilla.*\"`)\n- `title:` prefix: matches window title (e.g. `\"title:*YouTube*\"`)\n\n## Example\n\n```toml\n[modules.sway-workspaces.app-icon-map]\n\"*firefox*\" = \"ld-globe-symbolic\"\n\"title:*YouTube*\" = \"ld-youtube-symbolic\"\n```"
+        },
+        "app-icons-dedupe": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Deduplicate application icons within a workspace.\n\nWhen `true`, one icon per unique `app_id`. When `false`, one icon\nper window."
+        },
+        "app-icons-empty": {
+          "$ref": "#/$defs/string",
+          "default": "tb-minus-symbolic",
+          "description": "Icon shown when a workspace has no application windows."
+        },
+        "app-icons-fallback": {
+          "$ref": "#/$defs/string",
+          "default": "ld-app-window-symbolic",
+          "description": "Fallback icon for applications not matched by `app-icon-map`."
+        },
+        "app-icons-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Show application icons for windows on each workspace."
+        },
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "border-default",
+          "description": "Border color for the workspaces container."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around the workspaces container."
+        },
+        "container-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Background color for the workspaces container."
+        },
+        "display-mode": {
+          "$ref": "#/$defs/DisplayMode",
+          "default": "label",
+          "description": "What identifies each workspace button.\n\n- `label` (default): show the workspace label per `label-strategy`\n- `icon`: show an icon from `workspace-map` (falls back to label if unmapped)\n- `none`: show nothing — only app icons visible (if enabled)"
+        },
+        "divider": {
+          "$ref": "#/$defs/string",
+          "default": " ",
+          "description": "Text separator between workspace identity and app icons."
+        },
+        "empty-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "fg-subtle",
+          "description": "Color for empty workspaces and placeholder slots."
+        },
+        "hide-trailing-empty": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Hide the trailing empty workspace on each output.\n\nOff by default, since sway does not auto-allocate a trailing empty\nworkspace the way niri does. Enable it if your config keeps one around."
+        },
+        "icon-gap": {
+          "$ref": "#/$defs/Size",
+          "default": 0.30000001192092896,
+          "description": "Gap between app icons within a workspace button. Accepts a scale multiplier or pixels (e.g. `\"4px\"`)."
+        },
+        "icon-size": {
+          "$ref": "#/$defs/Size",
+          "default": 1.0,
+          "description": "Workspace icon size. Accepts a scale multiplier or pixels (e.g. `\"16px\"`).\n\nApplies to identity icons and custom icons from `workspace-map`."
+        },
+        "label-size": {
+          "$ref": "#/$defs/Size",
+          "default": 1.0,
+          "description": "Workspace label and divider size. Accepts a scale multiplier or pixels (e.g. `\"16px\"`)."
+        },
+        "label-strategy": {
+          "$ref": "#/$defs/LabelStrategy",
+          "default": "name-or-index",
+          "description": "How to compose the workspace label when `display-mode = \"label\"`.\n\n- `index`: number only (`\"1\"`, `\"2\"`)\n- `name-or-index` (default): name when set, number otherwise\n- `name-only`: name only; unnamed workspaces show nothing\n- `index-and-name`: `\"1: web\"` form; unnamed workspaces show the number alone"
+        },
+        "left-click": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "focus:this",
+          "description": "Action on left click."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "monitor-specific": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show only workspaces on this bar's monitor.\n\nWhen `true` (default), each bar shows only its own output's\nworkspaces. When `false`, all workspaces from every output are shown."
+        },
+        "occupied-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "fg-muted",
+          "description": "Color for occupied workspaces (have windows but not active)."
+        },
+        "right-click": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "focus:next",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/WorkspaceClickAction",
+          "default": "focus:previous",
+          "description": "Action on scroll up."
+        },
+        "urgent-mode": {
+          "$ref": "#/$defs/UrgentMode",
+          "default": "workspace",
+          "description": "Where the urgent pulse is applied.\n\n- `workspace` (default): whole button pulses\n- `application`: only the urgent app icon pulses, falling back to\n  `workspace` when app icons are disabled"
+        },
+        "urgent-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Pulse animation on workspaces with urgent windows."
+        },
+        "workspace-ignore": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "Workspaces to hide from the display.\n\nGlob patterns matched against the workspace's name, then its number,\nthen its stable id. Examples:\n- `\"scratch\"` — hide the workspace named `scratch`\n- `\"1?\"` — hide numbers 10-19"
+        },
+        "workspace-map": {
+          "$ref": "#/$defs/WorkspaceMap",
+          "default": {},
+          "description": "Per-workspace icon and color overrides, keyed by name or id-as-string.\n\n## Example\n\n```toml\n[modules.sway-workspaces.workspace-map]\nweb = { icon = \"ld-globe-symbolic\", color = \"#4a90d9\" }\nterminal = { icon = \"ld-terminal-symbolic\" }\n```"
+        },
+        "workspace-padding": {
+          "$ref": "#/$defs/Size",
+          "default": 0.5,
+          "description": "Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `\"8px\"`)."
+        }
+      },
+      "type": "object"
+    },
     "SystrayConfig": {
       "description": "System tray icons via the StatusNotifierItem protocol.",
       "properties": {
@@ -8698,6 +8891,38 @@
           "scroll-down": "",
           "scroll-up": "",
           "thresholds": []
+        },
+        "sway-workspaces": {
+          "active-color": "accent",
+          "active-indicator": "background",
+          "app-icon-map": {},
+          "app-icons-dedupe": true,
+          "app-icons-empty": "tb-minus-symbolic",
+          "app-icons-fallback": "ld-app-window-symbolic",
+          "app-icons-show": false,
+          "border-color": "border-default",
+          "border-show": false,
+          "container-bg-color": "bg-surface-elevated",
+          "display-mode": "label",
+          "divider": " ",
+          "empty-color": "fg-subtle",
+          "hide-trailing-empty": false,
+          "icon-gap": 0.30000001192092896,
+          "icon-size": 1.0,
+          "label-size": 1.0,
+          "label-strategy": "name-or-index",
+          "left-click": "focus:this",
+          "middle-click": "",
+          "monitor-specific": true,
+          "occupied-color": "fg-muted",
+          "right-click": "",
+          "scroll-down": "focus:next",
+          "scroll-up": "focus:previous",
+          "urgent-mode": "workspace",
+          "urgent-show": true,
+          "workspace-ignore": [],
+          "workspace-map": {},
+          "workspace-padding": 0.5
         },
         "systray": {
           "blacklist": [],

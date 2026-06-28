@@ -11,7 +11,7 @@ use super::{
     KeyboardInput, KeyboardInputInit,
     sources::{
         HyprlandKeyboardLayoutSource, KeyboardLayoutSource, MangoKeyboardLayoutSource,
-        NiriKeyboardLayoutSource,
+        NiriKeyboardLayoutSource, SwayKeyboardLayoutSource,
     },
 };
 use crate::shell::{
@@ -61,6 +61,10 @@ fn build_source(services: &ShellServices) -> Option<Arc<dyn KeyboardLayoutSource
         Compositor::Mango => {
             let mango = require_service("keyboard-input", "mango", services.mango.clone())?;
             Some(Arc::new(MangoKeyboardLayoutSource::new(mango)))
+        }
+        Compositor::Sway => {
+            let sway = require_service("keyboard-input", "sway", services.sway.clone())?;
+            Some(Arc::new(SwayKeyboardLayoutSource::new(sway)))
         }
         Compositor::Unknown(name) => {
             warn!(module = "keyboard-input", compositor = %name, "unsupported compositor");

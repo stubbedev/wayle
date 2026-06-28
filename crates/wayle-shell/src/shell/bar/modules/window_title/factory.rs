@@ -11,7 +11,7 @@ use super::{
     WindowTitle, WindowTitleInit,
     sources::{
         FocusedWindowSource, HyprlandFocusedWindowSource, MangoFocusedWindowSource,
-        NiriFocusedWindowSource,
+        NiriFocusedWindowSource, SwayFocusedWindowSource,
     },
 };
 use crate::shell::{
@@ -60,6 +60,10 @@ fn build_source(services: &ShellServices) -> Option<Arc<dyn FocusedWindowSource>
         Compositor::Mango => {
             let mango = require_service("window-title", "mango", services.mango.clone())?;
             Some(Arc::new(MangoFocusedWindowSource::new(mango)))
+        }
+        Compositor::Sway => {
+            let sway = require_service("window-title", "sway", services.sway.clone())?;
+            Some(Arc::new(SwayFocusedWindowSource::new(sway)))
         }
         Compositor::Unknown(name) => {
             warn!(module = "window-title", compositor = %name, "unsupported compositor");

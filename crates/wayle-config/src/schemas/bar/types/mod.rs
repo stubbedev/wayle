@@ -233,6 +233,8 @@ pub enum BarModule {
     NiriWorkspaces,
     /// MangoWM tag switcher.
     MangoWorkspaces,
+    /// sway workspace switcher.
+    SwayWorkspaces,
     /// Notification center button.
     Notifications,
     /// Power menu button.
@@ -314,6 +316,7 @@ impl BarModule {
             Self::Netstat => "netstat",
             Self::NiriWorkspaces => "niri-workspaces",
             Self::MangoWorkspaces => "mango-workspaces",
+            Self::SwayWorkspaces => "sway-workspaces",
             Self::Notifications => "notifications",
             Self::Power => "power",
             Self::PowerProfiles => "power-profiles",
@@ -353,6 +356,7 @@ impl BarModule {
             "netstat" => Self::Netstat,
             "niri-workspaces" => Self::NiriWorkspaces,
             "mango-workspaces" => Self::MangoWorkspaces,
+            "sway-workspaces" => Self::SwayWorkspaces,
             "notifications" => Self::Notifications,
             "power" => Self::Power,
             "power-profiles" => Self::PowerProfiles,
@@ -451,6 +455,7 @@ const BUILTIN_MODULES: &[&str] = &[
     "screenshot",
     "separator",
     "storage",
+    "sway-workspaces",
     "systray",
     "updates",
     "volume",

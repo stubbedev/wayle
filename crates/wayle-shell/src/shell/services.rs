@@ -13,6 +13,7 @@ use wayle_network::NetworkService;
 use wayle_niri::NiriService;
 use wayle_notification::NotificationService;
 use wayle_power_profiles::PowerProfilesService;
+use wayle_sway::SwayService;
 use wayle_sysinfo::SysinfoService;
 use wayle_systray::SystemTrayService;
 use wayle_wallpaper::WallpaperService;
@@ -43,6 +44,7 @@ pub(crate) struct ShellServices {
     pub network: Option<Arc<NetworkService>>,
     pub notification: Option<Arc<NotificationService>>,
     pub power_profiles: DeferredService<PowerProfilesService>,
+    pub sway: Option<Arc<SwayService>>,
     pub sysinfo: Arc<SysinfoService>,
     pub systray: Option<Arc<SystemTrayService>>,
     pub wallpaper: Option<Arc<WallpaperService>>,

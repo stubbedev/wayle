@@ -96,3 +96,13 @@ pub(crate) fn require_mango(module: &'static str) -> bool {
         }
     }
 }
+
+pub(crate) fn require_sway(module: &'static str) -> bool {
+    match Compositor::detect() {
+        Compositor::Sway => true,
+        other => {
+            warn!(module, compositor = ?other, "module requires sway, skipping");
+            false
+        }
+    }
+}
