@@ -7,7 +7,7 @@
 //! consumes.
 //!
 //! The picker is the running shell's `com.wayle.SharePicker1` surface, reached
-//! over D-Bus exactly like the legacy `wayle share-picker` stub — but here the
+//! over D-Bus exactly like the legacy `wayle portal share-picker` stub — but here the
 //! selection round-trips entirely within Wayle (we own the capture), so it
 //! works on any compositor, not just Hyprland.
 

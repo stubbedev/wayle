@@ -116,11 +116,13 @@ impl Component for Print {
                         #[name = "cancel_button"]
                         gtk::Button {
                             set_label: "Cancel",
+                            add_css_class: "portal-dialog-cancel",
                             connect_clicked => PrintInput::Cancel,
                         },
                         #[name = "confirm_button"]
                         gtk::Button {
                             set_label: "Print",
+                            add_css_class: "portal-dialog-confirm",
                             add_css_class: "suggested-action",
                             connect_clicked => PrintInput::Confirm,
                         },

@@ -3,7 +3,7 @@
 //! A layer-shell overlay that the running shell pops up when the
 //! xdg-desktop-portal asks the user to choose a window, output, or region to
 //! screen-share. The selection is delivered back to the requesting
-//! `wayle share-picker` stub through a oneshot channel carried in the
+//! `wayle portal share-picker` stub through a oneshot channel carried in the
 //! [`SharePickerInput::Show`] message.
 //!
 //! Enter/exit are animated through a [`gtk::Revealer`] using the same
