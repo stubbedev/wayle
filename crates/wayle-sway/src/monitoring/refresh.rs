@@ -6,13 +6,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use tracing::warn;
 
+use super::MonitoringHandles;
 use crate::{
-    core::{WindowSnapshot, Window, Workspace},
+    core::{Window, WindowSnapshot, Workspace},
     ipc::SwayCommandClient,
     types::TreeNode,
 };
-
-use super::MonitoringHandles;
 
 /// Re-queries `GET_WORKSPACES` and refreshes the workspaces field.
 pub(super) async fn refresh_workspaces(client: &SwayCommandClient, handles: &MonitoringHandles) {

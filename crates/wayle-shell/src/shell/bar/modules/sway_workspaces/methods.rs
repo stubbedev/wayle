@@ -365,7 +365,11 @@ fn build_button_init(
     let style =
         helpers::workspace_style(snapshot.name.as_deref(), snapshot.id, &layout.workspace_map);
     let label = style.and_then(|style| style.label.clone()).or_else(|| {
-        helpers::label_for(snapshot.num, snapshot.name.as_deref(), layout.label_strategy)
+        helpers::label_for(
+            snapshot.num,
+            snapshot.name.as_deref(),
+            layout.label_strategy,
+        )
     });
     let icon = style.and_then(|style| style.icon.clone());
 

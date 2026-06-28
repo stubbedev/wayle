@@ -3,6 +3,6 @@
 mod window;
 mod workspace;
 
-pub(crate) use window::WindowSnapshot;
 pub use window::Window;
+pub(crate) use window::WindowSnapshot;
 pub use workspace::Workspace;
