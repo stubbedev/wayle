@@ -2,6 +2,7 @@ pub mod buffer;
 pub mod dmabuf;
 pub mod error;
 pub mod ext_capture;
+pub mod ext_output;
 pub mod frame;
 pub mod image;
 pub mod output;

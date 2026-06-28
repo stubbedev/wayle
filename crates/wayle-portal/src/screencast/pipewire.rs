@@ -38,6 +38,7 @@ use std::{
 use pipewire as pw;
 use pw::spa::buffer::meta::{MetaHeader, MetaVideoDamage, MetaVideoTransform};
 use tracing::{debug, error, warn};
+use wayle_share_preview::ext_output::ExtOutputCapture;
 
 use super::{
     capture::Capturer,
@@ -189,10 +190,224 @@ fn run_loop(
     stop: &Arc<AtomicBool>,
     ready: &mpsc::Sender<Result<(u32, u32, u32), String>>,
 ) {
+    // Prefer the ext-image-copy path for whole-output capture: a persistent
+    // session (no per-frame re-advertise roundtrip) plus damage-driven capture
+    // (no copy while the screen is static). Falls back to wlr-screencopy when
+    // the compositor lacks the protocol or the session won't negotiate.
+    if let CaptureTarget::Output(name) = target {
+        match ExtOutputCapture::start(name, show_cursor) {
+            Ok(capture) => {
+                if let Err(err) = run_loop_ext(&capture, fps, stop, ready) {
+                    let _ = ready.send(Err(err));
+                }
+                return;
+            }
+            Err(err) => {
+                tracing::info!(
+                    error = %err,
+                    "ext-image-copy capture unavailable; using wlr-screencopy"
+                );
+            }
+        }
+    }
+
     if let Err(err) = run_loop_inner(target, show_cursor, fps, stop, ready) {
         // If we failed before reporting readiness, surface it to the caller.
         let _ = ready.send(Err(err));
     }
+}
+
+/// PipeWire producer fed by the damage-driven [`ExtOutputCapture`] thread.
+///
+/// The capture thread publishes the latest ready frame; this loop copies it
+/// (SHM) into a dequeued PipeWire buffer on each `process`, skipping frames
+/// whose sequence number it has already sent (so a static screen produces
+/// nothing). Rate-gated to the target fps like the other producers.
+fn run_loop_ext(
+    capture: &ExtOutputCapture,
+    fps: u32,
+    stop: &Arc<AtomicBool>,
+    ready: &mpsc::Sender<Result<(u32, u32, u32), String>>,
+) -> Result<(), String> {
+    pw::init();
+
+    let info = capture.info().clone();
+    let (width, height, stride) = (info.width, info.height, info.stride);
+    let pixel_format = PixelFormat::from_wl(info.format).unwrap_or(PixelFormat::Bgrx);
+    let transform = spa_video_transform(info.transform);
+    let fps = effective_fps(fps, info.refresh_mhz);
+
+    tracing::info!(
+        path = "ext-shm",
+        show_cursor = true,
+        fps,
+        width,
+        height,
+        "screencast stream starting (ext-image-copy)"
+    );
+
+    let main_loop =
+        pw::main_loop::MainLoopRc::new(None).map_err(|e| format!("pipewire main loop: {e}"))?;
+    let context = pw::context::ContextRc::new(&main_loop, None)
+        .map_err(|e| format!("pipewire context: {e}"))?;
+    let core = context
+        .connect_rc(None)
+        .map_err(|e| format!("pipewire connect: {e}"))?;
+
+    let stream = pw::stream::StreamBox::new(
+        &core,
+        "wayle-screencast",
+        pw::properties::properties! {
+            *pw::keys::MEDIA_TYPE => "Video",
+            *pw::keys::MEDIA_CATEGORY => "Capture",
+            *pw::keys::MEDIA_ROLE => "Screen",
+            *pw::keys::NODE_NAME => "wayle-screencast",
+        },
+    )
+    .map_err(|e| format!("pipewire stream: {e}"))?;
+
+    let produce = {
+        let capture = capture.frame_handle();
+        let start = Instant::now();
+        // Cap captures to the target fps; the consumer-driven `process` can free-
+        // run, and the damage-driven source can burst on a busy screen.
+        let min_interval =
+            Duration::from_nanos(1_000_000_000 * 10 / (u64::from(fps.max(1)) * 12));
+        let last_capture = Cell::new(start - min_interval);
+        // Last published sequence we copied, so an unchanged frame is skipped.
+        let last_seq = Cell::new(u64::MAX);
+        move |stream: &pw::stream::Stream| {
+            let now = Instant::now();
+            if now.duration_since(last_capture.get()) < min_interval {
+                return;
+            }
+            let Some(frame) = capture.latest() else {
+                return;
+            };
+            if frame.seq == last_seq.get() {
+                // Nothing new since the last buffer we sent (static screen).
+                return;
+            }
+            let Some(mut pw_buffer) = stream.dequeue_buffer() else {
+                return;
+            };
+            last_capture.set(now);
+
+            {
+                let datas = pw_buffer.datas_mut();
+                let Some(data) = datas.first_mut() else {
+                    return;
+                };
+                let Some(dst) = data.data() else {
+                    return;
+                };
+                match frame.buffer.read_into(dst) {
+                    Ok(written) => {
+                        let chunk = data.chunk_mut();
+                        *chunk.offset_mut() = 0;
+                        *chunk.stride_mut() = stride as i32;
+                        *chunk.size_mut() = written as u32;
+                    }
+                    Err(err) => {
+                        warn!(%err, "screencast: reading ext frame bytes failed");
+                        return;
+                    }
+                }
+            }
+
+            // Prefer the compositor's presentation time; else our own clock.
+            let pts = frame
+                .pts_nanos
+                .and_then(|n| i64::try_from(n).ok())
+                .unwrap_or_else(|| i64::try_from(start.elapsed().as_nanos()).unwrap_or(i64::MAX));
+            stamp_metadata(
+                &mut pw_buffer,
+                transform,
+                pts,
+                frame.seq,
+                &frame.damage,
+                width,
+                height,
+            );
+            last_seq.set(frame.seq);
+        }
+    };
+
+    let ready_state = ready.clone();
+    let mut reported = false;
+    let _listener = stream
+        .add_local_listener::<()>()
+        .state_changed(move |stream, _, old, new| {
+            debug!(?old, ?new, "screencast stream state changed");
+            if reported {
+                return;
+            }
+            match new {
+                pw::stream::StreamState::Paused => {
+                    reported = true;
+                    let node_id = stream.node_id();
+                    debug!(node_id, width, height, "screencast: node id assigned");
+                    let _ = ready_state.send(Ok((node_id, width, height)));
+                }
+                pw::stream::StreamState::Error(ref err) => {
+                    reported = true;
+                    let _ = ready_state.send(Err(format!("stream error: {err}")));
+                }
+                _ => {}
+            }
+        })
+        .param_changed(move |stream, _user_data, id, param| {
+            if param.is_none() || id != pw::spa::param::ParamType::Format.as_raw() {
+                return;
+            }
+            // SHM-only buffer layout (no dmabuf data type on this path).
+            let blobs = param_blobs(stride, height, false);
+            let mut pods: Vec<&pw::spa::pod::Pod> = blobs
+                .iter()
+                .filter_map(|bytes| pw::spa::pod::Pod::from_bytes(bytes))
+                .collect();
+            if !pods.is_empty()
+                && let Err(err) = stream.update_params(&mut pods)
+            {
+                warn!(%err, "screencast: update_params failed");
+            }
+        })
+        .process(move |stream, _user_data| produce(stream))
+        .register()
+        .map_err(|e| format!("pipewire listener: {e}"))?;
+
+    // SHM-only EnumFormat (no dmabuf modifier on this path).
+    let format_bytes = format_blobs(width, height, fps, pixel_format, None);
+    let mut params: Vec<&pw::spa::pod::Pod> = format_bytes
+        .iter()
+        .filter_map(|bytes| pw::spa::pod::Pod::from_bytes(bytes))
+        .collect();
+    stream
+        .connect(
+            pw::spa::utils::Direction::Output,
+            None,
+            pw::stream::StreamFlags::MAP_BUFFERS,
+            &mut params,
+        )
+        .map_err(|e| format!("pipewire stream connect: {e}"))?;
+
+    let quit = {
+        let quit_loop = main_loop.clone();
+        let stop = stop.clone();
+        main_loop.loop_().add_timer(move |_| {
+            if stop.load(Ordering::SeqCst) {
+                quit_loop.quit();
+            }
+        })
+    };
+    let poll = Duration::from_millis(100);
+    quit.update_timer(Some(poll), Some(poll))
+        .into_result()
+        .map_err(|e| format!("pipewire stop-timer: {e}"))?;
+
+    main_loop.run();
+    error!("screencast loop exited");
+    Ok(())
 }
 
 fn run_loop_inner(
@@ -309,6 +524,15 @@ fn run_loop_inner(
         // SPA_META_Header so consumers (recorders, WebRTC) can pace/sync.
         let start = Instant::now();
         let seq = Cell::new(0u64);
+        // Pace SHM captures to ~the target fps. The SHM path does a full-frame
+        // readback + memcpy every cycle, so a consumer that free-runs (pulls
+        // faster than the advertised rate) would peg a core. This gate caps the
+        // capture rate the same way the dmabuf path does; it never trips when the
+        // consumer already paces itself (33ms spacing > the 28ms floor at 30fps,
+        // 16.7ms > 13.9ms at 60fps). Floor = 1/(1.2·fps).
+        let min_interval =
+            Duration::from_nanos(1_000_000_000 * 10 / (u64::from(fps.max(1)) * 12));
+        let last_capture = Cell::new(start - min_interval);
         // Reused per-frame damage scratch (avoids a small alloc every frame).
         let damage_scratch = RefCell::new(Vec::<(u32, u32, u32, u32)>::new());
         // Per-pw_buffer dmabuf reuse pool, keyed by the buffer's spa_data
@@ -321,9 +545,17 @@ fn run_loop_inner(
         let dmabuf_pool =
             RefCell::new(HashMap::<usize, wayle_share_preview::buffer::Buffer>::new());
         move |stream: &pw::stream::Stream| {
+            // Rate gate (see `min_interval` above): drop this cycle if we captured
+            // too recently, so a free-running consumer can't drive a full-frame
+            // memcpy past ~the target fps and peg a core.
+            let now = Instant::now();
+            if now.duration_since(last_capture.get()) < min_interval {
+                return;
+            }
             let Some(mut pw_buffer) = stream.dequeue_buffer() else {
                 return;
             };
+            last_capture.set(now);
 
             // Decide SHM vs dmabuf from the *negotiated* buffer the consumer gave
             // us: only request a dmabuf capture when this buffer's data slot is a

@@ -11,6 +11,7 @@ license.workspace = true
 bitflags.workspace = true
 thiserror.workspace = true
 image = "0.25.10"
+libc.workspace = true
 log = "0.4"
 memfd = "0.6.5"
 wayland-backend = "0.3.15"

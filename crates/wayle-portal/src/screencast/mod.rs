@@ -39,8 +39,11 @@ use crate::{
     session,
 };
 
-/// Default capture frame rate.
-const DEFAULT_FPS: u32 = 30;
+/// Default capture frame rate. Clamped down to the output's real refresh by
+/// [`effective_fps`](source::effective_fps), so a 60 Hz panel
+/// streams a smooth 60 while a 30/24 Hz source is not oversampled. 30 here halved
+/// the frame rate on every ≥60 Hz monitor (visible every-other-frame judder).
+const DEFAULT_FPS: u32 = 60;
 
 /// Per-session ScreenCast configuration accumulated across the method calls.
 #[derive(Clone, Default)]

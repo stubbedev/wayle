@@ -6130,6 +6130,7 @@ dependencies = [
  "gbm",
  "hyprland",
  "image",
+ "libc",
  "log",
  "memfd",
  "thiserror 2.0.18",
