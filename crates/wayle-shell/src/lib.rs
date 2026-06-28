@@ -1,6 +1,6 @@
 //! Wayle desktop shell - a GTK4/Relm4 status bar for Wayland compositors.
 
-use std::{env, error::Error};
+use std::error::Error;
 
 use relm4::RelmApp;
 use tokio::runtime::Runtime;
@@ -30,13 +30,10 @@ use shell::{Shell, ShellInit};
 /// Returns error on tracing init failure, runtime creation failure,
 /// or service bootstrap failure.
 pub fn run() -> Result<(), Box<dyn Error>> {
-    if env::var_os("GSK_RENDERER").is_none() {
-        #[allow(unsafe_code)]
-        // SAFETY: single-threaded, called before any runtime or GTK init
-        unsafe {
-            env::set_var("GSK_RENDERER", "gl");
-        }
-    }
+    // No GSK_RENDERER pin: let GSK negotiate the best GPU renderer (vulkan/ngl)
+    // and fall back to the cairo software renderer when no GPU path works.
+    // Forcing a renderer is what *disables* that fallback chain. Override with
+    // GSK_RENDERER=… to force a specific one.
 
     tracing_init::init()?;
     info!("Wayle shell starting");
