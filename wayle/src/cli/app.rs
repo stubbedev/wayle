@@ -11,9 +11,9 @@ use crate::cli::{
     icons::commands::IconsCommands, idle::commands::IdleCommands, media::commands::MediaCommands,
     notify::commands::NotifyCommands, panel::commands::PanelCommands,
     portal::commands::PortalCommands, power::commands::PowerCommands,
-    recorder::commands::RecorderCommands,
-    screenshot::commands::ScreenshotCommands, systray::commands::SystrayCommands,
-    wallpaper::commands::WallpaperCommands, widget::commands::WidgetCommands,
+    recorder::commands::RecorderCommands, screenshot::commands::ScreenshotCommands,
+    systray::commands::SystrayCommands, wallpaper::commands::WallpaperCommands,
+    widget::commands::WidgetCommands,
 };
 
 fn get_styles() -> Styles {
