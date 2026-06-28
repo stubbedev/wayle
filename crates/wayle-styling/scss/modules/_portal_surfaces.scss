@@ -405,6 +405,40 @@ button.file-chooser-nav {
     }
 }
 
+// Action buttons for the dialog-host surfaces (Access / Account / AppChooser /
+// DynamicLauncher) and the print dialog. These live directly on the padded
+// surface rather than in a footer bar, so they carry their own base shape
+// instead of inheriting `.file-chooser-footer button`.
+.portal-dialog-cancel,
+.portal-dialog-confirm {
+    min-height: 0;
+    min-width: 0;
+    padding: var(--space-xs) var(--space-lg);
+    border-radius: var(--rounding-element);
+    border: none;
+    box-shadow: none;
+    font-weight: var(--weight-medium, var(--weight-semibold));
+}
+
+.portal-dialog-cancel {
+    background: var(--bg-hover);
+    color: var(--fg-default);
+
+    &:hover {
+        background: var(--bg-active, var(--bg-hover));
+    }
+}
+
+.portal-dialog-confirm {
+    background: var(--accent);
+    color: var(--fg-on-accent);
+    font-weight: var(--weight-semibold);
+
+    &:hover {
+        background: var(--accent-hover, var(--accent));
+    }
+}
+
 // --- Titles / secondary text ----------------------------------------------
 
 .portal-dialog-title,

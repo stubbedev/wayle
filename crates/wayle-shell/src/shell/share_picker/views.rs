@@ -52,7 +52,7 @@ pub(super) fn add_escape_controller(
 /// Builds the windows page.
 ///
 /// `toplevels` is the XDPH `XDPH_WINDOW_SHARING_LIST` (set only when XDPH is the
-/// screencast portal, i.e. Hyprland). When it is empty — `wayle share-picker`
+/// screencast portal, i.e. Hyprland). When it is empty — `wayle portal share-picker`
 /// run standalone, or a non-XDPH portal — we fall back to enumerating toplevels
 /// generically via `ext_foreign_toplevel_list_v1` so the tab still populates.
 /// See [`ext_fallback_toplevels`] for why those entries are display-only.

@@ -5,7 +5,7 @@
 //! requests to. Run as a standalone process (`wayle portal`), D-Bus-activated
 //! by the frontend via `org.freedesktop.impl.portal.desktop.wayle`.
 //!
-//! Unlike `wayle share-picker` (an xdg-desktop-portal-hyprland plugin that only
+//! Unlike `wayle portal share-picker` (an xdg-desktop-portal-hyprland plugin that only
 //! works under Hyprland), this backend plugs into the frontend directly, so it
 //! works on niri, mango, Hyprland, sway, and any other Wayland compositor.
 //!

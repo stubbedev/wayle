@@ -9,7 +9,7 @@ use std::process;
 use clap::Parser;
 use tokio::runtime::Runtime;
 use wayle::{
-    cli::{self, Cli, Commands},
+    cli::{self, Cli, Commands, portal::PortalCommands},
     core::{init, tracing as tracing_init},
 };
 
@@ -22,10 +22,9 @@ fn main() {
             cli::app::generate_completions(shell);
             return;
         }
-        // The portal reads the selection from stdout, so this path must not
-        // initialize stdout tracing — run it in its own minimal runtime.
-        Commands::SharePicker { allow_token } => return run_share_picker(allow_token),
-        Commands::Portal => return run_portal(),
+        // The portal backend and picker manage their own runtime and tracing,
+        // so they bypass the shared runtime below.
+        Commands::Portal { command } => return run_portal(command),
         _ => {}
     }
 
@@ -76,10 +75,7 @@ fn main() {
                 )
                 .await
             }
-            Commands::Shell
-            | Commands::Completions { .. }
-            | Commands::SharePicker { .. }
-            | Commands::Portal => {
+            Commands::Shell | Commands::Completions { .. } | Commands::Portal { .. } => {
                 unreachable!()
             }
         }
@@ -98,27 +94,43 @@ fn run_shell() {
     }
 }
 
-/// Runs the portal screencast picker stub in a dedicated runtime, without
-/// stdout tracing, then exits with its status code.
-fn run_share_picker(allow_token: bool) {
+/// Runs a `wayle portal` subcommand in a dedicated runtime, then exits with its
+/// status code.
+///
+/// The variants differ in tracing setup: the share-picker stub writes its
+/// selection to stdout for the portal frontend to parse, so it must not
+/// initialize stdout tracing; the backend (the default) and the dialog
+/// previewer both do. The backend blocks until terminated.
+fn run_portal(command: Option<PortalCommands>) {
     let Ok(runtime) = Runtime::new() else {
         eprintln!("Failed to create tokio runtime");
         process::exit(1);
     };
-    let code = runtime.block_on(cli::share_picker::execute(allow_token));
-    process::exit(code);
-}
 
-/// Runs the xdg-desktop-portal backend in a dedicated runtime, then exits with
-/// its status code. The backend blocks until terminated.
-fn run_portal() {
-    let Ok(runtime) = Runtime::new() else {
-        eprintln!("Failed to create tokio runtime");
-        process::exit(1);
-    };
-    if let Err(err) = tracing_init::init_cli_mode() {
-        eprintln!("Failed to initialize tracing: {err}");
-    }
-    let code = runtime.block_on(cli::portal::execute());
+    let code = runtime.block_on(async {
+        match command {
+            Some(PortalCommands::SharePicker { allow_token }) => {
+                cli::portal::share_picker::execute(allow_token).await
+            }
+            Some(PortalCommands::Show { dialog }) => {
+                if let Err(err) = tracing_init::init_cli_mode() {
+                    eprintln!("Failed to initialize tracing: {err}");
+                }
+                match cli::portal::show::execute(dialog).await {
+                    Ok(()) => 0,
+                    Err(err) => {
+                        eprintln!("Error: {err}");
+                        1
+                    }
+                }
+            }
+            None | Some(PortalCommands::Run) => {
+                if let Err(err) = tracing_init::init_cli_mode() {
+                    eprintln!("Failed to initialize tracing: {err}");
+                }
+                cli::portal::backend::execute().await
+            }
+        }
+    });
     process::exit(code);
 }

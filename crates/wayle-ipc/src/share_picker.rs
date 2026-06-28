@@ -1,6 +1,6 @@
 //! D-Bus client proxy for the share picker service.
 //!
-//! The `wayle share-picker` stub (invoked by xdg-desktop-portal-hyprland)
+//! The `wayle portal share-picker` stub (invoked by xdg-desktop-portal-hyprland)
 //! calls [`SharePickerProxy::pick`] to ask the running shell to display the
 //! picker surface and return the user's selection.
 #![allow(missing_docs)]

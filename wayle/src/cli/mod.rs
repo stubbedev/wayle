@@ -17,7 +17,7 @@ pub mod media;
 pub mod notify;
 /// Panel management commands
 pub mod panel;
-/// xdg-desktop-portal backend
+/// xdg-desktop-portal backend, picker stub, and dialog previewer
 pub mod portal;
 /// Power profile commands
 pub mod power;
@@ -25,8 +25,6 @@ pub mod power;
 pub mod recorder;
 /// Screenshot capture commands
 pub mod screenshot;
-/// xdg-desktop-portal screencast picker stub
-pub mod share_picker;
 /// ANSI styling for help output
 pub mod style;
 /// System tray commands

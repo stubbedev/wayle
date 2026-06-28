@@ -8,13 +8,13 @@ surface, driven over D-Bus — no separate process or repo.
 
 XDPH execs its `custom_picker_binary` through `/bin/sh`, sets
 `XDPH_WINDOW_SHARING_LIST`, and reads the chosen source from the binary's
-stdout. Point it at the `wayle share-picker` subcommand:
+stdout. Point it at the `wayle portal share-picker` subcommand:
 
 `~/.config/hypr/xdph.conf`:
 
 ```ini
 screencopy {
-  custom_picker_binary = wayle share-picker
+  custom_picker_binary = wayle portal share-picker
 }
 ```
 
@@ -23,7 +23,7 @@ systemd):
 
 ```ini
 screencopy {
-  custom_picker_binary = /run/current-system/sw/bin/wayle share-picker
+  custom_picker_binary = /run/current-system/sw/bin/wayle portal share-picker
 }
 ```
 
@@ -34,7 +34,7 @@ the picker surface, and the selection is printed back as the
 restore-token box:
 
 ```ini
-custom_picker_binary = wayle share-picker --allow-token
+custom_picker_binary = wayle portal share-picker --allow-token
 ```
 
 The shell must be running (`wayle shell`) for the picker to appear; otherwise

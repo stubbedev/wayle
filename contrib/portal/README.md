@@ -5,7 +5,7 @@ sharing, screenshots, remote control, global shortcuts, appearance settings and
 more work on **any** Wayland compositor — niri, mango, Hyprland, sway, river —
 not just the one whose portal happens to be installed.
 
-Unlike `wayle share-picker` (an xdg-desktop-portal-hyprland *plugin* that only
+Unlike `wayle portal share-picker` (an xdg-desktop-portal-hyprland *plugin* that only
 runs under Hyprland), this backend plugs into the compositor-independent
 `xdg-desktop-portal` **frontend**, which routes every app's portal request to
 whichever backend `portals.conf` selects.
@@ -48,11 +48,27 @@ needs the compositor to redirect local input to the portal, which wlroots
 compositors and niri do not expose (only KWin/Mutter back it). Clients detect
 the zero capabilities and fall back cleanly.
 
-`InputCapture` is declared and answers `GetZones` from the live output layout,
-but reports **zero capabilities** and performs no grab: real input capture
-needs the compositor to redirect local input to the portal, which wlroots
-compositors and niri do not expose (only KWin/Mutter back it). Clients detect
-the zero capabilities and fall back cleanly.
+## Previewing dialogs
+
+`wayle portal show <dialog>` pops a single dialog UI directly, without an
+application making a portal request — handy for developing and eyeballing the
+dialogs. It talks to the running shell over the same `com.wayle.*` services the
+real backend delegates to, so `wayle shell` must be running.
+
+```sh
+wayle portal show file-chooser [--save] [--multiple] [--directory]
+wayle portal show screenshot [--mode region|output|screen|window] [--target <output>]
+wayle portal show color
+wayle portal show print
+wayle portal show screen-cast [--allow-token] [--multiple]
+wayle portal show access
+wayle portal show account
+wayle portal show app-chooser
+wayle portal show dynamic-launcher
+```
+
+The chosen result (or `cancelled`) is printed to stdout. The dialogs use
+placeholder arguments, so they exercise the UI but do not act on a real request.
 
 ## Installing (non-Nix)
 

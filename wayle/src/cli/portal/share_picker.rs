@@ -1,5 +1,5 @@
-//! `wayle share-picker` — the xdg-desktop-portal-hyprland custom screencast
-//! picker.
+//! `wayle portal share-picker` — the xdg-desktop-portal-hyprland custom
+//! screencast picker.
 //!
 //! The portal execs this with the `XDPH_WINDOW_SHARING_LIST` environment
 //! variable set, then reads the chosen source from stdout. This stub forwards

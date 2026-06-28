@@ -10,7 +10,8 @@ use crate::cli::{
     audio::commands::AudioCommands, config::commands::ConfigCommands,
     icons::commands::IconsCommands, idle::commands::IdleCommands, media::commands::MediaCommands,
     notify::commands::NotifyCommands, panel::commands::PanelCommands,
-    power::commands::PowerCommands, recorder::commands::RecorderCommands,
+    portal::commands::PortalCommands, power::commands::PowerCommands,
+    recorder::commands::RecorderCommands,
     screenshot::commands::ScreenshotCommands, systray::commands::SystrayCommands,
     wallpaper::commands::WallpaperCommands, widget::commands::WidgetCommands,
 };
@@ -139,15 +140,12 @@ pub enum Commands {
         #[arg(long)]
         class: Option<String>,
     },
-    /// xdg-desktop-portal screencast picker (invoked by the portal, not by hand)
-    #[command(name = "share-picker")]
-    SharePicker {
-        /// Pre-check the "allow restore token" box.
-        #[arg(long)]
-        allow_token: bool,
+    /// xdg-desktop-portal backend, screencast picker stub, and dialog previewer
+    Portal {
+        /// Portal subcommand; defaults to running the backend when omitted.
+        #[command(subcommand)]
+        command: Option<PortalCommands>,
     },
-    /// Run the xdg-desktop-portal backend (activated by the portal frontend)
-    Portal,
     /// Run the desktop shell in the foreground
     Shell,
     /// Generate shell completions
