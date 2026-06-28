@@ -271,8 +271,7 @@ fn run_loop_ext(
         let start = Instant::now();
         // Cap captures to the target fps; the consumer-driven `process` can free-
         // run, and the damage-driven source can burst on a busy screen.
-        let min_interval =
-            Duration::from_nanos(1_000_000_000 * 10 / (u64::from(fps.max(1)) * 12));
+        let min_interval = Duration::from_nanos(1_000_000_000 * 10 / (u64::from(fps.max(1)) * 12));
         let last_capture = Cell::new(start - min_interval);
         // Last published sequence we copied, so an unchanged frame is skipped.
         let last_seq = Cell::new(u64::MAX);
@@ -530,8 +529,7 @@ fn run_loop_inner(
         // capture rate the same way the dmabuf path does; it never trips when the
         // consumer already paces itself (33ms spacing > the 28ms floor at 30fps,
         // 16.7ms > 13.9ms at 60fps). Floor = 1/(1.2·fps).
-        let min_interval =
-            Duration::from_nanos(1_000_000_000 * 10 / (u64::from(fps.max(1)) * 12));
+        let min_interval = Duration::from_nanos(1_000_000_000 * 10 / (u64::from(fps.max(1)) * 12));
         let last_capture = Cell::new(start - min_interval);
         // Reused per-frame damage scratch (avoids a small alloc every frame).
         let damage_scratch = RefCell::new(Vec::<(u32, u32, u32, u32)>::new());

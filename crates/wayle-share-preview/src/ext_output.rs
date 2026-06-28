@@ -321,9 +321,13 @@ fn setup(output_name: &str, show_cursor: bool) -> Result<SetupParts, Error> {
     };
 
     connection.display().get_registry(&qh, ());
-    queue.roundtrip(&mut state).map_err(Error::WaylandDispatch)?;
+    queue
+        .roundtrip(&mut state)
+        .map_err(Error::WaylandDispatch)?;
     // Drain the wl_output name/mode/geometry burst.
-    queue.roundtrip(&mut state).map_err(Error::WaylandDispatch)?;
+    queue
+        .roundtrip(&mut state)
+        .map_err(Error::WaylandDispatch)?;
 
     if state.capture_manager.is_none() || state.source_manager.is_none() {
         return Err(Error::ProtocolNotAvailable(std::any::type_name::<
@@ -387,10 +391,18 @@ fn setup(output_name: &str, show_cursor: bool) -> Result<SetupParts, Error> {
     let mut ring = Vec::with_capacity(RING);
     for _ in 0..RING {
         ring.push(Arc::new(Buffer::new(
-            &shm, width, height, stride, format, &qh, (),
+            &shm,
+            width,
+            height,
+            stride,
+            format,
+            &qh,
+            (),
         )?));
     }
-    queue.roundtrip(&mut state).map_err(Error::WaylandDispatch)?;
+    queue
+        .roundtrip(&mut state)
+        .map_err(Error::WaylandDispatch)?;
 
     let info = ExtStreamInfo {
         width,
@@ -475,13 +487,21 @@ fn dispatch_timeout(
     state: &mut CaptureState,
     timeout_ms: i32,
 ) -> Result<(), Error> {
-    queue.flush().map_err(Error::WaylandDispatch)?;
-    if queue.dispatch_pending(state).map_err(Error::WaylandDispatch)? > 0 {
+    queue
+        .flush()
+        .map_err(|e| Error::DmabufUnavailable(format!("wayland flush: {e}")))?;
+    if queue
+        .dispatch_pending(state)
+        .map_err(Error::WaylandDispatch)?
+        > 0
+    {
         return Ok(());
     }
     let Some(guard) = queue.prepare_read() else {
         // Events arrived between flush and prepare_read; dispatch them.
-        queue.dispatch_pending(state).map_err(Error::WaylandDispatch)?;
+        queue
+            .dispatch_pending(state)
+            .map_err(Error::WaylandDispatch)?;
         return Ok(());
     };
     let fd = guard.connection_fd();
@@ -494,8 +514,12 @@ fn dispatch_timeout(
     // `fd`/`events` and writes `revents` only.
     let ret = unsafe { libc::poll(&mut pollfd, 1, timeout_ms) };
     if ret > 0 && (pollfd.revents & libc::POLLIN) != 0 {
-        guard.read().map_err(Error::WaylandDispatch)?;
-        queue.dispatch_pending(state).map_err(Error::WaylandDispatch)?;
+        guard
+            .read()
+            .map_err(|e| Error::DmabufUnavailable(format!("wayland read: {e}")))?;
+        queue
+            .dispatch_pending(state)
+            .map_err(Error::WaylandDispatch)?;
     } else {
         // Timed out (ret == 0) or poll error: release the read intent so the
         // next iteration can prepare a fresh read.
@@ -566,11 +590,10 @@ impl Dispatch<WlOutput, ()> for CaptureState {
         };
         match event {
             wl_output::Event::Name { name } => info.name = Some(name),
-            wl_output::Event::Geometry { transform, .. } => {
-                if let WEnum::Value(t) = transform {
-                    info.transform = t;
-                }
-            }
+            wl_output::Event::Geometry {
+                transform: WEnum::Value(t),
+                ..
+            } => info.transform = t,
             wl_output::Event::Mode { flags, refresh, .. } => {
                 if let WEnum::Value(f) = flags
                     && f.contains(wl_output::Mode::Current)
@@ -623,11 +646,9 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, ()> for CaptureState {
     ) {
         let f = &mut state.frame;
         match event {
-            ext_image_copy_capture_frame_v1::Event::Transform { transform } => {
-                if let WEnum::Value(t) = transform {
-                    f.transform = Some(t);
-                }
-            }
+            ext_image_copy_capture_frame_v1::Event::Transform {
+                transform: WEnum::Value(t),
+            } => f.transform = Some(t),
             ext_image_copy_capture_frame_v1::Event::Damage {
                 x,
                 y,
