@@ -19,7 +19,10 @@ use relm4::{
 };
 use tracing::{info, warn};
 use wayle_auth::{AuthEvent, AuthHandle, AuthPrompt, GreetdAuth};
-use wayle_config::{Config, schemas::lock::LockBackground};
+use wayle_config::{
+    Config,
+    schemas::{animations::AnimationType, lock::LockBackground},
+};
 use wayle_styling::{STATIC_CSS, theme_css};
 use wayle_widgets::components::credential_box::{CredentialBox, CredentialOpts};
 
@@ -90,7 +93,7 @@ impl Component for Greeter {
         let cred = CredentialBox::build(
             &CredentialOpts {
                 show_clock,
-                transition: gtk::RevealerTransitionType::Crossfade,
+                transition: AnimationType::Fade,
                 duration_ms: 300,
             },
             move |text| input.emit(GreeterInput::Submit(text)),

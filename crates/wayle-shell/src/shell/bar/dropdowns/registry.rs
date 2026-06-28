@@ -15,9 +15,12 @@ use wayle_audio::volume::types::Volume;
 use wayle_brightness::{BacklightDevice, Percentage};
 use wayle_config::{
     ClickAction,
-    schemas::{animations::AnimSurface, bar::Location},
+    schemas::{
+        animations::{AnimSurface, AnimationType},
+        bar::Location,
+    },
 };
-use wayle_widgets::prelude::{BarButton, BarButtonInput};
+use wayle_widgets::prelude::{BarButton, BarButtonInput, GenieEdge, WayleRevealer};
 
 use crate::{process, shell::services::ShellServices};
 
@@ -50,7 +53,7 @@ pub(crate) struct DropdownInstance {
     /// Wraps the popover content so enter/exit animations can be played. The
     /// popover keeps its own size request, so the revealer animates content
     /// within stable geometry rather than resizing the popover surface.
-    revealer: gtk::Revealer,
+    revealer: WayleRevealer,
     _controller: Box<dyn Any>,
     thaw_target: Rc<Cell<Option<relm4::Sender<BarButtonInput>>>>,
     original_height: Cell<Option<i32>>,
@@ -63,7 +66,7 @@ impl DropdownInstance {
 
         // Re-parent the popover's content under a revealer so show/hide can be
         // animated like the notification and toast surfaces.
-        let revealer = gtk::Revealer::new();
+        let revealer = WayleRevealer::new();
         revealer.set_reveal_child(true);
         if let Some(child) = popover.child() {
             popover.set_child(None::<&gtk::Widget>);
@@ -156,7 +159,8 @@ impl DropdownInstance {
     /// does not animate). With animations disabled this reveals immediately.
     fn animate_in(&self, style: &DropdownStyle) {
         let (duration, transition) = style.enter;
-        self.revealer.set_transition_type(transition);
+        self.revealer.set_transition(transition);
+        self.revealer.set_genie_edge(style.genie_edge);
         self.revealer.set_transition_duration(duration);
 
         if duration == 0 {
@@ -181,7 +185,8 @@ impl DropdownInstance {
             return;
         }
 
-        self.revealer.set_transition_type(transition);
+        self.revealer.set_transition(transition);
+        self.revealer.set_genie_edge(style.genie_edge);
         self.revealer.set_transition_duration(duration);
         self.revealer.set_reveal_child(false);
 
@@ -466,12 +471,12 @@ struct DropdownStyle {
     autohide: bool,
     freeze_label: bool,
     /// `(duration_ms, transition)` for the enter animation.
-    enter: (u32, gtk::RevealerTransitionType),
+    enter: (u32, AnimationType),
     /// `(duration_ms, transition)` for the exit animation.
-    exit: (u32, gtk::RevealerTransitionType),
+    exit: (u32, AnimationType),
+    /// Edge a genie transition collapses toward (the bar's edge).
+    genie_edge: GenieEdge,
 }
-
-use crate::shell::helpers::animation::revealer_transition;
 
 const REM_PX: f32 = 16.0;
 
@@ -959,11 +964,17 @@ fn dropdown_style(registry: &DropdownRegistry) -> DropdownStyle {
         freeze_label: bar.dropdown_freeze_label.get(),
         enter: (
             animations.duration_for(AnimSurface::Dropdown, false),
-            revealer_transition(animations.transition_for(AnimSurface::Dropdown, false)),
+            animations.transition_for(AnimSurface::Dropdown, false),
         ),
         exit: (
             animations.duration_for(AnimSurface::Dropdown, true),
-            revealer_transition(animations.transition_for(AnimSurface::Dropdown, true)),
+            animations.transition_for(AnimSurface::Dropdown, true),
         ),
+        genie_edge: match bar.location.get() {
+            Location::Top => GenieEdge::Top,
+            Location::Bottom => GenieEdge::Bottom,
+            Location::Left => GenieEdge::Left,
+            Location::Right => GenieEdge::Right,
+        },
     }
 }

@@ -12,6 +12,7 @@ use gtk4_layer_shell::{KeyboardMode, LayerShell};
 use relm4::{gtk, prelude::*};
 use wayle_config::ConfigService;
 use wayle_notification::{NotificationService, core::notification::Notification};
+use wayle_widgets::prelude::WayleRevealer;
 
 pub(crate) use self::messages::PopupHostInit;
 use self::{card::NotificationPopupCard, messages::PopupHostCmd};
@@ -22,7 +23,7 @@ pub(crate) struct NotificationPopupHost {
     cards: Vec<(
         Arc<Notification>,
         Controller<NotificationPopupCard>,
-        gtk::Revealer,
+        WayleRevealer,
     )>,
     card_container: gtk::Box,
     /// Bumped each time a window hide is scheduled or cancelled, so a stale

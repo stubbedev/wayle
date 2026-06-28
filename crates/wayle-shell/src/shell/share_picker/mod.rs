@@ -23,8 +23,12 @@ use relm4::{gtk, gtk::prelude::*, prelude::*};
 use tokio::sync::oneshot;
 use tracing::error;
 use wayland_client::Connection;
-use wayle_config::{ConfigService, schemas::animations::AnimSurface};
+use wayle_config::{
+    ConfigService,
+    schemas::animations::{AnimSurface, AnimationType},
+};
 use wayle_share_preview::toplevel::Toplevel;
+use wayle_widgets::prelude::WayleRevealer;
 
 /// Messages driving the picker.
 pub(crate) enum SharePickerInput {
@@ -105,7 +109,7 @@ impl Component for SharePicker {
             set_visible: false,
 
             #[name = "revealer"]
-            gtk::Revealer {
+            WayleRevealer {
                 set_reveal_child: false,
 
                 // The surface carries the background and an explicit size, so
@@ -300,12 +304,10 @@ impl Component for SharePicker {
 
 impl SharePicker {
     /// Resolved revealer transition + duration for the share-picker surface.
-    fn animation(&self, exiting: bool) -> (gtk::RevealerTransitionType, u32) {
+    fn animation(&self, exiting: bool) -> (AnimationType, u32) {
         let animations = &self.config_service.config().animations;
-        let transition =
-            revealer_transition(animations.transition_for(AnimSurface::SharePicker, exiting));
         (
-            transition,
+            animations.transition_for(AnimSurface::SharePicker, exiting),
             animations.duration_for(AnimSurface::SharePicker, exiting),
         )
     }
@@ -315,7 +317,7 @@ impl SharePicker {
     /// (wired in `init`) so the transition plays after the window is on screen.
     fn reveal(&self, widgets: &SharePickerWidgets, root: &gtk::Window) {
         let (transition, duration) = self.animation(false);
-        widgets.revealer.set_transition_type(transition);
+        widgets.revealer.set_transition(transition);
         widgets.revealer.set_transition_duration(duration);
         widgets.revealer.set_reveal_child(false);
 
@@ -326,7 +328,7 @@ impl SharePicker {
     /// Plays the exit transition, then unmaps the window once it finishes.
     fn hide_animated(&self, widgets: &SharePickerWidgets, root: &gtk::Window) {
         let (transition, duration) = self.animation(true);
-        widgets.revealer.set_transition_type(transition);
+        widgets.revealer.set_transition(transition);
         widgets.revealer.set_transition_duration(duration);
         widgets.revealer.set_reveal_child(false);
 
@@ -336,8 +338,6 @@ impl SharePicker {
         });
     }
 }
-
-use crate::shell::helpers::animation::revealer_transition;
 
 /// Builds the `connect_toggled` handler that forwards checkbox state.
 fn glib_clone_toggle(

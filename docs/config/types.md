@@ -21,7 +21,8 @@ Visual indicator style for the active workspace.
 ## AnimationType {#animation-type}
 
 Enter/exit transition style for transient surfaces (OSD, toasts,
-notifications). Maps onto GTK's revealer transitions.
+notifications). Driven per frame by the custom revealer
+(`GskTransform` + opacity).
 
 | Value | Meaning |
 |---|---|
@@ -35,11 +36,17 @@ notifications). Maps onto GTK's revealer transitions.
 | `"swing-down"` | Slide in from / out to the bottom edge with a rotating swing. |
 | `"swing-left"` | Slide in from / out to the left edge with a rotating swing. |
 | `"swing-right"` | Slide in from / out to the right edge with a rotating swing. |
+| `"bounce"` | Scale in from a shrunken state with an elastic overshoot, then settle. |
+| `"genie"` | Suck in toward / out to the surface's anchored edge (macOS "genie" minimize, approximated with an affine scale-and-slide). Auto-orients to the edge the surface sits on. |
+| `"zoom"` | Scale in smoothly from the center with no overshoot. |
+| `"rotate"` | Spin in: rotate into place while scaling up and fading in. |
+| `"flip"` | Card flip: open out from a vertical edge (horizontal scale through zero). |
 
 ## AnimationType2 {#animation-type2}
 
 Enter/exit transition style for transient surfaces (OSD, toasts,
-notifications). Maps onto GTK's revealer transitions.
+notifications). Driven per frame by the custom revealer
+(`GskTransform` + opacity).
 
 | Value | Meaning |
 |---|---|
@@ -53,6 +60,11 @@ notifications). Maps onto GTK's revealer transitions.
 | `"swing-down"` | Slide in from / out to the bottom edge with a rotating swing. |
 | `"swing-left"` | Slide in from / out to the left edge with a rotating swing. |
 | `"swing-right"` | Slide in from / out to the right edge with a rotating swing. |
+| `"bounce"` | Scale in from a shrunken state with an elastic overshoot, then settle. |
+| `"genie"` | Suck in toward / out to the surface's anchored edge (macOS "genie" minimize, approximated with an affine scale-and-slide). Auto-orients to the edge the surface sits on. |
+| `"zoom"` | Scale in smoothly from the center with no overshoot. |
+| `"rotate"` | Spin in: rotate into place while scaling up and fading in. |
+| `"flip"` | Card flip: open out from a vertical edge (horizontal scale through zero). |
 
 ## AppIconSource {#app-icon-source}
 

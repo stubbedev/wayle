@@ -12,13 +12,16 @@
 //! drive the clock and respond to authentication events.
 
 use relm4::gtk::{self, prelude::*};
+use wayle_config::schemas::animations::AnimationType;
+
+use crate::primitives::revealer::WayleRevealer;
 
 /// Build-time options for a [`CredentialBox`].
 pub struct CredentialOpts {
     /// Whether the clock and date labels are shown.
     pub show_clock: bool,
     /// Reveal animation for the box.
-    pub transition: gtk::RevealerTransitionType,
+    pub transition: AnimationType,
     /// Reveal animation duration, in milliseconds.
     pub duration_ms: u32,
 }
@@ -27,7 +30,7 @@ pub struct CredentialOpts {
 pub struct CredentialBox {
     /// Root widget to place into the surface; overlay it and call
     /// [`CredentialBox::reveal`] once it is mapped.
-    pub root: gtk::Revealer,
+    pub root: WayleRevealer,
     /// Secret entry; activates fire the `on_submit` callback passed to
     /// [`CredentialBox::build`].
     pub entry: gtk::PasswordEntry,
@@ -74,10 +77,10 @@ impl CredentialBox {
             entry.connect_activate(move |_| on_submit(entry_ref.text().to_string()));
         }
 
-        let root = gtk::Revealer::new();
+        let root = WayleRevealer::new();
         root.set_halign(gtk::Align::Center);
         root.set_valign(gtk::Align::Center);
-        root.set_transition_type(opts.transition);
+        root.set_transition(opts.transition);
         root.set_transition_duration(opts.duration_ms);
         root.set_reveal_child(false);
         root.set_child(Some(&center));

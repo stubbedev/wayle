@@ -23,6 +23,7 @@ use relm4::{
 };
 use tokio::sync::oneshot;
 use wayle_config::{ConfigService, schemas::animations::AnimSurface};
+use wayle_widgets::prelude::WayleRevealer;
 
 use crate::shell::helpers::surface_anim;
 
@@ -220,7 +221,7 @@ impl Component for FileChooser {
             set_visible: false,
 
             #[name = "revealer"]
-            gtk::Revealer {
+            WayleRevealer {
                 set_reveal_child: false,
 
                 #[name = "overlay"]
@@ -2110,7 +2111,7 @@ fn setup_col_resize(handle: &gtk::Box, col_btn: &gtk::Button, input: &Sender<Fil
 /// Look) and the drag-and-drop target (drop a path to navigate).
 fn install_controllers(
     root: &gtk::Window,
-    revealer: &gtk::Revealer,
+    revealer: &WayleRevealer,
     search: &gtk::SearchEntry,
     input: &Sender<FileChooserInput>,
 ) {

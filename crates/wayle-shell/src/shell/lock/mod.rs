@@ -25,11 +25,17 @@ use tracing::{info, warn};
 use wayle_auth::{AuthEvent, AuthHandle, AuthPrompt, PamAuth};
 use wayle_config::{
     ConfigService,
-    schemas::{animations::AnimSurface, lock::LockBackground},
+    schemas::{
+        animations::{AnimSurface, AnimationType},
+        lock::LockBackground,
+    },
 };
-use wayle_widgets::components::credential_box::{CredentialBox, CredentialOpts};
+use wayle_widgets::{
+    components::credential_box::{CredentialBox, CredentialOpts},
+    prelude::WayleRevealer,
+};
 
-use crate::shell::helpers::{animation::revealer_transition, monitors::current_monitors};
+use crate::shell::helpers::monitors::current_monitors;
 
 /// Per-monitor widgets we keep live to drive the clock, password entry, and
 /// blank scrim while the screen is locked.
@@ -40,7 +46,7 @@ struct Surface {
     date: gtk::Label,
     error: gtk::Label,
     /// Reveals the credential box via the shared `[animations]` framework.
-    reveal: gtk::Revealer,
+    reveal: WayleRevealer,
     /// Opaque black overlay shown after `blank-timeout-ms` of inactivity.
     scrim: gtk::Box,
 }
@@ -185,10 +191,10 @@ impl Lock {
 
     /// Resolves the credential-box reveal animation `(transition, duration_ms)`
     /// from the shared `[animations]` config (`AnimSurface::Lock`, entering).
-    fn reveal_anim(&self) -> (gtk::RevealerTransitionType, u32) {
+    fn reveal_anim(&self) -> (AnimationType, u32) {
         let anim = &self.config.config().animations;
         (
-            revealer_transition(anim.transition_for(AnimSurface::Lock, false)),
+            anim.transition_for(AnimSurface::Lock, false),
             anim.duration_for(AnimSurface::Lock, false),
         )
     }
@@ -489,7 +495,7 @@ fn build_surfaces(
     instance: &Instance,
     bg: &BgConfig,
     show_clock: bool,
-    reveal: (gtk::RevealerTransitionType, u32),
+    reveal: (AnimationType, u32),
     sender: &ComponentSender<Lock>,
 ) -> Vec<Surface> {
     let mut surfaces = Vec::new();
@@ -511,7 +517,7 @@ fn build_surfaces(
 fn build_surface(
     bg: &BgConfig,
     show_clock: bool,
-    reveal: (gtk::RevealerTransitionType, u32),
+    reveal: (AnimationType, u32),
     sender: &ComponentSender<Lock>,
 ) -> Surface {
     let window = gtk::Window::builder().decorated(false).build();

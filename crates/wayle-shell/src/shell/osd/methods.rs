@@ -5,9 +5,10 @@ use relm4::{ComponentSender, gtk};
 use wayle_audio::core::device::{input::InputDevice, output::OutputDevice};
 use wayle_brightness::BacklightDevice;
 use wayle_config::schemas::{
-    animations::AnimSurface,
+    animations::{AnimSurface, AnimationType},
     osd::{OsdMonitor, OsdPosition, OsdTextAlign},
 };
+use wayle_widgets::prelude::GenieEdge;
 
 use super::{
     BRIGHTNESS_ICON, Osd, messages,
@@ -387,17 +388,26 @@ impl Osd {
     }
 }
 
-use crate::shell::helpers::animation::revealer_transition;
-
 /// Revealer transition for the current direction. `revealed` means entering;
 /// otherwise exiting. Resolved per-surface with the global fallback cascade.
-pub(super) fn anim_transition(model: &Osd) -> gtk::RevealerTransitionType {
-    let anim = model
+pub(super) fn anim_transition(model: &Osd) -> AnimationType {
+    model
         .config
         .config()
         .animations
-        .transition_for(AnimSurface::Osd, !model.revealed);
-    revealer_transition(anim)
+        .transition_for(AnimSurface::Osd, !model.revealed)
+}
+
+/// Edge a genie transition collapses toward, derived from the OSD's position.
+pub(super) fn genie_edge(model: &Osd) -> GenieEdge {
+    match model.config.config().osd.position.get() {
+        OsdPosition::Top | OsdPosition::TopLeft | OsdPosition::TopRight => GenieEdge::Top,
+        OsdPosition::Bottom | OsdPosition::BottomLeft | OsdPosition::BottomRight => {
+            GenieEdge::Bottom
+        }
+        OsdPosition::Left => GenieEdge::Left,
+        OsdPosition::Right => GenieEdge::Right,
+    }
 }
 
 /// Animation duration in ms for the current direction (`0` when disabled).

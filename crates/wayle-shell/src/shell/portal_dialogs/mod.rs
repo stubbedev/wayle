@@ -15,6 +15,7 @@ use relm4::{
 };
 use tokio::sync::oneshot;
 use wayle_config::{ConfigService, schemas::animations::AnimSurface};
+use wayle_widgets::prelude::WayleRevealer;
 
 use crate::shell::helpers::surface_anim;
 
@@ -97,7 +98,7 @@ impl Component for PortalDialogs {
             set_visible: false,
 
             #[name = "revealer"]
-            gtk::Revealer {
+            WayleRevealer {
                 set_reveal_child: false,
 
                 gtk::Box {

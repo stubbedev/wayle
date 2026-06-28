@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use wayle_derive::wayle_enum;
 
 /// Enter/exit transition style for transient surfaces (OSD, toasts,
-/// notifications). Maps onto GTK's revealer transitions.
+/// notifications). Driven per frame by the custom revealer
+/// (`GskTransform` + opacity).
 #[wayle_enum(default)]
 pub enum AnimationType {
     /// No transition; surfaces appear and disappear instantly.
@@ -27,6 +28,18 @@ pub enum AnimationType {
     SwingLeft,
     /// Slide in from / out to the right edge with a rotating swing.
     SwingRight,
+    /// Scale in from a shrunken state with an elastic overshoot, then settle.
+    Bounce,
+    /// Suck in toward / out to the surface's anchored edge (macOS "genie"
+    /// minimize, approximated with an affine scale-and-slide). Auto-orients to
+    /// the edge the surface sits on.
+    Genie,
+    /// Scale in smoothly from the center with no overshoot.
+    Zoom,
+    /// Spin in: rotate into place while scaling up and fading in.
+    Rotate,
+    /// Card flip: open out from a vertical edge (horizontal scale through zero).
+    Flip,
 }
 
 /// Per-surface enter/exit animation override. Any field left unset falls back
