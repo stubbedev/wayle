@@ -40,7 +40,7 @@ members = [
 exclude = ["sandbox"]
 
 [workspace.package]
-version = "0.8.5"
+version = "0.8.6"
 edition = "2024"
 rust-version = "1.93"
 repository = "https://github.com/stubbedev/wayle"
