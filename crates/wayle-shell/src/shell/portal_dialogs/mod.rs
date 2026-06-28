@@ -593,7 +593,9 @@ fn uri_to_path(uri: &str) -> Option<String> {
 
 /// Reads the local avatar path (`~/.face`) if present, for the account prompt.
 fn local_avatar() -> Option<String> {
-    let path = std::env::var_os("HOME").map(std::path::PathBuf::from)?.join(".face");
+    let path = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)?
+        .join(".face");
     path.exists().then(|| path.to_string_lossy().into_owned())
 }
 

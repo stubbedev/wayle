@@ -30,9 +30,7 @@ pub(crate) fn register_sender(sender: Sender<ColorPickerInput>) {
 /// Shows the colour picker over the given frozen per-output frames and awaits
 /// the user's pick. Returns the sRGB `(r, g, b)` in `[0, 1]`, or `None` on
 /// cancel / when the shell UI has not registered its sender yet.
-pub(crate) async fn request_color(
-    frames: HashMap<String, FrameData>,
-) -> Option<(f64, f64, f64)> {
+pub(crate) async fn request_color(frames: HashMap<String, FrameData>) -> Option<(f64, f64, f64)> {
     let sender = PICKER_SENDER.get()?.clone();
     let (reply_tx, reply_rx) = oneshot::channel();
     sender.emit(ColorPickerInput::Show {

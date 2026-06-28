@@ -374,7 +374,10 @@ fn build_settings(widgets: &PrintWidgets) -> (SettingsPairs, String, bool) {
     });
 
     let paper_idx = widgets.paper_drop.selected() as usize;
-    let paper_name = PAPER_SIZES.get(paper_idx).map_or("iso_a4", |p| p.1).to_owned();
+    let paper_name = PAPER_SIZES
+        .get(paper_idx)
+        .map_or("iso_a4", |p| p.1)
+        .to_owned();
     settings.set_paper_size(&gtk::PaperSize::new(Some(&paper_name)));
 
     settings.set_use_color(widgets.color_drop.selected() == 0);

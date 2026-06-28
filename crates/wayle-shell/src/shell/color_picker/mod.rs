@@ -16,7 +16,10 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use image::RgbImage;
 use relm4::{
     gtk,
-    gtk::{ContentFit, EventControllerKey, EventControllerMotion, GestureClick, cairo, gdk, glib, prelude::*},
+    gtk::{
+        ContentFit, EventControllerKey, EventControllerMotion, GestureClick, cairo, gdk, glib,
+        prelude::*,
+    },
     prelude::*,
 };
 use tokio::sync::oneshot;
@@ -106,12 +109,7 @@ impl Component for ColorPicker {
         ComponentParts { model, widgets }
     }
 
-    fn update(
-        &mut self,
-        msg: ColorPickerInput,
-        sender: ComponentSender<Self>,
-        _root: &Self::Root,
-    ) {
+    fn update(&mut self, msg: ColorPickerInput, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             ColorPickerInput::Show { reply, frames } => {
                 if let Some(prev) = self.reply.take() {
@@ -288,7 +286,16 @@ fn attach_loupe_draw(
         let Some((cx, cy)) = *cursor.borrow() else {
             return;
         };
-        draw_loupe(cr, &image, logical, cx, cy, width, height, &history.borrow());
+        draw_loupe(
+            cr,
+            &image,
+            logical,
+            cx,
+            cy,
+            width,
+            height,
+            &history.borrow(),
+        );
     });
 }
 
@@ -342,7 +349,66 @@ fn draw_loupe(
     cr.rectangle(px - 4.0, py - 4.0, panel_w + 8.0, panel_h + 8.0);
     let _ = cr.fill();
 
-    // Magnified pixel grid.
+    draw_grid(cr, image, center_px, center_py, px, py);
+
+    // Crosshair box on the exact center pixel.
+    let center = px + f64::from(RADIUS) * ZOOM;
+    cr.set_source_rgba(1.0, 1.0, 1.0, 0.95);
+    cr.set_line_width(1.5);
+    cr.rectangle(center, py + f64::from(RADIUS) * ZOOM, ZOOM, ZOOM);
+    let _ = cr.stroke();
+    cr.set_source_rgba(0.0, 0.0, 0.0, 0.9);
+    cr.set_line_width(1.5);
+    cr.rectangle(
+        center - 1.0,
+        py + f64::from(RADIUS) * ZOOM - 1.0,
+        ZOOM + 2.0,
+        ZOOM + 2.0,
+    );
+    let _ = cr.stroke();
+
+    let (r, g, b) = (
+        image.get_pixel(center_px as u32, center_py as u32)[0],
+        image.get_pixel(center_px as u32, center_py as u32)[1],
+        image.get_pixel(center_px as u32, center_py as u32)[2],
+    );
+
+    // Readout: a colour chip + hex string.
+    let ry = py + loupe_size;
+    cr.set_source_rgb(
+        f64::from(r) / 255.0,
+        f64::from(g) / 255.0,
+        f64::from(b) / 255.0,
+    );
+    cr.rectangle(px, ry + 4.0, 20.0, 20.0);
+    let _ = cr.fill();
+
+    cr.select_font_face(
+        "monospace",
+        cairo::FontSlant::Normal,
+        cairo::FontWeight::Bold,
+    );
+    cr.set_font_size(13.0);
+    cr.set_source_rgba(1.0, 1.0, 1.0, 0.95);
+    let hex = format!("#{r:02X}{g:02X}{b:02X}");
+    cr.move_to(px + 28.0, ry + 19.0);
+    let _ = cr.show_text(&hex);
+
+    // History swatches row.
+    if !history.is_empty() {
+        draw_history(cr, history, px, ry + readout_h, panel_w, swatch, swatch_gap);
+    }
+}
+
+/// Paints the magnified `2*RADIUS+1` pixel grid around the cursor at `(px, py)`.
+fn draw_grid(
+    cr: &cairo::Context,
+    image: &RgbImage,
+    center_px: i32,
+    center_py: i32,
+    px: f64,
+    py: f64,
+) {
     for gy in -RADIUS..=RADIUS {
         for gx in -RADIUS..=RADIUS {
             let sxp = (center_px + gx).clamp(0, image.width() as i32 - 1) as u32;
@@ -359,57 +425,35 @@ fn draw_loupe(
             let _ = cr.fill();
         }
     }
+}
 
-    // Crosshair box on the exact center pixel.
-    let center = px + f64::from(RADIUS) * ZOOM;
-    cr.set_source_rgba(1.0, 1.0, 1.0, 0.95);
-    cr.set_line_width(1.5);
-    cr.rectangle(center, py + f64::from(RADIUS) * ZOOM, ZOOM, ZOOM);
-    let _ = cr.stroke();
-    cr.set_source_rgba(0.0, 0.0, 0.0, 0.9);
-    cr.set_line_width(1.5);
-    cr.rectangle(center - 1.0, py + f64::from(RADIUS) * ZOOM - 1.0, ZOOM + 2.0, ZOOM + 2.0);
-    let _ = cr.stroke();
-
-    let (r, g, b) = (
-        image.get_pixel(center_px as u32, center_py as u32)[0],
-        image.get_pixel(center_px as u32, center_py as u32)[1],
-        image.get_pixel(center_px as u32, center_py as u32)[2],
-    );
-
-    // Readout: a colour chip + hex string.
-    let ry = py + loupe_size;
-    cr.set_source_rgb(f64::from(r) / 255.0, f64::from(g) / 255.0, f64::from(b) / 255.0);
-    cr.rectangle(px, ry + 4.0, 20.0, 20.0);
-    let _ = cr.fill();
-
-    cr.select_font_face("monospace", cairo::FontSlant::Normal, cairo::FontWeight::Bold);
-    cr.set_font_size(13.0);
-    cr.set_source_rgba(1.0, 1.0, 1.0, 0.95);
-    let hex = format!("#{r:02X}{g:02X}{b:02X}");
-    cr.move_to(px + 28.0, ry + 19.0);
-    let _ = cr.show_text(&hex);
-
-    // History swatches row.
-    if !history.is_empty() {
-        let hy = ry + readout_h;
-        for (i, (hr, hg, hb)) in history.iter().enumerate() {
-            let hx = px + i as f64 * (swatch + swatch_gap);
-            if hx + swatch > px + panel_w {
-                break;
-            }
-            cr.set_source_rgb(
-                f64::from(*hr) / 255.0,
-                f64::from(*hg) / 255.0,
-                f64::from(*hb) / 255.0,
-            );
-            cr.rectangle(hx, hy, swatch, swatch);
-            let _ = cr.fill();
-            cr.set_source_rgba(1.0, 1.0, 1.0, 0.3);
-            cr.set_line_width(1.0);
-            cr.rectangle(hx, hy, swatch, swatch);
-            let _ = cr.stroke();
+/// Paints the recently-picked swatches in a row at `(px, hy)`, clipped to the
+/// panel width.
+fn draw_history(
+    cr: &cairo::Context,
+    history: &[(u8, u8, u8)],
+    px: f64,
+    hy: f64,
+    panel_w: f64,
+    swatch: f64,
+    gap: f64,
+) {
+    for (i, (hr, hg, hb)) in history.iter().enumerate() {
+        let hx = px + i as f64 * (swatch + gap);
+        if hx + swatch > px + panel_w {
+            break;
         }
+        cr.set_source_rgb(
+            f64::from(*hr) / 255.0,
+            f64::from(*hg) / 255.0,
+            f64::from(*hb) / 255.0,
+        );
+        cr.rectangle(hx, hy, swatch, swatch);
+        let _ = cr.fill();
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.3);
+        cr.set_line_width(1.0);
+        cr.rectangle(hx, hy, swatch, swatch);
+        let _ = cr.stroke();
     }
 }
 
@@ -417,7 +461,9 @@ fn draw_loupe(
 fn history_path() -> Option<std::path::PathBuf> {
     let base = std::env::var_os("XDG_DATA_HOME")
         .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share")))?;
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share"))
+        })?;
     Some(base.join("wayle").join("color-history"))
 }
 
@@ -429,7 +475,10 @@ fn load_history() -> Vec<(u8, u8, u8)> {
     let Ok(text) = std::fs::read_to_string(path) else {
         return Vec::new();
     };
-    text.lines().filter_map(parse_hex).take(HISTORY_MAX).collect()
+    text.lines()
+        .filter_map(parse_hex)
+        .take(HISTORY_MAX)
+        .collect()
 }
 
 /// Persists the swatches, one `#RRGGBB` per line (best-effort).
