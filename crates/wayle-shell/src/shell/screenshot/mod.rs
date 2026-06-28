@@ -36,7 +36,7 @@ use wayle_hyprland::HyprlandService;
 use wayle_mango::MangoService;
 use wayle_niri::NiriService;
 
-use crate::shell::helpers::monitors::current_monitors;
+use crate::shell::{color_picker::FrameData, helpers::monitors::current_monitors};
 
 /// Messages driving the screenshot host.
 pub(crate) enum ScreenshotInput {
@@ -351,22 +351,31 @@ fn capture_full_screen() -> Result<RgbImage, String> {
     Ok(composite_outputs(&placed))
 }
 
-/// Picks a single color: runs the same region selection as a screenshot, then
-/// samples the center pixel of the selected area. Returns sRGB channels in
-/// `[0, 1]`. Errors on cancel or an empty selection.
+/// Picks a single color with the magnifier-loupe overlay: freezes every
+/// output, lets the user hover a zoom loupe and click one pixel. Returns sRGB
+/// channels in `[0, 1]`. Errors on cancel.
 async fn pick_color() -> Result<(f64, f64, f64), String> {
-    let Some(image) = capture_region().await? else {
-        return Err("color pick cancelled".to_owned());
-    };
-    if image.width() == 0 || image.height() == 0 {
-        return Err("empty color selection".to_owned());
+    let frozen = capture::capture_all_outputs()?;
+    let frames: HashMap<String, FrameData> = frozen
+        .into_iter()
+        .map(|frame| {
+            let texture = rgb_to_texture(&frame.image);
+            (
+                frame.connector,
+                FrameData {
+                    image: frame.image,
+                    texture,
+                },
+            )
+        })
+        .collect();
+    if frames.is_empty() {
+        return Err("no outputs available".to_owned());
     }
-    let pixel = image.get_pixel(image.width() / 2, image.height() / 2);
-    Ok((
-        f64::from(pixel[0]) / 255.0,
-        f64::from(pixel[1]) / 255.0,
-        f64::from(pixel[2]) / 255.0,
-    ))
+
+    crate::services::color_picker::request_color(frames)
+        .await
+        .ok_or_else(|| "color pick cancelled".to_owned())
 }
 
 /// Wraps an RGB frame in a `gdk::Texture` for the overlay to paint. The image is

@@ -95,6 +95,7 @@ impl RemoteDesktop {
                 "An application is requesting control of your pointer and keyboard.",
                 "Allow",
                 "Deny",
+                "input-keyboard-symbolic",
             )
             .await
             .unwrap_or(false)

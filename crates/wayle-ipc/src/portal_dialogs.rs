@@ -16,7 +16,8 @@ pub const SERVICE_PATH: &str = "/com/wayle/PortalDialogs";
     gen_blocking = false
 )]
 pub trait PortalDialogs {
-    /// Generic grant/deny access prompt. Returns `true` if granted.
+    /// Generic grant/deny access prompt. `icon` is a themed icon name for the
+    /// permission (empty for none). Returns `true` if granted.
     async fn access(
         &self,
         title: &str,
@@ -24,10 +25,15 @@ pub trait PortalDialogs {
         body: &str,
         grant_label: &str,
         deny_label: &str,
+        icon: &str,
     ) -> Result<bool>;
 
     /// Confirms sharing the user's account info. Returns `true` if shared.
     async fn account(&self, reason: &str) -> Result<bool>;
+
+    /// Previews `uri` (a `file://` image) and asks the user to confirm setting
+    /// it as the wallpaper. Returns `true` if the user accepted.
+    async fn confirm_wallpaper(&self, uri: &str) -> Result<bool>;
 
     /// Picks an application to handle `uri`/`content_type`. `choices` are
     /// candidate desktop-file ids (empty = offer all). Returns the chosen

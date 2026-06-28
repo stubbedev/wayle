@@ -48,6 +48,7 @@ impl Access {
     ) -> (u32, HashMap<String, OwnedValue>) {
         let grant = opt_string(&options, "grant_label").unwrap_or_else(|| "Allow".to_owned());
         let deny = opt_string(&options, "deny_label").unwrap_or_else(|| "Deny".to_owned());
+        let icon = opt_string(&options, "icon").unwrap_or_default();
 
         let proxy = match PortalDialogsProxy::new(&self.connection).await {
             Ok(proxy) => proxy,
@@ -56,7 +57,10 @@ impl Access {
                 return (Response::Other.code(), HashMap::new());
             }
         };
-        match proxy.access(&title, &subtitle, &body, &grant, &deny).await {
+        match proxy
+            .access(&title, &subtitle, &body, &grant, &deny, &icon)
+            .await
+        {
             Ok(true) => (Response::Success.code(), HashMap::new()),
             Ok(false) => (Response::Cancelled.code(), HashMap::new()),
             Err(err) => {

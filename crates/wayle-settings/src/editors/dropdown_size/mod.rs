@@ -220,7 +220,8 @@ fn size_field_row(
     SettingRowInit {
         i18n_key: Some(i18n_key),
         handle: PropertyHandle::new(property, move |size| display_size(get_field(size)))
-            .with_field_source(property, get_field),
+            .with_field_source(property, get_field)
+            .with_field_reset(property, get_field, set_field),
         control: widget,
         keepalive: Box::new((control, watcher)),
         full_width: false,

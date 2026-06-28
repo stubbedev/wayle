@@ -38,6 +38,7 @@ pub async fn execute(dialog: PortalDialog) -> Result<(), String> {
         PortalDialog::Account => account(&conn).await,
         PortalDialog::AppChooser => app_chooser(&conn).await,
         PortalDialog::DynamicLauncher => dynamic_launcher(&conn).await,
+        PortalDialog::Wallpaper { uri } => wallpaper(&conn, &uri).await,
     }
 }
 
@@ -128,6 +129,7 @@ async fn access(conn: &Connection) -> Result<(), String> {
             "This is a preview of the generic access prompt.",
             "Allow",
             "Deny",
+            "dialog-password-symbolic",
         )
         .await
         .map_err(|e| dbus::format_error("Access", "show access prompt", e))?;
@@ -168,6 +170,18 @@ async fn dynamic_launcher(conn: &Connection) -> Result<(), String> {
         .await
         .map_err(|e| dbus::format_error("DynamicLauncher", "show install confirmation", e))?;
     println!("{}", if approved { "approved" } else { "rejected" });
+    Ok(())
+}
+
+async fn wallpaper(conn: &Connection, uri: &str) -> Result<(), String> {
+    let proxy = PortalDialogsProxy::new(conn)
+        .await
+        .map_err(|e| format!("Failed to create portal dialogs proxy: {e}"))?;
+    let accepted = proxy
+        .confirm_wallpaper(uri)
+        .await
+        .map_err(|e| dbus::format_error("Wallpaper", "show wallpaper preview", e))?;
+    println!("{}", if accepted { "accepted" } else { "declined" });
     Ok(())
 }
 

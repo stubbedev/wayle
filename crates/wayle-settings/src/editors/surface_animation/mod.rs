@@ -89,7 +89,8 @@ fn enum_field_row(
     SettingRowInit {
         i18n_key: Some(i18n_key),
         handle: PropertyHandle::new(property, move |surface| display_enum(get_field(surface)))
-            .with_field_source(property, get_field),
+            .with_field_source(property, get_field)
+            .with_field_reset(property, get_field, set_field),
         control,
         keepalive: Box::new((refresh, watcher)),
         full_width: false,
@@ -127,7 +128,8 @@ fn number_field_row(
         handle: PropertyHandle::new(property, move |surface| {
             display_duration(get_field(surface))
         })
-        .with_field_source(property, get_field),
+        .with_field_source(property, get_field)
+        .with_field_reset(property, get_field, set_field),
         control,
         keepalive: Box::new((refresh, watcher)),
         full_width: false,

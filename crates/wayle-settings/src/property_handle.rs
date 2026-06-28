@@ -76,6 +76,31 @@ impl PropertyHandle {
         self
     }
 
+    /// Scopes the reset button to a single field of a composite property.
+    /// Without this, reset clears the whole runtime override — so resetting
+    /// one row (e.g. an animation's `enter`) wipes its siblings (`exit`, the
+    /// durations) too. This reverts only the target field to its config/default
+    /// value, leaving the other fields' runtime overrides intact.
+    pub(crate) fn with_field_reset<T, U>(
+        mut self,
+        property: &ConfigProperty<T>,
+        get_field: fn(&T) -> U,
+        set_field: fn(&mut T, U),
+    ) -> Self
+    where
+        T: Clone + Send + Sync + PartialEq + 'static,
+        U: 'static,
+    {
+        let prop = property.clone();
+        self.clear_runtime = Box::new(move || {
+            let baseline = prop.config().unwrap_or_else(|| prop.default().clone());
+            let mut current = prop.runtime().unwrap_or_else(|| baseline.clone());
+            set_field(&mut current, get_field(&baseline));
+            prop.set(current);
+        });
+        self
+    }
+
     pub(crate) fn source(&self) -> ValueSource {
         (self.source)()
     }

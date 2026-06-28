@@ -12,3 +12,11 @@
         color: var(--palette-primary);
     }
 }
+
+// Colour-picker overlay: same deal — the magnifier loupe, crosshair, readout,
+// and history swatches are all painted with cairo in `shell/color_picker`, so
+// the window only needs to stay transparent for the frozen frame + loupe to
+// composite cleanly.
+.color-picker-window {
+    background: transparent;
+}

@@ -7,12 +7,13 @@
 use std::collections::HashMap;
 
 use tracing::warn;
+use wayle_ipc::portal_dialogs::PortalDialogsProxy;
 use zbus::{
     Connection, interface, proxy,
     zvariant::{OwnedObjectPath, OwnedValue},
 };
 
-use crate::response::Response;
+use crate::{dbus_util::opt_bool, response::Response};
 
 /// Minimal client for the shell wallpaper service.
 #[proxy(
@@ -36,6 +37,28 @@ impl WallpaperPortal {
     pub fn new(connection: Connection) -> Self {
         Self { connection }
     }
+
+    /// Runs the `show-preview` confirm dialog. Returns `Ok(())` to proceed with
+    /// applying the wallpaper, or `Err(response_code)` to end the request now
+    /// (the user declined, or the prompt failed). A missing dialog host is
+    /// non-fatal — we proceed and apply directly.
+    async fn confirm_preview(&self, uri: &str) -> Result<(), u32> {
+        let dialogs = match PortalDialogsProxy::new(&self.connection).await {
+            Ok(dialogs) => dialogs,
+            Err(err) => {
+                warn!(%err, "wallpaper: dialog host unavailable, applying directly");
+                return Ok(());
+            }
+        };
+        match dialogs.confirm_wallpaper(uri).await {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(Response::Cancelled.code()),
+            Err(err) => {
+                warn!(%err, "wallpaper: preview prompt failed");
+                Err(Response::Other.code())
+            }
+        }
+    }
 }
 
 #[interface(name = "org.freedesktop.impl.portal.Wallpaper")]
@@ -53,12 +76,28 @@ impl WallpaperPortal {
         _app_id: String,
         _parent_window: String,
         uri: String,
-        _options: HashMap<String, OwnedValue>,
+        options: HashMap<String, OwnedValue>,
     ) -> u32 {
         let Some(path) = uri_to_path(&uri) else {
             warn!(%uri, "wallpaper: only file:// URIs are supported");
             return Response::Other.code();
         };
+
+        // Honour `show-preview`: ask the user to confirm before applying.
+        if opt_bool(&options, "show-preview").unwrap_or(false)
+            && let Err(code) = self.confirm_preview(&uri).await
+        {
+            return code;
+        }
+
+        self.apply(&path).await
+    }
+}
+
+impl WallpaperPortal {
+    /// Sends the resolved path to the shell wallpaper service (empty monitor =
+    /// all monitors), mapping the outcome to a portal response code.
+    async fn apply(&self, path: &str) -> u32 {
         let proxy = match WallpaperProxy::new(&self.connection).await {
             Ok(proxy) => proxy,
             Err(err) => {
@@ -66,8 +105,7 @@ impl WallpaperPortal {
                 return Response::Other.code();
             }
         };
-        // Empty monitor = all monitors.
-        match proxy.set_wallpaper(&path, "").await {
+        match proxy.set_wallpaper(path, "").await {
             Ok(()) => Response::Success.code(),
             Err(err) => {
                 warn!(%err, "wallpaper: set_wallpaper failed");

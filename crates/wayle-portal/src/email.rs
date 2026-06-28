@@ -1,20 +1,23 @@
 //! `org.freedesktop.impl.portal.Email`.
 //!
-//! `ComposeEmail` builds a `mailto:` URI from the requested recipients/subject/
-//! body and launches the user's default mail handler via `xdg-open`. No GUI of
-//! our own — the mail client provides the compose window. (Attachment fds are
-//! not expressible in `mailto:` and are dropped, matching what most handlers
-//! do.)
+//! `ComposeEmail` launches the user's mail client at a pre-filled compose
+//! window. When the request carries attachment fds we drive `xdg-email
+//! --attach` (copying each fd to a temp file first); otherwise — and as a
+//! fallback when `xdg-email` is absent — we build a `mailto:` URI and launch the
+//! default handler via `xdg-open`. No GUI of our own; the mail client provides
+//! the compose window.
 
 use std::{
     collections::HashMap,
+    io::{self, ErrorKind, Seek, SeekFrom},
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
 use tracing::warn;
 use zbus::{
     interface,
-    zvariant::{OwnedObjectPath, OwnedValue},
+    zvariant::{Fd, OwnedObjectPath, OwnedValue},
 };
 
 use crate::{
@@ -55,6 +58,18 @@ impl Email {
         _parent_window: String,
         options: HashMap<String, OwnedValue>,
     ) -> (u32, HashMap<String, OwnedValue>) {
+        // Attachments can't ride a `mailto:` URI — when present, drive
+        // `xdg-email --attach` instead. Fall through to the mailto path if
+        // xdg-email is missing or there are no attachments.
+        let attachments = copy_attachment_fds(&options);
+        if !attachments.is_empty() {
+            match launch_xdg_email(&options, &attachments) {
+                Ok(true) => return (Response::Success.code(), HashMap::new()),
+                Ok(false) => warn!("email: xdg-email not found; attachments dropped"),
+                Err(err) => warn!(%err, "email: xdg-email failed; falling back to mailto"),
+            }
+        }
+
         let uri = mailto(&options);
         match Command::new("xdg-open")
             .arg(&uri)
@@ -74,6 +89,96 @@ impl Email {
                 (Response::Other.code(), HashMap::new())
             }
         }
+    }
+}
+
+/// Copies any `attachment_fds` to temp files, returning their paths. The fds
+/// are only valid during the call, so we duplicate their contents up front.
+/// Temp files are left for the mail client to read (the OS reaps `/tmp`).
+fn copy_attachment_fds(options: &Vardict) -> Vec<PathBuf> {
+    let Some(value) = options.get("attachment_fds") else {
+        return Vec::new();
+    };
+    let fds: Vec<Fd> = match value.try_clone().ok().and_then(|v| Vec::try_from(v).ok()) {
+        Some(fds) => fds,
+        None => return Vec::new(),
+    };
+
+    let dir = std::env::temp_dir();
+    let pid = std::process::id();
+    fds.into_iter()
+        .enumerate()
+        .filter_map(|(i, fd)| {
+            let path = dir.join(format!("wayle-email-{pid}-{i}"));
+            copy_fd_to_file(fd, &path).then_some(path)
+        })
+        .collect()
+}
+
+/// Copies one attachment fd's contents into `path`. Returns whether it
+/// succeeded; logs and returns `false` otherwise.
+fn copy_fd_to_file(fd: Fd, path: &Path) -> bool {
+    let std_fd = match std::os::fd::OwnedFd::try_from(fd) {
+        Ok(fd) => fd,
+        Err(err) => {
+            warn!(%err, "email: cannot own attachment fd");
+            return false;
+        }
+    };
+    let mut src = std::fs::File::from(std_fd);
+    let _ = src.seek(SeekFrom::Start(0));
+    let mut dst = match std::fs::File::create(path) {
+        Ok(dst) => dst,
+        Err(err) => {
+            warn!(%err, "email: cannot create temp attachment file");
+            return false;
+        }
+    };
+    if io::copy(&mut src, &mut dst).is_err() {
+        warn!("email: cannot copy attachment fd");
+        return false;
+    }
+    true
+}
+
+/// Launches `xdg-email` with the compose fields + `--attach` for each file.
+/// Returns `Ok(false)` when `xdg-email` isn't installed (caller falls back to
+/// the `mailto:` path).
+fn launch_xdg_email(options: &Vardict, attachments: &[PathBuf]) -> io::Result<bool> {
+    let mut cmd = Command::new("xdg-email");
+    cmd.arg("--utf8");
+    if let Some(subject) = opt_string(options, "subject") {
+        cmd.arg("--subject").arg(subject);
+    }
+    if let Some(body) = opt_string(options, "body") {
+        cmd.arg("--body").arg(body);
+    }
+    for cc in string_list(options, "cc") {
+        cmd.arg("--cc").arg(cc);
+    }
+    for bcc in string_list(options, "bcc") {
+        cmd.arg("--bcc").arg(bcc);
+    }
+    for path in attachments {
+        cmd.arg("--attach").arg(path);
+    }
+    let mut to = string_list(options, "addresses");
+    if let Some(single) = opt_string(options, "address") {
+        to.push(single);
+    }
+    for addr in to {
+        cmd.arg(addr);
+    }
+
+    match cmd.stdout(Stdio::null()).stderr(Stdio::null()).spawn() {
+        Ok(mut child) => {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+            Ok(true)
+        }
+        Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(err),
     }
 }
 

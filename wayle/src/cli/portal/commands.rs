@@ -79,4 +79,11 @@ pub enum PortalDialog {
     /// (`org.freedesktop.impl.portal.DynamicLauncher`).
     #[command(name = "dynamic-launcher")]
     DynamicLauncher,
+    /// Wallpaper preview confirmation
+    /// (`org.freedesktop.impl.portal.Wallpaper` `show-preview`).
+    Wallpaper {
+        /// `file://` image URI to preview (defaults to a placeholder).
+        #[arg(long, default_value = "")]
+        uri: String,
+    },
 }

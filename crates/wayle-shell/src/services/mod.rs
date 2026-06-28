@@ -1,5 +1,6 @@
 //! Shell-specific services that run alongside the UI.
 
+pub mod color_picker;
 pub mod file_chooser;
 pub mod idle_inhibit;
 pub mod lock;

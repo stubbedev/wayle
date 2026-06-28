@@ -20,6 +20,7 @@ impl PortalDialogsDaemon {
         body: &str,
         grant_label: &str,
         deny_label: &str,
+        icon: &str,
     ) -> zbus::fdo::Result<bool> {
         let (reply_tx, reply_rx) = oneshot::channel();
         self.dispatch(PortalDialogInput::Access {
@@ -28,6 +29,7 @@ impl PortalDialogsDaemon {
             body: body.to_owned(),
             grant_label: grant_label.to_owned(),
             deny_label: deny_label.to_owned(),
+            icon: icon.to_owned(),
             reply: reply_tx,
         })?;
         reply_rx.await.map_err(|_| dropped())
@@ -39,6 +41,17 @@ impl PortalDialogsDaemon {
         let (reply_tx, reply_rx) = oneshot::channel();
         self.dispatch(PortalDialogInput::Account {
             reason: reason.to_owned(),
+            reply: reply_tx,
+        })?;
+        reply_rx.await.map_err(|_| dropped())
+    }
+
+    /// Wallpaper preview confirmation.
+    #[instrument(skip(self))]
+    pub async fn confirm_wallpaper(&self, uri: &str) -> zbus::fdo::Result<bool> {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        self.dispatch(PortalDialogInput::WallpaperPreview {
+            uri: uri.to_owned(),
             reply: reply_tx,
         })?;
         reply_rx.await.map_err(|_| dropped())
@@ -64,10 +77,11 @@ impl PortalDialogsDaemon {
 
     /// Dynamic-launcher install confirmation.
     #[instrument(skip(self))]
-    pub async fn confirm_install(&self, name: &str, _icon_name: &str) -> zbus::fdo::Result<bool> {
+    pub async fn confirm_install(&self, name: &str, icon_name: &str) -> zbus::fdo::Result<bool> {
         let (reply_tx, reply_rx) = oneshot::channel();
         self.dispatch(PortalDialogInput::ConfirmInstall {
             name: name.to_owned(),
+            icon_name: icon_name.to_owned(),
             reply: reply_tx,
         })?;
         reply_rx.await.map_err(|_| dropped())

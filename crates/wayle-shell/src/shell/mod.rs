@@ -1,4 +1,5 @@
 mod bar;
+pub(crate) mod color_picker;
 pub(crate) mod file_chooser;
 mod helpers;
 pub(crate) mod lock;
@@ -24,6 +25,7 @@ pub(crate) use services::ShellServices;
 use tracing::{debug, info};
 
 use self::{
+    color_picker::ColorPicker,
     file_chooser::FileChooser,
     lock::Lock,
     notification_popup::{NotificationPopupHost, PopupHostInit},
@@ -46,6 +48,7 @@ pub(crate) struct Shell {
     _osd: Option<Controller<Osd>>,
     _share_picker: Controller<SharePicker>,
     _region_overlay: Controller<RegionOverlay>,
+    _color_picker: Controller<ColorPicker>,
     _screenshot: Controller<Screenshot>,
     _file_chooser: Controller<FileChooser>,
     _portal_dialogs: Controller<PortalDialogs>,
@@ -133,6 +136,9 @@ impl Component for Shell {
         let region_overlay = RegionOverlay::builder().launch(()).detach();
         crate::services::region_overlay::register_sender(region_overlay.sender().clone());
 
+        let color_picker = ColorPicker::builder().launch(()).detach();
+        crate::services::color_picker::register_sender(color_picker.sender().clone());
+
         let screenshot = Screenshot::builder()
             .launch(ScreenshotInit {
                 config: init.services.config.clone(),
@@ -183,6 +189,7 @@ impl Component for Shell {
             _osd: osd,
             _share_picker: share_picker,
             _region_overlay: region_overlay,
+            _color_picker: color_picker,
             _screenshot: screenshot,
             _file_chooser: file_chooser,
             _portal_dialogs: portal_dialogs,

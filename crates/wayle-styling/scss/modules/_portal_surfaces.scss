@@ -492,3 +492,82 @@ button.file-chooser-nav {
 .file-chooser-name {
     margin: 0 var(--space-md) var(--space-sm);
 }
+
+// --- App chooser / dialog-host extras --------------------------------------
+
+// Header image slot — account avatar / dynamic-launcher icon, centered above
+// the title. Avatars read as rounded so they don't look like a flat sticker.
+.portal-dialog-image {
+    border-radius: var(--rounding-container);
+}
+
+// App-chooser search field, same chrome as the file-chooser search.
+.portal-dialog-search {
+    min-height: 0;
+    padding: 0 var(--space-xs);
+    border-radius: var(--rounding-element);
+    background: var(--bg-subtle, var(--bg-elevated));
+    border: 1px solid var(--border-subtle, var(--border-default));
+    color: var(--fg-default);
+
+    text {
+        min-height: 0;
+        padding: var(--space-xs) 0;
+    }
+
+    image {
+        color: var(--fg-muted);
+        min-height: 0;
+    }
+}
+
+// App rows: bold name over a muted one-line description. Both flip to the
+// on-accent foreground when the row is selected/hovered into the accent fill.
+.portal-dialog-app-name {
+    font-weight: var(--weight-medium, var(--weight-semibold));
+    color: var(--fg-default);
+}
+
+.portal-dialog-app-desc {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+}
+
+.portal-dialog-app-list row:selected {
+    .portal-dialog-app-name,
+    .portal-dialog-app-desc {
+        color: var(--fg-on-accent);
+    }
+}
+
+.portal-dialog-remember {
+    color: var(--fg-muted);
+    font-size: var(--text-sm);
+}
+
+// --- Print: settings form + rich printer rows ------------------------------
+
+.print-form-label {
+    color: var(--fg-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium, var(--weight-semibold));
+}
+
+// Printer rows carry a bold name over a muted "location · status" line; both
+// flip to the on-accent foreground when the row is selected.
+.print-printer-name {
+    font-weight: var(--weight-medium, var(--weight-semibold));
+    color: var(--fg-default);
+}
+
+.print-printer-detail {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+}
+
+.print-printer-list row:selected {
+    .print-printer-name,
+    .print-printer-detail {
+        color: var(--fg-on-accent);
+    }
+}
