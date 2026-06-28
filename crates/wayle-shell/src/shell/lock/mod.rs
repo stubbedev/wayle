@@ -4,14 +4,13 @@
 //! through [`gtk4_session_lock`]: the compositor blanks every output, routes
 //! input only to our surfaces, and—critically—keeps the session locked with a
 //! solid color if this process dies. We never expose an unlock path until the
-//! surfaces are mapped, and password verification ([`auth`]) runs on a blocking
-//! thread so the GTK loop cannot be stalled into skipping the grab.
+//! surfaces are mapped, and password verification (via [`wayle_auth`]) runs on
+//! a worker thread so the GTK loop cannot be stalled into skipping the grab.
 //!
 //! One [`gtk::Window`] is created per monitor and handed to the lock instance
 //! via [`Instance::assign_window_to_monitor`]. The instance, the windows, and
 //! the per-window widgets are all owned by the model and torn down on unlock.
 
-mod auth;
 mod logind;
 
 use std::time::{Duration, Instant};
@@ -23,12 +22,20 @@ use relm4::{
     prelude::*,
 };
 use tracing::{info, warn};
+use wayle_auth::{AuthEvent, AuthHandle, AuthPrompt, PamAuth};
 use wayle_config::{
     ConfigService,
-    schemas::{animations::AnimSurface, lock::LockBackground},
+    schemas::{
+        animations::{AnimSurface, AnimationType},
+        lock::LockBackground,
+    },
+};
+use wayle_widgets::{
+    components::credential_box::{CredentialBox, CredentialOpts},
+    prelude::WayleRevealer,
 };
 
-use crate::shell::helpers::{animation::revealer_transition, monitors::current_monitors};
+use crate::shell::helpers::monitors::current_monitors;
 
 /// Per-monitor widgets we keep live to drive the clock, password entry, and
 /// blank scrim while the screen is locked.
@@ -39,7 +46,7 @@ struct Surface {
     date: gtk::Label,
     error: gtk::Label,
     /// Reveals the credential box via the shared `[animations]` framework.
-    reveal: gtk::Revealer,
+    reveal: WayleRevealer,
     /// Opaque black overlay shown after `blank-timeout-ms` of inactivity.
     scrim: gtk::Box,
 }
@@ -64,8 +71,14 @@ pub(crate) struct Lock {
     attempts: u32,
     /// When the current lock began; drives the password-free grace window.
     locked_at: Option<Instant>,
-    /// A PAM verification is in flight; further submits are ignored.
-    authenticating: bool,
+    /// Handle to the in-flight auth conversation; `None` when idle.
+    auth: Option<AuthHandle>,
+    /// A prompt is on screen waiting for the user's next submit.
+    awaiting: bool,
+    /// A submitted value waiting to answer the conversation's first prompt
+    /// (the common "type password, hit enter" case where the value exists
+    /// before the backend asks for it).
+    pending: Option<String>,
     /// 1s clock refresh source, removed on unlock.
     clock_source: Option<glib::SourceId>,
     /// One-shot blank-screen source, re-armed on activity.
@@ -82,8 +95,8 @@ pub(crate) enum LockInput {
     ForceUnlock,
     /// The password entry was activated; verify `0`.
     Submit(String),
-    /// PAM verification finished with this result.
-    AuthResult(bool),
+    /// The auth conversation produced an event (prompt / success / failure).
+    Auth(AuthEvent),
     /// Refresh the clock/date labels.
     Tick,
     /// User input observed; unblank and re-arm the blank timer.
@@ -130,7 +143,9 @@ impl Component for Lock {
             surfaces: Vec::new(),
             attempts: 0,
             locked_at: None,
-            authenticating: false,
+            auth: None,
+            awaiting: false,
+            pending: None,
             clock_source: None,
             blank_source: None,
         };
@@ -143,7 +158,7 @@ impl Component for Lock {
             LockInput::Lock => self.acquire(&sender),
             LockInput::ForceUnlock => self.release(),
             LockInput::Submit(password) => self.submit(password, &sender),
-            LockInput::AuthResult(ok) => self.on_auth_result(ok),
+            LockInput::Auth(event) => self.on_auth_event(event),
             LockInput::Tick => self.refresh_clock(),
             LockInput::Activity => self.on_activity(&sender),
             LockInput::Blank => self.set_blanked(true),
@@ -176,10 +191,10 @@ impl Lock {
 
     /// Resolves the credential-box reveal animation `(transition, duration_ms)`
     /// from the shared `[animations]` config (`AnimSurface::Lock`, entering).
-    fn reveal_anim(&self) -> (gtk::RevealerTransitionType, u32) {
+    fn reveal_anim(&self) -> (AnimationType, u32) {
         let anim = &self.config.config().animations;
         (
-            revealer_transition(anim.transition_for(AnimSurface::Lock, false)),
+            anim.transition_for(AnimSurface::Lock, false),
             anim.duration_for(AnimSurface::Lock, false),
         )
     }
@@ -220,7 +235,11 @@ impl Lock {
         }
 
         self.attempts = 0;
-        self.authenticating = false;
+        // Reset conversation state by field (a `reset_auth()` call here would
+        // re-borrow `self` while the `instance` borrow below is still live).
+        self.auth = None;
+        self.awaiting = false;
+        self.pending = None;
         self.locked_at = Some(Instant::now());
         self.surfaces = build_surfaces(instance, &bg, show_clock, reveal, sender);
 
@@ -234,12 +253,30 @@ impl Lock {
         info!(monitors = self.surfaces.len(), "lock: session locked");
     }
 
-    /// Verifies a submitted password (or honors the grace window).
-    fn submit(&mut self, password: String, sender: &ComponentSender<Self>) {
-        if self.authenticating {
+    /// Handles a submitted entry value (or honors the grace window).
+    ///
+    /// The first submit of a lock session starts a PAM conversation; the typed
+    /// value is stashed in `pending` to answer that conversation's first
+    /// prompt. A submit made while a later prompt is on screen (`awaiting` — a
+    /// re-prompt such as an expired-password change) answers it directly.
+    fn submit(&mut self, value: String, sender: &ComponentSender<Self>) {
+        if self.attempts_exhausted() {
             return;
         }
-        if self.attempts_exhausted() {
+
+        // A prompt is waiting for input: answer it directly.
+        if self.awaiting {
+            self.awaiting = false;
+            if let Some(handle) = self.auth.as_ref() {
+                handle.answer(Some(value));
+            }
+            self.set_entries_sensitive(false);
+            return;
+        }
+
+        // Conversation already running but no prompt is pending: ignore the
+        // stray submit rather than racing the worker.
+        if self.auth.is_some() {
             return;
         }
 
@@ -255,37 +292,76 @@ impl Lock {
             return;
         }
 
-        if password.is_empty() {
+        if value.is_empty() {
             return;
         }
 
-        self.authenticating = true;
         self.set_entries_sensitive(false);
-
-        let service = self.config.config().lock.pam_service.get();
-        let user = auth::current_username();
-        let input = sender.input_sender().clone();
-        relm4::spawn(async move {
-            // PAM is blocking; keep it off the GTK loop.
-            let ok =
-                tokio::task::spawn_blocking(move || auth::authenticate(&service, &user, password))
-                    .await
-                    .unwrap_or(false);
-            input.emit(LockInput::AuthResult(ok));
-        });
+        self.start_conversation(value, sender);
     }
 
-    /// Applies the result of a PAM verification.
-    fn on_auth_result(&mut self, ok: bool) {
-        self.authenticating = false;
-        if ok {
-            info!("lock: authentication succeeded");
-            self.release();
-            return;
-        }
+    /// Spawns a PAM conversation, stashing `first_answer` for its first prompt.
+    fn start_conversation(&mut self, first_answer: String, sender: &ComponentSender<Self>) {
+        let service = self.config.config().lock.pam_service.get();
+        let input = sender.input_sender().clone();
+        self.pending = Some(first_answer);
+        self.auth = Some(wayle_auth::spawn(
+            PamAuth::new(service),
+            Some(wayle_auth::current_username()),
+            move |event| input.emit(LockInput::Auth(event)),
+        ));
+    }
 
+    /// Applies an event from the running auth conversation.
+    fn on_auth_event(&mut self, event: AuthEvent) {
+        match event {
+            AuthEvent::Prompt(prompt) => self.on_auth_prompt(prompt),
+            AuthEvent::Success => {
+                info!("lock: authentication succeeded");
+                self.release();
+            }
+            AuthEvent::Failure(reason) => self.on_auth_failure(&reason),
+        }
+    }
+
+    /// Routes a conversation prompt: answer input prompts from `pending` if a
+    /// value is already queued, otherwise surface the prompt and wait for the
+    /// next submit. Info/error prompts only update the on-screen text.
+    fn on_auth_prompt(&mut self, prompt: AuthPrompt) {
+        match prompt {
+            AuthPrompt::Secret(_) | AuthPrompt::Visible(_) => {
+                if let Some(answer) = self.pending.take() {
+                    if let Some(handle) = self.auth.as_ref() {
+                        handle.answer(Some(answer));
+                    }
+                } else {
+                    // A re-prompt with no queued value: re-enable input and let
+                    // the user respond. The next Submit answers it.
+                    self.awaiting = true;
+                    self.set_entries_sensitive(true);
+                    for s in &self.surfaces {
+                        s.entry.set_text("");
+                    }
+                    if let Some(first) = self.surfaces.first() {
+                        first.entry.grab_focus();
+                    }
+                }
+            }
+            AuthPrompt::Info(text) | AuthPrompt::Error(text) => {
+                for s in &self.surfaces {
+                    s.error.set_text(&text);
+                    s.error.set_visible(true);
+                }
+            }
+        }
+    }
+
+    /// Applies a failed/aborted conversation: counts the attempt and re-arms
+    /// the entry unless the cap is reached.
+    fn on_auth_failure(&mut self, reason: &str) {
+        self.reset_auth();
         self.attempts = self.attempts.saturating_add(1);
-        warn!(attempts = self.attempts, "lock: authentication failed");
+        warn!(attempts = self.attempts, %reason, "lock: authentication failed");
         self.set_entries_sensitive(!self.attempts_exhausted());
         self.show_error();
         for s in &self.surfaces {
@@ -296,6 +372,13 @@ impl Lock {
         {
             first.entry.grab_focus();
         }
+    }
+
+    /// Drops any in-flight conversation and clears its transient state.
+    fn reset_auth(&mut self) {
+        self.auth = None;
+        self.awaiting = false;
+        self.pending = None;
     }
 
     /// Tears down all surfaces and releases the lock.
@@ -316,6 +399,7 @@ impl Lock {
         }
         self.locked_at = None;
         self.attempts = 0;
+        self.reset_auth();
         self.set_locked_hint(false);
         info!("lock: session unlocked");
     }
@@ -411,7 +495,7 @@ fn build_surfaces(
     instance: &Instance,
     bg: &BgConfig,
     show_clock: bool,
-    reveal: (gtk::RevealerTransitionType, u32),
+    reveal: (AnimationType, u32),
     sender: &ComponentSender<Lock>,
 ) -> Vec<Surface> {
     let mut surfaces = Vec::new();
@@ -433,7 +517,7 @@ fn build_surfaces(
 fn build_surface(
     bg: &BgConfig,
     show_clock: bool,
-    reveal: (gtk::RevealerTransitionType, u32),
+    reveal: (AnimationType, u32),
     sender: &ComponentSender<Lock>,
 ) -> Surface {
     let window = gtk::Window::builder().decorated(false).build();
@@ -442,44 +526,20 @@ fn build_surface(
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&build_background(bg)));
 
-    // Centered credential box.
-    let center = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    center.add_css_class("lock-center");
-    center.set_halign(gtk::Align::Center);
-    center.set_valign(gtk::Align::Center);
-
-    let clock = gtk::Label::new(None);
-    clock.add_css_class("lock-clock");
-    clock.set_visible(show_clock);
-    let date = gtk::Label::new(None);
-    date.add_css_class("lock-date");
-    date.set_visible(show_clock);
-
-    let entry = gtk::PasswordEntry::new();
-    entry.add_css_class("lock-entry");
-    entry.set_show_peek_icon(true);
-    entry.set_width_chars(24);
-
-    let error = gtk::Label::new(None);
-    error.add_css_class("lock-error");
-    error.set_visible(false);
-
-    center.append(&clock);
-    center.append(&date);
-    center.append(&entry);
-    center.append(&error);
-
-    // Reveal the credential box through the shared animation framework; the
-    // background stays put so the screen is opaque the instant it locks.
+    // Shared credential box (clock, date, entry, error) wrapped in the reveal
+    // animation. The background stays put so the screen is opaque the instant
+    // it locks.
     let (transition, duration) = reveal;
-    let revealer = gtk::Revealer::new();
-    revealer.set_halign(gtk::Align::Center);
-    revealer.set_valign(gtk::Align::Center);
-    revealer.set_transition_type(transition);
-    revealer.set_transition_duration(duration);
-    revealer.set_reveal_child(false);
-    revealer.set_child(Some(&center));
-    overlay.add_overlay(&revealer);
+    let input = sender.input_sender().clone();
+    let cred = CredentialBox::build(
+        &CredentialOpts {
+            show_clock,
+            transition,
+            duration_ms: duration,
+        },
+        move |text| input.emit(LockInput::Submit(text)),
+    );
+    overlay.add_overlay(&cred.root);
 
     // Blank scrim: opaque black layer on top, hidden until the blank timer.
     let scrim = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -488,15 +548,6 @@ fn build_surface(
     overlay.add_overlay(&scrim);
 
     window.set_child(Some(&overlay));
-
-    // Entry submit → verify.
-    {
-        let input = sender.input_sender().clone();
-        let entry_ref = entry.clone();
-        entry.connect_activate(move |_| {
-            input.emit(LockInput::Submit(entry_ref.text().to_string()));
-        });
-    }
 
     // Any keypress counts as activity (unblank + reset blank timer).
     {
@@ -512,11 +563,11 @@ fn build_surface(
 
     Surface {
         window,
-        entry,
-        clock,
-        date,
-        error,
-        reveal: revealer,
+        entry: cred.entry,
+        clock: cred.clock,
+        date: cred.date,
+        error: cred.error,
+        reveal: cred.root,
         scrim,
     }
 }

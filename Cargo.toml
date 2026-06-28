@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+	"crates/wayle-auth",
 	"crates/wayle-config",
 	"crates/wayle-derive",
+	"crates/wayle-greeter",
 	"crates/wayle-i18n",
 	"crates/wayle-icons",
 	"crates/wayle-idle-inhibit",
@@ -39,7 +41,7 @@ members = [
 exclude = ["sandbox"]
 
 [workspace.package]
-version = "0.8.0"
+version = "0.8.6"
 edition = "2024"
 rust-version = "1.93"
 repository = "https://github.com/stubbedev/wayle"
@@ -84,7 +86,14 @@ libc = "0.2.176"
 libpulse-binding = { version = "2.30.1", features = ["pa_v13"] }
 niri-ipc = "=25.11.0"
 pipewire = "0.10"
-libspa = "0.10"
+# `v0_3_62` gates `MetaVideoTransform` (confirmed in
+# libspa-0.10.0/src/buffer/meta.rs: `#[cfg(feature = "v0_3_62")] MetaVideoTransform`).
+libspa = { version = "0.10", features = ["v0_3_62"] }
+# dmabuf zero-copy capture path (best-effort, SHM fallback). `gbm` allocates the
+# DRM buffer object; `drm-fourcc` provides the DRM fourcc / modifier types gbm's
+# Format/Modifier enums are built from.
+gbm = "0.18"
+drm-fourcc = "2.2"
 minijinja = { version = "2.15", default-features = false, features = [
 	"builtins",
 	"serde",
@@ -158,6 +167,7 @@ wayle-traits = { path = "crates/wayle-traits" }
 wayle-wallpaper = { path = "crates/wayle-wallpaper" }
 wayle-weather = { path = "crates/wayle-weather" }
 
+wayle-auth = { path = "crates/wayle-auth" }
 wayle-config = { path = "crates/wayle-config" }
 wayle-derive = { path = "crates/wayle-derive" }
 wayle-i18n = { path = "crates/wayle-i18n" }

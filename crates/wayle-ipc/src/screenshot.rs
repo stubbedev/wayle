@@ -15,9 +15,10 @@ pub const SERVICE_PATH: &str = "/com/wayle/Screenshot";
 pub trait Screenshot {
     /// Captures a screenshot.
     ///
-    /// `mode` is one of `region`, `output`, or `window`. `target` is an
-    /// optional output connector name (used by `output` mode) or empty.
-    /// Returns the saved PNG path, or an empty string if the user cancelled.
+    /// `mode` is one of `region`, `output`, `screen`, or `window`. `target` is
+    /// an optional output connector name (used by `output` mode) or empty;
+    /// `screen` composites all outputs into one whole-layout image. Returns the
+    /// saved PNG path, or an empty string if the user cancelled.
     async fn capture(&self, mode: &str, target: &str) -> Result<String>;
 
     /// Picks a single screen color interactively, returning it as an sRGB

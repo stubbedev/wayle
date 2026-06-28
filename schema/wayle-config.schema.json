@@ -16,7 +16,7 @@
       ]
     },
     "AnimationType": {
-      "description": "Enter/exit transition style for transient surfaces (OSD, toasts,\nnotifications). Maps onto GTK's revealer transitions.",
+      "description": "Enter/exit transition style for transient surfaces (OSD, toasts,\nnotifications). Driven per frame by the custom revealer\n(`GskTransform` + opacity).",
       "oneOf": [
         {
           "const": "none",
@@ -66,12 +66,37 @@
         {
           "const": "swing-right",
           "description": "Slide in from / out to the right edge with a rotating swing.",
+          "type": "string"
+        },
+        {
+          "const": "bounce",
+          "description": "Scale in from a shrunken state with an elastic overshoot, then settle.",
+          "type": "string"
+        },
+        {
+          "const": "genie",
+          "description": "Suck in toward / out to the surface's anchored edge (macOS \"genie\"\nminimize, approximated with an affine scale-and-slide). Auto-orients to\nthe edge the surface sits on.",
+          "type": "string"
+        },
+        {
+          "const": "zoom",
+          "description": "Scale in smoothly from the center with no overshoot.",
+          "type": "string"
+        },
+        {
+          "const": "rotate",
+          "description": "Spin in: rotate into place while scaling up and fading in.",
+          "type": "string"
+        },
+        {
+          "const": "flip",
+          "description": "Card flip: open out from a vertical edge (horizontal scale through zero).",
           "type": "string"
         }
       ]
     },
     "AnimationType2": {
-      "description": "Enter/exit transition style for transient surfaces (OSD, toasts,\nnotifications). Maps onto GTK's revealer transitions.",
+      "description": "Enter/exit transition style for transient surfaces (OSD, toasts,\nnotifications). Driven per frame by the custom revealer\n(`GskTransform` + opacity).",
       "oneOf": [
         {
           "const": "none",
@@ -121,6 +146,31 @@
         {
           "const": "swing-right",
           "description": "Slide in from / out to the right edge with a rotating swing.",
+          "type": "string"
+        },
+        {
+          "const": "bounce",
+          "description": "Scale in from a shrunken state with an elastic overshoot, then settle.",
+          "type": "string"
+        },
+        {
+          "const": "genie",
+          "description": "Suck in toward / out to the surface's anchored edge (macOS \"genie\"\nminimize, approximated with an affine scale-and-slide). Auto-orients to\nthe edge the surface sits on.",
+          "type": "string"
+        },
+        {
+          "const": "zoom",
+          "description": "Scale in smoothly from the center with no overshoot.",
+          "type": "string"
+        },
+        {
+          "const": "rotate",
+          "description": "Spin in: rotate into place while scaling up and fading in.",
+          "type": "string"
+        },
+        {
+          "const": "flip",
+          "description": "Card flip: open out from a vertical edge (horizontal scale through zero).",
           "type": "string"
         }
       ]
@@ -7957,7 +8007,7 @@
       "type": "integer"
     }
   },
-  "$id": "wayle-config-0.8.0",
+  "$id": "wayle-config-0.8.6",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for Wayle.\n\nRepresents the complete configuration schema that can be loaded\nfrom TOML files. All fields have sensible defaults.",
   "properties": {

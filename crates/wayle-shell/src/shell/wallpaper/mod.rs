@@ -239,18 +239,23 @@ fn content_fit(fit: FitMode) -> gtk::ContentFit {
 }
 
 /// Maps a shared [`AnimationType`] to a `gtk::Stack` transition. `Stack` has no
-/// swing variants, so those fall back to a crossfade.
+/// swing/bounce/genie variants, so those fall back to a crossfade.
 fn stack_transition(anim: AnimationType) -> gtk::StackTransitionType {
     match anim {
         AnimationType::None => gtk::StackTransitionType::None,
-        AnimationType::Fade => gtk::StackTransitionType::Crossfade,
         AnimationType::SlideUp => gtk::StackTransitionType::SlideUp,
         AnimationType::SlideDown => gtk::StackTransitionType::SlideDown,
         AnimationType::SlideLeft => gtk::StackTransitionType::SlideLeft,
         AnimationType::SlideRight => gtk::StackTransitionType::SlideRight,
-        AnimationType::SwingUp
+        AnimationType::Fade
+        | AnimationType::SwingUp
         | AnimationType::SwingDown
         | AnimationType::SwingLeft
-        | AnimationType::SwingRight => gtk::StackTransitionType::Crossfade,
+        | AnimationType::SwingRight
+        | AnimationType::Bounce
+        | AnimationType::Genie
+        | AnimationType::Zoom
+        | AnimationType::Rotate
+        | AnimationType::Flip => gtk::StackTransitionType::Crossfade,
     }
 }

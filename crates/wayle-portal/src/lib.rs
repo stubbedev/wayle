@@ -49,13 +49,15 @@ mod wallpaper;
 
 use std::{
     collections::HashMap,
-    future::pending,
     sync::{Arc, Mutex},
 };
 
-use tracing::info;
+use tracing::{info, warn};
 use wayle_config::ConfigService;
-use zbus::Connection;
+use zbus::{
+    Connection,
+    fdo::{RequestNameFlags, RequestNameReply},
+};
 
 /// Shared registry mapping a ScreenCast PipeWire node id to its pixel size, so
 /// RemoteDesktop can map absolute pointer coordinates onto the right extent.
@@ -97,109 +99,112 @@ pub async fn run() -> Result<(), Error> {
 
     let server = connection.object_server();
     let path = settings::PORTAL_PATH;
-    server
-        .at(path, Settings::new(config.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Lockdown)
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(
-            path,
-            ScreenCast::new(connection.clone(), stream_sizes.clone()),
-        )
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Screenshot::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(
-            path,
-            RemoteDesktop::new(connection.clone(), stream_sizes.clone()),
-        )
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, GlobalShortcuts::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
+    mount(server, path, Settings::new(config.clone())).await?;
+    mount(server, path, Lockdown).await?;
+    mount(
+        server,
+        path,
+        ScreenCast::new(connection.clone(), stream_sizes.clone()),
+    )
+    .await?;
+    mount(server, path, Screenshot::new(connection.clone())).await?;
+    mount(
+        server,
+        path,
+        RemoteDesktop::new(connection.clone(), stream_sizes.clone()),
+    )
+    .await?;
+    mount(server, path, GlobalShortcuts::new(connection.clone())).await?;
     let notification = Notification::new(connection.clone());
     notification.spawn_action_forwarder();
-    server
-        .at(path, notification)
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, WallpaperPortal::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Inhibit::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Background::new())
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Usb::new())
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Clipboard::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, InputCapture::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, FileChooser::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Email::new())
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Access::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Account::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, AppChooser::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, DynamicLauncher::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Print::new(connection.clone()))
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
-    server
-        .at(path, Secret::new())
-        .await
-        .map_err(|err| Error::Registration(err.to_string()))?;
+    mount(server, path, notification).await?;
+    mount(server, path, WallpaperPortal::new(connection.clone())).await?;
+    mount(server, path, Inhibit::new(connection.clone())).await?;
+    mount(server, path, Background::new()).await?;
+    mount(server, path, Usb::new()).await?;
+    mount(server, path, Clipboard::new(connection.clone())).await?;
+    mount(server, path, InputCapture::new(connection.clone())).await?;
+    mount(server, path, FileChooser::new(connection.clone())).await?;
+    mount(server, path, Email::new()).await?;
+    mount(server, path, Access::new(connection.clone())).await?;
+    mount(server, path, Account::new(connection.clone())).await?;
+    mount(server, path, AppChooser::new(connection.clone())).await?;
+    mount(server, path, DynamicLauncher::new(connection.clone())).await?;
+    mount(server, path, Print::new(connection.clone())).await?;
+    mount(server, path, Secret::new()).await?;
 
-    connection
-        .request_name(BUS_NAME)
+    // Request the name with `DoNotQueue` so that, if another backend already
+    // owns it, we fail loudly instead of silently queueing and idling forever.
+    let reply = connection
+        .request_name_with_flags(BUS_NAME, RequestNameFlags::DoNotQueue.into())
         .await
         .map_err(|err| Error::NameRequest(err.to_string()))?;
+    if reply != RequestNameReply::PrimaryOwner {
+        return Err(Error::NameRequest(format!(
+            "{BUS_NAME} is already owned by another backend (reply: {reply:?})"
+        )));
+    }
 
     settings::spawn_watcher(&connection, config);
 
     info!("Wayle portal backend registered at {BUS_NAME}");
 
-    // Keep the connection (and thus the name + objects) alive forever.
-    pending::<()>().await;
+    // Run until terminated. On SIGTERM/SIGINT, clear live sessions so their
+    // PipeWire loops stop, then return cleanly.
+    wait_for_shutdown().await;
+    info!("Wayle portal backend shutting down");
+    session::clear_all();
+
     Ok(())
+}
+
+/// Registers one portal interface object at `path`, mapping a registration
+/// failure to [`Error::Registration`]. Collapses the otherwise-repeated
+/// `server.at(...).await.map_err(...)?` boilerplate at every mount site.
+async fn mount<I>(
+    server: &zbus::object_server::ObjectServer,
+    path: &str,
+    iface: I,
+) -> Result<(), Error>
+where
+    I: zbus::object_server::Interface,
+{
+    server
+        .at(path, iface)
+        .await
+        .map(|_| ())
+        .map_err(|err| Error::Registration(err.to_string()))
+}
+
+/// Resolves on the first SIGTERM or SIGINT.
+///
+/// On non-Unix targets (none are supported in practice) this falls back to
+/// `ctrl_c` alone.
+async fn wait_for_shutdown() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+
+        let mut term = match signal(SignalKind::terminate()) {
+            Ok(term) => term,
+            Err(err) => {
+                warn!("cannot install SIGTERM handler: {err}; waiting on SIGINT only");
+                let _ = tokio::signal::ctrl_c().await;
+                return;
+            }
+        };
+        tokio::select! {
+            res = tokio::signal::ctrl_c() => {
+                if let Err(err) = res {
+                    warn!("cannot wait on SIGINT: {err}");
+                }
+            }
+            _ = term.recv() => {}
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
 }

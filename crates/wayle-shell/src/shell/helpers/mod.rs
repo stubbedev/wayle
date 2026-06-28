@@ -1,4 +1,3 @@
-pub(crate) mod animation;
 mod bootstrap;
 pub(crate) mod layer_shell;
 pub(crate) mod monitors;

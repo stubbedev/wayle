@@ -19,6 +19,7 @@ use relm4::{gtk, gtk::prelude::*, prelude::*};
 use tokio::sync::oneshot;
 use tracing::warn;
 use wayle_config::{ConfigService, schemas::animations::AnimSurface};
+use wayle_widgets::prelude::WayleRevealer;
 
 use crate::shell::helpers::surface_anim;
 
@@ -85,7 +86,7 @@ impl Component for Print {
             set_visible: false,
 
             #[name = "revealer"]
-            gtk::Revealer {
+            WayleRevealer {
                 set_reveal_child: false,
 
                 gtk::Box {

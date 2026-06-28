@@ -13,6 +13,7 @@ pub mod popover;
 pub mod progress_bar;
 pub mod progress_ring;
 pub mod radio_group;
+pub mod revealer;
 pub mod separator;
 pub mod slider;
 pub mod spinner;

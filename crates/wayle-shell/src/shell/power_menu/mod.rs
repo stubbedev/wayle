@@ -14,7 +14,11 @@ use relm4::{
     gtk::{EventControllerKey, glib, prelude::*},
     prelude::*,
 };
-use wayle_config::{ConfigService, schemas::animations::AnimSurface};
+use wayle_config::{
+    ConfigService,
+    schemas::animations::{AnimSurface, AnimationType},
+};
+use wayle_widgets::prelude::WayleRevealer;
 
 use crate::process;
 
@@ -92,7 +96,7 @@ impl Component for PowerMenu {
             set_visible: false,
 
             #[name = "revealer"]
-            gtk::Revealer {
+            WayleRevealer {
                 set_reveal_child: false,
 
                 #[name = "surface"]
@@ -215,17 +219,17 @@ impl PowerMenu {
         }
     }
 
-    fn animation(&self, exiting: bool) -> (gtk::RevealerTransitionType, u32) {
+    fn animation(&self, exiting: bool) -> (AnimationType, u32) {
         let animations = &self.config.config().animations;
         (
-            revealer_transition(animations.transition_for(AnimSurface::Power, exiting)),
+            animations.transition_for(AnimSurface::Power, exiting),
             animations.duration_for(AnimSurface::Power, exiting),
         )
     }
 
     fn reveal(&self, widgets: &PowerMenuWidgets, root: &gtk::Window) {
         let (transition, duration) = self.animation(false);
-        widgets.revealer.set_transition_type(transition);
+        widgets.revealer.set_transition(transition);
         widgets.revealer.set_transition_duration(duration);
         widgets.revealer.set_reveal_child(false);
         root.set_visible(true);
@@ -234,7 +238,7 @@ impl PowerMenu {
 
     fn hide_animated(&self, widgets: &PowerMenuWidgets, root: &gtk::Window) {
         let (transition, duration) = self.animation(true);
-        widgets.revealer.set_transition_type(transition);
+        widgets.revealer.set_transition(transition);
         widgets.revealer.set_transition_duration(duration);
         widgets.revealer.set_reveal_child(false);
 
@@ -244,5 +248,3 @@ impl PowerMenu {
         });
     }
 }
-
-use crate::shell::helpers::animation::revealer_transition;

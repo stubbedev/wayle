@@ -1,0 +1,28 @@
+[package]
+name = "wayle-greeter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Wayle greetd greeter - login screen sharing the lock screen theme"
+repository.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "wayle-greeter"
+path = "src/main.rs"
+
+[dependencies]
+gtk4.workspace = true
+gdk4.workspace = true
+glib.workspace = true
+relm4.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+wayle-auth.workspace = true
+wayle-config.workspace = true
+wayle-styling.workspace = true
+wayle-widgets.workspace = true
+
+[lints]
+workspace = true

@@ -11,7 +11,7 @@ use std::sync::{
 };
 
 use tokio::sync::Notify;
-use tracing::debug;
+use tracing::{debug, warn};
 use zbus::{Connection, interface, zvariant::OwnedObjectPath};
 
 /// Shared cancellation flag for an in-flight request.
@@ -97,13 +97,21 @@ impl RequestGuard {
 
 impl Drop for RequestGuard {
     fn drop(&mut self) {
+        // Drop runs in a sync context and cannot await, so the removal stays a
+        // spawned task. Unlike the previous fire-and-forget version we log a
+        // failed removal rather than silently dropping the `Result`, so a leaked
+        // Request object (and a potential handle-reuse collision) is at least
+        // visible in the logs.
         let connection = self.connection.clone();
         let handle = self.handle.clone();
         tokio::spawn(async move {
-            let _ = connection
+            if let Err(err) = connection
                 .object_server()
                 .remove::<Request, _>(&handle)
-                .await;
+                .await
+            {
+                warn!(%err, %handle, "cannot unmount request object");
+            }
         });
     }
 }

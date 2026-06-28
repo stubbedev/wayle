@@ -1,7 +1,7 @@
 [package]
 name = "wayle-niri"
 description = "Reactive niri compositor state and event streaming"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true

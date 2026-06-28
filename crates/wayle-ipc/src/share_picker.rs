@@ -22,7 +22,12 @@ pub trait SharePicker {
     /// `/screen:DP-1`, `/region:DP-1@0,0,800,600`. Returns an empty string if
     /// the user cancels.
     ///
+    /// When `multiple` is true the user may select more than one source before
+    /// confirming, and the suffix carries several payloads joined by `;` after
+    /// the (single, shared) flag segment, e.g. `r/screen:DP-1;window:123`. When
+    /// false at most one payload is returned (legacy single-select behaviour).
+    ///
     /// `window_list` is the raw `XDPH_WINDOW_SHARING_LIST` value;
     /// `allow_token` seeds the restore-token checkbox.
-    async fn pick(&self, window_list: &str, allow_token: bool) -> Result<String>;
+    async fn pick(&self, window_list: &str, allow_token: bool, multiple: bool) -> Result<String>;
 }

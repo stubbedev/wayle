@@ -1,8 +1,11 @@
 [Unit]
 Description=Wayle xdg-desktop-portal backend
+# Do NOT Requires=/After= xdg-desktop-portal.service: the frontend D-Bus-
+# activates this backend while still activating itself, so depending on the
+# frontend deadlocks both until 25s D-Bus timeouts break it. The frontend
+# discovers and starts this unit on demand via the .portal DBusName.
 PartOf=graphical-session.target
 After=graphical-session.target
-Requires=xdg-desktop-portal.service
 
 [Service]
 Type=dbus

@@ -509,7 +509,7 @@ checksum = "cb9f6e1368bd4621d2c86baa7e37de77a938adf5221e5dd3d6133340101b309e"
 dependencies = [
  "bitflags 2.10.0",
  "polling",
- "rustix",
+ "rustix 1.1.3",
  "slab",
  "tracing",
 ]
@@ -521,7 +521,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138efcf0940a02ebf0cc8d1eff41a1682a46b431630f4c52450d6265876021fa"
 dependencies = [
  "calloop",
- "rustix",
+ "rustix 1.1.3",
  "wayland-backend",
  "wayland-client",
 ]
@@ -903,6 +903,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dlib"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab8ecd87370524b461f8557c119c405552c396ed91fc0a8eec68679eab26f94a"
+dependencies = [
+ "libloading",
+]
+
+[[package]]
 name = "dotenvy"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -913,6 +922,46 @@ name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
+
+[[package]]
+name = "drm"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80bc8c5c6c2941f70a55c15f8d9f00f9710ebda3ffda98075f996a0e6c92756f"
+dependencies = [
+ "bitflags 2.10.0",
+ "bytemuck",
+ "drm-ffi",
+ "drm-fourcc",
+ "libc",
+ "rustix 0.38.44",
+]
+
+[[package]]
+name = "drm-ffi"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51a91c9b32ac4e8105dec255e849e0d66e27d7c34d184364fb93e469db08f690"
+dependencies = [
+ "drm-sys",
+ "rustix 1.1.3",
+]
+
+[[package]]
+name = "drm-fourcc"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0aafbcdb8afc29c1a7ee5fbe53b5d62f4565b35a042a662ca9fecd0b54dae6f4"
+
+[[package]]
+name = "drm-sys"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecc8e1361066d91f5ffccff060a3c3be9c3ecde15be2959c1937595f7a82a9f8"
+dependencies = [
+ "libc",
+ "linux-raw-sys 0.9.4",
+]
 
 [[package]]
 name = "dunce"
@@ -1388,6 +1437,30 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "slab",
+]
+
+[[package]]
+name = "gbm"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce852e998d3ca5e4a97014fb31c940dc5ef344ec7d364984525fd11e8a547e6a"
+dependencies = [
+ "bitflags 2.10.0",
+ "drm",
+ "drm-fourcc",
+ "gbm-sys",
+ "libc",
+ "wayland-backend",
+ "wayland-server",
+]
+
+[[package]]
+name = "gbm-sys"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c13a5f2acc785d8fb6bf6b7ab6bfb0ef5dad4f4d97e8e70bb8e470722312f76f"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -2673,7 +2746,7 @@ dependencies = [
  "libc",
  "libspa-sys",
  "nom 8.0.0",
- "rustix",
+ "rustix 1.1.3",
  "system-deps",
 ]
 
@@ -2708,6 +2781,18 @@ dependencies = [
  "libc",
  "pkg-config",
 ]
+
+[[package]]
+name = "linux-raw-sys"
+version = "0.4.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d26c52dbd32dccf2d10cac7725f8eae5296885fb5703b261f7d0a0739ec807ab"
+
+[[package]]
+name = "linux-raw-sys"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd945864f07fe9f5371a27ad7b52a172b4b499999f1d97574c9fa68373937e12"
 
 [[package]]
 name = "linux-raw-sys"
@@ -2791,7 +2876,7 @@ version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad38eb12aea514a0466ea40a80fd8cc83637065948eb4a426e4aa46261175227"
 dependencies = [
- "rustix",
+ "rustix 1.1.3",
 ]
 
 [[package]]
@@ -3278,7 +3363,7 @@ dependencies = [
  "libspa",
  "libspa-sys",
  "pipewire-sys",
- "rustix",
+ "rustix 1.1.3",
 ]
 
 [[package]]
@@ -3321,7 +3406,7 @@ dependencies = [
  "concurrent-queue",
  "hermit-abi 0.5.2",
  "pin-project-lite",
- "rustix",
+ "rustix 1.1.3",
  "windows-sys 0.61.2",
 ]
 
@@ -3733,7 +3818,7 @@ dependencies = [
  "calloop",
  "enumflags2",
  "log",
- "rustix",
+ "rustix 1.1.3",
 ]
 
 [[package]]
@@ -3930,6 +4015,19 @@ dependencies = [
 
 [[package]]
 name = "rustix"
+version = "0.38.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdb5bc1ae2baa591800df16c9ca78619bf65c0488b41b96ccec5d11220d8c154"
+dependencies = [
+ "bitflags 2.10.0",
+ "errno",
+ "libc",
+ "linux-raw-sys 0.4.15",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "rustix"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "146c9e247ccc180c1f61615433868c99f3de3ae256a30a43b49f67c2d9171f34"
@@ -3937,7 +4035,7 @@ dependencies = [
  "bitflags 2.10.0",
  "errno",
  "libc",
- "linux-raw-sys",
+ "linux-raw-sys 0.11.0",
  "windows-sys 0.61.2",
 ]
 
@@ -4088,6 +4186,12 @@ dependencies = [
  "serde_derive_internals",
  "syn",
 ]
+
+[[package]]
+name = "scoped-tls"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
 
 [[package]]
 name = "scopeguard"
@@ -4382,7 +4486,7 @@ dependencies = [
  "log",
  "memmap2",
  "pkg-config",
- "rustix",
+ "rustix 1.1.3",
  "thiserror 2.0.18",
  "wayland-backend",
  "wayland-client",
@@ -4593,7 +4697,7 @@ dependencies = [
  "fastrand",
  "getrandom 0.3.4",
  "once_cell",
- "rustix",
+ "rustix 1.1.3",
  "windows-sys 0.61.2",
 ]
 
@@ -5421,7 +5525,8 @@ checksum = "2857dd20b54e916ec7253b3d6b4d5c4d7d4ca2c33c2e11c6c76a99bd8744755d"
 dependencies = [
  "cc",
  "downcast-rs",
- "rustix",
+ "rustix 1.1.3",
+ "scoped-tls",
  "smallvec",
  "wayland-sys",
 ]
@@ -5433,7 +5538,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "645c7c96bb74690c3189b5c9cb4ca1627062bb23693a4fad9d8c3de958260144"
 dependencies = [
  "bitflags 2.10.0",
- "rustix",
+ "rustix 1.1.3",
  "wayland-backend",
  "wayland-scanner",
 ]
@@ -5455,7 +5560,7 @@ version = "0.31.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5864c4b5b6064b06b1e8b74ead4a98a6c45a285fe7a0e784d24735f011fdb078"
 dependencies = [
- "rustix",
+ "rustix 1.1.3",
  "wayland-client",
  "xcursor",
 ]
@@ -5523,17 +5628,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "wayland-server"
+version = "0.31.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc1846eb04c49182e04f4a099e2a830a2b745610bbc1d61246e206f29c7000a0"
+dependencies = [
+ "bitflags 2.10.0",
+ "downcast-rs",
+ "rustix 1.1.3",
+ "wayland-backend",
+ "wayland-scanner",
+]
+
+[[package]]
 name = "wayland-sys"
 version = "0.31.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8eab23fefc9e41f8e841df4a9c707e8a8c4ed26e944ef69297184de2785e3be"
 dependencies = [
+ "dlib",
+ "libc",
+ "log",
+ "memoffset",
  "pkg-config",
 ]
 
 [[package]]
 name = "wayle"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "chrono",
  "clap",
@@ -5582,7 +5704,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-audio"
-version = "0.1.4"
+version = "0.8.6"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -5600,8 +5722,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "wayle-auth"
+version = "0.8.6"
+dependencies = [
+ "pam",
+ "serde",
+ "serde_json",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "wayle-battery"
-version = "0.1.2"
+version = "0.8.6"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -5619,7 +5752,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-bluetooth"
-version = "0.1.2"
+version = "0.8.6"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -5636,7 +5769,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-brightness"
-version = "0.1.2"
+version = "0.8.6"
 dependencies = [
  "ddc",
  "ddc-i2c",
@@ -5655,7 +5788,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-cava"
-version = "0.1.2"
+version = "0.8.6"
 dependencies = [
  "bindgen",
  "cc",
@@ -5673,7 +5806,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-config"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "dotenvy",
  "futures",
@@ -5698,7 +5831,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-core"
-version = "0.1.2"
+version = "0.8.6"
 dependencies = [
  "futures",
  "schemars",
@@ -5713,7 +5846,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-derive"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5725,8 +5858,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "wayle-greeter"
+version = "0.8.6"
+dependencies = [
+ "chrono",
+ "gdk4",
+ "glib",
+ "gtk4",
+ "relm4",
+ "tracing",
+ "tracing-subscriber",
+ "wayle-auth",
+ "wayle-config",
+ "wayle-styling",
+ "wayle-widgets",
+]
+
+[[package]]
 name = "wayle-hyprland"
-version = "0.2.2"
+version = "0.8.6"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -5744,7 +5894,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-i18n"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "i18n-embed",
  "i18n-embed-fl",
@@ -5757,7 +5907,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-icons"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "futures",
  "gtk4",
@@ -5772,7 +5922,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-idle-inhibit"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "gdk4",
  "glib",
@@ -5782,7 +5932,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-ipc"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "serde",
  "serde_json",
@@ -5793,7 +5943,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-mango"
-version = "0.1.1"
+version = "0.8.6"
 dependencies = [
  "derive_more",
  "futures",
@@ -5810,7 +5960,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-media"
-version = "0.1.3"
+version = "0.8.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5832,7 +5982,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-network"
-version = "0.1.2"
+version = "0.8.6"
 dependencies = [
  "async-trait",
  "bitflags 2.10.0",
@@ -5851,7 +6001,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-niri"
-version = "0.1.0"
+version = "0.8.6"
 dependencies = [
  "derive_more",
  "futures",
@@ -5868,7 +6018,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-notification"
-version = "0.1.4"
+version = "0.8.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5891,7 +6041,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-portal"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "calloop",
  "futures",
@@ -5917,7 +6067,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-power-profiles"
-version = "0.1.4"
+version = "0.8.6"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -5935,7 +6085,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-recorder"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "ashpd",
  "futures",
@@ -5948,7 +6098,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-settings"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "futures",
  "gtk4",
@@ -5973,11 +6123,14 @@ dependencies = [
 
 [[package]]
 name = "wayle-share-preview"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "bitflags 2.10.0",
+ "drm-fourcc",
+ "gbm",
  "hyprland",
  "image",
+ "libc",
  "log",
  "memfd",
  "thiserror 2.0.18",
@@ -5990,7 +6143,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-shell"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "bytesize",
  "chrono",
@@ -6012,7 +6165,6 @@ dependencies = [
  "libc",
  "minijinja",
  "notify",
- "pam",
  "relm4",
  "rust-embed",
  "serde",
@@ -6026,6 +6178,7 @@ dependencies = [
  "tracing-subscriber",
  "wayland-client",
  "wayle-audio",
+ "wayle-auth",
  "wayle-battery",
  "wayle-bluetooth",
  "wayle-brightness",
@@ -6053,12 +6206,11 @@ dependencies = [
  "wayle-widgets",
  "wildcard",
  "zbus",
- "zeroize",
 ]
 
 [[package]]
 name = "wayle-styling"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "grass",
  "gtk4",
@@ -6092,7 +6244,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-sysinfo"
-version = "0.1.2"
+version = "0.8.6"
 dependencies = [
  "derive_more",
  "futures",
@@ -6106,7 +6258,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-systray"
-version = "0.1.4"
+version = "0.8.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6129,11 +6281,11 @@ dependencies = [
 
 [[package]]
 name = "wayle-traits"
-version = "0.1.2"
+version = "0.8.6"
 
 [[package]]
 name = "wayle-wallpaper"
-version = "0.1.4"
+version = "0.8.6"
 dependencies = [
  "derive_more",
  "futures",
@@ -6153,7 +6305,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-weather"
-version = "0.1.2"
+version = "0.8.6"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6171,7 +6323,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-widgets"
-version = "0.8.0"
+version = "0.8.6"
 dependencies = [
  "chrono",
  "futures",
@@ -6873,7 +7025,7 @@ dependencies = [
  "hex",
  "libc",
  "ordered-stream",
- "rustix",
+ "rustix 1.1.3",
  "serde",
  "serde_repr",
  "tokio",

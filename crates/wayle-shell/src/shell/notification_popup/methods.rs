@@ -5,10 +5,11 @@ use gtk4_layer_shell::{Edge, LayerShell};
 use relm4::{Component, ComponentController, gtk};
 use tracing::debug;
 use wayle_config::schemas::{
-    animations::AnimSurface,
+    animations::{AnimSurface, AnimationType},
     modules::notification::{PopupMonitor, PopupPosition, StackingOrder},
 };
 use wayle_notification::core::notification::Notification;
+use wayle_widgets::prelude::{GenieEdge, WayleRevealer};
 
 use super::{
     NotificationPopupHost,
@@ -89,7 +90,7 @@ impl NotificationPopupHost {
             // and it owns the controller + revealer to keep them alive (and the
             // card visible) for the duration of the fade. Apply the exit
             // transition/duration first (the card was created with the enter one).
-            revealer.set_transition_type(transition);
+            revealer.set_transition(transition);
             revealer.set_transition_duration(duration);
             revealer.set_reveal_child(false);
             let container = self.card_container.clone();
@@ -108,15 +109,29 @@ impl NotificationPopupHost {
     /// Notification-card animation `(duration_ms, transition)` for the given
     /// direction (`exiting` = removal). Resolved per-surface with the global
     /// fallback cascade; disabled animations collapse to `(0, None)`.
-    fn animation(&self, exiting: bool) -> (u32, gtk::RevealerTransitionType) {
+    fn animation(&self, exiting: bool) -> (u32, AnimationType) {
         let animations = &self.config.config().animations;
-        let transition = crate::shell::helpers::animation::revealer_transition(
-            animations.transition_for(AnimSurface::Notifications, exiting),
-        );
         (
             animations.duration_for(AnimSurface::Notifications, exiting),
-            transition,
+            animations.transition_for(AnimSurface::Notifications, exiting),
         )
+    }
+
+    /// Edge a genie transition collapses toward, from the popup's anchor.
+    fn genie_edge(&self) -> GenieEdge {
+        match self
+            .config
+            .config()
+            .modules
+            .notifications
+            .popup_position
+            .get()
+        {
+            PopupPosition::TopLeft | PopupPosition::TopCenter | PopupPosition::TopRight => {
+                GenieEdge::Top
+            }
+            _ => GenieEdge::Bottom,
+        }
     }
 
     fn insert_new_cards(&mut self, popups: &[Arc<Notification>], existing_ids: &[u32]) {
@@ -150,8 +165,9 @@ impl NotificationPopupHost {
                 .detach();
 
             let (duration, transition) = self.animation(false);
-            let revealer = gtk::Revealer::new();
-            revealer.set_transition_type(transition);
+            let revealer = WayleRevealer::new();
+            revealer.set_transition(transition);
+            revealer.set_genie_edge(self.genie_edge());
             revealer.set_transition_duration(duration);
             revealer.set_child(Some(controller.widget()));
             // Start collapsed, then reveal on the next main-loop tick so the

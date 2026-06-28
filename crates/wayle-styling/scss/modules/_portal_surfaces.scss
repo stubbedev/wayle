@@ -16,7 +16,6 @@
 // Shared panel chrome: surface fill, border, rounding, shadow, padding — same
 // tokens as `.share-picker-surface`.
 .portal-dialog-surface,
-.file-chooser-surface,
 .print-surface {
     background: var(--bg-base);
     color: var(--fg-default);
@@ -25,6 +24,385 @@
     border-radius: var(--rounding-container);
     box-shadow: var(--shadow);
     padding: var(--space-lg);
+}
+
+// --- File chooser: a macOS-Finder-style sheet ------------------------------
+// Sidebar + file list + footer action bar. The surface itself carries no
+// padding so the sidebar and footer rules can paint edge-to-edge; `overflow:
+// hidden` keeps those fills clipped to the rounded container corners.
+.file-chooser-surface {
+    background: var(--bg-base);
+    color: var(--fg-default);
+    font-family: var(--font-sans);
+    border: 1px solid var(--border-default);
+    border-radius: var(--rounding-container);
+    box-shadow: var(--shadow);
+    padding: 0;
+}
+
+// Header: a slim title bar. Nav button sits left, title centered.
+.file-chooser-header {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border-subtle, var(--border-default));
+}
+
+// Square so the symbolic icon sits dead-centre. Qualified with `button` to beat
+// the theme's `button` padding (a single class loses on specificity). The glyph
+// is centred by the explicit `Image` child in the view!; here we just keep the
+// button square with zero padding so there's no asymmetric offset.
+button.file-chooser-nav {
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    padding: 0;
+    border-radius: var(--rounding-element);
+    color: var(--fg-muted);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+
+    image {
+        -gtk-icon-size: 1rem;
+        margin: 0;
+        padding: 0;
+    }
+
+    &:hover {
+        background: var(--bg-hover);
+        color: var(--fg-default);
+    }
+}
+
+// Path bar: clickable breadcrumb trail on the left, filter dropdown on the right.
+.file-chooser-crumbbar {
+    padding: var(--space-xs) var(--space-md);
+    border-bottom: 1px solid var(--border-subtle, var(--border-default));
+}
+
+.file-chooser-crumb {
+    min-height: 0;
+    min-width: 0;
+    padding: 2px var(--space-sm);
+    border-radius: var(--rounding-element);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--fg-muted);
+    font-weight: var(--weight-medium, var(--weight-semibold));
+
+    &:hover {
+        background: var(--bg-hover);
+        color: var(--fg-default);
+    }
+
+    &.current {
+        color: var(--fg-default);
+        font-weight: var(--weight-semibold);
+    }
+}
+
+.file-chooser-crumb-sep {
+    color: var(--fg-subtle, var(--fg-muted));
+    font-size: var(--text-sm);
+}
+
+.file-chooser-filter {
+    min-height: 0;
+}
+
+.file-chooser-search {
+    min-height: 0;
+    padding: 0 var(--space-xs);
+    border-radius: var(--rounding-element);
+    background: var(--bg-subtle, var(--bg-elevated));
+    border: 1px solid var(--border-subtle, var(--border-default));
+    color: var(--fg-default);
+    font-size: var(--text-sm);
+
+    text {
+        min-height: 0;
+        padding: 2px 0;
+    }
+
+    image {
+        color: var(--fg-muted);
+        min-height: 0;
+    }
+}
+
+// Body wrapper holds the sidebar and the file list side by side.
+.file-chooser-body {
+    background: var(--bg-base);
+}
+
+// Sidebar: a faintly tinted column of favorites, like Finder's source list.
+.file-chooser-sidebar-scroll {
+    background: var(--bg-subtle, var(--bg-elevated, var(--bg-base)));
+    border-right: 1px solid var(--border-subtle, var(--border-default));
+}
+
+.file-chooser-sidebar {
+    padding: var(--space-sm);
+}
+
+.file-chooser-sidebar-header {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--fg-muted);
+    padding: var(--space-xs) var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.file-chooser-places {
+    background: transparent;
+
+    row {
+        border-radius: var(--rounding-element);
+        padding: var(--space-xs) var(--space-sm);
+        transition: background var(--duration-fast);
+
+        &:hover {
+            background: var(--bg-hover);
+        }
+
+        &:selected {
+            background: var(--accent);
+            color: var(--fg-on-accent);
+        }
+    }
+}
+
+.file-chooser-place-icon {
+    -gtk-icon-size: 1rem;
+    color: var(--accent);
+}
+
+// On a selected place the accent-coloured icon would vanish into the accent
+// fill — flip icon + label to the on-accent foreground for contrast.
+.file-chooser-places row:selected {
+    .file-chooser-place-icon,
+    label {
+        color: var(--fg-on-accent);
+    }
+}
+
+.file-chooser-list-scroll {
+    padding: var(--space-sm);
+}
+
+// File rows carry their icon + name; the icon picks up the muted foreground so
+// the selection accent reads cleanly when a row is highlighted.
+.file-chooser-icon {
+    -gtk-icon-size: 1.125rem;
+    color: var(--fg-muted);
+}
+
+.file-chooser-list {
+    row {
+        padding: var(--space-xs) var(--space-sm);
+    }
+
+    // Zebra striping for readability — never over hover/selection.
+    > row:nth-child(even):not(:selected):not(:hover) {
+        background: var(--bg-subtle, var(--bg-elevated));
+    }
+}
+
+// On a selected row every piece flips to the on-accent foreground: the leading
+// icon AND the Size / Modified / Kind cells (which are otherwise muted and would
+// be near-illegible on the accent fill).
+.file-chooser-list row:selected {
+    .file-chooser-icon,
+    .file-chooser-cell {
+        color: var(--fg-on-accent);
+    }
+}
+
+// Rounded image thumbnails. A faint fill stands in as the placeholder square
+// while the thumbnail decodes off-thread, so the slot reads as "loading" rather
+// than blank and nothing reflows when the texture swaps in.
+.file-chooser-thumb {
+    border-radius: 4px;
+    background: var(--bg-subtle, var(--bg-elevated));
+}
+
+// Empty-folder / no-results overlay.
+.file-chooser-empty {
+    color: var(--fg-muted);
+    font-size: var(--text-lg);
+}
+
+// Quick Look (spacebar) preview card.
+.file-chooser-quicklook {
+    background: var(--bg-elevated, var(--bg-base));
+    border: 1px solid var(--border-default);
+    border-radius: var(--rounding-container);
+    box-shadow: var(--shadow);
+    padding: var(--space-lg);
+    margin: var(--space-lg);
+}
+
+.file-chooser-ql-name {
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--fg-default);
+}
+
+.file-chooser-ql-info {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+}
+
+// Side preview pane (toggle) — selected item preview on the right.
+.file-chooser-preview {
+    background: var(--bg-subtle, var(--bg-base));
+    border-left: 1px solid var(--border-subtle, var(--border-default));
+    padding: var(--space-lg);
+}
+
+.file-chooser-preview-name {
+    font-size: var(--text-md, var(--text-sm));
+    font-weight: var(--weight-semibold);
+    color: var(--fg-default);
+}
+
+.file-chooser-preview-info {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+}
+
+// Clickable column headers (list view). The header hugs its text with a little
+// vertical breathing room (the tall-band bug was fixed structurally by pinning
+// the box's vexpand off, not by stripping padding).
+.file-chooser-colheader {
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px solid var(--border-subtle, var(--border-default));
+}
+
+.file-chooser-col {
+    min-height: 0;
+    padding: var(--space-xs) var(--space-sm);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--fg-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium, var(--weight-semibold));
+
+    &:hover {
+        background: var(--bg-hover);
+        color: var(--fg-default);
+    }
+}
+
+.file-chooser-cell {
+    color: var(--fg-muted);
+    font-size: var(--text-sm);
+}
+
+// Draggable divider between resizable columns.
+.file-chooser-col-grip {
+    min-width: 7px;
+    background: transparent;
+
+    &:hover {
+        background: var(--border-default);
+    }
+}
+
+// Bottom-right corner resize grip — subtle until hovered, like a macOS sheet.
+.file-chooser-resize-grip {
+    margin: 0 2px 2px 0;
+    border-radius: 0 0 var(--rounding-container) 0;
+    background:
+        linear-gradient(
+            135deg,
+            transparent 0%,
+            transparent 55%,
+            var(--fg-subtle, var(--fg-muted)) 55%,
+            var(--fg-subtle, var(--fg-muted)) 65%,
+            transparent 65%,
+            transparent 78%,
+            var(--fg-subtle, var(--fg-muted)) 78%,
+            var(--fg-subtle, var(--fg-muted)) 88%,
+            transparent 88%
+        );
+    opacity: 0.4;
+
+    &:hover {
+        opacity: 0.9;
+    }
+}
+
+// Grid / icon view.
+.file-chooser-grid {
+    padding: var(--space-sm);
+
+    flowboxchild {
+        border-radius: var(--rounding-element);
+        padding: var(--space-xs);
+        transition: background var(--duration-fast);
+
+        &:hover {
+            background: var(--bg-hover);
+        }
+
+        &:selected {
+            background: var(--accent);
+            color: var(--fg-on-accent);
+        }
+    }
+}
+
+.file-chooser-grid-cell {
+    padding: var(--space-xs);
+}
+
+.file-chooser-grid-icon {
+    color: var(--fg-muted);
+}
+
+.file-chooser-grid flowboxchild:selected .file-chooser-grid-icon {
+    color: var(--fg-on-accent);
+}
+
+// Footer: path breadcrumb on the left, Cancel / Open on the right. Its fill
+// reaches the surface edge, so its bottom corners must echo the container
+// rounding — GTK has no `overflow: hidden` to clip them for us.
+.file-chooser-footer {
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid var(--border-subtle, var(--border-default));
+    background: var(--bg-base);
+    border-bottom-left-radius: var(--rounding-container);
+    border-bottom-right-radius: var(--rounding-container);
+
+    button {
+        min-height: 0;
+        min-width: 0;
+        padding: var(--space-xs) var(--space-lg);
+        border-radius: var(--rounding-element);
+        border: none;
+        box-shadow: none;
+        font-weight: var(--weight-medium, var(--weight-semibold));
+    }
+}
+
+.file-chooser-cancel {
+    background: var(--bg-hover);
+    color: var(--fg-default);
+
+    &:hover {
+        background: var(--bg-active, var(--bg-hover));
+    }
+}
+
+.file-chooser-confirm {
+    background: var(--accent);
+    color: var(--fg-on-accent);
+    font-weight: var(--weight-semibold);
+
+    &:hover {
+        background: var(--accent-hover, var(--accent));
+    }
 }
 
 // --- Titles / secondary text ----------------------------------------------
@@ -78,5 +456,5 @@
 // --- File-chooser save-name entry -----------------------------------------
 
 .file-chooser-name {
-    margin-top: var(--space-xs);
+    margin: 0 var(--space-md) var(--space-sm);
 }

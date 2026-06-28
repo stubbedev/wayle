@@ -11,14 +11,15 @@ use relm4::{gtk, prelude::*};
 use wayle_audio::AudioService;
 use wayle_brightness::BrightnessService;
 use wayle_config::ConfigService;
-use wayle_widgets::WatcherToken;
+use wayle_widgets::{WatcherToken, prelude::WayleRevealer};
 
 pub(crate) use self::messages::OsdInit;
 use self::{
     messages::{OsdCmd, OsdEvent},
     methods::{
         anim_duration, anim_transition, event_fraction, event_icon, event_label,
-        event_slider_label, event_value, is_slider, is_toggle, osd_classes, toast_align,
+        event_slider_label, event_value, genie_edge, is_slider, is_toggle, osd_classes,
+        toast_align,
     },
 };
 
@@ -63,12 +64,14 @@ impl Component for Osd {
             set_visible: model.visible,
 
             #[name = "revealer"]
-            gtk::Revealer {
+            WayleRevealer {
                 // Set transition type + duration before toggling reveal_child so
                 // the correct per-direction (enter/exit) animation is in effect
                 // when the reveal flips.
                 #[watch]
-                set_transition_type: anim_transition(&model),
+                set_transition: anim_transition(&model),
+                #[watch]
+                set_genie_edge: genie_edge(&model),
                 #[watch]
                 set_transition_duration: anim_duration(&model),
                 #[watch]
