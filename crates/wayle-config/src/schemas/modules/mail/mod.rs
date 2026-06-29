@@ -53,7 +53,7 @@ pub struct MailConfig {
     #[default(true)]
     pub hide_when_zero: ConfigProperty<bool>,
 
-    /// Fire a desktop notification (via `notify-send`) when the unread count
+    /// Fire a desktop notification when the unread count
     /// rises — i.e. new mail arrives. One notification per newly-arrived
     /// message (capped per burst), showing its sender and subject. With
     /// `accounts` configured, each notification uses that account's provider

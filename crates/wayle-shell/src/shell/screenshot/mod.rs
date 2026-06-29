@@ -8,14 +8,13 @@
 //!
 //! The flow per request: resolve the capture target (opening the region overlay
 //! for `region`), capture a full-resolution image, save a PNG, optionally copy
-//! it to the clipboard and fire a `notify-send`, then reply with the path.
+//! it to the clipboard and fire a desktop notification, then reply with the path.
 
 mod capture;
 
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    process::Stdio,
     sync::Arc,
 };
 
@@ -234,21 +233,31 @@ async fn run(
         other => return Err(format!("unknown screenshot mode: {other}")),
     };
 
+    let post = std::time::Instant::now();
     let settings = config.config().modules.screenshot.snapshot();
     let dir = resolve_dir(&settings.output_directory);
     if let Err(err) = std::fs::create_dir_all(&dir) {
         return Err(format!("cannot create {}: {err}", dir.display()));
     }
     let path = dir.join(filename(&settings.filename_format));
+    let encode = std::time::Instant::now();
     save_png(&image, &path)?;
+    tracing::info!(
+        encode_ms = encode.elapsed().as_millis(),
+        "screenshot: png saved"
+    );
     let path_str = path.to_string_lossy().into_owned();
 
     if settings.copy_to_clipboard {
-        copy_to_clipboard(&path);
+        copy_to_clipboard(&image);
     }
     if settings.notify {
         notify_saved(&path_str);
     }
+    tracing::info!(
+        post_ms = post.elapsed().as_millis(),
+        "screenshot: save+clipboard+notify done"
+    );
 
     Ok(path_str)
 }
@@ -279,12 +288,10 @@ async fn capture_region() -> Result<Option<RgbImage>, String> {
         .iter()
         .map(|frame| (frame.connector.clone(), rgb_to_texture(&frame.image)))
         .collect();
-    if cfg!(debug_assertions) {
-        tracing::info!(
-            texture_ms = texture.elapsed().as_millis(),
-            "screenshot freeze: textures built, showing overlay"
-        );
-    }
+    tracing::info!(
+        texture_ms = texture.elapsed().as_millis(),
+        "screenshot freeze: textures built, showing overlay"
+    );
 
     let Some(selection) = crate::services::region_overlay::request_region(frames).await else {
         return Ok(None);
@@ -456,36 +463,18 @@ fn filename(format: &str) -> String {
     chrono::Local::now().format(format).to_string()
 }
 
-/// Copies the saved PNG to the Wayland clipboard via `gdk::Clipboard`.
-fn copy_to_clipboard(path: &Path) {
+/// Copies the captured frame to the Wayland clipboard via `gdk::Clipboard`,
+/// straight from the in-memory image (no disk round-trip).
+fn copy_to_clipboard(image: &RgbImage) {
     let Some(display) = gdk::Display::default() else {
         warn!("no gdk display for clipboard copy");
         return;
     };
-    match gdk::Texture::from_filename(path) {
-        Ok(texture) => display.clipboard().set_texture(&texture),
-        Err(err) => warn!(error = %err, "cannot load screenshot texture for clipboard"),
-    }
+    display.clipboard().set_texture(&rgb_to_texture(image));
 }
 
-/// Fires a fire-and-forget `notify-send` reporting where the shot was saved.
+/// Fires a desktop notification reporting where the shot was saved. The saved
+/// PNG doubles as the notification icon (a thumbnail of the capture).
 fn notify_saved(path: &str) {
-    let mut command = std::process::Command::new("notify-send");
-    command
-        .arg("--app-name=Wayle")
-        .arg(format!("--icon={path}"))
-        .arg("Screenshot saved")
-        .arg(path)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-
-    match command.spawn() {
-        // Reap on a detached thread so we leave no zombie and need no runtime.
-        Ok(mut child) => {
-            std::thread::spawn(move || {
-                let _ = child.wait();
-            });
-        }
-        Err(err) => warn!(error = %err, "cannot spawn notify-send"),
-    }
+    crate::notify::notify("Wayle", "Screenshot saved", path, path);
 }

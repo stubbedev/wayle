@@ -111,8 +111,8 @@ pub(crate) fn resolve_icon(
 
 /// Classifies a non-empty icon string as either a file path or theme icon name.
 ///
-/// A `-symbolic.svg` file (e.g. a brand glyph wayle hands `notify-send` as an
-/// absolute path) is resolved back to its theme name so GTK loads it through
+/// A `-symbolic.svg` file (e.g. a brand glyph wayle sends as an absolute
+/// `app_icon` path) is resolved back to its theme name so GTK loads it through
 /// the symbolic code path and recolors it to the foreground — otherwise the
 /// monochrome glyph renders as a flat black shape on the dark popup.
 fn try_icon_string(value: &Option<String>) -> Option<ResolvedIcon> {

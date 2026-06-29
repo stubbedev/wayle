@@ -9,6 +9,7 @@ use tracing::info;
 mod bootstrap;
 mod glob;
 mod i18n;
+mod notify;
 mod process;
 mod services;
 mod shell;

@@ -2,13 +2,12 @@
 
 use std::{
     path::PathBuf,
-    process::Stdio,
     sync::{Arc, Mutex, PoisonError},
     time::Duration,
 };
 
 use chrono::Local;
-use tokio::{process::Command, sync::mpsc, time::interval};
+use tokio::{sync::mpsc, time::interval};
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
 use wayle_config::{ConfigService, schemas::modules::RecorderFormat};
@@ -346,29 +345,13 @@ impl RecorderState {
         self.notify(&t!("recorder-notification-failed"), message, ERROR_ICON);
     }
 
-    /// Spawns a fire-and-forget `notify-send` with the given summary/body/icon.
+    /// Fires a fire-and-forget desktop notification.
     fn notify(&self, summary: &str, body: &str, icon: &str) {
-        let mut command = Command::new("notify-send");
-        command
-            .arg("--app-name=Wayle")
-            .arg(format!("--icon={icon}"))
-            .arg(summary)
-            .arg(body)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-
-        match command.spawn() {
-            Ok(child) => {
-                tokio::spawn(async move {
-                    let _ = child.wait_with_output().await;
-                });
-            }
-            Err(err) => warn!(error = %err, "cannot spawn notify-send"),
-        }
+        crate::notify::notify("Wayle", summary, body, icon);
     }
 
-    /// Fires a desktop notification (via `notify-send`) reporting where the
-    /// recording was saved. No-op when the path is empty.
+    /// Fires a desktop notification reporting where the recording was saved.
+    /// No-op when the path is empty.
     fn notify_saved(&self, path: &str) {
         if path.is_empty() {
             return;

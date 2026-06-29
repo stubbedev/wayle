@@ -5,7 +5,6 @@
 use std::{
     collections::{BTreeSet, HashMap},
     path::PathBuf,
-    process::Stdio,
     sync::Arc,
     time::Duration,
 };
@@ -280,9 +279,9 @@ fn render_notification(format: &str, mail: &NewMail) -> String {
         .replace("{{ new }}", &mail.new.to_string())
 }
 
-/// Resolve an icon name to an absolute SVG path for `notify-send` (notification
-/// daemons don't search wayle's private icon dir by name), falling back to the
-/// bare name for system-themed icons.
+/// Resolve an icon name to an absolute SVG path for the notification's `app_icon`
+/// (notification daemons don't search wayle's private icon dir by name), falling
+/// back to the bare name for system-themed icons.
 fn notify_icon_arg(icon: &str) -> String {
     IconRegistry::default_path()
         .ok()
@@ -297,7 +296,7 @@ fn notify_icon_arg(icon: &str) -> String {
         .unwrap_or_else(|| icon.to_owned())
 }
 
-/// Fire one fire-and-forget `notify-send` per message in the batch.
+/// Fire one fire-and-forget desktop notification per message in the batch.
 fn fire_notifications(mail: &MailConfig, batch: &[NewMail]) {
     let summary_fmt = mail.notify_summary.get();
     let body_fmt = mail.notify_body.get();
@@ -307,23 +306,7 @@ fn fire_notifications(mail: &MailConfig, batch: &[NewMail]) {
         let body = render_notification(&body_fmt, item);
         let icon = notify_icon_arg(&item.icon);
 
-        let mut command = Command::new("notify-send");
-        command
-            .arg("--app-name=Wayle")
-            .arg(format!("--icon={icon}"))
-            .arg(summary)
-            .arg(body)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-
-        match command.spawn() {
-            Ok(child) => {
-                tokio::spawn(async move {
-                    let _ = child.wait_with_output().await;
-                });
-            }
-            Err(err) => warn!(error = %err, "cannot spawn notify-send for mail"),
-        }
+        crate::notify::notify("Wayle", &summary, &body, &icon);
     }
 }
 

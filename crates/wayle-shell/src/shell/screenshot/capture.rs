@@ -76,32 +76,26 @@ pub(super) fn capture_all_outputs() -> Result<Vec<FrozenOutput>, String> {
     let mut manager = OutputManager::new(&connection).map_err(|e| e.to_string())?;
 
     let targets = snapshot_targets(&manager);
-    if cfg!(debug_assertions) {
-        info!(
-            setup_ms = setup.elapsed().as_millis(),
-            outputs = targets.len(),
-            "screenshot freeze: wl manager ready"
-        );
-    }
+    info!(
+        setup_ms = setup.elapsed().as_millis(),
+        outputs = targets.len(),
+        "screenshot freeze: wl manager ready"
+    );
 
     let copy = Instant::now();
     let raw = copy_outputs(&mut manager, targets)?;
-    if cfg!(debug_assertions) {
-        info!(
-            copy_ms = copy.elapsed().as_millis(),
-            "screenshot freeze: screencopy done"
-        );
-    }
+    info!(
+        copy_ms = copy.elapsed().as_millis(),
+        "screenshot freeze: screencopy done"
+    );
 
     // Phase 2 (parallel): convert/rotate each frame off the Wayland thread.
     let convert = Instant::now();
     let frozen = convert_outputs(raw)?;
-    if cfg!(debug_assertions) {
-        info!(
-            convert_ms = convert.elapsed().as_millis(),
-            "screenshot freeze: convert done"
-        );
-    }
+    info!(
+        convert_ms = convert.elapsed().as_millis(),
+        "screenshot freeze: convert done"
+    );
     Ok(frozen)
 }
 
