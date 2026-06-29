@@ -3273,7 +3273,7 @@
         "notify": {
           "$ref": "#/$defs/boolean",
           "default": false,
-          "description": "Fire a desktop notification (via `notify-send`) when the unread count\nrises — i.e. new mail arrives. One notification per newly-arrived\nmessage (capped per burst), showing its sender and subject. With\n`accounts` configured, each notification uses that account's provider\nicon; otherwise the module icon is used."
+          "description": "Fire a desktop notification when the unread count\nrises — i.e. new mail arrives. One notification per newly-arrived\nmessage (capped per burst), showing its sender and subject. With\n`accounts` configured, each notification uses that account's provider\nicon; otherwise the module icon is used."
         },
         "notify-body": {
           "$ref": "#/$defs/string",
@@ -8007,7 +8007,7 @@
       "type": "integer"
     }
   },
-  "$id": "wayle-config-0.8.8",
+  "$id": "wayle-config-0.8.9",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for Wayle.\n\nRepresents the complete configuration schema that can be loaded\nfrom TOML files. All fields have sensible defaults.",
   "properties": {
