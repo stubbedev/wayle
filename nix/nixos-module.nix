@@ -77,6 +77,25 @@ in
       };
     };
 
+    lock = {
+      enable = lib.mkEnableOption ''
+        a PAM service for the wayle session lock. Wayle locks the session
+        natively via `ext-session-lock-v1` (the `lock` CLI / logind `Lock`
+        signal); authenticating the unlock needs a PAM service, which NixOS does
+        not provide by default. This declares one named `lock.pamService`'';
+
+      pamService = lib.mkOption {
+        type = lib.types.str;
+        default = "wayle";
+        description = ''
+          Name of the PAM service created for unlock authentication. Must match
+          `lock.pam-service` in your wayle config (the config default is
+          `system-auth`, which exists on Arch/Fedora but not NixOS — point it at
+          this service, or set this to a service that already exists).
+        '';
+      };
+    };
+
     greeter = {
       enable = lib.mkEnableOption ''
         the wayle greetd greeter: a login screen that shares the desktop/lock
@@ -200,6 +219,14 @@ in
           Slice = "session.slice";
         };
       };
+    })
+
+    (lib.mkIf cfg.lock.enable {
+      # The lock surface authenticates the unlock against this PAM service.
+      # Empty stack = the NixOS default (pam_unix password auth), which is what
+      # an unlock needs. The user's wayle config `lock.pam-service` must name
+      # this same service.
+      security.pam.services.${cfg.lock.pamService} = { };
     })
 
     (lib.mkIf cfg.greeter.enable {
