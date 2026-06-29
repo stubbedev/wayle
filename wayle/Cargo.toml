@@ -11,6 +11,12 @@ license.workspace = true
 name = "wayle"
 path = "src/main.rs"
 
+# Thin single-token alias for `wayle lock`, for exec contexts that don't
+# shell-split (systemd ExecStart, idle daemons, compositor spawn).
+[[bin]]
+name = "wayle-lock"
+path = "src/bin/wayle-lock.rs"
+
 [dependencies]
 chrono.workspace = true
 clap.workspace = true
