@@ -116,6 +116,27 @@ in
       };
     };
 
+    lock = {
+      enable = lib.mkEnableOption ''
+        guidance for the wayle session lock's PAM service. Wayle locks the
+        session natively via `ext-session-lock-v1`; authenticating the unlock
+        needs a PAM service, which home-manager cannot create (PAM lives under
+        {file}`/etc/pam.d`, root-owned). Enabling this emits a warning with
+        instructions. On NixOS use the system module's `programs.wayle.lock`,
+        which provisions the service for you'';
+
+      pamService = lib.mkOption {
+        type = lib.types.str;
+        default = "wayle";
+        description = ''
+          Name of the PAM service the unlock authenticates against. Must match
+          `lock.pam-service` in your wayle config. The config default is
+          `system-auth` (exists on Arch/Fedora); on other distros create
+          {file}`/etc/pam.d/<this name>` and point the config at it.
+        '';
+      };
+    };
+
     greeter = {
       enable = lib.mkEnableOption ''
         wayle greeter tooling: installs the kiosk compositor (cage) and writes a
@@ -159,15 +180,32 @@ in
 
     # greetd is system-level; home-manager can only ship the binary + cage and
     # generate a themed config to copy somewhere the greetd user can read.
-    warnings = lib.optional cfg.greeter.enable ''
-      programs.wayle.greeter (home-manager) installs cage and writes
-      ~/.config/wayle/greeter.toml, but cannot configure greetd (a system
-      service). On NixOS use programs.wayle.greeter in the system module;
-      otherwise enable greetd yourself and point its command at:
-        cage -s -- wayle-greeter --config <path> -- <session>
-      The greeter runs as the greetd user, so place the config where that user
-      can read it (e.g. /etc/wayle/config.toml).
-    '';
+    warnings =
+      lib.optional cfg.greeter.enable ''
+        programs.wayle.greeter (home-manager) installs cage and writes
+        ~/.config/wayle/greeter.toml, but cannot configure greetd (a system
+        service). On NixOS use programs.wayle.greeter in the system module;
+        otherwise enable greetd yourself and point its command at:
+          cage -s -- wayle-greeter --config <path> -- <session>
+        The greeter runs as the greetd user, so place the config where that user
+        can read it (e.g. /etc/wayle/config.toml).
+      ''
+      # PAM is root-owned (/etc/pam.d); home-manager cannot create it. Point the
+      # consumer at the manual step the system module does automatically.
+      ++ lib.optional cfg.lock.enable ''
+        programs.wayle.lock (home-manager) cannot create the PAM service the
+        unlock authenticates against (/etc/pam.d is root-owned). Create
+        /etc/pam.d/${cfg.lock.pamService} yourself — a minimal stack works:
+          auth     sufficient pam_unix.so
+          auth     required   pam_deny.so
+          account  required   pam_unix.so
+          password required   pam_unix.so
+          session  required   pam_unix.so
+        — and set `lock.pam-service = "${cfg.lock.pamService}"` in your wayle
+        config. On Arch/Fedora the config default `system-auth` already exists;
+        set lock.pam-service to that instead and skip this. On NixOS use the
+        system module's programs.wayle.lock, which provisions it for you.
+      '';
 
     xdg.configFile."wayle/greeter.toml" = lib.mkIf (cfg.greeter.enable && cfg.greeter.settings != { }) {
       source = tomlFormat.generate "wayle-greeter-config.toml" cfg.greeter.settings;
