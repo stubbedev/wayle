@@ -6,6 +6,7 @@ rust-version.workspace = true
 description = "Wayland services CLI"
 repository.workspace = true
 license.workspace = true
+default-run = "wayle"
 
 [[bin]]
 name = "wayle"
