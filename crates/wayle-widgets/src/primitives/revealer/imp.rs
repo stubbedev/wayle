@@ -357,9 +357,9 @@ fn animates_size(transition: AnimationType) -> bool {
 fn apply_slide(snapshot: &gtk4::Snapshot, transition: AnimationType, t: f32, w: f32, h: f32) {
     let d = 1.0 - t;
     let (dx, dy) = match transition {
-        AnimationType::SlideUp => (0.0, d * h),     // enters from below
-        AnimationType::SlideDown => (0.0, -d * h),  // enters from above
-        AnimationType::SlideLeft => (d * w, 0.0),   // enters from the right
+        AnimationType::SlideUp => (0.0, d * h), // enters from below
+        AnimationType::SlideDown => (0.0, -d * h), // enters from above
+        AnimationType::SlideLeft => (d * w, 0.0), // enters from the right
         AnimationType::SlideRight => (-d * w, 0.0), // enters from the left
         _ => (0.0, 0.0),
     };
