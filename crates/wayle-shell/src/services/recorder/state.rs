@@ -12,7 +12,9 @@ use tokio_util::sync::CancellationToken;
 use tracing::warn;
 use wayle_config::{ConfigService, schemas::modules::RecorderFormat};
 use wayle_core::Property;
-use wayle_recorder::{AudioOptions, OutputFormat, RecordOptions, Recorder, WebcamOptions};
+use wayle_recorder::{
+    AudioOptions, OutputFormat, RecordOptions, Recorder, ScreenCast, WebcamOptions,
+};
 
 use crate::{
     i18n::t,
@@ -163,61 +165,82 @@ impl RecorderState {
         let opts = self.build_options();
         let path = opts.output_path.clone();
 
-        // filesink won't create missing directories; do it ourselves so a
-        // first-ever recording into ~/Videos (or a custom dir) doesn't fail.
-        if let Some(parent) = PathBuf::from(&path).parent()
-            && let Err(err) = std::fs::create_dir_all(parent)
-        {
-            warn!(error = %err, dir = %parent.display(), "cannot create recording directory");
-            self.reset_idle();
-            self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
+        if !self.prepare_output_dir(&path) {
             return;
         }
-
-        // Open the portal session first so the source picker appears
-        // immediately on the user's action, not after the delay below.
-        // Cancellable: a stop while the picker is up drops the open_session
-        // future (cancelling the D-Bus call) so the lifecycle doesn't wedge in
-        // Stopping until the user dismisses the picker.
-        let cast = tokio::select! {
-            () = cancel.cancelled() => {
-                self.reset_idle();
-                return;
-            }
-            result = self.recorder.open_session(opts.show_cursor) => match result {
-                Ok(cast) => cast,
-                Err(err) => {
-                    self.reset_idle();
-                    warn!(error = %err, "failed to start recording");
-                    self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
-                    return;
-                }
-            },
+        let Some(cast) = self.open_or_cancel(&cancel, opts.show_cursor).await else {
+            return;
         };
-
-        // With the source chosen, announce the start and pulse the bar icon,
-        // then wait for the toast to clear the screen before capture begins —
-        // otherwise the toast is in the recording. Cancellable: a stop during
-        // this window aborts cleanly without ever launching the pipeline.
-        let delay_ms = u64::from(self.config.config().modules.recorder.start_delay_ms.get());
-        self.show_toast(&t!("recorder-toast-starting"), START_TOAST_MS);
-        tokio::select! {
-            () = cancel.cancelled() => {
-                self.reset_idle();
-                return;
-            }
-            () = tokio::time::sleep(Duration::from_millis(delay_ms)) => {}
+        if !self.wait_start_delay(&cancel).await {
+            return;
         }
 
         let (term_tx, term_rx) = mpsc::unbounded_channel();
         match self.recorder.start(cast, &opts, term_tx) {
             Ok(()) => self.commit_recording(path, term_rx, &cancel),
-            Err(err) => {
-                self.reset_idle();
-                warn!(error = %err, "failed to start recording");
-                self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
-            }
+            Err(err) => self.fail_start(&err),
         }
+    }
+
+    /// Ensures the output directory exists (filesink won't create it), so a
+    /// first-ever recording into `~/Videos` or a custom dir doesn't fail.
+    /// Returns `false` (after resetting to idle + toasting) if it can't.
+    fn prepare_output_dir(&self, path: &str) -> bool {
+        if let Some(parent) = PathBuf::from(path).parent()
+            && let Err(err) = std::fs::create_dir_all(parent)
+        {
+            warn!(error = %err, dir = %parent.display(), "cannot create recording directory");
+            self.reset_idle();
+            self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
+            return false;
+        }
+        true
+    }
+
+    /// Opens the portal session (source picker) first, so it appears immediately
+    /// on the user's action, not after the delay. Cancellable: a stop while the
+    /// picker is up drops the future (cancelling the D-Bus call) so the lifecycle
+    /// doesn't wedge in Stopping. Returns `None` on cancel or error.
+    async fn open_or_cancel(
+        &self,
+        cancel: &CancellationToken,
+        show_cursor: bool,
+    ) -> Option<ScreenCast> {
+        tokio::select! {
+            () = cancel.cancelled() => {
+                self.reset_idle();
+                None
+            }
+            result = self.recorder.open_session(show_cursor) => match result {
+                Ok(cast) => Some(cast),
+                Err(err) => {
+                    self.fail_start(&err);
+                    None
+                }
+            },
+        }
+    }
+
+    /// Announces the start, then waits out the pre-capture delay so the toast
+    /// clears the screen before capture begins — otherwise it's in the
+    /// recording. Returns `false` if a stop cancels us during the window.
+    async fn wait_start_delay(&self, cancel: &CancellationToken) -> bool {
+        let delay_ms = u64::from(self.config.config().modules.recorder.start_delay_ms.get());
+        self.show_toast(&t!("recorder-toast-starting"), START_TOAST_MS);
+        tokio::select! {
+            () = cancel.cancelled() => {
+                self.reset_idle();
+                false
+            }
+            () = tokio::time::sleep(Duration::from_millis(delay_ms)) => true,
+        }
+    }
+
+    /// Resets to idle and toasts a failure reason. Shared by the start paths.
+    fn fail_start(&self, err: &impl std::fmt::Display) {
+        self.reset_idle();
+        warn!(error = %err, "failed to start recording");
+        self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
     }
 
     /// Commits a launched pipeline to `Recording`, unless a `stop` cancelled us
