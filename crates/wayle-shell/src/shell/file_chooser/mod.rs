@@ -2313,7 +2313,10 @@ mod tests {
             ("text/plain", "txt"),
             ("text/csv", "csv"),
             ("text/html", "html"),
-            ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
+            (
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "docx",
+            ),
             // Overrides for mime2ext's missing / obscure media picks.
             ("audio/mpeg", "mp3"),
             ("audio/flac", "flac"),
