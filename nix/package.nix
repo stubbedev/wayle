@@ -2,6 +2,7 @@
   lib,
   craneLib,
   rustPlatform,
+  runCommandLocal,
   pkg-config,
   cmake,
   clang,
@@ -28,6 +29,7 @@
 }:
 let
   cargoToml = lib.importTOML ../Cargo.toml;
+  version = cargoToml.workspace.package.version;
 
   # GStreamer plugins the recorder loads at runtime (pipewiresrc, v4l2src,
   # x264enc, opusenc, mp4/matroska/webm mux, compositor, ...).
@@ -58,9 +60,8 @@ let
   # derivation on Cargo.lock + these inputs (NOT on your source), so editing a
   # crate reuses the cached deps and only recompiles wayle's own crates.
   commonArgs = {
-    inherit src;
+    inherit src version;
     pname = "wayle";
-    version = cargoToml.workspace.package.version;
     strictDeps = true;
 
     # CI's `test` job covers the suite. Skipping checks here applies to BOTH
@@ -130,8 +131,30 @@ let
     env.RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=mold";
   };
 
-  # The cached dependency layer. Built once per Cargo.lock; pushed to attic.
-  cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+  # crane keys the deps layer on the manifests it folds into the dummy src: the
+  # root Cargo.toml and every wayle* entry in Cargo.lock — all of which carry
+  # the workspace version. Every `chore: release` bumps that version (70 changed
+  # lines, zero dependency change) and would otherwise recompile all 591 crates
+  # (~30 min) on the release commit. Normalize the wayle version to 0.0.0 in the
+  # deps src so only a *real* Cargo.lock dependency change invalidates the layer;
+  # the final buildPackage below still uses the real version via commonArgs.
+  depsSrc = runCommandLocal "wayle-deps-src" { } ''
+    cp -r --no-preserve=mode,ownership ${src} $out
+    chmod -R u+w $out
+    find $out -name Cargo.toml -exec \
+      sed -i 's/^version = "${version}"$/version = "0.0.0"/' {} +
+    sed -i '/^name = "wayle/{n;s/^version = "${version}"$/version = "0.0.0"/;}' $out/Cargo.lock
+  '';
+
+  # The cached dependency layer. Built once per Cargo.lock (version-independent
+  # via depsSrc); pushed to attic and reused across releases.
+  cargoArtifacts = craneLib.buildDepsOnly (
+    commonArgs
+    // {
+      src = depsSrc;
+      version = "0.0.0";
+    }
+  );
 in
 craneLib.buildPackage (
   commonArgs
