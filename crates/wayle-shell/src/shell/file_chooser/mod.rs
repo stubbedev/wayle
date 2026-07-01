@@ -323,11 +323,6 @@ impl Component for FileChooser {
                             // instead of once per keystroke.
                             set_search_delay: 300,
                         },
-                        #[name = "filter_dropdown"]
-                        gtk::DropDown {
-                            add_css_class: "file-chooser-filter",
-                            set_visible: false,
-                        },
                     },
 
                     // --- Body: sidebar + file list ----------------------
@@ -557,6 +552,12 @@ impl Component for FileChooser {
                         add_css_class: "file-chooser-footer",
                         set_orientation: gtk::Orientation::Horizontal,
                         set_spacing: 8,
+                        #[name = "filter_dropdown"]
+                        gtk::DropDown {
+                            add_css_class: "file-chooser-filter",
+                            set_valign: gtk::Align::Center,
+                            set_visible: false,
+                        },
                         gtk::Box { set_hexpand: true },
                         #[name = "cancel_button"]
                         gtk::Button {
@@ -792,12 +793,22 @@ impl FileChooser {
         }
         let dir = start_dir(current_folder);
 
-        // Populate the filter dropdown from the request's named filters.
+        // Populate the filter dropdown from the request's named filters. Append
+        // an "All Files" escape hatch (unless a catch-all is already offered) so
+        // the user can always bypass a restrictive app-supplied filter.
+        let mut filters = filters;
+        if !filters.is_empty() && !filters.iter().any(matches_everything) {
+            filters.push(("All Files".to_owned(), vec![(0, "*".to_owned())]));
+        }
         if filters.is_empty() {
             widgets.filter_dropdown.set_visible(false);
         } else {
-            let names: Vec<&str> = filters.iter().map(|(name, _)| name.as_str()).collect();
-            let model = gtk::StringList::new(&names);
+            // Label each filter with its glob patterns (e.g. "Images
+            // (*.png, *.jpg)") so an opaque name like "Custom Files" still says
+            // what it matches.
+            let names: Vec<String> = filters.iter().map(filter_label).collect();
+            let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
+            let model = gtk::StringList::new(&name_refs);
             widgets.filter_dropdown.set_model(Some(&model));
             widgets.filter_dropdown.set_selected(0);
             widgets.filter_dropdown.set_visible(true);
@@ -1419,9 +1430,57 @@ fn entry_name(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// Whether `name` passes the active filter. No filters → match all. A filter
-/// with no glob rules (only MIME, which we can't evaluate here) also matches
-/// all so nothing is hidden unexpectedly.
+/// Dropdown label for a filter: its name plus its patterns as `*.ext` globs,
+/// e.g. `Images (*.png, *.jpg)`. Globs (kind 0) show as-is; MIME rules (kind 1)
+/// are mapped to their canonical extension via `mime2ext`, falling back to the
+/// raw type for wildcards / unknown types it can't resolve (e.g. `image/*`).
+/// Falls back to the bare name when there are no patterns or the only one is the
+/// catch-all `*`.
+fn filter_label(filter: &Filter) -> String {
+    let mut patterns: Vec<String> = Vec::new();
+    for (kind, value) in &filter.1 {
+        let token = match kind {
+            1 => mime_ext(value).map_or_else(|| value.clone(), |ext| format!("*.{ext}")),
+            _ => value.clone(),
+        };
+        if !patterns.contains(&token) {
+            patterns.push(token);
+        }
+    }
+    if patterns.is_empty() || patterns == ["*"] {
+        filter.0.clone()
+    } else {
+        format!("{} ({})", filter.0, patterns.join(", "))
+    }
+}
+
+/// Canonical extension for a MIME type. Overrides the handful of common media
+/// types where `mime2ext`'s pick is missing or an obscure alias (`audio/mpeg`
+/// → `mpga`, `video/quicktime` → `qt`), so labels read `*.mp3` / `*.mov`.
+/// Everything else defers to `mime2ext`; `None` (wildcards / unknown types) lets
+/// the caller fall back to the raw MIME string.
+fn mime_ext(mime: &str) -> Option<&'static str> {
+    match mime {
+        "audio/mpeg" | "audio/mp3" => Some("mp3"),
+        "audio/flac" | "audio/x-flac" => Some("flac"),
+        "audio/aac" => Some("aac"),
+        "video/quicktime" => Some("mov"),
+        other => mime2ext::mime2ext(other),
+    }
+}
+
+/// Whether a filter already matches everything (a `*`/`*.*` glob), so we don't
+/// append a redundant "All Files" entry.
+fn matches_everything(filter: &Filter) -> bool {
+    filter
+        .1
+        .iter()
+        .any(|(kind, value)| *kind == 0 && (value == "*" || value == "*.*"))
+}
+
+/// Whether `name` passes the active filter. No filters (or an empty rule set) →
+/// match all. Otherwise the name must satisfy any one rule: glob (kind 0) by
+/// pattern, or MIME (kind 1) against the type guessed from the name.
 fn matches_filter(name: &str, filters: &[Filter], active_filter: usize) -> bool {
     if filters.is_empty() {
         return true;
@@ -1429,23 +1488,37 @@ fn matches_filter(name: &str, filters: &[Filter], active_filter: usize) -> bool 
     let Some((_, rules)) = filters.get(active_filter) else {
         return true;
     };
-    let globs: Vec<&String> = rules
-        .iter()
-        .filter(|(kind, _)| *kind == 0)
-        .map(|(_, value)| value)
-        .collect();
-    if globs.is_empty() {
+    if rules.is_empty() {
         return true;
     }
-    globs.iter().any(|value| {
-        if value.as_str() == "*" {
-            true
-        } else if let Some(suffix) = value.strip_prefix('*') {
-            name.ends_with(suffix)
-        } else {
-            name == value.as_str()
-        }
+    rules.iter().any(|(kind, value)| match kind {
+        1 => matches_mime(name, value),
+        // Treat any non-MIME kind as a glob (kind 0 is the only other spec value).
+        _ => matches_glob(name, value),
     })
+}
+
+/// Whether `name` matches a glob rule. Supports `*`/`*.*` (all), a leading-`*`
+/// suffix match (`*.png`), else an exact name.
+fn matches_glob(name: &str, glob: &str) -> bool {
+    if glob == "*" || glob == "*.*" {
+        true
+    } else if let Some(suffix) = glob.strip_prefix('*') {
+        name.ends_with(suffix)
+    } else {
+        name == glob
+    }
+}
+
+/// Whether `name`'s guessed content type matches a MIME rule. Handles a
+/// `type/*` wildcard as a prefix match; otherwise exact or subtype-of via gio.
+fn matches_mime(name: &str, mime: &str) -> bool {
+    let (guessed, _) = gio::content_type_guess(Some(Path::new(name)), None::<&[u8]>);
+    if let Some(prefix) = mime.strip_suffix('*') {
+        guessed.starts_with(prefix)
+    } else {
+        guessed == mime || gio::content_type_is_a(&guessed, mime)
+    }
 }
 
 /// `file://` URI for a path.
@@ -2207,11 +2280,76 @@ mod tests {
         let exact = vec![("Make".to_owned(), vec![(0u32, "Makefile".to_owned())])];
         assert!(matches_filter("Makefile", &exact, 0));
         assert!(!matches_filter("makefile", &exact, 0));
-        // MIME-only filter (no glob rules) → match all so nothing is hidden.
+        // MIME filter: the type guessed from the name must match the rule.
         let mime = vec![("Img".to_owned(), vec![(1u32, "image/png".to_owned())])];
-        assert!(matches_filter("whatever.xyz", &mime, 0));
+        assert!(matches_filter("photo.png", &mime, 0));
+        assert!(!matches_filter("notes.txt", &mime, 0));
+        // MIME wildcard matches any subtype of the family.
+        let imgs = vec![("Images".to_owned(), vec![(1u32, "image/*".to_owned())])];
+        assert!(matches_filter("a.png", &imgs, 0));
+        assert!(matches_filter("a.jpg", &imgs, 0));
+        assert!(!matches_filter("a.txt", &imgs, 0));
+        // Empty rule set → match all so nothing is hidden.
+        let empty = vec![("Any".to_owned(), Vec::new())];
+        assert!(matches_filter("x.bin", &empty, 0));
         // Out-of-range active filter → match all.
         assert!(matches_filter("x", &filters, 99));
+    }
+
+    #[test]
+    fn mime_ext_covers_common_types() {
+        // A spread of types apps actually put in file-chooser filters.
+        for (mime, want) in [
+            ("image/png", "png"),
+            ("image/jpeg", "jpg"),
+            ("image/svg+xml", "svg"),
+            ("image/gif", "gif"),
+            ("image/webp", "webp"),
+            ("video/mp4", "mp4"),
+            ("video/x-matroska", "mkv"),
+            ("application/pdf", "pdf"),
+            ("application/zip", "zip"),
+            ("application/json", "json"),
+            ("text/plain", "txt"),
+            ("text/csv", "csv"),
+            ("text/html", "html"),
+            ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
+            // Overrides for mime2ext's missing / obscure media picks.
+            ("audio/mpeg", "mp3"),
+            ("audio/flac", "flac"),
+            ("audio/aac", "aac"),
+            ("video/quicktime", "mov"),
+        ] {
+            assert_eq!(mime_ext(mime), Some(want), "{mime}");
+        }
+        // Wildcards / unknown types resolve to nothing (caller shows raw MIME).
+        assert_eq!(mime_ext("image/*"), None);
+        assert_eq!(mime_ext("application/x-made-up"), None);
+    }
+
+    #[test]
+    fn filter_label_reverse_maps_mime_to_extensions() {
+        // Globs shown as-is.
+        let g = (
+            "Images".to_owned(),
+            vec![(0u32, "*.png".to_owned()), (0, "*.jpg".to_owned())],
+        );
+        assert_eq!(filter_label(&g), "Images (*.png, *.jpg)");
+        // MIME reverse-mapped to a `*.ext` glob.
+        let m = ("PNG".to_owned(), vec![(1u32, "image/png".to_owned())]);
+        assert_eq!(filter_label(&m), "PNG (*.png)");
+        // A glob and its equivalent MIME dedup to a single token.
+        let both = (
+            "PNG".to_owned(),
+            vec![(0u32, "*.png".to_owned()), (1, "image/png".to_owned())],
+        );
+        assert_eq!(filter_label(&both), "PNG (*.png)");
+        // Wildcard MIME kept raw — `mime_guess` can't reverse it to extensions.
+        let w = ("All images".to_owned(), vec![(1u32, "image/*".to_owned())]);
+        assert_eq!(filter_label(&w), "All images (image/*)");
+        // A lone catch-all `*` → just the name.
+        let star = ("All".to_owned(), vec![(0u32, "*".to_owned())]);
+        assert_eq!(filter_label(&star), "All");
     }
 
     #[test]

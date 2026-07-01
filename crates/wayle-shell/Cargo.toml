@@ -54,6 +54,7 @@ hyprland.workspace = true
 image = "0.25.10"
 wayland-client.workspace = true
 minijinja.workspace = true
+mime2ext.workspace = true
 wildcard.workspace = true
 wayle-hyprland.workspace = true
 wayle-icons.workspace = true

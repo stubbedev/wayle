@@ -98,6 +98,7 @@ minijinja = { version = "2.15", default-features = false, features = [
 	"builtins",
 	"serde",
 ] }
+mime2ext = "0.1"
 notify = "8"
 # pam 0.7 pins pam-sys 0.5 which ships prebuilt bindings (no bindgen/libclang
 # at build time, unlike 0.8's pam-sys 1.0-alpha).

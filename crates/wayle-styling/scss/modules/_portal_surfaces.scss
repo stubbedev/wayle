@@ -107,6 +107,19 @@ button.file-chooser-nav {
 
 .file-chooser-filter {
     min-height: 0;
+
+    // Lives in the footer now, whose `button {}` rule flattens borders; give the
+    // dropdown its own subtle chrome so it still reads as a control, like the
+    // search entry.
+    > button {
+        min-height: 0;
+        padding: var(--space-xs) var(--space-sm);
+        border-radius: var(--rounding-element);
+        background: var(--bg-subtle, var(--bg-elevated));
+        border: 1px solid var(--border-subtle, var(--border-default));
+        color: var(--fg-default);
+        font-weight: var(--weight-medium, var(--weight-semibold));
+    }
 }
 
 .file-chooser-search {
