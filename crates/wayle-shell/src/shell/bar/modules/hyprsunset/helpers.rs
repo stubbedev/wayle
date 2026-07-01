@@ -1,10 +1,10 @@
-use std::{env, io, path::PathBuf, str};
+use std::{env, io, path::PathBuf, str, sync::Mutex};
 
 use serde_json::json;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
-    process::Command,
+    process::{Child, Command},
 };
 use tracing::debug;
 
@@ -102,23 +102,49 @@ fn parse_numeric_response(response: &str, command: &str) -> Option<u32> {
     }
 }
 
+/// The hyprsunset process wayle spawned, if any. Tracked so [`stop`] signals
+/// exactly our child instead of `pkill`-ing every hyprsunset on the system.
+// ponytail: one global child — there is only ever one hyprsunset.
+static CHILD: Mutex<Option<Child>> = Mutex::new(None);
+
 pub(super) async fn start(temperature: u32, gamma: u32) -> io::Result<()> {
-    Command::new("hyprsunset")
+    let child = Command::new("hyprsunset")
         .arg("-t")
         .arg(temperature.to_string())
         .arg("-g")
         .arg(gamma.to_string())
         .spawn()?;
+    // Terminate any previous child before replacing it, so we never leak one.
+    if let Some(old) = lock_child().replace(child) {
+        terminate(old);
+    }
     Ok(())
 }
 
 pub(super) async fn stop() -> io::Result<()> {
-    Command::new("pkill")
-        .arg("-x")
-        .arg("hyprsunset")
-        .output()
-        .await?;
+    if let Some(child) = lock_child().take() {
+        terminate(child);
+    }
     Ok(())
+}
+
+fn lock_child() -> std::sync::MutexGuard<'static, Option<Child>> {
+    CHILD.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// SIGTERM the tracked child — the signal `pkill` sent by default, so
+/// hyprsunset's own exit handler restores the gamma ramp — then reap it so no
+/// zombie lingers.
+fn terminate(mut child: Child) {
+    if let Some(pid) = child.id() {
+        // SAFETY: `pid` is a child process we spawned; SIGTERM is a valid signal.
+        unsafe {
+            libc::kill(pid as libc::pid_t, libc::SIGTERM);
+        }
+    }
+    tokio::spawn(async move {
+        let _ = child.wait().await;
+    });
 }
 
 #[cfg(test)]
