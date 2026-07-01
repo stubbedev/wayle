@@ -129,7 +129,9 @@ pub(super) async fn stop() -> io::Result<()> {
 }
 
 fn lock_child() -> std::sync::MutexGuard<'static, Option<Child>> {
-    CHILD.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    CHILD
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// SIGTERM the tracked child — the signal `pkill` sent by default, so

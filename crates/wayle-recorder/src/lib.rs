@@ -133,7 +133,7 @@ impl Recorder {
     ///
     /// Returns [`Error::AlreadyRunning`] if a recording is in progress, or a
     /// pipeline / state / capture error otherwise.
-    pub async fn start(
+    pub fn start(
         &self,
         cast: ScreenCast,
         opts: &RecordOptions,

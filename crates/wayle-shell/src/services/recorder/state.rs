@@ -210,7 +210,7 @@ impl RecorderState {
         }
 
         let (term_tx, term_rx) = mpsc::unbounded_channel();
-        match self.recorder.start(cast, &opts, term_tx).await {
+        match self.recorder.start(cast, &opts, term_tx) {
             Ok(()) => {
                 // A stop may have arrived while the portal/pipeline negotiated.
                 // Commit to Recording only if nothing cancelled us meanwhile;
