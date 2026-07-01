@@ -50,6 +50,9 @@ settings-modules-recorder-output-format = Output Format
 settings-modules-recorder-show-cursor = Show Cursor
     .description = Draw the mouse cursor in the recording
 
+settings-modules-recorder-start-delay-ms = Start Delay
+    .description = Delay between choosing the source and recording, so the start toast clears the screen first
+
 settings-modules-recorder-border-show = Show Border
     .description = Display border around button
 

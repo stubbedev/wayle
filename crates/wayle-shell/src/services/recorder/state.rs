@@ -25,10 +25,6 @@ const TOAST_ICON: &str = "ld-circle-dot-symbolic";
 const ERROR_ICON: &str = "ld-alert-triangle-symbolic";
 /// How long the "starting" toast stays on screen, in milliseconds.
 const START_TOAST_MS: u32 = 1000;
-/// Delay between the start toast and the actual capture. Kept longer than
-/// [`START_TOAST_MS`] (plus the OSD's exit animation) so the toast has cleared
-/// the screen before recording begins — otherwise it ends up in the capture.
-const START_CAPTURE_DELAY_MS: u64 = 1400;
 /// How long the "stopped" toast stays on screen, in milliseconds.
 const STOP_TOAST_MS: u32 = 1500;
 
@@ -178,21 +174,43 @@ impl RecorderState {
             return;
         }
 
-        // Announce the start and pulse the bar icon, then wait for the toast
-        // to clear the screen before capture begins — otherwise the toast is
-        // in the recording. Cancellable: a stop during this window aborts
-        // cleanly without ever opening the portal.
+        // Open the portal session first so the source picker appears
+        // immediately on the user's action, not after the delay below.
+        // Cancellable: a stop while the picker is up drops the open_session
+        // future (cancelling the D-Bus call) so the lifecycle doesn't wedge in
+        // Stopping until the user dismisses the picker.
+        let cast = tokio::select! {
+            () = cancel.cancelled() => {
+                self.reset_idle();
+                return;
+            }
+            result = self.recorder.open_session(opts.show_cursor) => match result {
+                Ok(cast) => cast,
+                Err(err) => {
+                    self.reset_idle();
+                    warn!(error = %err, "failed to start recording");
+                    self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
+                    return;
+                }
+            },
+        };
+
+        // With the source chosen, announce the start and pulse the bar icon,
+        // then wait for the toast to clear the screen before capture begins —
+        // otherwise the toast is in the recording. Cancellable: a stop during
+        // this window aborts cleanly without ever launching the pipeline.
+        let delay_ms = u64::from(self.config.config().modules.recorder.start_delay_ms.get());
         self.show_toast(&t!("recorder-toast-starting"), START_TOAST_MS);
         tokio::select! {
             () = cancel.cancelled() => {
                 self.reset_idle();
                 return;
             }
-            () = tokio::time::sleep(Duration::from_millis(START_CAPTURE_DELAY_MS)) => {}
+            () = tokio::time::sleep(Duration::from_millis(delay_ms)) => {}
         }
 
         let (term_tx, term_rx) = mpsc::unbounded_channel();
-        match self.recorder.start(&opts, term_tx).await {
+        match self.recorder.start(cast, &opts, term_tx).await {
             Ok(()) => {
                 // A stop may have arrived while the portal/pipeline negotiated.
                 // Commit to Recording only if nothing cancelled us meanwhile;

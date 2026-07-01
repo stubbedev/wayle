@@ -106,6 +106,13 @@ pub struct RecorderConfig {
     #[default(true)]
     pub show_cursor: ConfigProperty<bool>,
 
+    /// Delay between choosing the capture source and the recording actually
+    /// starting, in milliseconds. Gives on-screen UI (the start toast) time to
+    /// clear so it isn't captured in the video.
+    #[serde(rename = "start-delay-ms")]
+    #[default(1400u32)]
+    pub start_delay_ms: ConfigProperty<u32>,
+
     /// Display border around button.
     #[serde(rename = "border-show")]
     #[default(false)]

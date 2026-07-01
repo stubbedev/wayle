@@ -21,6 +21,7 @@ use futures::StreamExt;
 use gst::prelude::*;
 use gstreamer as gst;
 pub use options::{AudioOptions, OutputFormat, RecordOptions, WebcamOptions};
+pub use portal::ScreenCast;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
@@ -100,13 +101,28 @@ impl Recorder {
             .is_some()
     }
 
-    /// Starts recording with the given options.
+    /// Negotiates the ScreenCast portal session, showing the source picker if
+    /// the compositor has no cached grant.
     ///
-    /// Negotiates the ScreenCast portal, builds the pipeline, sets it playing,
-    /// and confirms it actually reached `Playing` before reporting success —
-    /// so a missing encoder, busy device, or unwritable path surfaces as an
-    /// error here instead of a silently dead recording. The portal file
-    /// descriptor is held for the pipeline's lifetime.
+    /// Split from [`Recorder::start`] so the picker appears immediately on the
+    /// user's action; the returned session can then be held across a start
+    /// delay before the pipeline is launched.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Portal`] if the portal is unavailable, the user cancels
+    /// the picker, or no stream is returned.
+    pub async fn open_session(&self, show_cursor: bool) -> Result<ScreenCast, Error> {
+        portal::open_screencast(show_cursor).await
+    }
+
+    /// Starts recording from an already-negotiated portal `cast` session.
+    ///
+    /// Builds the pipeline, sets it playing, and confirms it actually reached
+    /// `Playing` before reporting success — so a missing encoder, busy device,
+    /// or unwritable path surfaces as an error here instead of a silently dead
+    /// recording. The portal file descriptor is held for the pipeline's
+    /// lifetime.
     ///
     /// If the pipeline later dies on its own (source disconnect, disk full,
     /// encoder fault), a human-readable reason is sent on `term_tx` so the
@@ -116,17 +132,16 @@ impl Recorder {
     /// # Errors
     ///
     /// Returns [`Error::AlreadyRunning`] if a recording is in progress, or a
-    /// portal / pipeline / state / capture error otherwise.
+    /// pipeline / state / capture error otherwise.
     pub async fn start(
         &self,
+        cast: ScreenCast,
         opts: &RecordOptions,
         term_tx: UnboundedSender<String>,
     ) -> Result<(), Error> {
         if self.is_running() {
             return Err(Error::AlreadyRunning);
         }
-
-        let cast = portal::open_screencast(opts.show_cursor).await?;
 
         // Prefer a hardware encoder, but never let a flaky GPU encode path block
         // a recording: if the detected hardware encoder fails to launch or reach

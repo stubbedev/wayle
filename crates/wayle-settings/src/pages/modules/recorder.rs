@@ -8,7 +8,7 @@ use crate::{
         enum_select::enum_select,
         icon::icon,
         number::number_u32_range,
-        slider::percentage,
+        slider::{milliseconds, percentage},
         text::text,
         toggle::toggle,
     },
@@ -55,6 +55,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                         enum_select(&module.output_format),
                         text(&module.output_directory),
                         toggle(&module.show_cursor),
+                        milliseconds(&module.start_delay_ms, 0, 5000),
                     ],
                 },
                 SectionSpec {

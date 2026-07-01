@@ -38,6 +38,43 @@ pub(crate) fn percentage(property: &ConfigProperty<Percentage>) -> SettingRowIni
     }
 }
 
+/// Row with a slider over a millisecond duration, labelled in seconds.
+pub(crate) fn milliseconds(
+    property: &ConfigProperty<u32>,
+    range_min: u32,
+    range_max: u32,
+) -> SettingRowInit {
+    let controller = SliderControl::builder()
+        .launch(SliderInit {
+            property: property.clone(),
+            range_min: f64::from(range_min),
+            range_max: f64::from(range_max),
+            to_slider: |ms| f64::from(*ms),
+            from_slider: |value| {
+                if value.is_finite() {
+                    value.round().clamp(0.0, f64::from(u32::MAX)) as u32
+                } else {
+                    0
+                }
+            },
+            format_label: |value| format!("{:.1}s", value / 1000.0),
+        })
+        .detach();
+
+    let widget = controller.widget().clone();
+
+    SettingRowInit {
+        i18n_key: property.i18n_key(),
+        handle: PropertyHandle::new(property, |ms| format!("{:.1}s", f64::from(*ms) / 1000.0)),
+        control: widget.upcast(),
+        keepalive: Box::new(controller),
+        full_width: false,
+        dirty_badge: None,
+        behavior: RowBehavior::Setting,
+        unit: None,
+    }
+}
+
 /// Row with a slider over the -1.0 to 1.0 range for a `SignedNormalizedF64` property.
 pub(crate) fn signed_normalized(property: &ConfigProperty<SignedNormalizedF64>) -> SettingRowInit {
     let controller = SliderControl::builder()

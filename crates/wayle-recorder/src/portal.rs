@@ -46,8 +46,9 @@ fn save_restore_token(token: &str) {
     let _ = fs::write(path, token);
 }
 
-/// A negotiated screen-capture stream.
-pub(crate) struct ScreenCast {
+/// A negotiated screen-capture stream. Opaque handle returned by
+/// [`crate::Recorder::open_session`] and consumed by [`crate::Recorder::start`].
+pub struct ScreenCast {
     /// PipeWire remote file descriptor. Kept alive for the pipeline's lifetime.
     pub(crate) fd: OwnedFd,
     /// PipeWire node id of the captured monitor.

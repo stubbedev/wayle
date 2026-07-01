@@ -582,10 +582,12 @@ fn build_background(bg: &BgConfig) -> gtk::Widget {
         LockBackground::Color => solid_fill(gdk::RGBA::parse(bg.color.as_str()).ok()),
         LockBackground::Image | LockBackground::Wallpaper if !bg.image.is_empty() => {
             let overlay = gtk::Overlay::new();
-            let picture = match (bg.blur > 0).then(|| blurred_texture(&bg.image, bg.blur)) {
-                Some(Some(texture)) => gtk::Picture::for_paintable(&texture),
-                // blur disabled, or load/blur failed: GPU-scale the file directly.
-                _ => gtk::Picture::for_filename(&bg.image),
+            // Decode via the `image` crate (like the wallpaper renderer) so
+            // formats gdk-pixbuf lacks a loader for (webp/jxl/avif) still show;
+            // only fall back to GDK's own loader if that decode fails.
+            let picture = match load_texture(&bg.image, bg.blur) {
+                Some(texture) => gtk::Picture::for_paintable(&texture),
+                None => gtk::Picture::for_filename(&bg.image),
             };
             picture.set_content_fit(gtk::ContentFit::Cover);
             overlay.set_child(Some(&picture));
@@ -616,11 +618,18 @@ fn solid_fill(rgba: Option<gdk::RGBA>) -> gtk::Widget {
     area.upcast()
 }
 
-/// Loads `path` and returns a gaussian-blurred texture, or `None` if the file
-/// can't be read/decoded. Runs synchronously on the GTK thread during lock
-/// acquisition (a one-off cost, like the screenshot freeze capture).
-fn blurred_texture(path: &str, radius: u32) -> Option<gdk::Texture> {
-    let rgba = image::open(path).ok()?.blur(radius as f32).to_rgba8();
+/// Loads `path` into a texture, applying a gaussian blur when `radius > 0`.
+/// Returns `None` if the file can't be read/decoded. Runs synchronously on the
+/// GTK thread during lock acquisition (a one-off cost, like the screenshot
+/// freeze capture).
+fn load_texture(path: &str, radius: u32) -> Option<gdk::Texture> {
+    let image = image::open(path).ok()?;
+    let image = if radius > 0 {
+        image.blur(radius as f32)
+    } else {
+        image
+    };
+    let rgba = image.to_rgba8();
     let (width, height) = rgba.dimensions();
     let stride = width as usize * 4;
     let bytes = gtk::glib::Bytes::from_owned(rgba.into_raw());

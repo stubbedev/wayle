@@ -1,4 +1,7 @@
-use std::cell::{Cell, RefCell};
+use std::{
+    cell::{Cell, RefCell},
+    time::{Duration, Instant},
+};
 
 use gtk4::{glib, graphene, gsk, prelude::*, subclass::prelude::*};
 use wayle_config::schemas::animations::AnimationType;
@@ -7,6 +10,14 @@ use super::GenieEdge;
 
 /// Default transition duration (ms) before a caller sets one.
 const DEFAULT_DURATION_MS: u32 = 200;
+
+/// Animation step interval (~60fps). The reveal is driven by a main-loop timer
+/// rather than the widget's frame clock: a slide collapses the allocation to
+/// zero at progress 0, and a zero-size layer-shell surface commits no valid
+/// buffer, so the compositor never delivers frame callbacks and a frame-clock
+/// tick would never fire — leaving the overlay stuck invisible. A wall-clock
+/// timer advances regardless, growing the surface until it renders normally.
+const FRAME_INTERVAL: Duration = Duration::from_millis(16);
 
 pub struct WayleRevealerImp {
     child: RefCell<Option<gtk4::Widget>>,
@@ -21,13 +32,13 @@ pub struct WayleRevealerImp {
     target: Cell<f64>,
     /// `progress` captured when the current animation started.
     start_progress: Cell<f64>,
-    /// Frame-clock time (µs) the current animation anchored at, captured on the
-    /// first tick so an enter that is armed before the surface maps still plays.
-    anim_start_us: Cell<i64>,
-    /// Whether [`Self::anim_start_us`] has been anchored for this run.
-    anim_anchored: Cell<bool>,
-    ticking: Cell<bool>,
-    tick_id: RefCell<Option<gtk4::TickCallbackId>>,
+    /// Wall-clock instant the current animation started, for elapsed timing.
+    anim_start: Cell<Option<Instant>>,
+    /// Whether a step timer is currently in flight (drives the 1px travel-axis
+    /// floor in `measure`).
+    animating: Cell<bool>,
+    /// Running step timer, if an animation is in flight.
+    source_id: RefCell<Option<glib::SourceId>>,
 }
 
 impl Default for WayleRevealerImp {
@@ -41,10 +52,9 @@ impl Default for WayleRevealerImp {
             progress: Cell::new(0.0),
             target: Cell::new(0.0),
             start_progress: Cell::new(0.0),
-            anim_start_us: Cell::new(0),
-            anim_anchored: Cell::new(false),
-            ticking: Cell::new(false),
-            tick_id: RefCell::new(None),
+            anim_start: Cell::new(None),
+            animating: Cell::new(false),
+            source_id: RefCell::new(None),
         }
     }
 }
@@ -58,7 +68,7 @@ impl ObjectSubclass for WayleRevealerImp {
 
 impl ObjectImpl for WayleRevealerImp {
     fn dispose(&self) {
-        if let Some(id) = self.tick_id.take() {
+        if let Some(id) = self.source_id.take() {
             id.remove();
         }
         if let Some(child) = self.child.take() {
@@ -87,9 +97,16 @@ impl WidgetImpl for WayleRevealerImp {
         // Slides shrink along their travel axis so the parent reflows (sibling
         // widgets get pushed) as the surface grows/collapses — like GtkRevealer.
         // The child keeps its full size; the shrinking allocation clips it.
+        //
+        // While a step timer is in flight, floor the travel axis at 1px so a
+        // layer-shell overlay's surface keeps a valid (non-zero) buffer and its
+        // frame clock can't park mid-animation and strand the reveal. That 1px is
+        // drawn fully transparent (see `snapshot`), and at rest the floor is 0 so
+        // a hidden slide (e.g. a closed dropdown) leaves no sliver.
         if slide_axis(transition) == Some(orientation) {
             let shown = (f64::from(nat) * ease_in_out_cubic(self.progress.get())).round() as i32;
-            return (0, shown.max(0), -1, -1);
+            let floor = i32::from(self.animating.get());
+            return (0, shown.max(floor), -1, -1);
         }
         (min, nat, min_b, nat_b)
     }
@@ -144,9 +161,16 @@ impl WidgetImpl for WayleRevealerImp {
             return;
         }
         // Slides: the animated allocation + overflow clip already produce the
-        // motion (see `size_allocate`), so just draw the child.
-        if slide_axis(transition).is_some() {
-            obj.snapshot_child(&child, snapshot);
+        // motion (see `size_allocate`), so just draw the child — but skip it while
+        // collapsed to the 1px buffer floor so that floor stays fully transparent.
+        if let Some(axis) = slide_axis(transition) {
+            let collapsed = match axis {
+                gtk4::Orientation::Horizontal => obj.width() <= 1,
+                _ => obj.height() <= 1,
+            };
+            if !collapsed {
+                obj.snapshot_child(&child, snapshot);
+            }
             return;
         }
         // Fully shown: cheap fast-path, no transform stack.
@@ -286,41 +310,42 @@ impl WayleRevealerImp {
     fn start_animation(&self, target: f64) {
         self.target.set(target);
 
-        // Zero duration (animations disabled) snaps with no tick.
+        // Zero duration (animations disabled) snaps with no timer.
         if self.duration_ms.get() == 0 {
-            if let Some(id) = self.tick_id.take() {
+            if let Some(id) = self.source_id.take() {
                 id.remove();
             }
-            self.ticking.set(false);
+            self.animating.set(false);
             self.progress.set(target);
             self.invalidate();
             return;
         }
 
         self.start_progress.set(self.progress.get());
-        // Anchor on the first tick (the surface may not be mapped yet, so the
-        // frame clock isn't running — anchoring now would skip the animation).
-        self.anim_anchored.set(false);
+        self.anim_start.set(Some(Instant::now()));
+        self.animating.set(true);
 
-        // A live tick already animates toward the new target/anchor — don't stack a second.
-        if self.ticking.get() {
+        // A live timer already animates toward the new target/anchor — reusing it
+        // (it re-reads target/start above) avoids stacking a second source.
+        if self.source_id.borrow().is_some() {
             return;
         }
-        self.ticking.set(true);
-        let id = self
-            .obj()
-            .add_tick_callback(|obj, clock| obj.imp().tick(clock));
-        self.tick_id.replace(Some(id));
+        let weak = self.obj().downgrade();
+        let id = glib::timeout_add_local(FRAME_INTERVAL, move || {
+            let Some(obj) = weak.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            obj.imp().step()
+        });
+        self.source_id.replace(Some(id));
     }
 
-    fn tick(&self, clock: &gtk4::gdk::FrameClock) -> glib::ControlFlow {
-        if !self.anim_anchored.get() {
-            self.anim_start_us.set(clock.frame_time());
-            self.anim_anchored.set(true);
-        }
-
+    fn step(&self) -> glib::ControlFlow {
         let duration = f64::from(self.duration_ms.get());
-        let elapsed_ms = (clock.frame_time() - self.anim_start_us.get()) as f64 / 1000.0;
+        let elapsed_ms = self
+            .anim_start
+            .get()
+            .map_or(duration, |start| start.elapsed().as_secs_f64() * 1000.0);
         let frac = if duration <= 0.0 {
             1.0
         } else {
@@ -334,9 +359,11 @@ impl WayleRevealerImp {
 
         if frac >= 1.0 {
             self.progress.set(to);
-            self.ticking.set(false);
+            self.animating.set(false);
             // Returning Break removes the source; drop the handle without re-removing.
-            self.tick_id.replace(None);
+            self.source_id.replace(None);
+            // Drop the transparent 1px buffer floor now the animation has settled.
+            self.invalidate();
             glib::ControlFlow::Break
         } else {
             glib::ControlFlow::Continue

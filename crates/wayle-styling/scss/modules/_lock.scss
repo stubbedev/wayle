@@ -33,6 +33,12 @@
 
     .lock-entry {
         margin-top: 1rem;
+
+        // PasswordEntry dots render with no kerning and slightly overlap;
+        // add tracking so each typed char reads as a distinct dot.
+        text {
+            letter-spacing: 0.15em;
+        }
     }
 
     .lock-error {
