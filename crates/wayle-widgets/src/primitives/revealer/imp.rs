@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use gtk4::{glib, graphene, gsk, prelude::*, subclass::prelude::*};
+use gtk4::{glib, graphene, prelude::*, subclass::prelude::*};
 use wayle_config::schemas::animations::AnimationType;
 
 use super::GenieEdge;
@@ -34,9 +34,6 @@ pub struct WayleRevealerImp {
     start_progress: Cell<f64>,
     /// Wall-clock instant the current animation started, for elapsed timing.
     anim_start: Cell<Option<Instant>>,
-    /// Whether a step timer is currently in flight (drives the 1px travel-axis
-    /// floor in `measure`).
-    animating: Cell<bool>,
     /// Running step timer, if an animation is in flight.
     source_id: RefCell<Option<glib::SourceId>>,
 }
@@ -53,7 +50,6 @@ impl Default for WayleRevealerImp {
             target: Cell::new(0.0),
             start_progress: Cell::new(0.0),
             anim_start: Cell::new(None),
-            animating: Cell::new(false),
             source_id: RefCell::new(None),
         }
     }
@@ -94,20 +90,15 @@ impl WidgetImpl for WayleRevealerImp {
             };
         }
 
-        // Slides shrink along their travel axis so the parent reflows (sibling
-        // widgets get pushed) as the surface grows/collapses — like GtkRevealer.
-        // The child keeps its full size; the shrinking allocation clips it.
-        //
-        // While a step timer is in flight, floor the travel axis at 1px so a
-        // layer-shell overlay's surface keeps a valid (non-zero) buffer and its
-        // frame clock can't park mid-animation and strand the reveal. That 1px is
-        // drawn fully transparent (see `snapshot`), and at rest the floor is 0 so
-        // a hidden slide (e.g. a closed dropdown) leaves no sliver.
-        if slide_axis(transition) == Some(orientation) {
-            let shown = (f64::from(nat) * ease_in_out_cubic(self.progress.get())).round() as i32;
-            let floor = i32::from(self.animating.get());
-            return (0, shown.max(floor), -1, -1);
-        }
+        // Every animated transition — slides included — reserves its full natural
+        // size for the whole run and moves the child within it via `snapshot`.
+        // Shrinking the allocation instead (to push siblings, GtkRevealer-style)
+        // collapses a content-sized layer-shell surface to zero at progress 0; a
+        // zero-size Wayland surface commits no valid buffer, so the compositor
+        // parks the frame clock and the reveal never advances — the popup is
+        // stranded invisible. Reserving full size keeps the surface mapped and the
+        // clock live. The trade-off: siblings don't get pushed, they hold position
+        // while the card slides in over its own slot.
         (min, nat, min_b, nat_b)
     }
 
@@ -115,31 +106,10 @@ impl WidgetImpl for WayleRevealerImp {
         let Some(child) = self.child.borrow().clone() else {
             return;
         };
-        // Slides give the child its full natural size and offset it toward the
-        // travel edge; the (smaller, clipped) allocation reveals a growing strip.
-        match slide_axis(self.transition.get()) {
-            Some(gtk4::Orientation::Vertical) => {
-                let (_, nat_h, _, _) = child.measure(gtk4::Orientation::Vertical, width);
-                // SlideUp enters from the bottom (anchor bottom); SlideDown from the top.
-                let dy = match self.transition.get() {
-                    AnimationType::SlideUp => (height - nat_h) as f32,
-                    _ => 0.0,
-                };
-                let offset = gsk::Transform::new().translate(&graphene::Point::new(0.0, dy));
-                child.allocate(width, nat_h, baseline, Some(offset));
-            }
-            Some(gtk4::Orientation::Horizontal) => {
-                let (_, nat_w, _, _) = child.measure(gtk4::Orientation::Horizontal, height);
-                // SlideLeft enters from the right (anchor right); SlideRight from the left.
-                let dx = match self.transition.get() {
-                    AnimationType::SlideLeft => (width - nat_w) as f32,
-                    _ => 0.0,
-                };
-                let offset = gsk::Transform::new().translate(&graphene::Point::new(dx, 0.0));
-                child.allocate(nat_w, height, baseline, Some(offset));
-            }
-            _ => child.allocate(width, height, baseline, None),
-        }
+        // The child always gets the full allocation; slides move it within these
+        // bounds in `snapshot` (overflow clipped), so the surface stays a constant
+        // size throughout the animation.
+        child.allocate(width, height, baseline, None);
     }
 
     fn snapshot(&self, snapshot: &gtk4::Snapshot) {
@@ -160,17 +130,18 @@ impl WidgetImpl for WayleRevealerImp {
         if p <= 0.0 {
             return;
         }
-        // Slides: the animated allocation + overflow clip already produce the
-        // motion (see `size_allocate`), so just draw the child — but skip it while
-        // collapsed to the 1px buffer floor so that floor stays fully transparent.
-        if let Some(axis) = slide_axis(transition) {
-            let collapsed = match axis {
-                gtk4::Orientation::Horizontal => obj.width() <= 1,
-                _ => obj.height() <= 1,
-            };
-            if !collapsed {
-                obj.snapshot_child(&child, snapshot);
-            }
+
+        let w = obj.width() as f32;
+        let h = obj.height() as f32;
+
+        // Slides translate the full-size child from its entry edge toward rest;
+        // the revealer's overflow clip (set for slides in `set_transition`) turns
+        // the offset child into a growing strip.
+        if slide_axis(transition).is_some() {
+            snapshot.save();
+            apply_slide(snapshot, transition, ease_in_out_cubic(p) as f32, w, h);
+            obj.snapshot_child(&child, snapshot);
+            snapshot.restore();
             return;
         }
         // Fully shown: cheap fast-path, no transform stack.
@@ -178,9 +149,6 @@ impl WidgetImpl for WayleRevealerImp {
             obj.snapshot_child(&child, snapshot);
             return;
         }
-
-        let w = obj.width() as f32;
-        let h = obj.height() as f32;
 
         snapshot.save();
         let alpha = match transition {
@@ -315,7 +283,6 @@ impl WayleRevealerImp {
             if let Some(id) = self.source_id.take() {
                 id.remove();
             }
-            self.animating.set(false);
             self.progress.set(target);
             self.invalidate();
             return;
@@ -323,7 +290,6 @@ impl WayleRevealerImp {
 
         self.start_progress.set(self.progress.get());
         self.anim_start.set(Some(Instant::now()));
-        self.animating.set(true);
 
         // A live timer already animates toward the new target/anchor — reusing it
         // (it re-reads target/start above) avoids stacking a second source.
@@ -359,11 +325,8 @@ impl WayleRevealerImp {
 
         if frac >= 1.0 {
             self.progress.set(to);
-            self.animating.set(false);
             // Returning Break removes the source; drop the handle without re-removing.
             self.source_id.replace(None);
-            // Drop the transparent 1px buffer floor now the animation has settled.
-            self.invalidate();
             glib::ControlFlow::Break
         } else {
             glib::ControlFlow::Continue
@@ -382,9 +345,25 @@ fn slide_axis(transition: AnimationType) -> Option<gtk4::Orientation> {
 }
 
 /// Whether the transition animates the widget's allocation (so siblings are
-/// pushed and the parent must relayout each frame).
+/// pushed and the parent must relayout each frame). Only `None` reflows; slides
+/// keep a constant allocation and move the child in `snapshot`.
 fn animates_size(transition: AnimationType) -> bool {
-    matches!(transition, AnimationType::None) || slide_axis(transition).is_some()
+    matches!(transition, AnimationType::None)
+}
+
+/// Translate the full-size child from its entry edge toward rest for a slide.
+/// `t` is the eased progress (`0` = fully offset offscreen, `1` = at rest). The
+/// revealer clips to its bounds, so the offset child reads as a growing strip.
+fn apply_slide(snapshot: &gtk4::Snapshot, transition: AnimationType, t: f32, w: f32, h: f32) {
+    let d = 1.0 - t;
+    let (dx, dy) = match transition {
+        AnimationType::SlideUp => (0.0, d * h),     // enters from below
+        AnimationType::SlideDown => (0.0, -d * h),  // enters from above
+        AnimationType::SlideLeft => (d * w, 0.0),   // enters from the right
+        AnimationType::SlideRight => (-d * w, 0.0), // enters from the left
+        _ => (0.0, 0.0),
+    };
+    snapshot.translate(&graphene::Point::new(dx, dy));
 }
 
 /// Rotate about the relevant edge for a swing transition (affine approximation
