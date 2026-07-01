@@ -4491,6 +4491,7 @@
             "scroll-down": "",
             "scroll-up": "",
             "show-cursor": true,
+            "start-delay-ms": 1400,
             "system-audio": true,
             "webcam-device": "",
             "webcam-enabled": false,
@@ -6025,6 +6026,11 @@
           "$ref": "#/$defs/boolean",
           "default": true,
           "description": "Draw the mouse cursor in the recording."
+        },
+        "start-delay-ms": {
+          "$ref": "#/$defs/uint32",
+          "default": 1400,
+          "description": "Delay between choosing the capture source and the recording actually\nstarting, in milliseconds. Gives on-screen UI (the start toast) time to\nclear so it isn't captured in the video."
         },
         "system-audio": {
           "$ref": "#/$defs/boolean",
@@ -8007,7 +8013,7 @@
       "type": "integer"
     }
   },
-  "$id": "wayle-config-0.8.10",
+  "$id": "wayle-config-0.8.11",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for Wayle.\n\nRepresents the complete configuration schema that can be loaded\nfrom TOML files. All fields have sensible defaults.",
   "properties": {
@@ -8837,6 +8843,7 @@
           "scroll-down": "",
           "scroll-up": "",
           "show-cursor": true,
+          "start-delay-ms": 1400,
           "system-audio": true,
           "webcam-device": "",
           "webcam-enabled": false,
