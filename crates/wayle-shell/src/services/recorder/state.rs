@@ -211,36 +211,43 @@ impl RecorderState {
 
         let (term_tx, term_rx) = mpsc::unbounded_channel();
         match self.recorder.start(cast, &opts, term_tx) {
-            Ok(()) => {
-                // A stop may have arrived while the portal/pipeline negotiated.
-                // Commit to Recording only if nothing cancelled us meanwhile;
-                // decide under the status lock so it can't race `stop`.
-                let mut status = self.lock_status();
-                if *status != Status::Starting || cancel.is_cancelled() {
-                    drop(status);
-                    let _ = self.recorder.stop();
-                    self.reset_idle();
-                    return;
-                }
-                *status = Status::Recording;
-                drop(status);
-
-                self.file_path.set(path);
-                self.elapsed_secs.set(0);
-                self.paused.set(false);
-                // Flip active before clearing preparing so the icon goes
-                // straight from pulsing to solid-recording, with no idle flash.
-                self.active.set(true);
-                self.preparing.set(false);
-                self.start_timer();
-                self.watch_termination(term_rx);
-            }
+            Ok(()) => self.commit_recording(path, term_rx, &cancel),
             Err(err) => {
                 self.reset_idle();
                 warn!(error = %err, "failed to start recording");
                 self.show_error(&format!("{}: {err}", t!("recorder-toast-failed")));
             }
         }
+    }
+
+    /// Commits a launched pipeline to `Recording`, unless a `stop` cancelled us
+    /// while the portal/pipeline negotiated — in which case tear it back down.
+    /// Decides under the status lock so it can't race `stop`.
+    fn commit_recording(
+        &self,
+        path: String,
+        term_rx: mpsc::UnboundedReceiver<String>,
+        cancel: &CancellationToken,
+    ) {
+        let mut status = self.lock_status();
+        if *status != Status::Starting || cancel.is_cancelled() {
+            drop(status);
+            let _ = self.recorder.stop();
+            self.reset_idle();
+            return;
+        }
+        *status = Status::Recording;
+        drop(status);
+
+        self.file_path.set(path);
+        self.elapsed_secs.set(0);
+        self.paused.set(false);
+        // Flip active before clearing preparing so the icon goes straight from
+        // pulsing to solid-recording, with no idle flash.
+        self.active.set(true);
+        self.preparing.set(false);
+        self.start_timer();
+        self.watch_termination(term_rx);
     }
 
     /// Watches for an unexpected pipeline death (source disconnect, disk full,
