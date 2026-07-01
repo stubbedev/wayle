@@ -135,6 +135,7 @@ fn lock_child() -> std::sync::MutexGuard<'static, Option<Child>> {
 /// SIGTERM the tracked child — the signal `pkill` sent by default, so
 /// hyprsunset's own exit handler restores the gamma ramp — then reap it so no
 /// zombie lingers.
+#[allow(unsafe_code)]
 fn terminate(mut child: Child) {
     if let Some(pid) = child.id() {
         // SAFETY: `pid` is a child process we spawned; SIGTERM is a valid signal.
