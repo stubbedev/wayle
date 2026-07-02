@@ -1,10 +1,15 @@
-//! Wayland session discovery + last-choice persistence for the greeter.
+//! Session discovery + last-choice persistence for the greeter.
 //!
-//! A display-manager greeter lets the user pick which Wayland session to start.
+//! A display-manager greeter lets the user pick which session to start.
 //! Sessions are advertised as freedesktop `.desktop` files under
-//! `wayland-sessions` directories (the same ones sddm/gdm read). We parse each
-//! for its display `Name` and `Exec` line, present them in a dropdown, and
-//! remember the last pick in a small state file so it pre-selects next time.
+//! `wayland-sessions` and `xsessions` directories (the same ones sddm/gdm
+//! read). We parse each for its display `Name` and `Exec` line, present them in
+//! a dropdown, and remember the last pick in a small state file so it
+//! pre-selects next time.
+//!
+//! X11 sessions are labelled `(X11)` and launched through `startx /usr/bin/env
+//! <exec>` — greetd (unlike sddm) does not manage an X server, so `startx`
+//! provides one (the tuigreet approach).
 
 use std::{
     fs,
@@ -13,25 +18,37 @@ use std::{
 
 use tracing::warn;
 
-/// A selectable Wayland session parsed from a `wayland-sessions/*.desktop` file.
+/// Which kind of session a discovery directory advertises.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionKind {
+    /// `wayland-sessions/*.desktop`: exec started directly by greetd.
+    Wayland,
+    /// `xsessions/*.desktop`: exec wrapped in `startx /usr/bin/env`.
+    X11,
+}
+
+/// A selectable session parsed from a sessions `.desktop` file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Session {
-    /// Stable id: the `.desktop` file stem (e.g. `sway`). Used to remember the
-    /// last choice across restarts.
+    /// Stable id: the `.desktop` file stem (e.g. `sway`), suffixed `-x11` for
+    /// X11 sessions so both kinds can coexist. Used to remember the last
+    /// choice across restarts.
     pub id: String,
-    /// Human-readable name from `Name=` (falls back to the id).
+    /// Human-readable name from `Name=` (falls back to the id), suffixed
+    /// ` (X11)` for X11 sessions.
     pub name: String,
-    /// Command argv from `Exec=`, with field codes stripped.
+    /// Command argv from `Exec=`, with field codes stripped (and the `startx`
+    /// wrapper prepended for X11 sessions).
     pub exec: Vec<String>,
 }
 
-/// Discovers sessions from every `*.desktop` under each dir in `dirs`.
+/// Discovers `kind` sessions from every `*.desktop` under each dir in `dirs`.
 ///
 /// Entries with `Hidden=true` or `NoDisplay=true` are skipped, as are files
 /// with no usable `Exec`. Results are de-duplicated by id (earlier dirs win,
-/// matching XDG precedence) and sorted by display name.
+/// matching XDG precedence). Callers merging kinds sort the combined list.
 #[must_use]
-pub fn discover(dirs: &[PathBuf]) -> Vec<Session> {
+pub fn discover(dirs: &[PathBuf], kind: SessionKind) -> Vec<Session> {
     let mut sessions: Vec<Session> = Vec::new();
     for dir in dirs {
         let Ok(entries) = fs::read_dir(dir) else {
@@ -42,8 +59,12 @@ pub fn discover(dirs: &[PathBuf]) -> Vec<Session> {
             if path.extension().and_then(|e| e.to_str()) != Some("desktop") {
                 continue;
             }
-            let Some(id) = path.file_stem().and_then(|s| s.to_str()).map(String::from) else {
+            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
                 continue;
+            };
+            let id = match kind {
+                SessionKind::Wayland => stem.to_owned(),
+                SessionKind::X11 => format!("{stem}-x11"),
             };
             if sessions.iter().any(|s| s.id == id) {
                 continue; // a higher-precedence dir already provided this id
@@ -51,12 +72,22 @@ pub fn discover(dirs: &[PathBuf]) -> Vec<Session> {
             // `None` = hidden, unreadable, or no Exec.
             if let Some(session) = parse_desktop(&fs::read_to_string(&path).unwrap_or_default(), id)
             {
-                sessions.push(session);
+                sessions.push(apply_kind(session, kind));
             }
         }
     }
-    sessions.sort_by_key(|s| s.name.to_lowercase());
     sessions
+}
+
+/// Applies the kind-specific labelling and launch wrapper.
+fn apply_kind(mut session: Session, kind: SessionKind) -> Session {
+    if kind == SessionKind::X11 {
+        session.name.push_str(" (X11)");
+        let mut exec = vec!["startx".to_owned(), "/usr/bin/env".to_owned()];
+        exec.append(&mut session.exec);
+        session.exec = exec;
+    }
+    session
 }
 
 /// Parses a desktop-entry `text`, returning `None` if it is hidden or lacks a
@@ -179,6 +210,28 @@ mod tests {
         let s = parse_desktop("[Desktop Entry]\nExec=hyprland\n", "hyprland".to_owned())
             .expect("session");
         assert_eq!(s.name, "hyprland");
+    }
+
+    #[test]
+    fn x11_sessions_are_labelled_and_wrapped() {
+        let s = parse_desktop(
+            "[Desktop Entry]\nName=Plasma\nExec=startplasma-x11\n",
+            "plasma-x11".to_owned(),
+        )
+        .map(|s| apply_kind(s, SessionKind::X11))
+        .expect("session");
+        assert_eq!(s.id, "plasma-x11");
+        assert_eq!(s.name, "Plasma (X11)");
+        assert_eq!(s.exec, vec!["startx", "/usr/bin/env", "startplasma-x11"]);
+    }
+
+    #[test]
+    fn wayland_sessions_are_untouched_by_kind() {
+        let s = parse_desktop("[Desktop Entry]\nName=Sway\nExec=sway\n", "sway".to_owned())
+            .map(|s| apply_kind(s, SessionKind::Wayland))
+            .expect("session");
+        assert_eq!(s.name, "Sway");
+        assert_eq!(s.exec, vec!["sway"]);
     }
 
     #[test]

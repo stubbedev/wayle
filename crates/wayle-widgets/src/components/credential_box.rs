@@ -53,11 +53,13 @@ impl CredentialBox {
     /// Builds the credential box. `on_submit` fires with the entry's text each
     /// time the user activates it (presses Enter).
     ///
-    /// `extra`, if given, is appended below the entry (above the error label) —
-    /// the greeter uses this slot for its Wayland-session picker; the lock
-    /// screen passes `None`.
+    /// `header`, if given, is placed above the entries (below the clock) — the
+    /// greeter uses this slot for its user list. `extra`, if given, is appended
+    /// below the entry (above the error label) — the greeter uses it for its
+    /// session picker. The lock screen passes `None` for both.
     pub fn build(
         opts: &CredentialOpts,
+        header: Option<&gtk::Widget>,
         extra: Option<&gtk::Widget>,
         on_submit: impl Fn(String) + 'static,
     ) -> Self {
@@ -97,6 +99,9 @@ impl CredentialBox {
 
         center.append(&clock);
         center.append(&date);
+        if let Some(header) = header {
+            center.append(header);
+        }
         if let Some(user) = &username {
             center.append(user);
         }

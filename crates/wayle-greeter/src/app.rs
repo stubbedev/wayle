@@ -39,7 +39,16 @@ use wayle_config::{
 use wayle_styling::{STATIC_CSS, theme_css};
 use wayle_widgets::components::credential_box::{CredentialBox, CredentialOpts};
 
-use crate::session::{self, Session};
+use crate::{
+    i18n::t,
+    session::{self, Session},
+    users::User,
+};
+
+/// Most users shown as avatar buttons; beyond this the row is dropped and the
+/// free-text username entry carries the load (a row of 30 avatars on a
+/// corporate box helps nobody).
+const MAX_LISTED_USERS: usize = 8;
 
 /// Initialization payload for the greeter component.
 pub struct GreeterInit {
@@ -47,6 +56,8 @@ pub struct GreeterInit {
     pub config: Config,
     /// Selectable Wayland sessions (non-empty; enforced in `main`).
     pub sessions: Vec<Session>,
+    /// Login accounts offered as clickable avatars (may be empty).
+    pub users: Vec<User>,
     /// Id of the last-used session to pre-select, if any is remembered.
     pub last_session: Option<String>,
     /// Last successfully logged-in username to pre-fill, if remembered.
@@ -127,9 +138,24 @@ impl Component for Greeter {
         let selected = dropdown.selected() as usize;
         let selected_cmd = Arc::new(Mutex::new(init.sessions[selected].exec.clone()));
 
+        // Below-entry column: caps-lock warning + session picker.
+        let caps_label = gtk::Label::new(Some(&t!("greeter-caps-lock")));
+        caps_label.add_css_class("lock-caps");
+        caps_label.set_visible(false);
+        let below = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        below.append(&caps_label);
+        below.append(&dropdown);
+
+        // User list container; populated after the credential box exists (the
+        // buttons need the entry handles).
+        let user_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        user_row.add_css_class("lock-users");
+        user_row.set_halign(gtk::Align::Center);
+
         let show_clock = init.config.lock.show_clock.get();
         let input = sender.input_sender().clone();
-        let dropdown_widget: gtk::Widget = dropdown.clone().upcast();
+        let below_widget: gtk::Widget = below.clone().upcast();
+        let user_row_widget: gtk::Widget = user_row.clone().upcast();
         let cred = CredentialBox::build(
             &CredentialOpts {
                 show_clock,
@@ -137,9 +163,15 @@ impl Component for Greeter {
                 transition: AnimationType::Fade,
                 duration_ms: 300,
             },
-            Some(&dropdown_widget),
+            Some(&user_row_widget),
+            Some(&below_widget),
             move |text| input.emit(GreeterInput::Submit(text)),
         );
+        if let Some(user_entry) = &cred.username {
+            user_entry.set_placeholder_text(Some(&t!("greeter-username")));
+        }
+
+        populate_user_row(&user_row, &init.users, init.last_user.as_deref(), &cred);
 
         // Pre-fill the remembered username and focus whichever field the user
         // needs next (password when the username is known, username otherwise).
@@ -159,6 +191,7 @@ impl Component for Greeter {
         overlay.add_overlay(&build_power_box());
         root.set_child(Some(&overlay));
         cred.reveal();
+        watch_caps_lock(&caps_label);
 
         // Keep the shared session command in step with the dropdown.
         {
@@ -218,7 +251,7 @@ impl Greeter {
             Ok(backend) => backend,
             Err(err) => {
                 warn!(error = %err, "greeter: cannot connect to greetd");
-                self.show_message(&format!("greetd unavailable: {err}"));
+                self.show_message(&t!("greeter-greetd-unavailable", error = err.to_string()));
                 self.set_form_sensitive(true);
                 return;
             }
@@ -270,7 +303,7 @@ impl Greeter {
             .map(|u| u.text().trim().to_owned())
             .unwrap_or_default();
         if username.is_empty() {
-            self.show_message("Enter a username");
+            self.show_message(&t!("greeter-enter-username"));
             if let Some(user_entry) = &self.cred.username {
                 user_entry.grab_focus();
             }
@@ -362,6 +395,102 @@ impl Greeter {
     }
 }
 
+/// Fills the user row with one avatar button per discovered login user.
+/// Clicking one fills the username entry and focuses the password. The row is
+/// left empty (invisible) when there are no users or too many to be useful.
+fn populate_user_row(row: &gtk::Box, users: &[User], last: Option<&str>, cred: &CredentialBox) {
+    if users.is_empty() || users.len() > MAX_LISTED_USERS {
+        row.set_visible(false);
+        return;
+    }
+
+    let mut buttons = Vec::with_capacity(users.len());
+    for user in users {
+        let button = build_user_button(user);
+        if last == Some(user.name.as_str()) {
+            button.add_css_class("selected");
+        }
+        row.append(&button);
+        buttons.push(button);
+    }
+
+    for (button, user) in buttons.iter().zip(users) {
+        let name = user.name.clone();
+        let username_entry = cred.username.clone();
+        let password_entry = cred.entry.clone();
+        let all = buttons.clone();
+        let this = button.clone();
+        button.connect_clicked(move |_| {
+            for b in &all {
+                b.remove_css_class("selected");
+            }
+            this.add_css_class("selected");
+            if let Some(entry) = &username_entry {
+                entry.set_text(&name);
+            }
+            password_entry.grab_focus();
+        });
+    }
+}
+
+/// Builds one user button: avatar (image or initial-letter fallback) above the
+/// display name.
+fn build_user_button(user: &User) -> gtk::Button {
+    let avatar: gtk::Widget = match &user.icon {
+        Some(path) => {
+            let picture = gtk::Picture::for_filename(path);
+            picture.set_content_fit(gtk::ContentFit::Cover);
+            picture.add_css_class("lock-avatar");
+            picture.upcast()
+        }
+        None => {
+            let initial = user
+                .display_name
+                .chars()
+                .next()
+                .map(|c| c.to_uppercase().to_string())
+                .unwrap_or_default();
+            let label = gtk::Label::new(Some(&initial));
+            label.add_css_class("lock-avatar");
+            label.add_css_class("lock-avatar-fallback");
+            label.upcast()
+        }
+    };
+    avatar.set_size_request(64, 64);
+
+    let name = gtk::Label::new(Some(&user.display_name));
+    name.add_css_class("lock-user-name");
+    name.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    name.set_max_width_chars(14);
+
+    let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    column.set_halign(gtk::Align::Center);
+    column.append(&avatar);
+    column.append(&name);
+
+    let button = gtk::Button::new();
+    button.add_css_class("lock-user-button");
+    button.add_css_class("flat");
+    button.set_child(Some(&column));
+    button
+}
+
+/// Shows `label` whenever Caps Lock is on, tracking the keyboard device's
+/// caps-lock-state property (set at startup, updated on every change).
+fn watch_caps_lock(label: &gtk::Label) {
+    let Some(keyboard) = Display::default()
+        .and_then(|display| display.default_seat())
+        .and_then(|seat| seat.keyboard())
+    else {
+        return; // no keyboard device; leave the warning hidden
+    };
+    label.set_visible(keyboard.is_caps_locked());
+    let label = label.clone();
+    keyboard.connect_caps_lock_state_notify(move |device| {
+        label.set_visible(device.is_caps_locked());
+    });
+}
+
 /// Builds the power controls shown at the bottom of the screen: shutdown and
 /// reboot, via `systemctl` (logind allows both for the active local session
 /// without extra polkit rules).
@@ -372,13 +501,17 @@ fn build_power_box() -> gtk::Widget {
     row.set_valign(gtk::Align::End);
 
     for (icon, tooltip, verb) in [
-        ("system-shutdown-symbolic", "Shut down", "poweroff"),
-        ("system-reboot-symbolic", "Restart", "reboot"),
+        (
+            "system-shutdown-symbolic",
+            t!("greeter-shutdown"),
+            "poweroff",
+        ),
+        ("system-reboot-symbolic", t!("greeter-restart"), "reboot"),
     ] {
         let button = gtk::Button::from_icon_name(icon);
         button.add_css_class("lock-power-button");
         button.add_css_class("flat");
-        button.set_tooltip_text(Some(tooltip));
+        button.set_tooltip_text(Some(&tooltip));
         button.connect_clicked(move |_| {
             if let Err(err) = std::process::Command::new("systemctl").arg(verb).spawn() {
                 warn!(%verb, error = %err, "greeter: power action failed");

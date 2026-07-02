@@ -45,6 +45,9 @@ let
       sessionDirArgs = lib.concatMapStringsSep " " (
         d: "--sessions ${lib.escapeShellArg d}"
       ) cfg.greeter.session.dirs;
+      xsessionDirArgs = lib.concatMapStringsSep " " (
+        d: "--xsessions ${lib.escapeShellArg d}"
+      ) cfg.greeter.session.x11Dirs;
       # Optional explicit fallback session, appended as a "Custom" entry.
       fallback = lib.optionalString (
         cfg.greeter.session.command != ""
@@ -58,7 +61,7 @@ let
     in
     "${wrapperPrefix}${envPrefix}${cageExe} -s -- "
     + "${greeterExe} --config /etc/wayle/config.toml "
-    + "--state ${greeterStateDir}/last-session ${sessionDirArgs} ${envArgs} ${fallback}";
+    + "--state ${greeterStateDir}/last-session ${sessionDirArgs} ${xsessionDirArgs} ${envArgs} ${fallback}";
 in
 {
   options.programs.wayle = {
@@ -196,6 +199,19 @@ in
             Directories scanned for `*.desktop` Wayland session files to offer in
             the picker. Defaults to the aggregate NixOS sessions directory, which
             collects the session files of every installed Wayland compositor.
+          '';
+        };
+
+        x11Dirs = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "${config.services.displayManager.sessionData.desktops}/share/xsessions" ];
+          defaultText = lib.literalExpression ''["''${config.services.displayManager.sessionData.desktops}/share/xsessions"]'';
+          description = ''
+            Directories scanned for `*.desktop` X11 session files, offered with
+            an "(X11)" label and launched through `startx` (greetd does not
+            manage an X server itself, so `startx` must be on the session PATH —
+            typically via `services.xserver.enable`). Set to `[]` to offer
+            Wayland sessions only.
           '';
         };
 

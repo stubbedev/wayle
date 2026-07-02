@@ -46,9 +46,52 @@
         color: var(--palette-red);
     }
 
+    // Greeter-only: clickable user avatars above the entries.
+    .lock-users {
+        margin-top: 1rem;
+
+        .lock-user-button {
+            background: transparent;
+            padding: 0.5rem;
+            border-radius: var(--rounding-lg, 12px);
+
+            &:hover {
+                background: rgba(0, 0, 0, 0.35);
+            }
+
+            &.selected {
+                background: rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        .lock-avatar {
+            border-radius: 50%;
+        }
+
+        // Initial-letter fallback when no avatar image is readable.
+        .lock-avatar-fallback {
+            background: rgba(0, 0, 0, 0.45);
+            color: var(--palette-fg);
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .lock-user-name {
+            color: var(--palette-fg-muted);
+            font-size: 0.9rem;
+        }
+    }
+
     // Greeter-only: visible username entry above the password.
     .lock-user {
         margin-top: 1rem;
+    }
+
+    // Greeter-only: Caps Lock warning under the password entry.
+    .lock-caps {
+        margin-top: 0.5rem;
+        color: var(--palette-yellow);
+        font-size: 0.9rem;
     }
 
     // Greeter-only: Wayland session picker below the entry (hidden on the lock

@@ -8,11 +8,21 @@ look identical.
 Features:
 
 - **Session picker** — discovers Wayland sessions from
-  `wayland-sessions/*.desktop` (the same files sddm/gdm read) and offers them in
-  a dropdown. The last-used session is remembered and pre-selected.
+  `wayland-sessions/*.desktop` and X11 sessions from `xsessions/*.desktop` (the
+  same files sddm/gdm read) and offers them in a dropdown. X11 entries are
+  labelled `(X11)` and launched through `startx`. The last-used session is
+  remembered and pre-selected.
+- **User list** — real login accounts (from `/etc/passwd`) shown as clickable
+  avatars; avatars come from AccountsService
+  (`/var/lib/AccountsService/icons/<user>`) or `~/.face`, with an
+  initial-letter fallback. Hidden when there are more than 8 users (the
+  username field always works).
 - **Remembered username** — the last successful username is pre-filled, with
   focus on the password field.
+- **Caps Lock warning** — shown under the password entry while Caps Lock is on.
 - **Power controls** — shutdown and reboot buttons.
+- **Localized** — greeter labels follow the system locale (same Fluent-based
+  i18n as the shell).
 
 ## How it runs
 
@@ -46,7 +56,8 @@ contains the session files of every installed Wayland compositor. Options:
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `greeter.session.dirs` | NixOS sessions dir | Directories scanned for `*.desktop` session files. |
+| `greeter.session.dirs` | NixOS sessions dir | Directories scanned for Wayland `*.desktop` session files. |
+| `greeter.session.x11Dirs` | NixOS xsessions dir | Directories scanned for X11 session files (launched via `startx`; `[]` disables). |
 | `greeter.session.command` | `""` | Optional explicit fallback session, offered as a "Custom" entry. |
 | `greeter.session.environment` | `[]` | Extra `KEY=value` entries for the started session. |
 | `greeter.renderer` | `"auto"` | `auto` tries GPU and falls back to software; `software` forces the driver-free pixman + cairo path. |
@@ -96,13 +107,14 @@ nixGLIntel wayle-greeter-session --config /etc/wayle/config.toml --state /var/li
 ## CLI reference
 
 ```
-wayle-greeter [--config PATH] [--sessions DIR]... [--state PATH] [--env KEY=VAL]... [-- <session argv...>]
+wayle-greeter [--config PATH] [--sessions DIR]... [--xsessions DIR]... [--state PATH] [--env KEY=VAL]... [-- <session argv...>]
 ```
 
 | Flag | Default | What it does |
 | --- | --- | --- |
 | `--config PATH` | `/etc/wayle/config.toml` | Wayle config used for theming. |
-| `--sessions DIR` | `/usr/{local/,}share/wayland-sessions` | Session `.desktop` dir (repeatable; overrides defaults). |
+| `--sessions DIR` | `/usr/{local/,}share/wayland-sessions` | Wayland session `.desktop` dir (repeatable; overrides defaults). |
+| `--xsessions DIR` | `/usr/{local/,}share/xsessions` | X11 session `.desktop` dir (repeatable; launched via `startx`). |
 | `--state PATH` | `$XDG_STATE_HOME/wayle-greeter/last-session` | File the last session id is remembered in (username in a `last-user` sibling). |
 | `--env KEY=VAL` | — | Extra environment for the started session (repeatable). |
 | `-- <argv...>` | — | Optional explicit fallback session ("Custom"). |

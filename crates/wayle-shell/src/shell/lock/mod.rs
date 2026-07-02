@@ -539,6 +539,7 @@ fn build_surface(
             duration_ms: duration,
         },
         None,
+        None,
         move |text| input.emit(LockInput::Submit(text)),
     );
     overlay.add_overlay(&cred.root);

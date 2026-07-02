@@ -7,13 +7,18 @@
 
 mod app;
 mod config;
+mod i18n;
 mod session;
+mod users;
 
 use relm4::RelmApp;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use crate::session::Session;
+use crate::{
+    i18n::t,
+    session::{Session, SessionKind},
+};
 
 fn main() {
     init_tracing();
@@ -28,22 +33,24 @@ fn main() {
 
     let config = config::load(&options.config_path);
 
-    // Sessions discovered from `wayland-sessions` dirs, plus the optional
-    // explicit `-- <argv>` as a "Custom" entry (or the sole session when none
-    // are discovered — e.g. a single-session kiosk).
-    let mut sessions = session::discover(&options.session_dirs);
+    // Sessions discovered from the `wayland-sessions` + `xsessions` dirs, plus
+    // the optional explicit `-- <argv>` as a "Custom" entry (or the sole
+    // session when none are discovered — e.g. a single-session kiosk).
+    let mut sessions = session::discover(&options.session_dirs, SessionKind::Wayland);
+    sessions.extend(session::discover(&options.xsession_dirs, SessionKind::X11));
+    sessions.sort_by_key(|s| s.name.to_lowercase());
     if !options.command.is_empty() {
         sessions.push(Session {
             id: "custom".to_owned(),
-            name: "Custom".to_owned(),
+            name: t!("greeter-custom-session"),
             exec: options.command.clone(),
         });
     }
     if sessions.is_empty() {
         eprintln!(
-            "no Wayland sessions found in {:?} and no `-- <argv>` fallback given; \
+            "no sessions found in {:?} or {:?} and no `-- <argv>` fallback given; \
              nothing to log into",
-            options.session_dirs
+            options.session_dirs, options.xsession_dirs
         );
         std::process::exit(2);
     }
@@ -55,6 +62,7 @@ fn main() {
     let init = app::GreeterInit {
         config,
         sessions,
+        users: users::load(),
         last_session,
         last_user,
         state_path: options.state_path,
