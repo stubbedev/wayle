@@ -49,12 +49,14 @@ fn main() {
     }
 
     let last_session = session::load_last(&options.state_path);
+    let last_user = session::load_last(&options.state_path.with_file_name("last-user"));
     info!(count = sessions.len(), "wayle-greeter starting");
 
     let init = app::GreeterInit {
         config,
         sessions,
         last_session,
+        last_user,
         state_path: options.state_path,
         session_env: options.env,
     };

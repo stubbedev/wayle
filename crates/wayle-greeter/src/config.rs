@@ -3,9 +3,10 @@
 //! The greeter deliberately reuses the full wayle [`Config`] so its theme,
 //! background, and clock match the user's desktop and lock screen exactly. It
 //! loads that config from a system path (no `$HOME` is available pre-login),
-//! defaulting to `/etc/wayle/config.toml`. The only greeter-specific input is
-//! the session command to launch on a successful login, taken from the command
-//! line.
+//! defaulting to `/etc/wayle/config.toml`. The remaining options are where to
+//! discover Wayland sessions (`--sessions`), where to remember the last
+//! session/username (`--state`), and an optional explicit fallback session
+//! (`-- <argv>`).
 
 use std::path::{Path, PathBuf};
 
@@ -33,7 +34,8 @@ pub struct Options {
     pub config_path: PathBuf,
     /// Directories scanned for `*.desktop` Wayland session files.
     pub session_dirs: Vec<PathBuf>,
-    /// File the last-selected session id is remembered in.
+    /// File the last-selected session id is remembered in. The last username
+    /// is remembered in a `last-user` file next to it.
     pub state_path: PathBuf,
     /// Explicit fallback session argv from `-- <argv>`. Optional now that the
     /// greeter discovers sessions from `session_dirs`; used as an extra entry
@@ -46,8 +48,9 @@ pub struct Options {
 impl Options {
     /// Parses options from the process arguments.
     ///
-    /// Usage: `wayle-greeter [--config PATH] [--env KEY=VAL]... -- <session argv...>`
-    /// Everything after `--` is the session command.
+    /// Usage: `wayle-greeter [--config PATH] [--sessions DIR]... [--state PATH]
+    /// [--env KEY=VAL]... [-- <session argv...>]`
+    /// Everything after `--` is an optional explicit fallback session.
     ///
     /// # Errors
     /// Returns a usage message if required arguments are missing or malformed.
@@ -80,7 +83,9 @@ impl Options {
                 "--sessions" => {
                     // Repeatable: each flag appends one dir, overriding the
                     // defaults once any is given.
-                    let dir = args.next().ok_or_else(|| usage("--sessions requires a DIR"))?;
+                    let dir = args
+                        .next()
+                        .ok_or_else(|| usage("--sessions requires a DIR"))?;
                     session_dirs.push(PathBuf::from(dir));
                 }
                 "--state" => {
@@ -133,7 +138,8 @@ fn default_state_path() -> PathBuf {
 /// Builds the usage error string.
 fn usage(detail: &str) -> String {
     format!(
-        "{detail}\nusage: wayle-greeter [--config PATH] [--env KEY=VAL]... -- <session argv...>"
+        "{detail}\nusage: wayle-greeter [--config PATH] [--sessions DIR]... [--state PATH] \
+         [--env KEY=VAL]... [-- <session argv...>]"
     )
 }
 

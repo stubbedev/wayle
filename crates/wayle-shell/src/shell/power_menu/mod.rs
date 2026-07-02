@@ -235,7 +235,12 @@ impl PowerMenu {
 
     /// Plays the exit transition, hides the window, then runs `then_run` (if
     /// any) — deferred so the action fires only after the menu has faded out.
-    fn hide_animated(&self, widgets: &PowerMenuWidgets, root: &gtk::Window, then_run: Option<String>) {
+    fn hide_animated(
+        &self,
+        widgets: &PowerMenuWidgets,
+        root: &gtk::Window,
+        then_run: Option<String>,
+    ) {
         let (transition, duration) = self.animation(true);
         widgets.revealer.set_transition(transition);
         widgets.revealer.set_transition_duration(duration);

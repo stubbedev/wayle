@@ -48,13 +48,14 @@ pub fn discover(dirs: &[PathBuf]) -> Vec<Session> {
             if sessions.iter().any(|s| s.id == id) {
                 continue; // a higher-precedence dir already provided this id
             }
-            match parse_desktop(&fs::read_to_string(&path).unwrap_or_default(), id) {
-                Some(session) => sessions.push(session),
-                None => {} // hidden, unreadable, or no Exec
+            // `None` = hidden, unreadable, or no Exec.
+            if let Some(session) = parse_desktop(&fs::read_to_string(&path).unwrap_or_default(), id)
+            {
+                sessions.push(session);
             }
         }
     }
-    sessions.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    sessions.sort_by_key(|s| s.name.to_lowercase());
     sessions
 }
 

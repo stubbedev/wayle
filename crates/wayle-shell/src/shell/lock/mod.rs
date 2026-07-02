@@ -534,6 +534,7 @@ fn build_surface(
     let cred = CredentialBox::build(
         &CredentialOpts {
             show_clock,
+            with_username: false,
             transition,
             duration_ms: duration,
         },

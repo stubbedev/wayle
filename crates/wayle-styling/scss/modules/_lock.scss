@@ -46,10 +46,32 @@
         color: var(--palette-red);
     }
 
+    // Greeter-only: visible username entry above the password.
+    .lock-user {
+        margin-top: 1rem;
+    }
+
     // Greeter-only: Wayland session picker below the entry (hidden on the lock
     // screen and when only one session exists).
     .lock-session {
         margin-top: 1rem;
+    }
+
+    // Greeter-only: shutdown/reboot buttons at the bottom of the screen.
+    .lock-power {
+        margin-bottom: 2rem;
+
+        .lock-power-button {
+            color: var(--palette-fg-muted);
+            background: transparent;
+            padding: 0.75rem;
+            border-radius: var(--rounding-lg, 12px);
+
+            &:hover {
+                color: var(--palette-fg);
+                background: rgba(0, 0, 0, 0.35);
+            }
+        }
     }
 
     // Opaque blackout shown after `blank-timeout-ms` of inactivity.

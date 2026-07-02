@@ -20,6 +20,10 @@ use crate::primitives::revealer::WayleRevealer;
 pub struct CredentialOpts {
     /// Whether the clock and date labels are shown.
     pub show_clock: bool,
+    /// Include a visible username entry above the secret entry. The greeter
+    /// needs one (pre-login, the user is unknown); the lock screen does not
+    /// (it authenticates the current user).
+    pub with_username: bool,
     /// Reveal animation for the box.
     pub transition: AnimationType,
     /// Reveal animation duration, in milliseconds.
@@ -31,6 +35,9 @@ pub struct CredentialBox {
     /// Root widget to place into the surface; overlay it and call
     /// [`CredentialBox::reveal`] once it is mapped.
     pub root: WayleRevealer,
+    /// Visible username entry (`Some` only when built `with_username`).
+    /// Activating it moves focus to the secret entry.
+    pub username: Option<gtk::Entry>,
     /// Secret entry; activates fire the `on_submit` callback passed to
     /// [`CredentialBox::build`].
     pub entry: gtk::PasswordEntry,
@@ -71,12 +78,28 @@ impl CredentialBox {
         entry.set_show_peek_icon(true);
         entry.set_width_chars(24);
 
+        // Visible username entry (greeter): Enter moves focus to the password.
+        let username = opts.with_username.then(|| {
+            let user = gtk::Entry::new();
+            user.add_css_class("lock-user");
+            user.set_placeholder_text(Some("Username"));
+            user.set_width_chars(24);
+            let password = entry.clone();
+            user.connect_activate(move |_| {
+                password.grab_focus();
+            });
+            user
+        });
+
         let error = gtk::Label::new(None);
         error.add_css_class("lock-error");
         error.set_visible(false);
 
         center.append(&clock);
         center.append(&date);
+        if let Some(user) = &username {
+            center.append(user);
+        }
         center.append(&entry);
         if let Some(extra) = extra {
             center.append(extra);
@@ -98,6 +121,7 @@ impl CredentialBox {
 
         Self {
             root,
+            username,
             entry,
             clock,
             date,
