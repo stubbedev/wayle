@@ -1,4 +1,4 @@
-use gtk::prelude::*;
+use gtk::{glib, prelude::*};
 use relm4::{gtk, spawn_local};
 use wayle_config::schemas::modules::notification::{PopupCloseBehavior, UrgencyBarThreshold};
 use wayle_notification::core::types::Action;
@@ -14,6 +14,29 @@ use crate::{
 const POPUP_ICON_TEXTURE_SIZE_PX: i32 = 64;
 
 impl NotificationPopupCard {
+    /// Reserves the body label's full wrapped height as its minimum size.
+    ///
+    /// The popup lives in a layer-shell surface that commits the window's
+    /// *minimum* size (see `wayle_widgets::utils::force_window_resize`). A
+    /// wrapping, ellipsized label reports a one-line minimum height regardless
+    /// of its text, so the surface would only ever reserve a single line and
+    /// clip multi-line bodies at the card's bottom edge. Once the label has an
+    /// allocated width, we measure the natural height it needs at that width
+    /// and pin it as the minimum via `set_size_request`, so the surface grows
+    /// to fit. Short bodies measure to one line, so they keep their size.
+    pub(super) fn pin_body_height(body: &gtk::Label) {
+        body.add_tick_callback(|body, _clock| {
+            let width = body.width();
+            if width <= 0 {
+                // Not allocated yet; check again next frame.
+                return glib::ControlFlow::Continue;
+            }
+            let (_, natural, _, _) = body.measure(gtk::Orientation::Vertical, width);
+            body.set_size_request(-1, natural);
+            glib::ControlFlow::Break
+        });
+    }
+
     pub(super) fn apply_css_classes(
         &self,
         root: &gtk::Box,

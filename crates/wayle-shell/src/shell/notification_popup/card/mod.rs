@@ -85,6 +85,7 @@ impl Component for NotificationPopupCard {
                 },
 
                 #[template]
+                #[name = "content"]
                 NotificationContentTemplate {
                     #[template_child]
                     app_label {
@@ -172,6 +173,7 @@ impl Component for NotificationPopupCard {
         let widgets = view_output!();
 
         model.apply_css_classes(&root, init.shadow, init.urgency_bar);
+        Self::pin_body_height(&widgets.content.body);
         model.apply_icon(&widgets.icon, &widgets.icon_container);
         model.setup_action_buttons(&widgets.actions_box);
         model.setup_default_action(&root);
