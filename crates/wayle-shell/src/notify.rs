@@ -56,17 +56,15 @@ pub fn notify(app_name: &str, summary: &str, body: &str, icon: &str) {
             Ok(proxy) => proxy,
             Err(err) => return warn!(%err, "notify: daemon unavailable"),
         };
+        // Mirror libnotify: the icon also goes in the image-path hint, which is
+        // what wayle's own popup consults in the default Automatic icon mode
+        // (app_icon is only read in Application mode).
+        let mut hints = HashMap::new();
+        if !icon.is_empty() {
+            hints.insert("image-path", Value::from(icon.as_str()));
+        }
         if let Err(err) = proxy
-            .notify(
-                &app_name,
-                0,
-                &icon,
-                &summary,
-                &body,
-                Vec::new(),
-                HashMap::new(),
-                -1,
-            )
+            .notify(&app_name, 0, &icon, &summary, &body, Vec::new(), hints, -1)
             .await
         {
             warn!(%err, "notify: Notify failed");
