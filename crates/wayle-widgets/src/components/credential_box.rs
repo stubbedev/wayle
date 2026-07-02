@@ -45,7 +45,15 @@ pub struct CredentialBox {
 impl CredentialBox {
     /// Builds the credential box. `on_submit` fires with the entry's text each
     /// time the user activates it (presses Enter).
-    pub fn build(opts: &CredentialOpts, on_submit: impl Fn(String) + 'static) -> Self {
+    ///
+    /// `extra`, if given, is appended below the entry (above the error label) —
+    /// the greeter uses this slot for its Wayland-session picker; the lock
+    /// screen passes `None`.
+    pub fn build(
+        opts: &CredentialOpts,
+        extra: Option<&gtk::Widget>,
+        on_submit: impl Fn(String) + 'static,
+    ) -> Self {
         let center = gtk::Box::new(gtk::Orientation::Vertical, 12);
         center.add_css_class("lock-center");
         center.set_halign(gtk::Align::Center);
@@ -70,6 +78,9 @@ impl CredentialBox {
         center.append(&clock);
         center.append(&date);
         center.append(&entry);
+        if let Some(extra) = extra {
+            center.append(extra);
+        }
         center.append(&error);
 
         {

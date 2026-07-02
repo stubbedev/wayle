@@ -10,6 +10,17 @@
 //! greetd "username" prompt is echoed hidden. The prompt text is surfaced in
 //! the label so the user knows what is being asked. A visible username field is
 //! left for a later iteration.
+//!
+//! A [`gtk::DropDown`] below the entry lets the user pick which Wayland session
+//! to start; the choice is remembered across restarts (see [`crate::session`]).
+//! The session command is shared with the greetd backend through an
+//! `Arc<Mutex<_>>` so changing the dropdown mid-login is picked up when greetd
+//! actually starts the session.
+
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use gdk4::Display;
 use relm4::{
@@ -26,12 +37,18 @@ use wayle_config::{
 use wayle_styling::{STATIC_CSS, theme_css};
 use wayle_widgets::components::credential_box::{CredentialBox, CredentialOpts};
 
+use crate::session::{self, Session};
+
 /// Initialization payload for the greeter component.
 pub struct GreeterInit {
     /// Theme/background/clock config (shared with the desktop + lock screen).
     pub config: Config,
-    /// Session argv to start on successful login.
-    pub session_cmd: Vec<String>,
+    /// Selectable Wayland sessions (non-empty; enforced in `main`).
+    pub sessions: Vec<Session>,
+    /// Id of the last-used session to pre-select, if any is remembered.
+    pub last_session: Option<String>,
+    /// File the selected session id is persisted to on success.
+    pub state_path: PathBuf,
     /// Extra `KEY=value` environment entries for the session.
     pub session_env: Vec<String>,
 }
@@ -39,7 +56,15 @@ pub struct GreeterInit {
 /// Greeter component state.
 pub struct Greeter {
     config: Config,
-    session_cmd: Vec<String>,
+    /// Selectable sessions, indexed in lockstep with the dropdown rows.
+    sessions: Vec<Session>,
+    /// Session picker; its selected row drives `selected_cmd` and is persisted.
+    dropdown: gtk::DropDown,
+    /// Argv of the currently selected session, shared with the greetd backend
+    /// (read only when greetd starts the session, so mid-login changes apply).
+    selected_cmd: Arc<Mutex<Vec<String>>>,
+    /// Where the selected session id is remembered.
+    state_path: PathBuf,
     session_env: Vec<String>,
     /// Live credential-box handles (entry, clock, date, error).
     cred: CredentialBox,
@@ -88,23 +113,46 @@ impl Component for Greeter {
         let overlay = gtk::Overlay::new();
         overlay.set_child(Some(&build_background(&init.config)));
 
+        // Session picker: one row per session, pre-selecting the remembered one.
+        let dropdown = build_session_dropdown(&init.sessions, init.last_session.as_deref());
+        let selected = dropdown.selected() as usize;
+        let selected_cmd = Arc::new(Mutex::new(init.sessions[selected].exec.clone()));
+
         let show_clock = init.config.lock.show_clock.get();
         let input = sender.input_sender().clone();
+        let dropdown_widget: gtk::Widget = dropdown.clone().upcast();
         let cred = CredentialBox::build(
             &CredentialOpts {
                 show_clock,
                 transition: AnimationType::Fade,
                 duration_ms: 300,
             },
+            Some(&dropdown_widget),
             move |text| input.emit(GreeterInput::Submit(text)),
         );
         overlay.add_overlay(&cred.root);
         root.set_child(Some(&overlay));
         cred.reveal();
 
+        // Keep the shared session command in step with the dropdown.
+        {
+            let sessions = init.sessions.clone();
+            let selected_cmd = Arc::clone(&selected_cmd);
+            dropdown.connect_selected_notify(move |dd| {
+                if let Some(session) = sessions.get(dd.selected() as usize)
+                    && let Ok(mut cmd) = selected_cmd.lock()
+                {
+                    *cmd = session.exec.clone();
+                }
+            });
+        }
+
         let mut model = Greeter {
             config: init.config,
-            session_cmd: init.session_cmd,
+            sessions: init.sessions,
+            dropdown,
+            selected_cmd,
+            state_path: init.state_path,
             session_env: init.session_env,
             cred,
             auth: None,
@@ -133,8 +181,9 @@ impl Greeter {
     /// Spawns a fresh greetd conversation. greetd prompts for the username
     /// first (we pass `None`), then for the password.
     fn start_conversation(&mut self, sender: &ComponentSender<Self>) {
-        let backend = match GreetdAuth::from_env(self.session_cmd.clone(), self.session_env.clone())
-        {
+        let selected_cmd = Arc::clone(&self.selected_cmd);
+        let cmd = move || selected_cmd.lock().map(|c| c.clone()).unwrap_or_default();
+        let backend = match GreetdAuth::from_env(cmd, self.session_env.clone()) {
             Ok(backend) => backend,
             Err(err) => {
                 warn!(error = %err, "greeter: cannot connect to greetd");
@@ -147,6 +196,13 @@ impl Greeter {
         self.auth = Some(wayle_auth::spawn(backend, None, move |event| {
             input.emit(GreeterInput::Auth(event));
         }));
+    }
+
+    /// Persists the currently selected session so it pre-selects next time.
+    fn remember_session(&self) {
+        if let Some(session) = self.sessions.get(self.dropdown.selected() as usize) {
+            session::save_last(&self.state_path, &session.id);
+        }
     }
 
     /// Answers the pending prompt with the submitted value.
@@ -168,6 +224,7 @@ impl Greeter {
             AuthEvent::Prompt(prompt) => self.on_prompt(prompt),
             AuthEvent::Success => {
                 info!("greeter: authentication succeeded; greetd is starting the session");
+                self.remember_session();
                 relm4::main_application().quit();
             }
             AuthEvent::Failure(reason) => {
@@ -218,6 +275,24 @@ impl Greeter {
         });
         self.clock_source = Some(id);
     }
+}
+
+/// Builds the session picker: one row per session, pre-selecting `last` (by id)
+/// when it is still present. The dropdown is hidden when there is only one
+/// session, since there is then nothing to choose.
+fn build_session_dropdown(sessions: &[Session], last: Option<&str>) -> gtk::DropDown {
+    let names: Vec<&str> = sessions.iter().map(|s| s.name.as_str()).collect();
+    let dropdown = gtk::DropDown::from_strings(&names);
+    dropdown.add_css_class("lock-session");
+    dropdown.set_halign(gtk::Align::Center);
+
+    if let Some(last) = last
+        && let Some(idx) = sessions.iter().position(|s| s.id == last)
+    {
+        dropdown.set_selected(idx as u32);
+    }
+    dropdown.set_visible(sessions.len() > 1);
+    dropdown
 }
 
 /// Installs the wayle theme (static CSS + palette) on the default display.

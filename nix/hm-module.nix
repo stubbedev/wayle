@@ -9,6 +9,19 @@ let
   cfg = config.programs.wayle;
   tomlFormat = pkgs.formats.toml { };
 
+  # A self-contained launch wrapper for the greeter: `cage -s -- wayle-greeter`
+  # with the render env baked in, passing any extra args straight through. Point
+  # your (non-NixOS) greetd at this one path — or, for GPU acceleration, wrap it
+  # with nixGL: `nixGLIntel wayle-greeter-session --config /etc/wayle/config.toml
+  # --state /var/lib/wayle-greeter/last-session`. `renderer = "software"` bakes
+  # the driver-free pixman/cairo path so it runs without nixGL at all.
+  greeterSession = pkgs.writeShellScriptBin "wayle-greeter-session" ''
+    exec ${lib.optionalString (cfg.greeter.renderer == "software")
+      "env WLR_RENDERER=pixman WLR_DRM_NO_MODIFIERS=1 GSK_RENDERER=cairo GDK_DISABLE=gl "
+    }${lib.getExe cfg.greeter.cagePackage} -s -- \
+      ${lib.getExe' cfg.package "wayle-greeter"} "$@"
+  '';
+
   pkgIfPresent = name: lib.optional (builtins.hasAttr name pkgs) (builtins.getAttr name pkgs);
 
   # Modules referenced anywhere in the bar layout. Used to install the soft
@@ -151,6 +164,21 @@ in
         description = "Kiosk compositor that hosts the greeter under greetd.";
       };
 
+      renderer = lib.mkOption {
+        type = lib.types.enum [
+          "auto"
+          "software"
+        ];
+        default = "auto";
+        description = ''
+          Render path baked into the {command}`wayle-greeter-session` wrapper.
+          `auto` sets nothing (cage's GLES2 and GTK's GL renderer each fall back
+          to software on their own); `software` forces the driver-free pixman +
+          cairo path, so the wrapper runs without nixGL on a non-NixOS host. Use
+          `auto` together with a nixGL wrapper when you want GPU acceleration.
+        '';
+      };
+
       settings = lib.mkOption {
         type = tomlFormat.type;
         default = { };
@@ -166,7 +194,9 @@ in
           {file}`$XDG_CONFIG_HOME/wayle/greeter.toml`. The greeter runs as the
           greetd user, so copy this somewhere that user can read (e.g.
           {file}`/etc/wayle/config.toml`) and point greetd's command at it:
-          {command}`cage -s -- wayle-greeter --config /etc/wayle/config.toml -- <session>`.
+          {command}`cage -s -- wayle-greeter --config /etc/wayle/config.toml --state /var/lib/wayle-greeter/last-session`.
+          The greeter discovers Wayland sessions from the standard
+          {file}`wayland-sessions` dirs; add `--sessions DIR` to override.
         '';
       };
     };
@@ -176,19 +206,27 @@ in
     home.packages =
       [ cfg.package ]
       ++ lib.optionals cfg.autoInstallDependencies softDeps
-      ++ lib.optional cfg.greeter.enable cfg.greeter.cagePackage;
+      ++ lib.optionals cfg.greeter.enable [
+        cfg.greeter.cagePackage
+        greeterSession
+      ];
 
     # greetd is system-level; home-manager can only ship the binary + cage and
     # generate a themed config to copy somewhere the greetd user can read.
     warnings =
       lib.optional cfg.greeter.enable ''
-        programs.wayle.greeter (home-manager) installs cage and writes
-        ~/.config/wayle/greeter.toml, but cannot configure greetd (a system
+        programs.wayle.greeter (home-manager) installs cage + the
+        `wayle-greeter-session` wrapper, but cannot configure greetd (a system
         service). On NixOS use programs.wayle.greeter in the system module;
-        otherwise enable greetd yourself and point its command at:
-          cage -s -- wayle-greeter --config <path> -- <session>
-        The greeter runs as the greetd user, so place the config where that user
-        can read it (e.g. /etc/wayle/config.toml).
+        otherwise enable greetd yourself and point its command at the wrapper:
+          wayle-greeter-session --config /etc/wayle/config.toml --state /var/lib/wayle-greeter/last-session
+        For GPU acceleration on a non-NixOS host, wrap it with nixGL:
+          nixGLIntel wayle-greeter-session --config /etc/wayle/config.toml --state /var/lib/wayle-greeter/last-session
+        (or set greeter.renderer = "software" to run driver-free without nixGL).
+        The greeter discovers Wayland sessions from the standard
+        wayland-sessions dirs and remembers the last pick under --state (make
+        that dir writable by the greetd user). It runs as the greetd user, so
+        place the config where that user can read it (e.g. /etc/wayle/config.toml).
       ''
       # PAM is root-owned (/etc/pam.d); home-manager cannot create it. Point the
       # consumer at the manual step the system module does automatically.

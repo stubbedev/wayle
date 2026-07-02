@@ -26,8 +26,10 @@ const GREETD_SOCK: &str = "GREETD_SOCK";
 /// greetd authentication: drives a full create→auth→start session flow.
 pub struct GreetdAuth {
     stream: UnixStream,
-    /// Command (argv) to launch as the user's session on success.
-    cmd: Vec<String>,
+    /// Resolves the session argv to launch on success. Read only at
+    /// `start_session`, so the greeter's session picker can change the
+    /// selection at any point during the login without racing this backend.
+    cmd: Box<dyn Fn() -> Vec<String> + Send>,
     /// Extra `KEY=value` environment entries for the session.
     env: Vec<String>,
 }
@@ -35,13 +37,17 @@ pub struct GreetdAuth {
 impl GreetdAuth {
     /// Connects to the greetd socket named by `$GREETD_SOCK`.
     ///
-    /// `cmd` is the session argv started on successful authentication; `env`
-    /// holds extra `KEY=value` entries.
+    /// `cmd` resolves the session argv started on successful authentication (it
+    /// is called once, at `start_session`); `env` holds extra `KEY=value`
+    /// entries.
     ///
     /// # Errors
     /// Returns an error if `$GREETD_SOCK` is unset or the socket cannot be
     /// connected.
-    pub fn from_env(cmd: Vec<String>, env: Vec<String>) -> io::Result<Self> {
+    pub fn from_env(
+        cmd: impl Fn() -> Vec<String> + Send + 'static,
+        env: Vec<String>,
+    ) -> io::Result<Self> {
         let path = std::env::var_os(GREETD_SOCK).ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::NotFound,
@@ -49,13 +55,11 @@ impl GreetdAuth {
             )
         })?;
         let stream = UnixStream::connect(path)?;
-        Ok(Self { stream, cmd, env })
-    }
-
-    /// Builds a backend over an already-connected stream (for tests).
-    #[must_use]
-    pub fn with_stream(stream: UnixStream, cmd: Vec<String>, env: Vec<String>) -> Self {
-        Self { stream, cmd, env }
+        Ok(Self {
+            stream,
+            cmd: Box::new(cmd),
+            env,
+        })
     }
 
     /// Writes one length-prefixed JSON request.
@@ -125,7 +129,7 @@ impl AuthConversation for GreetdAuth {
 
         // Authenticated: hand off to the session. greetd replaces us on success.
         self.send(&Request::StartSession {
-            cmd: self.cmd.clone(),
+            cmd: (self.cmd)(),
             env: self.env.clone(),
         })?;
         match self.recv()? {

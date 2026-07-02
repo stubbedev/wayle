@@ -9,10 +9,32 @@ let
   cfg = config.programs.wayle;
   tomlFormat = pkgs.formats.toml { };
 
+  # Directory the greeter remembers the last-selected session in. Must be
+  # writable by the greetd user (`greeter`); the tmpfiles rule below creates it.
+  greeterStateDir = "/var/lib/wayle-greeter";
+
+  # Forces both render layers onto their software paths: wlroots' pixman
+  # renderer (DRM dumb buffers, no EGL/GBM) for cage, and GTK's cairo GSK
+  # renderer (no GL context) for the greeter client. This needs no GPU vendor
+  # driver at all, so it always renders — on a VM, a driverless box, or a
+  # non-NixOS install without nixGL. `renderer = "auto"` omits these and lets
+  # each layer try acceleration and fall back to software on its own.
+  softwareRenderEnv = [
+    "WLR_RENDERER=pixman"
+    "WLR_DRM_NO_MODIFIERS=1"
+    "GSK_RENDERER=cairo"
+    "GDK_DISABLE=gl"
+  ];
+
   # The greetd `default_session` command: a kiosk compositor (cage) hosting the
-  # wayle greeter, which on login starts the configured session. cage's `-s`
-  # allows VT switching. The greeter reads its theme from /etc/wayle/config.toml
-  # (written below from `greeter.settings`).
+  # wayle greeter. The greeter discovers Wayland sessions from `session.dirs`,
+  # lets the user pick one, and remembers the choice under `greeterStateDir`.
+  # cage's `-s` allows VT switching. The greeter reads its theme from
+  # /etc/wayle/config.toml (written below from `greeter.settings`).
+  #
+  # Layering, outermost first: [graphicsWrapper] env[software vars] cage → greeter.
+  # The graphicsWrapper (e.g. nixGL) must wrap the whole thing so it injects the
+  # host GPU driver into cage *and* the greeter it spawns.
   greeterCommand =
     let
       cageExe = lib.getExe cfg.greeter.cagePackage;
@@ -20,8 +42,23 @@ let
       envArgs = lib.concatMapStringsSep " " (
         e: "--env ${lib.escapeShellArg e}"
       ) cfg.greeter.session.environment;
+      sessionDirArgs = lib.concatMapStringsSep " " (
+        d: "--sessions ${lib.escapeShellArg d}"
+      ) cfg.greeter.session.dirs;
+      # Optional explicit fallback session, appended as a "Custom" entry.
+      fallback = lib.optionalString (
+        cfg.greeter.session.command != ""
+      ) "-- ${cfg.greeter.session.command}";
+      wrapperPrefix = lib.optionalString (
+        cfg.greeter.graphicsWrapper != [ ]
+      ) (lib.concatStringsSep " " cfg.greeter.graphicsWrapper + " ");
+      envPrefix = lib.optionalString (
+        cfg.greeter.renderer == "software"
+      ) ("env " + lib.concatStringsSep " " softwareRenderEnv + " ");
     in
-    "${cageExe} -s -- ${greeterExe} --config /etc/wayle/config.toml ${envArgs} -- ${cfg.greeter.session.command}";
+    "${wrapperPrefix}${envPrefix}${cageExe} -s -- "
+    + "${greeterExe} --config /etc/wayle/config.toml "
+    + "--state ${greeterStateDir}/last-session ${sessionDirArgs} ${envArgs} ${fallback}";
 in
 {
   options.programs.wayle = {
@@ -99,8 +136,9 @@ in
     greeter = {
       enable = lib.mkEnableOption ''
         the wayle greetd greeter: a login screen that shares the desktop/lock
-        theme. Enables `services.greetd` with a kiosk compositor (cage) hosting
-        the greeter; on login it starts `greeter.session.command`'';
+        theme and lets the user pick a Wayland session. Enables `services.greetd`
+        with a kiosk compositor (cage) hosting the greeter; on login it starts
+        the selected session (discovered from `greeter.session.dirs`)'';
 
       package = lib.mkOption {
         type = lib.types.package;
@@ -116,15 +154,60 @@ in
         description = "Kiosk compositor that hosts the greeter under greetd.";
       };
 
+      renderer = lib.mkOption {
+        type = lib.types.enum [
+          "auto"
+          "software"
+        ];
+        default = "auto";
+        description = ''
+          Render path for the greeter stack.
+
+          `auto` sets nothing: wlroots (cage) tries its GLES2 renderer and GTK
+          tries its GL renderer, each falling back to software on failure — so
+          you get acceleration where a GPU driver is present and software
+          otherwise. `software` forces both onto their software paths (wlroots
+          pixman + GTK cairo), which needs no GPU driver at all. Use `software`
+          on VMs, headless-ish boxes, or any host where GL init is unreliable and
+          you would rather guarantee the login screen renders.
+        '';
+      };
+
+      graphicsWrapper = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        example = lib.literalExpression ''[ "''${pkgs.nixgl.nixGLIntel}/bin/nixGLIntel" ]'';
+        description = ''
+          Command prefix wrapping the whole greeter launch (cage + greeter).
+          Unused on NixOS, where drivers come from {file}`/run/opengl-driver`.
+          Its purpose is nixGL on non-NixOS hosts: set this to a nixGL wrapper so
+          cage — and the greeter it spawns — find the host's GPU driver and run
+          accelerated. Leave empty (with `renderer = "software"`) to skip GL
+          entirely instead.
+        '';
+      };
+
       session = {
+        dirs = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "${config.services.displayManager.sessionData.desktops}/share/wayland-sessions" ];
+          defaultText = lib.literalExpression ''["''${config.services.displayManager.sessionData.desktops}/share/wayland-sessions"]'';
+          description = ''
+            Directories scanned for `*.desktop` Wayland session files to offer in
+            the picker. Defaults to the aggregate NixOS sessions directory, which
+            collects the session files of every installed Wayland compositor.
+          '';
+        };
+
         command = lib.mkOption {
           type = lib.types.str;
           default = "";
           example = lib.literalExpression ''"''${pkgs.niri}/bin/niri --session"'';
           description = ''
-            Command greetd starts as the user's session after a successful
-            login (typically the compositor). Required when the greeter is
-            enabled.
+            Optional explicit fallback session, offered as a "Custom" entry in
+            the picker (and the only session when `session.dirs` yields none).
+            Usually unnecessary — installed compositors provide their own session
+            files automatically.
           '';
         };
 
@@ -230,19 +313,18 @@ in
     })
 
     (lib.mkIf cfg.greeter.enable {
-      assertions = [
-        {
-          assertion = cfg.greeter.session.command != "";
-          message = "programs.wayle.greeter.session.command must be set (the session greetd starts after login).";
-        }
-      ];
-
       # greetd runs the kiosk compositor + greeter as the unprivileged greeter
       # user. mkDefault so an explicit greetd config wins.
       services.greetd = {
         enable = true;
         settings.default_session.command = lib.mkDefault greeterCommand;
       };
+
+      # Persist the last-selected session. Owned by the greetd user (`greeter`)
+      # so the greeter can write it; 0700 since only that user needs it.
+      systemd.tmpfiles.rules = [
+        "d ${greeterStateDir} 0700 greeter greeter -"
+      ];
 
       # The greeter runs as the greetd user with no $HOME, so its theme config
       # lives system-wide. environment.etc files are world-readable (0444).

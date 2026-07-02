@@ -170,11 +170,8 @@ impl Component for PowerMenu {
                 self.populate(widgets, &sender);
                 self.reveal(widgets, root);
             }
-            PowerMenuInput::Run(command) => {
-                process::run_if_set(&command);
-                self.hide_animated(widgets, root);
-            }
-            PowerMenuInput::Cancel => self.hide_animated(widgets, root),
+            PowerMenuInput::Run(command) => self.hide_animated(widgets, root, Some(command)),
+            PowerMenuInput::Cancel => self.hide_animated(widgets, root, None),
         }
     }
 }
@@ -236,7 +233,9 @@ impl PowerMenu {
         root.present();
     }
 
-    fn hide_animated(&self, widgets: &PowerMenuWidgets, root: &gtk::Window) {
+    /// Plays the exit transition, hides the window, then runs `then_run` (if
+    /// any) — deferred so the action fires only after the menu has faded out.
+    fn hide_animated(&self, widgets: &PowerMenuWidgets, root: &gtk::Window, then_run: Option<String>) {
         let (transition, duration) = self.animation(true);
         widgets.revealer.set_transition(transition);
         widgets.revealer.set_transition_duration(duration);
@@ -245,6 +244,9 @@ impl PowerMenu {
         let root = root.clone();
         glib::timeout_add_local_once(Duration::from_millis(u64::from(duration)), move || {
             root.set_visible(false);
+            if let Some(command) = then_run {
+                process::run_if_set(&command);
+            }
         });
     }
 }

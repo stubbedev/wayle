@@ -46,6 +46,12 @@
         color: var(--palette-red);
     }
 
+    // Greeter-only: Wayland session picker below the entry (hidden on the lock
+    // screen and when only one session exists).
+    .lock-session {
+        margin-top: 1rem;
+    }
+
     // Opaque blackout shown after `blank-timeout-ms` of inactivity.
     .lock-scrim {
         background: #000000;
