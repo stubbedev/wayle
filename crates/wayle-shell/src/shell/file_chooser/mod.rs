@@ -669,6 +669,7 @@ impl Component for FileChooser {
 
         install_column_resize(&widgets, sender.input_sender());
         setup_surface_move(&widgets.header, &root);
+        setup_filter_dropdown(&widgets.filter_dropdown, &root);
 
         surface_anim::play_on_map(&root, &widgets.revealer);
 
@@ -2129,7 +2130,18 @@ fn setup_surface_resize(overlay: &gtk::Overlay, surface: &gtk::Box) {
 /// `live_margin + offset` settles instead of oscillating — that oscillation was
 /// the jank.
 fn setup_surface_move(header: &gtk::CenterBox, root: &gtk::Window) {
+    // Grab/grabbing cursor so the header reads as a draggable titlebar (child
+    // buttons keep their own "pointer" cursor). GTK ignores CSS `cursor`.
+    header.set_cursor_from_name(Some("grab"));
     let drag = gtk::GestureDrag::new();
+    drag.connect_drag_begin({
+        let header = header.clone();
+        move |_, _, _| header.set_cursor_from_name(Some("grabbing"))
+    });
+    drag.connect_drag_end({
+        let header = header.clone();
+        move |_, _, _| header.set_cursor_from_name(Some("grab"))
+    });
     drag.connect_drag_update({
         let root = root.clone();
         move |_, dx, dy| {
@@ -2140,6 +2152,71 @@ fn setup_surface_move(header: &gtk::CenterBox, root: &gtk::Window) {
         }
     });
     header.add_controller(drag);
+}
+
+/// Wires the file-type dropdown's presentation and input:
+///
+/// - Custom factory: the default selected-item widget is a `GtkInscription`
+///   that renders the filter label cramped/clipped; a plain ellipsized `Label`
+///   reads cleanly and styles with the rest of the sheet.
+/// - Keyboard workaround: while the layer surface holds an exclusive keyboard
+///   grab, the popup gets keyboard input but *no pointer* input — items only
+///   highlight/activate via the arrow keys, not the mouse. Drop to on-demand
+///   keyboard while the popup is open so the mouse works, and restore the
+///   exclusive grab (for list type-ahead) when it closes.
+fn setup_filter_dropdown(dropdown: &gtk::DropDown, root: &gtk::Window) {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        item.set_child(Some(
+            &gtk::Label::builder()
+                .xalign(0.0)
+                .ellipsize(gtk::pango::EllipsizeMode::End)
+                .build(),
+        ));
+    });
+    factory.connect_bind(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        let text = item
+            .item()
+            .and_downcast::<gtk::StringObject>()
+            .map(|s| s.string());
+        if let Some(label) = item.child().and_downcast::<gtk::Label>() {
+            label.set_label(text.as_deref().unwrap_or_default());
+        }
+    });
+    dropdown.set_factory(Some(&factory));
+
+    if let Some(popover) = find_descendant_popover(dropdown.upcast_ref()) {
+        popover.connect_show({
+            let root = root.clone();
+            move |_| root.set_keyboard_mode(KeyboardMode::OnDemand)
+        });
+        popover.connect_closed({
+            let root = root.clone();
+            move |_| root.set_keyboard_mode(KeyboardMode::Exclusive)
+        });
+    }
+}
+
+/// Depth-first search for the first `GtkPopover` under `widget` (the popup a
+/// `GtkDropDown` builds eagerly in its constructor).
+fn find_descendant_popover(widget: &gtk::Widget) -> Option<gtk::Popover> {
+    let mut child = widget.first_child();
+    while let Some(c) = child {
+        if let Ok(popover) = c.clone().downcast::<gtk::Popover>() {
+            return Some(popover);
+        }
+        if let Some(found) = find_descendant_popover(&c) {
+            return Some(found);
+        }
+        child = c.next_sibling();
+    }
+    None
 }
 
 /// Layer-shell margins (left, top) that centre a `w`×`h` sheet on the primary

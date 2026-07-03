@@ -120,6 +120,29 @@ button.file-chooser-nav {
         color: var(--fg-default);
         font-weight: var(--weight-medium, var(--weight-semibold));
     }
+
+    // Popup list: GTK gives it no chrome — match the sheet and give rows a
+    // hover/selected state so the mouse reads as usable.
+    popover > contents {
+        padding: var(--space-xxs, var(--space-xs));
+        background: var(--bg-elevated);
+        border: 1px solid var(--border-subtle, var(--border-default));
+        border-radius: var(--rounding-element);
+    }
+
+    popover listview row {
+        padding: var(--space-xs) var(--space-sm);
+        border-radius: var(--rounding-element);
+        color: var(--fg-default);
+
+        &:hover {
+            background: var(--bg-hover);
+        }
+
+        &:selected {
+            background: var(--bg-hover);
+        }
+    }
 }
 
 .file-chooser-search {
