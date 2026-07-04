@@ -50,6 +50,30 @@ use crate::{
 /// corporate box helps nobody).
 const MAX_LISTED_USERS: usize = 8;
 
+/// Power icons baked into the binary: the greeter runs pre-login, so it cannot
+/// rely on `wayle icons install` (per-user) or a system icon theme being
+/// present in the kiosk environment.
+const EMBEDDED_ICONS: [(&str, &str); 4] = [
+    // GTK's DropDown checkmark; shipped under GTK's own icon name so it
+    // resolves without a system icon theme.
+    (
+        "object-select-symbolic.svg",
+        include_str!("../assets/object-select-symbolic.svg"),
+    ),
+    (
+        "ld-power-symbolic.svg",
+        include_str!("../assets/ld-power-symbolic.svg"),
+    ),
+    (
+        "ld-rotate-ccw-symbolic.svg",
+        include_str!("../assets/ld-rotate-ccw-symbolic.svg"),
+    ),
+    (
+        "ld-chevron-down-symbolic.svg",
+        include_str!("../assets/ld-chevron-down-symbolic.svg"),
+    ),
+];
+
 /// Initialization payload for the greeter component.
 pub struct GreeterInit {
     /// Theme/background/clock config (shared with the desktop + lock screen).
@@ -129,6 +153,8 @@ impl Component for Greeter {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         install_css(&init.config);
+        install_icons();
+        install_cursor(&init.config);
 
         let overlay = gtk::Overlay::new();
         overlay.set_child(Some(&build_background(&init.config)));
@@ -152,7 +178,7 @@ impl Component for Greeter {
         user_row.add_css_class("lock-users");
         user_row.set_halign(gtk::Align::Center);
 
-        let show_clock = init.config.lock.show_clock.get();
+        let show_clock = init.config.greeter.show_clock.get();
         let input = sender.input_sender().clone();
         let below_widget: gtk::Widget = below.clone().upcast();
         let user_row_widget: gtk::Widget = user_row.clone().upcast();
@@ -171,7 +197,11 @@ impl Component for Greeter {
             user_entry.set_placeholder_text(Some(&t!("greeter-username")));
         }
 
-        populate_user_row(&user_row, &init.users, init.last_user.as_deref(), &cred);
+        if init.config.greeter.show_user_list.get() {
+            populate_user_row(&user_row, &init.users, init.last_user.as_deref(), &cred);
+        } else {
+            user_row.set_visible(false);
+        }
 
         // Pre-fill the remembered username and focus whichever field the user
         // needs next (password when the username is known, username otherwise).
@@ -188,7 +218,9 @@ impl Component for Greeter {
         }
 
         overlay.add_overlay(&cred.root);
-        overlay.add_overlay(&build_power_box());
+        if init.config.greeter.show_power_buttons.get() {
+            overlay.add_overlay(&build_power_box());
+        }
         root.set_child(Some(&overlay));
         cred.reveal();
         watch_caps_lock(&caps_label);
@@ -222,6 +254,7 @@ impl Component for Greeter {
 
         model.refresh_clock();
         model.start_clock(&sender);
+        apply_debug_ops(&model, &sender);
 
         let widgets = view_output!();
         ComponentParts { model, widgets }
@@ -379,8 +412,12 @@ impl Greeter {
 
     fn refresh_clock(&self) {
         let now = chrono::Local::now();
-        let time = now.format(&self.config.lock.clock_format.get()).to_string();
-        let date = now.format(&self.config.lock.date_format.get()).to_string();
+        let time = now
+            .format(&self.config.greeter.clock_format.get())
+            .to_string();
+        let date = now
+            .format(&self.config.greeter.date_format.get())
+            .to_string();
         self.cred.clock.set_text(&time);
         self.cred.date.set_text(&date);
     }
@@ -392,6 +429,36 @@ impl Greeter {
             glib::ControlFlow::Continue
         });
         self.clock_source = Some(id);
+    }
+}
+
+/// Dev-harness hook: `WAYLE_GREETER_DEBUG` drives interactions that synthetic
+/// input cannot reach under a nested headless compositor. Comma-separated ops:
+/// `popup` opens the session dropdown; `login=<user>:<pass>` fills the form
+/// and submits. Never set in production (greetd does not forward it).
+fn apply_debug_ops(model: &Greeter, sender: &ComponentSender<Greeter>) {
+    let Ok(spec) = std::env::var("WAYLE_GREETER_DEBUG") else {
+        return;
+    };
+    for op in spec.split(',') {
+        if op == "popup" {
+            let dropdown = model.dropdown.clone();
+            glib::timeout_add_seconds_local_once(1, move || {
+                dropdown.emit_by_name::<()>("activate", &[]);
+            });
+        } else if let Some(login) = op.strip_prefix("login=")
+            && let Some((user, pass)) = login.split_once(':')
+        {
+            let username = model.cred.username.clone();
+            let input = sender.input_sender().clone();
+            let (user, pass) = (user.to_owned(), pass.to_owned());
+            glib::timeout_add_seconds_local_once(1, move || {
+                if let Some(entry) = &username {
+                    entry.set_text(&user);
+                }
+                input.emit(GreeterInput::Submit(pass));
+            });
+        }
     }
 }
 
@@ -501,12 +568,8 @@ fn build_power_box() -> gtk::Widget {
     row.set_valign(gtk::Align::End);
 
     for (icon, tooltip, verb) in [
-        (
-            "system-shutdown-symbolic",
-            t!("greeter-shutdown"),
-            "poweroff",
-        ),
-        ("system-reboot-symbolic", t!("greeter-restart"), "reboot"),
+        ("ld-power-symbolic", t!("greeter-shutdown"), "poweroff"),
+        ("ld-rotate-ccw-symbolic", t!("greeter-restart"), "reboot"),
     ] {
         let button = gtk::Button::from_icon_name(icon);
         button.add_css_class("lock-power-button");
@@ -540,6 +603,61 @@ fn build_session_dropdown(sessions: &[Session], last: Option<&str>) -> gtk::Drop
     dropdown
 }
 
+/// Materializes the embedded power icons into a runtime directory and adds it
+/// to GTK's icon search path, so `from_icon_name` resolves them without any
+/// installed icon theme.
+fn install_icons() {
+    let dir = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("wayle-greeter-icons");
+    if let Err(err) = std::fs::create_dir_all(&dir) {
+        warn!(dir = %dir.display(), error = %err, "greeter: cannot create icon dir");
+        return;
+    }
+    for (name, svg) in EMBEDDED_ICONS {
+        if let Err(err) = std::fs::write(dir.join(name), svg) {
+            warn!(%name, error = %err, "greeter: cannot write icon");
+        }
+    }
+    let Some(display) = Display::default() else {
+        return;
+    };
+    gtk::IconTheme::for_display(&display).add_search_path(&dir);
+}
+
+/// Applies the configured cursor theme/size. The size is logical: GTK loads a
+/// scaled cursor per output, so HiDPI displays get the right resolution. The
+/// settings are re-applied on monitor hotplug to force that re-resolution.
+fn install_cursor(config: &Config) {
+    let Some(settings) = gtk::Settings::default() else {
+        return;
+    };
+    let theme = config.greeter.cursor_theme.get();
+    let theme = if theme.is_empty() {
+        std::env::var("XCURSOR_THEME").unwrap_or_default()
+    } else {
+        theme
+    };
+    let size = config.greeter.cursor_size.get().max(1) as i32;
+    info!(%theme, size, "greeter: applying cursor settings");
+    let apply = move |settings: &gtk::Settings| {
+        if !theme.is_empty() {
+            settings.set_gtk_cursor_theme_name(Some(&theme));
+        }
+        settings.set_gtk_cursor_theme_size(size);
+    };
+    apply(&settings);
+
+    if let Some(display) = Display::default() {
+        display.monitors().connect_items_changed(move |_, _, _, _| {
+            if let Some(settings) = gtk::Settings::default() {
+                apply(&settings);
+            }
+        });
+    }
+}
+
 /// Installs the wayle theme (static CSS + palette) on the default display.
 fn install_css(config: &Config) {
     let Some(display) = Display::default() else {
@@ -557,13 +675,13 @@ fn install_css(config: &Config) {
     );
 }
 
-/// Builds the greeter background from the shared lock background config.
+/// Builds the greeter background from the greeter background config.
 fn build_background(config: &Config) -> gtk::Widget {
-    let lock = &config.lock;
-    let color = lock.background_color.get();
-    match lock.background_mode.get() {
+    let greeter = &config.greeter;
+    let color = greeter.background_color.get();
+    match greeter.background_mode.get() {
         LockBackground::Color => solid_fill(color.as_str()),
-        LockBackground::Image => image_or_fill(&lock.background_image.get(), color.as_str()),
+        LockBackground::Image => image_or_fill(&greeter.background_image.get(), color.as_str()),
         LockBackground::Wallpaper => {
             image_or_fill(&config.wallpaper.wallpaper.get(), color.as_str())
         }

@@ -15,9 +15,17 @@ let
   # with nixGL: `nixGLIntel wayle-greeter-session --config /etc/wayle/config.toml
   # --state /var/lib/wayle-greeter/last-session`. `renderer = "software"` bakes
   # the driver-free pixman/cairo path so it runs without nixGL at all.
+  # cage's own cursor (shown until the greeter maps) follows XCURSOR_*; mirror
+  # the greeter's cursor config so both cursors match.
+  greeterCursorEnv =
+    "XCURSOR_SIZE=${toString (cfg.greeter.settings.greeter.cursor-size or 24)}"
+    + lib.optionalString (
+      (cfg.greeter.settings.greeter.cursor-theme or "") != ""
+    ) " XCURSOR_THEME=${cfg.greeter.settings.greeter.cursor-theme}";
+
   greeterSession = pkgs.writeShellScriptBin "wayle-greeter-session" ''
-    exec ${lib.optionalString (cfg.greeter.renderer == "software")
-      "env WLR_RENDERER=pixman WLR_DRM_NO_MODIFIERS=1 GSK_RENDERER=cairo GDK_DISABLE=gl "
+    exec env ${greeterCursorEnv} ${lib.optionalString (cfg.greeter.renderer == "software")
+      "WLR_RENDERER=pixman WLR_DRM_NO_MODIFIERS=1 GSK_RENDERER=cairo GDK_DISABLE=gl "
     }${lib.getExe cfg.greeter.cagePackage} -s -- \
       ${lib.getExe' cfg.package "wayle-greeter"} "$@"
   '';

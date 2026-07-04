@@ -95,9 +95,69 @@
     }
 
     // Greeter-only: Wayland session picker below the entry (hidden on the lock
-    // screen and when only one session exists).
+    // screen and when only one session exists). GTK's default DropDown chrome
+    // clashes with the lock theme, so restyle both the button and its popover.
     .lock-session {
         margin-top: 1rem;
+
+        > button {
+            background: rgba(0, 0, 0, 0.35);
+            color: var(--palette-fg);
+            border: none;
+            box-shadow: none;
+            border-radius: var(--rounding-element, 8px);
+            padding: 0.4rem 1rem;
+
+            &:hover,
+            &:focus-visible {
+                background: rgba(0, 0, 0, 0.55);
+            }
+
+            // Picker affordance; the greeter embeds this icon (no icon theme
+            // is guaranteed pre-login).
+            arrow {
+                -gtk-icon-source: -gtk-icontheme("ld-chevron-down-symbolic");
+                -gtk-icon-size: 1rem;
+                min-width: 1rem;
+                min-height: 1rem;
+                margin-left: 0.5rem;
+                color: var(--palette-fg-muted);
+            }
+        }
+
+        > popover {
+            > contents {
+                padding: 0.375rem;
+                border-radius: var(--rounding-container, 10px);
+                background: var(--bg-surface);
+                border: 1px solid var(--bg-hover);
+                box-shadow: var(--shadow);
+            }
+
+            listview {
+                background: transparent;
+
+                > row {
+                    padding: 0.5rem 0.75rem;
+                    border-radius: var(--rounding-element, 8px);
+                    color: var(--fg-default);
+
+                    &:hover {
+                        background: var(--bg-overlay);
+                    }
+
+                    &:selected {
+                        background: var(--accent-subtle);
+                        color: var(--accent);
+                    }
+
+                    // Selected-session checkmark; give it air from the label.
+                    image {
+                        margin-left: 0.75rem;
+                    }
+                }
+            }
+        }
     }
 
     // Greeter-only: shutdown/reboot buttons at the bottom of the screen.

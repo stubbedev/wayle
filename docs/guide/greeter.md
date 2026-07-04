@@ -2,8 +2,9 @@
 
 `wayle-greeter` is a [greetd](https://sr.ht/~kennylevinsen/greetd/) greeter — a
 display-manager login screen that can replace sddm/gdm for Wayland sessions. It
-shares the lock screen's theme (background, clock, colors), so login and unlock
-look identical.
+shares the wayle theme (colors, fonts) and has its own `[greeter]` config
+section for appearance: background, clock, cursor, user list, and power
+buttons — editable under **Greeter → Login Screen** in `wayle-settings`.
 
 Features:
 
@@ -24,6 +25,28 @@ Features:
 - **Localized** — greeter labels follow the system locale (same Fluent-based
   i18n as the shell).
 
+## Configuration
+
+The greeter reads the `[greeter]` section of its config file (see below for
+where that file lives per setup):
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `background-mode` | `"color"` | `color`, `image`, or `wallpaper` (reuses `wallpaper.wallpaper`). |
+| `background-image` | `""` | Image path for `background-mode = "image"`. |
+| `background-color` | `"#000000"` | Fill color for `background-mode = "color"`. |
+| `show-clock` | `true` | Show the clock above the login form. |
+| `clock-format` / `date-format` | `"%H:%M"` / `"%A, %B %-d"` | strftime formats. |
+| `show-user-list` | `true` | Clickable avatars for login users. |
+| `show-power-buttons` | `true` | Shutdown/reboot buttons at the bottom. |
+| `cursor-theme` | `""` | Xcursor theme (empty = system default). |
+| `cursor-size` | `24` | Logical cursor size; scaled per display, so HiDPI outputs get a sharp cursor (hotplug included). |
+
+These options live under **Greeter → Login Screen** in `wayle-settings`. Note
+that the greeter reads the *system* config (`/etc/wayle/config.toml`), not your
+user config — copy or generate it from the same settings if you want them to
+match.
+
 ## How it runs
 
 greetd starts a kiosk compositor ([cage](https://github.com/cage-kiosk/cage))
@@ -42,11 +65,12 @@ Enable it through the system module:
 programs.wayle.greeter = {
   enable = true;
   # Theme it like your desktop (full wayle config schema; the greeter honours
-  # styling, lock.* and wallpaper).
+  # styling, greeter.* and wallpaper).
   settings = {
     styling.appearance = "dark";
-    lock.background-mode = "color";
-    lock.background-color = "#1e1e2e";
+    greeter.background-mode = "color";
+    greeter.background-color = "#1e1e2e";
+    greeter.cursor-size = 24;
   };
 };
 ```

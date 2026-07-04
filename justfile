@@ -43,6 +43,14 @@ dev *args:
 inspect *args:
     WAYLE_DEV=1 GTK_DEBUG=interactive {{cargo}} run --bin wayle -- {{args}}
 
+# Run the greeter as a window on your current session for UI iteration: your
+# user config for theming, throwaway state in /tmp. Login attempts only show an
+# error unless a real greetd socket is around ($GREETD_SOCK), which is fine for
+# visuals. WAYLE_GREETER_DEBUG=popup opens the session dropdown after 1s;
+# WAYLE_GREETER_DEBUG=login=user:pass auto-submits (see app.rs).
+dev-greeter *args:
+    {{cargo}} run --bin wayle-greeter -- --config ~/.config/wayle/config.toml --state /tmp/wayle-greeter-dev/last-session {{args}}
+
 # Remove target/ build artifacts.
 clean:
     {{cargo}} clean

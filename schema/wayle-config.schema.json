@@ -2385,6 +2385,62 @@
       },
       "type": "object"
     },
+    "GreeterConfig": {
+      "description": "Greeter (display manager): the pre-login screen `wayle-greeter` renders as\na greetd greeter.\n\nThe greeter reads the system config (`/etc/wayle/config.toml`), so these\nsettings take effect there — copy or symlink your user config if you want\nthe login screen to follow it.",
+      "properties": {
+        "background-color": {
+          "$ref": "#/$defs/HexColor",
+          "default": "#000000",
+          "description": "Background fill color (used when `background-mode = \"color\"`)."
+        },
+        "background-image": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Background image path (used when `background-mode = \"image\"`)."
+        },
+        "background-mode": {
+          "$ref": "#/$defs/LockBackground",
+          "default": "color",
+          "description": "How the background is drawn: solid color, an image, or the wallpaper."
+        },
+        "clock-format": {
+          "$ref": "#/$defs/string",
+          "default": "%H:%M",
+          "description": "`strftime` format for the greeter time."
+        },
+        "cursor-size": {
+          "$ref": "#/$defs/uint32",
+          "default": 24,
+          "description": "Logical cursor size on the login screen. Scaled automatically per\ndisplay, so HiDPI outputs get a matching high-resolution cursor."
+        },
+        "cursor-theme": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Xcursor theme used on the login screen (empty = system default)."
+        },
+        "date-format": {
+          "$ref": "#/$defs/string",
+          "default": "%A, %B %-d",
+          "description": "`strftime` format for the greeter date."
+        },
+        "show-clock": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show a clock above the login form."
+        },
+        "show-power-buttons": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show the shutdown/reboot buttons at the bottom of the screen."
+        },
+        "show-user-list": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show clickable avatars for the machine's login users."
+        }
+      },
+      "type": "object"
+    },
     "HexColor": {
       "description": "GTK4 CSS hex color (#rgb, #rgba, #rrggbb, or #rrggbbaa)",
       "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
@@ -8218,6 +8274,22 @@
         "tearing-mode": false
       },
       "description": "General Wayle settings."
+    },
+    "greeter": {
+      "$ref": "#/$defs/GreeterConfig",
+      "default": {
+        "background-color": "#000000",
+        "background-image": "",
+        "background-mode": "color",
+        "clock-format": "%H:%M",
+        "cursor-size": 24,
+        "cursor-theme": "",
+        "date-format": "%A, %B %-d",
+        "show-clock": true,
+        "show-power-buttons": true,
+        "show-user-list": true
+      },
+      "description": "Greeter (display manager) settings."
     },
     "imports": {
       "default": [],

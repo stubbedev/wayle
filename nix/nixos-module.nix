@@ -26,6 +26,16 @@ let
     "GDK_DISABLE=gl"
   ];
 
+  # cage draws its own cursor until the greeter window maps (and wlroots
+  # scales it per output). Mirror the greeter's cursor config into XCURSOR_*
+  # so cage's cursor matches the one GTK shows inside the greeter.
+  greeterSettings = cfg.greeter.settings.greeter or { };
+  cursorEnv =
+    [ "XCURSOR_SIZE=${toString (greeterSettings.cursor-size or 24)}" ]
+    ++ lib.optional (
+      (greeterSettings.cursor-theme or "") != ""
+    ) "XCURSOR_THEME=${greeterSettings.cursor-theme}";
+
   # The greetd `default_session` command: a kiosk compositor (cage) hosting the
   # wayle greeter. The greeter discovers Wayland sessions from `session.dirs`,
   # lets the user pick one, and remembers the choice under `greeterStateDir`.
@@ -55,9 +65,12 @@ let
       wrapperPrefix = lib.optionalString (
         cfg.greeter.graphicsWrapper != [ ]
       ) (lib.concatStringsSep " " cfg.greeter.graphicsWrapper + " ");
-      envPrefix = lib.optionalString (
-        cfg.greeter.renderer == "software"
-      ) ("env " + lib.concatStringsSep " " softwareRenderEnv + " ");
+      envPrefix =
+        "env "
+        + lib.concatStringsSep " " (
+          cursorEnv ++ lib.optionals (cfg.greeter.renderer == "software") softwareRenderEnv
+        )
+        + " ";
     in
     "${wrapperPrefix}${envPrefix}${cageExe} -s -- "
     + "${greeterExe} --config /etc/wayle/config.toml "
@@ -248,8 +261,9 @@ in
         description = ''
           Theme/background/clock config written to {file}`/etc/wayle/config.toml`
           and read by the greeter. Uses the full wayle config schema; the
-          greeter honours `styling`, `lock.*` (background + clock), and
-          `wallpaper`. Leave empty to use the built-in defaults.
+          greeter honours `styling`, `greeter.*` (background, clock, cursor,
+          user list, power buttons), and `wallpaper`. Leave empty to use the
+          built-in defaults.
         '';
       };
     };

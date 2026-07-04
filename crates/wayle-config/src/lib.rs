@@ -32,6 +32,8 @@ pub mod schemas {
     pub mod dropdowns;
     /// General Wayle configuration.
     pub mod general;
+    /// Greeter (display manager) configuration.
+    pub mod greeter;
     /// Lock screen configuration.
     pub mod lock;
     /// Module-specific configurations.
@@ -81,9 +83,9 @@ pub use infrastructure::{
     watcher::FileWatcher,
 };
 use schemas::{
-    animations::AnimationsConfig, bar::BarConfig, dropdowns::DropdownsConfig, lock::LockConfig,
-    modules::ModulesConfig, osd::OsdConfig, share_picker::SharePickerConfig,
-    styling::StylingConfig, wallpaper::WallpaperConfig,
+    animations::AnimationsConfig, bar::BarConfig, dropdowns::DropdownsConfig,
+    greeter::GreeterConfig, lock::LockConfig, modules::ModulesConfig, osd::OsdConfig,
+    share_picker::SharePickerConfig, styling::StylingConfig, wallpaper::WallpaperConfig,
 };
 use wayle_derive::wayle_config;
 
@@ -127,6 +129,9 @@ pub struct Config {
 
     /// Lock screen settings.
     pub lock: LockConfig,
+
+    /// Greeter (display manager) settings.
+    pub greeter: GreeterConfig,
 
     /// Screen-share picker settings.
     #[serde(rename = "share-picker")]
