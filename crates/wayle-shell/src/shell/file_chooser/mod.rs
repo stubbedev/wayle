@@ -348,7 +348,10 @@ impl Component for FileChooser {
                                 #[name = "places_list"]
                                 gtk::ListBox {
                                     add_css_class: "file-chooser-places",
-                                    set_selection_mode: gtk::SelectionMode::Single,
+                                    // None: places are navigation buttons, not a
+                                    // selection — Single left the clicked row
+                                    // painted as "active" indefinitely.
+                                    set_selection_mode: gtk::SelectionMode::None,
                                 },
                                 gtk::Label {
                                     add_css_class: "file-chooser-sidebar-header",
@@ -359,7 +362,7 @@ impl Component for FileChooser {
                                 #[name = "locations_list"]
                                 gtk::ListBox {
                                     add_css_class: "file-chooser-places",
-                                    set_selection_mode: gtk::SelectionMode::Single,
+                                    set_selection_mode: gtk::SelectionMode::None,
                                 },
                             },
                         },
@@ -552,11 +555,22 @@ impl Component for FileChooser {
                         add_css_class: "file-chooser-footer",
                         set_orientation: gtk::Orientation::Horizontal,
                         set_spacing: 8,
-                        #[name = "filter_dropdown"]
-                        gtk::DropDown {
+                        // File-type filter: our own toggle + in-surface popup
+                        // (below) instead of a GtkDropDown — its popover is an
+                        // xdg_popup, which doesn't reliably receive pointer
+                        // input over a keyboard-exclusive layer surface.
+                        #[name = "filter_button"]
+                        gtk::ToggleButton {
                             add_css_class: "file-chooser-filter",
                             set_valign: gtk::Align::Center,
                             set_visible: false,
+                            #[wrap(Some)]
+                            #[name = "filter_button_label"]
+                            set_child = &gtk::Label {
+                                set_xalign: 0.0,
+                                set_ellipsize: gtk::pango::EllipsizeMode::End,
+                                set_max_width_chars: 28,
+                            },
                         },
                         gtk::Box { set_hexpand: true },
                         #[name = "cancel_button"]
@@ -570,6 +584,31 @@ impl Component for FileChooser {
                             add_css_class: "file-chooser-confirm",
                             add_css_class: "suggested-action",
                             connect_clicked => FileChooserInput::Confirm,
+                        },
+                    },
+                },
+                // File-type filter popup — an overlay child of the sheet itself
+                // (not an xdg_popup), so it always gets pointer input.
+                #[name = "filter_popup"]
+                add_overlay = &gtk::Box {
+                    add_css_class: "file-chooser-filter-popup",
+                    set_orientation: gtk::Orientation::Vertical,
+                    set_halign: gtk::Align::Start,
+                    set_valign: gtk::Align::End,
+                    set_margin_start: 16,
+                    set_margin_bottom: 56,
+                    set_visible: false,
+                    gtk::ScrolledWindow {
+                        set_hscrollbar_policy: gtk::PolicyType::Never,
+                        // Both: without natural-width propagation the scrolled
+                        // window shrinks the ellipsized labels to bare "…".
+                        set_propagate_natural_width: true,
+                        set_propagate_natural_height: true,
+                        set_max_content_height: 320,
+                        #[name = "filter_list"]
+                        gtk::ListBox {
+                            add_css_class: "file-chooser-filter-list",
+                            set_selection_mode: gtk::SelectionMode::None,
                         },
                     },
                 },
@@ -593,6 +632,7 @@ impl Component for FileChooser {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        let (sort_key, sort_asc, view) = load_ui_state();
         let model = FileChooser {
             config: init,
             active: None,
@@ -600,9 +640,9 @@ impl Component for FileChooser {
             locations: other_locations(),
             show_hidden: false,
             search: String::new(),
-            sort_key: SortColumn::Name,
-            sort_asc: true,
-            view: ViewMode::List,
+            sort_key,
+            sort_asc,
+            view,
             size_col_w: 90,
             mod_col_w: 150,
             kind_col_w: 90,
@@ -642,7 +682,8 @@ impl Component for FileChooser {
         for widget in [
             widgets.up_button.upcast_ref::<gtk::Widget>(),
             widgets.hidden_toggle.upcast_ref(),
-            widgets.filter_dropdown.upcast_ref(),
+            widgets.filter_button.upcast_ref(),
+            widgets.filter_list.upcast_ref(),
             widgets.cancel_button.upcast_ref(),
             widgets.confirm_button.upcast_ref(),
             widgets.view_toggle.upcast_ref(),
@@ -669,7 +710,10 @@ impl Component for FileChooser {
 
         install_column_resize(&widgets, sender.input_sender());
         setup_surface_move(&widgets.header, &root);
-        setup_filter_dropdown(&widgets.filter_dropdown, &root);
+        widgets.filter_button.connect_toggled({
+            let popup = widgets.filter_popup.clone();
+            move |button| popup.set_visible(button.is_active())
+        });
 
         surface_anim::play_on_map(&root, &widgets.revealer);
 
@@ -750,7 +794,11 @@ impl Component for FileChooser {
             FileChooserInput::SelectFilter(index) => {
                 if let Some(active) = self.active.as_mut() {
                     active.active_filter = index as usize;
+                    if let Some(filter) = active.filters.get(index as usize) {
+                        widgets.filter_button_label.set_label(&filter_label(filter));
+                    }
                 }
+                widgets.filter_button.set_active(false);
                 self.refresh_view(widgets);
             }
             FileChooserInput::Sort(column) => self.sort_by(widgets, column),
@@ -801,18 +849,14 @@ impl FileChooser {
         if !filters.is_empty() && !filters.iter().any(matches_everything) {
             filters.push(("All Files".to_owned(), vec![(0, "*".to_owned())]));
         }
-        if filters.is_empty() {
-            widgets.filter_dropdown.set_visible(false);
-        } else {
-            // Label each filter with its glob patterns (e.g. "Images
-            // (*.png, *.jpg)") so an opaque name like "Custom Files" still says
-            // what it matches.
-            let names: Vec<String> = filters.iter().map(filter_label).collect();
-            let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
-            let model = gtk::StringList::new(&name_refs);
-            widgets.filter_dropdown.set_model(Some(&model));
-            widgets.filter_dropdown.set_selected(0);
-            widgets.filter_dropdown.set_visible(true);
+        widgets.filter_button.set_active(false);
+        widgets.filter_button.set_visible(!filters.is_empty());
+        clear_list(&widgets.filter_list);
+        for filter in &filters {
+            widgets.filter_list.append(&filter_row(&filter_label(filter)));
+        }
+        if let Some(first) = filters.first() {
+            widgets.filter_button_label.set_label(&filter_label(first));
         }
 
         self.active = Some(Active {
@@ -1018,6 +1062,7 @@ impl FileChooser {
             self.sort_key = column;
             self.sort_asc = true;
         }
+        save_ui_state(self.sort_key, self.sort_asc, self.view);
         self.populate(widgets);
     }
 
@@ -1027,12 +1072,17 @@ impl FileChooser {
             ViewMode::List => ViewMode::Grid,
             ViewMode::Grid => ViewMode::List,
         };
+        save_ui_state(self.sort_key, self.sort_asc, self.view);
         self.populate(widgets);
     }
 
     /// Cancels the request (empty reply) and animates the surface away. If the
-    /// Quick Look preview is open, Escape closes that first instead.
+    /// filter popup or Quick Look preview is open, Escape closes that first.
     fn cancel(&mut self, widgets: &FileChooserWidgets, root: &gtk::Window) {
+        if widgets.filter_button.is_active() {
+            widgets.filter_button.set_active(false);
+            return;
+        }
         if widgets.quicklook.is_visible() {
             widgets.quicklook.set_visible(false);
             return;
@@ -1431,13 +1481,15 @@ fn entry_name(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// Dropdown label for a filter: its name plus its patterns as `*.ext` globs,
-/// e.g. `Images (*.png, *.jpg)`. Globs (kind 0) show as-is; MIME rules (kind 1)
-/// are mapped to their canonical extension via `mime2ext`, falling back to the
-/// raw type for wildcards / unknown types it can't resolve (e.g. `image/*`).
-/// Falls back to the bare name when there are no patterns or the only one is the
-/// catch-all `*`.
+/// Display label for a filter: its name. Apps that want patterns visible put
+/// them in the name ("PNG images (*.png)"); appending the raw rules ourselves
+/// rendered walls of case-insensitive globs like `*.[Pp][Nn][Gg]` and blew the
+/// sheet wider than the screen. Only a nameless filter falls back to its
+/// patterns (globs as-is, MIME types reverse-mapped to `*.ext` via `mime2ext`).
 fn filter_label(filter: &Filter) -> String {
+    if !filter.0.trim().is_empty() {
+        return filter.0.clone();
+    }
     let mut patterns: Vec<String> = Vec::new();
     for (kind, value) in &filter.1 {
         let token = match kind {
@@ -1448,11 +1500,7 @@ fn filter_label(filter: &Filter) -> String {
             patterns.push(token);
         }
     }
-    if patterns.is_empty() || patterns == ["*"] {
-        filter.0.clone()
-    } else {
-        format!("{} ({})", filter.0, patterns.join(", "))
-    }
+    patterns.join(", ")
 }
 
 /// Canonical extension for a MIME type. Overrides the handful of common media
@@ -1555,6 +1603,66 @@ fn user_places() -> Vec<Place> {
         }
     }
     places
+}
+
+/// Builds one row of the file-type filter popup.
+fn filter_row(label: &str) -> gtk::Label {
+    gtk::Label::builder()
+        .label(label)
+        .xalign(0.0)
+        .ellipsize(gtk::pango::EllipsizeMode::End)
+        .max_width_chars(40)
+        .build()
+}
+
+/// Where the chooser's sticky view preferences (sort column/direction, view
+/// mode) live: `$XDG_STATE_HOME/wayle/file-chooser-view`.
+fn ui_state_path() -> Option<PathBuf> {
+    wayle_core::paths::ConfigPaths::state_dir()
+        .ok()
+        .map(|dir| dir.join("file-chooser-view"))
+}
+
+/// Loads the persisted sort/view preferences (`<sort> <asc|desc> <list|grid>`),
+/// defaulting any missing/unknown token.
+fn load_ui_state() -> (SortColumn, bool, ViewMode) {
+    let text = ui_state_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .unwrap_or_default();
+    let mut tokens = text.split_whitespace();
+    let sort = match tokens.next() {
+        Some("size") => SortColumn::Size,
+        Some("modified") => SortColumn::Modified,
+        Some("kind") => SortColumn::Kind,
+        _ => SortColumn::Name,
+    };
+    let asc = tokens.next() != Some("desc");
+    let view = if tokens.next() == Some("grid") {
+        ViewMode::Grid
+    } else {
+        ViewMode::List
+    };
+    (sort, asc, view)
+}
+
+/// Persists the sort/view preferences. Best-effort — a failed write only means
+/// the preference doesn't stick across restarts.
+fn save_ui_state(sort: SortColumn, asc: bool, view: ViewMode) {
+    let Some(path) = ui_state_path() else {
+        return;
+    };
+    let sort = match sort {
+        SortColumn::Name => "name",
+        SortColumn::Size => "size",
+        SortColumn::Modified => "modified",
+        SortColumn::Kind => "kind",
+    };
+    let asc = if asc { "asc" } else { "desc" };
+    let view = match view {
+        ViewMode::List => "list",
+        ViewMode::Grid => "grid",
+    };
+    let _ = std::fs::write(path, format!("{sort} {asc} {view}\n"));
 }
 
 /// Builds a sidebar place row: a symbolic icon next to its label.
@@ -1669,6 +1777,10 @@ fn grid_cell(name: &str, entry: &Entry) -> gtk::Box {
             .max_width_chars(14)
             .lines(2)
             .wrap(true)
+            // Break anywhere, not just at word boundaries — dot/underscore
+            // filenames have none, and an unbreakable line blows the cell (and
+            // the whole sheet) wide.
+            .wrap_mode(gtk::pango::WrapMode::WordChar)
             .build(),
     );
     cell
@@ -2063,14 +2175,9 @@ fn wire_widget_signals(widgets: &FileChooserWidgets, input: &Sender<FileChooserI
         let input = input.clone();
         move |_| input.emit(FileChooserInput::Confirm)
     });
-    widgets.filter_dropdown.connect_selected_notify({
+    widgets.filter_list.connect_row_activated({
         let input = input.clone();
-        move |dd| {
-            let i = dd.selected();
-            if i != u32::MAX {
-                input.emit(FileChooserInput::SelectFilter(i));
-            }
-        }
+        move |_, row| input.emit(FileChooserInput::SelectFilter(row.index().max(0) as u32))
     });
 }
 
@@ -2152,71 +2259,6 @@ fn setup_surface_move(header: &gtk::CenterBox, root: &gtk::Window) {
         }
     });
     header.add_controller(drag);
-}
-
-/// Wires the file-type dropdown's presentation and input:
-///
-/// - Custom factory: the default selected-item widget is a `GtkInscription`
-///   that renders the filter label cramped/clipped; a plain ellipsized `Label`
-///   reads cleanly and styles with the rest of the sheet.
-/// - Keyboard workaround: while the layer surface holds an exclusive keyboard
-///   grab, the popup gets keyboard input but *no pointer* input — items only
-///   highlight/activate via the arrow keys, not the mouse. Drop to on-demand
-///   keyboard while the popup is open so the mouse works, and restore the
-///   exclusive grab (for list type-ahead) when it closes.
-fn setup_filter_dropdown(dropdown: &gtk::DropDown, root: &gtk::Window) {
-    let factory = gtk::SignalListItemFactory::new();
-    factory.connect_setup(|_, item| {
-        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        item.set_child(Some(
-            &gtk::Label::builder()
-                .xalign(0.0)
-                .ellipsize(gtk::pango::EllipsizeMode::End)
-                .build(),
-        ));
-    });
-    factory.connect_bind(|_, item| {
-        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        let text = item
-            .item()
-            .and_downcast::<gtk::StringObject>()
-            .map(|s| s.string());
-        if let Some(label) = item.child().and_downcast::<gtk::Label>() {
-            label.set_label(text.as_deref().unwrap_or_default());
-        }
-    });
-    dropdown.set_factory(Some(&factory));
-
-    if let Some(popover) = find_descendant_popover(dropdown.upcast_ref()) {
-        popover.connect_show({
-            let root = root.clone();
-            move |_| root.set_keyboard_mode(KeyboardMode::OnDemand)
-        });
-        popover.connect_closed({
-            let root = root.clone();
-            move |_| root.set_keyboard_mode(KeyboardMode::Exclusive)
-        });
-    }
-}
-
-/// Depth-first search for the first `GtkPopover` under `widget` (the popup a
-/// `GtkDropDown` builds eagerly in its constructor).
-fn find_descendant_popover(widget: &gtk::Widget) -> Option<gtk::Popover> {
-    let mut child = widget.first_child();
-    while let Some(c) = child {
-        if let Ok(popover) = c.clone().downcast::<gtk::Popover>() {
-            return Some(popover);
-        }
-        if let Some(found) = find_descendant_popover(&c) {
-            return Some(found);
-        }
-        child = c.next_sibling();
-    }
-    None
 }
 
 /// Layer-shell margins (left, top) that centre a `w`×`h` sheet on the primary
@@ -2408,28 +2450,26 @@ mod tests {
     }
 
     #[test]
-    fn filter_label_reverse_maps_mime_to_extensions() {
-        // Globs shown as-is.
+    fn filter_label_prefers_name_falls_back_to_patterns() {
+        // Named filters show the name alone — never the raw rules (apps send
+        // walls of case-insensitive globs like `*.[Pp][Nn][Gg]`).
         let g = (
             "Images".to_owned(),
-            vec![(0u32, "*.png".to_owned()), (0, "*.jpg".to_owned())],
+            vec![(0u32, "*.png".to_owned()), (0, "*.[Jj][Pp][Gg]".to_owned())],
         );
-        assert_eq!(filter_label(&g), "Images (*.png, *.jpg)");
-        // MIME reverse-mapped to a `*.ext` glob.
-        let m = ("PNG".to_owned(), vec![(1u32, "image/png".to_owned())]);
-        assert_eq!(filter_label(&m), "PNG (*.png)");
-        // A glob and its equivalent MIME dedup to a single token.
-        let both = (
-            "PNG".to_owned(),
+        assert_eq!(filter_label(&g), "Images");
+        // A nameless filter falls back to its patterns; MIME rules are
+        // reverse-mapped to `*.ext` globs, duplicates collapse.
+        let unnamed = (
+            String::new(),
             vec![(0u32, "*.png".to_owned()), (1, "image/png".to_owned())],
         );
-        assert_eq!(filter_label(&both), "PNG (*.png)");
-        // Wildcard MIME kept raw — `mime_guess` can't reverse it to extensions.
-        let w = ("All images".to_owned(), vec![(1u32, "image/*".to_owned())]);
-        assert_eq!(filter_label(&w), "All images (image/*)");
-        // A lone catch-all `*` → just the name.
-        let star = ("All".to_owned(), vec![(0u32, "*".to_owned())]);
-        assert_eq!(filter_label(&star), "All");
+        assert_eq!(filter_label(&unnamed), "*.png");
+        let unnamed_mime = (" ".to_owned(), vec![(1u32, "image/jpeg".to_owned())]);
+        assert_eq!(filter_label(&unnamed_mime), "*.jpg");
+        // Wildcard MIME kept raw — it can't reverse to an extension.
+        let w = (String::new(), vec![(1u32, "image/*".to_owned())]);
+        assert_eq!(filter_label(&w), "image/*");
     }
 
     #[test]
