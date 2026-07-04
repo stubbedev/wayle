@@ -853,7 +853,9 @@ impl FileChooser {
         widgets.filter_button.set_visible(!filters.is_empty());
         clear_list(&widgets.filter_list);
         for filter in &filters {
-            widgets.filter_list.append(&filter_row(&filter_label(filter)));
+            widgets
+                .filter_list
+                .append(&filter_row(&filter_label(filter)));
         }
         if let Some(first) = filters.first() {
             widgets.filter_button_label.set_label(&filter_label(first));
