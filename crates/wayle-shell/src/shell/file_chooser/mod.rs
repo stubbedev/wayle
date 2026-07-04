@@ -654,6 +654,11 @@ impl Component for FileChooser {
         root.init_layer_shell();
         root.set_namespace(Some("wayle-file-chooser"));
         root.set_layer(Layer::Overlay);
+        // Pin the default size below any real sheet size so the window always
+        // tracks the surface's size *request*. Without this GTK keeps the
+        // largest allocation it has seen: the corner-drag could grow the sheet
+        // but never shrink it back.
+        root.set_default_size(1, 1);
         // Grab keyboard while shown so type-ahead, Esc, and arrow navigation work
         // immediately — like a native modal picker.
         root.set_keyboard_mode(KeyboardMode::Exclusive);
@@ -708,7 +713,7 @@ impl Component for FileChooser {
             sender.input_sender(),
         );
 
-        install_column_resize(&widgets, sender.input_sender());
+        install_column_resize(&widgets, sender.input_sender(), &root);
         setup_surface_move(&widgets.header, &root);
         widgets.filter_button.connect_toggled({
             let popup = widgets.filter_popup.clone();
@@ -2183,14 +2188,77 @@ fn wire_widget_signals(widgets: &FileChooserWidgets, input: &Sender<FileChooserI
     });
 }
 
-fn install_column_resize(widgets: &FileChooserWidgets, input: &Sender<FileChooserInput>) {
-    setup_col_resize(&widgets.size_handle, &widgets.sort_size_btn, input);
-    setup_col_resize(&widgets.mod_handle, &widgets.sort_modified_btn, input);
-    setup_col_resize(&widgets.kind_handle, &widgets.sort_kind_btn, input);
-    widgets.size_handle.set_cursor_from_name(Some("col-resize"));
-    widgets.mod_handle.set_cursor_from_name(Some("col-resize"));
-    widgets.kind_handle.set_cursor_from_name(Some("col-resize"));
-    setup_surface_resize(&widgets.overlay, &widgets.surface);
+/// Column dividers drag-resize their column (live), committing on release so
+/// the rows re-lay to match. One gesture on the **header** (a stable frame —
+/// it doesn't move while a column resizes), hit-testing which grip the press
+/// landed on. Attaching the gesture to the grip itself fed the grip's own
+/// displacement back into the drag offset, so the divider tracked the cursor
+/// at roughly half speed.
+fn install_column_resize(
+    widgets: &FileChooserWidgets,
+    input: &Sender<FileChooserInput>,
+    root: &gtk::Window,
+) {
+    let grips = [
+        (widgets.size_handle.clone(), widgets.sort_size_btn.clone()),
+        (
+            widgets.mod_handle.clone(),
+            widgets.sort_modified_btn.clone(),
+        ),
+        (widgets.kind_handle.clone(), widgets.sort_kind_btn.clone()),
+    ];
+    for (handle, _) in &grips {
+        handle.set_cursor_from_name(Some("col-resize"));
+    }
+
+    let header = widgets.col_header.clone();
+    let drag = gtk::GestureDrag::new();
+    // The grip under the press + its column's starting width, for the drag's
+    // duration; None when the press wasn't on a grip.
+    let target: std::rc::Rc<std::cell::RefCell<Option<(gtk::Button, i32)>>> =
+        std::rc::Rc::new(std::cell::RefCell::new(None));
+    drag.connect_drag_begin({
+        let target = target.clone();
+        let header = header.clone();
+        move |gesture, x, _| {
+            // Pad the 7px grip so it isn't a pixel-hunt to grab.
+            const SLOP: f32 = 5.0;
+            let hit = grips.iter().find_map(|(handle, btn)| {
+                let bounds = handle.compute_bounds(&header)?;
+                (x as f32 >= bounds.x() - SLOP && x as f32 <= bounds.x() + bounds.width() + SLOP)
+                    .then(|| btn.clone())
+            });
+            match hit {
+                Some(btn) => {
+                    let base = btn.width().max(btn.width_request());
+                    *target.borrow_mut() = Some((btn, base));
+                }
+                None => {
+                    gesture.set_state(gtk::EventSequenceState::Denied);
+                }
+            }
+        }
+    });
+    drag.connect_drag_update({
+        let target = target.clone();
+        move |_, offset_x, _| {
+            if let Some((btn, base)) = target.borrow().as_ref() {
+                let new_w = (f64::from(*base) - offset_x).round() as i32;
+                btn.set_width_request(new_w.clamp(50, 400));
+            }
+        }
+    });
+    drag.connect_drag_end({
+        let input = input.clone();
+        move |_, _, _| {
+            if target.borrow_mut().take().is_some() {
+                input.emit(FileChooserInput::ColumnsResized);
+            }
+        }
+    });
+    header.add_controller(drag);
+
+    setup_surface_resize(&widgets.overlay, &widgets.surface, root);
     widgets.resize_grip.set_cursor_from_name(Some("se-resize"));
 }
 
@@ -2201,21 +2269,47 @@ fn install_column_resize(widgets: &FileChooserWidgets, input: &Sender<FileChoose
 /// instead would feed the grip's own movement back in, so the size would lag the
 /// cursor by a constant gap. Only starts when the press lands in the bottom-right
 /// corner zone (over the visible grip).
-fn setup_surface_resize(overlay: &gtk::Overlay, surface: &gtk::Box) {
+fn setup_surface_resize(overlay: &gtk::Overlay, surface: &gtk::Box, root: &gtk::Window) {
     const CORNER_ZONE: i32 = 28;
     let drag = gtk::GestureDrag::new();
+    // The sheet's content floor, captured at drag start: the size below which
+    // the sidebar + fixed columns can't compress. Clamping to a measured floor
+    // (not a guessed constant) means the grip stops exactly where the layout
+    // stops — a constant below the floor left a dead drag range where
+    // shrinking silently did nothing, which read as "resize is broken".
+    let floor = std::rc::Rc::new(std::cell::Cell::new((400i32, 300i32)));
     drag.connect_drag_begin({
         let overlay = overlay.clone();
+        let surface = surface.clone();
+        let floor = floor.clone();
         move |gesture, x, y| {
             let in_corner = (x.round() as i32) >= overlay.width() - CORNER_ZONE
                 && (y.round() as i32) >= overlay.height() - CORNER_ZONE;
             if !in_corner {
                 gesture.set_state(gtk::EventSequenceState::Denied);
+                return;
             }
+            // Measure the surface's children, not the surface: the surface's
+            // own min is the width_request a previous drag set, which would
+            // ratchet the floor up to wherever the sheet currently is.
+            let (mut floor_w, mut floor_h) = (0i32, 0i32);
+            let mut child = surface.first_child();
+            while let Some(c) = child {
+                if c.is_visible() {
+                    let (min_w, _, _, _) = c.measure(gtk::Orientation::Horizontal, -1);
+                    let (min_h, _, _, _) = c.measure(gtk::Orientation::Vertical, -1);
+                    floor_w = floor_w.max(min_w);
+                    floor_h += min_h;
+                }
+                child = c.next_sibling();
+            }
+            floor.set((floor_w.max(400), floor_h.max(300)));
         }
     });
     drag.connect_drag_update({
         let surface = surface.clone();
+        let root = root.clone();
+        let floor = floor.clone();
         // start_point + offset = the cursor's position relative to the overlay's
         // (fixed) top-left, which is the size we want the sheet to be. No feedback
         // from the surface growing, so it tracks the cursor 1:1.
@@ -2223,10 +2317,16 @@ fn setup_surface_resize(overlay: &gtk::Overlay, surface: &gtk::Box) {
             let Some((sx, sy)) = gesture.start_point() else {
                 return;
             };
-            let w = ((sx + ox).round() as i32).clamp(520, 1600);
-            let h = ((sy + oy).round() as i32).clamp(360, 1100);
+            let (floor_w, floor_h) = floor.get();
+            let w = ((sx + ox).round() as i32).clamp(floor_w, 1600);
+            let h = ((sy + oy).round() as i32).clamp(floor_h, 1100);
             surface.set_width_request(w);
             surface.set_height_request(h);
+            // The size request alone can fail to shrink the window: GTK keeps
+            // the largest configured size once mapped. Re-setting the default
+            // size is GTK4's programmatic resize, and guarantees the window
+            // follows the drag in both directions.
+            root.set_default_size(w, h);
         }
     });
     overlay.add_controller(drag);
@@ -2274,31 +2374,6 @@ fn center_margins(w: i32, h: i32) -> (i32, i32) {
         Some(g) => (((g.width() - w) / 2).max(0), ((g.height() - h) / 2).max(0)),
         None => (200, 150),
     }
-}
-
-/// Makes a column divider drag-resize its column button (live), committing the
-/// new width on release so the rows re-lay to match.
-fn setup_col_resize(handle: &gtk::Box, col_btn: &gtk::Button, input: &Sender<FileChooserInput>) {
-    let drag = gtk::GestureDrag::new();
-    let base = std::rc::Rc::new(std::cell::Cell::new(0i32));
-    drag.connect_drag_begin({
-        let base = base.clone();
-        let btn = col_btn.clone();
-        move |_, _, _| base.set(btn.width().max(btn.width_request()))
-    });
-    drag.connect_drag_update({
-        let base = base.clone();
-        let btn = col_btn.clone();
-        move |_, offset_x, _| {
-            let new_w = (f64::from(base.get()) - offset_x).round() as i32;
-            btn.set_width_request(new_w.clamp(50, 400));
-        }
-    });
-    drag.connect_drag_end({
-        let input = input.clone();
-        move |_, _, _| input.emit(FileChooserInput::ColumnsResized)
-    });
-    handle.add_controller(drag);
 }
 
 /// Installs the window's keyboard shortcuts (Escape cancels, spacebar Quick
