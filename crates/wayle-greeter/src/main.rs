@@ -69,7 +69,13 @@ fn main() {
         session_env: options.env,
     };
 
-    let app = RelmApp::new("dev.stubbe.wayle.greeter");
+    // Hand GApplication only argv[0]. Our own flags (--config, --sessions,
+    // --xsessions, --state, --env) were already consumed by `config::Options`
+    // above; without this, RelmApp forwards the full `std::env::args()` to
+    // GApplication, which rejects the first unknown option ("Unknown option
+    // --config") and aborts before any window is shown.
+    let app = RelmApp::new("dev.stubbe.wayle.greeter")
+        .with_args(vec![std::env::args().next().unwrap_or_default()]);
     app.run::<app::Greeter>(init);
 }
 
