@@ -57,6 +57,18 @@ of the remembered session. Both are best-effort: they only work when that user's
 home is readable by the greetd user (e.g. `chmod o+x` on `$HOME`); otherwise the
 `XCURSOR_THEME`/`XCURSOR_SIZE` environment and finally the defaults apply.
 
+> **Cursor theme must be reachable by the greeter.** The greeter runs as the
+> unprivileged `greeter` user (home `/var/empty`), so a theme installed only via
+> home-manager (in your `0700` home) is invisible to it — and with *no* theme
+> resolvable it shows the large built-in fallback cursor, which ignores the size.
+> On NixOS the module inherits the system cursor automatically: set it the usual
+> way (`environment.sessionVariables.XCURSOR_THEME` / `XCURSOR_SIZE`) and install
+> the theme system-wide (`environment.systemPackages`, so it lands in
+> `/run/current-system/sw/share/icons`, which is on the greeter's `XCURSOR_PATH`).
+> An explicit `greeter.settings.greeter.cursor-theme` still overrides. On other
+> setups install the theme system-wide and pass `XCURSOR_THEME` / `XCURSOR_PATH`
+> in the greetd command.
+
 These options live under **Greeter → Login Screen** in `wayle-settings`. The
 greeter reads the *system* config (`/etc/wayle/config.toml` plus a
 `runtime.toml` overlay beside it), not your user config. The **Apply to login

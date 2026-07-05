@@ -26,15 +26,39 @@ let
     "GDK_DISABLE=gl"
   ];
 
-  # cage draws its own cursor until the greeter window maps (and wlroots
-  # scales it per output). Mirror the greeter's cursor config into XCURSOR_*
-  # so cage's cursor matches the one GTK shows inside the greeter.
+  # cage draws its own cursor until the greeter window maps (and wlroots scales
+  # it per output). Give both cage and the GTK greeter the same cursor as the
+  # rest of the system.
+  #
+  # The greeter runs as the unprivileged `greeter` user (home /var/empty) and
+  # cannot read a normal user's often-0700 home, so a cursor theme installed only
+  # via home-manager is invisible to it — with no theme resolvable it shows the
+  # large built-in fallback cursor. So we don't invent a wayle-specific cursor
+  # knob: we inherit the system-wide cursor the user already configures
+  # (`environment.sessionVariables`, falling back to `environment.variables`) and
+  # point XCURSOR_PATH at the system icon dir, where a theme installed via
+  # `environment.systemPackages` lands. Set your cursor there — install the theme
+  # system-wide and export XCURSOR_THEME/XCURSOR_SIZE — and the greeter follows.
+  # An explicit `greeter.settings.greeter.cursor-theme`/`cursor-size` still wins.
+  # sessionVariables wins over variables (that's the layer users set cursor in).
+  sysVars = config.environment.variables // config.environment.sessionVariables;
   greeterSettings = cfg.greeter.settings.greeter or { };
+  cursorName =
+    if (greeterSettings.cursor-theme or "") != "" then
+      greeterSettings.cursor-theme
+    else
+      (sysVars.XCURSOR_THEME or "");
+  cursorSize =
+    if (greeterSettings.cursor-size or null) != null then
+      toString greeterSettings.cursor-size
+    else
+      (sysVars.XCURSOR_SIZE or "24");
   cursorEnv =
-    [ "XCURSOR_SIZE=${toString (greeterSettings.cursor-size or 24)}" ]
-    ++ lib.optional (
-      (greeterSettings.cursor-theme or "") != ""
-    ) "XCURSOR_THEME=${greeterSettings.cursor-theme}";
+    [
+      "XCURSOR_SIZE=${toString cursorSize}"
+      "XCURSOR_PATH=/run/current-system/sw/share/icons"
+    ]
+    ++ lib.optional (cursorName != "") "XCURSOR_THEME=${cursorName}";
 
   # The greetd `default_session` command: a kiosk compositor (cage) hosting the
   # wayle greeter. The greeter discovers Wayland sessions from `session.dirs`,
