@@ -30,6 +30,7 @@ mod separator;
 mod storage;
 mod sway_workspaces;
 mod systray;
+mod treeman;
 mod volume;
 pub(crate) mod weather;
 mod window_title;
@@ -94,6 +95,7 @@ register_modules! {
     Storage => storage::Factory,
     SwayWorkspaces => sway_workspaces::Factory,
     Systray => systray::Factory,
+    Treeman => treeman::Factory,
     Volume => volume::Factory,
     Weather => weather::Factory,
     WindowTitle => window_title::Factory,

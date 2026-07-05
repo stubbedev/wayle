@@ -10,6 +10,7 @@ mod network;
 mod notification;
 mod recorder;
 mod registry;
+mod treeman;
 mod weather;
 
 use wayle_config::schemas::styling::Size;
@@ -76,5 +77,6 @@ register_dropdowns! {
     "network" => network::Factory,
     "notification" => notification::Factory,
     "recorder" => recorder::Factory,
+    "treeman" => treeman::Factory,
     "weather" => weather::Factory,
 }

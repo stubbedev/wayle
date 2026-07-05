@@ -68,6 +68,7 @@ pub(crate) fn choices_for(module_id: &str) -> Vec<ActionChoice<ClickAction>> {
         ],
         "mail" => vec![dropdown("Open mail panel", "mail")],
         "weather" => vec![dropdown("Open weather panel", "weather")],
+        "treeman" => vec![dropdown("Open treeman panel", "treeman")],
         "dashboard" => vec![dropdown("Open dashboard", "dashboard")],
         "clock" => vec![
             dropdown("Open calendar", "calendar"),

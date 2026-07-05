@@ -253,6 +253,8 @@ pub enum BarModule {
     Storage,
     /// System tray icons.
     Systray,
+    /// treeman worktree health across all repos.
+    Treeman,
     /// System updates indicator.
     Updates,
     /// Volume control.
@@ -326,6 +328,7 @@ impl BarModule {
             Self::Separator => "separator",
             Self::Storage => "storage",
             Self::Systray => "systray",
+            Self::Treeman => "treeman",
             Self::Updates => "updates",
             Self::Volume => "volume",
             Self::Weather => "weather",
@@ -366,6 +369,7 @@ impl BarModule {
             "separator" => Self::Separator,
             "storage" => Self::Storage,
             "systray" => Self::Systray,
+            "treeman" => Self::Treeman,
             "updates" => Self::Updates,
             "volume" => Self::Volume,
             "weather" => Self::Weather,
@@ -457,6 +461,7 @@ const BUILTIN_MODULES: &[&str] = &[
     "storage",
     "sway-workspaces",
     "systray",
+    "treeman",
     "updates",
     "volume",
     "weather",

@@ -36,6 +36,7 @@ mod storage;
 pub mod sway_workspaces;
 /// System tray module configuration and shared base sizes.
 pub mod systray;
+mod treeman;
 mod volume;
 mod weather;
 mod window_title;
@@ -82,6 +83,7 @@ pub use separator::SeparatorConfig;
 pub use storage::{StorageConfig, StorageMountPoint};
 pub use sway_workspaces::SwayWorkspacesConfig;
 pub use systray::{SystrayConfig, TrayItemOverride};
+pub use treeman::TreemanConfig;
 pub use types::TimeFormat;
 pub use volume::{AppIconSource, VolumeConfig};
 use wayle_derive::wayle_config;
@@ -162,6 +164,8 @@ pub struct ModulesConfig {
     pub sway_workspaces: SwayWorkspacesConfig,
     /// System tray module.
     pub systray: SystrayConfig,
+    /// treeman worktree health module.
+    pub treeman: TreemanConfig,
     /// Volume control module.
     pub volume: VolumeConfig,
     /// Weather display module.

@@ -1,0 +1,106 @@
+// Treeman dropdown: a summary chip row over per-repo cards, each listing
+// worktree rows (status dot + branch/meta + state badge + copy-path button).
+.treeman-dropdown {
+    .treeman-scroll {
+        background: transparent;
+
+        scrollbar range trough {
+            background: transparent;
+        }
+    }
+
+    .treeman-list {
+        padding: var(--space-xs);
+    }
+
+    // Top row of per-bucket count chips.
+    .treeman-summary {
+        padding: var(--space-xs) var(--space-sm) var(--space-sm);
+
+        .treeman-stat {
+            margin-right: var(--space-sm);
+
+            .status-dot {
+                margin-right: var(--space-xs);
+            }
+
+            .treeman-stat-label {
+                font-size: var(--text-sm);
+                color: var(--fg-muted);
+            }
+        }
+    }
+
+    .treeman-repo {
+        padding: var(--space-sm);
+        margin-bottom: var(--space-sm);
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+
+        .treeman-repo-header {
+            margin-bottom: var(--space-xs);
+
+            .treeman-repo-name {
+                font-size: var(--text-sm);
+                font-weight: var(--weight-bold);
+                color: var(--fg-muted);
+            }
+        }
+    }
+
+    .treeman-wt {
+        padding: var(--space-xs) var(--space-sm);
+        border-radius: var(--rounding-element);
+
+        &:hover {
+            background: var(--bg-elevated);
+        }
+
+        .status-dot {
+            margin-top: calc(var(--space-xs) + 0.15rem);
+            margin-right: var(--space-sm);
+        }
+
+        .treeman-wt-info {
+            .treeman-branch {
+                font-size: var(--text-md);
+                color: var(--fg-default);
+            }
+
+            .treeman-badge.main {
+                padding: 0 var(--space-xs);
+                margin-left: var(--space-xs);
+                border-radius: var(--rounding-element);
+                font-size: var(--text-sm);
+                background: var(--accent-subtle);
+                color: var(--accent);
+            }
+
+            .treeman-wt-meta {
+                font-size: var(--text-sm);
+                color: var(--fg-muted);
+            }
+        }
+
+        .badge {
+            margin-left: var(--space-xs);
+        }
+
+        // Action cluster (prepare / reset / teardown), revealed on row hover so
+        // resting rows stay calm.
+        .treeman-actions {
+            margin-left: var(--space-xs);
+            opacity: 0;
+
+            .ghost-icon {
+                margin-left: 2px;
+            }
+        }
+
+        &:hover .treeman-actions {
+            opacity: 1;
+        }
+    }
+}

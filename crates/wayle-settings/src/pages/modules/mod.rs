@@ -30,6 +30,7 @@ mod separator;
 mod storage;
 mod sway_workspaces;
 mod systray;
+mod treeman;
 mod volume;
 mod weather;
 mod window_title;
@@ -71,6 +72,7 @@ pub(crate) fn factories() -> Vec<fn(&Config) -> LeafEntry> {
         storage::entry,
         sway_workspaces::entry,
         systray::entry,
+        treeman::entry,
         volume::entry,
         weather::entry,
         window_title::entry,

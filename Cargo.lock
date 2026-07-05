@@ -6212,6 +6212,7 @@ dependencies = [
  "wayle-sway",
  "wayle-sysinfo",
  "wayle-systray",
+ "wayle-treeman",
  "wayle-wallpaper",
  "wayle-weather",
  "wayle-widgets",
@@ -6293,6 +6294,19 @@ dependencies = [
 [[package]]
 name = "wayle-traits"
 version = "0.8.20"
+
+[[package]]
+name = "wayle-treeman"
+version = "0.8.20"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "wayle-core",
+]
 
 [[package]]
 name = "wayle-wallpaper"

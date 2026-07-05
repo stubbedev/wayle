@@ -29,6 +29,7 @@ use wayle_power_profiles::PowerProfilesService;
 use wayle_sway::SwayService;
 use wayle_sysinfo::SysinfoService;
 use wayle_systray::{SystemTrayService, types::TrayMode};
+use wayle_treeman::TreemanService;
 use wayle_wallpaper::WallpaperService;
 use zbus::{Connection, fdo::DBusProxy};
 
@@ -175,6 +176,8 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 
     let mail = crate::services::MailService::new(config_service.clone());
 
+    let treeman = timer.time_sync("Treeman", || Arc::new(TreemanService::builder().build()));
+
     timer.mark_services_done();
 
     let services = ShellServices {
@@ -198,6 +201,7 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
         systray: daemons.systray,
         wallpaper: core.wallpaper,
         weather,
+        treeman,
         shell_ipc,
         widget_bus,
         toast_bus,

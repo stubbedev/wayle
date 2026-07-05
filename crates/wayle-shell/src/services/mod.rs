@@ -19,4 +19,4 @@ pub use idle_inhibit::IdleInhibitService;
 pub use mail::MailService;
 pub use recorder::RecorderService;
 pub use shell_ipc::ShellIpcService;
-pub use widget_ipc::{ToastBus, WidgetBus};
+pub use widget_ipc::{ToastBus, ToastRequest, WidgetBus};

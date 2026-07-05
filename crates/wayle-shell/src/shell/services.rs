@@ -16,6 +16,7 @@ use wayle_power_profiles::PowerProfilesService;
 use wayle_sway::SwayService;
 use wayle_sysinfo::SysinfoService;
 use wayle_systray::SystemTrayService;
+use wayle_treeman::TreemanService;
 use wayle_wallpaper::WallpaperService;
 use wayle_weather::WeatherService;
 
@@ -49,6 +50,7 @@ pub(crate) struct ShellServices {
     pub systray: Option<Arc<SystemTrayService>>,
     pub wallpaper: Option<Arc<WallpaperService>>,
     pub weather: Arc<WeatherService>,
+    pub treeman: Arc<TreemanService>,
     pub shell_ipc: Arc<ShellIpcService>,
     pub widget_bus: WidgetBus,
     pub toast_bus: ToastBus,

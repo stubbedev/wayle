@@ -807,6 +807,7 @@
             "storage",
             "sway-workspaces",
             "systray",
+            "treeman",
             "updates",
             "volume",
             "weather",
@@ -4667,6 +4668,30 @@
           },
           "description": "System tray module."
         },
+        "treeman": {
+          "$ref": "#/$defs/TreemanConfig",
+          "default": {
+            "border-color": "border-accent",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "format": "{{ total }}",
+            "hide-if-empty": false,
+            "icon-bg-color": "accent",
+            "icon-color": "auto",
+            "icon-failed": "tb-alert-triangle-symbolic",
+            "icon-name": "ld-layers-symbolic",
+            "icon-show": true,
+            "label-color": "accent",
+            "label-max-length": 0,
+            "label-show": true,
+            "left-click": "dropdown:treeman",
+            "middle-click": "",
+            "right-click": "",
+            "scroll-down": "",
+            "scroll-up": ""
+          },
+          "description": "treeman worktree health module."
+        },
         "volume": {
           "$ref": "#/$defs/VolumeConfig",
           "default": {
@@ -7253,6 +7278,102 @@
       ],
       "type": "object"
     },
+    "TreemanConfig": {
+      "description": "treeman worktree health across all registered repos, in a dropdown.",
+      "properties": {
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "border-accent",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "format": {
+          "$ref": "#/$defs/string",
+          "default": "{{ total }}",
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ total }}` - Total active worktrees\n- `{{ stable }}` - Worktrees in the ready bucket\n- `{{ up }}` - Worktrees preparing\n- `{{ down }}` - Worktrees tearing down\n- `{{ failed }}` - Worktrees whose last finalize errored\n\n## Examples\n\n- `\"{{ total }}\"` - \"7\"\n- `\"{{ total }} ({{ failed }}!)\"` - \"7 (1!)\""
+        },
+        "hide-if-empty": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Collapse the module entirely when there are no active worktrees."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "accent",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast."
+        },
+        "icon-failed": {
+          "$ref": "#/$defs/string",
+          "default": "tb-alert-triangle-symbolic",
+          "description": "Icon shown when any worktree's last finalize errored."
+        },
+        "icon-name": {
+          "$ref": "#/$defs/string",
+          "default": "ld-layers-symbolic",
+          "description": "Module icon (shown when no worktree has failed)."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "accent",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display count label."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "dropdown:treeman",
+          "description": "Action on left click."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        }
+      },
+      "type": "object"
+    },
     "UrgencyBarThreshold": {
       "description": "Minimum urgency level that shows a colored urgency bar on popup cards.\n\nAll urgency levels at or above the threshold display the bar.\nFor example, `Normal` shows bars on both normal and critical popups.",
       "oneOf": [
@@ -9012,6 +9133,26 @@
           "internal-padding": 0.5,
           "item-gap": 0.25,
           "overrides": []
+        },
+        "treeman": {
+          "border-color": "border-accent",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "format": "{{ total }}",
+          "hide-if-empty": false,
+          "icon-bg-color": "accent",
+          "icon-color": "auto",
+          "icon-failed": "tb-alert-triangle-symbolic",
+          "icon-name": "ld-layers-symbolic",
+          "icon-show": true,
+          "label-color": "accent",
+          "label-max-length": 0,
+          "label-show": true,
+          "left-click": "dropdown:treeman",
+          "middle-click": "",
+          "right-click": "",
+          "scroll-down": "",
+          "scroll-up": ""
         },
         "volume": {
           "border-color": "red",

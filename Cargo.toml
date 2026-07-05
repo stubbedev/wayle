@@ -34,6 +34,7 @@ members = [
 	"crates/wayle-sysinfo",
 	"crates/wayle-systray",
 	"crates/wayle-traits",
+	"crates/wayle-treeman",
 	"crates/wayle-wallpaper",
 	"crates/wayle-weather",
 	"wayle",
@@ -165,6 +166,7 @@ wayle-power-profiles = { path = "crates/wayle-power-profiles" }
 wayle-sysinfo = { path = "crates/wayle-sysinfo" }
 wayle-systray = { path = "crates/wayle-systray" }
 wayle-traits = { path = "crates/wayle-traits" }
+wayle-treeman = { path = "crates/wayle-treeman" }
 wayle-wallpaper = { path = "crates/wayle-wallpaper" }
 wayle-weather = { path = "crates/wayle-weather" }
 
