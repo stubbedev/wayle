@@ -27,11 +27,15 @@ pub(crate) struct SectionSpec {
 pub(crate) struct PageSpec {
     pub(crate) header_key: &'static str,
     pub(crate) sections: Vec<SectionSpec>,
+    /// Optional widget appended below the sections (e.g. a page-level action
+    /// button). Rendered as-is by [`crate::pages::page::SettingsPage`].
+    pub(crate) footer: Option<gtk::Widget>,
 }
 
 pub(crate) fn page_spec(header_key: &'static str, sections: Vec<SectionSpec>) -> PageSpec {
     PageSpec {
         header_key,
         sections,
+        footer: None,
     }
 }

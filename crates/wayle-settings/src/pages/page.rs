@@ -47,6 +47,10 @@ impl SimpleComponent for SettingsPage {
 
         let rows = build_sections(content, spec.sections);
 
+        if let Some(footer) = spec.footer {
+            content.append(&footer);
+        }
+
         let model = Self { rows };
 
         ComponentParts { model, widgets }

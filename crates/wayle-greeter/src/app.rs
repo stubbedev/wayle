@@ -655,9 +655,16 @@ fn install_cursor(config: &Config, home: Option<&Path>, session: &str) {
     let Some(settings) = gtk::Settings::default() else {
         return;
     };
+    // "Explicit" = set in config.toml or the runtime.toml overlay (what
+    // wayle-settings writes); either beats auto-detection. A bare default is
+    // not explicit, so detection still gets a chance.
+    let cfg_theme = config.greeter.cursor_theme.config();
+    let cfg_size = config.greeter.cursor_size.config();
     let configured = cursor::Cursor {
-        theme: Some(config.greeter.cursor_theme.get()).filter(|t| !t.is_empty()),
-        size: config.greeter.cursor_size.config(),
+        theme: cfg_theme
+            .or_else(|| config.greeter.cursor_theme.runtime())
+            .filter(|t| !t.is_empty()),
+        size: cfg_size.or_else(|| config.greeter.cursor_size.runtime()),
     };
     let detected = home
         .map(|home| cursor::detect(home, session))

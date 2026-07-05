@@ -43,19 +43,29 @@ where that file lives per setup):
 | `cursor-size` | `24` (auto) | Logical cursor size; scaled per display, so HiDPI outputs get a sharp cursor (hotplug included). Unset = auto-detect. |
 
 When `cursor-theme` / `cursor-size` are not set, the greeter auto-detects the
-cursor the last logged-in user actually sees: it reads their Hyprland config
-(`env = XCURSOR_*` lines, `hyprctl setcursor`, following `source =` includes),
-niri's `cursor` block, sway's `seat … xcursor_theme`, GTK `settings.ini`, and
-`~/.icons/default/index.theme` — preferring the compositor of the remembered
-session. This is best-effort: it only works when that user's home directory is
-readable by the greetd user (e.g. `chmod o+x` on `$HOME` plus readable config
-files); otherwise the `XCURSOR_THEME`/`XCURSOR_SIZE` environment and finally
-the defaults apply.
+cursor the last logged-in user actually sees. The primary source is a small file
+each running wayle shell writes at startup —
+`~/.local/state/wayle/greeter-cursor`, recording the session's live
+`XCURSOR_THEME` / `XCURSOR_SIZE` (size falling back to `HYPRCURSOR_SIZE`). That
+is exactly what the compositor exported, so the login screen keeps the last
+session's cursor even when it was set via env or `hyprcursor` rather than a
+config file. If no record exists, the greeter falls back to reading dotfiles:
+the Hyprland config (`env = XCURSOR_*` lines, `hyprctl setcursor`, following
+`source =` includes), niri's `cursor` block, sway's `seat … xcursor_theme`, GTK
+`settings.ini`, and `~/.icons/default/index.theme` — preferring the compositor
+of the remembered session. Both are best-effort: they only work when that user's
+home is readable by the greetd user (e.g. `chmod o+x` on `$HOME`); otherwise the
+`XCURSOR_THEME`/`XCURSOR_SIZE` environment and finally the defaults apply.
 
-These options live under **Greeter → Login Screen** in `wayle-settings`. Note
-that the greeter reads the *system* config (`/etc/wayle/config.toml`), not your
-user config — copy or generate it from the same settings if you want them to
-match.
+These options live under **Greeter → Login Screen** in `wayle-settings`. The
+greeter reads the *system* config (`/etc/wayle/config.toml` plus a
+`runtime.toml` overlay beside it), not your user config. The **Apply to login
+screen** button on that page pushes the current greeter values to the system via
+`pkexec wayle-greeter apply-config` (bundled polkit action
+`dev.stubbe.wayle.greeter.apply-config`, admin auth), writing only greeter keys
+to `/etc/wayle/runtime.toml` — so any user can set the login-screen background
+without hand-editing root-owned files, and a hand-written `config.toml` is never
+clobbered.
 
 ## How it runs
 

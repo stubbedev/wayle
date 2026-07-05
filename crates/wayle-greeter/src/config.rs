@@ -11,10 +11,10 @@
 use std::path::{Path, PathBuf};
 
 use tracing::warn;
-use wayle_config::{ApplyConfigLayer, CommitConfigReload, Config};
+use wayle_config::{ApplyConfigLayer, ApplyRuntimeLayer, CommitConfigReload, Config};
 
 /// Default system config path read when `--config` is not given.
-const DEFAULT_CONFIG: &str = "/etc/wayle/config.toml";
+pub(crate) const DEFAULT_CONFIG: &str = "/etc/wayle/config.toml";
 
 /// Directories searched for `*.desktop` session files when no `--sessions` is
 /// given — the same locations sddm/gdm read (highest precedence first).
@@ -162,8 +162,14 @@ fn usage(detail: &str) -> String {
 }
 
 /// Loads the wayle config for theming, applying the file at `path` over the
-/// built-in defaults. A missing or invalid file logs a warning and falls back
-/// to defaults, so the greeter always renders.
+/// built-in defaults, then a sibling `runtime.toml` over that. A missing or
+/// invalid file logs a warning and falls back to defaults, so the greeter
+/// always renders.
+///
+/// The `runtime.toml` overlay (e.g. `/etc/wayle/runtime.toml`) is where
+/// `wayle-greeter apply-config` — invoked by wayle-settings via polkit — writes
+/// user-chosen greeter overrides, so they never clobber a hand-written
+/// `config.toml`. It wins over `config.toml`, matching the shell's layering.
 #[must_use]
 pub fn load(path: &Path) -> Config {
     let config = Config::default();
@@ -171,6 +177,19 @@ pub fn load(path: &Path) -> Config {
         Ok(toml) => config.apply_config_layer(&toml, ""),
         Err(err) => {
             warn!(path = %path.display(), error = %err, "greeter: config load failed; using defaults")
+        }
+    }
+    let runtime_path = path.with_file_name("runtime.toml");
+    if runtime_path.exists()
+        && let Ok(text) = std::fs::read_to_string(&runtime_path)
+    {
+        match toml::from_str(&text) {
+            Ok(toml) => {
+                let _ = config.apply_runtime_layer(&toml, "");
+            }
+            Err(err) => {
+                warn!(path = %runtime_path.display(), error = %err, "greeter: runtime.toml ignored")
+            }
         }
     }
     config.commit_config_reload();

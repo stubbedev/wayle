@@ -362,6 +362,14 @@ in
         source = tomlFormat.generate "wayle-greeter-config.toml" cfg.greeter.settings;
       };
 
+      # Let any local user push their greeter (login-screen) choices from
+      # wayle-settings to the system config via `pkexec wayle-greeter
+      # apply-config` (writes only greeter keys to /etc/wayle/runtime.toml,
+      # which the greeter overlays on config.toml). Admin auth is required.
+      security.polkit.enable = true;
+      environment.etc."polkit-1/actions/dev.stubbe.wayle.greeter.policy".source =
+        "${cfg.greeter.package}/share/polkit-1/actions/dev.stubbe.wayle.greeter.policy";
+
       environment.systemPackages = [ cfg.greeter.cagePackage ];
     })
 

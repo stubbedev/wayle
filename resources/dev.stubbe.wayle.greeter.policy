@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>Wayle</vendor>
+  <vendor_url>https://github.com/stubbedev/wayle</vendor_url>
+
+  <!--
+    Lets wayle-settings push a user's greeter (login-screen) choices to the
+    system config via `pkexec wayle-greeter apply-config`. The annotation makes
+    pkexec use THIS action (instead of the generic org.freedesktop.policykit.exec)
+    when the target program is /usr/bin/wayle-greeter, so it carries this
+    action's admin-auth policy and message. apply-config only ever writes
+    allowlisted greeter keys to <config-dir>/runtime.toml.
+  -->
+  <action id="dev.stubbe.wayle.greeter.apply-config">
+    <description>Change the Wayle login screen</description>
+    <message>Authentication is required to change the Wayle login screen</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/wayle-greeter</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

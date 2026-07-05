@@ -6,6 +6,7 @@
 //! replaces this process.
 
 mod app;
+mod apply;
 mod config;
 mod cursor;
 mod i18n;
@@ -22,6 +23,13 @@ use crate::{
 };
 
 fn main() {
+    // Privileged config writer for wayle-settings (via pkexec). Handled before
+    // tracing/GUI setup so it stays a plain, side-effect-free CLI.
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    if raw.first().map(String::as_str) == Some("apply-config") {
+        std::process::exit(apply::run(&raw[1..]));
+    }
+
     init_tracing();
 
     let options = match config::Options::from_args() {

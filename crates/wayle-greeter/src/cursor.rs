@@ -11,6 +11,11 @@
 
 use std::path::{Path, PathBuf};
 
+/// Home-relative path where a running wayle session records its live cursor
+/// (see `wayle-shell`'s `cursor_record`). Read before parsing dotfiles so the
+/// greeter keeps exactly the theme/size the last session actually used.
+const RECORDED_REL: &str = ".local/state/wayle/greeter-cursor";
+
 /// Cursor settings found by one detection source; either side may be missing
 /// (e.g. a Hyprland config that sets only the theme).
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -43,12 +48,18 @@ pub fn detect(home: &Path, session: &str) -> Cursor {
     let read = |rel: &str| std::fs::read_to_string(home.join(rel)).unwrap_or_default();
     let session = session.to_lowercase();
 
+    // A running wayle session records its resolved cursor here; trust it over
+    // dotfile guessing since it is what the user actually saw last login.
+    let mut found = parse_recorded(&read(RECORDED_REL));
+    if found.complete() {
+        return found;
+    }
+
     let mut compositors = ["hypr", "niri", "sway"];
     if let Some(pos) = compositors.iter().position(|c| session.contains(c)) {
         compositors[..=pos].rotate_right(1);
     }
 
-    let mut found = Cursor::default();
     for compositor in compositors {
         if found.complete() {
             break;
@@ -71,6 +82,24 @@ pub fn detect(home: &Path, session: &str) -> Cursor {
         found = found.or(parsed);
     }
     found
+}
+
+/// Parses the `theme=`/`size=` file a wayle session records (see
+/// [`RECORDED_REL`]). Empty/missing content yields an empty [`Cursor`].
+fn parse_recorded(text: &str) -> Cursor {
+    let mut cursor = Cursor::default();
+    for line in text.lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim();
+        match key.trim() {
+            "theme" if !value.is_empty() => cursor.theme = Some(value.to_owned()),
+            "size" => cursor.size = value.parse().ok(),
+            _ => {}
+        }
+    }
+    cursor
 }
 
 /// Reads a Hyprland config file, following `source =` includes (depth-capped;
@@ -282,6 +311,21 @@ mod tests {
         let cursor = parse_index_theme("[Icon Theme]\nInherits=phinger-cursors-light, other\n");
         assert_eq!(cursor.theme.as_deref(), Some("phinger-cursors-light"));
         assert_eq!(cursor.size, None);
+    }
+
+    #[test]
+    fn recorded_file_wins() {
+        let cursor = parse_recorded("theme=Bibata-Modern-Ice\nsize=32\n");
+        assert_eq!(cursor.theme.as_deref(), Some("Bibata-Modern-Ice"));
+        assert_eq!(cursor.size, Some(32));
+    }
+
+    #[test]
+    fn recorded_partial_and_blank() {
+        let cursor = parse_recorded("size=20\n");
+        assert_eq!(cursor.theme, None);
+        assert_eq!(cursor.size, Some(20));
+        assert_eq!(parse_recorded(""), Cursor::default());
     }
 
     #[test]

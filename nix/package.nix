@@ -173,6 +173,10 @@ craneLib.buildPackage (
 
     postInstall = ''
       install -Dm0644 resources/com.wayle.settings.desktop -t $out/share/applications
+      # Polkit action so wayle-settings can push greeter (login-screen) changes
+      # to the system config via `pkexec wayle-greeter apply-config`.
+      install -Dm0644 resources/dev.stubbe.wayle.greeter.policy \
+        -t $out/share/polkit-1/actions
       install -Dm0644 resources/wayle-settings.svg \
         $out/share/icons/hicolor/scalable/apps/wayle-settings.svg
       install -Dm0644 resources/icons/hicolor/scalable/actions/*.svg \

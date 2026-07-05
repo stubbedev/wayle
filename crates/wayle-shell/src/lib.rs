@@ -7,6 +7,7 @@ use tokio::runtime::Runtime;
 use tracing::info;
 
 mod bootstrap;
+mod cursor_record;
 mod glob;
 mod i18n;
 mod notify;
@@ -38,6 +39,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     tracing_init::init()?;
     info!("Wayle shell starting");
+
+    // Stash the session's real cursor so the pre-login greeter can match it.
+    cursor_record::record();
 
     let runtime = Runtime::new()?;
     let _guard = runtime.enter();

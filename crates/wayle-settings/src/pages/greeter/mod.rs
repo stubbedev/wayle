@@ -1,6 +1,8 @@
 //! Greeter (display manager) settings page: background, clock, cursor, and
 //! login-form options for the `wayle-greeter` login screen.
 
+mod apply;
+
 use wayle_config::Config;
 
 use crate::{
@@ -10,7 +12,7 @@ use crate::{
     },
     pages::{
         nav::LeafEntry,
-        spec::{SectionSpec, page_spec},
+        spec::{PageSpec, SectionSpec},
     },
 };
 
@@ -21,9 +23,10 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
         id: "greeter",
         i18n_key: "settings-nav-greeter-page",
         icon: "ld-monitor-symbolic",
-        spec: page_spec(
-            "settings-page-greeter",
-            vec![
+        spec: PageSpec {
+            header_key: "settings-page-greeter",
+            footer: Some(apply::build_footer(config)),
+            sections: vec![
                 SectionSpec {
                     title_key: "settings-section-general",
                     items: vec![
@@ -55,6 +58,6 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     ],
                 },
             ],
-        ),
+        },
     }
 }
