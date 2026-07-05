@@ -65,6 +65,10 @@ pub(crate) enum FileChooserInput {
     Crumb(PathBuf),
     /// Internal: go to the parent directory.
     GoUp,
+    /// Internal: go back in the navigation history (mouse thumb button).
+    HistoryBack,
+    /// Internal: go forward in the navigation history (mouse thumb button).
+    HistoryForward,
     /// Internal: the show-hidden-files toggle changed.
     ToggleHidden,
     /// Internal: the active file-type filter changed.
@@ -111,6 +115,8 @@ impl std::fmt::Debug for FileChooserInput {
                 .finish(),
             Self::Crumb(p) => f.debug_tuple("Crumb").field(p).finish(),
             Self::GoUp => f.write_str("GoUp"),
+            Self::HistoryBack => f.write_str("HistoryBack"),
+            Self::HistoryForward => f.write_str("HistoryForward"),
             Self::ToggleHidden => f.write_str("ToggleHidden"),
             Self::SelectFilter(i) => f.debug_tuple("SelectFilter").field(i).finish(),
             Self::Sort(_) => f.write_str("Sort"),
@@ -178,6 +184,11 @@ struct Active {
     /// Cached results of the active recursive search (empty when not searching),
     /// kept so re-sorting / view toggles don't re-walk the tree.
     search_entries: Vec<Entry>,
+    /// Directories navigated away from, most recent last (mouse back button).
+    back: Vec<PathBuf>,
+    /// Directories backed out of, most recent last (mouse forward button).
+    /// Cleared whenever a fresh navigation forks the history.
+    forward: Vec<PathBuf>,
     reply: oneshot::Sender<Vec<String>>,
 }
 
@@ -792,6 +803,8 @@ impl Component for FileChooser {
             }
             FileChooserInput::Crumb(path) => self.goto_dir(widgets, path),
             FileChooserInput::GoUp => self.go_up(widgets),
+            FileChooserInput::HistoryBack => self.history_step(widgets, true),
+            FileChooserInput::HistoryForward => self.history_step(widgets, false),
             FileChooserInput::ToggleHidden => {
                 self.show_hidden = widgets.hidden_toggle.is_active();
                 self.refresh_view(widgets);
@@ -873,6 +886,8 @@ impl FileChooser {
             active_filter: 0,
             entries: Vec::new(),
             search_entries: Vec::new(),
+            back: Vec::new(),
+            forward: Vec::new(),
             reply,
         });
 
@@ -1047,18 +1062,47 @@ impl FileChooser {
         self.populate(widgets);
     }
 
-    /// Navigates to an arbitrary directory (breadcrumb / place jump). Clears the
-    /// active search so the new directory shows in full.
+    /// Navigates to an arbitrary directory (breadcrumb / place jump), recording
+    /// the departed directory in the back history (which forks: the forward
+    /// stack is cleared). Clears the active search so the new directory shows
+    /// in full.
     fn goto_dir(&mut self, widgets: &FileChooserWidgets, path: PathBuf) {
         if let Some(active) = self.active.as_mut() {
-            active.dir = path;
+            if active.dir != path {
+                active.back.push(std::mem::replace(&mut active.dir, path));
+                active.forward.clear();
+            }
             active.search_entries.clear();
         }
+        self.show_dir(widgets);
+    }
+
+    /// Repaints after a directory change, dropping any active search text.
+    fn show_dir(&mut self, widgets: &FileChooserWidgets) {
         if !self.search.is_empty() {
             self.search.clear();
             widgets.search_entry.set_text("");
         }
         self.populate(widgets);
+    }
+
+    /// Steps through the navigation history: back pops the back stack onto the
+    /// forward stack (and vice versa), swapping the current directory along.
+    fn history_step(&mut self, widgets: &FileChooserWidgets, back: bool) {
+        let Some(active) = self.active.as_mut() else {
+            return;
+        };
+        let (from, to) = if back {
+            (&mut active.back, &mut active.forward)
+        } else {
+            (&mut active.forward, &mut active.back)
+        };
+        let Some(dir) = from.pop() else {
+            return;
+        };
+        to.push(std::mem::replace(&mut active.dir, dir));
+        active.search_entries.clear();
+        self.show_dir(widgets);
     }
 
     /// Sorts by `column`, toggling direction when it's already the sort column.
@@ -2404,6 +2448,26 @@ fn install_controllers(
         }
     });
     root.add_controller(key);
+
+    // Mouse thumb buttons walk the navigation history, like a file manager.
+    // Capture phase on the whole surface so a click anywhere works; buttons
+    // 8/9 (BTN_SIDE/BTN_EXTRA) are claimed, everything else propagates.
+    let thumb = gtk::GestureClick::new();
+    thumb.set_button(0);
+    thumb.set_propagation_phase(gtk::PropagationPhase::Capture);
+    thumb.connect_pressed({
+        let input = input.clone();
+        move |gesture, _, _, _| {
+            let msg = match gesture.current_button() {
+                8 => FileChooserInput::HistoryBack,
+                9 => FileChooserInput::HistoryForward,
+                _ => return,
+            };
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            input.emit(msg);
+        }
+    });
+    revealer.add_controller(thumb);
 
     // Drag a file/folder onto the dialog to navigate there (like Finder).
     let drop = gtk::DropTarget::new(

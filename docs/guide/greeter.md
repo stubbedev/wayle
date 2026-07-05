@@ -39,8 +39,18 @@ where that file lives per setup):
 | `clock-format` / `date-format` | `"%H:%M"` / `"%A, %B %-d"` | strftime formats. |
 | `show-user-list` | `true` | Clickable avatars for login users. |
 | `show-power-buttons` | `true` | Shutdown/reboot buttons at the bottom. |
-| `cursor-theme` | `""` | Xcursor theme (empty = system default). |
-| `cursor-size` | `24` | Logical cursor size; scaled per display, so HiDPI outputs get a sharp cursor (hotplug included). |
+| `cursor-theme` | `""` (auto) | Xcursor theme. Empty = auto-detect (see below). |
+| `cursor-size` | `24` (auto) | Logical cursor size; scaled per display, so HiDPI outputs get a sharp cursor (hotplug included). Unset = auto-detect. |
+
+When `cursor-theme` / `cursor-size` are not set, the greeter auto-detects the
+cursor the last logged-in user actually sees: it reads their Hyprland config
+(`env = XCURSOR_*` lines, `hyprctl setcursor`, following `source =` includes),
+niri's `cursor` block, sway's `seat … xcursor_theme`, GTK `settings.ini`, and
+`~/.icons/default/index.theme` — preferring the compositor of the remembered
+session. This is best-effort: it only works when that user's home directory is
+readable by the greetd user (e.g. `chmod o+x` on `$HOME` plus readable config
+files); otherwise the `XCURSOR_THEME`/`XCURSOR_SIZE` environment and finally
+the defaults apply.
 
 These options live under **Greeter → Login Screen** in `wayle-settings`. Note
 that the greeter reads the *system* config (`/etc/wayle/config.toml`), not your

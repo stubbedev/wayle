@@ -21,6 +21,9 @@ pub struct User {
     pub name: String,
     /// Display name from the GECOS full-name field (falls back to `name`).
     pub display_name: String,
+    /// Home directory from passwd (used for `~/.face` avatars and best-effort
+    /// cursor detection; may not be readable by the greeter user).
+    pub home: PathBuf,
     /// Readable avatar image, if one was found.
     pub icon: Option<PathBuf>,
 }
@@ -31,18 +34,16 @@ pub fn load() -> Vec<User> {
     let passwd = std::fs::read_to_string("/etc/passwd").unwrap_or_default();
     parse_passwd(&passwd)
         .into_iter()
-        .map(|(mut user, home)| {
-            user.icon = find_avatar(&user.name, &home);
+        .map(|mut user| {
+            user.icon = find_avatar(&user.name, &user.home);
             user
         })
         .collect()
 }
 
-/// Parses passwd `text` into `(user, home_dir)` pairs for the offerable
-/// accounts, sorted by display name. The home dir is returned separately so
-/// [`load`] can resolve `~/.face` without stashing it in the [`User`].
-fn parse_passwd(text: &str) -> Vec<(User, PathBuf)> {
-    let mut users: Vec<(User, PathBuf)> = text
+/// Parses passwd `text` into the offerable accounts, sorted by display name.
+fn parse_passwd(text: &str) -> Vec<User> {
+    let mut users: Vec<User> = text
         .lines()
         .filter_map(|line| {
             let fields: Vec<&str> = line.split(':').collect();
@@ -54,19 +55,19 @@ fn parse_passwd(text: &str) -> Vec<(User, PathBuf)> {
                 return None;
             }
             let full_name = gecos.split(',').next().unwrap_or("").trim();
-            let user = User {
+            Some(User {
                 name: name.to_owned(),
                 display_name: if full_name.is_empty() {
                     name.to_owned()
                 } else {
                     full_name.to_owned()
                 },
+                home: PathBuf::from(home),
                 icon: None,
-            };
-            Some((user, PathBuf::from(home)))
+            })
         })
         .collect();
-    users.sort_by_key(|(u, _)| u.display_name.to_lowercase());
+    users.sort_by_key(|u| u.display_name.to_lowercase());
     users
 }
 
@@ -105,21 +106,21 @@ carol:x:1002:1002:Carol:/home/carol:/bin/false
     #[test]
     fn keeps_regular_users_with_login_shells() {
         let users = parse_passwd(PASSWD);
-        let names: Vec<&str> = users.iter().map(|(u, _)| u.name.as_str()).collect();
+        let names: Vec<&str> = users.iter().map(|u| u.name.as_str()).collect();
         assert_eq!(names, vec!["alice", "bob"]);
     }
 
     #[test]
     fn display_name_prefers_gecos_full_name() {
         let users = parse_passwd(PASSWD);
-        assert_eq!(users[0].0.display_name, "Alice Wonder");
-        assert_eq!(users[1].0.display_name, "bob");
+        assert_eq!(users[0].display_name, "Alice Wonder");
+        assert_eq!(users[1].display_name, "bob");
     }
 
     #[test]
-    fn home_is_returned_for_avatar_resolution() {
+    fn home_is_kept_on_the_user() {
         let users = parse_passwd(PASSWD);
-        assert_eq!(users[0].1, PathBuf::from("/home/alice"));
+        assert_eq!(users[0].home, PathBuf::from("/home/alice"));
     }
 
     #[test]

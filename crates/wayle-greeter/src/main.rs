@@ -7,6 +7,7 @@
 
 mod app;
 mod config;
+mod cursor;
 mod i18n;
 mod session;
 mod users;

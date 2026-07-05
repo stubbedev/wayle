@@ -20,7 +20,7 @@
 //! actually starts the session.
 
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -40,6 +40,7 @@ use wayle_styling::{STATIC_CSS, theme_css};
 use wayle_widgets::components::credential_box::{CredentialBox, CredentialOpts};
 
 use crate::{
+    cursor,
     i18n::t,
     session::{self, Session},
     users::User,
@@ -154,7 +155,22 @@ impl Component for Greeter {
     ) -> ComponentParts<Self> {
         install_css(&init.config);
         install_icons();
-        install_cursor(&init.config);
+        // Detect the cursor from the last user's dotfiles (sole user when
+        // nothing is remembered), preferring the compositor they last used.
+        let cursor_home = init
+            .last_user
+            .as_deref()
+            .and_then(|last| init.users.iter().find(|u| u.name == last))
+            .or_else(|| match init.users.as_slice() {
+                [only] => Some(only),
+                _ => None,
+            })
+            .map(|user| user.home.clone());
+        install_cursor(
+            &init.config,
+            cursor_home.as_deref(),
+            init.last_session.as_deref().unwrap_or_default(),
+        );
 
         let overlay = gtk::Overlay::new();
         overlay.set_child(Some(&build_background(&init.config)));
@@ -538,6 +554,7 @@ fn build_user_button(user: &User) -> gtk::Button {
     let button = gtk::Button::new();
     button.add_css_class("lock-user-button");
     button.add_css_class("flat");
+    button.set_cursor_from_name(Some("pointer"));
     button.set_child(Some(&column));
     button
 }
@@ -574,6 +591,7 @@ fn build_power_box() -> gtk::Widget {
         let button = gtk::Button::from_icon_name(icon);
         button.add_css_class("lock-power-button");
         button.add_css_class("flat");
+        button.set_cursor_from_name(Some("pointer"));
         button.set_tooltip_text(Some(&tooltip));
         button.connect_clicked(move |_| {
             if let Err(err) = std::process::Command::new("systemctl").arg(verb).spawn() {
@@ -592,6 +610,7 @@ fn build_session_dropdown(sessions: &[Session], last: Option<&str>) -> gtk::Drop
     let names: Vec<&str> = sessions.iter().map(|s| s.name.as_str()).collect();
     let dropdown = gtk::DropDown::from_strings(&names);
     dropdown.add_css_class("lock-session");
+    dropdown.set_cursor_from_name(Some("pointer"));
     dropdown.set_halign(gtk::Align::Center);
 
     if let Some(last) = last
@@ -626,20 +645,35 @@ fn install_icons() {
     gtk::IconTheme::for_display(&display).add_search_path(&dir);
 }
 
-/// Applies the configured cursor theme/size. The size is logical: GTK loads a
-/// scaled cursor per output, so HiDPI displays get the right resolution. The
-/// settings are re-applied on monitor hotplug to force that re-resolution.
-fn install_cursor(config: &Config) {
+/// Applies the cursor theme/size, resolved in order: explicit `[greeter]`
+/// config, the last user's own dotfiles ([`cursor::detect`], best-effort — the
+/// home may not be readable pre-login), `XCURSOR_*` environment, and finally
+/// the config defaults. The size is logical: GTK loads a scaled cursor per
+/// output, so HiDPI displays get the right resolution. The settings are
+/// re-applied on monitor hotplug to force that re-resolution.
+fn install_cursor(config: &Config, home: Option<&Path>, session: &str) {
     let Some(settings) = gtk::Settings::default() else {
         return;
     };
-    let theme = config.greeter.cursor_theme.get();
-    let theme = if theme.is_empty() {
-        std::env::var("XCURSOR_THEME").unwrap_or_default()
-    } else {
-        theme
+    let configured = cursor::Cursor {
+        theme: Some(config.greeter.cursor_theme.get()).filter(|t| !t.is_empty()),
+        size: config.greeter.cursor_size.config(),
     };
-    let size = config.greeter.cursor_size.get().max(1) as i32;
+    let detected = home
+        .map(|home| cursor::detect(home, session))
+        .unwrap_or_default();
+    let env = cursor::Cursor {
+        theme: std::env::var("XCURSOR_THEME").ok().filter(|t| !t.is_empty()),
+        size: std::env::var("XCURSOR_SIZE")
+            .ok()
+            .and_then(|v| v.trim().parse().ok()),
+    };
+    let resolved = configured.or(detected).or(env);
+    let theme = resolved.theme.unwrap_or_default();
+    let size = resolved
+        .size
+        .unwrap_or_else(|| config.greeter.cursor_size.get())
+        .max(1) as i32;
     info!(%theme, size, "greeter: applying cursor settings");
     let apply = move |settings: &gtk::Settings| {
         if !theme.is_empty() {
