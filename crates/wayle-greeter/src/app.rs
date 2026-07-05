@@ -161,7 +161,7 @@ impl Component for Greeter {
             .last_user
             .as_deref()
             .and_then(|last| init.users.iter().find(|u| u.name == last))
-            .or_else(|| match init.users.as_slice() {
+            .or(match init.users.as_slice() {
                 [only] => Some(only),
                 _ => None,
             })
@@ -663,7 +663,9 @@ fn install_cursor(config: &Config, home: Option<&Path>, session: &str) {
         .map(|home| cursor::detect(home, session))
         .unwrap_or_default();
     let env = cursor::Cursor {
-        theme: std::env::var("XCURSOR_THEME").ok().filter(|t| !t.is_empty()),
+        theme: std::env::var("XCURSOR_THEME")
+            .ok()
+            .filter(|t| !t.is_empty()),
         size: std::env::var("XCURSOR_SIZE")
             .ok()
             .and_then(|v| v.trim().parse().ok()),
