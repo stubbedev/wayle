@@ -1,0 +1,44 @@
+use std::sync::Arc;
+
+use relm4::ComponentSender;
+use wayle_config::{ConfigProperty, ConfigService};
+use wayle_widgets::watch;
+
+use super::{SeparatorCmd, SeparatorModule};
+
+/// Spawns watchers for separator config and orientation changes.
+pub fn spawn_watchers(
+    sender: &ComponentSender<SeparatorModule>,
+    is_vertical: ConfigProperty<bool>,
+    config_service: &Arc<ConfigService>,
+) {
+    let full_config = config_service.config();
+    let sep_config = &full_config.modules.separator;
+    let bar_config = &full_config.bar;
+    let styling = &full_config.styling;
+
+    let size = sep_config.size.clone();
+    let length = sep_config.length.clone();
+    let color = sep_config.color.clone();
+    let scale = bar_config.scale.clone();
+    let theme = styling.theme_provider.clone();
+
+    watch!(
+        sender,
+        [
+            size.watch(),
+            length.watch(),
+            color.watch(),
+            scale.watch(),
+            theme.watch()
+        ],
+        |out| {
+            let _ = out.send(SeparatorCmd::StylingChanged);
+        }
+    );
+
+    let is_vertical_prop = is_vertical.clone();
+    watch!(sender, [is_vertical_prop.watch()], |out| {
+        let _ = out.send(SeparatorCmd::OrientationChanged(is_vertical_prop.get()));
+    });
+}

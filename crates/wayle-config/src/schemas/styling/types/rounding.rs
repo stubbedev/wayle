@@ -2,7 +2,6 @@
 //!
 //! Global rounding preferences and per-component radius overrides.
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use wayle_derive::wayle_enum;
 
@@ -115,7 +114,8 @@ impl RoundingLevel {
 }
 
 /// Per-component radius override independent of global `RoundingLevel`.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RadiusClass {
     /// No rounding (--radius-none).

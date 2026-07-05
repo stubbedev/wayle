@@ -5,7 +5,6 @@ use std::{
     ops::Deref,
 };
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::warn;
 
@@ -13,10 +12,11 @@ const MIN: f32 = 0.25;
 const MAX: f32 = 3.0;
 
 /// Scale multiplier clamped to 0.25-3.0.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
-pub struct ScaleFactor(#[schemars(range(min = MIN, max = MAX))] f32);
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct ScaleFactor(#[cfg_attr(feature = "schema", schemars(range(min = MIN, max = MAX)))] f32);
 
 impl ScaleFactor {
     /// `0.25`

@@ -1,6 +1,5 @@
 use std::fmt::{self, Display, Formatter};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::warn;
 use wayle_derive::wayle_enum;
@@ -34,10 +33,13 @@ pub enum CyclingMode {
 const INTERVAL_MIN: u64 = 1;
 
 /// Cycling interval in minutes, minimum 1.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
-pub struct CyclingInterval(#[schemars(range(min = INTERVAL_MIN))] u64);
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct CyclingInterval(
+    #[cfg_attr(feature = "schema", schemars(range(min = INTERVAL_MIN)))] u64,
+);
 
 impl CyclingInterval {
     /// Default interval (15 minutes).
@@ -91,7 +93,8 @@ impl<'de> Deserialize<'de> for CyclingInterval {
 }
 
 /// Per-monitor wallpaper configuration.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct MonitorWallpaperConfig {
     /// Monitor name (e.g., "HDMI-1", "DP-1").

@@ -2,7 +2,6 @@
 //!
 //! Text size and font weight classes for consistent typography.
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use wayle_derive::wayle_enum;
 
@@ -10,7 +9,8 @@ use wayle_derive::wayle_enum;
 ///
 /// Maps to CSS classes like `.text-xs`, `.text-sm`, etc.
 /// The actual font sizes are defined in SCSS tokens.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TextSizeClass {
     /// Extra small text (--text-xs token).

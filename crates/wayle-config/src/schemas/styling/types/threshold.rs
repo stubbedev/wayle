@@ -4,7 +4,6 @@
 
 use std::borrow::Cow;
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::color::ColorValue;
@@ -27,7 +26,8 @@ use super::color::ColorValue;
 /// icon-color = "status-error"
 /// label-color = "status-error"
 /// ```
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ThresholdEntry {
     /// Activate when metric value >= this threshold.
     #[serde(default)]

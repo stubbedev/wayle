@@ -1,13 +1,15 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use schemars::{JsonSchema, schema_for};
+#[cfg(feature = "schema")]
+use schemars::schema_for;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use wayle_derive::{wayle_config, wayle_enum};
 
 use super::WorkspaceClickAction;
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, Size},
 };
 
@@ -24,17 +26,9 @@ pub enum DisplayMode {
 }
 
 /// How workspace numbers are displayed.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    wayle_derive::EnumVariants,
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, wayle_derive::EnumVariants,
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum Numbering {
@@ -49,17 +43,9 @@ pub enum Numbering {
 }
 
 /// Where the urgent pulse animation is applied.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    wayle_derive::EnumVariants,
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, wayle_derive::EnumVariants,
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum UrgentMode {
@@ -93,7 +79,8 @@ impl ActiveIndicator {
 }
 
 /// Per-workspace styling override.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct WorkspaceStyle {
     /// Custom icon for this workspace. When set, the icon is shown regardless
     /// of the module's `display-mode`, so a row can mix labelled workspaces
@@ -131,8 +118,9 @@ pub struct WorkspaceStyle {
 /// [modules.hyprland-workspaces.workspace-map.-99]
 /// icon = "ld-scratch-symbolic"
 /// ```
-#[derive(Debug, Clone, Default, PartialEq, JsonSchema)]
-#[schemars(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "schema", schemars(transparent))]
 pub struct WorkspaceMap(BTreeMap<i32, WorkspaceStyle>);
 
 impl Deref for WorkspaceMap {
@@ -453,6 +441,7 @@ pub struct HyprlandWorkspacesConfig {
     pub scroll_down: ConfigProperty<WorkspaceClickAction>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for HyprlandWorkspacesConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -468,6 +457,7 @@ impl ModuleInfoProvider for HyprlandWorkspacesConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(HyprlandWorkspacesConfig);
 
 /// Base size (in rem) the `icon_size` scale multiplier resolves against

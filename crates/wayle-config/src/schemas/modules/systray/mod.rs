@@ -1,10 +1,12 @@
-use schemars::{JsonSchema, schema_for};
+#[cfg(feature = "schema")]
+use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, Size},
 };
 
@@ -65,6 +67,7 @@ pub struct SystrayConfig {
     pub button_bg_color: ConfigProperty<ColorValue>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for SystrayConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -81,7 +84,8 @@ impl ModuleInfoProvider for SystrayConfig {
 }
 
 /// Custom icon and color override for tray items matching a pattern.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TrayItemOverride {
     /// Glob pattern to match against item ID or title.
     ///
@@ -93,6 +97,7 @@ pub struct TrayItemOverride {
     pub color: Option<ColorValue>,
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(SystrayConfig);
 
 /// Base size (in rem) the `icon_scale` multiplier resolves against

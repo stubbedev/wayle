@@ -1,9 +1,11 @@
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken},
 };
 
@@ -114,6 +116,7 @@ pub struct ScreenshotConfig {
     pub scroll_down: ConfigProperty<ClickAction>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for ScreenshotConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -129,4 +132,5 @@ impl ModuleInfoProvider for ScreenshotConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(ScreenshotConfig);

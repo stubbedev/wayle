@@ -1,6 +1,7 @@
-use std::{borrow::Cow, fmt};
+#[cfg(feature = "schema")]
+use std::borrow::Cow;
+use std::fmt;
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer, de};
 use wayle_derive::wayle_enum;
 
@@ -68,7 +69,8 @@ impl<'de> Deserialize<'de> for OsdMonitor {
     }
 }
 
-impl JsonSchema for OsdMonitor {
+#[cfg(feature = "schema")]
+impl schemars::JsonSchema for OsdMonitor {
     fn schema_name() -> Cow<'static, str> {
         Cow::Borrowed("OsdMonitor")
     }
@@ -118,7 +120,8 @@ impl de::Visitor<'_> for OsdMonitorVisitor {
 /// # Fire it: wayle toast --preset saved
 /// # With a progress bar: wayle toast --preset saved --percentage 80
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToastPreset {
     /// Unique identifier. Trigger with `wayle toast --preset <id>`.
@@ -133,6 +136,7 @@ pub struct ToastPreset {
     pub icon: Option<String>,
 }
 
+#[cfg(feature = "schema")]
 impl crate::docs::ModuleInfoProvider for ToastPreset {
     fn module_info() -> crate::docs::ModuleInfo {
         crate::docs::ModuleInfo {
@@ -148,4 +152,5 @@ impl crate::docs::ModuleInfoProvider for ToastPreset {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(ToastPreset);

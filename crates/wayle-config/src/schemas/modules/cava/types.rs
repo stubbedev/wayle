@@ -2,7 +2,6 @@
 
 use std::fmt::{self, Display, Formatter};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::warn;
 use wayle_derive::wayle_enum;
@@ -11,10 +10,13 @@ const BAR_COUNT_MIN: u16 = 1;
 const BAR_COUNT_MAX: u16 = 256;
 
 /// Frequency bar count clamped to 1-256 (mirrors `wayle_cava::BarCount`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
-pub struct BarCount(#[schemars(range(min = BAR_COUNT_MIN, max = BAR_COUNT_MAX))] u16);
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct BarCount(
+    #[cfg_attr(feature = "schema", schemars(range(min = BAR_COUNT_MIN, max = BAR_COUNT_MAX)))] u16,
+);
 
 impl BarCount {
     /// Default bar count.
@@ -74,10 +76,13 @@ const FRAMERATE_MIN: u32 = 1;
 const FRAMERATE_MAX: u32 = 360;
 
 /// Visualization framerate clamped to 1-360 fps (mirrors `wayle_cava::Framerate`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
-pub struct Framerate(#[schemars(range(min = FRAMERATE_MIN, max = FRAMERATE_MAX))] u32);
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct Framerate(
+    #[cfg_attr(feature = "schema", schemars(range(min = FRAMERATE_MIN, max = FRAMERATE_MAX)))] u32,
+);
 
 impl Framerate {
     /// Default framerate (60 fps).
@@ -139,10 +144,11 @@ const FREQUENCY_MIN: u32 = 1;
 ///
 /// Cross-field constraints (high_cutoff > low_cutoff, samplerate/2 > high_cutoff)
 /// are validated at the service builder.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
-pub struct FrequencyHz(#[schemars(range(min = FREQUENCY_MIN))] u32);
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct FrequencyHz(#[cfg_attr(feature = "schema", schemars(range(min = FREQUENCY_MIN)))] u32);
 
 impl FrequencyHz {
     /// Creates a frequency value, clamping to >= 1 Hz.
@@ -211,17 +217,9 @@ pub enum CavaDirection {
 }
 
 /// Audio capture backend.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    wayle_derive::EnumVariants,
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, wayle_derive::EnumVariants,
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum CavaInput {

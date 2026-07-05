@@ -2,13 +2,15 @@
 
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::{BarCount, CavaDirection, CavaInput, CavaStyle, Framerate, FrequencyHz};
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, NormalizedF64, Size},
 };
 
@@ -127,6 +129,7 @@ pub struct CavaConfig {
     pub scroll_down: ConfigProperty<ClickAction>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for CavaConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -142,4 +145,5 @@ impl ModuleInfoProvider for CavaConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(CavaConfig);

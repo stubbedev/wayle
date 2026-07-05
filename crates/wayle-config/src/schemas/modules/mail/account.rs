@@ -1,20 +1,14 @@
-use schemars::{JsonSchema, schema_for};
+#[cfg(feature = "schema")]
+use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "schema")]
 use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 
 /// Mail provider, used to pick a default brand icon for an account.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    wayle_derive::EnumVariants,
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, wayle_derive::EnumVariants,
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum MailProvider {
@@ -79,7 +73,8 @@ impl MailProvider {
 /// query = "folder:work/INBOX and tag:unread"
 /// provider = "gmail"
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct MailAccount {
     /// Display name shown in the dropdown.
@@ -108,6 +103,7 @@ impl MailAccount {
     }
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for MailAccount {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -123,4 +119,5 @@ impl ModuleInfoProvider for MailAccount {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(MailAccount);

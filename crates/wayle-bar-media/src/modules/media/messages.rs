@@ -1,0 +1,32 @@
+use std::{rc::Rc, sync::Arc};
+
+use wayle_config::ConfigService;
+use wayle_media::{MediaService, core::player::Player};
+use wayle_widgets::prelude::BarSettings;
+
+use crate::shell::bar::dropdowns::DropdownRegistry;
+
+pub struct MediaInit {
+    pub settings: BarSettings,
+    pub media: Arc<MediaService>,
+    pub config: Arc<ConfigService>,
+    pub dropdowns: Rc<DropdownRegistry>,
+}
+
+#[derive(Debug)]
+pub enum MediaMsg {
+    LeftClick,
+    RightClick,
+    MiddleClick,
+    ScrollUp,
+    ScrollDown,
+}
+
+#[derive(Debug)]
+pub enum MediaCmd {
+    PlayerChanged(Option<Arc<Player>>),
+    MetadataChanged,
+    PlaybackStateChanged,
+    UpdateIcon(String),
+    IconTypeChanged,
+}

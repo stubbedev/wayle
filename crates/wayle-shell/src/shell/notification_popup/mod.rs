@@ -1,5 +1,5 @@
 mod card;
-pub(crate) mod helpers;
+pub(crate) use wayle_shell_core::notification_icons as helpers;
 pub(crate) mod messages;
 mod methods;
 mod templates;

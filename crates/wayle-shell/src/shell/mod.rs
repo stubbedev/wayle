@@ -10,7 +10,6 @@ pub(crate) mod power_menu;
 pub(crate) mod print;
 pub(crate) mod region_overlay;
 pub(crate) mod screenshot;
-pub(crate) mod services;
 pub(crate) mod share_picker;
 mod wallpaper;
 
@@ -21,8 +20,10 @@ use gdk4::Display;
 use gtk4::{CssProvider, glib::idle_add_local_once};
 use gtk4_layer_shell::{Layer, LayerShell};
 use relm4::{gtk, gtk::prelude::*, prelude::*};
-pub(crate) use services::ShellServices;
 use tracing::{debug, info};
+pub(crate) use wayle_shell_core::ShellServices;
+#[allow(unused_imports)]
+pub(crate) use wayle_shell_core::shell_services as services;
 
 use self::{
     color_picker::ColorPicker,

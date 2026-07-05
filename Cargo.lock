@@ -417,6 +417,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cee35f73844aa3014bb606320a6c1f010249dbdf43342fe54b5a4f6a8ed4b79"
+dependencies = [
+ "memchr",
+ "serde_core",
+]
+
+[[package]]
 name = "built"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1704,6 +1714,19 @@ name = "glob"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
+
+[[package]]
+name = "globset"
+version = "0.4.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52dfc19153a48bde0cbd630453615c8151bce3a5adfac7a0aebfbf0a1e1f57e3"
+dependencies = [
+ "aho-corasick",
+ "bstr",
+ "log",
+ "regex-automata",
+ "regex-syntax",
+]
 
 [[package]]
 name = "gobject-sys"
@@ -4000,6 +4023,7 @@ version = "8.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bcdef0be6fe7f6fa333b1073c949729274b05f123a0ad7efcb8efd878e5c3b1"
 dependencies = [
+ "globset",
  "sha2",
  "walkdir",
 ]
@@ -5739,6 +5763,163 @@ dependencies = [
 ]
 
 [[package]]
+name = "wayle-bar-apps"
+version = "0.8.21"
+dependencies = [
+ "futures",
+ "gdk-pixbuf",
+ "glib",
+ "glob",
+ "gtk4",
+ "i18n-embed-fl",
+ "relm4",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "wayle-config",
+ "wayle-notification",
+ "wayle-shell-core",
+ "wayle-systray",
+ "wayle-treeman",
+ "wayle-widgets",
+]
+
+[[package]]
+name = "wayle-bar-hardware"
+version = "0.8.21"
+dependencies = [
+ "bytesize",
+ "futures",
+ "glib",
+ "gtk4",
+ "i18n-embed-fl",
+ "relm4",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "wayle-battery",
+ "wayle-brightness",
+ "wayle-config",
+ "wayle-core",
+ "wayle-idle-inhibit",
+ "wayle-power-profiles",
+ "wayle-shell-core",
+ "wayle-sysinfo",
+ "wayle-widgets",
+]
+
+[[package]]
+name = "wayle-bar-info"
+version = "0.8.21"
+dependencies = [
+ "chrono",
+ "futures",
+ "glib",
+ "gtk4",
+ "i18n-embed-fl",
+ "notify",
+ "relm4",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "wayle-audio",
+ "wayle-battery",
+ "wayle-bluetooth",
+ "wayle-config",
+ "wayle-core",
+ "wayle-media",
+ "wayle-network",
+ "wayle-notification",
+ "wayle-power-profiles",
+ "wayle-shell-core",
+ "wayle-sysinfo",
+ "wayle-weather",
+ "wayle-widgets",
+]
+
+[[package]]
+name = "wayle-bar-media"
+version = "0.8.21"
+dependencies = [
+ "futures",
+ "gdk4",
+ "gio-unix",
+ "glib",
+ "gtk4",
+ "i18n-embed-fl",
+ "libc",
+ "relm4",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "wayle-audio",
+ "wayle-cava",
+ "wayle-config",
+ "wayle-media",
+ "wayle-shell-core",
+ "wayle-styling",
+ "wayle-wallpaper",
+ "wayle-widgets",
+]
+
+[[package]]
+name = "wayle-bar-network"
+version = "0.8.21"
+dependencies = [
+ "bytesize",
+ "futures",
+ "glib",
+ "gtk4",
+ "i18n-embed-fl",
+ "relm4",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "wayle-bluetooth",
+ "wayle-config",
+ "wayle-core",
+ "wayle-network",
+ "wayle-shell-core",
+ "wayle-sysinfo",
+ "wayle-widgets",
+ "zbus",
+]
+
+[[package]]
+name = "wayle-bar-workspaces"
+version = "0.8.21"
+dependencies = [
+ "chrono",
+ "futures",
+ "glib",
+ "glob",
+ "gtk4",
+ "hyprland",
+ "i18n-embed-fl",
+ "libc",
+ "relm4",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "wayle-config",
+ "wayle-hyprland",
+ "wayle-mango",
+ "wayle-niri",
+ "wayle-shell-core",
+ "wayle-sway",
+ "wayle-widgets",
+ "zbus",
+]
+
+[[package]]
 name = "wayle-battery"
 version = "0.8.21"
 dependencies = [
@@ -6190,6 +6371,12 @@ dependencies = [
  "wayland-client",
  "wayle-audio",
  "wayle-auth",
+ "wayle-bar-apps",
+ "wayle-bar-hardware",
+ "wayle-bar-info",
+ "wayle-bar-media",
+ "wayle-bar-network",
+ "wayle-bar-workspaces",
  "wayle-battery",
  "wayle-bluetooth",
  "wayle-brightness",
@@ -6208,6 +6395,60 @@ dependencies = [
  "wayle-power-profiles",
  "wayle-recorder",
  "wayle-share-preview",
+ "wayle-shell-core",
+ "wayle-styling",
+ "wayle-sway",
+ "wayle-sysinfo",
+ "wayle-systray",
+ "wayle-treeman",
+ "wayle-wallpaper",
+ "wayle-weather",
+ "wayle-widgets",
+ "wildcard",
+ "zbus",
+]
+
+[[package]]
+name = "wayle-shell-core"
+version = "0.8.21"
+dependencies = [
+ "chrono",
+ "futures",
+ "gdk-pixbuf",
+ "gdk4",
+ "glob",
+ "gtk4",
+ "gtk4-layer-shell",
+ "i18n-embed",
+ "i18n-embed-fl",
+ "minijinja",
+ "notify",
+ "relm4",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "wayle-audio",
+ "wayle-battery",
+ "wayle-bluetooth",
+ "wayle-brightness",
+ "wayle-config",
+ "wayle-core",
+ "wayle-hyprland",
+ "wayle-icons",
+ "wayle-idle-inhibit",
+ "wayle-ipc",
+ "wayle-mango",
+ "wayle-media",
+ "wayle-network",
+ "wayle-niri",
+ "wayle-notification",
+ "wayle-power-profiles",
+ "wayle-recorder",
  "wayle-styling",
  "wayle-sway",
  "wayle-sysinfo",

@@ -2,13 +2,15 @@ mod icons;
 
 use std::collections::BTreeMap;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::{wayle_config, wayle_enum};
 
 pub use self::icons::BUILTIN_MAPPINGS;
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken},
 };
 
@@ -192,6 +194,7 @@ impl MediaIconType {
     }
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for MediaConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -207,4 +210,5 @@ impl ModuleInfoProvider for MediaConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(MediaConfig);

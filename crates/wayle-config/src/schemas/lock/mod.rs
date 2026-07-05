@@ -1,14 +1,13 @@
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::LockBackground;
 use wayle_derive::wayle_config;
 
-use crate::{
-    ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-    schemas::styling::HexColor,
-};
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
+use crate::{ConfigProperty, schemas::styling::HexColor};
 
 fn black() -> HexColor {
     HexColor::new("#000000").unwrap_or_default()
@@ -92,6 +91,7 @@ pub struct LockConfig {
     pub pam_service: ConfigProperty<String>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for LockConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -107,6 +107,7 @@ impl ModuleInfoProvider for LockConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(LockConfig);
 
 #[cfg(test)]

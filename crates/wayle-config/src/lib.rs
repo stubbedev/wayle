@@ -11,6 +11,7 @@ mod enum_variants;
 mod property;
 
 /// Documentation and metadata types for configuration schemas.
+#[cfg(feature = "schema")]
 pub mod docs;
 
 pub use click_action::ClickAction;
@@ -60,6 +61,7 @@ pub mod infrastructure {
     /// Configuration persistence
     pub mod persistence;
     /// JSON Schema generation for editor support
+    #[cfg(feature = "schema")]
     pub mod schema;
     /// Secret resolution from environment variables
     pub mod secrets;
@@ -73,11 +75,12 @@ pub mod infrastructure {
     pub mod watcher;
 }
 
+#[cfg(feature = "schema")]
+pub use infrastructure::schema::generate_schema;
 pub use infrastructure::{
     error::Error,
     paths::ConfigPaths,
     persistence::PersistenceWatcher,
-    schema::generate_schema,
     secrets,
     service::{ConfigService, ConfigServiceCli},
     watcher::FileWatcher,

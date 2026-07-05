@@ -2,6 +2,7 @@
 pub mod dropdowns;
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::{
     BarButtonVariant, BarGroup, BarItem, BarLayout, BarModule, BorderLocation, ClassedModule,
@@ -9,9 +10,10 @@ pub use types::{
 };
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ConfigProperty,
-    docs::{ConfigGroup, ModuleInfo, ModuleInfoProvider},
     schemas::{
         general::Layer,
         styling::{
@@ -256,6 +258,7 @@ pub struct BarConfig {
     pub dropdown_freeze_label: ConfigProperty<bool>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for BarConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -276,4 +279,5 @@ impl ModuleInfoProvider for BarConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(BarConfig);

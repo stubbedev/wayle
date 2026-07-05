@@ -1,6 +1,5 @@
 use std::fmt::{self, Display, Formatter};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::warn;
 use wayle_derive::wayle_enum;
@@ -155,17 +154,9 @@ impl Display for WallustPalette {
 }
 
 /// Wallust image sampling backend.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    wayle_derive::EnumVariants,
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, wayle_derive::EnumVariants,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum WallustBackend {
@@ -205,17 +196,9 @@ impl Display for WallustBackend {
 }
 
 /// Wallust color space for dominant color selection.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    wayle_derive::EnumVariants,
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, wayle_derive::EnumVariants,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum WallustColorspace {
@@ -255,10 +238,13 @@ const SIGNED_MIN: f64 = -1.0;
 const SIGNED_MAX: f64 = 1.0;
 
 /// Floating-point value clamped to -1.0 to 1.0.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
-pub struct SignedNormalizedF64(#[schemars(range(min = SIGNED_MIN, max = SIGNED_MAX))] f64);
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct SignedNormalizedF64(
+    #[cfg_attr(feature = "schema", schemars(range(min = SIGNED_MIN, max = SIGNED_MAX)))] f64,
+);
 
 impl SignedNormalizedF64 {
     /// Creates a value, clamping to -1.0 to 1.0.
@@ -315,11 +301,13 @@ const PYWAL_CONTRAST_MIN: f64 = 1.0;
 const PYWAL_CONTRAST_MAX: f64 = 21.0;
 
 /// Pywal contrast ratio clamped to 1.0-21.0 (WCAG range).
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
+#[cfg_attr(feature = "schema", schemars(transparent))]
 pub struct PywalContrast(
-    #[schemars(range(min = PYWAL_CONTRAST_MIN, max = PYWAL_CONTRAST_MAX))] f64,
+    #[cfg_attr(feature = "schema", schemars(range(min = PYWAL_CONTRAST_MIN, max = PYWAL_CONTRAST_MAX)))]
+     f64,
 );
 
 impl PywalContrast {

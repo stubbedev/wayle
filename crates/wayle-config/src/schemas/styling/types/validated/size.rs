@@ -5,12 +5,10 @@
 //! the global/bar scale) or as a pixel string like `"24px"` (an absolute
 //! length that ignores the scale multipliers entirely).
 
-use std::{
-    borrow::Cow,
-    fmt::{self, Display, Formatter},
-};
+#[cfg(feature = "schema")]
+use std::borrow::Cow;
+use std::fmt::{self, Display, Formatter};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tracing::warn;
 
@@ -157,12 +155,14 @@ impl<'de> Deserialize<'de> for Size {
     }
 }
 
-impl JsonSchema for Size {
+#[cfg(feature = "schema")]
+impl schemars::JsonSchema for Size {
     fn schema_name() -> Cow<'static, str> {
         Cow::Borrowed("Size")
     }
 
     fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        #[cfg(feature = "schema")]
         use schemars::json_schema;
 
         json_schema!({

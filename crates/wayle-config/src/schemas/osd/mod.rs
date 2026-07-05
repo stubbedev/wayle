@@ -1,12 +1,14 @@
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::{OsdMonitor, OsdPosition, OsdTextAlign, ToastPreset};
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::{general::Layer, styling::Size},
 };
 
@@ -61,6 +63,7 @@ pub struct OsdConfig {
     pub presets: ConfigProperty<Vec<ToastPreset>>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for OsdConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -76,4 +79,5 @@ impl ModuleInfoProvider for OsdConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(OsdConfig);

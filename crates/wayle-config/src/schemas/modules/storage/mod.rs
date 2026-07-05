@@ -1,17 +1,20 @@
-use schemars::{JsonSchema, schema_for};
+#[cfg(feature = "schema")]
+use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, ThresholdEntry},
 };
 
 /// Storage mount targets accepted by `mount-point`.
 ///
 /// Supports a single string for backwards compatibility or an array of paths.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum StorageMountPoint {
     /// Monitor a single mount path.
@@ -171,6 +174,7 @@ pub struct StorageConfig {
     pub thresholds: ConfigProperty<Vec<ThresholdEntry>>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for StorageConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -186,4 +190,5 @@ impl ModuleInfoProvider for StorageConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(StorageConfig);

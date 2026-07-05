@@ -1,9 +1,11 @@
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::{
         bar::dropdowns::dashboard::user_session::SessionAction,
         styling::{ColorValue, CssToken},
@@ -119,7 +121,7 @@ pub struct DashboardConfig {
 
     /// Hidden: icon always shown.
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(true)]
@@ -127,7 +129,7 @@ pub struct DashboardConfig {
 
     /// Hidden: label visibility (always false).
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(false)]
@@ -135,7 +137,7 @@ pub struct DashboardConfig {
 
     /// Hidden: label color (unused).
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(ColorValue::Token(CssToken::Yellow))]
@@ -143,7 +145,7 @@ pub struct DashboardConfig {
 
     /// Hidden: label max length (unused).
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(0)]
@@ -151,13 +153,14 @@ pub struct DashboardConfig {
 
     /// Hidden: button background (unused).
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(ColorValue::Token(CssToken::BgSurfaceElevated))]
     pub button_bg_color: ConfigProperty<ColorValue>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for DashboardConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -188,6 +191,7 @@ pub struct UserSessionConfig {
     pub actions: ConfigProperty<Vec<SessionAction>>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for UserSessionConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -203,5 +207,7 @@ impl ModuleInfoProvider for UserSessionConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(UserSessionConfig);
+#[cfg(feature = "schema")]
 crate::register_module!(DashboardConfig);

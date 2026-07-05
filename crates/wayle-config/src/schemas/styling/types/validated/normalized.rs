@@ -2,7 +2,6 @@
 
 use std::fmt::{self, Display, Formatter};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::warn;
 
@@ -10,10 +9,13 @@ const MIN: f64 = 0.0;
 const MAX: f64 = 1.0;
 
 /// Floating-point value clamped to 0.0-1.0.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
-pub struct NormalizedF64(#[schemars(range(min = MIN, max = MAX))] f64);
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct NormalizedF64(
+    #[cfg_attr(feature = "schema", schemars(range(min = MIN, max = MAX)))] f64,
+);
 
 impl NormalizedF64 {
     /// `0.0`

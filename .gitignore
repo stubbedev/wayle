@@ -2,7 +2,11 @@ target/
 dist/
 wayle-design
 
+# Generated per-domain FTL copies (wayle-shell-core build.rs concatenates the
+# _*.ftl partials into one file per consuming crate).
 wayle-shell.ftl
+wayle-shell-core.ftl
+wayle-bar-*.ftl
 # Temporary sandboxes
 Wayle
 sandbox/

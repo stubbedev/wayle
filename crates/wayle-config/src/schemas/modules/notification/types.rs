@@ -1,4 +1,6 @@
-use std::{borrow::Cow, fmt};
+#[cfg(feature = "schema")]
+use std::borrow::Cow;
+use std::fmt;
 
 use serde::{Deserialize, Serialize, Serializer, de};
 use wayle_derive::wayle_enum;
@@ -75,6 +77,7 @@ impl<'de> Deserialize<'de> for PopupMonitor {
     }
 }
 
+#[cfg(feature = "schema")]
 impl schemars::JsonSchema for PopupMonitor {
     fn schema_name() -> Cow<'static, str> {
         Cow::Borrowed("PopupMonitor")

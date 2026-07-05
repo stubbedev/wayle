@@ -1,48 +1,22 @@
-mod battery;
-mod bluetooth;
-mod brightness;
-mod cava;
-mod clock;
-mod compositor;
-mod cpu;
-mod custom;
-mod dashboard;
-mod hyprland_workspaces;
-mod hyprsunset;
-mod idle_inhibit;
-mod keybind_mode;
-mod keyboard_input;
-mod mail;
-mod mango_workspaces;
-mod media;
-mod microphone;
-mod netstat;
-mod network;
-mod niri_workspaces;
-mod notification;
-mod power;
-mod power_profiles;
-mod ram;
-mod recorder;
-mod registry;
-mod screenshot;
-mod separator;
-mod storage;
-mod sway_workspaces;
-mod systray;
-mod treeman;
-mod volume;
-pub(crate) mod weather;
-mod window_title;
-mod world_clock;
+//! Aggregates the bar module factories from the wayle-bar-* domain crates.
+//!
+//! The modules themselves live in their own crates so they compile in
+//! parallel; this file is the single place that maps a config
+//! [`BarModule`] variant to its factory.
 
 use std::rc::Rc;
 
 use tracing::warn;
+use wayle_bar_apps::modules as apps;
+use wayle_bar_hardware::modules as hardware;
+use wayle_bar_info::modules as info;
+use wayle_bar_media::modules as media;
+use wayle_bar_network::modules as network;
+use wayle_bar_workspaces::modules as workspaces;
 use wayle_config::schemas::bar::{BarModule, ModuleRef};
+pub(crate) use wayle_shell_core::bar::module_registry::{ModuleFactory, ModuleInstance};
 use wayle_widgets::prelude::BarSettings;
 
-pub(crate) use self::registry::{ModuleFactory, ModuleInstance};
 use crate::shell::{bar::dropdowns::DropdownRegistry, services::ShellServices};
 
 macro_rules! register_modules {
@@ -66,40 +40,40 @@ macro_rules! register_modules {
 }
 
 register_modules! {
-    Battery => battery::Factory,
-    Bluetooth => bluetooth::Factory,
-    Brightness => brightness::Factory,
-    Cava => cava::Factory,
-    Clock => clock::Factory,
-    Cpu => cpu::Factory,
-    Dashboard => dashboard::Factory,
-    HyprlandWorkspaces => hyprland_workspaces::Factory,
-    Hyprsunset => hyprsunset::Factory,
-    IdleInhibit => idle_inhibit::Factory,
-    KeybindMode => keybind_mode::Factory,
-    KeyboardInput => keyboard_input::Factory,
-    Mail => mail::Factory,
-    MangoWorkspaces => mango_workspaces::Factory,
-    Media => media::Factory,
-    Microphone => microphone::Factory,
-    Netstat => netstat::Factory,
-    Network => network::Factory,
-    NiriWorkspaces => niri_workspaces::Factory,
-    Notifications => notification::Factory,
-    Power => power::Factory,
-    PowerProfiles => power_profiles::Factory,
-    Ram => ram::Factory,
-    Recorder => recorder::Factory,
-    Screenshot => screenshot::Factory,
-    Separator => separator::Factory,
-    Storage => storage::Factory,
-    SwayWorkspaces => sway_workspaces::Factory,
-    Systray => systray::Factory,
-    Treeman => treeman::Factory,
-    Volume => volume::Factory,
-    Weather => weather::Factory,
-    WindowTitle => window_title::Factory,
-    WorldClock => world_clock::Factory,
+    Battery => hardware::battery::Factory,
+    Bluetooth => network::bluetooth::Factory,
+    Brightness => hardware::brightness::Factory,
+    Cava => media::cava::Factory,
+    Clock => info::clock::Factory,
+    Cpu => hardware::cpu::Factory,
+    Dashboard => info::dashboard::Factory,
+    HyprlandWorkspaces => workspaces::hyprland_workspaces::Factory,
+    Hyprsunset => workspaces::hyprsunset::Factory,
+    IdleInhibit => hardware::idle_inhibit::Factory,
+    KeybindMode => workspaces::keybind_mode::Factory,
+    KeyboardInput => workspaces::keyboard_input::Factory,
+    Mail => network::mail::Factory,
+    MangoWorkspaces => workspaces::mango_workspaces::Factory,
+    Media => media::media::Factory,
+    Microphone => media::microphone::Factory,
+    Netstat => network::netstat::Factory,
+    Network => network::network::Factory,
+    NiriWorkspaces => workspaces::niri_workspaces::Factory,
+    Notifications => apps::notification::Factory,
+    Power => hardware::power::Factory,
+    PowerProfiles => hardware::power_profiles::Factory,
+    Ram => hardware::ram::Factory,
+    Recorder => media::recorder::Factory,
+    Screenshot => hardware::screenshot::Factory,
+    Separator => info::separator::Factory,
+    Storage => hardware::storage::Factory,
+    SwayWorkspaces => workspaces::sway_workspaces::Factory,
+    Systray => apps::systray::Factory,
+    Treeman => apps::treeman::Factory,
+    Volume => media::volume::Factory,
+    Weather => info::weather::Factory,
+    WindowTitle => workspaces::window_title::Factory,
+    WorldClock => info::world_clock::Factory,
 }
 
 pub(crate) fn create_module(
@@ -112,7 +86,7 @@ pub(crate) fn create_module(
     let class = module_ref.class().map(String::from);
 
     if let Some(id) = module.custom_id() {
-        return custom::Factory::create_for_id(id, settings, services, dropdowns, class);
+        return info::custom::Factory::create_for_id(id, settings, services, dropdowns, class);
     }
 
     create_from_variant(module.clone(), settings, services, dropdowns, class)

@@ -95,12 +95,15 @@ fn generate(parsed_struct: ItemStruct, args: MacroArgs) -> syn::Result<TokenStre
 
     Ok(quote! {
         #(#struct_attrs)*
+        // JsonSchema only when the expanding crate enables its `schema`
+        // feature — schema generation is a `wayle config schema` / docs
+        // concern, not a runtime one.
+        #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
         #[derive(
             Debug,
             Clone,
             serde::Serialize,
             serde::Deserialize,
-            schemars::JsonSchema,
             wayle_derive::ApplyConfigLayer,
             wayle_derive::ApplyRuntimeLayer,
             wayle_derive::ExtractRuntimeValues,

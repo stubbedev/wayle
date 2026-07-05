@@ -1,0 +1,35 @@
+[package]
+name = "wayle-bar-workspaces"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Wayle bar modules: workspaces"
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono.workspace = true
+futures.workspace = true
+glib.workspace = true
+glob.workspace = true
+gtk4.workspace = true
+hyprland.workspace = true
+i18n-embed-fl.workspace = true
+libc.workspace = true
+relm4.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tokio-stream.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+wayle-config.workspace = true
+wayle-hyprland.workspace = true
+wayle-mango.workspace = true
+wayle-niri.workspace = true
+wayle-shell-core.workspace = true
+wayle-sway.workspace = true
+wayle-widgets.workspace = true
+zbus.workspace = true
+
+[lints]
+workspace = true

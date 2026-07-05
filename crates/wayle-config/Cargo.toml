@@ -11,10 +11,10 @@ license.workspace = true
 dotenvy.workspace = true
 futures.workspace = true
 glob.workspace = true
-inventory.workspace = true
+inventory = { workspace = true, optional = true }
 notify.workspace = true
 owo-colors = "4.2.3"
-schemars.workspace = true
+schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 serde_json_path.workspace = true
@@ -29,6 +29,10 @@ wayle-derive.workspace = true
 
 [features]
 default = []
+# JSON-schema generation + docs registry. Only the `wayle` binary needs this
+# (`wayle config schema`, docs generator); leaving it off keeps schemars and
+# its derive expansion out of every other crate's build of wayle-config.
+schema = ["dep:schemars", "dep:inventory", "wayle-core/schema"]
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

@@ -1,9 +1,11 @@
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::{lock::LockBackground, styling::HexColor},
 };
 
@@ -71,6 +73,7 @@ pub struct GreeterConfig {
     pub cursor_size: ConfigProperty<u32>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for GreeterConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -86,6 +89,7 @@ impl ModuleInfoProvider for GreeterConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(GreeterConfig);
 
 #[cfg(test)]

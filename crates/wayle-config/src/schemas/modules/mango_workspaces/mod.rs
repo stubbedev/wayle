@@ -8,13 +8,15 @@
 
 use std::collections::HashMap;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
 use super::{ActiveIndicator, DisplayMode, UrgentMode, WorkspaceClickAction, WorkspaceStyle};
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, Size},
 };
 
@@ -189,6 +191,7 @@ pub struct MangoWorkspacesConfig {
     pub scroll_down: ConfigProperty<WorkspaceClickAction>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for MangoWorkspacesConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -204,6 +207,7 @@ impl ModuleInfoProvider for MangoWorkspacesConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(MangoWorkspacesConfig);
 
 /// Base size (in rem) the `icon_size` scale multiplier resolves against

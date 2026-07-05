@@ -50,6 +50,13 @@ wayle-core.workspace = true
 wayle-ipc.workspace = true
 wayle-recorder.workspace = true
 wayle-share-preview = { workspace = true, features = ["hyprland-rs"] }
+wayle-shell-core.workspace = true
+wayle-bar-apps.workspace = true
+wayle-bar-info.workspace = true
+wayle-bar-media.workspace = true
+wayle-bar-network.workspace = true
+wayle-bar-hardware.workspace = true
+wayle-bar-workspaces.workspace = true
 hyprland.workspace = true
 image = "0.25.10"
 wayland-client.workspace = true

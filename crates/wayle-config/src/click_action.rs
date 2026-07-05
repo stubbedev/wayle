@@ -68,6 +68,7 @@ impl<'de> Deserialize<'de> for ClickAction {
     }
 }
 
+#[cfg(feature = "schema")]
 impl schemars::JsonSchema for ClickAction {
     fn schema_name() -> std::borrow::Cow<'static, str> {
         std::borrow::Cow::Borrowed("ClickAction")

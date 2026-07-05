@@ -1,6 +1,5 @@
 use std::fmt::{self, Display, Formatter};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::warn;
 use wayle_derive::wayle_enum;
@@ -26,7 +25,8 @@ pub enum ExecutionMode {
 }
 
 /// Restart behavior for watch-mode custom modules.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum RestartPolicy {
     /// Never restart after exit.
@@ -41,10 +41,11 @@ pub enum RestartPolicy {
 const MIN_MS: u64 = 1;
 
 /// Restart delay in milliseconds, clamped to >= 1.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
-pub struct RestartDelay(#[schemars(range(min = MIN_MS))] u64);
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct RestartDelay(#[cfg_attr(feature = "schema", schemars(range(min = MIN_MS)))] u64);
 
 impl RestartDelay {
     /// Default delay (1000ms).
@@ -102,7 +103,8 @@ impl<'de> Deserialize<'de> for RestartDelay {
 /// Values are keyed in `color-map` by the JSON output's `alt` field, mirroring
 /// `icon-map`. Any field left unset falls back to the module's static color of
 /// the same name. Use the `"default"` key as a fallback state.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct StateColors {
     /// Icon foreground color for this state.

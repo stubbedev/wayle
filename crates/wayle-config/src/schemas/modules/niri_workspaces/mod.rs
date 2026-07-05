@@ -2,14 +2,16 @@
 
 use std::{collections::BTreeMap, ops::Deref};
 
-use schemars::{JsonSchema, schema_for};
+#[cfg(feature = "schema")]
+use schemars::schema_for;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use wayle_derive::{wayle_config, wayle_enum};
 
 use super::{ActiveIndicator, DisplayMode, UrgentMode, WorkspaceStyle};
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, Size},
 };
 
@@ -96,7 +98,8 @@ impl<'de> Deserialize<'de> for WorkspaceClickAction {
     }
 }
 
-impl JsonSchema for WorkspaceClickAction {
+#[cfg(feature = "schema")]
+impl schemars::JsonSchema for WorkspaceClickAction {
     fn schema_name() -> std::borrow::Cow<'static, str> {
         std::borrow::Cow::Borrowed("WorkspaceClickAction")
     }
@@ -129,9 +132,10 @@ impl JsonSchema for WorkspaceClickAction {
 /// icon = "ld-code-symbolic"
 /// color = "accent"
 /// ```
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
+#[cfg_attr(feature = "schema", schemars(transparent))]
 pub struct WorkspaceMap(BTreeMap<String, WorkspaceStyle>);
 
 impl Deref for WorkspaceMap {
@@ -363,6 +367,7 @@ pub struct NiriWorkspacesConfig {
     pub scroll_down: ConfigProperty<WorkspaceClickAction>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for NiriWorkspacesConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -378,6 +383,7 @@ impl ModuleInfoProvider for NiriWorkspacesConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(NiriWorkspacesConfig);
 
 /// Base size (in rem) the `icon_size` scale multiplier resolves against

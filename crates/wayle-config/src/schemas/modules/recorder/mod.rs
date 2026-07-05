@@ -1,12 +1,14 @@
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::RecorderFormat;
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, Percentage},
 };
 
@@ -184,6 +186,7 @@ pub struct RecorderConfig {
     pub scroll_down: ConfigProperty<ClickAction>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for RecorderConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -199,4 +202,5 @@ impl ModuleInfoProvider for RecorderConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(RecorderConfig);

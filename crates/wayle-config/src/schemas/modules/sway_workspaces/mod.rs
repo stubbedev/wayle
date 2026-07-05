@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
@@ -13,9 +14,10 @@ use super::{
     ActiveIndicator, DisplayMode, UrgentMode,
     niri_workspaces::{LabelStrategy, WorkspaceClickAction, WorkspaceMap},
 };
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, Size},
 };
 
@@ -225,6 +227,7 @@ pub struct SwayWorkspacesConfig {
     pub scroll_down: ConfigProperty<WorkspaceClickAction>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for SwayWorkspacesConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -240,6 +243,7 @@ impl ModuleInfoProvider for SwayWorkspacesConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(SwayWorkspacesConfig);
 
 /// Base size (in rem) the `icon_size` scale multiplier resolves against

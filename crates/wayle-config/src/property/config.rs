@@ -1,13 +1,15 @@
 //! The core config property type backing every field in the config schema.
 
+#[cfg(feature = "schema")]
+use std::borrow::Cow;
 use std::{
-    borrow::Cow,
     fmt::Debug,
     sync::{Arc, RwLock},
 };
 
 use futures::{Stream, StreamExt};
-use schemars::{JsonSchema, Schema, SchemaGenerator};
+#[cfg(feature = "schema")]
+use schemars::{Schema, SchemaGenerator};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tokio::sync::mpsc;
 use wayle_core::Property;
@@ -255,7 +257,10 @@ impl<'de, T: Clone + Send + Sync + PartialEq + Deserialize<'de> + 'static> Deser
     }
 }
 
-impl<T: Clone + Send + Sync + PartialEq + JsonSchema + 'static> JsonSchema for ConfigProperty<T> {
+#[cfg(feature = "schema")]
+impl<T: Clone + Send + Sync + PartialEq + schemars::JsonSchema + 'static> schemars::JsonSchema
+    for ConfigProperty<T>
+{
     fn schema_name() -> Cow<'static, str> {
         T::schema_name()
     }

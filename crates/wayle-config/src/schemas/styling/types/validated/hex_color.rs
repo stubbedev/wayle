@@ -1,7 +1,8 @@
 //! GTK4 CSS hex color newtype.
 
+#[cfg(feature = "schema")]
+use std::borrow::Cow;
 use std::{
-    borrow::Cow,
     fmt::{self, Display, Formatter},
     ops::Deref,
     str::FromStr,
@@ -16,6 +17,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[serde(transparent)]
 pub struct HexColor(String);
 
+#[cfg(feature = "schema")]
 impl schemars::JsonSchema for HexColor {
     fn schema_name() -> Cow<'static, str> {
         Cow::Borrowed("HexColor")

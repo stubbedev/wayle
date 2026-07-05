@@ -2,6 +2,7 @@ mod palette;
 mod types;
 
 pub use palette::PaletteConfig;
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::{
     Appearance, ColorValue, CssToken, FontWeightClass, GapClass, HexColor, IconSizeClass,
@@ -12,11 +13,9 @@ pub use types::{
 };
 use wayle_derive::wayle_config;
 
-use crate::{
-    ConfigProperty,
-    docs::{ConfigGroup, ModuleInfo, ModuleInfoProvider},
-    infrastructure::themes::Palette,
-};
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, ModuleInfo, ModuleInfoProvider};
+use crate::{ConfigProperty, infrastructure::themes::Palette};
 
 /// Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet.
 #[wayle_config(i18n_prefix = "settings-styling")]
@@ -127,13 +126,14 @@ pub struct StylingConfig {
 
     /// Discovered themes (runtime-populated).
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(Vec::new())]
     pub available: ConfigProperty<Vec<ThemeEntry>>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for StylingConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -156,6 +156,7 @@ impl ModuleInfoProvider for StylingConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(StylingConfig);
 
 impl StylingConfig {

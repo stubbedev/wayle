@@ -1,13 +1,13 @@
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::DropdownSize;
 use wayle_derive::wayle_config;
 
-use crate::{
-    ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-};
+use crate::ConfigProperty;
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 
 /// Per-dropdown foldout panel sizing.
 ///
@@ -60,6 +60,7 @@ pub struct DropdownsConfig {
     pub weather: ConfigProperty<DropdownSize>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for DropdownsConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -75,4 +76,5 @@ impl ModuleInfoProvider for DropdownsConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(DropdownsConfig);

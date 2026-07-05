@@ -1,9 +1,11 @@
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::{wayle_config, wayle_enum};
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, ThresholdEntry},
 };
 
@@ -148,6 +150,7 @@ pub struct VolumeConfig {
     pub thresholds: ConfigProperty<Vec<ThresholdEntry>>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for VolumeConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -163,4 +166,5 @@ impl ModuleInfoProvider for VolumeConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(VolumeConfig);

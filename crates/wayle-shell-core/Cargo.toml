@@ -1,0 +1,64 @@
+[package]
+name = "wayle-shell-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Shared shell infrastructure: services container, i18n, bar module/dropdown registries"
+repository.workspace = true
+license.workspace = true
+build = "build.rs"
+
+[dependencies]
+# gtk4-layer-shell MUST be first - it shims libwayland calls
+gtk4-layer-shell.workspace = true
+gtk4.workspace = true
+gdk4.workspace = true
+gdk-pixbuf.workspace = true
+chrono.workspace = true
+glob.workspace = true
+i18n-embed.workspace = true
+i18n-embed-fl.workspace = true
+futures.workspace = true
+rust-embed = { workspace = true, features = ["include-exclude"] }
+relm4.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tokio-stream.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+minijinja.workspace = true
+notify.workspace = true
+wildcard.workspace = true
+zbus.workspace = true
+
+# Service dependencies
+wayle-audio.workspace = true
+wayle-battery.workspace = true
+wayle-bluetooth.workspace = true
+wayle-brightness.workspace = true
+wayle-config.workspace = true
+wayle-core.workspace = true
+wayle-hyprland.workspace = true
+wayle-icons.workspace = true
+wayle-idle-inhibit.workspace = true
+wayle-ipc.workspace = true
+wayle-mango.workspace = true
+wayle-media.workspace = true
+wayle-network.workspace = true
+wayle-niri.workspace = true
+wayle-notification.workspace = true
+wayle-power-profiles.workspace = true
+wayle-recorder.workspace = true
+wayle-styling.workspace = true
+wayle-sway.workspace = true
+wayle-sysinfo.workspace = true
+wayle-systray.workspace = true
+wayle-treeman.workspace = true
+wayle-wallpaper.workspace = true
+wayle-weather.workspace = true
+wayle-widgets.workspace = true
+
+[lints]
+workspace = true

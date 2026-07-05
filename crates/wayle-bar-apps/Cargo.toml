@@ -1,0 +1,29 @@
+[package]
+name = "wayle-bar-apps"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Wayle bar modules: apps"
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+futures.workspace = true
+gdk-pixbuf.workspace = true
+glib.workspace = true
+gtk4.workspace = true
+i18n-embed-fl.workspace = true
+relm4.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tokio-util.workspace = true
+tracing.workspace = true
+glob.workspace = true
+wayle-config.workspace = true
+wayle-notification.workspace = true
+wayle-shell-core.workspace = true
+wayle-systray = { workspace = true, features = ["adapter-gtk"] }
+wayle-treeman.workspace = true
+wayle-widgets.workspace = true
+
+[lints]
+workspace = true

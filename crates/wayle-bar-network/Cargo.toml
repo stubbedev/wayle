@@ -1,0 +1,31 @@
+[package]
+name = "wayle-bar-network"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Wayle bar modules: network"
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+bytesize.workspace = true
+futures.workspace = true
+glib.workspace = true
+gtk4.workspace = true
+i18n-embed-fl.workspace = true
+relm4.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tokio-util.workspace = true
+tracing.workspace = true
+wayle-bluetooth.workspace = true
+wayle-config.workspace = true
+wayle-core.workspace = true
+wayle-network.workspace = true
+wayle-shell-core.workspace = true
+wayle-sysinfo.workspace = true
+wayle-widgets.workspace = true
+zbus.workspace = true
+
+[lints]
+workspace = true

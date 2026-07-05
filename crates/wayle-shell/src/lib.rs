@@ -8,19 +8,17 @@ use tracing::info;
 
 mod bootstrap;
 mod cursor_record;
-mod glob;
-mod i18n;
-mod notify;
-mod process;
 mod services;
 mod shell;
 mod startup;
-mod template;
 mod tracing_init;
 mod wallpaper_map;
 mod watchers;
 
+// Moved to wayle-shell-core in the bar-crate split; re-exported here so the
+// old `crate::…` paths keep working throughout this crate.
 use shell::{Shell, ShellInit};
+pub(crate) use wayle_shell_core::{i18n, notify, process};
 
 /// Launches the Wayle shell GUI.
 ///

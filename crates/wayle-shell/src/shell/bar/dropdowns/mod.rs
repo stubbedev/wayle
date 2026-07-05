@@ -1,50 +1,19 @@
-mod audio;
-mod battery;
-mod bluetooth;
-mod brightness;
-mod calendar;
-mod dashboard;
-mod mail;
-mod media;
-mod network;
-mod notification;
-mod recorder;
-mod registry;
-mod treeman;
-mod weather;
+//! Aggregates the dropdown factories from the wayle-bar-* domain crates.
+//!
+//! The dropdowns live next to their bar modules in the domain crates; this
+//! file is the single place that maps a dropdown name to its factory, and it
+//! injects that mapping into the shared [`DropdownRegistry`].
 
-use wayle_config::schemas::styling::Size;
-
-pub(crate) use self::registry::{
-    DropdownFactory, DropdownInstance, DropdownRegistry, dispatch_click, dispatch_click_widget,
-    require_service,
+use wayle_bar_apps::dropdowns as apps;
+use wayle_bar_hardware::dropdowns as hardware;
+use wayle_bar_info::dropdowns as info;
+use wayle_bar_media::dropdowns as media;
+use wayle_bar_network::dropdowns as network;
+pub(crate) use wayle_shell_core::bar::dropdown_registry::{
+    DropdownFactory, DropdownInstance, DropdownRegistry,
 };
+
 use crate::shell::services::ShellServices;
-
-/// Resolves a dropdown width/height override to a pixel request.
-///
-/// `None` keeps the built-in default (`base * scale`). A [`Size::Scale`]
-/// multiplies the base before scaling; a [`Size::Px`] is an absolute length
-/// that ignores the scale.
-pub(crate) fn resolve_dimension(override_: Option<Size>, base: f32, scale: f32) -> i32 {
-    match override_ {
-        Some(size) => size.resolve_px(base, scale).round() as i32,
-        None => (base * scale).round() as i32,
-    }
-}
-
-/// Resolves an optional height override for dropdowns that otherwise size their
-/// height to content.
-///
-/// Returns `-1` (GTK's "natural size" request) when no override applies. Only
-/// an absolute [`Size::Px`] takes effect, since there is no base height to
-/// scale a multiplier against.
-pub(crate) fn resolve_content_height(override_: Option<Size>) -> i32 {
-    match override_ {
-        Some(Size::Px(px)) => px.round() as i32,
-        Some(Size::Scale(_)) | None => -1,
-    }
-}
 
 macro_rules! register_dropdowns {
     ($($name:literal => $factory:ty),+ $(,)?) => {
@@ -66,17 +35,17 @@ macro_rules! register_dropdowns {
 }
 
 register_dropdowns! {
-    "audio" => audio::Factory,
-    "battery" => battery::Factory,
-    "bluetooth" => bluetooth::Factory,
-    "brightness" => brightness::Factory,
-    "calendar" => calendar::Factory,
-    "dashboard" => dashboard::Factory,
-    "mail" => mail::Factory,
-    "media" => media::Factory,
-    "network" => network::Factory,
-    "notification" => notification::Factory,
-    "recorder" => recorder::Factory,
-    "treeman" => treeman::Factory,
-    "weather" => weather::Factory,
+    "audio" => media::audio::Factory,
+    "battery" => hardware::battery::Factory,
+    "bluetooth" => network::bluetooth::Factory,
+    "brightness" => hardware::brightness::Factory,
+    "calendar" => info::calendar::Factory,
+    "dashboard" => info::dashboard::Factory,
+    "mail" => network::mail::Factory,
+    "media" => media::media::Factory,
+    "network" => network::network::Factory,
+    "notification" => apps::notification::Factory,
+    "recorder" => media::recorder::Factory,
+    "treeman" => apps::treeman::Factory,
+    "weather" => info::weather::Factory,
 }

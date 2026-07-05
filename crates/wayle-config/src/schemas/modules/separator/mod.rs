@@ -1,9 +1,11 @@
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ModuleInfo, ModuleInfoProvider};
 use crate::{
     ConfigProperty,
-    docs::{ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, Size},
 };
 
@@ -26,6 +28,7 @@ pub struct SeparatorConfig {
     pub color: ConfigProperty<ColorValue>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for SeparatorConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -37,4 +40,5 @@ impl ModuleInfoProvider for SeparatorConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(SeparatorConfig);

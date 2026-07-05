@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
+	"crates/wayle-bar-workspaces",
+	"crates/wayle-bar-hardware",
+	"crates/wayle-bar-network",
+	"crates/wayle-bar-media",
+	"crates/wayle-bar-info",
+	"crates/wayle-bar-apps",
 	"crates/wayle-auth",
 	"crates/wayle-config",
 	"crates/wayle-derive",
@@ -13,6 +19,7 @@ members = [
 	"crates/wayle-settings",
 	"crates/wayle-share-preview",
 	"crates/wayle-shell",
+	"crates/wayle-shell-core",
 	"crates/wayle-styling",
 	"crates/wayle-widgets",
 	# Service crates, folded in from the former wayle-services repo.
@@ -170,6 +177,12 @@ wayle-treeman = { path = "crates/wayle-treeman" }
 wayle-wallpaper = { path = "crates/wayle-wallpaper" }
 wayle-weather = { path = "crates/wayle-weather" }
 
+wayle-bar-workspaces = { path = "crates/wayle-bar-workspaces" }
+wayle-bar-hardware = { path = "crates/wayle-bar-hardware" }
+wayle-bar-network = { path = "crates/wayle-bar-network" }
+wayle-bar-media = { path = "crates/wayle-bar-media" }
+wayle-bar-info = { path = "crates/wayle-bar-info" }
+wayle-bar-apps = { path = "crates/wayle-bar-apps" }
 wayle-auth = { path = "crates/wayle-auth" }
 wayle-config = { path = "crates/wayle-config" }
 wayle-derive = { path = "crates/wayle-derive" }
@@ -180,6 +193,7 @@ wayle-ipc = { path = "crates/wayle-ipc" }
 wayle-recorder = { path = "crates/wayle-recorder" }
 wayle-share-preview = { path = "crates/wayle-share-preview" }
 wayle-shell = { path = "crates/wayle-shell" }
+wayle-shell-core = { path = "crates/wayle-shell-core" }
 wayle-styling = { path = "crates/wayle-styling" }
 wayle-widgets = { path = "crates/wayle-widgets" }
 
@@ -200,6 +214,12 @@ unwrap_used = "deny"
 [workspace.lints.rust]
 missing_docs = "warn"
 unsafe_code = "deny"
+
+# Line tables only: backtraces and panic locations still resolve, but rustc
+# skips full debuginfo and mold links far less data. Flip back to
+# `debug = true` temporarily when a debugger needs variable inspection.
+[profile.dev]
+debug = "line-tables-only"
 
 # Thin LTO + parallel codegen: ~2-4x faster link than fat LTO / 1 unit, with
 # negligible runtime cost for a GTK app. Used by `just build` and every CI

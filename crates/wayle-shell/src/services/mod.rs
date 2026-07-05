@@ -2,21 +2,17 @@
 
 pub mod color_picker;
 pub mod file_chooser;
-pub mod idle_inhibit;
 pub mod lock;
-pub mod mail;
 pub mod portal_dialogs;
 pub mod power_menu;
 pub mod print;
-pub mod recorder;
 pub mod region_overlay;
 pub mod screenshot;
 pub mod share_picker;
-pub mod shell_ipc;
-pub mod widget_ipc;
 
-pub use idle_inhibit::IdleInhibitService;
-pub use mail::MailService;
-pub use recorder::RecorderService;
-pub use shell_ipc::ShellIpcService;
-pub use widget_ipc::{ToastBus, ToastRequest, WidgetBus};
+// Bar-facing services moved to wayle-shell-core in the bar-crate split;
+// re-exported so the old `crate::services::…` paths keep working.
+pub use wayle_shell_core::services::{
+    IdleInhibitService, MailService, RecorderService, ShellIpcService, ToastBus, WidgetBus,
+    shell_ipc, widget_ipc,
+};

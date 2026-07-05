@@ -1,4 +1,3 @@
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Built-in theme palettes.
@@ -7,7 +6,8 @@ pub mod palettes;
 pub(crate) mod utils;
 
 /// Ten-color palette for CSS generation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Palette {
     /// Base background color (darkest).
     pub bg: String,

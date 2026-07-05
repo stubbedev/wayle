@@ -104,7 +104,11 @@
             # relink time hard with 591 crates. Mirrors the same RUSTFLAGS the
             # `nix build` package sets (see nix/package.nix); set here too so
             # plain `cargo build` in the devShell links with mold.
-            RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=mold";
+            # -Zthreads: parallel rustc frontend — big win on the largest
+            # crates (wayle-shell, wayle-config). Nightly-only, so devShell
+            # only (rustup honors rust-toolchain.toml); package.nix builds
+            # with nixpkgs' stable rustc and must not get this flag.
+            RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=mold -Zthreads=8";
 
             # bindgen (via the cava build script) needs libclang at runtime.
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";

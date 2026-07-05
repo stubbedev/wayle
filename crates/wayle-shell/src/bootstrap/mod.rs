@@ -16,7 +16,7 @@ use wayle_audio::AudioService;
 use wayle_battery::BatteryService;
 use wayle_bluetooth::BluetoothService;
 use wayle_brightness::BrightnessService;
-use wayle_config::{ConfigService, infrastructure::schema};
+use wayle_config::ConfigService;
 use wayle_core::{DeferredService, Property};
 use wayle_hyprland::HyprlandService;
 use wayle_ipc::shell::APP_ID;
@@ -122,12 +122,13 @@ pub async fn is_already_running() -> bool {
 pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Error>> {
     let mut timer = StartupTimer::new();
 
-    if let Err(e) = timer
-        .time("Schema", async { schema::ensure_schema_current() })
-        .await
-    {
-        warn!(error = %e, "Could not write schema file");
-    }
+    // Hooks for the window components that stay in this crate while their
+    // callers (dropdown click builtins, shell IPC) live in wayle-shell-core.
+    wayle_shell_core::bar::dropdown_registry::set_screenshot_trigger(screenshot_trigger);
+    wayle_shell_core::services::shell_ipc::set_lock_trigger(crate::services::lock::lock);
+    wayle_shell_core::bar::set_power_menu_trigger(|| {
+        crate::services::power_menu::show();
+    });
 
     let config_service = timer.time("Config", ConfigService::load()).await?;
 
@@ -442,4 +443,19 @@ async fn init_daemon_services(
         notification,
         systray,
     }
+}
+
+/// `wayle screenshot …` click builtin: forwards to the screenshot window
+/// component hosted in this crate.
+fn screenshot_trigger(mode: String, target: String) -> bool {
+    let Some(sender) = crate::services::screenshot::host_sender() else {
+        return false;
+    };
+    let (reply, _rx) = tokio::sync::oneshot::channel();
+    sender.emit(crate::shell::screenshot::ScreenshotInput::Capture {
+        mode,
+        target,
+        reply,
+    });
+    true
 }

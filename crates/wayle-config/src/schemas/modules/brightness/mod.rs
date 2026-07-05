@@ -1,9 +1,11 @@
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken, ThresholdEntry},
 };
 
@@ -143,6 +145,7 @@ pub struct BrightnessConfig {
     pub thresholds: ConfigProperty<Vec<ThresholdEntry>>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for BrightnessConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -158,4 +161,5 @@ impl ModuleInfoProvider for BrightnessConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(BrightnessConfig);

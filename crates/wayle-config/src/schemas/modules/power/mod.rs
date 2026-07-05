@@ -1,9 +1,11 @@
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken},
 };
 
@@ -112,7 +114,7 @@ pub struct PowerConfig {
 
     /// Hidden: icon always shown.
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(true)]
@@ -120,7 +122,7 @@ pub struct PowerConfig {
 
     /// Hidden: label visibility (always false).
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(false)]
@@ -128,7 +130,7 @@ pub struct PowerConfig {
 
     /// Hidden: label color (unused).
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(ColorValue::Token(CssToken::Red))]
@@ -136,7 +138,7 @@ pub struct PowerConfig {
 
     /// Hidden: label max length (unused).
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(0)]
@@ -144,13 +146,14 @@ pub struct PowerConfig {
 
     /// Hidden: button background (unused).
     #[serde(skip)]
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
     #[wayle(skip)]
     #[i18n(skip)]
     #[default(ColorValue::Token(CssToken::BgSurfaceElevated))]
     pub button_bg_color: ConfigProperty<ColorValue>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for PowerConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -166,4 +169,5 @@ impl ModuleInfoProvider for PowerConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(PowerConfig);

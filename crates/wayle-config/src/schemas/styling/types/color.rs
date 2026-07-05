@@ -4,7 +4,6 @@
 
 use std::{borrow::Cow, fmt, str::FromStr};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use wayle_derive::wayle_enum;
 
@@ -15,7 +14,8 @@ use super::validated::HexColor;
 /// Provides type-safe access to CSS custom properties defined in SCSS.
 /// Derived tokens are computed in CSS via `color-mix()` and cannot be
 /// resolved to hex at runtime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum CssToken {
     /// `--bg-base` - Application background.
@@ -326,12 +326,14 @@ impl<'de> Deserialize<'de> for ColorValue {
     }
 }
 
+#[cfg(feature = "schema")]
 impl schemars::JsonSchema for ColorValue {
     fn schema_name() -> Cow<'static, str> {
         Cow::Borrowed("ColorValue")
     }
 
     fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        #[cfg(feature = "schema")]
         use schemars::json_schema;
 
         let token_schema = CssToken::json_schema(generator);

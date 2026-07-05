@@ -2,20 +2,23 @@ mod types;
 
 use std::collections::BTreeMap;
 
-use schemars::{JsonSchema, schema_for};
+#[cfg(feature = "schema")]
+use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 
 pub use self::types::{ExecutionMode, RestartDelay, RestartPolicy, StateColors};
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction,
-    docs::{ConfigGroup, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken},
 };
 
 /// User-defined module that runs a shell command and renders the output in the bar.
 ///
 /// Full walkthrough with examples in `docs/guide/custom-modules.md`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct CustomModuleDefinition {
     /// Unique identifier for this module.
@@ -360,6 +363,7 @@ fn default_button_bg() -> ColorValue {
     ColorValue::Token(CssToken::BgSurfaceElevated)
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for CustomModuleDefinition {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -381,4 +385,5 @@ impl ModuleInfoProvider for CustomModuleDefinition {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(CustomModuleDefinition);

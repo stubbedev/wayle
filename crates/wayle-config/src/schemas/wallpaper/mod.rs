@@ -1,13 +1,13 @@
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::{CyclingInterval, CyclingMode, FitMode, MonitorWallpaperConfig};
 use wayle_derive::wayle_config;
 
-use crate::{
-    ConfigProperty,
-    docs::{ConfigGroup, ModuleInfo, ModuleInfoProvider},
-};
+use crate::ConfigProperty;
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, ModuleInfo, ModuleInfoProvider};
 
 /// Wallpaper rendering, cycling, and per-monitor overrides.
 #[wayle_config(i18n_prefix = "settings-wallpaper")]
@@ -69,6 +69,7 @@ pub struct WallpaperConfig {
     pub monitors: ConfigProperty<Vec<MonitorWallpaperConfig>>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for WallpaperConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -88,4 +89,5 @@ impl ModuleInfoProvider for WallpaperConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(WallpaperConfig);

@@ -2,7 +2,6 @@ mod shadow;
 
 use std::fmt;
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 pub use shadow::ShadowPreset;
 use wayle_derive::wayle_enum;
@@ -55,7 +54,8 @@ use wayle_derive::wayle_enum;
 /// monitor = "HDMI-2"
 /// show = false
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct BarLayout {
     /// Monitor connector name (e.g., `"DP-1"`) or `"*"` for all monitors.
@@ -123,7 +123,8 @@ impl Default for BarLayout {
 ///   { module = "world-clock", class = "remote" }
 /// ]}]
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum BarItem {
     /// A single module (plain or with custom CSS class).
@@ -133,7 +134,8 @@ pub enum BarItem {
 }
 
 /// Named group of modules. The name becomes a CSS ID selector.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BarGroup {
     /// Unique name for CSS targeting (becomes `#name` selector).
     pub name: String,
@@ -152,7 +154,8 @@ pub struct BarGroup {
 /// # Module with custom CSS class
 /// left = [{ module = "clock", class = "primary-clock" }]
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ModuleRef {
     /// Module with a custom CSS class.
@@ -180,7 +183,8 @@ impl ModuleRef {
 }
 
 /// A module with an associated CSS class for custom styling.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClassedModule {
     /// The module type.
     pub module: BarModule,
@@ -269,6 +273,7 @@ pub enum BarModule {
     Custom(String),
 }
 
+#[cfg(feature = "schema")]
 impl schemars::JsonSchema for BarModule {
     fn schema_name() -> std::borrow::Cow<'static, str> {
         std::borrow::Cow::Borrowed("BarModule")

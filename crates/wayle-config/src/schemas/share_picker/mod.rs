@@ -1,14 +1,13 @@
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::SharePickerPage;
 use wayle_derive::wayle_config;
 
-use crate::{
-    ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-    schemas::styling::Size,
-};
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
+use crate::{ConfigProperty, schemas::styling::Size};
 
 /// Base sizes (in rem, `1rem = 16px`) a `Size::Scale` multiplier resolves
 /// against, so a scale value reads as a multiplier of the default (`Scale(1.0)`
@@ -92,6 +91,7 @@ pub struct SharePickerConfig {
     pub outputs_respect_scaling: ConfigProperty<bool>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for SharePickerConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -107,4 +107,5 @@ impl ModuleInfoProvider for SharePickerConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(SharePickerConfig);

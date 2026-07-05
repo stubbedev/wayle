@@ -1,25 +1,19 @@
-use schemars::{JsonSchema, schema_for};
+#[cfg(feature = "schema")]
+use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken},
 };
 
 /// Which day appears in the first column of the calendar dropdown.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    wayle_derive::EnumVariants,
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, wayle_derive::EnumVariants,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum WeekStart {
@@ -153,6 +147,7 @@ pub struct ClockConfig {
     pub calendar_weekday_start: ConfigProperty<WeekStart>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for ClockConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -168,4 +163,5 @@ impl ModuleInfoProvider for ClockConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(ClockConfig);

@@ -3,13 +3,10 @@ use std::{
     time::Duration,
 };
 
-use gdk4::{
-    gio::prelude::ListModelExt,
-    glib::{self, object::Cast},
-    prelude::{DisplayExt, MonitorExt},
-};
+use gdk4::{gio::prelude::ListModelExt, glib, prelude::DisplayExt};
 use relm4::{Controller, gtk::gdk, prelude::*};
 use tracing::{debug, info, warn};
+pub(crate) use wayle_shell_core::helpers::monitors::{Connector, current_monitors};
 
 use crate::shell::{
     ShellCmd,
@@ -17,33 +14,11 @@ use crate::shell::{
     services::ShellServices,
 };
 
-pub(crate) type Connector = String;
 pub(crate) type BarMap = HashMap<Connector, Controller<Bar>>;
 
 const MAX_SYNC_RETRIES: u32 = 5;
 const BASE_RETRY_DELAY_MS: u64 = 50;
 const RETRY_BACKOFF_FACTOR: u64 = 2;
-
-#[allow(clippy::expect_used)]
-pub(crate) fn current_monitors() -> Vec<(Connector, gdk::Monitor)> {
-    let display = gdk::Display::default().expect("No GDK display found...");
-    let monitor_list = display.monitors();
-
-    (0..monitor_list.n_items())
-        .filter_map(|i| monitor_list.item(i))
-        .filter_map(|obj| obj.downcast::<gdk::Monitor>().ok())
-        .filter_map(|monitor| match monitor.connector() {
-            Some(connector) => Some((connector.to_string(), monitor)),
-            None => {
-                warn!(
-                    model = monitor.model().map(|m| m.to_string()),
-                    "GDK monitor has no connector, skipping"
-                );
-                None
-            }
-        })
-        .collect()
-}
 
 pub(crate) fn create_bars(services: &ShellServices) -> BarMap {
     let mut bars = HashMap::new();

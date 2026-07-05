@@ -5,17 +5,17 @@ use std::{
     ops::Deref,
 };
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::warn;
 
 const MIN: f32 = 0.0;
 
 /// Non-negative spacing value (clamped at 0).
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
-pub struct Spacing(#[schemars(range(min = MIN))] f32);
+#[cfg_attr(feature = "schema", schemars(transparent))]
+pub struct Spacing(#[cfg_attr(feature = "schema", schemars(range(min = MIN)))] f32);
 
 impl Spacing {
     /// `0.0`

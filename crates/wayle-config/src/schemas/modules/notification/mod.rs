@@ -1,14 +1,16 @@
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::{
     IconSource, PopupCloseBehavior, PopupMonitor, PopupPosition, StackingOrder, UrgencyBarThreshold,
 };
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::{
         general::Layer,
         styling::{ColorValue, CssToken, Size, ThresholdEntry},
@@ -232,6 +234,7 @@ pub struct NotificationConfig {
     pub thresholds: ConfigProperty<Vec<ThresholdEntry>>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for NotificationConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -247,4 +250,5 @@ impl ModuleInfoProvider for NotificationConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(NotificationConfig);

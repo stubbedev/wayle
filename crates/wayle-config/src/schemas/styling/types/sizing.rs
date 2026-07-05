@@ -2,14 +2,14 @@
 //!
 //! Icon sizes, padding, and gap classes for layout control.
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Icon size class for CSS-based sizing.
 ///
 /// Maps to CSS classes like `.icon-sm`, `.icon-md`, etc.
 /// The actual pixel values are defined in SCSS tokens.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum IconSizeClass {
     /// Small icons (--icon-sm token).
@@ -49,7 +49,8 @@ impl IconSizeClass {
 ///
 /// Maps to CSS classes like `.padding-xs`, `.padding-sm`, etc.
 /// The actual spacing values are defined in SCSS tokens.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PaddingClass {
     /// Extra small padding (--space-xs token).
@@ -115,7 +116,8 @@ impl PaddingClass {
 ///
 /// Maps to CSS classes like `.gap-xs`, `.gap-sm`, etc.
 /// Used for spacing between icon and label in bar buttons.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GapClass {
     /// Extra small gap (--space-xs token).

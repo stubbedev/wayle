@@ -5,7 +5,6 @@ use std::{
     ops::Deref,
 };
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::warn;
 
@@ -13,11 +12,12 @@ const MIN: u8 = 0;
 const MAX: u8 = 100;
 
 /// Percentage value clamped to 0-100.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-#[schemars(transparent)]
+#[cfg_attr(feature = "schema", schemars(transparent))]
 #[derive(Default)]
-pub struct Percentage(#[schemars(range(min = MIN, max = MAX))] u8);
+pub struct Percentage(#[cfg_attr(feature = "schema", schemars(range(min = MIN, max = MAX)))] u8);
 
 impl Percentage {
     /// `0`

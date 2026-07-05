@@ -1,13 +1,13 @@
 mod types;
 
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 pub use types::{AnimationType, SurfaceAnimation};
 use wayle_derive::wayle_config;
 
-use crate::{
-    ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
-};
+use crate::ConfigProperty;
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 
 /// Enter/exit and change animations for transient surfaces.
 #[wayle_config(i18n_prefix = "settings-animations")]
@@ -231,6 +231,7 @@ impl AnimationsConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for AnimationsConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -246,4 +247,5 @@ impl ModuleInfoProvider for AnimationsConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(AnimationsConfig);

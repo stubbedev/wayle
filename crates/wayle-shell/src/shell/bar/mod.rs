@@ -1,6 +1,5 @@
 mod dropdowns;
 mod factory;
-pub(crate) mod icons;
 mod methods;
 mod modules;
 mod styling;
@@ -156,7 +155,11 @@ impl Component for Bar {
         watchers::exclusive::spawn(&sender, &init.services.config);
         watchers::layer::spawn(&sender, &init.services.config);
 
-        let dropdowns = Rc::new(DropdownRegistry::new(&init.services));
+        let dropdowns = Rc::new(DropdownRegistry::new(
+            &init.services,
+            dropdowns::DROPDOWN_NAMES,
+            dropdowns::create,
+        ));
         dropdowns.warm_all();
 
         let mut model = Self {

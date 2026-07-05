@@ -68,6 +68,9 @@ fn generate(
 
     quote! {
         #(#enum_attrs)*
+        // JsonSchema only when the expanding crate enables its `schema`
+        // feature — matches the `wayle_config` macro.
+        #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
         #[derive(
             Debug,
             Clone,
@@ -77,7 +80,6 @@ fn generate(
             #default_derive
             serde::Serialize,
             serde::Deserialize,
-            schemars::JsonSchema,
             wayle_derive::EnumVariants,
         )]
         #default_rename_all

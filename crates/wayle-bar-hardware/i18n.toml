@@ -1,0 +1,6 @@
+fallback_language = "en-US"
+
+[fluent]
+# Locales live in wayle-shell-core, which generates a wayle-bar-hardware.ftl
+# domain copy for this crate's fl! validation.
+assets_dir = "../wayle-shell-core/locales"

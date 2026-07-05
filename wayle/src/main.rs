@@ -88,6 +88,14 @@ fn main() {
 }
 
 fn run_shell() {
+    // Editor-support schema files (config.toml JSON schema + tombi config).
+    // Lives here rather than in wayle-shell's bootstrap so only this binary
+    // needs wayle-config's `schema` feature (schemars stays out of the
+    // shell's build graph).
+    if let Err(err) = wayle_config::infrastructure::schema::ensure_schema_current() {
+        eprintln!("Warning: could not write schema file: {err}");
+    }
+
     if let Err(err) = wayle_shell::run() {
         eprintln!("Error: {err}");
         process::exit(1);

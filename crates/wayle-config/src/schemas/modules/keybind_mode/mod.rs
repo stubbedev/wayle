@@ -1,9 +1,11 @@
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use wayle_derive::wayle_config;
 
+#[cfg(feature = "schema")]
+use crate::docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider};
 use crate::{
     ClickAction, ConfigProperty,
-    docs::{ConfigGroup, GroupDefaults, ModuleInfo, ModuleInfoProvider},
     schemas::styling::{ColorValue, CssToken},
 };
 
@@ -105,6 +107,7 @@ pub struct KeybindModeConfig {
     pub scroll_down: ConfigProperty<ClickAction>,
 }
 
+#[cfg(feature = "schema")]
 impl ModuleInfoProvider for KeybindModeConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
@@ -120,4 +123,5 @@ impl ModuleInfoProvider for KeybindModeConfig {
     }
 }
 
+#[cfg(feature = "schema")]
 crate::register_module!(KeybindModeConfig);
