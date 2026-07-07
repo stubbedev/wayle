@@ -10,16 +10,18 @@ license.workspace = true
 [dependencies]
 async-trait.workspace = true
 bitflags.workspace = true
+gio = "0.22"
+gio-unix = { version = "0.22.6", default-features = false }
+glib.workspace = true
 glob.workspace = true
 nucleo.workspace = true
 regex.workspace = true
 rusqlite.workspace = true
+shlex.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
 tracing.workspace = true
 wayle-core.workspace = true
-
-[dev-dependencies]
-tokio.workspace = true
 
 [lints]
 workspace = true

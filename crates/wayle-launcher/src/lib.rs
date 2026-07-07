@@ -10,7 +10,10 @@ pub mod history;
 pub mod item;
 pub mod matcher;
 pub mod mode;
+pub mod modes;
 pub mod session;
+pub mod spawn;
+pub mod template;
 
 pub use error::Error;
 pub use item::{IconSource, Item, ItemFlags};
