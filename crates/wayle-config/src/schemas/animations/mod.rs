@@ -107,6 +107,10 @@ pub struct AnimationsConfig {
     /// Per-surface override for the lock screen reveal.
     #[default(SurfaceAnimation::default())]
     pub lock: ConfigProperty<SurfaceAnimation>,
+
+    /// Per-surface override for the application launcher.
+    #[default(SurfaceAnimation::default())]
+    pub launcher: ConfigProperty<SurfaceAnimation>,
 }
 
 /// Transient surface an animation applies to.
@@ -132,6 +136,8 @@ pub enum AnimSurface {
     Print,
     /// The lock screen reveal.
     Lock,
+    /// The application launcher overlay.
+    Launcher,
 }
 
 impl AnimationsConfig {
@@ -147,6 +153,7 @@ impl AnimationsConfig {
             AnimSurface::FileChooser => self.file_chooser.get(),
             AnimSurface::Print => self.print.get(),
             AnimSurface::Lock => self.lock.get(),
+            AnimSurface::Launcher => self.launcher.get(),
         }
     }
 

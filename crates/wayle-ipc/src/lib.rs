@@ -9,6 +9,9 @@ pub mod file_chooser;
 /// Idle inhibit D-Bus client proxy.
 pub mod idle_inhibit;
 
+/// Launcher (rofi shim) unix-socket session protocol.
+pub mod launcher_socket;
+
 /// Portal dialog host D-Bus client proxy (access/account/appchooser/launcher).
 pub mod portal_dialogs;
 

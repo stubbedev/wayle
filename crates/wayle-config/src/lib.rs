@@ -35,6 +35,8 @@ pub mod schemas {
     pub mod general;
     /// Greeter (display manager) configuration.
     pub mod greeter;
+    /// Application launcher (rofi replacement) configuration.
+    pub mod launcher;
     /// Lock screen configuration.
     pub mod lock;
     /// Module-specific configurations.
@@ -87,8 +89,9 @@ pub use infrastructure::{
 };
 use schemas::{
     animations::AnimationsConfig, bar::BarConfig, dropdowns::DropdownsConfig,
-    greeter::GreeterConfig, lock::LockConfig, modules::ModulesConfig, osd::OsdConfig,
-    share_picker::SharePickerConfig, styling::StylingConfig, wallpaper::WallpaperConfig,
+    greeter::GreeterConfig, launcher::LauncherConfig, lock::LockConfig, modules::ModulesConfig,
+    osd::OsdConfig, share_picker::SharePickerConfig, styling::StylingConfig,
+    wallpaper::WallpaperConfig,
 };
 use wayle_derive::wayle_config;
 
@@ -139,6 +142,9 @@ pub struct Config {
     /// Screen-share picker settings.
     #[serde(rename = "share-picker")]
     pub share_picker: SharePickerConfig,
+
+    /// Application launcher (rofi replacement) settings.
+    pub launcher: LauncherConfig,
 
     /// Animation settings.
     pub animations: AnimationsConfig,
