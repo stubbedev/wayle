@@ -15,6 +15,7 @@ members = [
 	"crates/wayle-icons",
 	"crates/wayle-idle-inhibit",
 	"crates/wayle-ipc",
+	"crates/wayle-launcher",
 	"crates/wayle-recorder",
 	"crates/wayle-settings",
 	"crates/wayle-share-preview",
@@ -108,6 +109,9 @@ minijinja = { version = "2.15", default-features = false, features = [
 ] }
 mime2ext = "0.1"
 notify = "8"
+# Launcher fuzzy matching: Helix's matcher — multithreaded, incremental,
+# streaming injector, fzf pattern syntax (tokenize/negation/prefix built in).
+nucleo = "0.5"
 # pam 0.7 pins pam-sys 0.5 which ships prebuilt bindings (no bindgen/libclang
 # at build time, unlike 0.8's pam-sys 1.0-alpha).
 pam = "0.7"
@@ -190,6 +194,7 @@ wayle-i18n = { path = "crates/wayle-i18n" }
 wayle-icons = { path = "crates/wayle-icons" }
 wayle-idle-inhibit = { path = "crates/wayle-idle-inhibit" }
 wayle-ipc = { path = "crates/wayle-ipc" }
+wayle-launcher = { path = "crates/wayle-launcher" }
 wayle-recorder = { path = "crates/wayle-recorder" }
 wayle-share-preview = { path = "crates/wayle-share-preview" }
 wayle-shell = { path = "crates/wayle-shell" }

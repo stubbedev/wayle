@@ -1,0 +1,25 @@
+[package]
+name = "wayle-launcher"
+description = "Launcher engine (rofi replacement): modes, matching, history"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+bitflags.workspace = true
+glob.workspace = true
+nucleo.workspace = true
+regex.workspace = true
+rusqlite.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+wayle-core.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true
