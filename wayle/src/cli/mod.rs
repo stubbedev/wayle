@@ -9,6 +9,8 @@ mod dbus;
 pub mod icons;
 /// Idle inhibit control commands
 pub mod idle;
+/// Application launcher (rofi shim) commands
+pub mod launcher;
 /// Lock screen command
 pub mod lock;
 /// Media control commands

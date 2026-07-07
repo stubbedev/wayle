@@ -34,6 +34,7 @@ reqwest.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+shlex.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tokio-stream.workspace = true
@@ -53,6 +54,7 @@ wayle-ipc.workspace = true
 wayle-config = { workspace = true, features = ["schema"] }
 wayle-hyprland.workspace = true
 wayle-icons.workspace = true
+wayle-launcher.workspace = true
 wayle-media.workspace = true
 wayle-network.workspace = true
 wayle-notification.workspace = true

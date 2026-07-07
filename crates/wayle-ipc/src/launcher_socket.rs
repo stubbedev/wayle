@@ -173,6 +173,8 @@ pub struct SessionOptions {
 
     /// `-kb-*` overrides: action name (without `kb-`) → key list.
     pub kb_overrides: BTreeMap<String, String>,
+    /// `-display-<mode>` overrides: mode name → display name.
+    pub display_names: BTreeMap<String, String>,
 }
 
 /// Frames sent CLI → daemon.
@@ -322,6 +324,74 @@ impl LauncherClient {
             return Err(ClientError::Disconnected);
         }
         Ok(serde_json::from_str(line.trim())?)
+    }
+
+    async fn send(&mut self, frame: &ClientFrame) -> Result<(), ClientError> {
+        let mut line = serde_json::to_string(frame)?;
+        line.push('\n');
+        self.writer.write_all(line.as_bytes()).await?;
+        self.writer.flush().await?;
+        Ok(())
+    }
+
+    /// Split into independent read/write halves so rows can stream while
+    /// frames are awaited concurrently.
+    #[must_use]
+    pub fn split(self) -> (FrameReader, FrameWriter) {
+        (
+            FrameReader {
+                reader: self.reader,
+            },
+            FrameWriter {
+                writer: self.writer,
+            },
+        )
+    }
+}
+
+/// Read half of a split [`LauncherClient`].
+pub struct FrameReader {
+    reader: BufReader<OwnedReadHalf>,
+}
+
+impl FrameReader {
+    /// Read the next daemon frame.
+    ///
+    /// # Errors
+    ///
+    /// Fails on I/O errors, protocol errors, or daemon disconnect.
+    pub async fn next_frame(&mut self) -> Result<ServerFrame, ClientError> {
+        let mut line = String::new();
+        let read = self.reader.read_line(&mut line).await?;
+        if read == 0 {
+            return Err(ClientError::Disconnected);
+        }
+        Ok(serde_json::from_str(line.trim())?)
+    }
+}
+
+/// Write half of a split [`LauncherClient`].
+pub struct FrameWriter {
+    writer: OwnedWriteHalf,
+}
+
+impl FrameWriter {
+    /// Send a chunk of dmenu rows.
+    ///
+    /// # Errors
+    ///
+    /// Fails on I/O or serialization errors.
+    pub async fn send_rows(&mut self, items: Vec<String>) -> Result<(), ClientError> {
+        self.send(&ClientFrame::Rows { items }).await
+    }
+
+    /// Signal stdin EOF.
+    ///
+    /// # Errors
+    ///
+    /// Fails on I/O or serialization errors.
+    pub async fn finish_rows(&mut self) -> Result<(), ClientError> {
+        self.send(&ClientFrame::RowsDone).await
     }
 
     async fn send(&mut self, frame: &ClientFrame) -> Result<(), ClientError> {

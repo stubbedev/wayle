@@ -8,6 +8,7 @@
 pub mod error;
 pub mod history;
 pub mod item;
+pub mod keybinds;
 pub mod matcher;
 pub mod mode;
 pub mod modes;

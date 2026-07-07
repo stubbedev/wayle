@@ -100,6 +100,13 @@ pub enum Commands {
         #[command(subcommand)]
         command: IdleCommands,
     },
+    /// Application launcher / dmenu with rofi-compatible flags
+    #[command(disable_help_flag = true, disable_version_flag = true)]
+    Launcher {
+        /// Raw rofi-style args (single-dash long flags, e.g. `-show drun`).
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// Lock the session via Wayle's lock screen
     Lock,
     /// Screen recorder control commands

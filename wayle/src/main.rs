@@ -14,6 +14,12 @@ use wayle::{
 };
 
 fn main() {
+    // `rofi` symlink/hardlink support: invoked under that name, the whole
+    // arg vector is rofi-style flags — bypass clap entirely.
+    if invoked_as_rofi() {
+        return run_rofi_compat();
+    }
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -53,6 +59,7 @@ fn main() {
             Commands::Systray { command } => cli::systray::execute(command).await,
             Commands::Wallpaper { command } => cli::wallpaper::execute(command).await,
             Commands::Idle { command } => cli::idle::execute(command).await,
+            Commands::Launcher { args } => cli::launcher::execute(args).await,
             Commands::Lock => cli::lock::execute().await,
             Commands::Recorder { command } => cli::recorder::execute(command).await,
             Commands::Screenshot { command } => cli::screenshot::execute(command).await,
@@ -81,6 +88,28 @@ fn main() {
         }
     });
 
+    if let Err(err) = result {
+        eprintln!("Error: {err}");
+        process::exit(1);
+    }
+}
+
+fn invoked_as_rofi() -> bool {
+    std::env::args()
+        .next()
+        .as_deref()
+        .map(std::path::Path::new)
+        .and_then(|path| path.file_name())
+        .is_some_and(|name| name == "rofi")
+}
+
+/// Runs the launcher with the full argv as rofi-style flags.
+fn run_rofi_compat() {
+    let Ok(runtime) = Runtime::new() else {
+        eprintln!("Failed to create tokio runtime");
+        process::exit(1);
+    };
+    let result = runtime.block_on(cli::launcher::execute(std::env::args().skip(1).collect()));
     if let Err(err) = result {
         eprintln!("Error: {err}");
         process::exit(1);
