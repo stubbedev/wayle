@@ -1,0 +1,122 @@
+// Application launcher (rofi replacement): the layer-shell overlay opened by
+// `wayle launcher`. Widget tree in `shell/launcher/{mod,views}.rs`.
+
+// Transparent window; the surface inside the revealer paints, so enter/exit
+// transitions animate the whole panel (same pattern as the share picker).
+.launcher-window {
+    background: transparent;
+}
+
+.launcher-surface {
+    background: var(--bg-base);
+    color: var(--fg-default);
+    font-family: var(--font-sans);
+    border: 1px solid var(--border-default);
+    border-radius: var(--rounding-container);
+    box-shadow: var(--shadow);
+    padding: var(--space-md);
+}
+
+// --- Input row --------------------------------------------------------------
+
+.launcher-input {
+    margin-bottom: var(--space-sm);
+}
+
+.launcher-prompt {
+    color: var(--accent);
+    font-weight: 600;
+    padding: 0 var(--space-md);
+}
+
+.launcher-entry {
+    all: unset;
+    background: var(--bg-surface);
+    color: var(--fg-default);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--rounding-element);
+    padding: var(--space-sm) var(--space-md);
+    caret-color: var(--accent);
+
+    &:focus-within {
+        border-color: var(--accent);
+    }
+}
+
+// --- Message row (script `message` / dmenu -mesg / -e dialogs) --------------
+
+.launcher-message {
+    color: var(--fg-muted);
+    padding: var(--space-xs) var(--space-md) var(--space-sm);
+}
+
+// --- Results list ------------------------------------------------------------
+
+.launcher-list {
+    background: transparent;
+
+    listview {
+        background: transparent;
+
+        > row {
+            all: unset;
+
+            &:selected .launcher-row,
+            &:selected:hover .launcher-row {
+                background: var(--accent);
+                color: var(--on-accent);
+            }
+
+            &:hover .launcher-row {
+                background: var(--bg-hover);
+            }
+        }
+    }
+}
+
+.launcher-row {
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--rounding-element);
+    transition: background var(--duration-fast);
+
+    &.urgent {
+        color: var(--error, #f38ba8);
+    }
+
+    &.active {
+        color: var(--accent);
+    }
+
+    &.nonselectable {
+        opacity: 0.5;
+    }
+}
+
+.launcher-row-icon {
+    -gtk-icon-size: calc(1.5rem * var(--global-scale));
+}
+
+// --- Sidebar mode tabs --------------------------------------------------------
+
+.launcher-tabs {
+    margin-top: var(--space-sm);
+
+    .launcher-tab {
+        all: unset;
+        padding: var(--space-xs) var(--space-md);
+        border-radius: var(--rounding-element);
+        color: var(--fg-muted);
+        transition:
+            background var(--duration-fast),
+            color var(--duration-fast);
+
+        &:hover {
+            background: var(--bg-hover);
+        }
+
+        &.active {
+            background: var(--accent);
+            color: var(--on-accent);
+        }
+    }
+}

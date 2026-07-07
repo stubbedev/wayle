@@ -48,6 +48,7 @@ wayle-cava.workspace = true
 wayle-config.workspace = true
 wayle-core.workspace = true
 wayle-ipc.workspace = true
+wayle-launcher.workspace = true
 wayle-recorder.workspace = true
 wayle-share-preview = { workspace = true, features = ["hyprland-rs"] }
 wayle-shell-core.workspace = true

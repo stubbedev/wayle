@@ -88,12 +88,15 @@ impl Session {
 
     /// Switch to a mode by name. Returns false if unknown.
     pub async fn switch_to_named(&mut self, name: &str) -> bool {
-        match self.modes.iter().position(|mode| mode.name() == name) {
-            Some(index) => {
-                self.switch_to(index).await;
-                true
-            }
-            None => false,
+        // Resolve the position before awaiting: a `match` on the iterator
+        // expression would hold the `&self.modes` borrow across the await
+        // and force a `Sync` bound on `Mode`.
+        let position = self.modes.iter().position(|mode| mode.name() == name);
+        if let Some(index) = position {
+            self.switch_to(index).await;
+            true
+        } else {
+            false
         }
     }
 
@@ -132,7 +135,15 @@ impl Session {
     }
 
     fn apply_state(&mut self, mut state: ModeState) {
-        let items: Arc<Vec<Item>> = Arc::new(std::mem::take(&mut state.items));
+        let mut items = std::mem::take(&mut state.items);
+        // Mode-level markup (script `markup-rows`, dmenu `-markup-rows`)
+        // becomes a per-item flag so the row factory has one source of truth.
+        if state.markup_rows {
+            for item in &mut items {
+                item.flags |= crate::item::ItemFlags::MARKUP;
+            }
+        }
+        let items: Arc<Vec<Item>> = Arc::new(items);
         self.state = state;
         self.engine.set_items(items);
     }

@@ -6436,6 +6436,7 @@ dependencies = [
  "wayle-icons",
  "wayle-idle-inhibit",
  "wayle-ipc",
+ "wayle-launcher",
  "wayle-mango",
  "wayle-media",
  "wayle-network",

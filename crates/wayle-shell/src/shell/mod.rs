@@ -2,6 +2,7 @@ mod bar;
 pub(crate) mod color_picker;
 pub(crate) mod file_chooser;
 mod helpers;
+pub(crate) mod launcher;
 pub(crate) mod lock;
 mod notification_popup;
 mod osd;
@@ -28,6 +29,7 @@ pub(crate) use wayle_shell_core::shell_services as services;
 use self::{
     color_picker::ColorPicker,
     file_chooser::FileChooser,
+    launcher::Launcher,
     lock::Lock,
     notification_popup::{NotificationPopupHost, PopupHostInit},
     osd::{Osd, OsdInit},
@@ -48,6 +50,7 @@ pub(crate) struct Shell {
     _notification_popup: Option<Controller<NotificationPopupHost>>,
     _osd: Option<Controller<Osd>>,
     _share_picker: Controller<SharePicker>,
+    _launcher: Controller<Launcher>,
     _region_overlay: Controller<RegionOverlay>,
     _color_picker: Controller<ColorPicker>,
     _screenshot: Controller<Screenshot>,
@@ -134,6 +137,11 @@ impl Component for Shell {
             .detach();
         crate::services::share_picker::register_sender(share_picker.sender().clone());
 
+        let launcher = Launcher::builder()
+            .launch(init.services.config.clone())
+            .detach();
+        crate::services::launcher::register_sender(launcher.sender().clone());
+
         let region_overlay = RegionOverlay::builder().launch(()).detach();
         crate::services::region_overlay::register_sender(region_overlay.sender().clone());
 
@@ -189,6 +197,7 @@ impl Component for Shell {
             _notification_popup: notification_popup,
             _osd: osd,
             _share_picker: share_picker,
+            _launcher: launcher,
             _region_overlay: region_overlay,
             _color_picker: color_picker,
             _screenshot: screenshot,

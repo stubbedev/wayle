@@ -35,8 +35,8 @@ use zbus::{Connection, fdo::DBusProxy};
 
 use crate::{
     services::{
-        IdleInhibitService, RecorderService, ShellIpcService, ToastBus, WidgetBus, screenshot,
-        share_picker, widget_ipc,
+        IdleInhibitService, RecorderService, ShellIpcService, ToastBus, WidgetBus, launcher,
+        screenshot, share_picker, widget_ipc,
     },
     shell::ShellServices,
     startup::StartupTimer,
@@ -164,6 +164,7 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
     let (widget_bus, toast_bus) = init_widget_socket().await;
 
     init_share_picker().await;
+    init_launcher_socket().await;
 
     init_screenshot().await;
 
@@ -216,6 +217,14 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 async fn init_share_picker() {
     if let Err(err) = share_picker::start().await {
         warn!(error = %err, "Share picker service unavailable");
+    }
+}
+
+/// Starts the launcher session socket. Non-fatal: a failure just leaves the
+/// shell usable without `wayle launcher`.
+async fn init_launcher_socket() {
+    if let Err(err) = launcher::start().await {
+        warn!(error = %err, "Launcher socket unavailable");
     }
 }
 

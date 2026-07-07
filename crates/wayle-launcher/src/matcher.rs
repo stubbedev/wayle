@@ -85,6 +85,15 @@ impl Default for MatcherOptions {
     }
 }
 
+/// Result of a [`MatchEngine::tick`] call.
+#[derive(Debug, Clone, Copy)]
+pub struct TickStatus {
+    /// Match results changed since the last tick.
+    pub changed: bool,
+    /// Matching is still in progress; keep ticking.
+    pub running: bool,
+}
+
 /// The engine: owns a nucleo instance plus the scan fallback.
 pub struct MatchEngine {
     nucleo: Nucleo<u32>,
@@ -177,12 +186,19 @@ impl MatchEngine {
         }
     }
 
-    /// Drive nucleo. Returns true when match results changed.
-    pub fn tick(&mut self) -> bool {
+    /// Drive nucleo.
+    pub fn tick(&mut self) -> TickStatus {
         if self.scanned.is_some() {
-            return false;
+            return TickStatus {
+                changed: false,
+                running: false,
+            };
         }
-        self.nucleo.tick(10).changed
+        let status = self.nucleo.tick(10);
+        TickStatus {
+            changed: status.changed,
+            running: status.running,
+        }
     }
 
     /// Ranked matched item indices, plus trailing PERMANENT rows.
@@ -397,7 +413,7 @@ mod tests {
     /// Drive nucleo until it settles, then collect matches.
     fn settled_matches(engine: &mut MatchEngine) -> Vec<u32> {
         for _ in 0..100 {
-            engine.tick();
+            let _ = engine.tick();
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
         engine.matched()

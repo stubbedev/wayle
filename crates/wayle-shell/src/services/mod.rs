@@ -2,6 +2,7 @@
 
 pub mod color_picker;
 pub mod file_chooser;
+pub mod launcher;
 pub mod lock;
 pub mod portal_dialogs;
 pub mod power_menu;

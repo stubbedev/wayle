@@ -18,6 +18,6 @@ pub mod template;
 
 pub use error::Error;
 pub use item::{IconSource, Item, ItemFlags};
-pub use matcher::{CaseMode, MatchEngine, MatchMethod, MatcherOptions, SortMethod};
+pub use matcher::{CaseMode, MatchEngine, MatchMethod, MatcherOptions, SortMethod, TickStatus};
 pub use mode::{Action, ActivateKind, Mode, ModeState};
 pub use session::Session;
