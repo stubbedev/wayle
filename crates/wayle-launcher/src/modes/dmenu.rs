@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 use crate::{
     item::ItemFlags,
     mode::{Action, ActivateKind, Mode, ModeState},
-    modes::script::{parse_row, parse_ranges},
+    modes::script::{parse_ranges, parse_row},
 };
 
 /// dmenu behavior knobs (subset of the CLI's dmenu flags the engine needs).
@@ -87,7 +87,11 @@ impl Mode for DmenuMode {
         self.texts = texts;
         ModeState {
             items,
-            prompt: self.config.prompt.clone().unwrap_or_else(|| "dmenu".to_owned()),
+            prompt: self
+                .config
+                .prompt
+                .clone()
+                .unwrap_or_else(|| "dmenu".to_owned()),
             message: self.config.message.clone(),
             markup_rows: self.config.markup_rows,
             multi_select: self.config.multi_select,

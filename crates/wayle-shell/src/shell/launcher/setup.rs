@@ -155,7 +155,9 @@ pub(super) fn build(
             error_message: options.error_message.clone(),
             filter: options.filter.clone(),
             prompt: options.prompt.clone(),
-            show_icons: options.show_icons.unwrap_or_else(|| launcher.show_icons.get()),
+            show_icons: options
+                .show_icons
+                .unwrap_or_else(|| launcher.show_icons.get()),
             sidebar: options
                 .sidebar_mode
                 .unwrap_or_else(|| launcher.sidebar_mode.get()),
@@ -190,7 +192,10 @@ fn requested_modes(
     options: &SessionOptions,
     launcher: &wayle_config::schemas::launcher::LauncherConfig,
 ) -> Vec<String> {
-    let mut names = options.modes.clone().unwrap_or_else(|| launcher.modes.get());
+    let mut names = options
+        .modes
+        .clone()
+        .unwrap_or_else(|| launcher.modes.get());
     if let Some(mode) = &options.mode
         && !names.contains(mode)
     {
@@ -241,7 +246,14 @@ fn build_mode(
                 .iter()
                 .filter(|child| child.as_str() != "combi") // no recursion
                 .filter_map(|child| {
-                    build_mode(child, options, config, history.clone(), max_history, bindings)
+                    build_mode(
+                        child,
+                        options,
+                        config,
+                        history.clone(),
+                        max_history,
+                        bindings,
+                    )
                 })
                 .collect();
             if children.is_empty() {
@@ -260,12 +272,9 @@ fn build_mode(
             if let Some((name, script)) = other.split_once(':') {
                 return Some(Box::new(ScriptMode::new(name, expand_home(script))));
             }
-            config
-                .launcher
-                .scripts
-                .get()
-                .get(other)
-                .map(|script| Box::new(ScriptMode::new(other, expand_home(script))) as Box<dyn Mode>)
+            config.launcher.scripts.get().get(other).map(|script| {
+                Box::new(ScriptMode::new(other, expand_home(script))) as Box<dyn Mode>
+            })
         }
     }
 }
@@ -345,8 +354,14 @@ fn window_config(options: &SessionOptions, config: &Config, current_only: bool) 
 fn ssh_config(options: &SessionOptions, config: &Config, max_history: u32) -> SshConfig {
     let ssh = &config.launcher.ssh;
     SshConfig {
-        client: options.ssh_client.clone().unwrap_or_else(|| ssh.client.get()),
-        command: options.ssh_command.clone().unwrap_or_else(|| ssh.command.get()),
+        client: options
+            .ssh_client
+            .clone()
+            .unwrap_or_else(|| ssh.client.get()),
+        command: options
+            .ssh_command
+            .clone()
+            .unwrap_or_else(|| ssh.command.get()),
         parse_hosts: options.parse_hosts.unwrap_or_else(|| ssh.parse_hosts.get()),
         parse_known_hosts: options
             .parse_known_hosts
@@ -395,7 +410,10 @@ fn drun_config(options: &SessionOptions, config: &Config, max_history: u32) -> D
                     DrunField::Keywords,
                 ]
             } else {
-                fields.iter().filter_map(|raw| drun_field_str(raw)).collect()
+                fields
+                    .iter()
+                    .filter_map(|raw| drun_field_str(raw))
+                    .collect()
             }
         },
     );

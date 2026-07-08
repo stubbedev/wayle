@@ -220,7 +220,10 @@ fn category_allowed(categories: &str, config: &DrunConfig) -> bool {
     {
         return false;
     }
-    config.categories.is_empty() || list.iter().any(|c| config.categories.iter().any(|w| w == c))
+    config.categories.is_empty()
+        || list
+            .iter()
+            .any(|c| config.categories.iter().any(|w| w == c))
 }
 
 fn collect_apps(config: &DrunConfig) -> Vec<(Item, Entry)> {

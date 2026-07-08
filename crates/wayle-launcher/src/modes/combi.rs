@@ -89,7 +89,9 @@ impl Mode for CombiMode {
     async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, input: &str) -> Action {
         match index.and_then(|merged| self.locate(merged)) {
             Some((child, local)) => {
-                let action = self.children[child].activate(Some(local), kind, input).await;
+                let action = self.children[child]
+                    .activate(Some(local), kind, input)
+                    .await;
                 self.forward(action).await
             }
             None => {
@@ -127,12 +129,7 @@ impl Mode for CombiMode {
         if !allowed.iter().any(|&hit| hit) {
             return None;
         }
-        Some(
-            self.owners
-                .iter()
-                .map(|&owner| allowed[owner])
-                .collect(),
-        )
+        Some(self.owners.iter().map(|&owner| allowed[owner]).collect())
     }
 }
 

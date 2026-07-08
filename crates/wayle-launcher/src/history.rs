@@ -199,7 +199,9 @@ mod tests {
     fn frecency_decays_with_age() {
         let store = store();
         store.record_at("drun", "old.desktop", 0, 25).unwrap();
-        store.record_at("drun", "new.desktop", 100 * DAY, 25).unwrap();
+        store
+            .record_at("drun", "new.desktop", 100 * DAY, 25)
+            .unwrap();
         let weights = store.frecency_at("drun", 100 * DAY).unwrap();
         assert!(weights["new.desktop"] > weights["old.desktop"]);
         assert!((weights["old.desktop"] - 0.1).abs() < f64::EPSILON);

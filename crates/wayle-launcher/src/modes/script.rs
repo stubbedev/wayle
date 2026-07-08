@@ -47,7 +47,13 @@ impl ScriptMode {
     }
 
     /// Run the script and turn its output into the next action/state.
-    async fn invoke(&mut self, arg: Option<&str>, retv: i32, info: Option<&str>, input: &str) -> ScriptResult {
+    async fn invoke(
+        &mut self,
+        arg: Option<&str>,
+        retv: i32,
+        info: Option<&str>,
+        input: &str,
+    ) -> ScriptResult {
         let mut command = tokio::process::Command::new(&self.script);
         if let Some(arg) = arg {
             command.arg(arg);
@@ -365,7 +371,9 @@ mod tests {
 
     #[test]
     fn row_options_meta_display_nonselectable() {
-        let row = parse_row("entry\0display\u{1f}Pretty\u{1f}meta\u{1f}hidden words\u{1f}nonselectable\u{1f}true");
+        let row = parse_row(
+            "entry\0display\u{1f}Pretty\u{1f}meta\u{1f}hidden words\u{1f}nonselectable\u{1f}true",
+        );
         assert_eq!(row.text, "entry");
         assert_eq!(row.item.display, "Pretty");
         assert_eq!(row.item.match_text, "entry hidden words");

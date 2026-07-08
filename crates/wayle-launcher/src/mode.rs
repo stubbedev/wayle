@@ -86,7 +86,10 @@ pub trait Mode: Send {
     /// Handle a multi-select accept (dmenu). Default: activate the first.
     async fn activate_many(&mut self, indices: &[u32], input: &str) -> Action {
         match indices.first() {
-            Some(&first) => self.activate(Some(first), ActivateKind::Default, input).await,
+            Some(&first) => {
+                self.activate(Some(first), ActivateKind::Default, input)
+                    .await
+            }
             None => Action::Nothing,
         }
     }

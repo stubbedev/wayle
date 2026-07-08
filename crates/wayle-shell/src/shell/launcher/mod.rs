@@ -765,10 +765,7 @@ impl Launcher {
             return;
         };
         if let Some(engine) = self.engine() {
-            let _ = engine.send(EngineCmd::Activate(
-                Some(item_index),
-                ActivateKind::Default,
-            ));
+            let _ = engine.send(EngineCmd::Activate(Some(item_index), ActivateKind::Default));
         }
     }
 
@@ -866,7 +863,11 @@ fn rebuild_tabs(
         widgets.tabs.remove(&child);
     }
     for (index, name) in mode_names.iter().enumerate() {
-        let label = ui.display_names.get(name).cloned().unwrap_or_else(|| name.clone());
+        let label = ui
+            .display_names
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| name.clone());
         let button = gtk::Button::with_label(&label);
         button.add_css_class("launcher-tab");
         if index == active {

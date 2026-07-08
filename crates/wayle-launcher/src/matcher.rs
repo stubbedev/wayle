@@ -207,8 +207,7 @@ impl MatchEngine {
             Some(scanned) => scanned.clone(),
             None => {
                 let snapshot = self.nucleo.snapshot();
-                let mut ids: Vec<u32> =
-                    snapshot.matched_items(..).map(|item| *item.data).collect();
+                let mut ids: Vec<u32> = snapshot.matched_items(..).map(|item| *item.data).collect();
                 if !self.options.sort || self.query.is_empty() {
                     // rofi default: filter, keep list order.
                     ids.sort_unstable();

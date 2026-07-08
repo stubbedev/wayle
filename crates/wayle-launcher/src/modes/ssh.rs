@@ -243,8 +243,10 @@ fn parse_etc_hosts(path: impl AsRef<Path>, hosts: &mut BTreeSet<String>) {
             continue;
         };
         for name in fields {
-            if !matches!(name, "localhost" | "localhost.localdomain" | "ip6-localhost")
-                && !name.starts_with("ip6-")
+            if !matches!(
+                name,
+                "localhost" | "localhost.localdomain" | "ip6-localhost"
+            ) && !name.starts_with("ip6-")
             {
                 hosts.insert(name.to_owned());
             }

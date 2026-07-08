@@ -4,8 +4,8 @@ use wayle_config::{Config, schemas::launcher::WIDTH_BASE_REM};
 
 use crate::{
     editors::{
-        enum_list::enum_list, enum_select::enum_select, number::number_u32,
-        size::size_with_base, string_list::string_list, string_map::string_map,
+        enum_list::enum_list, enum_select::enum_select, number::number_u32, size::size_with_base,
+        string_list::string_list, string_map::string_map,
         surface_animation::surface_animation_rows, text::text, toggle::toggle,
     },
     pages::{

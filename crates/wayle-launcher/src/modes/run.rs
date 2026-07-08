@@ -218,6 +218,9 @@ mod tests {
             .map(ToOwned::to_owned)
             .collect();
         let recent = vec!["mytool".to_owned(), "gone".to_owned()];
-        assert_eq!(order_by_recent(names, &recent), vec!["mytool", "alpha", "zeta"]);
+        assert_eq!(
+            order_by_recent(names, &recent),
+            vec!["mytool", "alpha", "zeta"]
+        );
     }
 }

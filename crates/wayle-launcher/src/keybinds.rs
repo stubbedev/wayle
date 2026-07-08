@@ -66,9 +66,7 @@ pub const DEFAULTS: &[(&str, &str)] = &[
 
 /// Effective bindings: rofi defaults with per-action `overrides` applied
 /// (config `[launcher.keybindings]`, then per-session `-kb-*`).
-pub fn effective(
-    overrides: &std::collections::BTreeMap<String, String>,
-) -> Vec<(String, String)> {
+pub fn effective(overrides: &std::collections::BTreeMap<String, String>) -> Vec<(String, String)> {
     DEFAULTS
         .iter()
         .map(|(action, keys)| {

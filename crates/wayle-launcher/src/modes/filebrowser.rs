@@ -99,7 +99,11 @@ impl FileBrowserMode {
         } else {
             list_dir(&self.current, self.config.show_hidden)
         };
-        sort_entries(&mut listed, self.config.sorting, self.config.directories_first);
+        sort_entries(
+            &mut listed,
+            self.config.sorting,
+            self.config.directories_first,
+        );
 
         let mut entries = Vec::with_capacity(listed.len() + 1);
         let mut items = Vec::with_capacity(listed.len() + 1);
@@ -116,8 +120,17 @@ impl FileBrowserMode {
             });
         }
         for (path, is_dir) in listed {
-            items.push(entry_item(&path, is_dir, &self.current, self.config.recursive));
-            entries.push(if is_dir { Entry::Dir(path) } else { Entry::File(path) });
+            items.push(entry_item(
+                &path,
+                is_dir,
+                &self.current,
+                self.config.recursive,
+            ));
+            entries.push(if is_dir {
+                Entry::Dir(path)
+            } else {
+                Entry::File(path)
+            });
         }
         self.entries = entries;
 

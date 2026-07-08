@@ -192,5 +192,8 @@ fn send_state(session: &Session, ui: &Sender<LauncherInput>, after_activate: boo
 fn push_matches(session: &mut Session, ui: &Sender<LauncherInput>) {
     let matched = session.matched();
     let items = session.engine.items().clone();
-    let _ = ui.send(LauncherInput::Engine(EngineEvent::Matches { items, matched }));
+    let _ = ui.send(LauncherInput::Engine(EngineEvent::Matches {
+        items,
+        matched,
+    }));
 }

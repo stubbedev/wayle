@@ -184,9 +184,7 @@ impl Mode for WindowMode {
         if !self.config.close_on_delete {
             return Action::Nothing;
         }
-        if let (Some(backend), Some(window)) =
-            (self.backend, self.windows.get(index as usize))
-        {
+        if let (Some(backend), Some(window)) = (self.backend, self.windows.get(index as usize)) {
             close_window(backend, &window.id).await;
             return Action::Reload(self.load().await);
         }
@@ -256,10 +254,22 @@ async fn list_windows(backend: Backend) -> Vec<WindowInfo> {
 async fn focus_window(backend: Backend, id: &str) {
     match backend {
         Backend::Hyprland => {
-            spawn::run_argv(&argv(&["hyprctl", "dispatch", "focuswindow", &format!("address:{id}")]));
+            spawn::run_argv(&argv(&[
+                "hyprctl",
+                "dispatch",
+                "focuswindow",
+                &format!("address:{id}"),
+            ]));
         }
         Backend::Niri => {
-            spawn::run_argv(&argv(&["niri", "msg", "action", "focus-window", "--id", id]));
+            spawn::run_argv(&argv(&[
+                "niri",
+                "msg",
+                "action",
+                "focus-window",
+                "--id",
+                id,
+            ]));
         }
         Backend::Sway => {
             spawn::run_argv(&argv(&["swaymsg", &format!("[con_id={id}] focus")]));
@@ -270,10 +280,22 @@ async fn focus_window(backend: Backend, id: &str) {
 async fn close_window(backend: Backend, id: &str) {
     match backend {
         Backend::Hyprland => {
-            spawn::run_argv(&argv(&["hyprctl", "dispatch", "closewindow", &format!("address:{id}")]));
+            spawn::run_argv(&argv(&[
+                "hyprctl",
+                "dispatch",
+                "closewindow",
+                &format!("address:{id}"),
+            ]));
         }
         Backend::Niri => {
-            spawn::run_argv(&argv(&["niri", "msg", "action", "close-window", "--id", id]));
+            spawn::run_argv(&argv(&[
+                "niri",
+                "msg",
+                "action",
+                "close-window",
+                "--id",
+                id,
+            ]));
         }
         Backend::Sway => {
             spawn::run_argv(&argv(&["swaymsg", &format!("[con_id={id}] kill")]));
@@ -370,7 +392,9 @@ fn walk_sway(node: &serde_json::Value, workspace: Option<&str>, out: &mut Vec<Wi
     } else {
         workspace
     };
-    let is_view = node["type"].as_str().is_some_and(|t| t == "con" || t == "floating_con")
+    let is_view = node["type"]
+        .as_str()
+        .is_some_and(|t| t == "con" || t == "floating_con")
         && (node["app_id"].is_string() || node["window_properties"].is_object())
         && node["name"].is_string()
         && node["nodes"].as_array().is_none_or(Vec::is_empty);

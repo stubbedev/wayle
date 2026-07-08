@@ -227,7 +227,12 @@ mod tests {
             }
         }
 
-        async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, _input: &str) -> Action {
+        async fn activate(
+            &mut self,
+            index: Option<u32>,
+            kind: ActivateKind,
+            _input: &str,
+        ) -> Action {
             self.activated = Some((index, kind));
             Action::Close
         }

@@ -233,11 +233,13 @@ pub(super) fn row_factory(
         {
             let multi = multi.borrow();
             if multi.enabled {
-                widgets.ballot.set_text(if multi.picked.contains(&row.item_index) {
-                    &multi.ballot_selected
-                } else {
-                    &multi.ballot_unselected
-                });
+                widgets
+                    .ballot
+                    .set_text(if multi.picked.contains(&row.item_index) {
+                        &multi.ballot_selected
+                    } else {
+                        &multi.ballot_unselected
+                    });
                 widgets.ballot.set_visible(true);
             } else {
                 widgets.ballot.set_visible(false);
@@ -245,7 +247,9 @@ pub(super) fn row_factory(
         }
 
         widgets.label.set_ellipsize(display.ellipsize_mode());
-        widgets.label.set_use_markup(row.item.flags.contains(ItemFlags::MARKUP));
+        widgets
+            .label
+            .set_use_markup(row.item.flags.contains(ItemFlags::MARKUP));
         let shown = display.apply_columns(&row.item.display);
         if row.item.flags.contains(ItemFlags::MARKUP) {
             widgets.label.set_markup(&shown);
@@ -268,8 +272,16 @@ pub(super) fn row_factory(
             }
         }
 
-        set_class(&container, "urgent", row.item.flags.contains(ItemFlags::URGENT));
-        set_class(&container, "active", row.item.flags.contains(ItemFlags::ACTIVE));
+        set_class(
+            &container,
+            "urgent",
+            row.item.flags.contains(ItemFlags::URGENT),
+        );
+        set_class(
+            &container,
+            "active",
+            row.item.flags.contains(ItemFlags::ACTIVE),
+        );
         set_class(
             &container,
             "nonselectable",
@@ -284,7 +296,11 @@ fn row_widgets(container: &gtk::Box) -> Option<RowWidgets> {
     let ballot = container.first_child()?.downcast::<gtk::Label>().ok()?;
     let icon = ballot.next_sibling()?.downcast::<gtk::Image>().ok()?;
     let label = icon.next_sibling()?.downcast::<gtk::Label>().ok()?;
-    Some(RowWidgets { ballot, icon, label })
+    Some(RowWidgets {
+        ballot,
+        icon,
+        label,
+    })
 }
 
 fn set_class(widget: &impl IsA<gtk::Widget>, class: &str, on: bool) {
@@ -304,15 +320,15 @@ pub(super) fn add_key_controller(
 ) {
     let controller = gtk::EventControllerKey::new();
     controller.set_propagation_phase(gtk::PropagationPhase::Capture);
-    controller.connect_key_pressed(move |_, key, _, state| {
-        match lookup(&bindings(), key, state) {
+    controller.connect_key_pressed(
+        move |_, key, _, state| match lookup(&bindings(), key, state) {
             Some(action) => {
                 sender.emit(LauncherInput::Key(action));
                 glib::Propagation::Stop
             }
             None => glib::Propagation::Proceed,
-        }
-    });
+        },
+    );
     widget.add_controller(controller);
 }
 

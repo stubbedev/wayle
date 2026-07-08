@@ -209,7 +209,9 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
             "window-hide-active-window" | "hide-active-window" => {
                 opts.hide_active_window = Some(true);
             }
-            "drun-categories" => opts.drun_categories = Some(split_list(&value("drun-categories")?)),
+            "drun-categories" => {
+                opts.drun_categories = Some(split_list(&value("drun-categories")?))
+            }
             "drun-exclude-categories" => {
                 opts.drun_exclude_categories = Some(split_list(&value("drun-exclude-categories")?));
             }
@@ -270,8 +272,7 @@ fn parse_ranges(raw: &str) -> Vec<u32> {
     for part in raw.split(',') {
         let part = part.trim();
         if let Some((start, end)) = part.split_once('-') {
-            if let (Ok(start), Ok(end)) = (start.trim().parse::<u32>(), end.trim().parse::<u32>())
-            {
+            if let (Ok(start), Ok(end)) = (start.trim().parse::<u32>(), end.trim().parse::<u32>()) {
                 out.extend(start..=end);
             }
         } else if let Ok(index) = part.parse::<u32>() {
@@ -326,7 +327,10 @@ mod tests {
     fn kb_and_display_prefixes() {
         let inv = parse_ok(&["-kb-accept-entry", "Return", "-display-drun", "apps"]);
         assert_eq!(
-            inv.options.kb_overrides.get("accept-entry").map(String::as_str),
+            inv.options
+                .kb_overrides
+                .get("accept-entry")
+                .map(String::as_str),
             Some("Return")
         );
         assert_eq!(
@@ -368,7 +372,10 @@ mod tests {
 
     #[test]
     fn local_commands() {
-        assert_eq!(parse_ok(&["-dump-config"]).local, Some(LocalCmd::DumpConfig));
+        assert_eq!(
+            parse_ok(&["-dump-config"]).local,
+            Some(LocalCmd::DumpConfig)
+        );
         assert_eq!(
             parse_ok(&["-list-keybindings"]).local,
             Some(LocalCmd::ListKeybindings)
