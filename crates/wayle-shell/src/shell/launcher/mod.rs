@@ -432,7 +432,16 @@ impl Launcher {
         }
 
         if let Some(list) = widgets.scrolled.child().and_downcast::<gtk::ListView>() {
-            list.set_factory(Some(&views::row_factory(ui.show_icons, self.multi.clone())));
+            let display = views::RowDisplay {
+                columns: ui.display_columns.clone(),
+                separator: ui.column_separator.clone(),
+                ellipsize: ui.ellipsize.clone(),
+            };
+            list.set_factory(Some(&views::row_factory(
+                ui.show_icons,
+                display,
+                self.multi.clone(),
+            )));
         }
 
         widgets.tabs.set_visible(ui.sidebar);
@@ -461,6 +470,12 @@ impl Launcher {
                         PendingSelection::At(position) => position.min(self.model.len() - 1),
                     };
                     self.selection.set_selected(target);
+                    self.apply_one_shot_selection();
+                    // rofi -auto-select: accept when one result remains.
+                    let auto = self.session.as_ref().is_some_and(|s| s.ui.auto_select);
+                    if auto && self.model.len() == 1 && !widgets.entry.text().is_empty() {
+                        self.activate_position(Some(0));
+                    }
                 }
                 self.arm_dump_reply(sender);
             }
@@ -660,6 +675,21 @@ impl Launcher {
         }
     }
 
+    /// Apply `-select`/`-selected-row` once, on the first populated match
+    /// list of the session.
+    fn apply_one_shot_selection(&mut self) {
+        let Some(session) = &mut self.session else {
+            return;
+        };
+        if let Some(row) = session.ui.selected_row.take() {
+            self.selection.set_selected(row.min(self.model.len() - 1));
+        } else if let Some(needle) = session.ui.select.take()
+            && let Some(position) = self.model.find_position(&needle)
+        {
+            self.selection.set_selected(position);
+        }
+    }
+
     /// Toggle the current row in the multi-select set and re-bind it.
     fn toggle_picked(&mut self) {
         let position = self.selection.selected();
@@ -699,8 +729,13 @@ impl Launcher {
         if len == 0 {
             return;
         }
+        let cycle = self.session.as_ref().is_some_and(|s| s.ui.cycle);
         let current = i64::from(self.selection.selected());
-        let target = (current + delta).clamp(0, len - 1);
+        let target = if cycle && delta.abs() == 1 {
+            (current + delta).rem_euclid(len)
+        } else {
+            (current + delta).clamp(0, len - 1)
+        };
         #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         self.selection.set_selected(target as u32);
     }

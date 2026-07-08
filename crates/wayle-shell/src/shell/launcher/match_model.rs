@@ -100,6 +100,22 @@ impl MatchModel {
         }
     }
 
+    /// First matched position whose text contains `needle` (`-select`).
+    pub fn find_position(&self, needle: &str) -> Option<u32> {
+        let items = self.imp().items.borrow();
+        let needle = needle.to_lowercase();
+        self.imp()
+            .matched
+            .borrow()
+            .iter()
+            .position(|&index| {
+                items
+                    .get(index as usize)
+                    .is_some_and(|item| item.match_text.to_lowercase().contains(&needle))
+            })
+            .and_then(|position| u32::try_from(position).ok())
+    }
+
     /// All row texts in display order (`-dump`).
     pub fn texts(&self) -> Vec<String> {
         let items = self.imp().items.borrow();

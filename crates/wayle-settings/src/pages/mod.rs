@@ -6,6 +6,7 @@ pub(crate) mod dropdowns;
 pub(crate) mod general;
 pub(crate) mod greeter;
 pub(crate) mod layout;
+pub(crate) mod launcher;
 pub(crate) mod lock;
 pub(crate) mod modules;
 pub(crate) mod nav;

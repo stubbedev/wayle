@@ -4,8 +4,8 @@
 use wayle_config::Config;
 
 use super::{
-    animations, bar, dropdowns, general, greeter, lock, modules, notifications, osd, share_picker,
-    spec::PageSpec, styling, wallpaper,
+    animations, bar, dropdowns, general, greeter, launcher, lock, modules, notifications, osd,
+    share_picker, spec::PageSpec, styling, wallpaper,
 };
 
 pub(crate) struct LeafEntry {
@@ -44,6 +44,10 @@ pub(crate) fn layout() -> Vec<NavSectionLayout> {
                 share_picker::entry,
                 dropdowns::entry,
             ],
+        },
+        NavSectionLayout {
+            i18n_key: "settings-nav-launcher",
+            factories: launcher::factories(),
         },
         NavSectionLayout {
             i18n_key: "settings-nav-lock",

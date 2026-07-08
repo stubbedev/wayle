@@ -50,6 +50,21 @@ pub(super) struct UiSettings {
     pub display_names: BTreeMap<String, String>,
     /// Effective keybindings (defaults ← config ← `-kb-*`).
     pub keybindings: Vec<(String, String)>,
+    /// Wrap selection at list edges.
+    pub cycle: bool,
+    /// Accept automatically when exactly one result remains.
+    pub auto_select: bool,
+    /// Pre-select the first entry matching this string (`-select`).
+    pub select: Option<String>,
+    /// Pre-select this row (`-selected-row`).
+    pub selected_row: Option<u32>,
+    /// 1-based columns of each row to display (`-display-columns`).
+    pub display_columns: Option<Vec<u32>>,
+    /// Column separator (`-display-column-separator`, default tab).
+    pub column_separator: String,
+    /// Row text truncation: "start" | "middle" | "end" (`-keep-right` =
+    /// start).
+    pub ellipsize: String,
 }
 
 /// Everything the surface needs to run one session.
@@ -146,6 +161,25 @@ pub(super) fn build(
                 .unwrap_or_else(|| launcher.sidebar_mode.get()),
             display_names,
             keybindings: effective_bindings,
+            cycle: options.cycle.unwrap_or_else(|| launcher.cycle.get()),
+            auto_select: options
+                .auto_select
+                .unwrap_or_else(|| launcher.auto_select.get()),
+            select: options.select.clone(),
+            selected_row: options.selected_row,
+            display_columns: options.display_columns.clone(),
+            column_separator: options
+                .display_column_separator
+                .clone()
+                .unwrap_or_else(|| "\t".to_owned()),
+            ellipsize: if options.keep_right {
+                "start".to_owned()
+            } else {
+                options
+                    .ellipsize_mode
+                    .clone()
+                    .unwrap_or_else(|| "end".to_owned())
+            },
         },
     }
 }

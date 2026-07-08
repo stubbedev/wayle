@@ -150,9 +150,43 @@ pub(super) struct MultiSelect {
     pub ballot_unselected: String,
 }
 
+/// Row text presentation knobs (rofi display-columns / ellipsize).
+#[derive(Debug, Clone)]
+pub(super) struct RowDisplay {
+    /// 1-based columns to show (None = whole text).
+    pub columns: Option<Vec<u32>>,
+    /// Column separator.
+    pub separator: String,
+    /// Truncation mode: "start" | "middle" | anything else = end.
+    pub ellipsize: String,
+}
+
+impl RowDisplay {
+    fn apply_columns(&self, text: &str) -> String {
+        let Some(columns) = &self.columns else {
+            return text.to_owned();
+        };
+        let parts: Vec<&str> = text.split(self.separator.as_str()).collect();
+        columns
+            .iter()
+            .filter_map(|&column| parts.get(column.saturating_sub(1) as usize).copied())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn ellipsize_mode(&self) -> pango::EllipsizeMode {
+        match self.ellipsize.as_str() {
+            "start" => pango::EllipsizeMode::Start,
+            "middle" => pango::EllipsizeMode::Middle,
+            _ => pango::EllipsizeMode::End,
+        }
+    }
+}
+
 /// Build the `SignalListItemFactory` for the results list.
 pub(super) fn row_factory(
     show_icons: bool,
+    display: RowDisplay,
     multi: std::rc::Rc<std::cell::RefCell<MultiSelect>>,
 ) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
@@ -210,11 +244,13 @@ pub(super) fn row_factory(
             }
         }
 
+        widgets.label.set_ellipsize(display.ellipsize_mode());
         widgets.label.set_use_markup(row.item.flags.contains(ItemFlags::MARKUP));
+        let shown = display.apply_columns(&row.item.display);
         if row.item.flags.contains(ItemFlags::MARKUP) {
-            widgets.label.set_markup(&row.item.display);
+            widgets.label.set_markup(&shown);
         } else {
-            widgets.label.set_text(&row.item.display);
+            widgets.label.set_text(&shown);
         }
 
         match &row.item.icon {
