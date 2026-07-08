@@ -17,6 +17,7 @@ glob.workspace = true
 nucleo.workspace = true
 regex.workspace = true
 rusqlite.workspace = true
+serde_json.workspace = true
 shlex.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

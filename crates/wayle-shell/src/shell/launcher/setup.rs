@@ -7,15 +7,18 @@ use tracing::warn;
 use wayle_config::{
     Config,
     schemas::launcher::{
-        LauncherCase, LauncherDrunField, LauncherLocation, LauncherMatching, LauncherSorting,
-        WIDTH_BASE_REM,
+        LauncherCase, LauncherDrunField, LauncherFileSort, LauncherLocation, LauncherMatching,
+        LauncherSorting, LauncherWindowField, WIDTH_BASE_REM,
     },
 };
 use wayle_ipc::launcher_socket::SessionOptions;
 use wayle_launcher::{
     CaseMode, MatchMethod, MatcherOptions, Mode, SortMethod,
     history::HistoryStore,
-    modes::{DrunConfig, DrunField, DrunMode, RunConfig, RunMode},
+    modes::{
+        DrunConfig, DrunField, DrunMode, FileBrowserConfig, FileBrowserMode, FileSort, KeysMode,
+        RunConfig, RunMode, SshConfig, SshMode, WindowConfig, WindowField, WindowMode,
+    },
 };
 
 /// Resolved UI knobs for one session.
@@ -79,10 +82,23 @@ pub(super) fn build(options: &SessionOptions, config: &Config) -> SessionSetup {
         .flatten();
     let max_history = launcher.history.max_size.get();
 
+    let mut keybindings = launcher.keybindings.get();
+    for (action, keys) in &options.kb_overrides {
+        keybindings.insert(action.clone(), keys.clone());
+    }
+    let effective_bindings = wayle_launcher::keybinds::effective(&keybindings);
+
     let mode_names = requested_modes(options, launcher);
     let mut modes: Vec<Box<dyn Mode>> = Vec::new();
     for name in &mode_names {
-        match build_mode(name, options, config, history.clone(), max_history) {
+        match build_mode(
+            name,
+            options,
+            config,
+            history.clone(),
+            max_history,
+            &effective_bindings,
+        ) {
             Some(mode) => modes.push(mode),
             None => warn!(mode = %name, "launcher mode not available; skipped"),
         }
@@ -92,11 +108,6 @@ pub(super) fn build(options: &SessionOptions, config: &Config) -> SessionSetup {
         .as_ref()
         .and_then(|wanted| modes.iter().position(|mode| mode.name() == wanted))
         .unwrap_or(0);
-
-    let mut keybindings = launcher.keybindings.get();
-    for (action, keys) in &options.kb_overrides {
-        keybindings.insert(action.clone(), keys.clone());
-    }
     let mut display_names = launcher.display_names.get();
     for (mode, name) in &options.display_names {
         display_names.insert(mode.clone(), name.clone());
@@ -124,7 +135,7 @@ pub(super) fn build(options: &SessionOptions, config: &Config) -> SessionSetup {
                 .sidebar_mode
                 .unwrap_or_else(|| launcher.sidebar_mode.get()),
             display_names,
-            keybindings: wayle_launcher::keybinds::effective(&keybindings),
+            keybindings: effective_bindings,
         },
     }
 }
@@ -150,6 +161,7 @@ fn build_mode(
     config: &Config,
     history: Option<HistoryStore>,
     max_history: u32,
+    bindings: &[(String, String)],
 ) -> Option<Box<dyn Mode>> {
     match name {
         "drun" => Some(Box::new(DrunMode::new(
@@ -160,8 +172,109 @@ fn build_mode(
             run_config(options, config, max_history),
             history,
         ))),
-        // window/ssh/filebrowser/keys/combi/scripts land in later phases.
+        "window" => Some(Box::new(WindowMode::new(window_config(
+            options, config, false,
+        )))),
+        "windowcd" => Some(Box::new(WindowMode::new(window_config(
+            options, config, true,
+        )))),
+        "ssh" => Some(Box::new(SshMode::new(
+            ssh_config(options, config, max_history),
+            history,
+        ))),
+        "filebrowser" => Some(Box::new(FileBrowserMode::new(filebrowser_config(
+            config, false,
+        )))),
+        "recursivebrowser" => Some(Box::new(FileBrowserMode::new(filebrowser_config(
+            config, true,
+        )))),
+        "keys" => Some(Box::new(KeysMode::new(bindings.to_vec()))),
+        // combi + custom script modes land in the next phase.
         _ => None,
+    }
+}
+
+fn window_config(options: &SessionOptions, config: &Config, current_only: bool) -> WindowConfig {
+    let window = &config.launcher.window;
+    let match_fields = options.window_match_fields.as_ref().map_or_else(
+        || {
+            window
+                .match_fields
+                .get()
+                .iter()
+                .map(|field| match field {
+                    LauncherWindowField::Title => WindowField::Title,
+                    LauncherWindowField::Class => WindowField::Class,
+                    LauncherWindowField::Name => WindowField::Name,
+                    LauncherWindowField::Role => WindowField::Role,
+                    LauncherWindowField::Desktop => WindowField::Desktop,
+                })
+                .collect()
+        },
+        |fields| {
+            fields
+                .iter()
+                .flat_map(|raw| match raw.as_str() {
+                    "title" => vec![WindowField::Title],
+                    "class" => vec![WindowField::Class],
+                    "name" => vec![WindowField::Name],
+                    "role" => vec![WindowField::Role],
+                    "desktop" => vec![WindowField::Desktop],
+                    "all" => vec![
+                        WindowField::Title,
+                        WindowField::Class,
+                        WindowField::Name,
+                        WindowField::Role,
+                        WindowField::Desktop,
+                    ],
+                    _ => Vec::new(),
+                })
+                .collect()
+        },
+    );
+    WindowConfig {
+        format: options
+            .window_format
+            .clone()
+            .unwrap_or_else(|| window.format.get()),
+        match_fields,
+        hide_active: options
+            .hide_active_window
+            .unwrap_or_else(|| window.hide_active.get()),
+        close_on_delete: window.close_on_delete.get(),
+        window_command: options.window_command.clone().unwrap_or_default(),
+        current_desktop_only: current_only,
+    }
+}
+
+fn ssh_config(options: &SessionOptions, config: &Config, max_history: u32) -> SshConfig {
+    let ssh = &config.launcher.ssh;
+    SshConfig {
+        client: options.ssh_client.clone().unwrap_or_else(|| ssh.client.get()),
+        command: options.ssh_command.clone().unwrap_or_else(|| ssh.command.get()),
+        parse_hosts: options.parse_hosts.unwrap_or_else(|| ssh.parse_hosts.get()),
+        parse_known_hosts: options
+            .parse_known_hosts
+            .unwrap_or_else(|| ssh.parse_known_hosts.get()),
+        terminal: terminal(options, config),
+        max_history,
+    }
+}
+
+fn filebrowser_config(config: &Config, recursive: bool) -> FileBrowserConfig {
+    let browser = &config.launcher.filebrowser;
+    FileBrowserConfig {
+        directory: browser.directory.get(),
+        sorting: match browser.sorting_method.get() {
+            LauncherFileSort::Name => FileSort::Name,
+            LauncherFileSort::Mtime => FileSort::Mtime,
+            LauncherFileSort::Atime => FileSort::Atime,
+            LauncherFileSort::Ctime => FileSort::Ctime,
+        },
+        directories_first: browser.directories_first.get(),
+        show_hidden: browser.show_hidden.get(),
+        command: browser.command.get(),
+        recursive,
     }
 }
 

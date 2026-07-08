@@ -6174,6 +6174,7 @@ dependencies = [
  "nucleo",
  "regex",
  "rusqlite",
+ "serde_json",
  "shlex 2.0.1",
  "thiserror 2.0.18",
  "tokio",
