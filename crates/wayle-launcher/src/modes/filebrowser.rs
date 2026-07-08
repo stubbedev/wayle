@@ -336,7 +336,14 @@ mod tests {
     use super::*;
 
     fn fixture() -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("wayle-fb-test-{}", std::process::id()));
+        // Unique per call so parallel tests don't share (and race on) one dir.
+        static COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "wayle-fb-test-{}-{}",
+            std::process::id(),
+            id
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("sub")).unwrap();
         std::fs::write(dir.join("b.txt"), "b").unwrap();
