@@ -161,7 +161,7 @@ impl Mode for WindowMode {
         }
     }
 
-    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind) -> Action {
+    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, _input: &str) -> Action {
         let (Some(backend), Some(window)) = (
             self.backend,
             index.and_then(|row| self.windows.get(row as usize)),

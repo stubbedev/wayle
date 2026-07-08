@@ -105,7 +105,7 @@ impl Mode for RunMode {
         }
     }
 
-    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind) -> Action {
+    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, _input: &str) -> Action {
         let command = match (&index, &kind) {
             (Some(row), _) => match self.commands.get(*row as usize) {
                 Some(command) => command.clone(),

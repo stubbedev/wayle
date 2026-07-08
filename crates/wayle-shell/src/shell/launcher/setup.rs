@@ -16,8 +16,9 @@ use wayle_launcher::{
     CaseMode, MatchMethod, MatcherOptions, Mode, SortMethod,
     history::HistoryStore,
     modes::{
-        DrunConfig, DrunField, DrunMode, FileBrowserConfig, FileBrowserMode, FileSort, KeysMode,
-        RunConfig, RunMode, SshConfig, SshMode, WindowConfig, WindowField, WindowMode,
+        CombiMode, DmenuConfig, DmenuMode, DrunConfig, DrunField, DrunMode, FileBrowserConfig,
+        FileBrowserMode, FileSort, KeysMode, RunConfig, RunMode, ScriptMode, SshConfig, SshMode,
+        WindowConfig, WindowField, WindowMode,
     },
 };
 
@@ -64,7 +65,12 @@ pub(super) struct SessionSetup {
 }
 
 /// Resolve a session from CLI options merged over the live config.
-pub(super) fn build(options: &SessionOptions, config: &Config) -> SessionSetup {
+/// `dmenu_rows` is the CLI's row stream for `-dmenu` sessions.
+pub(super) fn build(
+    options: &SessionOptions,
+    config: &Config,
+    dmenu_rows: Option<tokio::sync::mpsc::Receiver<Vec<String>>>,
+) -> SessionSetup {
     let launcher = &config.launcher;
     let scale = config.styling.scale.get().value();
 
@@ -88,19 +94,23 @@ pub(super) fn build(options: &SessionOptions, config: &Config) -> SessionSetup {
     }
     let effective_bindings = wayle_launcher::keybinds::effective(&keybindings);
 
-    let mode_names = requested_modes(options, launcher);
     let mut modes: Vec<Box<dyn Mode>> = Vec::new();
-    for name in &mode_names {
-        match build_mode(
-            name,
-            options,
-            config,
-            history.clone(),
-            max_history,
-            &effective_bindings,
-        ) {
-            Some(mode) => modes.push(mode),
-            None => warn!(mode = %name, "launcher mode not available; skipped"),
+    if let Some(rows) = dmenu_rows {
+        modes.push(Box::new(DmenuMode::new(dmenu_config(options), rows)));
+    } else {
+        let mode_names = requested_modes(options, launcher);
+        for name in &mode_names {
+            match build_mode(
+                name,
+                options,
+                config,
+                history.clone(),
+                max_history,
+                &effective_bindings,
+            ) {
+                Some(mode) => modes.push(mode),
+                None => warn!(mode = %name, "launcher mode not available; skipped"),
+            }
         }
     }
     let initial_mode = options
@@ -189,8 +199,59 @@ fn build_mode(
             config, true,
         )))),
         "keys" => Some(Box::new(KeysMode::new(bindings.to_vec()))),
-        // combi + custom script modes land in the next phase.
-        _ => None,
+        "combi" => {
+            let combi = &config.launcher.combi;
+            let children: Vec<Box<dyn Mode>> = combi
+                .modes
+                .get()
+                .iter()
+                .filter(|child| child.as_str() != "combi") // no recursion
+                .filter_map(|child| {
+                    build_mode(child, options, config, history.clone(), max_history, bindings)
+                })
+                .collect();
+            if children.is_empty() {
+                return None;
+            }
+            Some(Box::new(CombiMode::new(
+                children,
+                options
+                    .combi_display_format
+                    .clone()
+                    .unwrap_or_else(|| combi.display_format.get()),
+            )))
+        }
+        // Custom script modes: `name:script` inline, or a [launcher.scripts] key.
+        other => {
+            if let Some((name, script)) = other.split_once(':') {
+                return Some(Box::new(ScriptMode::new(name, expand_home(script))));
+            }
+            config
+                .launcher
+                .scripts
+                .get()
+                .get(other)
+                .map(|script| Box::new(ScriptMode::new(other, expand_home(script))) as Box<dyn Mode>)
+        }
+    }
+}
+
+fn expand_home(path: &str) -> String {
+    match path.strip_prefix("~") {
+        Some(rest) => format!("{}{rest}", std::env::var("HOME").unwrap_or_default()),
+        None => path.to_owned(),
+    }
+}
+
+fn dmenu_config(options: &SessionOptions) -> DmenuConfig {
+    DmenuConfig {
+        prompt: options.prompt.clone(),
+        message: options.mesg.clone(),
+        markup_rows: options.markup_rows,
+        multi_select: options.multi_select,
+        no_custom: options.no_custom || options.only_match,
+        urgent: options.urgent.clone().unwrap_or_default(),
+        active: options.active.clone().unwrap_or_default(),
     }
 }
 

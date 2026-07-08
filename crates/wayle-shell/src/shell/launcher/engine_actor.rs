@@ -22,6 +22,8 @@ pub(crate) enum EngineCmd {
     Tick,
     /// Accept a row (`Some(item_index)`) or custom input (`None`).
     Activate(Option<u32>, ActivateKind),
+    /// Accept a multi-select set (item indices, input order).
+    ActivateMulti(Vec<u32>),
     /// Shift-delete on a row.
     Delete(u32),
     /// Switch to the next mode.
@@ -48,6 +50,17 @@ pub(crate) enum EngineEvent {
         active_mode: usize,
         /// Display names of all loaded modes.
         mode_names: Vec<String>,
+        /// Multi-select is on for this mode.
+        multi_select: bool,
+        /// This state came from an activation reload (script/dmenu), not a
+        /// mode switch — governs filter clearing.
+        after_activate: bool,
+        /// Keep the typed filter (script `keep-filter`).
+        keep_filter: bool,
+        /// Keep the selection position (script `keep-selection`).
+        keep_selection: bool,
+        /// Absolute selection to apply (script `new-selection`).
+        new_selection: Option<u32>,
     },
     /// Fresh match results.
     Matches {
@@ -85,13 +98,13 @@ async fn run(
     ui: Sender<LauncherInput>,
 ) {
     session.switch_to(initial_mode).await;
-    send_state(&session, &ui);
+    send_state(&session, &ui, false);
     push_matches(&mut session, &ui);
 
     while let Some(cmd) = rx.recv().await {
         match cmd {
             EngineCmd::SetQuery(query) => {
-                session.engine.set_query(&query);
+                session.set_query(&query);
                 // Regex/glob scans complete synchronously; nucleo paths
                 // deliver via notify → Tick.
                 push_matches(&mut session, &ui);
@@ -114,23 +127,27 @@ async fn run(
                 let action = session.activate(index, kind).await;
                 dispatch(action, &mut session, &ui);
             }
+            EngineCmd::ActivateMulti(indices) => {
+                let action = session.activate_many(&indices).await;
+                dispatch(action, &mut session, &ui);
+            }
             EngineCmd::Delete(index) => {
                 let action = session.delete(index).await;
                 dispatch(action, &mut session, &ui);
             }
             EngineCmd::ModeNext => {
                 session.switch_next().await;
-                send_state(&session, &ui);
+                send_state(&session, &ui, false);
                 push_matches(&mut session, &ui);
             }
             EngineCmd::ModePrevious => {
                 session.switch_previous().await;
-                send_state(&session, &ui);
+                send_state(&session, &ui, false);
                 push_matches(&mut session, &ui);
             }
             EngineCmd::ModeTo(index) => {
                 session.switch_to(index).await;
-                send_state(&session, &ui);
+                send_state(&session, &ui, false);
                 push_matches(&mut session, &ui);
             }
             EngineCmd::Stop => break,
@@ -144,7 +161,7 @@ async fn run(
 fn dispatch(action: Action, session: &mut Session, ui: &Sender<LauncherInput>) {
     match action {
         Action::Nothing => {
-            send_state(session, ui);
+            send_state(session, ui, true);
             push_matches(session, ui);
         }
         other => {
@@ -153,7 +170,7 @@ fn dispatch(action: Action, session: &mut Session, ui: &Sender<LauncherInput>) {
     }
 }
 
-fn send_state(session: &Session, ui: &Sender<LauncherInput>) {
+fn send_state(session: &Session, ui: &Sender<LauncherInput>, after_activate: bool) {
     let state = session.state();
     let _ = ui.send(LauncherInput::Engine(EngineEvent::State {
         prompt: state.prompt.clone(),
@@ -164,11 +181,16 @@ fn send_state(session: &Session, ui: &Sender<LauncherInput>) {
             .into_iter()
             .map(ToOwned::to_owned)
             .collect(),
+        multi_select: state.multi_select,
+        after_activate,
+        keep_filter: state.keep_filter,
+        keep_selection: state.keep_selection,
+        new_selection: state.new_selection,
     }));
 }
 
 fn push_matches(session: &mut Session, ui: &Sender<LauncherInput>) {
-    let matched = session.engine.matched();
+    let matched = session.matched();
     let items = session.engine.items().clone();
     let _ = ui.send(LauncherInput::Engine(EngineEvent::Matches { items, matched }));
 }

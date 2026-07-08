@@ -114,7 +114,7 @@ impl Mode for SshMode {
         }
     }
 
-    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind) -> Action {
+    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, _input: &str) -> Action {
         let host = match (&index, &kind) {
             (Some(row), _) => match self.hosts.get(*row as usize) {
                 Some(host) => host.clone(),

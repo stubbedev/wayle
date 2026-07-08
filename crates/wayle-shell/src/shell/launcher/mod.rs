@@ -63,6 +63,8 @@ pub(crate) enum LauncherInput {
     Key(KeyAction),
     /// A sidebar mode tab was clicked.
     TabClicked(usize),
+    /// `-dump` debounce fired: matches settled, reply and close.
+    DumpReady,
 }
 
 impl std::fmt::Debug for LauncherInput {
@@ -79,6 +81,7 @@ impl std::fmt::Debug for LauncherInput {
             Self::RowActivated(pos) => f.debug_tuple("RowActivated").field(pos).finish(),
             Self::Key(action) => f.debug_tuple("Key").field(action).finish(),
             Self::TabClicked(index) => f.debug_tuple("TabClicked").field(index).finish(),
+            Self::DumpReady => f.write_str("DumpReady"),
         }
     }
 }
@@ -92,6 +95,8 @@ pub(crate) struct Launcher {
     selection: gtk::SingleSelection,
     /// Compiled keybindings, shared with the key controller closure.
     bindings: Rc<RefCell<Vec<KeyBinding>>>,
+    /// Multi-select display state, shared with the row factory.
+    multi: Rc<RefCell<views::MultiSelect>>,
 }
 
 struct ActiveSession {
@@ -103,6 +108,24 @@ struct ActiveSession {
     mode_prompt: String,
     /// `-e` dialog: message only, any accept/cancel closes with code 0.
     dialog: bool,
+    /// `-dump`: reply with the filtered list, never show the surface.
+    dump: bool,
+    /// Debounce source for the dump reply (fires after matches settle).
+    dump_timer: Option<gtk::glib::SourceId>,
+    /// Selection to apply on the next Matches (script `new-selection` /
+    /// `keep-selection`).
+    pending_selection: PendingSelection,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+enum PendingSelection {
+    /// Select the first row (default).
+    #[default]
+    First,
+    /// Keep the current position.
+    Keep,
+    /// Select an absolute position.
+    At(u32),
 }
 
 #[relm4::component(pub(crate))]
@@ -185,6 +208,7 @@ impl Component for Launcher {
             model: model_data,
             selection,
             bindings: Rc::new(RefCell::new(Vec::new())),
+            multi: Rc::new(RefCell::new(views::MultiSelect::default())),
         };
         let widgets = view_output!();
 
@@ -266,6 +290,11 @@ impl Component for Launcher {
                     let _ = engine.send(EngineCmd::ModeTo(index));
                 }
             }
+
+            LauncherInput::DumpReady => {
+                let items = self.model.texts();
+                self.end_session(Some(ServerFrame::Dump { items }), widgets, root);
+            }
         }
     }
 }
@@ -282,7 +311,7 @@ impl Launcher {
         options: &SessionOptions,
         replace: bool,
         reply: oneshot::Sender<ServerFrame>,
-        _rows: mpsc::Receiver<Vec<String>>,
+        rows: mpsc::Receiver<Vec<String>>,
         widgets: &LauncherWidgets,
         root: &gtk::Window,
         sender: &ComponentSender<Self>,
@@ -295,15 +324,9 @@ impl Launcher {
                 return;
             }
         }
-        if options.dmenu {
-            // dmenu lands in a later phase.
-            warn!("launcher: -dmenu not implemented yet");
-            let _ = reply.send(ServerFrame::Cancelled { code: 1 });
-            return;
-        }
 
         let config = self.config.config();
-        let setup = setup::build(options, config);
+        let setup = setup::build(options, config, options.dmenu.then_some(rows));
         let dialog = setup.ui.error_message.is_some();
         if setup.modes.is_empty() && !dialog {
             warn!("launcher: no usable modes in session request");
@@ -312,6 +335,19 @@ impl Launcher {
         }
 
         *self.bindings.borrow_mut() = views::compile_bindings(&setup.ui.keybindings);
+        {
+            let mut multi = self.multi.borrow_mut();
+            multi.enabled = false;
+            multi.picked.clear();
+            multi.ballot_selected = options
+                .ballot_selected
+                .clone()
+                .unwrap_or_else(|| "☑ ".to_owned());
+            multi.ballot_unselected = options
+                .ballot_unselected
+                .clone()
+                .unwrap_or_else(|| "☐ ".to_owned());
+        }
 
         let engine = (!dialog).then(|| {
             engine_actor::spawn(
@@ -322,6 +358,7 @@ impl Launcher {
             )
         });
 
+        let dump = options.dump;
         self.apply_ui(&setup.ui, dialog, widgets, root);
         self.session = Some(ActiveSession {
             id,
@@ -330,10 +367,22 @@ impl Launcher {
             ui: setup.ui,
             mode_prompt: String::new(),
             dialog,
+            dump,
+            dump_timer: None,
+            pending_selection: PendingSelection::First,
         });
         self.model.update(Arc::new(Vec::new()), Vec::new());
-        self.reveal(widgets, root);
-        widgets.entry.grab_focus();
+        if let (true, Some(filter), Some(engine)) = (
+            dump,
+            self.session.as_ref().and_then(|s| s.ui.filter.clone()),
+            self.engine(),
+        ) {
+            let _ = engine.send(EngineCmd::SetQuery(filter));
+        }
+        if !dump {
+            self.reveal(widgets, root);
+            widgets.entry.grab_focus();
+        }
     }
 
     /// Apply per-session UI settings to the widget tree.
@@ -383,7 +432,7 @@ impl Launcher {
         }
 
         if let Some(list) = widgets.scrolled.child().and_downcast::<gtk::ListView>() {
-            list.set_factory(Some(&views::row_factory(ui.show_icons)));
+            list.set_factory(Some(&views::row_factory(ui.show_icons, self.multi.clone())));
         }
 
         widgets.tabs.set_visible(ui.sidebar);
@@ -397,55 +446,23 @@ impl Launcher {
         sender: &ComponentSender<Self>,
     ) {
         match event {
-            EngineEvent::State {
-                prompt,
-                message,
-                active_mode,
-                mode_names,
-            } => {
-                let Some(session) = &mut self.session else {
-                    return;
-                };
-                session.mode_prompt.clone_from(&prompt);
-                let shown = session
-                    .ui
-                    .prompt
-                    .clone()
-                    .or_else(|| session.ui.display_names.get(&prompt).cloned())
-                    .unwrap_or(prompt);
-                widgets.prompt.set_text(&shown);
-                widgets.prompt.set_visible(!shown.is_empty());
-
-                let message = session
-                    .ui
-                    .error_message
-                    .as_deref()
-                    .or(session.ui.mesg.as_deref())
-                    .map(ToOwned::to_owned)
-                    .or(message);
-                match message {
-                    Some(text) => {
-                        widgets.message.set_markup(&text);
-                        widgets.message.set_visible(true);
-                    }
-                    None => widgets.message.set_visible(false),
-                }
-
-                if session.ui.sidebar {
-                    rebuild_tabs(
-                        widgets,
-                        &mode_names,
-                        active_mode,
-                        &session.ui,
-                        sender.input_sender(),
-                    );
-                }
-            }
+            EngineEvent::State { .. } => self.on_state(event, widgets, sender),
             EngineEvent::Matches { items, matched } => {
+                let previous = self.selection.selected();
                 self.model.update(items, matched);
                 if self.model.len() > 0 {
-                    self.selection.set_selected(0);
+                    let target = match self
+                        .session
+                        .as_ref()
+                        .map_or(PendingSelection::First, |s| s.pending_selection)
+                    {
+                        PendingSelection::First => 0,
+                        PendingSelection::Keep => previous.min(self.model.len() - 1),
+                        PendingSelection::At(position) => position.min(self.model.len() - 1),
+                    };
+                    self.selection.set_selected(target);
                 }
+                self.arm_dump_reply(sender);
             }
             EngineEvent::Action(action) => match action {
                 Action::Close => {
@@ -459,10 +476,11 @@ impl Launcher {
                         root,
                     );
                 }
-                Action::Exit { code, output } => {
-                    let selected = output
-                        .map(|text| vec![Selected { index: -1, text }])
-                        .unwrap_or_default();
+                Action::Exit { code, selected } => {
+                    let selected = selected
+                        .into_iter()
+                        .map(|(index, text)| Selected { index, text })
+                        .collect();
                     self.end_session(
                         Some(ServerFrame::Result {
                             code,
@@ -479,6 +497,83 @@ impl Launcher {
                 }
                 Action::Reload(_) | Action::SwitchMode(_) | Action::Nothing => {}
             },
+        }
+    }
+
+    /// Apply an [`EngineEvent::State`]: prompt, message, tabs, selection
+    /// intent, multi-select flag, filter clearing.
+    fn on_state(
+        &mut self,
+        event: EngineEvent,
+        widgets: &LauncherWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        let EngineEvent::State {
+            prompt,
+            message,
+            active_mode,
+            mode_names,
+            multi_select,
+            after_activate,
+            keep_filter,
+            keep_selection,
+            new_selection,
+        } = event
+        else {
+            return;
+        };
+        {
+            let mut multi = self.multi.borrow_mut();
+            multi.enabled = multi_select;
+            if !multi_select {
+                multi.picked.clear();
+            }
+        }
+        if after_activate && !keep_filter && !widgets.entry.text().is_empty() {
+            // Script reload without keep-filter clears the query.
+            widgets.entry.set_text("");
+        }
+        let Some(session) = &mut self.session else {
+            return;
+        };
+        session.pending_selection = match new_selection {
+            Some(position) => PendingSelection::At(position),
+            None if keep_selection => PendingSelection::Keep,
+            None => PendingSelection::First,
+        };
+        session.mode_prompt.clone_from(&prompt);
+        let shown = session
+            .ui
+            .prompt
+            .clone()
+            .or_else(|| session.ui.display_names.get(&prompt).cloned())
+            .unwrap_or(prompt);
+        widgets.prompt.set_text(&shown);
+        widgets.prompt.set_visible(!shown.is_empty());
+
+        let message = session
+            .ui
+            .error_message
+            .as_deref()
+            .or(session.ui.mesg.as_deref())
+            .map(ToOwned::to_owned)
+            .or(message);
+        match message {
+            Some(text) => {
+                widgets.message.set_markup(&text);
+                widgets.message.set_visible(true);
+            }
+            None => widgets.message.set_visible(false),
+        }
+
+        if session.ui.sidebar {
+            rebuild_tabs(
+                widgets,
+                &mode_names,
+                active_mode,
+                &session.ui,
+                sender.input_sender(),
+            );
         }
     }
 
@@ -501,13 +596,26 @@ impl Launcher {
                 self.end_session(Some(ServerFrame::Cancelled { code: 1 }), widgets, root);
             }
             KeyAction::Accept => {
-                if self.model.len() == 0 {
+                let picked: Vec<u32> = self.multi.borrow().picked.iter().copied().collect();
+                if !picked.is_empty() {
+                    if let Some(engine) = self.engine() {
+                        let _ = engine.send(EngineCmd::ActivateMulti(picked));
+                    }
+                } else if self.model.len() == 0 {
                     self.activate_custom(widgets, ActivateKind::Custom(String::new()));
                 } else {
                     self.activate_position(None);
                 }
             }
-            KeyAction::AcceptAlt => self.activate_selected(ActivateKind::Alt),
+            KeyAction::AcceptAlt => {
+                if self.multi.borrow().enabled {
+                    // rofi multi-select: Shift+Enter toggles + advances.
+                    self.toggle_picked();
+                    self.move_selection(1);
+                } else {
+                    self.activate_selected(ActivateKind::Alt);
+                }
+            }
             KeyAction::AcceptCustom => {
                 self.activate_custom(widgets, ActivateKind::Custom(String::new()));
             }
@@ -550,6 +658,40 @@ impl Launcher {
                 self.move_selection(i64::from(lines));
             }
         }
+    }
+
+    /// Toggle the current row in the multi-select set and re-bind it.
+    fn toggle_picked(&mut self) {
+        let position = self.selection.selected();
+        let Some(item_index) = self.model.item_index(position) else {
+            return;
+        };
+        {
+            let mut multi = self.multi.borrow_mut();
+            if !multi.picked.remove(&item_index) {
+                multi.picked.insert(item_index);
+            }
+        }
+        self.model.refresh(position);
+    }
+
+    /// `-dump` sessions: reply with the filtered list once matches have
+    /// settled (150ms debounce), then close.
+    fn arm_dump_reply(&mut self, sender: &ComponentSender<Self>) {
+        let Some(session) = &mut self.session else {
+            return;
+        };
+        if !session.dump {
+            return;
+        }
+        if let Some(source) = session.dump_timer.take() {
+            source.remove();
+        }
+        let sender = sender.input_sender().clone();
+        session.dump_timer = Some(gtk::glib::timeout_add_local_once(
+            Duration::from_millis(150),
+            move || sender.emit(LauncherInput::DumpReady),
+        ));
     }
 
     fn move_selection(&self, delta: i64) {
@@ -615,10 +757,14 @@ impl Launcher {
             if let Some(engine) = session.engine.take() {
                 let _ = engine.send(EngineCmd::Stop);
             }
+            if let Some(source) = session.dump_timer.take() {
+                source.remove();
+            }
             if let (Some(reply), Some(frame)) = (session.reply.take(), frame) {
                 let _ = reply.send(frame);
             }
         }
+        self.multi.borrow_mut().picked.clear();
         self.model.update(Arc::new(Vec::new()), Vec::new());
         self.hide_animated(widgets, root);
     }

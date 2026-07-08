@@ -171,7 +171,7 @@ impl Mode for DrunMode {
         }
     }
 
-    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind) -> Action {
+    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, _input: &str) -> Action {
         match (index, kind) {
             (Some(row), _) => {
                 let Some(entry) = self.entries.get(row as usize) else {

@@ -28,13 +28,13 @@ pub enum Action {
     SwitchMode(String),
     /// Replace the query text (script `new-selection` companion).
     SetInput(String),
-    /// Terminate the session with an exit code and optional stdout payload
+    /// Terminate the session with an exit code and the accepted rows
     /// (dmenu mode only; forwarded to the waiting CLI).
     Exit {
         /// Process exit code (0 accept, 1 cancel, 10..=28 kb-custom-N).
         code: i32,
-        /// Text printed to the CLI's stdout.
-        output: Option<String>,
+        /// Accepted rows as `(input index, text)`; index `-1` = custom input.
+        selected: Vec<(i64, String)>,
     },
     /// Nothing to do.
     Nothing,
@@ -61,6 +61,8 @@ pub struct ModeState {
     pub keep_selection: bool,
     /// Absolute selection position to apply (script `new-selection`).
     pub new_selection: Option<u32>,
+    /// Keep the typed filter across a reload (script `keep-filter`).
+    pub keep_filter: bool,
 }
 
 /// One launch mode (drun, run, window, ssh, script, dmenu, ...).
@@ -77,8 +79,17 @@ pub trait Mode: Send {
     /// Produce the initial list state.
     async fn load(&mut self) -> ModeState;
 
-    /// Handle acceptance of a row (`Some(index)`) or of custom input (`None`).
-    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind) -> Action;
+    /// Handle acceptance of a row (`Some(index)`) or of custom input
+    /// (`None`). `input` is the query text at accept time (`ROFI_INPUT`).
+    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, input: &str) -> Action;
+
+    /// Handle a multi-select accept (dmenu). Default: activate the first.
+    async fn activate_many(&mut self, indices: &[u32], input: &str) -> Action {
+        match indices.first() {
+            Some(&first) => self.activate(Some(first), ActivateKind::Default, input).await,
+            None => Action::Nothing,
+        }
+    }
 
     /// Handle shift-delete on a row (history removal, window close).
     /// Default: unsupported.
@@ -89,5 +100,11 @@ pub trait Mode: Send {
     /// Whether typed text that matches no row can be accepted.
     fn allows_custom(&self) -> bool {
         true
+    }
+
+    /// Combi only: item mask for a `!bang` prefix (true = shown). `None`
+    /// when the bang matches no sub-mode (or the mode isn't combi).
+    fn subset(&self, _bang: &str) -> Option<Vec<bool>> {
+        None
     }
 }

@@ -156,7 +156,7 @@ impl Mode for FileBrowserMode {
         self.state()
     }
 
-    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind) -> Action {
+    async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, _input: &str) -> Action {
         match index.and_then(|row| self.entries.get(row as usize)) {
             Some(Entry::Parent(path) | Entry::Dir(path)) => {
                 self.current = path.clone();

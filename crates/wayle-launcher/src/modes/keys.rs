@@ -44,7 +44,7 @@ impl Mode for KeysMode {
         }
     }
 
-    async fn activate(&mut self, _index: Option<u32>, _kind: ActivateKind) -> Action {
+    async fn activate(&mut self, _index: Option<u32>, _kind: ActivateKind, _input: &str) -> Action {
         Action::Nothing
     }
 

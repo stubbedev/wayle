@@ -132,12 +132,29 @@ pub(super) fn lookup(
 
 /// Widgets inside one recycled list row.
 struct RowWidgets {
+    ballot: gtk::Label,
     icon: gtk::Image,
     label: gtk::Label,
 }
 
+/// Multi-select display state shared between the component and the factory.
+#[derive(Debug, Default)]
+pub(super) struct MultiSelect {
+    /// Multi-select is active for the current session.
+    pub enabled: bool,
+    /// Toggled item indices.
+    pub picked: std::collections::BTreeSet<u32>,
+    /// Ballot prefix for picked rows (rofi `-ballot-selected-str`).
+    pub ballot_selected: String,
+    /// Ballot prefix for unpicked rows.
+    pub ballot_unselected: String,
+}
+
 /// Build the `SignalListItemFactory` for the results list.
-pub(super) fn row_factory(show_icons: bool) -> gtk::SignalListItemFactory {
+pub(super) fn row_factory(
+    show_icons: bool,
+    multi: std::rc::Rc<std::cell::RefCell<MultiSelect>>,
+) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
 
     factory.connect_setup(move |_, object| {
@@ -146,6 +163,9 @@ pub(super) fn row_factory(show_icons: bool) -> gtk::SignalListItemFactory {
         };
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         row.add_css_class("launcher-row");
+        let ballot = gtk::Label::new(None);
+        ballot.add_css_class("launcher-row-ballot");
+        ballot.set_visible(false);
         let icon = gtk::Image::new();
         icon.add_css_class("launcher-row-icon");
         icon.set_visible(show_icons);
@@ -155,6 +175,7 @@ pub(super) fn row_factory(show_icons: bool) -> gtk::SignalListItemFactory {
         label.set_hexpand(true);
         label.set_ellipsize(pango::EllipsizeMode::End);
         label.set_single_line_mode(true);
+        row.append(&ballot);
         row.append(&icon);
         row.append(&label);
         list_item.set_child(Some(&row));
@@ -174,6 +195,20 @@ pub(super) fn row_factory(show_icons: bool) -> gtk::SignalListItemFactory {
         let Some(widgets) = row_widgets(&container) else {
             return;
         };
+
+        {
+            let multi = multi.borrow();
+            if multi.enabled {
+                widgets.ballot.set_text(if multi.picked.contains(&row.item_index) {
+                    &multi.ballot_selected
+                } else {
+                    &multi.ballot_unselected
+                });
+                widgets.ballot.set_visible(true);
+            } else {
+                widgets.ballot.set_visible(false);
+            }
+        }
 
         widgets.label.set_use_markup(row.item.flags.contains(ItemFlags::MARKUP));
         if row.item.flags.contains(ItemFlags::MARKUP) {
@@ -210,12 +245,10 @@ pub(super) fn row_factory(show_icons: bool) -> gtk::SignalListItemFactory {
 }
 
 fn row_widgets(container: &gtk::Box) -> Option<RowWidgets> {
-    let icon = container.first_child()?.downcast::<gtk::Image>().ok()?;
-    let label = icon
-        .next_sibling()?
-        .downcast::<gtk::Label>()
-        .ok()?;
-    Some(RowWidgets { icon, label })
+    let ballot = container.first_child()?.downcast::<gtk::Label>().ok()?;
+    let icon = ballot.next_sibling()?.downcast::<gtk::Image>().ok()?;
+    let label = icon.next_sibling()?.downcast::<gtk::Label>().ok()?;
+    Some(RowWidgets { ballot, icon, label })
 }
 
 fn set_class(widget: &impl IsA<gtk::Widget>, class: &str, on: bool) {

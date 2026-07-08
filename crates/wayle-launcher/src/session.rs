@@ -15,6 +15,10 @@ pub struct Session {
     modes: Vec<Box<dyn Mode>>,
     active: usize,
     state: ModeState,
+    /// Current query text (`ROFI_INPUT`; bang prefix already stripped).
+    query: String,
+    /// Combi `!bang` item mask, when one is active.
+    subset: Option<Vec<bool>>,
     /// Matching engine; the surface reads matches from here.
     pub engine: MatchEngine,
     /// Multi-select accumulation (matched-item indices).
@@ -37,9 +41,33 @@ impl Session {
             modes,
             active: 0,
             state: ModeState::default(),
+            query: String::new(),
+            subset: None,
             engine: MatchEngine::new(options, notify),
             selected: BTreeSet::new(),
         }
+    }
+
+    /// Update the query. A leading `!bang ` token restricts a combi mode to
+    /// the matching sub-mode; the remainder is the real match query.
+    pub fn set_query(&mut self, query: &str) {
+        let (bang, rest) = split_bang(query);
+        self.subset = bang.and_then(|bang| self.modes[self.active].subset(bang));
+        self.query = if self.subset.is_some() {
+            rest.to_owned()
+        } else {
+            query.to_owned()
+        };
+        self.engine.set_query(&self.query);
+    }
+
+    /// Ranked matched indices with any combi `!bang` mask applied.
+    pub fn matched(&mut self) -> Vec<u32> {
+        let mut matched = self.engine.matched();
+        if let Some(mask) = &self.subset {
+            matched.retain(|&index| mask.get(index as usize).copied().unwrap_or(true));
+        }
+        matched
     }
 
     /// Names of all loaded modes (sidebar tabs, kb-mode-next order).
@@ -72,6 +100,7 @@ impl Session {
     pub async fn switch_to(&mut self, index: usize) {
         self.active = index % self.modes.len();
         self.selected.clear();
+        self.subset = None;
         self.load().await;
     }
 
@@ -103,10 +132,20 @@ impl Session {
     /// Forward an accept to the active mode and apply the resulting action.
     /// Returns the action for the surface to interpret (Close/Exit/...).
     pub async fn activate(&mut self, index: Option<u32>, kind: ActivateKind) -> Action {
-        if matches!(kind, ActivateKind::Custom(_)) && !self.modes[self.active].allows_custom() {
+        if matches!(kind, ActivateKind::Custom(_))
+            && (!self.modes[self.active].allows_custom() || self.state.no_custom)
+        {
             return Action::Nothing;
         }
-        let action = self.modes[self.active].activate(index, kind).await;
+        let query = self.query.clone();
+        let action = self.modes[self.active].activate(index, kind, &query).await;
+        self.apply_action(action).await
+    }
+
+    /// Forward a multi-select accept (dmenu).
+    pub async fn activate_many(&mut self, indices: &[u32]) -> Action {
+        let query = self.query.clone();
+        let action = self.modes[self.active].activate_many(indices, &query).await;
         self.apply_action(action).await
     }
 
@@ -149,6 +188,18 @@ impl Session {
     }
 }
 
+/// Split a leading `!bang ` prefix off a query: `"!win term"` →
+/// `(Some("win"), "term")`. A lone `"!win"` (no space yet) also counts.
+fn split_bang(query: &str) -> (Option<&str>, &str) {
+    let Some(rest) = query.strip_prefix('!') else {
+        return (None, query);
+    };
+    match rest.split_once(char::is_whitespace) {
+        Some((bang, remainder)) => (Some(bang), remainder),
+        None => (Some(rest), ""),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
@@ -176,7 +227,7 @@ mod tests {
             }
         }
 
-        async fn activate(&mut self, index: Option<u32>, kind: ActivateKind) -> Action {
+        async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, _input: &str) -> Action {
             self.activated = Some((index, kind));
             Action::Close
         }

@@ -18,6 +18,8 @@ use wayle_launcher::Item;
 pub(super) struct Row {
     /// The matched item.
     pub item: Item,
+    /// The item's index in the mode's item vec (multi-select identity).
+    pub item_index: u32,
 }
 
 mod imp {
@@ -54,7 +56,7 @@ mod imp {
             let item_index = *matched.get(position as usize)?;
             let items = self.items.borrow();
             let item = items.get(item_index as usize)?.clone();
-            Some(glib::BoxedAnyObject::new(Row { item }).upcast::<glib::Object>())
+            Some(glib::BoxedAnyObject::new(Row { item, item_index }).upcast::<glib::Object>())
         }
     }
 }
@@ -89,5 +91,23 @@ impl MatchModel {
     /// Number of matched rows.
     pub fn len(&self) -> u32 {
         self.imp().n_items()
+    }
+
+    /// Re-bind the row at a matched-list position (ballot toggles).
+    pub fn refresh(&self, position: u32) {
+        if position < self.imp().n_items() {
+            self.items_changed(position, 1, 1);
+        }
+    }
+
+    /// All row texts in display order (`-dump`).
+    pub fn texts(&self) -> Vec<String> {
+        let items = self.imp().items.borrow();
+        self.imp()
+            .matched
+            .borrow()
+            .iter()
+            .filter_map(|&index| items.get(index as usize).map(|item| item.display.clone()))
+            .collect()
     }
 }
