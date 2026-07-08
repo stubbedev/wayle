@@ -248,6 +248,16 @@
           "default": 150,
           "description": "Duration in ms for in-place dropdown transitions: hover highlights and\nthe page/stack crossfades inside dropdowns. `enabled = false` removes\nthem entirely."
         },
+        "launcher": {
+          "$ref": "#/$defs/SurfaceAnimation",
+          "default": {
+            "enter": null,
+            "enter-duration": null,
+            "exit": null,
+            "exit-duration": null
+          },
+          "description": "Per-surface override for the application launcher."
+        },
         "lock": {
           "$ref": "#/$defs/SurfaceAnimation",
           "default": {
@@ -375,6 +385,18 @@
     "Array_of_CustomModuleDefinition": {
       "items": {
         "$ref": "#/$defs/CustomModuleDefinition"
+      },
+      "type": "array"
+    },
+    "Array_of_LauncherDrunField": {
+      "items": {
+        "$ref": "#/$defs/LauncherDrunField"
+      },
+      "type": "array"
+    },
+    "Array_of_LauncherWindowField": {
+      "items": {
+        "$ref": "#/$defs/LauncherWindowField"
       },
       "type": "array"
     },
@@ -3073,6 +3095,602 @@
         {
           "const": "index-and-name",
           "description": "Show both, joined as `\"1: web\"`. Unnamed workspaces show the index alone.",
+          "type": "string"
+        }
+      ]
+    },
+    "LauncherCase": {
+      "description": "Case handling (collapses rofi `-case-sensitive`/`-case-smart`).",
+      "oneOf": [
+        {
+          "const": "insensitive",
+          "description": "Always case-insensitive.",
+          "type": "string"
+        },
+        {
+          "const": "smart",
+          "description": "Sensitive only when the query contains an uppercase char.",
+          "type": "string"
+        },
+        {
+          "const": "sensitive",
+          "description": "Always case-sensitive.",
+          "type": "string"
+        }
+      ]
+    },
+    "LauncherCombiConfig": {
+      "description": "combi mode settings.",
+      "properties": {
+        "display-format": {
+          "$ref": "#/$defs/string",
+          "default": "{text}",
+          "description": "Row template (`{mode}`, `{text}`)."
+        },
+        "modes": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [
+            "window",
+            "drun",
+            "run"
+          ],
+          "description": "Modes merged into the combined list."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherConfig": {
+      "description": "Application launcher / dmenu (rofi replacement).",
+      "properties": {
+        "auto-select": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Accept automatically when exactly one result remains."
+        },
+        "case": {
+          "$ref": "#/$defs/LauncherCase",
+          "default": "insensitive",
+          "description": "Case handling."
+        },
+        "combi": {
+          "$ref": "#/$defs/LauncherCombiConfig",
+          "default": {
+            "display-format": "{text}",
+            "modes": [
+              "window",
+              "drun",
+              "run"
+            ]
+          },
+          "description": "combi (combined modes) mode."
+        },
+        "cycle": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Wrap selection at list edges."
+        },
+        "display-names": {
+          "$ref": "#/$defs/Map_of_string",
+          "default": {},
+          "description": "Per-mode display-name overrides (rofi `display-{mode}`), e.g.\n`drun = \"apps\"`."
+        },
+        "drun": {
+          "$ref": "#/$defs/LauncherDrunConfig",
+          "default": {
+            "categories": [],
+            "display-format": "{name} [<span weight='light' size='small'><i>({generic})</i></span>]",
+            "exclude-categories": [],
+            "match-fields": [
+              "name",
+              "generic",
+              "exec",
+              "categories",
+              "keywords"
+            ],
+            "show-actions": false,
+            "url-launcher": "xdg-open"
+          },
+          "description": "drun (application) mode."
+        },
+        "filebrowser": {
+          "$ref": "#/$defs/LauncherFilebrowserConfig",
+          "default": {
+            "command": "",
+            "directories-first": true,
+            "directory": "",
+            "show-hidden": false,
+            "sorting-method": "name"
+          },
+          "description": "file browser mode."
+        },
+        "fixed-num-lines": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Keep the list height fixed at `lines` rows."
+        },
+        "history": {
+          "$ref": "#/$defs/LauncherHistoryConfig",
+          "default": {
+            "enable": true,
+            "max-size": 25
+          },
+          "description": "Launch history / frecency."
+        },
+        "hover-select": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Select the row under the mouse cursor."
+        },
+        "icon-theme": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Icon theme override (\"\" = system theme)."
+        },
+        "keybindings": {
+          "$ref": "#/$defs/Map_of_string",
+          "default": {},
+          "description": "Keybinding overrides: action (rofi `kb-` name without the prefix,\ne.g. `accept`, `cancel`, `mode-next`, `custom-1`) → comma-separated\nkey list (e.g. `\"Control+Tab,F3\"`). Unset actions keep rofi's\ndefaults."
+        },
+        "lines": {
+          "$ref": "#/$defs/uint32",
+          "default": 10,
+          "description": "Visible result lines."
+        },
+        "location": {
+          "$ref": "#/$defs/LauncherLocation",
+          "default": "center",
+          "description": "Surface position on screen."
+        },
+        "matching": {
+          "$ref": "#/$defs/LauncherMatching",
+          "default": "normal",
+          "description": "Matching method."
+        },
+        "modes": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [
+            "drun",
+            "run",
+            "window"
+          ],
+          "description": "Modes enabled by default (order = tab/kb-mode-next order). Script\nmodes are referenced by their `[launcher.scripts]` key."
+        },
+        "monitor": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Output connector to show on (\"\" = focused output)."
+        },
+        "negate-char": {
+          "$ref": "#/$defs/string",
+          "default": "-",
+          "description": "Token prefix that negates a token."
+        },
+        "normalize-match": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Strip accents/normalize Unicode while matching."
+        },
+        "run": {
+          "$ref": "#/$defs/LauncherRunConfig",
+          "default": {
+            "list-command": "",
+            "run-command": "{cmd}",
+            "shell-command": "{terminal} -e {cmd}"
+          },
+          "description": "run (command) mode."
+        },
+        "scripts": {
+          "$ref": "#/$defs/Map_of_string",
+          "default": {},
+          "description": "Custom script modes: name → executable (rofi `name:script`)."
+        },
+        "show-icons": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Show row icons."
+        },
+        "sidebar-mode": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Show mode tabs at the bottom of the surface."
+        },
+        "sort": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Rank results by match quality (off = keep list order, rofi default)."
+        },
+        "sorting-method": {
+          "$ref": "#/$defs/LauncherSorting",
+          "default": "levenshtein",
+          "description": "Ranking method when `sort` is on."
+        },
+        "ssh": {
+          "$ref": "#/$defs/LauncherSshConfig",
+          "default": {
+            "client": "ssh",
+            "command": "{terminal} -e {ssh-client} {host}",
+            "parse-hosts": false,
+            "parse-known-hosts": true
+          },
+          "description": "ssh mode."
+        },
+        "terminal": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Terminal emulator for terminal apps (\"\" = autodetect)."
+        },
+        "tokenize": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Split the query into independently matched words."
+        },
+        "width": {
+          "$ref": "#/$defs/Size",
+          "default": 1.0,
+          "description": "Surface width: a multiplier of the default 600px (`1.0` = default)\nor absolute pixels (e.g. `\"800px\"`)."
+        },
+        "window": {
+          "$ref": "#/$defs/LauncherWindowConfig",
+          "default": {
+            "close-on-delete": true,
+            "format": "{w}   {c}   {t}",
+            "hide-active": false,
+            "match-fields": [
+              "title",
+              "class"
+            ]
+          },
+          "description": "window switcher mode."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherDrunConfig": {
+      "description": "drun (application) mode settings.",
+      "properties": {
+        "categories": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "Only show apps within these categories (empty = all)."
+        },
+        "display-format": {
+          "$ref": "#/$defs/string",
+          "default": "{name} [<span weight='light' size='small'><i>({generic})</i></span>]",
+          "description": "Row template: `{name}`, `{generic}`, `{exec}`, `{categories}`,\n`{comment}`; `[..]` renders only when its placeholders are non-empty."
+        },
+        "exclude-categories": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "Hide apps within these categories."
+        },
+        "match-fields": {
+          "$ref": "#/$defs/Array_of_LauncherDrunField",
+          "default": [
+            "name",
+            "generic",
+            "exec",
+            "categories",
+            "keywords"
+          ],
+          "description": "Desktop-entry fields fed to the matcher."
+        },
+        "show-actions": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Expose desktop-file actions as extra rows."
+        },
+        "url-launcher": {
+          "$ref": "#/$defs/string",
+          "default": "xdg-open",
+          "description": "Command opening `Type=Link` entries."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherDrunField": {
+      "description": "Desktop-entry fields searched by drun (rofi `-drun-match-fields`).",
+      "oneOf": [
+        {
+          "const": "name",
+          "description": "Localized Name.",
+          "type": "string"
+        },
+        {
+          "const": "generic",
+          "description": "GenericName.",
+          "type": "string"
+        },
+        {
+          "const": "exec",
+          "description": "Exec command line.",
+          "type": "string"
+        },
+        {
+          "const": "categories",
+          "description": "Categories list.",
+          "type": "string"
+        },
+        {
+          "const": "comment",
+          "description": "Comment.",
+          "type": "string"
+        },
+        {
+          "const": "keywords",
+          "description": "Keywords list.",
+          "type": "string"
+        }
+      ]
+    },
+    "LauncherFileSort": {
+      "description": "File sorting in the file browser (rofi filebrowser `sorting-method`).",
+      "oneOf": [
+        {
+          "const": "name",
+          "description": "By file name.",
+          "type": "string"
+        },
+        {
+          "const": "mtime",
+          "description": "By modification time.",
+          "type": "string"
+        },
+        {
+          "const": "atime",
+          "description": "By access time.",
+          "type": "string"
+        },
+        {
+          "const": "ctime",
+          "description": "By creation time.",
+          "type": "string"
+        }
+      ]
+    },
+    "LauncherFilebrowserConfig": {
+      "description": "file browser mode settings.",
+      "properties": {
+        "command": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Command opening the picked file (\"\" = xdg-open)."
+        },
+        "directories-first": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "List directories before files."
+        },
+        "directory": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Start directory (\"\" = home)."
+        },
+        "show-hidden": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Show hidden files."
+        },
+        "sorting-method": {
+          "$ref": "#/$defs/LauncherFileSort",
+          "default": "name",
+          "description": "File ordering."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherHistoryConfig": {
+      "description": "Launch history / frecency settings.",
+      "properties": {
+        "enable": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Record launches and rank frequently used entries first."
+        },
+        "max-size": {
+          "$ref": "#/$defs/uint32",
+          "default": 25,
+          "description": "Maximum remembered entries per mode."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherLocation": {
+      "description": "Launcher surface position (rofi `-location` 0-8 grid).",
+      "oneOf": [
+        {
+          "const": "center",
+          "description": "Centered (rofi location 0).",
+          "type": "string"
+        },
+        {
+          "const": "north-west",
+          "description": "Top-left (1).",
+          "type": "string"
+        },
+        {
+          "const": "north",
+          "description": "Top edge (2).",
+          "type": "string"
+        },
+        {
+          "const": "north-east",
+          "description": "Top-right (3).",
+          "type": "string"
+        },
+        {
+          "const": "east",
+          "description": "Right edge (4).",
+          "type": "string"
+        },
+        {
+          "const": "south-east",
+          "description": "Bottom-right (5).",
+          "type": "string"
+        },
+        {
+          "const": "south",
+          "description": "Bottom edge (6).",
+          "type": "string"
+        },
+        {
+          "const": "south-west",
+          "description": "Bottom-left (7).",
+          "type": "string"
+        },
+        {
+          "const": "west",
+          "description": "Left edge (8).",
+          "type": "string"
+        }
+      ]
+    },
+    "LauncherMatching": {
+      "description": "Matching method (rofi `-matching`).",
+      "oneOf": [
+        {
+          "const": "normal",
+          "description": "Tokenized substring matching.",
+          "type": "string"
+        },
+        {
+          "const": "regex",
+          "description": "Regular expression.",
+          "type": "string"
+        },
+        {
+          "const": "glob",
+          "description": "Glob patterns per token.",
+          "type": "string"
+        },
+        {
+          "const": "fuzzy",
+          "description": "fzf-style fuzzy matching.",
+          "type": "string"
+        },
+        {
+          "const": "prefix",
+          "description": "Tokenized prefix matching.",
+          "type": "string"
+        }
+      ]
+    },
+    "LauncherRunConfig": {
+      "description": "run (command) mode settings.",
+      "properties": {
+        "list-command": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Extra command whose stdout lines add entries."
+        },
+        "run-command": {
+          "$ref": "#/$defs/string",
+          "default": "{cmd}",
+          "description": "Plain accept template (`{cmd}`)."
+        },
+        "shell-command": {
+          "$ref": "#/$defs/string",
+          "default": "{terminal} -e {cmd}",
+          "description": "Run-in-terminal template (`{terminal}`, `{cmd}`)."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherSorting": {
+      "description": "Result sorting method (rofi `-sorting-method`).",
+      "oneOf": [
+        {
+          "const": "levenshtein",
+          "description": "Levenshtein distance to the query (rofi \"normal\").",
+          "type": "string"
+        },
+        {
+          "const": "fzf",
+          "description": "fzf match-quality score.",
+          "type": "string"
+        }
+      ]
+    },
+    "LauncherSshConfig": {
+      "description": "ssh mode settings.",
+      "properties": {
+        "client": {
+          "$ref": "#/$defs/string",
+          "default": "ssh",
+          "description": "SSH client binary."
+        },
+        "command": {
+          "$ref": "#/$defs/string",
+          "default": "{terminal} -e {ssh-client} {host}",
+          "description": "Connect template (`{terminal}`, `{ssh-client}`, `{host}`)."
+        },
+        "parse-hosts": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Include hosts from `/etc/hosts`."
+        },
+        "parse-known-hosts": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Include hosts from `~/.ssh/known_hosts`."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherWindowConfig": {
+      "description": "window switcher mode settings.",
+      "properties": {
+        "close-on-delete": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Shift-delete closes the selected window."
+        },
+        "format": {
+          "$ref": "#/$defs/string",
+          "default": "{w}   {c}   {t}",
+          "description": "Row template: `{w}` workspace, `{c}` class, `{t}` title, `{n}` name,\n`{r}` role."
+        },
+        "hide-active": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Hide the currently focused window from the list."
+        },
+        "match-fields": {
+          "$ref": "#/$defs/Array_of_LauncherWindowField",
+          "default": [
+            "title",
+            "class"
+          ],
+          "description": "Window fields fed to the matcher."
+        }
+      },
+      "type": "object"
+    },
+    "LauncherWindowField": {
+      "description": "Window fields searched by window mode (rofi `-window-match-fields`).",
+      "oneOf": [
+        {
+          "const": "title",
+          "description": "Window title.",
+          "type": "string"
+        },
+        {
+          "const": "class",
+          "description": "Application class/app-id.",
+          "type": "string"
+        },
+        {
+          "const": "name",
+          "description": "Window name.",
+          "type": "string"
+        },
+        {
+          "const": "role",
+          "description": "Window role.",
+          "type": "string"
+        },
+        {
+          "const": "desktop",
+          "description": "Workspace/desktop name.",
           "type": "string"
         }
       ]
@@ -8190,7 +8808,7 @@
       "type": "integer"
     }
   },
-  "$id": "wayle-config-0.8.22",
+  "$id": "wayle-config-0.8.23",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for Wayle.\n\nRepresents the complete configuration schema that can be loaded\nfrom TOML files. All fields have sensible defaults.",
   "properties": {
@@ -8223,6 +8841,12 @@
         },
         "indicators": true,
         "interaction-duration": 150,
+        "launcher": {
+          "enter": null,
+          "enter-duration": null,
+          "exit": null,
+          "exit-duration": null
+        },
         "lock": {
           "enter": null,
           "enter-duration": null,
@@ -8419,6 +9043,92 @@
         "type": "string"
       },
       "type": "array"
+    },
+    "launcher": {
+      "$ref": "#/$defs/LauncherConfig",
+      "default": {
+        "auto-select": false,
+        "case": "insensitive",
+        "combi": {
+          "display-format": "{text}",
+          "modes": [
+            "window",
+            "drun",
+            "run"
+          ]
+        },
+        "cycle": true,
+        "display-names": {},
+        "drun": {
+          "categories": [],
+          "display-format": "{name} [<span weight='light' size='small'><i>({generic})</i></span>]",
+          "exclude-categories": [],
+          "match-fields": [
+            "name",
+            "generic",
+            "exec",
+            "categories",
+            "keywords"
+          ],
+          "show-actions": false,
+          "url-launcher": "xdg-open"
+        },
+        "filebrowser": {
+          "command": "",
+          "directories-first": true,
+          "directory": "",
+          "show-hidden": false,
+          "sorting-method": "name"
+        },
+        "fixed-num-lines": true,
+        "history": {
+          "enable": true,
+          "max-size": 25
+        },
+        "hover-select": false,
+        "icon-theme": "",
+        "keybindings": {},
+        "lines": 10,
+        "location": "center",
+        "matching": "normal",
+        "modes": [
+          "drun",
+          "run",
+          "window"
+        ],
+        "monitor": "",
+        "negate-char": "-",
+        "normalize-match": true,
+        "run": {
+          "list-command": "",
+          "run-command": "{cmd}",
+          "shell-command": "{terminal} -e {cmd}"
+        },
+        "scripts": {},
+        "show-icons": true,
+        "sidebar-mode": false,
+        "sort": false,
+        "sorting-method": "levenshtein",
+        "ssh": {
+          "client": "ssh",
+          "command": "{terminal} -e {ssh-client} {host}",
+          "parse-hosts": false,
+          "parse-known-hosts": true
+        },
+        "terminal": "",
+        "tokenize": true,
+        "width": 1.0,
+        "window": {
+          "close-on-delete": true,
+          "format": "{w}   {c}   {t}",
+          "hide-active": false,
+          "match-fields": [
+            "title",
+            "class"
+          ]
+        }
+      },
+      "description": "Application launcher (rofi replacement) settings."
     },
     "lock": {
       "$ref": "#/$defs/LockConfig",
