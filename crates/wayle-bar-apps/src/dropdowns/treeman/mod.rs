@@ -241,7 +241,7 @@ fn repo_card(repo: &wayle_treeman::TreemanRepo, actions: &Actions) -> gtk::Box {
     card
 }
 
-fn worktree_row(wt: &wayle_treeman::TreemanWorktree, actions: &Actions) -> gtk::Box {
+fn worktree_row(wt: &wayle_treeman::TreemanWorktree, actions: &Actions) -> gtk::Overlay {
     let bucket = Bucket::parse(&wt.bucket);
 
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -288,11 +288,20 @@ fn worktree_row(wt: &wayle_treeman::TreemanWorktree, actions: &Actions) -> gtk::
     state.set_valign(gtk::Align::Center);
     row.append(&state);
 
+    // Actions float over the trailing edge so, unlike an in-flow cluster hidden
+    // by opacity, they reserve no width at rest — the branch/meta column keeps
+    // the full row. Hover swaps the state badge out for the buttons in place.
+    let overlay = gtk::Overlay::new();
+    overlay.add_css_class("treeman-wt-overlay");
+    overlay.set_child(Some(&row));
     if !wt.path.is_empty() {
-        row.append(&actions.buttons(&wt.path));
+        let buttons = actions.buttons(&wt.path);
+        buttons.set_halign(gtk::Align::End);
+        buttons.set_valign(gtk::Align::Center);
+        overlay.add_overlay(&buttons);
     }
 
-    row
+    overlay
 }
 
 /// The muted second line of a worktree row: `slug · path`, gracefully dropping

@@ -51,12 +51,8 @@
     }
 
     .treeman-wt {
-        padding: var(--space-xs) var(--space-sm);
+        padding: var(--space-sm);
         border-radius: var(--rounding-element);
-
-        &:hover {
-            background: var(--bg-elevated);
-        }
 
         .status-dot {
             margin-top: calc(var(--space-xs) + 0.15rem);
@@ -81,17 +77,27 @@
             .treeman-wt-meta {
                 font-size: var(--text-sm);
                 color: var(--fg-muted);
+                margin-top: 0.1rem;
             }
         }
 
         .badge {
-            margin-left: var(--space-xs);
+            margin-left: var(--space-sm);
+        }
+    }
+
+    // Hover state and the floating action cluster live on the overlay so the
+    // buttons reserve no row width at rest. Hover reveals them and fades the
+    // state badge underneath, swapping in place with no reflow.
+    .treeman-wt-overlay {
+        &:hover .treeman-wt {
+            background: var(--bg-elevated);
         }
 
-        // Action cluster (prepare / reset / teardown), revealed on row hover so
-        // resting rows stay calm.
         .treeman-actions {
-            margin-left: var(--space-xs);
+            padding: 0 var(--space-xs);
+            border-radius: var(--rounding-element);
+            background: var(--bg-elevated);
             opacity: 0;
 
             .ghost-icon {
@@ -99,8 +105,14 @@
             }
         }
 
-        &:hover .treeman-actions {
-            opacity: 1;
+        &:hover {
+            .treeman-actions {
+                opacity: 1;
+            }
+
+            .treeman-wt .badge {
+                opacity: 0;
+            }
         }
     }
 }
