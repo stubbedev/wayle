@@ -256,18 +256,24 @@ jobs:
             # substituter above. Best-effort: large-path 504s don't fail the
             # job — retry with backoff, then give up softly. The master-only
             # GH /nix/store cache above is the primary cross-run reuse path.
+            - name: setup xilo
+              if: >-
+                  github.event_name == 'push' ||
+                  github.event.pull_request.head.repo.full_name == github.repository
+              uses: stubbedev/xilo@v0
+              with:
+                  url: https://nix.stubbe.dev
+                  cache: wayle
+                  token: ${{ secrets.XILO_TOKEN }}
+
             - name: Push to cache (xilo)
               if: >-
                   github.event_name == 'push' ||
                   github.event.pull_request.head.repo.full_name == github.repository
               continue-on-error: true
-              env:
-                  XILO_URL: https://nix.stubbe.dev
-                  XILO_TOKEN: ${{ secrets.XILO_TOKEN }}
               run: |
-                  curl -fsSL https://github.com/stubbedev/xilo/releases/latest/download/xilo-linux-amd64.tar.gz | tar -xz
                   for attempt in 1 2 3; do
-                      if ./xilo push wayle $(cat /tmp/wayle-outpaths); then
+                      if xilo push wayle $(cat /tmp/wayle-outpaths); then
                           exit 0
                       fi
                       echo "::warning::xilo push attempt $attempt failed; retrying in $((attempt * 30))s"

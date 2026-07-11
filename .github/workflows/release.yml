@@ -123,15 +123,18 @@ jobs:
             # source of truth for both CI and releases. Best-effort: a cache
             # push failure must not redden the release. Retry with backoff,
             # then give up softly.
+            - name: setup xilo
+              uses: stubbedev/xilo@v0
+              with:
+                  url: https://nix.stubbe.dev
+                  cache: wayle
+                  token: ${{ secrets.XILO_TOKEN }}
+
             - name: Push to cache (xilo)
               continue-on-error: true
-              env:
-                  XILO_URL: https://nix.stubbe.dev
-                  XILO_TOKEN: ${{ secrets.XILO_TOKEN }}
               run: |
-                  curl -fsSL https://github.com/stubbedev/xilo/releases/latest/download/xilo-linux-amd64.tar.gz | tar -xz
                   for attempt in 1 2 3; do
-                      if ./xilo push wayle $(cat /tmp/wayle-outpaths); then
+                      if xilo push wayle $(cat /tmp/wayle-outpaths); then
                           exit 0
                       fi
                       echo "::warning::xilo push attempt $attempt failed; retrying in $((attempt * 30))s"
