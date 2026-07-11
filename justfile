@@ -92,13 +92,14 @@ update:
 
 # ─────────────────────────── Nix cache ───────────────────────────
 
-# Build the flake package and push its closure to the self-hosted attic
+# Build the flake package and push its closure to the self-hosted xilo
 # cache (https://nix.stubbe.dev, cache `wayle`) — the same cache CI/releases
-# push to. Requires the attic client logged in (~/.config/attic/config.toml
-# with a push token). Pull access is public via the flake's substituter.
+# push to. Requires the xilo client logged in
+# (`xilo login https://nix.stubbe.dev --token <tok>`). Pull access is public
+# via the flake's substituter.
 cache-push:
     nix build '.?submodules=1#wayle' -L --accept-flake-config
-    attic push wayle ./result
+    xilo push wayle ./result
 
 release-preview:
     #!/usr/bin/env bash

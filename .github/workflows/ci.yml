@@ -9,8 +9,8 @@ permissions:
     contents: read
 
 # Cancel superseded runs on PRs (fast feedback on fixup pushes), but NEVER on
-# master: the nix job populates the attic cache + GH /nix/store cache in its
-# post-steps, and a follow-up master push must not cancel that mid-build —
+# master: the nix job populates the xilo cache + GH /nix/store cache in its
+# later steps, and a follow-up master push must not cancel that mid-build —
 # doing so leaves the cache unpopulated and forces the next run to recompile
 # wayle-deps from scratch (~30 min). Master runs queue instead of cancelling,
 # which also warms the cache sequentially: run N populates what run N+1 hits.
@@ -194,7 +194,7 @@ jobs:
         # Always build + push on master so the cache tracks every commit (a
         # docs/schema-only commit still runs — mostly cache hits once wayle-deps
         # is cached, but keeps the binary present). On PRs, only when code
-        # changed. Same-repo PRs also push to attic (see the push step), so a
+        # changed. Same-repo PRs also push to xilo (see the push step), so a
         # deps bump compiled in a PR is a cache hit when it merges to master
         # instead of a fresh ~30 min rebuild.
         if: >-
@@ -221,10 +221,10 @@ jobs:
               with:
                   extra_nix_config: |
                       experimental-features = nix-command flakes
-                      # Pull from the self-hosted attic cache on every event
+                      # Pull from the self-hosted xilo cache on every event
                       # (incl. fork PRs — read access is public, no secret).
                       extra-substituters = https://nix.stubbe.dev/wayle
-                      extra-trusted-public-keys = wayle:XD2O2h1Mmka+VegRi2JY7ywNbG9al+TUAZp6CObizFU=
+                      extra-trusted-public-keys = wayle:BA9vQHJFl0dx4Zl5y0tbk+Osfly7y6k6tPKWAy49rdQ=
 
             # Restore /nix/store from the GitHub Actions cache so the big
             # `wayle-deps` derivation (591 crates, ~30 min) is reused instead of
@@ -244,28 +244,36 @@ jobs:
                   primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', 'nix/package.nix') }}
                   restore-prefixes-first-match: nix-${{ runner.os }}-
 
-            # Push everything built during this run to the attic cache. The
-            # action installs a cached attic-client (no `nix run` cold eval) and
-            # pushes in a post-job step. Runs on master pushes and same-repo PRs
-            # (both have the token) so PR-built deps are in attic before merge.
-            # Fork PRs lack the secret and just pull via the substituter above.
-            # Best-effort: large-path 504s don't fail the job. The master-only
-            # GH /nix/store cache above is the primary cross-run reuse path.
-            - name: Setup attic push
-              if: >-
-                  github.event_name == 'push' ||
-                  github.event.pull_request.head.repo.full_name == github.repository
-              uses: ryanccn/attic-action@v0
-              with:
-                  endpoint: https://nix.stubbe.dev
-                  cache: wayle
-                  token: ${{ secrets.ATTIC_TOKEN }}
-
             - name: Build package
               # --accept-flake-config: honor the flake's nixConfig substituter
               # (the system extra_nix_config above sets it too, but this trusts
               # the flake's own setting and silences the untrusted-config warning).
-              run: nix build '.?submodules=1#wayle' -L --accept-flake-config
+              run: nix build '.?submodules=1#wayle' -L --accept-flake-config --print-out-paths | tee /tmp/wayle-outpaths
+
+            # Push the build closure to the xilo cache. Runs on master pushes
+            # and same-repo PRs (both have the token) so PR-built deps are in
+            # xilo before merge. Fork PRs lack the secret and just pull via the
+            # substituter above. Best-effort: large-path 504s don't fail the
+            # job — retry with backoff, then give up softly. The master-only
+            # GH /nix/store cache above is the primary cross-run reuse path.
+            - name: Push to cache (xilo)
+              if: >-
+                  github.event_name == 'push' ||
+                  github.event.pull_request.head.repo.full_name == github.repository
+              continue-on-error: true
+              env:
+                  XILO_URL: https://nix.stubbe.dev
+                  XILO_TOKEN: ${{ secrets.XILO_TOKEN }}
+              run: |
+                  curl -fsSL https://github.com/stubbedev/xilo/releases/latest/download/xilo-linux-amd64.tar.gz | tar -xz
+                  for attempt in 1 2 3; do
+                      if ./xilo push wayle $(cat /tmp/wayle-outpaths); then
+                          exit 0
+                      fi
+                      echo "::warning::xilo push attempt $attempt failed; retrying in $((attempt * 30))s"
+                      sleep $((attempt * 30))
+                  done
+                  echo "::warning::xilo push failed after 3 attempts; cache push is best-effort, continuing"
 
             # Save /nix/store ONLY on master pushes — never on PRs. One master
             # nix cache fits comfortably under the 10 GiB budget; per-PR copies

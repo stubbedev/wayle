@@ -1,13 +1,13 @@
 {
   description = "wayle — a Wayland desktop shell (Rust + GTK4 + Relm4)";
 
-  # Always use the self-hosted attic cache for wayle builds (CI, releases, and
+  # Always use the self-hosted xilo cache for wayle builds (CI, releases, and
   # local dev via `nix build`). Read access is public; pushes are CI/release
-  # only (ATTIC_TOKEN). Users are prompted before an untrusted flake's config
+  # only (XILO_TOKEN). Users are prompted before an untrusted flake's config
   # is honoured, or add the key to trusted-public-keys in nix.conf.
   nixConfig = {
     extra-substituters = [ "https://nix.stubbe.dev/wayle" ];
-    extra-trusted-public-keys = [ "wayle:XD2O2h1Mmka+VegRi2JY7ywNbG9al+TUAZp6CObizFU=" ];
+    extra-trusted-public-keys = [ "wayle:BA9vQHJFl0dx4Zl5y0tbk+Osfly7y6k6tPKWAy49rdQ=" ];
   };
 
   inputs = {

@@ -101,9 +101,9 @@ jobs:
               with:
                   extra_nix_config: |
                       experimental-features = nix-command flakes
-                      # Pull from the self-hosted attic cache (same as CI).
+                      # Pull from the self-hosted xilo cache (same as CI).
                       extra-substituters = https://nix.stubbe.dev/wayle
-                      extra-trusted-public-keys = wayle:XD2O2h1Mmka+VegRi2JY7ywNbG9al+TUAZp6CObizFU=
+                      extra-trusted-public-keys = wayle:BA9vQHJFl0dx4Zl5y0tbk+Osfly7y6k6tPKWAy49rdQ=
 
             # Restore /nix/store from the GitHub Actions cache (shared with the
             # CI nix job via the lockfile key) so a tag build reuses the cached
@@ -113,20 +113,31 @@ jobs:
                   primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', 'nix/package.nix') }}
                   restore-prefixes-first-match: nix-${{ runner.os }}-
 
-            # Push the release build closure to the attic cache — the single
-            # source of truth for both CI and releases.
-            - name: Setup attic push
-              uses: ryanccn/attic-action@v0
-              with:
-                  endpoint: https://nix.stubbe.dev
-                  cache: wayle
-                  token: ${{ secrets.ATTIC_TOKEN }}
-
-            - name: Build and push release package
+            - name: Build release package
               # --accept-flake-config: trust the flake's nixConfig substituter
               # (also set via extra_nix_config above); silences the
               # untrusted-config warning.
-              run: nix build '.?submodules=1#wayle' -L --accept-flake-config
+              run: nix build '.?submodules=1#wayle' -L --accept-flake-config --print-out-paths | tee /tmp/wayle-outpaths
+
+            # Push the release build closure to the xilo cache — the single
+            # source of truth for both CI and releases. Best-effort: a cache
+            # push failure must not redden the release. Retry with backoff,
+            # then give up softly.
+            - name: Push to cache (xilo)
+              continue-on-error: true
+              env:
+                  XILO_URL: https://nix.stubbe.dev
+                  XILO_TOKEN: ${{ secrets.XILO_TOKEN }}
+              run: |
+                  curl -fsSL https://github.com/stubbedev/xilo/releases/latest/download/xilo-linux-amd64.tar.gz | tar -xz
+                  for attempt in 1 2 3; do
+                      if ./xilo push wayle $(cat /tmp/wayle-outpaths); then
+                          exit 0
+                      fi
+                      echo "::warning::xilo push attempt $attempt failed; retrying in $((attempt * 30))s"
+                      sleep $((attempt * 30))
+                  done
+                  echo "::warning::xilo push failed after 3 attempts; cache push is best-effort, continuing"
 
     ubuntu:
         name: Package (Ubuntu ${{ matrix.arch }})

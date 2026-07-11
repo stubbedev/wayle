@@ -147,7 +147,7 @@ let
   '';
 
   # The cached dependency layer. Built once per Cargo.lock (version-independent
-  # via depsSrc); pushed to attic and reused across releases.
+  # via depsSrc); pushed to the xilo cache and reused across releases.
   cargoArtifacts = craneLib.buildDepsOnly (
     commonArgs
     // {
