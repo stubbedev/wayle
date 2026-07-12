@@ -254,7 +254,7 @@ jobs:
             # and same-repo PRs (both have the token) so PR-built deps are in
             # xilo before merge. Fork PRs lack the secret and just pull via the
             # substituter above. Best-effort: large-path 504s don't fail the
-            # job — retry with backoff, then give up softly. The master-only
+            # job. The master-only
             # GH /nix/store cache above is the primary cross-run reuse path.
             - name: setup xilo
               if: >-
@@ -272,14 +272,7 @@ jobs:
                   github.event.pull_request.head.repo.full_name == github.repository
               continue-on-error: true
               run: |
-                  for attempt in 1 2 3; do
-                      if xilo push default $(cat /tmp/wayle-outpaths); then
-                          exit 0
-                      fi
-                      echo "::warning::xilo push attempt $attempt failed; retrying in $((attempt * 30))s"
-                      sleep $((attempt * 30))
-                  done
-                  echo "::warning::xilo push failed after 3 attempts; cache push is best-effort, continuing"
+                  xilo push default $(cat /tmp/wayle-outpaths)
 
             # Save /nix/store ONLY on master pushes — never on PRs. One master
             # nix cache fits comfortably under the 10 GiB budget; per-PR copies

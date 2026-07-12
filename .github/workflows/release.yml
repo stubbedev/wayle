@@ -121,8 +121,7 @@ jobs:
 
             # Push the release build closure to the xilo cache — the single
             # source of truth for both CI and releases. Best-effort: a cache
-            # push failure must not redden the release. Retry with backoff,
-            # then give up softly.
+            # push failure must not redden the release.
             - name: setup xilo
               uses: stubbedev/xilo@v1
               with:
@@ -133,14 +132,7 @@ jobs:
             - name: Push to cache (xilo)
               continue-on-error: true
               run: |
-                  for attempt in 1 2 3; do
-                      if xilo push default $(cat /tmp/wayle-outpaths); then
-                          exit 0
-                      fi
-                      echo "::warning::xilo push attempt $attempt failed; retrying in $((attempt * 30))s"
-                      sleep $((attempt * 30))
-                  done
-                  echo "::warning::xilo push failed after 3 attempts; cache push is best-effort, continuing"
+                  xilo push default $(cat /tmp/wayle-outpaths)
 
     ubuntu:
         name: Package (Ubuntu ${{ matrix.arch }})
