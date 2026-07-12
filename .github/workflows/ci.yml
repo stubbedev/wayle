@@ -260,10 +260,10 @@ jobs:
               if: >-
                   github.event_name == 'push' ||
                   github.event.pull_request.head.repo.full_name == github.repository
-              uses: stubbedev/xilo@v0
+              uses: stubbedev/xilo@v1
               with:
                   url: https://nix.stubbe.dev
-                  cache: wayle
+                  cache: default
                   token: ${{ secrets.XILO_TOKEN }}
 
             - name: Push to cache (xilo)
@@ -273,7 +273,7 @@ jobs:
               continue-on-error: true
               run: |
                   for attempt in 1 2 3; do
-                      if xilo push wayle $(cat /tmp/wayle-outpaths); then
+                      if xilo push default $(cat /tmp/wayle-outpaths); then
                           exit 0
                       fi
                       echo "::warning::xilo push attempt $attempt failed; retrying in $((attempt * 30))s"
