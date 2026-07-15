@@ -93,13 +93,13 @@ update:
 # ─────────────────────────── Nix cache ───────────────────────────
 
 # Build the flake package and push its closure to the self-hosted xilo
-# cache (https://nix.stubbe.dev, cache `wayle`) — the same cache CI/releases
-# push to. Requires the xilo client logged in
-# (`xilo login https://nix.stubbe.dev --token <tok>`). Pull access is public
-# via the flake's substituter.
+# cache (https://nix.stubbe.dev, cache `default/default`) — the same cache
+# CI/releases push to (`xilo push default`). Requires the xilo client logged
+# in (`xilo login https://nix.stubbe.dev --token <tok>`). Pull access is
+# public via the flake's substituter.
 cache-push:
     nix build '.?submodules=1#wayle' -L --accept-flake-config
-    xilo push wayle ./result
+    xilo push default/default ./result
 
 release-preview:
     #!/usr/bin/env bash
