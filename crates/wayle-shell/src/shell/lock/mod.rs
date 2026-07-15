@@ -13,8 +13,12 @@
 
 mod logind;
 
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashSet,
+    time::{Duration, Instant},
+};
 
+use gdk4::gio::prelude::ListModelExt;
 use gtk4_session_lock::Instance;
 use relm4::{
     gtk,
@@ -35,7 +39,7 @@ use wayle_widgets::{
     prelude::WayleRevealer,
 };
 
-use crate::shell::helpers::monitors::current_monitors;
+use crate::shell::helpers::monitors::{Connector, current_monitors};
 
 /// Per-monitor widgets we keep live to drive the clock, password entry, and
 /// blank scrim while the screen is locked.
@@ -49,6 +53,9 @@ struct Surface {
     reveal: WayleRevealer,
     /// Opaque black overlay shown after `blank-timeout-ms` of inactivity.
     scrim: gtk::Box,
+    /// Connector name (e.g. `DP-1`) this surface was built for, so hotplug
+    /// reconciliation can tell which monitors already have a surface.
+    connector: Connector,
 }
 
 /// Resolved background configuration for a lock session.
@@ -103,6 +110,10 @@ pub(crate) enum LockInput {
     Activity,
     /// Blank timer fired; show the black scrim.
     Blank,
+    /// A monitor was added or removed; reconcile lock surfaces (only acts while
+    /// locked). A reconnected output with no surface makes the compositor treat
+    /// the lock as dead, so we must (re)cover every output.
+    MonitorsChanged,
 }
 
 #[relm4::component(pub(crate))]
@@ -137,6 +148,16 @@ impl Component for Lock {
             logind::listen(input).await;
         });
 
+        // Rebuild lock surfaces when outputs come and go while locked (e.g. a
+        // KVM switch disconnects then reconnects a monitor). Same primitive the
+        // bar uses; the handler no-ops unless a lock is held.
+        if let Some(display) = gdk::Display::default() {
+            let input = sender.input_sender().clone();
+            display.monitors().connect_items_changed(move |_, _, _, _| {
+                input.emit(LockInput::MonitorsChanged);
+            });
+        }
+
         let model = Lock {
             config,
             instance: None,
@@ -162,6 +183,7 @@ impl Component for Lock {
             LockInput::Tick => self.refresh_clock(),
             LockInput::Activity => self.on_activity(&sender),
             LockInput::Blank => self.set_blanked(true),
+            LockInput::MonitorsChanged => self.reconcile_surfaces(&sender),
         }
     }
 }
@@ -251,6 +273,58 @@ impl Lock {
         self.arm_blank(sender);
         self.set_locked_hint(true);
         info!(monitors = self.surfaces.len(), "lock: session locked");
+    }
+
+    /// Reconciles lock surfaces to match the current monitor set. Runs on
+    /// monitor hotplug and no-ops unless a lock is held. A reconnected output
+    /// (e.g. after a KVM switch) has no `ext-session-lock` surface, which makes
+    /// the compositor treat the lock as dead — so any newly present monitor
+    /// gets a fresh surface and surfaces for removed monitors are dropped (the
+    /// library also auto-unmaps those, but we own the `Surface` bookkeeping).
+    fn reconcile_surfaces(&mut self, sender: &ComponentSender<Self>) {
+        if !self.instance.as_ref().is_some_and(Instance::is_locked) {
+            return;
+        }
+
+        let monitors = current_monitors();
+        let live: HashSet<Connector> = monitors.iter().map(|(c, _)| c.clone()).collect();
+
+        // Read config before borrowing the instance / mutating surfaces, so the
+        // instance borrow below does not conflict (mirrors `acquire`).
+        let bg = self.background_config();
+        let show_clock = self.config.config().lock.show_clock.get();
+        let reveal = self.reveal_anim();
+
+        let Some(instance) = self.instance.as_ref() else {
+            return;
+        };
+
+        // Drop surfaces whose monitor is gone.
+        self.surfaces.retain(|s| {
+            let keep = live.contains(&s.connector);
+            if !keep {
+                s.window.destroy();
+            }
+            keep
+        });
+
+        // Cover any monitor that lacks a surface.
+        let have: HashSet<Connector> = self.surfaces.iter().map(|s| s.connector.clone()).collect();
+        let mut added = false;
+        for (connector, monitor) in monitors {
+            if have.contains(&connector) {
+                continue;
+            }
+            let surface = present_surface(
+                instance, connector, &monitor, &bg, show_clock, reveal, sender,
+            );
+            self.surfaces.push(surface);
+            added = true;
+        }
+
+        if added && let Some(first) = self.surfaces.first() {
+            first.entry.grab_focus();
+        }
     }
 
     /// Handles a submitted entry value (or honors the grace window).
@@ -498,23 +572,41 @@ fn build_surfaces(
     reveal: (AnimationType, u32),
     sender: &ComponentSender<Lock>,
 ) -> Vec<Surface> {
-    let mut surfaces = Vec::new();
-    for (connector, monitor) in current_monitors() {
-        let surface = build_surface(bg, show_clock, reveal, sender);
-        instance.assign_window_to_monitor(&surface.window, &monitor);
-        surface.window.present();
-        // Reveal on the next tick so the transition actually runs (a same-tick
-        // false→true does not animate), mirroring the other overlays.
-        let revealer = surface.reveal.clone();
-        glib::idle_add_local_once(move || revealer.set_reveal_child(true));
-        tracing::debug!(%connector, "lock: surface presented");
-        surfaces.push(surface);
-    }
-    surfaces
+    current_monitors()
+        .into_iter()
+        .map(|(connector, monitor)| {
+            present_surface(
+                instance, connector, &monitor, bg, show_clock, reveal, sender,
+            )
+        })
+        .collect()
+}
+
+/// Builds one surface, assigns it to `monitor` on the lock `instance`, and
+/// presents + reveals it. Shared by initial acquisition and hotplug reconcile.
+fn present_surface(
+    instance: &Instance,
+    connector: Connector,
+    monitor: &gdk::Monitor,
+    bg: &BgConfig,
+    show_clock: bool,
+    reveal: (AnimationType, u32),
+    sender: &ComponentSender<Lock>,
+) -> Surface {
+    let surface = build_surface(connector.clone(), bg, show_clock, reveal, sender);
+    instance.assign_window_to_monitor(&surface.window, monitor);
+    surface.window.present();
+    // Reveal on the next tick so the transition actually runs (a same-tick
+    // false→true does not animate), mirroring the other overlays.
+    let revealer = surface.reveal.clone();
+    glib::idle_add_local_once(move || revealer.set_reveal_child(true));
+    tracing::debug!(%connector, "lock: surface presented");
+    surface
 }
 
 /// Builds one lock surface (window + widgets) for a monitor.
 fn build_surface(
+    connector: Connector,
     bg: &BgConfig,
     show_clock: bool,
     reveal: (AnimationType, u32),
@@ -572,6 +664,7 @@ fn build_surface(
         error: cred.error,
         reveal: cred.root,
         scrim,
+        connector,
     }
 }
 
