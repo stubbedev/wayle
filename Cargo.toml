@@ -152,6 +152,7 @@ tracing-attributes = "0.1.30"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter", "json"] }
 unic-langid = "0.9"
 wildcard = "0.3"
+xcursor = "0.3.10"
 zbus = { version = "5.11.0", default-features = false, features = ["tokio"] }
 hyprland = "0.4.0-beta.2"
 regex = "1.12"

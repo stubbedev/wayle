@@ -11,6 +11,9 @@
 
 use std::path::{Path, PathBuf};
 
+use gdk4::{Cursor as GdkCursor, MemoryFormat, MemoryTexture, glib::Bytes};
+use xcursor::{CursorTheme, parser::Image, parser::parse_xcursor};
+
 /// Home-relative path where a running wayle session records its live cursor
 /// (see `wayle-shell`'s `cursor_record`). Read before parsing dotfiles so the
 /// greeter keeps exactly the theme/size the last session actually used.
@@ -82,6 +85,52 @@ pub fn detect(home: &Path, session: &str) -> Cursor {
         found = found.or(parsed);
     }
     found
+}
+
+/// Loads `name` from the xcursor `theme` (searched via `XCURSOR_PATH`, then the
+/// XDG defaults) as an explicit GTK texture cursor at roughly `size` logical
+/// pixels, or `None` if the theme is unset or lacks the icon.
+///
+/// GTK 4's Wayland backend no longer renders named cursors from an xcursor
+/// theme itself: it uses cursor-shape-v1 (compositor-side) or its own bundled
+/// PNG fallbacks. Under a kiosk host without cursor-shape-v1 (e.g. cage 0.3)
+/// every named cursor becomes GTK's oversized bundled arrow, ignoring
+/// `XCURSOR_THEME` entirely. So the greeter loads the theme bitmap itself and
+/// hands GTK a texture cursor, which the backend always honours.
+pub fn load_texture_cursor(theme: &str, size: u32, name: &str) -> Option<GdkCursor> {
+    if theme.is_empty() {
+        return None;
+    }
+    let path = CursorTheme::load(theme).load_icon(name)?;
+    let images = parse_xcursor(&std::fs::read(path).ok()?)?;
+    let image = best_image(&images, size)?;
+    let bytes = Bytes::from(image.pixels_rgba.as_slice());
+    let texture = MemoryTexture::new(
+        image.width as i32,
+        image.height as i32,
+        MemoryFormat::R8g8b8a8Premultiplied,
+        &bytes,
+        image.width as usize * 4,
+    );
+    Some(GdkCursor::from_texture(
+        &texture,
+        image.xhot as i32,
+        image.yhot as i32,
+        None,
+    ))
+}
+
+/// Picks the theme image whose nominal size best matches `size` (xcursor themes
+/// ship several): the smallest that is at least `size`, else the largest. For
+/// an animated cursor this takes the first frame at that size.
+// ponytail: nominal-size match only; HiDPI wants size*scale, add a scale arg if
+// the login screen ever needs per-output cursor sizing.
+fn best_image(images: &[Image], size: u32) -> Option<&Image> {
+    images
+        .iter()
+        .filter(|i| i.size >= size)
+        .min_by_key(|i| i.size)
+        .or_else(|| images.iter().max_by_key(|i| i.size))
 }
 
 /// Parses the `theme=`/`size=` file a wayle session records (see

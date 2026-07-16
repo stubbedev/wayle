@@ -10,7 +10,10 @@
 //! next start. Unknown keys and non-greeter tables are dropped, so even invoked
 //! with a hostile file this can only ever set greeter options.
 
-use std::path::{Path, PathBuf};
+use std::{
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+};
 
 use toml::{Table, Value};
 
@@ -86,6 +89,8 @@ fn apply(staged: &Path, config_path: &Path) -> Result<PathBuf, String> {
         return Err("no recognised greeter keys in staged file".to_owned());
     }
 
+    relocate_background_image(&mut greeter, config_path)?;
+
     let dest = config_path.with_file_name("runtime.toml");
     let mut root: Table = match std::fs::read_to_string(&dest) {
         Ok(existing) => toml::from_str(&existing)
@@ -101,6 +106,66 @@ fn apply(staged: &Path, config_path: &Path) -> Result<PathBuf, String> {
     }
     std::fs::write(&dest, rendered).map_err(|e| format!("cannot write {}: {e}", dest.display()))?;
     Ok(dest)
+}
+
+/// Copies an image-mode background into the system config dir and rewrites the
+/// stored path to point there.
+///
+/// The greeter runs pre-login as the unprivileged `greeter` user and cannot
+/// read the picking user's home, so a `background-image` under `~` would render
+/// as the blank color fallback. Only `background-mode = "image"` triggers a
+/// copy; other modes leave the key untouched.
+///
+/// Security: this runs as root (via pkexec), and the source path comes from a
+/// user. Reading it directly would let a caller point `background-image` at a
+/// root-only file (`/etc/shadow`) and get a world-readable copy. So the read is
+/// done with the *caller's* effective uid ([`as_pkexec_caller`]) — an
+/// unreadable source fails with `EACCES` instead, whether reached by path or by
+/// symlink.
+fn relocate_background_image(greeter: &mut Table, config_path: &Path) -> Result<(), String> {
+    let is_image = matches!(greeter.get("background-mode"), Some(Value::String(m)) if m == "image");
+    let Some(Value::String(src)) = greeter.get("background-image").cloned() else {
+        return Ok(());
+    };
+    if !is_image || src.is_empty() {
+        return Ok(());
+    }
+
+    let data = as_pkexec_caller(|| std::fs::read(&src))
+        .map_err(|e| format!("cannot read background image {src}: {e}"))?;
+    let ext = Path::new(&src)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("img");
+    let dest = config_path.with_file_name(format!("greeter-background.{ext}"));
+    std::fs::write(&dest, &data).map_err(|e| format!("cannot write {}: {e}", dest.display()))?;
+    // World-readable so the greeter user can load it.
+    let _ = std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o644));
+    greeter.insert(
+        "background-image".to_owned(),
+        Value::String(dest.to_string_lossy().into_owned()),
+    );
+    Ok(())
+}
+
+/// Runs `f` with the effective uid dropped to the pkexec caller (`PKEXEC_UID`),
+/// restoring root afterwards, so a privileged read can only touch files that
+/// caller can. When `PKEXEC_UID` is unset (invoked directly as root, not via
+/// the settings button) `f` runs unchanged.
+#[allow(unsafe_code)] // seteuid has no safe std wrapper
+fn as_pkexec_caller<T>(f: impl FnOnce() -> T) -> T {
+    let Some(uid) = std::env::var("PKEXEC_UID")
+        .ok()
+        .and_then(|u| u.parse::<u32>().ok())
+    else {
+        return f();
+    };
+    // SAFETY: apply-config is single-threaded and short-lived; real/saved uid
+    // stay 0 (pkexec runs us as root) so the restoring `seteuid(0)` succeeds.
+    unsafe { libc::seteuid(uid) };
+    let out = f();
+    unsafe { libc::seteuid(0) };
+    out
 }
 
 fn fail(message: &str) -> i32 {
@@ -144,6 +209,56 @@ mod tests {
         let staged = dir.join("s.toml");
         std::fs::write(&staged, "[general]\nfoo = 1\n").unwrap();
         assert!(apply(&staged, &dir.join("config.toml")).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn image_mode_copies_background_into_config_dir() {
+        // PKEXEC_UID is unset under the test runner, so as_pkexec_caller reads
+        // the source as the current user — no privilege drop needed here.
+        let dir = std::env::temp_dir().join(format!("wg-apply3-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let src = dir.join("wall.png");
+        std::fs::write(&src, b"PNGDATA").unwrap();
+        let staged = dir.join("staged.toml");
+        std::fs::write(
+            &staged,
+            format!(
+                "[greeter]\nbackground-mode = \"image\"\nbackground-image = \"{}\"\n",
+                src.display()
+            ),
+        )
+        .unwrap();
+        let config = dir.join("config.toml");
+
+        let dest = apply(&staged, &config).unwrap();
+        let written: Table = toml::from_str(&std::fs::read_to_string(&dest).unwrap()).unwrap();
+        let image = written["greeter"]["background-image"].as_str().unwrap();
+        // Path was rewritten next to the config, and the bytes were copied.
+        assert_eq!(image, config.with_file_name("greeter-background.png").to_str().unwrap());
+        assert_eq!(std::fs::read(image).unwrap(), b"PNGDATA");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn color_mode_leaves_background_image_untouched() {
+        let dir = std::env::temp_dir().join(format!("wg-apply4-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let staged = dir.join("staged.toml");
+        // A home path the greeter cannot read: color mode must not try to copy it.
+        std::fs::write(
+            &staged,
+            "[greeter]\nbackground-mode = \"color\"\nbackground-image = \"/home/nobody/x.png\"\n",
+        )
+        .unwrap();
+        let config = dir.join("config.toml");
+
+        let dest = apply(&staged, &config).unwrap();
+        let written: Table = toml::from_str(&std::fs::read_to_string(&dest).unwrap()).unwrap();
+        assert_eq!(
+            written["greeter"]["background-image"].as_str(),
+            Some("/home/nobody/x.png")
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

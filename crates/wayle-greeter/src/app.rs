@@ -155,21 +155,12 @@ impl Component for Greeter {
     ) -> ComponentParts<Self> {
         install_css(&init.config);
         install_icons();
-        // Detect the cursor from the last user's dotfiles (sole user when
-        // nothing is remembered), preferring the compositor they last used.
-        let cursor_home = init
-            .last_user
-            .as_deref()
-            .and_then(|last| init.users.iter().find(|u| u.name == last))
-            .or(match init.users.as_slice() {
-                [only] => Some(only),
-                _ => None,
-            })
-            .map(|user| user.home.clone());
+        let cursor_home = cursor_home(&init.users, init.last_user.as_deref());
         install_cursor(
             &init.config,
             cursor_home.as_deref(),
             init.last_session.as_deref().unwrap_or_default(),
+            &root,
         );
 
         let overlay = gtk::Overlay::new();
@@ -212,6 +203,7 @@ impl Component for Greeter {
         if let Some(user_entry) = &cred.username {
             user_entry.set_placeholder_text(Some(&t!("greeter-username")));
         }
+        apply_text_cursor(&cred);
 
         if init.config.greeter.show_user_list.get() {
             populate_user_row(&user_row, &init.users, init.last_user.as_deref(), &cred);
@@ -554,7 +546,7 @@ fn build_user_button(user: &User) -> gtk::Button {
     let button = gtk::Button::new();
     button.add_css_class("lock-user-button");
     button.add_css_class("flat");
-    button.set_cursor_from_name(Some("pointer"));
+    set_pointer_cursor(&button);
     button.set_child(Some(&column));
     button
 }
@@ -591,7 +583,7 @@ fn build_power_box() -> gtk::Widget {
         let button = gtk::Button::from_icon_name(icon);
         button.add_css_class("lock-power-button");
         button.add_css_class("flat");
-        button.set_cursor_from_name(Some("pointer"));
+        set_pointer_cursor(&button);
         button.set_tooltip_text(Some(&tooltip));
         button.connect_clicked(move |_| {
             if let Err(err) = std::process::Command::new("systemctl").arg(verb).spawn() {
@@ -610,7 +602,7 @@ fn build_session_dropdown(sessions: &[Session], last: Option<&str>) -> gtk::Drop
     let names: Vec<&str> = sessions.iter().map(|s| s.name.as_str()).collect();
     let dropdown = gtk::DropDown::from_strings(&names);
     dropdown.add_css_class("lock-session");
-    dropdown.set_cursor_from_name(Some("pointer"));
+    set_pointer_cursor(&dropdown);
     dropdown.set_halign(gtk::Align::Center);
 
     if let Some(last) = last
@@ -645,13 +637,72 @@ fn install_icons() {
     gtk::IconTheme::for_display(&display).add_search_path(&dir);
 }
 
+/// The home whose dotfiles seed cursor detection: the remembered user's, or
+/// the sole user's when nothing is remembered (best-effort — see
+/// [`cursor::detect`]).
+fn cursor_home(users: &[User], last_user: Option<&str>) -> Option<PathBuf> {
+    last_user
+        .and_then(|last| users.iter().find(|u| u.name == last))
+        .or(match users {
+            [only] => Some(only),
+            _ => None,
+        })
+        .map(|user| user.home.clone())
+}
+
+thread_local! {
+    /// Resolved (theme, logical-size) for the login screen, set once in
+    /// [`install_cursor`] so the widget builders can request themed cursors
+    /// (see [`set_pointer_cursor`]) without config plumbing.
+    static CURSOR_THEME: std::cell::RefCell<Option<(String, u32)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Builds a themed texture cursor `name` from the login screen's resolved
+/// theme, or `None` when no theme is set or the theme lacks the icon — the
+/// caller then falls back to a named cursor.
+fn themed_cursor(name: &str) -> Option<gdk::Cursor> {
+    CURSOR_THEME.with(|cell| {
+        let borrow = cell.borrow();
+        let (theme, size) = borrow.as_ref()?;
+        cursor::load_texture_cursor(theme, *size, name)
+    })
+}
+
+/// Sets the themed I-beam on the credential fields: like the pointer, the
+/// `"text"` cursor GTK draws over an entry is a named cursor a cage-style host
+/// won't theme, so apply the texture explicitly (a no-op when no theme
+/// resolves, leaving GTK's own I-beam).
+fn apply_text_cursor(cred: &CredentialBox) {
+    let Some(text_cursor) = themed_cursor("text") else {
+        return;
+    };
+    cred.entry.set_cursor(Some(&text_cursor));
+    if let Some(user_entry) = &cred.username {
+        user_entry.set_cursor(Some(&text_cursor));
+    }
+}
+
+/// Gives `widget` a hand pointer: the themed texture cursor when a theme is
+/// resolved (kiosk hosts without cursor-shape-v1 ignore named cursors, so a
+/// bare `"pointer"` would show GTK's oversized bundled fallback — see
+/// [`cursor::load_texture_cursor`]), else the named `"pointer"`.
+fn set_pointer_cursor(widget: &impl IsA<gtk::Widget>) {
+    match themed_cursor("pointer") {
+        Some(cursor) => widget.set_cursor(Some(&cursor)),
+        None => widget.set_cursor_from_name(Some("pointer")),
+    }
+}
+
 /// Applies the cursor theme/size, resolved in order: explicit `[greeter]`
 /// config, the last user's own dotfiles ([`cursor::detect`], best-effort — the
 /// home may not be readable pre-login), `XCURSOR_*` environment, and finally
-/// the config defaults. The size is logical: GTK loads a scaled cursor per
-/// output, so HiDPI displays get the right resolution. The settings are
-/// re-applied on monitor hotplug to force that re-resolution.
-fn install_cursor(config: &Config, home: Option<&Path>, session: &str) {
+/// the config defaults. Sets the resolved theme's arrow as `root`'s cursor (a
+/// texture cursor, since GTK 4 no longer loads xcursor themes for named cursors
+/// under a cage-style host) and stores the theme for [`themed_cursor`]. Also
+/// pushes the theme into `gtk::Settings` for hosts that DO honour it. The
+/// settings are re-applied on monitor hotplug to force per-output resolution.
+fn install_cursor(config: &Config, home: Option<&Path>, session: &str, root: &gtk::Window) {
     let Some(settings) = gtk::Settings::default() else {
         return;
     };
@@ -684,6 +735,17 @@ fn install_cursor(config: &Config, home: Option<&Path>, session: &str) {
         .unwrap_or_else(|| config.greeter.cursor_size.get())
         .max(1) as i32;
     info!(%theme, size, "greeter: applying cursor settings");
+
+    // Store the resolved theme for the widget builders, then hand the window an
+    // explicit arrow texture cursor: GTK's named-cursor path is a no-op under a
+    // host without cursor-shape-v1, so gtk::Settings alone leaves the bundled
+    // fallback. Children inherit this arrow unless they set their own (buttons
+    // ask for a hand via set_pointer_cursor).
+    CURSOR_THEME.with(|cell| *cell.borrow_mut() = Some((theme.clone(), size as u32)));
+    if let Some(default) = themed_cursor("default") {
+        root.set_cursor(Some(&default));
+    }
+
     let apply = move |settings: &gtk::Settings| {
         if !theme.is_empty() {
             settings.set_gtk_cursor_theme_name(Some(&theme));
@@ -732,9 +794,19 @@ fn build_background(config: &Config) -> gtk::Widget {
 }
 
 /// An image scaled to cover with a legibility scrim, or a solid fill if the
-/// path is empty. Blur is intentionally omitted in the greeter for now.
+/// path is empty or unreadable. Blur is intentionally omitted in the greeter
+/// for now.
 fn image_or_fill(path: &str, color: &str) -> gtk::Widget {
     if path.is_empty() {
+        return solid_fill(color);
+    }
+    // The greeter runs pre-login as the `greeter` user; a background under a
+    // user's 0700 home is a common misconfiguration that would silently render
+    // as a blank fill. Surface it and fall back to the color so the screen is
+    // never mysteriously black. (`wayle-greeter apply-config` copies images to a
+    // greeter-readable path to avoid exactly this.)
+    if let Err(err) = std::fs::File::open(path) {
+        warn!(path, error = %err, "greeter: background image unreadable; using color fill");
         return solid_fill(color);
     }
     let overlay = gtk::Overlay::new();
