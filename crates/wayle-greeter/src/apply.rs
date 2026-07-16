@@ -235,7 +235,13 @@ mod tests {
         let written: Table = toml::from_str(&std::fs::read_to_string(&dest).unwrap()).unwrap();
         let image = written["greeter"]["background-image"].as_str().unwrap();
         // Path was rewritten next to the config, and the bytes were copied.
-        assert_eq!(image, config.with_file_name("greeter-background.png").to_str().unwrap());
+        assert_eq!(
+            image,
+            config
+                .with_file_name("greeter-background.png")
+                .to_str()
+                .unwrap()
+        );
         assert_eq!(std::fs::read(image).unwrap(), b"PNGDATA");
         let _ = std::fs::remove_dir_all(&dir);
     }

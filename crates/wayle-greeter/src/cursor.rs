@@ -12,7 +12,10 @@
 use std::path::{Path, PathBuf};
 
 use gdk4::{Cursor as GdkCursor, MemoryFormat, MemoryTexture, glib::Bytes};
-use xcursor::{CursorTheme, parser::Image, parser::parse_xcursor};
+use xcursor::{
+    CursorTheme,
+    parser::{Image, parse_xcursor},
+};
 
 /// Home-relative path where a running wayle session records its live cursor
 /// (see `wayle-shell`'s `cursor_record`). Read before parsing dotfiles so the
