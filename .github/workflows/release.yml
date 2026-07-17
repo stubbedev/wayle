@@ -102,8 +102,8 @@ jobs:
                   extra_nix_config: |
                       experimental-features = nix-command flakes
                       # Pull from the self-hosted xilo cache (same as CI).
-                      extra-substituters = https://nix.stubbe.dev/default
-                      extra-trusted-public-keys = default:BA9vQHJFl0dx4Zl5y0tbk+Osfly7y6k6tPKWAy49rdQ=
+                      extra-substituters = https://nix.stubbe.dev/c/default/default
+                      extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
 
             # Restore /nix/store from the GitHub Actions cache (shared with the
             # CI nix job via the lockfile key) so a tag build reuses the cached
