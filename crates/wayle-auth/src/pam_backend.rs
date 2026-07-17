@@ -5,10 +5,12 @@
 //! been handed to PAM, so the plaintext does not linger in our buffers longer
 //! than the single verification attempt. The password is never logged.
 
-use std::cell::RefCell;
-use std::ffi::{CStr, CString};
-use std::io::Write;
-use std::process::{Command, Stdio};
+use std::{
+    cell::RefCell,
+    ffi::{CStr, CString},
+    io::Write,
+    process::{Command, Stdio},
+};
 
 use pam::Converse;
 use tracing::warn;
