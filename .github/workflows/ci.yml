@@ -223,8 +223,8 @@ jobs:
                       experimental-features = nix-command flakes
                       # Pull from the self-hosted xilo cache on every event
                       # (incl. fork PRs — read access is public, no secret).
-                      extra-substituters = https://nix.stubbe.dev/wayle
-                      extra-trusted-public-keys = wayle:BA9vQHJFl0dx4Zl5y0tbk+Osfly7y6k6tPKWAy49rdQ=
+                      extra-substituters = https://nix.stubbe.dev/default
+                      extra-trusted-public-keys = default:BA9vQHJFl0dx4Zl5y0tbk+Osfly7y6k6tPKWAy49rdQ=
 
             # Restore /nix/store from the GitHub Actions cache so the big
             # `wayle-deps` derivation (591 crates, ~30 min) is reused instead of

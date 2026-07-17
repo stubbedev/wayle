@@ -6,8 +6,8 @@
   # only (XILO_TOKEN). Users are prompted before an untrusted flake's config
   # is honoured, or add the key to trusted-public-keys in nix.conf.
   nixConfig = {
-    extra-substituters = [ "https://nix.stubbe.dev/wayle" ];
-    extra-trusted-public-keys = [ "wayle:BA9vQHJFl0dx4Zl5y0tbk+Osfly7y6k6tPKWAy49rdQ=" ];
+    extra-substituters = [ "https://nix.stubbe.dev/default" ];
+    extra-trusted-public-keys = [ "default:BA9vQHJFl0dx4Zl5y0tbk+Osfly7y6k6tPKWAy49rdQ=" ];
   };
 
   inputs = {
