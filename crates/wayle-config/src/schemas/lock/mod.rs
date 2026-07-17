@@ -26,6 +26,14 @@ pub struct LockConfig {
     #[default(true)]
     pub enabled: ConfigProperty<bool>,
 
+    /// Lock the session as soon as the shell starts. For autologin setups
+    /// (e.g. greetd with no password at boot) where the lock screen is the
+    /// access gate: the session comes up locked and requires the password
+    /// before use. Off by default — a normal login has already authenticated.
+    #[serde(rename = "lock-on-start")]
+    #[default(false)]
+    pub lock_on_start: ConfigProperty<bool>,
+
     /// How the background is drawn: solid color, an image, or the wallpaper.
     #[serde(rename = "background-mode")]
     #[default(LockBackground::default())]
@@ -119,6 +127,8 @@ mod tests {
         let lock = LockConfig::default();
         // Wayle handles locking by default.
         assert!(lock.enabled.get());
+        // Never auto-lock on start unless explicitly opted in.
+        assert!(!lock.lock_on_start.get());
         // Solid black background unless configured otherwise.
         assert_eq!(lock.background_mode.get(), LockBackground::Color);
         assert_eq!(lock.background_color.get().as_str(), "#000000");

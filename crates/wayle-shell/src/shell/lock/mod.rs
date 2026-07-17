@@ -158,6 +158,20 @@ impl Component for Lock {
             });
         }
 
+        // Autologin gate: lock once when the session first starts, so a session
+        // that never entered a password at boot (greetd autologin) comes up
+        // locked. `claim_lock_on_start` guards it to the first shell start per
+        // login session — a later restart (home-manager switch bouncing
+        // wayle.service, or an on-failure restart) must NOT relock a session the
+        // user is already using. Queued on the input sender: relm4 processes it
+        // once the component loop runs, so `acquire` maps surfaces on the
+        // monitors the shell already knows (MonitorsChanged covers late ones).
+        if config.config().lock.lock_on_start.get()
+            && crate::services::lock::claim_lock_on_start()
+        {
+            sender.input_sender().emit(LockInput::Lock);
+        }
+
         let model = Lock {
             config,
             instance: None,
