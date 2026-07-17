@@ -65,9 +65,9 @@ fn claim_marker(runtime_dir: &std::path::Path) -> bool {
         .create_new(true)
         .open(&marker)
     {
-        Ok(_) => true,                                                   // first start → lock
+        Ok(_) => true,                                                    // first start → lock
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => false, // restart → skip
-        Err(_) => true,                                                  // unknown error → fail secure
+        Err(_) => true, // unknown error → fail secure
     }
 }
 

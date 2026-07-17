@@ -166,8 +166,7 @@ impl Component for Lock {
         // user is already using. Queued on the input sender: relm4 processes it
         // once the component loop runs, so `acquire` maps surfaces on the
         // monitors the shell already knows (MonitorsChanged covers late ones).
-        if config.config().lock.lock_on_start.get()
-            && crate::services::lock::claim_lock_on_start()
+        if config.config().lock.lock_on_start.get() && crate::services::lock::claim_lock_on_start()
         {
             sender.input_sender().emit(LockInput::Lock);
         }
