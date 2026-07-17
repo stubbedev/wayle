@@ -3813,6 +3813,11 @@
           "default": 0,
           "description": "Grace window after locking during which the screen unlocks without a\npassword (milliseconds, `0` = always require the password)."
         },
+        "lock-on-start": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Lock the session as soon as the shell starts. For autologin setups\n(e.g. greetd with no password at boot) where the lock screen is the\naccess gate: the session comes up locked and requires the password\nbefore use. Off by default — a normal login has already authenticated."
+        },
         "max-attempts": {
           "$ref": "#/$defs/uint32",
           "default": 0,
@@ -8808,7 +8813,7 @@
       "type": "integer"
     }
   },
-  "$id": "wayle-config-0.8.28",
+  "$id": "wayle-config-0.8.29",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Main configuration structure for Wayle.\n\nRepresents the complete configuration schema that can be loaded\nfrom TOML files. All fields have sensible defaults.",
   "properties": {
@@ -9142,6 +9147,7 @@
         "date-format": "%A, %B %-d",
         "enabled": true,
         "grace-period-ms": 0,
+        "lock-on-start": false,
         "max-attempts": 0,
         "pam-service": "system-auth",
         "show-clock": true,
