@@ -241,12 +241,20 @@ in
       ++ lib.optional cfg.lock.enable ''
         programs.wayle.lock (home-manager) cannot create the PAM service the
         unlock authenticates against (/etc/pam.d is root-owned). Create
-        /etc/pam.d/${cfg.lock.pamService} yourself — a minimal stack works:
-          auth     sufficient pam_unix.so
-          auth     required   pam_deny.so
+        /etc/pam.d/${cfg.lock.pamService} yourself — this stack authenticates
+        the unlock AND unlocks the GNOME `login` keyring (pam_unix must be
+        `required`, not `sufficient`: a sufficient pass short-circuits the
+        stack and skips the keyring hook below it; keyring lines are
+        `optional`, so without gnome-keyring installed they no-op):
+          auth     required   pam_unix.so
+          auth     optional   pam_gnome_keyring.so
           account  required   pam_unix.so
           password required   pam_unix.so
+          password optional   pam_gnome_keyring.so use_authtok
           session  required   pam_unix.so
+          session  optional   pam_gnome_keyring.so auto_start
+        (pam_gnome_keyring.so is packaged as libpam-gnome-keyring on
+        Debian/Ubuntu, bundled with gnome-keyring on Arch/Fedora.)
         — and set `lock.pam-service = "${cfg.lock.pamService}"` in your wayle
         config. On Arch/Fedora the config default `system-auth` already exists;
         set lock.pam-service to that instead and skip this. On NixOS use the

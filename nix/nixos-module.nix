@@ -360,10 +360,17 @@ in
 
     (lib.mkIf cfg.lock.enable {
       # The lock surface authenticates the unlock against this PAM service.
-      # Empty stack = the NixOS default (pam_unix password auth), which is what
-      # an unlock needs. The user's wayle config `lock.pam-service` must name
-      # this same service.
-      security.pam.services.${cfg.lock.pamService} = { };
+      # The NixOS default stack (pam_unix password auth) is what an unlock
+      # needs; enableGnomeKeyring additionally forwards the password to a
+      # running gnome-keyring-daemon so unlocking the session also unlocks the
+      # `login` keyring. That matters on autologin setups (e.g. greetd
+      # initial_session straight into a locked compositor): no password is ever
+      # typed at login, so the wayle unlock is the only PAM interaction that
+      # can unlock the keyring — without this, secret-service clients (Chrome,
+      # ...) prompt for the keyring password on first use every session. The
+      # lines are `optional`, so with no keyring daemon running they no-op.
+      # The user's wayle config `lock.pam-service` must name this same service.
+      security.pam.services.${cfg.lock.pamService}.enableGnomeKeyring = true;
     })
 
     (lib.mkIf cfg.greeter.enable {
