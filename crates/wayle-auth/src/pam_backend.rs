@@ -8,8 +8,9 @@
 use std::{
     cell::RefCell,
     ffi::{CStr, CString},
-    io::Write,
-    process::{Command, Stdio},
+    io::{Read, Write},
+    os::unix::net::UnixStream,
+    time::Duration,
 };
 
 use pam::Converse;
@@ -20,50 +21,71 @@ use crate::{AuthConversation, AuthPrompt};
 
 /// Unlock the gnome-keyring login collection with the just-verified password.
 ///
-/// Under greetd autologin no password is entered at boot, so the PAM login
-/// hook (`pam_gnome_keyring`) starts the daemon but leaves the login keyring
-/// LOCKED — the first password the user ever types is at this lock screen. We
-/// hand that password to the already-running daemon so the keyring unlocks
-/// here instead, matching what a normal password login would have done.
+/// Under greetd autologin no password is entered at boot, so the daemon starts
+/// with the login keyring LOCKED — the first password the user ever types is
+/// at this lock screen. We hand that password to the already-running daemon so
+/// the keyring unlocks here, matching what a password login would have done.
 ///
-/// Deliberately a short-lived subprocess, not `pam`'s `open_session()`: that
-/// path calls `env::set_var` on the live process (multithreaded here → UB, and
-/// it also sets `PATH` to a literal `"$PATH:…"`). The subprocess keeps all of
-/// that isolated. Best-effort: any failure is logged and ignored, never
-/// blocking or denying the unlock the user already authenticated.
+/// Speaks the daemon's control-socket protocol directly (what
+/// `pam_gnome_keyring.so` does), NOT `gnome-keyring-daemon --unlock`: that CLI
+/// does not forward to a running daemon — it becomes a second daemon that
+/// rebinds `$XDG_RUNTIME_DIR/keyring/control` out from under the real one,
+/// leaving the D-Bus secrets service locked and breaking every later unlock.
+/// Best-effort: any failure is logged and ignored, never blocking or denying
+/// the unlock the user already authenticated.
 fn unlock_login_keyring(password: &str) {
-    // gnome-keyring-daemon finds the running daemon via GNOME_KEYRING_CONTROL;
-    // the greetd PAM session exports it, but fall back to the well-known path
-    // under XDG_RUNTIME_DIR so an unset var still works.
-    let control = std::env::var_os("GNOME_KEYRING_CONTROL").unwrap_or_else(|| {
-        let rt = std::env::var("XDG_RUNTIME_DIR").unwrap_or_default();
-        format!("{rt}/keyring").into()
-    });
-
-    let mut child = match Command::new("gnome-keyring-daemon")
-        .arg("--unlock")
-        .env("GNOME_KEYRING_CONTROL", control)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-    {
-        Ok(child) => child,
-        // gnome-keyring not installed / not on PATH: nothing to unlock.
-        Err(err) => {
-            warn!(error = %err, "keyring: could not spawn gnome-keyring-daemon --unlock");
-            return;
-        }
-    };
-
-    if let Some(mut stdin) = child.stdin.take() {
-        // No trailing newline: the keyring password is the exact byte string.
-        if let Err(err) = stdin.write_all(password.as_bytes()) {
-            warn!(error = %err, "keyring: could not write password to unlock pipe");
-        }
-        // Drop closes stdin → EOF, so the daemon stops reading.
+    if let Err(err) = control_socket_unlock(password) {
+        warn!(error = %err, "keyring: could not unlock login keyring");
     }
-    let _ = child.wait();
+}
+
+/// `GKD_CONTROL_OP_UNLOCK` over the gnome-keyring control socket.
+///
+/// Wire format (gnome-keyring `pam/gkr-pam-client.c`, all u32 big-endian):
+/// one credentials byte (0x00; the kernel attaches SCM_CREDENTIALS), then
+/// `[packet_len][op][arg_len][arg…]`, answered by `[8][result]` where
+/// result 0 = OK, 1 = DENIED, 2 = FAILED, 3 = NO_DAEMON.
+fn control_socket_unlock(password: &str) -> Result<(), String> {
+    const OP_UNLOCK: u32 = 1;
+
+    let control = std::env::var("GNOME_KEYRING_CONTROL").unwrap_or_else(|_| {
+        let rt = std::env::var("XDG_RUNTIME_DIR").unwrap_or_default();
+        format!("{rt}/keyring")
+    });
+    let path = format!("{control}/control");
+
+    let mut sock =
+        UnixStream::connect(&path).map_err(|err| format!("connect {path}: {err}"))?;
+    // A locker must never hang on a wedged daemon.
+    let timeout = Some(Duration::from_secs(5));
+    let _ = sock.set_read_timeout(timeout);
+    let _ = sock.set_write_timeout(timeout);
+
+    let pw = password.as_bytes();
+    let pw_len = u32::try_from(pw.len()).map_err(|_| "password too long".to_string())?;
+    let mut msg = Zeroizing::new(Vec::with_capacity(13 + pw.len()));
+    msg.push(0u8); // credentials byte
+    msg.extend_from_slice(&(8 + 4 + pw_len).to_be_bytes());
+    msg.extend_from_slice(&OP_UNLOCK.to_be_bytes());
+    msg.extend_from_slice(&pw_len.to_be_bytes());
+    msg.extend_from_slice(pw);
+    sock.write_all(&msg)
+        .map_err(|err| format!("write: {err}"))?;
+
+    let mut resp = [0u8; 8];
+    sock.read_exact(&mut resp)
+        .map_err(|err| format!("read: {err}"))?;
+    let len = u32::from_be_bytes([resp[0], resp[1], resp[2], resp[3]]);
+    let result = u32::from_be_bytes([resp[4], resp[5], resp[6], resp[7]]);
+    if len != 8 {
+        return Err(format!("unexpected response length {len}"));
+    }
+    match result {
+        0 => Ok(()),
+        1 => Err("denied (keyring password differs from login password)".into()),
+        3 => Err("no daemon".into()),
+        other => Err(format!("daemon returned {other}")),
+    }
 }
 
 /// Resolves the login name of the session user from the environment.
