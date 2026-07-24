@@ -54,8 +54,7 @@ fn control_socket_unlock(password: &str) -> Result<(), String> {
     });
     let path = format!("{control}/control");
 
-    let mut sock =
-        UnixStream::connect(&path).map_err(|err| format!("connect {path}: {err}"))?;
+    let mut sock = UnixStream::connect(&path).map_err(|err| format!("connect {path}: {err}"))?;
     // A locker must never hang on a wedged daemon.
     let timeout = Some(Duration::from_secs(5));
     let _ = sock.set_read_timeout(timeout);
