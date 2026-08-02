@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -90,6 +91,7 @@ impl FileWatcher {
         if let Ok(canonical_path) = config_path.canonicalize()
             && let Some(canonical_dir) = canonical_path.parent()
             && canonical_dir != config_dir
+            && !Self::is_immutable_store(canonical_dir)
         {
             if let Err(e) = watcher.watch(canonical_dir, RecursiveMode::NonRecursive) {
                 tracing::warn!(error = %e, ?canonical_dir, "failed to watch canonical config folder");
@@ -97,6 +99,23 @@ impl FileWatcher {
                 info!(?canonical_dir, "Canonical config folder watcher started");
             }
         }
+    }
+
+    /// Whether `dir` is the root of an immutable package store shared with the
+    /// rest of the system.
+    ///
+    /// A config symlinked in by Nix/Home Manager resolves to a file sitting
+    /// directly in `/nix/store`, so the canonical parent is the store root.
+    /// Watching it means every build, GC, or substitution on the machine floods
+    /// this watcher with thousands of unrelated events. There is nothing to
+    /// gain either: store paths are immutable, and a rebuild swaps the symlink
+    /// in the config dir, which the recursive `config_dir` watch already sees.
+    fn is_immutable_store(dir: &Path) -> bool {
+        // ponytail: literal store root; honours NIX_STORE_DIR if someone
+        // relocated the store, otherwise the compiled-in default.
+        let store = std::env::var_os("NIX_STORE_DIR")
+            .map_or_else(|| PathBuf::from("/nix/store"), PathBuf::from);
+        dir == store
     }
 
     fn should_reload(event: &Event) -> bool {
@@ -192,16 +211,25 @@ impl FileWatcher {
 
 const DEBOUNCE_DURATION: Duration = Duration::from_millis(100);
 
+/// Ceiling on how long a sustained event stream may defer a flush.
+///
+/// Every event pushes the debounce deadline out, so a directory under
+/// continuous churn would otherwise never reload and the pending set would grow
+/// without bound.
+const MAX_DEBOUNCE_DELAY: Duration = Duration::from_secs(2);
+
 async fn run_debounced_event_loop(watcher: FileWatcher, mut rx: mpsc::UnboundedReceiver<Event>) {
     use tokio::time::{Instant, sleep_until};
 
-    let mut pending_paths: Vec<PathBuf> = Vec::new();
+    let mut pending_paths: HashSet<PathBuf> = HashSet::new();
     let mut deadline: Option<Instant> = None;
+    let mut flush_by: Option<Instant> = None;
 
     loop {
+        // No `biased` here on purpose: an always-ready `rx` would starve the
+        // timer branch entirely and the debounce would never fire.
         let maybe_event = match deadline {
             Some(d) => tokio::select! {
-                biased;
                 event = rx.recv() => event,
                 () = sleep_until(d) => None,
             },
@@ -210,33 +238,81 @@ async fn run_debounced_event_loop(watcher: FileWatcher, mut rx: mpsc::UnboundedR
 
         match maybe_event {
             Some(event) if FileWatcher::should_reload(&event) => {
-                accumulate_paths(&mut pending_paths, event.paths);
-                deadline = Some(Instant::now() + DEBOUNCE_DURATION);
+                pending_paths.extend(event.paths);
+                deadline = Some(next_deadline(Instant::now(), &mut flush_by));
             }
             Some(_) => {}
             None if deadline.is_some() => {
                 flush_pending(&watcher, &mut pending_paths).await;
                 deadline = None;
+                flush_by = None;
             }
             None => break,
         }
     }
 }
 
-fn accumulate_paths(pending: &mut Vec<PathBuf>, new_paths: Vec<PathBuf>) {
-    for path in new_paths {
-        if !pending.contains(&path) {
-            pending.push(path);
-        }
+/// Debounce deadline for an event seen at `now`, capped so a continuous event
+/// stream still flushes within [`MAX_DEBOUNCE_DELAY`] of the first pending
+/// event. `flush_by` holds that ceiling and is reset by the flush.
+fn next_deadline(
+    now: tokio::time::Instant,
+    flush_by: &mut Option<tokio::time::Instant>,
+) -> tokio::time::Instant {
+    let ceiling = *flush_by.get_or_insert(now + MAX_DEBOUNCE_DELAY);
+    (now + DEBOUNCE_DURATION).min(ceiling)
+}
+
+async fn flush_pending(watcher: &FileWatcher, pending_paths: &mut HashSet<PathBuf>) {
+    let paths: Vec<PathBuf> = pending_paths.drain().collect();
+    debug!(?paths, "Debounce complete, reloading config");
+
+    if let Err(e) = watcher.reload_and_sync(&paths).await {
+        error!("config reload failed:\n{e}");
     }
 }
 
-async fn flush_pending(watcher: &FileWatcher, pending_paths: &mut Vec<PathBuf>) {
-    debug!(?pending_paths, "Debounce complete, reloading config");
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    if let Err(e) = watcher.reload_and_sync(pending_paths).await {
-        error!("config reload failed:\n{e}");
+    #[test]
+    fn store_root_is_never_watched() {
+        assert!(FileWatcher::is_immutable_store(Path::new("/nix/store")));
+        assert!(!FileWatcher::is_immutable_store(Path::new(
+            "/nix/store/blyx7c87qbilmj512y14jgmydx640dbv-source"
+        )));
+        assert!(!FileWatcher::is_immutable_store(Path::new(
+            "/home/user/.config/wayle"
+        )));
     }
 
-    pending_paths.clear();
+    #[test]
+    fn continuous_events_still_flush_within_the_ceiling() {
+        let start = tokio::time::Instant::now();
+        let mut flush_by = None;
+        let mut now = start;
+
+        // An event every 10ms forever: each one pushes the 100ms debounce out,
+        // so only the ceiling can end the batch.
+        for _ in 0..1_000 {
+            let deadline = next_deadline(now, &mut flush_by);
+            assert!(deadline <= start + MAX_DEBOUNCE_DELAY);
+            if deadline <= now {
+                assert!(now >= start + MAX_DEBOUNCE_DELAY);
+                return;
+            }
+            now += Duration::from_millis(10);
+        }
+
+        panic!("debounce never reached its ceiling under a continuous event stream");
+    }
+
+    #[test]
+    fn isolated_events_use_the_short_debounce() {
+        let now = tokio::time::Instant::now();
+        let mut flush_by = None;
+
+        assert_eq!(next_deadline(now, &mut flush_by), now + DEBOUNCE_DURATION);
+    }
 }
