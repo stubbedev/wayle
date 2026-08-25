@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use relm4::ComponentSender;
 use wayle_config::schemas::modules::TreemanConfig;
-use wayle_treeman::TreemanService;
+use wayle_treeman::{Bucket, TreemanService, TreemanStatus};
 use wayle_widgets::watch;
 
 use super::{TreemanModule, helpers, messages::TreemanCmd};
@@ -16,6 +16,8 @@ pub fn spawn_watchers(
     let format_config = config.format.clone();
     let hide_if_empty = config.hide_if_empty.clone();
     let icon_name = config.icon_name.clone();
+    let icon_preparing = config.icon_preparing.clone();
+    let icon_tearing_down = config.icon_tearing_down.clone();
     let icon_failed = config.icon_failed.clone();
 
     watch!(
@@ -25,6 +27,8 @@ pub fn spawn_watchers(
             format_config.watch(),
             hide_if_empty.watch(),
             icon_name.watch(),
+            icon_preparing.watch(),
+            icon_tearing_down.watch(),
             icon_failed.watch()
         ],
         |out| {
@@ -37,10 +41,13 @@ pub fn spawn_watchers(
                 ),
                 None => (String::from("--"), None),
             };
-            let icon = if status.as_ref().is_some_and(|s| s.failed > 0) {
-                icon_failed.get()
-            } else {
-                icon_name.get()
+            // Icon follows the worst bucket, so a prepare or a teardown in
+            // flight is legible on the bar without opening the dropdown.
+            let icon = match status.as_ref().map(TreemanStatus::worst_bucket) {
+                Some(Bucket::Failed) => icon_failed.get(),
+                Some(Bucket::Down) => icon_tearing_down.get(),
+                Some(Bucket::Up) => icon_preparing.get(),
+                Some(Bucket::Stable) | None => icon_name.get(),
             };
             let visible = !(hide_if_empty.get() && total == 0);
             let _ = out.send(TreemanCmd::Update {

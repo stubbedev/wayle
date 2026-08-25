@@ -28,5 +28,8 @@ settings-dropdowns-network = Network
 settings-dropdowns-notification = Notification
     .description = Notification dropdown panel size (width/height override)
 
+settings-dropdowns-treeman = Treeman
+    .description = Treeman dropdown panel size (width/height override)
+
 settings-dropdowns-weather = Weather
     .description = Weather dropdown panel size (width/height override)

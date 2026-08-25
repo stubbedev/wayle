@@ -6,6 +6,7 @@ dropdown-treeman-title = Treeman
 dropdown-treeman-main = main
 
 ## Row actions
+dropdown-treeman-action-info = Details
 dropdown-treeman-action-prepare = Prepare
 dropdown-treeman-action-reset = Reset databases
 dropdown-treeman-action-teardown = Delete worktree
@@ -27,3 +28,10 @@ dropdown-treeman-bucket-failed = failed
 ## Empty state
 dropdown-treeman-empty-title = No worktrees
 dropdown-treeman-empty-desc = No treeman-managed worktrees are registered, or the treeman daemon is not running.
+
+## Worktree detail page
+dropdown-treeman-back = Back
+dropdown-treeman-detail-repo = Repo
+dropdown-treeman-detail-bucket = Bucket
+dropdown-treeman-detail-slug = Slug
+dropdown-treeman-detail-path = Path

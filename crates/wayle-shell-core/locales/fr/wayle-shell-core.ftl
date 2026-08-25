@@ -491,6 +491,7 @@ dropdown-treeman-title = Treeman
 dropdown-treeman-main = principal
 
 ## Actions
+dropdown-treeman-action-info = Détails
 dropdown-treeman-action-prepare = Préparer
 dropdown-treeman-action-reset = Réinitialiser les bases
 dropdown-treeman-action-teardown = Supprimer l'arbre de travail
@@ -512,6 +513,13 @@ dropdown-treeman-bucket-failed = échec
 ## État vide
 dropdown-treeman-empty-title = Aucun arbre de travail
 dropdown-treeman-empty-desc = Aucun arbre de travail géré par treeman n'est enregistré, ou le démon treeman n'est pas en cours d'exécution.
+
+## Détail de l'arbre de travail
+dropdown-treeman-back = Retour
+dropdown-treeman-detail-repo = Dépôt
+dropdown-treeman-detail-bucket = État
+dropdown-treeman-detail-slug = Identifiant
+dropdown-treeman-detail-path = Chemin
 
 ### Menu déroulant de la météo
 

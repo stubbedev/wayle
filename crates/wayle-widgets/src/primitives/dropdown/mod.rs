@@ -64,6 +64,12 @@ impl WidgetTemplate for Dropdown {
     }
 }
 
+/// Longest title, in characters, that may influence a dropdown's width.
+///
+/// Only a *measurement* bound: the label still fills whatever width it is
+/// given, and ellipsizes past it.
+const TITLE_MAX_CHARS: i32 = 24;
+
 /// Header with icon, label, and actions container.
 #[relm4::widget_template(pub)]
 impl WidgetTemplate for DropdownHeader {
@@ -80,8 +86,20 @@ impl WidgetTemplate for DropdownHeader {
                     set_visible: false,
                 },
 
+                // A plain label reports its full text as its natural width, and
+                // that propagates up to the popover. A popover's size request is
+                // only a floor, so a long title (a branch name, a device name, a
+                // track title) makes the popover want to be wider than it asked
+                // for — and GTK cannot resize a mapped Wayland popup in place, so
+                // it destroys and recreates the surface, which closes the
+                // popover mid-interaction. Ellipsizing with a capped natural
+                // width keeps the title from ever driving the geometry.
                 #[name = "label"]
-                gtk::Label {},
+                gtk::Label {
+                    set_ellipsize: gtk4::pango::EllipsizeMode::End,
+                    set_max_width_chars: TITLE_MAX_CHARS,
+                    set_xalign: 0.0,
+                },
             },
 
             #[name = "actions"]

@@ -28,5 +28,8 @@ settings-dropdowns-network = Réseau
 settings-dropdowns-notification = Notification
     .description = Taille du panneau du menu notification (remplacement largeur/hauteur)
 
+settings-dropdowns-treeman = Treeman
+    .description = Taille du panneau Treeman (largeur/hauteur)
+
 settings-dropdowns-weather = Météo
     .description = Taille du panneau du menu météo (remplacement largeur/hauteur)

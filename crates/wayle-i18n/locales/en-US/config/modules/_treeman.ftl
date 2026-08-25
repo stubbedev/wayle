@@ -6,7 +6,13 @@ settings-modules-treeman-format = Label Format
     .description = Format string with placeholders: {"{{ total }}"}, {"{{ stable }}"}, {"{{ up }}"}, {"{{ down }}"}, {"{{ failed }}"}
 
 settings-modules-treeman-icon-name = Icon
-    .description = Module icon (shown when no worktree has failed)
+    .description = Module icon (shown when every worktree is resting-ready)
+
+settings-modules-treeman-icon-preparing = Preparing Icon
+    .description = Icon shown while any worktree is being prepared
+
+settings-modules-treeman-icon-tearing-down = Tearing Down Icon
+    .description = Icon shown while any worktree is being torn down
 
 settings-modules-treeman-icon-failed = Failed Icon
     .description = Icon shown when any worktree's last finalize errored

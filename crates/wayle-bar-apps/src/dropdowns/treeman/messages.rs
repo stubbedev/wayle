@@ -12,6 +12,14 @@ pub struct TreemanDropdownInit {
 }
 
 #[derive(Debug)]
+pub enum TreemanDropdownMsg {
+    /// Drill into one worktree's detail page, keyed by its absolute path.
+    OpenDetail(String),
+    /// Return from the detail page to the repo list.
+    Back,
+}
+
+#[derive(Debug)]
 pub enum TreemanDropdownCmd {
     ScaleChanged(f32),
     StatusChanged(Option<TreemanStatus>),

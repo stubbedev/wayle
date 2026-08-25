@@ -29,6 +29,7 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                 size_section(&dropdowns.media),
                 size_section(&dropdowns.network),
                 size_section(&dropdowns.notification),
+                size_section(&dropdowns.treeman),
                 size_section(&dropdowns.weather),
                 SectionSpec {
                     title_key: "settings-section-animation",

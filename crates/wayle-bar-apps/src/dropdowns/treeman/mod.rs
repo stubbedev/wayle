@@ -1,39 +1,67 @@
 mod actions;
 mod factory;
 mod messages;
+mod views;
 mod watchers;
 
-use gtk::{pango, prelude::*};
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
+
+use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
-use wayle_treeman::{Bucket, TreemanStatus};
+use wayle_config::schemas::styling::Size;
+use wayle_treeman::TreemanStatus;
 use wayle_widgets::prelude::*;
 
 pub use self::factory::Factory;
 use self::{
     actions::Actions,
-    messages::{TreemanDropdownCmd, TreemanDropdownInit},
+    messages::{TreemanDropdownCmd, TreemanDropdownInit, TreemanDropdownMsg},
+    views::Ui,
 };
 use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
-const BASE_WIDTH: f32 = 400.0;
+const BASE_WIDTH: f32 = 440.0;
 const BASE_HEIGHT: f32 = 460.0;
+
+/// Stack page names.
+const PAGE_LIST: &str = "list";
+const PAGE_DETAIL: &str = "detail";
 
 pub struct TreemanDropdown {
     scaled_width: i32,
     scaled_height: i32,
-    /// Handle to the scrollable list box, rebuilt imperatively on each status
-    /// change. Cloning a GTK widget yields another handle to the same object,
-    /// so mutating this from `update_cmd` updates the shown widget.
-    content: gtk::Box,
-    /// Row action dispatcher (prepare/reset/teardown), captured into each
-    /// rebuilt row's button callbacks.
-    actions: Actions,
+    /// User size overrides from `dropdowns.treeman`, reapplied when the global
+    /// scale changes.
+    width_override: Option<Size>,
+    height_override: Option<Size>,
+    /// Pages the popover switches between. Both stay alive across navigation,
+    /// so a click never destroys the widget that is still dispatching it.
+    stack: gtk::Stack,
+    /// Repo list page, rebuilt imperatively on each status change. Cloning a
+    /// GTK widget yields another handle to the same object, so mutating this
+    /// from `update_cmd` updates the shown widget.
+    list: gtk::Box,
+    /// Single-worktree page, rebuilt when navigating into it.
+    detail_page: gtk::Box,
+    /// Latest status, kept so navigation can re-render without waiting for the
+    /// next push from the service.
+    status: Option<TreemanStatus>,
+    /// Absolute path of the worktree whose detail page is showing, if any.
+    detail: Option<String>,
+    /// In-dropdown transition duration from the animation config, shared by the
+    /// stack slide and the popover height tween. `0` when animations are off.
+    transition_ms: u32,
+    /// Title shown in the header: the branch on the detail page, otherwise the
+    /// dropdown's own name.
+    title: String,
+    /// Render-tree dependencies (actions, accordion state, navigation sender).
+    ui: Ui,
 }
 
 #[relm4::component(pub)]
 impl Component for TreemanDropdown {
     type Init = TreemanDropdownInit;
-    type Input = ();
+    type Input = TreemanDropdownMsg;
     type Output = ();
     type CommandOutput = TreemanDropdownCmd;
 
@@ -58,7 +86,26 @@ impl Component for TreemanDropdown {
                     },
                     #[template_child]
                     label {
-                        set_label: &t!("dropdown-treeman-title"),
+                        #[watch]
+                        set_label: &model.title,
+                    },
+                    #[template_child]
+                    actions {
+                        #[template]
+                        GhostIconButton {
+                            set_icon_name: "ld-arrow-left-symbolic",
+                            set_tooltip_text: Some(&t!("dropdown-treeman-back")),
+                            // This button hides itself on click. A focused
+                            // widget going invisible moves focus out of the
+                            // popover, and an autohide popover closes when it
+                            // loses focus — so never take focus on click.
+                            set_focus_on_click: false,
+                            #[watch]
+                            set_visible: model.detail.is_some(),
+                            connect_clicked[sender] => move |_| {
+                                sender.input(TreemanDropdownMsg::Back);
+                            },
+                        },
                     },
                 },
 
@@ -76,11 +123,21 @@ impl Component for TreemanDropdown {
                         set_child = &gtk::Box {
                             set_orientation: gtk::Orientation::Vertical,
 
+                            // Both axes homogeneous, and no `interpolate_size`:
+                            // the stack must measure identically on every page.
+                            // A popover sizes to its child's natural height —
+                            // `set_height_request` is only a floor — so a stack
+                            // that measured the visible child would resize the
+                            // popover surface on every page switch. Resizing a
+                            // mapped popover drops its Wayland popup grab and
+                            // closes it mid-click.
                             #[local_ref]
-                            content -> gtk::Box {
-                                set_orientation: gtk::Orientation::Vertical,
+                            stack -> gtk::Stack {
+                                set_transition_type: gtk::StackTransitionType::SlideLeftRight,
+                                set_transition_duration: model.transition_ms,
+                                set_hhomogeneous: true,
+                                set_vhomogeneous: true,
                                 set_vexpand: true,
-                                add_css_class: "treeman-list",
                             },
                         },
                     },
@@ -91,246 +148,141 @@ impl Component for TreemanDropdown {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let content = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .build();
+        let list = page_box("treeman-list");
+        // The stack is vertically homogeneous, so the short detail page would
+        // otherwise be stretched down the full height of the repo list.
+        let detail_page = page_box("treeman-list");
+        detail_page.set_valign(gtk::Align::Start);
 
-        let actions = Actions::new(init.treeman.clone(), init.toast_bus.clone());
-        render(&content, init.treeman.status.get().as_ref(), &actions);
+        let stack = gtk::Stack::new();
+        stack.add_named(&list, Some(PAGE_LIST));
+        stack.add_named(&detail_page, Some(PAGE_DETAIL));
+
+        let ui = Ui {
+            actions: Actions::new(init.treeman.clone(), init.toast_bus.clone()),
+            collapsed: Rc::new(RefCell::new(HashSet::new())),
+            sender: sender.clone(),
+        };
+        let status = init.treeman.status.get();
+        views::render_list(&list, status.as_ref(), &ui);
         watchers::spawn(&sender, &init.treeman, &init.config);
 
-        let scale = init.config.config().styling.scale.get().value();
+        // Reopening a dropdown should land on its root page. It also keeps the
+        // size honest: the registry restores a popover's first-seen height
+        // request on every popup, which would otherwise fight a detail page
+        // that had shrunk the popover before it was closed.
+        let closed = sender.clone();
+        root.connect_closed(move |_| closed.input(TreemanDropdownMsg::Back));
+
+        let config = init.config.config();
+        let scale = config.styling.scale.get().value();
+        let transition_ms = config.animations.interaction_duration_ms();
+        let size = config.dropdowns.treeman.get();
         let model = Self {
-            scaled_width: resolve_dimension(None, BASE_WIDTH, scale),
-            scaled_height: resolve_dimension(None, BASE_HEIGHT, scale),
-            content: content.clone(),
-            actions,
+            scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
+            scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
+            width_override: size.width,
+            height_override: size.height,
+            transition_ms,
+            stack: stack.clone(),
+            list,
+            detail_page,
+            status,
+            detail: None,
+            title: t!("dropdown-treeman-title"),
+            ui,
         };
 
-        let content = &content;
+        let stack = &stack;
         let widgets = view_output!();
         ComponentParts { model, widgets }
+    }
+
+    fn update(&mut self, msg: Self::Input, _sender: ComponentSender<Self>, root: &Self::Root) {
+        self.detail = match msg {
+            TreemanDropdownMsg::OpenDetail(path) => Some(path),
+            TreemanDropdownMsg::Back => None,
+        };
+        self.sync_page(root);
     }
 
     fn update_cmd(
         &mut self,
         msg: Self::CommandOutput,
         _sender: ComponentSender<Self>,
-        _root: &Self::Root,
+        root: &Self::Root,
     ) {
         match msg {
             TreemanDropdownCmd::ScaleChanged(scale) => {
-                self.scaled_width = resolve_dimension(None, BASE_WIDTH, scale);
-                self.scaled_height = resolve_dimension(None, BASE_HEIGHT, scale);
+                self.scaled_width = resolve_dimension(self.width_override, BASE_WIDTH, scale);
+                self.scaled_height = resolve_dimension(self.height_override, BASE_HEIGHT, scale);
             }
             TreemanDropdownCmd::StatusChanged(status) => {
-                render(&self.content, status.as_ref(), &self.actions);
+                self.status = status;
+                views::render_list(&self.list, self.status.as_ref(), &self.ui);
+                self.sync_page(root);
             }
         }
     }
 }
 
-/// Rebuilds the list from the current status. Read-only: clears every child and
-/// repopulates, since worktree changes are infrequent and the list is small.
-fn render(content: &gtk::Box, status: Option<&TreemanStatus>, actions: &Actions) {
-    while let Some(child) = content.first_child() {
-        content.remove(&child);
-    }
-
-    let Some(status) = status.filter(|s| !s.repos.is_empty()) else {
-        content.append(&empty_state());
-        return;
-    };
-
-    content.append(&summary(status));
-    for repo in &status.repos {
-        content.append(&repo_card(repo, actions));
-    }
-}
-
-fn empty_state() -> gtk::Box {
-    let root = gtk::Box::builder()
+fn page_box(css_class: &str) -> gtk::Box {
+    let page = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .valign(gtk::Align::Center)
-        .vexpand(true)
         .build();
-    root.add_css_class("empty-state");
-
-    let icon = gtk::Image::from_icon_name("ld-layers-symbolic");
-    icon.add_css_class("icon");
-    root.append(&icon);
-
-    let title = gtk::Label::new(Some(&t!("dropdown-treeman-empty-title")));
-    title.add_css_class("title");
-    root.append(&title);
-
-    let desc = gtk::Label::new(Some(&t!("dropdown-treeman-empty-desc")));
-    desc.add_css_class("description");
-    desc.set_wrap(true);
-    desc.set_justify(gtk::Justification::Center);
-    root.append(&desc);
-
-    root
+    page.add_css_class(css_class);
+    page
 }
 
-/// A row of per-bucket count chips across the top, so overall health reads at a
-/// glance before scanning individual repos. Only non-empty buckets show.
-fn summary(status: &TreemanStatus) -> gtk::Box {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    row.add_css_class("treeman-summary");
+impl TreemanDropdown {
+    /// Points the stack at the right page and resyncs the header title. Drops
+    /// back to the list when the detail page's worktree is gone — a teardown
+    /// finishing while its own page is open would otherwise strand the user.
+    fn sync_page(&mut self, popover: &gtk::Popover) {
+        let found = self
+            .detail
+            .as_deref()
+            .zip(self.status.as_ref())
+            .and_then(|(path, status)| views::find_worktree(status, path));
 
-    for (count, bucket) in [
-        (status.stable, Bucket::Stable),
-        (status.up, Bucket::Up),
-        (status.down, Bucket::Down),
-        (status.failed, Bucket::Failed),
-    ] {
-        if count > 0 {
-            row.append(&stat_chip(count, bucket));
+        let page = match found {
+            Some((repo, wt)) => {
+                self.title = wt.branch.clone();
+                views::render_detail(&self.detail_page, repo, wt, &self.ui);
+                PAGE_DETAIL
+            }
+            None => {
+                self.detail = None;
+                self.title = t!("dropdown-treeman-title");
+                PAGE_LIST
+            }
+        };
+
+        if self.stack.visible_child_name().as_deref() == Some(page) {
+            return;
         }
-    }
+        self.stack.set_visible_child_name(page);
 
-    row
-}
+        // Geometry is logged because a popover that resizes while mapped loses
+        // its popup grab: if this ever shows the popover height changing across
+        // a page switch, that is the bug returning.
+        // Popover geometry across a page switch. It must not change: a mapped
+        // Wayland popup cannot be resized in place, so GTK would destroy and
+        // recreate the surface and the popover would close mid-interaction.
+        tracing::debug!(
+            page,
+            popover = ?(popover.width(), popover.height()),
+            natural = ?popover.preferred_size().1.width(),
+            visible = popover.is_visible(),
+            "treeman page switch"
+        );
 
-fn stat_chip(count: u32, bucket: Bucket) -> gtk::Box {
-    let chip = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    chip.add_css_class("treeman-stat");
-
-    let dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    dot.set_css_classes(&["status-dot", dot_variant(bucket)]);
-    dot.set_valign(gtk::Align::Center);
-    chip.append(&dot);
-
-    let label = gtk::Label::new(Some(&format!("{count} {}", bucket_label(bucket))));
-    label.add_css_class("treeman-stat-label");
-    chip.append(&label);
-
-    chip
-}
-
-fn repo_card(repo: &wayle_treeman::TreemanRepo, actions: &Actions) -> gtk::Box {
-    let card = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .build();
-    card.set_css_classes(&["card", "treeman-repo"]);
-
-    let header = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    header.add_css_class("treeman-repo-header");
-
-    let name = gtk::Label::new(Some(&repo.repo));
-    name.add_css_class("treeman-repo-name");
-    name.set_xalign(0.0);
-    name.set_hexpand(true);
-    name.set_ellipsize(pango::EllipsizeMode::End);
-    header.append(&name);
-
-    let count = gtk::Label::new(Some(&repo.total.to_string()));
-    count.add_css_class("badge");
-    header.append(&count);
-
-    card.append(&header);
-
-    for wt in &repo.worktrees {
-        card.append(&worktree_row(wt, actions));
-    }
-
-    card
-}
-
-fn worktree_row(wt: &wayle_treeman::TreemanWorktree, actions: &Actions) -> gtk::Overlay {
-    let bucket = Bucket::parse(&wt.bucket);
-
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    row.add_css_class("treeman-wt");
-
-    let dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    dot.set_css_classes(&["status-dot", dot_variant(bucket)]);
-    dot.set_valign(gtk::Align::Center);
-    row.append(&dot);
-
-    let info = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .hexpand(true)
-        .build();
-    info.add_css_class("treeman-wt-info");
-
-    let line1 = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    let branch = gtk::Label::new(Some(&wt.branch));
-    branch.add_css_class("treeman-branch");
-    branch.set_xalign(0.0);
-    branch.set_ellipsize(pango::EllipsizeMode::End);
-    line1.append(&branch);
-    if wt.is_main {
-        let badge = gtk::Label::new(Some(&t!("dropdown-treeman-main")));
-        badge.set_css_classes(&["treeman-badge", "main"]);
-        line1.append(&badge);
-    }
-    info.append(&line1);
-
-    let meta = worktree_meta(wt);
-    if !meta.is_empty() {
-        let sub = gtk::Label::new(Some(&meta));
-        sub.add_css_class("treeman-wt-meta");
-        sub.set_xalign(0.0);
-        sub.set_ellipsize(pango::EllipsizeMode::Middle);
-        sub.set_selectable(true);
-        sub.set_tooltip_text(Some(&wt.path));
-        info.append(&sub);
-    }
-    row.append(&info);
-
-    let state = gtk::Label::new(Some(&wt.state));
-    state.set_css_classes(&["badge", dot_variant(bucket)]);
-    state.set_valign(gtk::Align::Center);
-    row.append(&state);
-
-    // Actions float over the trailing edge so, unlike an in-flow cluster hidden
-    // by opacity, they reserve no width at rest — the branch/meta column keeps
-    // the full row. Hover swaps the state badge out for the buttons in place.
-    let overlay = gtk::Overlay::new();
-    overlay.add_css_class("treeman-wt-overlay");
-    overlay.set_child(Some(&row));
-    if !wt.path.is_empty() {
-        let buttons = actions.buttons(&wt.path);
-        buttons.set_halign(gtk::Align::End);
-        buttons.set_valign(gtk::Align::Center);
-        overlay.add_overlay(&buttons);
-    }
-
-    overlay
-}
-
-/// The muted second line of a worktree row: `slug · path`, gracefully dropping
-/// either half when absent.
-fn worktree_meta(wt: &wayle_treeman::TreemanWorktree) -> String {
-    match (wt.slug.is_empty(), wt.path.is_empty()) {
-        (false, false) => format!("{} · {}", wt.slug, wt.path),
-        (false, true) => wt.slug.clone(),
-        (true, false) => wt.path.clone(),
-        (true, true) => String::new(),
-    }
-}
-
-/// Localized bucket name for the summary chips.
-fn bucket_label(bucket: Bucket) -> String {
-    match bucket {
-        Bucket::Stable => t!("dropdown-treeman-bucket-stable"),
-        Bucket::Up => t!("dropdown-treeman-bucket-up"),
-        Bucket::Down => t!("dropdown-treeman-bucket-down"),
-        Bucket::Failed => t!("dropdown-treeman-bucket-failed"),
-    }
-}
-
-/// Maps a bucket to the shared `status-dot` / `badge` colour variant.
-fn dot_variant(bucket: Bucket) -> &'static str {
-    match bucket {
-        Bucket::Stable => "success",
-        Bucket::Up => "info",
-        Bucket::Down => "warning",
-        Bucket::Failed => "error",
+        // The detail page is short, so let the popover shrink to it; the repo
+        // list keeps the base height and scrolls, as every other dropdown does.
+        // Never grow past the base height — a long list must not stretch the
+        // popover down the screen.
     }
 }

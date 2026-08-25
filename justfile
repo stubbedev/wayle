@@ -19,29 +19,50 @@ build:
 run *args:
     {{cargo}} run --bin wayle -- {{args}}
 
+# Debug logging for the dev recipes below. RUST_LOG drives the console, and
+# WAYLE_FILE_LOG the rolling file in `just logs` — both default to `warn` and
+# `warn,wayle_=info` otherwise, which hides the debug! lines that explain
+# popover/dropdown behaviour. Exporting either variable yourself wins.
+dev_log := 'RUST_LOG="${RUST_LOG:-warn,wayle_=debug}" WAYLE_FILE_LOG="${WAYLE_FILE_LOG:-warn,wayle_=debug}"'
+
 # Run the settings GUI with SCSS hot-reload — for rapidly iterating on the
 # settings/widget CSS. WAYLE_DEV=1 makes the app watch
 # crates/wayle-styling/scss/** and recompile + reload live on save (~100ms),
 # no restart. Edit the SCSS, watch the open window repaint.
 dev-settings *args:
-    WAYLE_DEV=1 {{cargo}} run --bin wayle-settings -- {{args}}
+    {{dev_log}} WAYLE_DEV=1 {{cargo}} run --bin wayle-settings -- {{args}}
 
 # Like dev-settings, plus the GTK inspector — pick any widget to see its CSS
 # node names + classes so you know which selector to target. (Ctrl+Shift+D
 # toggles the inspector in-app too.)
 inspect-settings *args:
-    WAYLE_DEV=1 GTK_DEBUG=interactive {{cargo}} run --bin wayle-settings -- {{args}}
+    {{dev_log}} WAYLE_DEV=1 GTK_DEBUG=interactive {{cargo}} run --bin wayle-settings -- {{args}}
 
 # Run the shell with SCSS hot-reload (watches crates/wayle-styling/scss/**).
 # Pass the subcommand: `just dev shell`.
 dev *args:
-    WAYLE_DEV=1 {{cargo}} run --bin wayle -- {{args}}
+    {{dev_log}} WAYLE_DEV=1 {{cargo}} run --bin wayle -- {{args}}
 
 # Like dev, plus the GTK inspector for the bar/overlays — pick any widget to see
 # its CSS node names + classes. (Ctrl+Shift+D toggles the inspector in-app too.)
 # Pass the subcommand: `just inspect shell`.
 inspect *args:
-    WAYLE_DEV=1 GTK_DEBUG=interactive {{cargo}} run --bin wayle -- {{args}}
+    {{dev_log}} WAYLE_DEV=1 GTK_DEBUG=interactive {{cargo}} run --bin wayle -- {{args}}
+
+# Tail today's shell log. The dev recipes above write debug! lines here, so this
+# is where to look after reproducing a bug — `just logs 200` for more backlog.
+logs lines="80":
+    tail -n {{lines}} -f "${XDG_STATE_HOME:-$HOME/.local/state}/wayle/wayle-shell.$(date +%F).log"
+
+# Stop the packaged shell so a dev build can take over (only one instance may
+# hold the com.wayle.shell bus name), run it, then restore the service on exit.
+dev-shell *args:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    was_active=$(systemctl --user is-active wayle.service || true)
+    if [ "$was_active" = "active" ]; then systemctl --user stop wayle.service; fi
+    trap '[ "$was_active" = "active" ] && systemctl --user start wayle.service' EXIT
+    just inspect shell {{args}}
 
 # Run the greeter as a window on your current session for UI iteration: your
 # user config for theming, throwaway state in /tmp. Login attempts only show an

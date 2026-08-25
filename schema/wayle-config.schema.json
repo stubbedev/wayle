@@ -2273,6 +2273,14 @@
           },
           "description": "Notification dropdown panel size."
         },
+        "treeman": {
+          "$ref": "#/$defs/DropdownSize",
+          "default": {
+            "height": null,
+            "width": null
+          },
+          "description": "Treeman dropdown panel size."
+        },
         "weather": {
           "$ref": "#/$defs/DropdownSize",
           "default": {
@@ -5303,7 +5311,9 @@
             "icon-color": "auto",
             "icon-failed": "tb-alert-triangle-symbolic",
             "icon-name": "ld-layers-symbolic",
+            "icon-preparing": "tb-loader-2-symbolic",
             "icon-show": true,
+            "icon-tearing-down": "ld-trash-2-symbolic",
             "label-color": "accent",
             "label-max-length": 0,
             "label-show": true,
@@ -7947,12 +7957,22 @@
         "icon-name": {
           "$ref": "#/$defs/string",
           "default": "ld-layers-symbolic",
-          "description": "Module icon (shown when no worktree has failed)."
+          "description": "Module icon (shown when every worktree is resting-ready)."
+        },
+        "icon-preparing": {
+          "$ref": "#/$defs/string",
+          "default": "tb-loader-2-symbolic",
+          "description": "Icon shown while any worktree is being prepared."
         },
         "icon-show": {
           "$ref": "#/$defs/boolean",
           "default": true,
           "description": "Display module icon."
+        },
+        "icon-tearing-down": {
+          "$ref": "#/$defs/string",
+          "default": "ld-trash-2-symbolic",
+          "description": "Icon shown while any worktree is being torn down."
         },
         "label-color": {
           "$ref": "#/$defs/ColorValue",
@@ -9009,6 +9029,10 @@
           "height": null,
           "width": null
         },
+        "treeman": {
+          "height": null,
+          "width": null
+        },
         "weather": {
           "height": null,
           "width": null
@@ -9860,7 +9884,9 @@
           "icon-color": "auto",
           "icon-failed": "tb-alert-triangle-symbolic",
           "icon-name": "ld-layers-symbolic",
+          "icon-preparing": "tb-loader-2-symbolic",
           "icon-show": true,
+          "icon-tearing-down": "ld-trash-2-symbolic",
           "label-color": "accent",
           "label-max-length": 0,
           "label-show": true,

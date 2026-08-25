@@ -45,6 +45,8 @@ pub(crate) fn entry(config: &Config) -> LeafEntry {
                     items: vec![
                         text(&module.format),
                         icon(&module.icon_name),
+                        icon(&module.icon_preparing),
+                        icon(&module.icon_tearing_down),
                         icon(&module.icon_failed),
                         toggle(&module.hide_if_empty),
                     ],

@@ -30,10 +30,20 @@ pub struct TreemanConfig {
     #[default(String::from("{{ total }}"))]
     pub format: ConfigProperty<String>,
 
-    /// Module icon (shown when no worktree has failed).
+    /// Module icon (shown when every worktree is resting-ready).
     #[serde(rename = "icon-name")]
     #[default(String::from("ld-layers-symbolic"))]
     pub icon_name: ConfigProperty<String>,
+
+    /// Icon shown while any worktree is being prepared.
+    #[serde(rename = "icon-preparing")]
+    #[default(String::from("tb-loader-2-symbolic"))]
+    pub icon_preparing: ConfigProperty<String>,
+
+    /// Icon shown while any worktree is being torn down.
+    #[serde(rename = "icon-tearing-down")]
+    #[default(String::from("ld-trash-2-symbolic"))]
+    pub icon_tearing_down: ConfigProperty<String>,
 
     /// Icon shown when any worktree's last finalize errored.
     #[serde(rename = "icon-failed")]

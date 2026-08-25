@@ -55,6 +55,10 @@ pub struct DropdownsConfig {
     #[default(DropdownSize::default())]
     pub notification: ConfigProperty<DropdownSize>,
 
+    /// Treeman dropdown panel size.
+    #[default(DropdownSize::default())]
+    pub treeman: ConfigProperty<DropdownSize>,
+
     /// Weather dropdown panel size.
     #[default(DropdownSize::default())]
     pub weather: ConfigProperty<DropdownSize>,

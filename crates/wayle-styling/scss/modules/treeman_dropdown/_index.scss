@@ -1,5 +1,43 @@
-// Treeman dropdown: a summary chip row over per-repo cards, each listing
-// worktree rows (status dot + branch/meta + state badge + copy-path button).
+// Bar module: the icon tracks the worst bucket, so a prepare or a teardown in
+// flight is visible without opening the dropdown. Preparing spins its loader,
+// tearing down pulses, failed just goes red.
+@keyframes treeman-spin {
+    from {
+        -gtk-icon-transform: rotate(0deg);
+    }
+
+    to {
+        -gtk-icon-transform: rotate(360deg);
+    }
+}
+
+@keyframes treeman-pulse {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0.4;
+    }
+}
+
+.treeman {
+    &.preparing .icon-container image {
+        animation: treeman-spin var(--cfg-anim-spin, 1s) linear infinite;
+    }
+
+    &.tearing-down .icon-container {
+        animation: treeman-pulse var(--cfg-anim-pulse, 0.8s) ease-in-out infinite alternate;
+    }
+
+    &.failed .icon-container {
+        color: var(--status-error);
+    }
+}
+
+// Treeman dropdown: a summary chip row over per-repo accordion cards, each
+// listing worktree rows (status dot + branch + state badge) whose hover cluster
+// opens a per-worktree detail page.
 .treeman-dropdown {
     .treeman-scroll {
         background: transparent;
@@ -39,8 +77,20 @@
             margin-bottom: 0;
         }
 
+        // Accordion handle: a flat button (bare `button` is `all: unset`), so
+        // only hover needs styling to read as clickable.
         .treeman-repo-header {
-            margin-bottom: var(--space-xs);
+            padding: var(--space-xs) 0;
+
+            &:hover .treeman-repo-name {
+                color: var(--fg-default);
+            }
+
+            .treeman-repo-chevron {
+                -gtk-icon-size: var(--icon-sm);
+                margin-right: var(--space-xs);
+                color: var(--fg-subtle);
+            }
 
             .treeman-repo-name {
                 font-size: var(--text-sm);
@@ -55,7 +105,6 @@
         border-radius: var(--rounding-element);
 
         .status-dot {
-            margin-top: calc(var(--space-xs) + 0.15rem);
             margin-right: var(--space-sm);
         }
 
@@ -74,21 +123,18 @@
                 color: var(--accent);
             }
 
-            .treeman-wt-meta {
-                font-size: var(--text-sm);
-                color: var(--fg-muted);
-                margin-top: 0.1rem;
-            }
         }
 
         .badge {
             margin-left: var(--space-sm);
+            transition: opacity var(--duration-fast);
         }
     }
 
     // Hover state and the floating action cluster live on the overlay so the
-    // buttons reserve no row width at rest. Hover reveals them and fades the
-    // state badge underneath, swapping in place with no reflow.
+    // buttons reserve no row width at rest. Hover slides the cluster in from
+    // the trailing edge and fades the state badge out underneath it, swapping
+    // in place with no reflow.
     .treeman-wt-overlay {
         &:hover .treeman-wt {
             background: var(--bg-elevated);
@@ -99,6 +145,10 @@
             border-radius: var(--rounding-element);
             background: var(--bg-elevated);
             opacity: 0;
+            transform: translateX(var(--space-xl));
+            transition:
+                opacity var(--duration-fast),
+                transform var(--duration-fast);
 
             .ghost-icon {
                 margin-left: 2px;
@@ -108,11 +158,67 @@
         &:hover {
             .treeman-actions {
                 opacity: 1;
+                transform: translateX(0);
             }
 
             .treeman-wt .badge {
                 opacity: 0;
             }
+        }
+    }
+
+    // Detail page for one worktree, reached from its row's info button.
+    // Padding comes from the page wrapper it shares with the list.
+    .treeman-detail {
+        .treeman-detail-head {
+            padding: var(--space-sm) var(--space-xs);
+
+            .status-dot {
+                margin-right: var(--space-sm);
+            }
+
+            .treeman-detail-branch {
+                font-size: var(--text-lg);
+                font-weight: var(--weight-semibold);
+                color: var(--fg-default);
+            }
+
+            .treeman-badge.main {
+                padding: 0 var(--space-xs);
+                margin-left: var(--space-xs);
+                border-radius: var(--rounding-element);
+                font-size: var(--text-sm);
+                background: var(--accent-subtle);
+                color: var(--accent);
+            }
+
+            .badge {
+                margin-left: var(--space-sm);
+            }
+        }
+
+        .treeman-detail-fields {
+            padding: var(--space-sm);
+
+            .treeman-detail-field {
+                padding: var(--space-xs) 0;
+
+                .treeman-detail-key {
+                    min-width: 5rem;
+                    font-size: var(--text-sm);
+                    color: var(--fg-subtle);
+                }
+
+                .treeman-detail-value {
+                    font-size: var(--text-sm);
+                    color: var(--fg-default);
+                }
+            }
+        }
+
+        // Always visible here — no row to hover, so no opacity swap.
+        .treeman-detail-actions {
+            padding: var(--space-sm) 0 0;
         }
     }
 }

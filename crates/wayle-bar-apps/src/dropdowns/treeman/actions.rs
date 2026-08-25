@@ -79,12 +79,7 @@ impl Actions {
         worktree_path: &str,
         confirm: Option<Confirm>,
     ) -> gtk::Button {
-        let button = gtk::Button::new();
-        button.set_css_classes(&["ghost-icon"]);
-        button.set_icon_name(icon);
-        button.set_cursor_from_name(Some("pointer"));
-        button.set_valign(gtk::Align::Center);
-        button.set_tooltip_text(Some(tooltip));
+        let button = super::views::ghost_icon(icon, tooltip);
 
         let this = self.clone();
         let path = worktree_path.to_owned();

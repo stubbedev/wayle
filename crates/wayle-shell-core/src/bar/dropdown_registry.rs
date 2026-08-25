@@ -157,20 +157,31 @@ impl DropdownInstance {
     /// Plays the enter animation: collapse instantly, then reveal on the next
     /// main-loop tick so the transition actually runs (a same-tick false→true
     /// does not animate). With animations disabled this reveals immediately.
+    ///
+    /// The collapse has to be a *zero-duration* one. `set_reveal_child(false)`
+    /// at the enter duration only starts a tween toward hidden, and the idle
+    /// below runs before the revealer's first 16ms frame — so progress would
+    /// still be ~1.0 and the enter tween would run from fully-shown to
+    /// fully-shown, i.e. no visible animation at all.
     fn animate_in(&self, style: &DropdownStyle) {
         let (duration, transition) = style.enter;
         self.revealer.set_transition(transition);
         self.revealer.set_genie_edge(style.genie_edge);
-        self.revealer.set_transition_duration(duration);
 
         if duration == 0 {
+            self.revealer.set_transition_duration(0);
             self.revealer.set_reveal_child(true);
             return;
         }
 
+        self.revealer.set_transition_duration(0);
         self.revealer.set_reveal_child(false);
+
         let revealer = self.revealer.clone();
-        gtk::glib::idle_add_local_once(move || revealer.set_reveal_child(true));
+        gtk::glib::idle_add_local_once(move || {
+            revealer.set_transition_duration(duration);
+            revealer.set_reveal_child(true);
+        });
     }
 
     /// Plays the exit animation, then pops the popover down once it finishes.
