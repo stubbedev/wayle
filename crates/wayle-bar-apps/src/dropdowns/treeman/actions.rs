@@ -57,15 +57,16 @@ impl Actions {
                 accept: t!("dropdown-treeman-confirm-reset-accept"),
             }),
         ));
+        // Deliberately unconfirmed: a worktree is cheap to recreate from the
+        // branch, and the extra dialog was more friction than the delete is
+        // worth. Reset keeps its confirm because dropping a branch's databases
+        // loses local data.
         row.append(&self.button(
             "ld-trash-2-symbolic",
             &t!("dropdown-treeman-action-teardown"),
             Action::Teardown,
             worktree_path,
-            Some(Confirm {
-                title: t!("dropdown-treeman-confirm-teardown-title"),
-                accept: t!("dropdown-treeman-confirm-teardown-accept"),
-            }),
+            None,
         ));
 
         row

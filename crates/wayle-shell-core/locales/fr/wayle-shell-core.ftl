@@ -501,8 +501,6 @@ dropdown-treeman-action-failed = Échec de l'action treeman
 dropdown-treeman-confirm-cancel = Annuler
 dropdown-treeman-confirm-reset-title = Réinitialiser les bases de données de cet arbre de travail ?
 dropdown-treeman-confirm-reset-accept = Réinitialiser
-dropdown-treeman-confirm-teardown-title = Supprimer cet arbre de travail ?
-dropdown-treeman-confirm-teardown-accept = Supprimer
 
 ## Noms des états (résumé)
 dropdown-treeman-bucket-stable = prêt

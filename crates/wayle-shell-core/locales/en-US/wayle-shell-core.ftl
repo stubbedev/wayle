@@ -550,8 +550,6 @@ dropdown-treeman-action-failed = treeman action failed
 dropdown-treeman-confirm-cancel = Cancel
 dropdown-treeman-confirm-reset-title = Reset this worktree's databases?
 dropdown-treeman-confirm-reset-accept = Reset
-dropdown-treeman-confirm-teardown-title = Delete this worktree?
-dropdown-treeman-confirm-teardown-accept = Delete
 
 ## Bucket names (summary chips)
 dropdown-treeman-bucket-stable = ready
