@@ -291,21 +291,20 @@ mod tests {
     fn continuous_events_still_flush_within_the_ceiling() {
         let start = tokio::time::Instant::now();
         let mut flush_by = None;
-        let mut now = start;
 
         // An event every 10ms forever: each one pushes the 100ms debounce out,
         // so only the ceiling can end the batch.
-        for _ in 0..1_000 {
+        let reached_ceiling = (0..1_000_u64).any(|tick| {
+            let now = start + Duration::from_millis(tick * 10);
             let deadline = next_deadline(now, &mut flush_by);
             assert!(deadline <= start + MAX_DEBOUNCE_DELAY);
-            if deadline <= now {
-                assert!(now >= start + MAX_DEBOUNCE_DELAY);
-                return;
-            }
-            now += Duration::from_millis(10);
-        }
+            deadline <= now
+        });
 
-        panic!("debounce never reached its ceiling under a continuous event stream");
+        assert!(
+            reached_ceiling,
+            "debounce never reached its ceiling under a continuous event stream"
+        );
     }
 
     #[test]
