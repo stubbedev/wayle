@@ -94,6 +94,7 @@
               cmake
               clang
               mold # fast linker — wired in via RUSTFLAGS below
+              cargo-nextest # `just test` runner
             ];
 
             # System libraries linked by the workspace and its -sys crates
