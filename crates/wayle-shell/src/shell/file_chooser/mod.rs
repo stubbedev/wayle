@@ -58,9 +58,12 @@ pub(crate) enum FileChooserInput {
     Location(u32),
     /// Internal: the search query changed.
     Search(String),
-    /// Internal: a recursive search finished — `paths` matched `query` under the
-    /// search root (delivered async; dropped if the query has since changed).
-    SearchResults { query: String, paths: Vec<PathBuf> },
+    /// Internal: a batch of recursive-search matches for `query` under the
+    /// search root (streamed as the walk finds them; dropped if the query has
+    /// since changed).
+    SearchResults { query: String, entries: Vec<Entry> },
+    /// Internal: the "search subfolders" toggle changed.
+    ToggleRecursive,
     /// Internal: a breadcrumb segment was activated — jump to that ancestor.
     Crumb(PathBuf),
     /// Internal: go to the parent directory.
@@ -108,11 +111,12 @@ impl std::fmt::Debug for FileChooserInput {
             Self::Place(i) => f.debug_tuple("Place").field(i).finish(),
             Self::Location(i) => f.debug_tuple("Location").field(i).finish(),
             Self::Search(q) => f.debug_tuple("Search").field(q).finish(),
-            Self::SearchResults { query, paths } => f
+            Self::SearchResults { query, entries } => f
                 .debug_struct("SearchResults")
                 .field("query", query)
-                .field("matches", &paths.len())
+                .field("matches", &entries.len())
                 .finish(),
+            Self::ToggleRecursive => f.write_str("ToggleRecursive"),
             Self::Crumb(p) => f.debug_tuple("Crumb").field(p).finish(),
             Self::GoUp => f.write_str("GoUp"),
             Self::HistoryBack => f.write_str("HistoryBack"),
@@ -143,7 +147,7 @@ enum Mode {
 
 /// An entry in the current directory listing.
 #[derive(Clone)]
-struct Entry {
+pub(crate) struct Entry {
     path: PathBuf,
     is_dir: bool,
     size: u64,
@@ -180,9 +184,18 @@ struct Active {
     filters: Vec<Filter>,
     /// Index into `filters` of the active file-type filter (ignored if empty).
     active_filter: usize,
+    /// Everything `list_dir` returned for [`Active::listed_dir`] — unfiltered by
+    /// the hidden toggle, the file-type filter or the search text. The search
+    /// box partitions *this* vector in memory, so typing never touches the
+    /// filesystem.
+    all_entries: Vec<Entry>,
+    /// Which directory `all_entries` was listed from, so a repaint only re-lists
+    /// when the directory actually changed.
+    listed_dir: Option<PathBuf>,
+    /// `all_entries` after the hidden / type / text filters, in display order.
     entries: Vec<Entry>,
-    /// Cached results of the active recursive search (empty when not searching),
-    /// kept so re-sorting / view toggles don't re-walk the tree.
+    /// Results of the active recursive search (empty unless searching
+    /// recursively). Appended to as the walk streams batches in.
     search_entries: Vec<Entry>,
     /// Directories navigated away from, most recent last (mouse back button).
     back: Vec<PathBuf>,
@@ -200,6 +213,9 @@ pub(crate) struct FileChooser {
     locations: Vec<Place>,
     show_hidden: bool,
     search: String,
+    /// Whether the search box walks subfolders (explicit opt-in) instead of
+    /// filtering the current folder in memory.
+    recursive: bool,
     sort_key: SortColumn,
     sort_asc: bool,
     view: ViewMode,
@@ -209,10 +225,10 @@ pub(crate) struct FileChooser {
     // Sheet geometry (size/position) lives on the widgets during a drag, not on
     // the model — the resize/move gestures mutate the surface + window directly
     // so dragging stays smooth (no per-event message round-trip).
-    /// Monotonic search generation. Bumped on every query change; the recursive
+    /// Monotonic search generation. Bumped on every query change; a recursive
     /// walk captures its generation and bails the moment a newer keystroke
-    /// supersedes it, so superseded walks don't keep pegging CPU/IO behind the
-    /// debounce.
+    /// supersedes it. This is what replaces the old keystroke debounce — the
+    /// in-memory filter needs none, and a walk cancels itself instead.
     search_gen: Arc<AtomicU64>,
     input: Sender<FileChooserInput>,
 }
@@ -304,6 +320,14 @@ impl Component for FileChooser {
                                 set_tooltip_text: Some("Show hidden files"),
                                 connect_toggled => FileChooserInput::ToggleHidden,
                             },
+                            #[name = "recursive_toggle"]
+                            gtk::ToggleButton {
+                                add_css_class: "file-chooser-nav",
+                                add_css_class: "flat",
+                                set_icon_name: "folder-saved-search-symbolic",
+                                set_tooltip_text: Some("Search subfolders"),
+                                connect_toggled => FileChooserInput::ToggleRecursive,
+                            },
                         },
                     },
 
@@ -326,13 +350,14 @@ impl Component for FileChooser {
                         #[name = "search_entry"]
                         gtk::SearchEntry {
                             add_css_class: "file-chooser-search",
-                            set_placeholder_text: Some("Search this folder"),
+                            set_placeholder_text: Some("Filter this folder"),
                             set_width_request: 150,
                             set_valign: gtk::Align::Center,
-                            // Debounce: only emit `search-changed` after typing
-                            // pauses, so a recursive walk fires once per pause
-                            // instead of once per keystroke.
-                            set_search_delay: 300,
+                            // No debounce: filtering the cached listing is an
+                            // in-memory scan, so it can run on every keystroke.
+                            // A recursive walk is cancelled by the generation
+                            // counter instead.
+                            set_search_delay: 0,
                         },
                     },
 
@@ -651,6 +676,7 @@ impl Component for FileChooser {
             locations: other_locations(),
             show_hidden: false,
             search: String::new(),
+            recursive: false,
             sort_key,
             sort_asc,
             view,
@@ -798,8 +824,12 @@ impl Component for FileChooser {
                 }
             }
             FileChooserInput::Search(query) => self.set_search(widgets, query),
-            FileChooserInput::SearchResults { query, paths } => {
-                self.apply_search_results(widgets, &query, paths);
+            FileChooserInput::SearchResults { query, entries } => {
+                self.apply_search_results(widgets, &query, entries);
+            }
+            FileChooserInput::ToggleRecursive => {
+                self.recursive = widgets.recursive_toggle.is_active();
+                self.set_search(widgets, self.search.clone());
             }
             FileChooserInput::Crumb(path) => self.goto_dir(widgets, path),
             FileChooserInput::GoUp => self.go_up(widgets),
@@ -884,6 +914,8 @@ impl FileChooser {
             dir,
             filters,
             active_filter: 0,
+            all_entries: Vec::new(),
+            listed_dir: None,
             entries: Vec::new(),
             search_entries: Vec::new(),
             back: Vec::new(),
@@ -918,13 +950,20 @@ impl FileChooser {
         );
     }
 
-    /// Repaints the breadcrumb + list. When a search is active the rows come
-    /// from the recursive results ([`Self::apply_search_results`]) and are
-    /// labelled by their path relative to the search root; otherwise the current
-    /// directory is listed in full.
+    /// Repaints the breadcrumb + list.
+    ///
+    /// The rows are derived in memory from `Active::all_entries` — the cached,
+    /// unfiltered listing of the current directory — by applying, in order: the
+    /// hidden toggle, the file-type filter, then the search text. Only a
+    /// directory change re-reads the filesystem, so typing in the search box is
+    /// instant at any depth.
+    ///
+    /// In recursive-search mode the rows come from the streamed walk results
+    /// ([`Self::apply_search_results`]) instead, and are labelled by their path
+    /// relative to the search root.
     fn populate(&mut self, widgets: &FileChooserWidgets) {
         let show_hidden = self.show_hidden;
-        let searching = !self.search.is_empty();
+        let recursive = self.recursive && !self.search.is_empty();
         let query = self.search.clone();
         let input = self.input.clone();
         let (sort_key, sort_asc, view) = (self.sort_key, self.sort_asc, self.view);
@@ -950,20 +989,34 @@ impl FileChooser {
         build_breadcrumb(&widgets.crumb_bar, &active.dir, &input);
 
         let root = active.dir.clone();
-        let mut entries = if searching {
+        let mut entries = if recursive {
             active.search_entries.clone()
         } else {
-            list_dir(
-                &active.dir,
-                &active.filters,
-                active.active_filter,
-                active.mode,
-                show_hidden,
-            )
+            // Re-list only when the directory changed; every other repaint
+            // (sort, view toggle, hidden toggle, filter change, keystroke)
+            // re-partitions the cached vector.
+            if active.listed_dir.as_deref() != Some(active.dir.as_path()) {
+                active.all_entries = list_dir(&active.dir, active.mode);
+                active.listed_dir = Some(active.dir.clone());
+            }
+            active.all_entries.clone()
         };
+        let matcher = TextFilter::new(&query);
+        entries.retain(|entry| {
+            let name = entry_name(&entry.path);
+            if !show_hidden && name.starts_with('.') {
+                return false;
+            }
+            if !entry.is_dir && !matches_filter(&name, &active.filters, active.active_filter) {
+                return false;
+            }
+            // Recursive results already matched the query during the walk, and
+            // their rows show a relative path rather than a basename.
+            recursive || matcher.matches(&name)
+        });
         // Searching ranks by relevance (closest matches first) rather than the
         // column sort; a plain listing honours the clicked column.
-        if searching {
+        if recursive {
             sort_search_entries(&mut entries, &root, &query);
         } else {
             sort_entries(&mut entries, sort_key, sort_asc);
@@ -973,7 +1026,7 @@ impl FileChooser {
         for entry in &active.entries {
             // In search mode show the path relative to the root for context;
             // in a plain listing the basename is the whole story.
-            let name = if searching {
+            let name = if recursive {
                 entry.path.strip_prefix(&root).map_or_else(
                     |_| entry_name(&entry.path),
                     |rel| rel.to_string_lossy().into_owned(),
@@ -984,7 +1037,7 @@ impl FileChooser {
             if list_mode {
                 widgets
                     .file_list
-                    .append(&file_row(&name, entry, size_w, mod_w, kind_w, searching));
+                    .append(&file_row(&name, entry, size_w, mod_w, kind_w, recursive));
             } else {
                 widgets.file_grid.insert(&grid_cell(&name, entry), -1);
             }
@@ -994,23 +1047,28 @@ impl FileChooser {
             .set_visible(list_mode && active.entries.is_empty());
     }
 
-    /// Handles a search-query change: empty clears search mode and re-lists the
-    /// directory; non-empty kicks off a recursive walk from the current folder
-    /// (off the UI thread) whose result arrives as [`FileChooserInput::SearchResults`].
+    /// Handles a search-query change.
     ///
-    /// Every call bumps the search generation; the spawned walk carries that
+    /// With the "search subfolders" toggle **off** (the default) this is a pure
+    /// in-memory filter over the cached listing: no thread, no I/O, no debounce
+    /// — [`Self::populate`] does the whole job on the current vector.
+    ///
+    /// With it **on**, a recursive walk of the current folder is kicked off on
+    /// the blocking pool and streams its matches back in batches as
+    /// [`FileChooserInput::SearchResults`], so rows appear while the walk is
+    /// still running instead of all at once at the end.
+    ///
+    /// Every call bumps the search generation; a spawned walk carries its
     /// generation and aborts as soon as a newer query supersedes it, so the
-    /// blocking pool isn't left grinding through stale full-tree walks (the
-    /// freeze). The `SearchEntry`'s `search-delay` already collapses bursts of
-    /// keystrokes into one call, so in steady state only the final query walks.
+    /// blocking pool isn't left grinding through stale full-tree walks.
     fn set_search(&mut self, widgets: &FileChooserWidgets, query: String) {
         self.search = query;
         // Supersede any in-flight walk regardless of empty/non-empty.
         let generation = self.search_gen.fetch_add(1, AtomicOrdering::SeqCst) + 1;
-        if self.search.is_empty() {
-            if let Some(active) = self.active.as_mut() {
-                active.search_entries.clear();
-            }
+        if let Some(active) = self.active.as_mut() {
+            active.search_entries.clear();
+        }
+        if !self.recursive || self.search.is_empty() {
             self.populate(widgets);
             return;
         }
@@ -1018,47 +1076,60 @@ impl FileChooser {
             return;
         };
         let root = active.dir.clone();
+        let mode = active.mode;
         let query = self.search.clone();
         let show_hidden = self.show_hidden;
         let input = self.input.clone();
         let cancel = self.search_gen.clone();
+        // Clear the stale rows immediately so the list doesn't show the previous
+        // query's matches while the new walk streams in.
+        self.populate(widgets);
         relm4::spawn(async move {
-            let walk_query = query.clone();
-            let paths = tokio::task::spawn_blocking(move || {
-                walk_search(&root, &walk_query, show_hidden, &cancel, generation)
+            let _ = tokio::task::spawn_blocking(move || {
+                walk_search(
+                    &root,
+                    &query,
+                    show_hidden,
+                    &cancel,
+                    generation,
+                    &mut |batch| {
+                        let _ = input.send(FileChooserInput::SearchResults {
+                            query: query.clone(),
+                            entries: build_search_entries(batch, mode),
+                        });
+                    },
+                );
             })
-            .await
-            .unwrap_or_default();
-            let _ = input.send(FileChooserInput::SearchResults { query, paths });
+            .await;
         });
     }
 
-    /// Repaints, re-running the recursive walk first when a search is active
-    /// (since hidden-files / filter changes invalidate the cached results).
+    /// Repaints, re-running the recursive walk first when one is active (its
+    /// results depend on the hidden-files setting, which the cached listing
+    /// filter does not).
     fn refresh_view(&mut self, widgets: &FileChooserWidgets) {
-        if self.search.is_empty() {
-            self.populate(widgets);
-        } else {
+        if self.recursive && !self.search.is_empty() {
             self.set_search(widgets, self.search.clone());
+        } else {
+            self.populate(widgets);
         }
     }
 
-    /// Applies async recursive-search results, ignoring them if the query has
-    /// moved on. Builds entries (stat + filter/mode rules) and repaints.
+    /// Appends a streamed batch of recursive-search results, ignoring it if the
+    /// query has moved on, and repaints.
     fn apply_search_results(
         &mut self,
         widgets: &FileChooserWidgets,
         query: &str,
-        paths: Vec<PathBuf>,
+        entries: Vec<Entry>,
     ) {
-        if query != self.search {
+        if query != self.search || !self.recursive {
             return;
         }
         let Some(active) = self.active.as_mut() else {
             return;
         };
-        active.search_entries =
-            build_search_entries(paths, &active.filters, active.active_filter, active.mode);
+        active.search_entries.extend(entries);
         self.populate(widgets);
     }
 
@@ -1319,36 +1390,22 @@ fn start_dir(current_folder: &str) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("/"))
 }
 
-/// Lists `dir` with each entry's size + mtime. Files are filtered (unless
-/// picking a folder); hidden entries are skipped unless `show_hidden`. Ordering
-/// is applied later by [`sort_entries`].
-fn list_dir(
-    dir: &Path,
-    filters: &[Filter],
-    active_filter: usize,
-    mode: Mode,
-    show_hidden: bool,
-) -> Vec<Entry> {
+/// Lists `dir` in full, with each entry's size + mtime. Only the mode rule is
+/// applied here (picking a folder drops files) because it can't change while
+/// the listing is cached; the hidden toggle, the file-type filter and the
+/// search text are applied over the cached vector by [`FileChooser::populate`].
+/// Ordering is applied later by [`sort_entries`].
+fn list_dir(dir: &Path, mode: Mode) -> Vec<Entry> {
     let Ok(read) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
     let mut entries = Vec::new();
     for dir_entry in read.flatten() {
-        let name = dir_entry.file_name();
-        let name = name.to_string_lossy();
-        if !show_hidden && name.starts_with('.') {
-            continue;
-        }
         let path = dir_entry.path();
         let meta = std::fs::metadata(&path).ok();
         let is_dir = meta.as_ref().is_some_and(std::fs::Metadata::is_dir);
-        if !is_dir {
-            if mode == Mode::Folder {
-                continue;
-            }
-            if !matches_filter(&name, filters, active_filter) {
-                continue;
-            }
+        if !is_dir && mode == Mode::Folder {
+            continue;
         }
         let size = meta.as_ref().map_or(0, std::fs::Metadata::len);
         let modified = meta.as_ref().and_then(|m| m.modified().ok());
@@ -1366,10 +1423,19 @@ fn list_dir(
 /// on huge trees (and the UI responsive).
 const SEARCH_RESULT_CAP: usize = 1000;
 
+/// How many matches accumulate before a batch is handed to `emit`. Small enough
+/// that the first rows appear almost immediately, large enough that a
+/// match-dense walk doesn't flood the UI with one message per file.
+const SEARCH_BATCH: usize = 64;
+
 /// Recursively walks `root` (depth-first, bounded by [`SEARCH_RESULT_CAP`]),
-/// collecting every entry whose name contains `query` (case-insensitive). Honors
-/// the hidden-files setting: dot-entries are skipped, and their subtrees aren't
-/// descended into, unless `show_hidden`. Runs on a blocking thread.
+/// handing every entry whose name matches `query` to `emit` in batches of
+/// [`SEARCH_BATCH`] as they are found, so results stream into the view instead
+/// of arriving in one lump at the end. Honors the hidden-files setting:
+/// dot-entries are skipped, and their subtrees aren't descended into, unless
+/// `show_hidden`. Symlinked directories are not descended — `DirEntry::file_type`
+/// doesn't follow symlinks — which keeps the walk out of loops and duplicates.
+/// Runs on a blocking thread.
 ///
 /// `cancel`/`my_gen` make a superseded walk abort early: once
 /// `cancel.load() != my_gen` (a newer query bumped the generation) the walk
@@ -1380,12 +1446,19 @@ fn walk_search(
     show_hidden: bool,
     cancel: &AtomicU64,
     my_gen: u64,
-) -> Vec<PathBuf> {
-    let needle = query.to_lowercase();
-    let mut out = Vec::new();
+    emit: &mut dyn FnMut(Vec<PathBuf>),
+) -> usize {
+    let matcher = TextFilter::new(query);
+    let mut batch: Vec<PathBuf> = Vec::new();
+    let mut found = 0usize;
     let mut stack = vec![root.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        if out.len() >= SEARCH_RESULT_CAP || cancel.load(AtomicOrdering::SeqCst) != my_gen {
+    let mut flush = |batch: &mut Vec<PathBuf>| {
+        if !batch.is_empty() {
+            emit(std::mem::take(batch));
+        }
+    };
+    'walk: while let Some(dir) = stack.pop() {
+        if found >= SEARCH_RESULT_CAP || cancel.load(AtomicOrdering::SeqCst) != my_gen {
             break;
         }
         let Ok(read) = std::fs::read_dir(&dir) else {
@@ -1395,7 +1468,7 @@ fn walk_search(
             // Bail mid-directory too — a single huge directory shouldn't pin the
             // thread after the query already moved on.
             if cancel.load(AtomicOrdering::SeqCst) != my_gen {
-                return out;
+                return found;
             }
             let name = dir_entry.file_name();
             let name = name.to_string_lossy();
@@ -1403,10 +1476,14 @@ fn walk_search(
                 continue;
             }
             let path = dir_entry.path();
-            if name.to_lowercase().contains(&needle) {
-                out.push(path.clone());
-                if out.len() >= SEARCH_RESULT_CAP {
-                    break;
+            if matcher.matches(&name) {
+                batch.push(path.clone());
+                found += 1;
+                if batch.len() >= SEARCH_BATCH {
+                    flush(&mut batch);
+                }
+                if found >= SEARCH_RESULT_CAP {
+                    break 'walk;
                 }
             }
             if dir_entry.file_type().is_ok_and(|t| t.is_dir()) {
@@ -1414,29 +1491,21 @@ fn walk_search(
             }
         }
     }
-    out
+    flush(&mut batch);
+    found
 }
 
-/// Builds list entries from recursive-search result paths, applying the same
-/// mode/filter rules as a normal listing (directories always shown; in `Folder`
-/// mode files are dropped; otherwise files must pass the active filter).
-fn build_search_entries(
-    paths: Vec<PathBuf>,
-    filters: &[Filter],
-    active_filter: usize,
-    mode: Mode,
-) -> Vec<Entry> {
+/// Builds list entries from recursive-search result paths. Only the mode rule is
+/// applied (in `Folder` mode files are dropped); the hidden toggle and the
+/// file-type filter are applied over the collected entries by
+/// [`FileChooser::populate`], the same as for a plain listing.
+fn build_search_entries(paths: Vec<PathBuf>, mode: Mode) -> Vec<Entry> {
     let mut entries = Vec::new();
     for path in paths {
         let meta = std::fs::metadata(&path).ok();
         let is_dir = meta.as_ref().is_some_and(std::fs::Metadata::is_dir);
-        if !is_dir {
-            if mode == Mode::Folder {
-                continue;
-            }
-            if !matches_filter(&entry_name(&path), filters, active_filter) {
-                continue;
-            }
+        if !is_dir && mode == Mode::Folder {
+            continue;
         }
         let size = meta.as_ref().map_or(0, std::fs::Metadata::len);
         let modified = meta.as_ref().and_then(|m| m.modified().ok());
@@ -1598,15 +1667,69 @@ fn matches_filter(name: &str, filters: &[Filter], active_filter: usize) -> bool 
     })
 }
 
-/// Whether `name` matches a glob rule. Supports `*`/`*.*` (all), a leading-`*`
-/// suffix match (`*.png`), else an exact name.
+/// Whether `name` matches a glob rule, case-insensitively, with full
+/// `*` / `?` / `[...]` semantics.
+///
+/// Character classes are not optional here: GTK4's `gtk_file_filter_add_suffix`
+/// serialises for the portal as a case-insensitive class glob — `*.png` arrives
+/// as `*.[pP][nN][gG]` — so a matcher without bracket expressions matches
+/// nothing at all for any modern app. Matching case-insensitively on top makes
+/// plain `*.gif` match `PHOTO.GIF` as well, which is a superset of what those
+/// classes were emulating.
+///
+/// An unparseable pattern falls back to a case-insensitive exact-name compare
+/// rather than matching everything.
 fn matches_glob(name: &str, glob: &str) -> bool {
-    if glob == "*" || glob == "*.*" {
-        true
-    } else if let Some(suffix) = glob.strip_prefix('*') {
-        name.ends_with(suffix)
-    } else {
-        name == glob
+    match glob::Pattern::new(glob) {
+        Ok(pattern) => pattern.matches_with(
+            name,
+            glob::MatchOptions {
+                case_sensitive: false,
+                require_literal_separator: false,
+                require_literal_leading_dot: false,
+            },
+        ),
+        Err(_) => name.eq_ignore_ascii_case(glob),
+    }
+}
+
+/// The search box's predicate over a basename: a case-insensitive substring
+/// match, or a glob when the query carries a metacharacter (`*`, `?`, `[`).
+///
+/// The query is lowercased (or compiled) once at construction, not per row, so
+/// filtering a directory is a linear scan over already-listed names.
+struct TextFilter {
+    needle: String,
+    pattern: Option<glob::Pattern>,
+}
+
+impl TextFilter {
+    fn new(query: &str) -> Self {
+        let pattern = query
+            .contains(['*', '?', '['])
+            .then(|| glob::Pattern::new(query).ok())
+            .flatten();
+        Self {
+            needle: query.to_lowercase(),
+            pattern,
+        }
+    }
+
+    fn matches(&self, name: &str) -> bool {
+        if self.needle.is_empty() {
+            return true;
+        }
+        match &self.pattern {
+            Some(pattern) => pattern.matches_with(
+                name,
+                glob::MatchOptions {
+                    case_sensitive: false,
+                    require_literal_separator: false,
+                    require_literal_leading_dot: false,
+                },
+            ),
+            None => name.to_lowercase().contains(&self.needle),
+        }
     }
 }
 
@@ -2534,12 +2657,13 @@ mod tests {
         assert!(!matches_filter("a.png", &filters, 1));
         // No filters → match all.
         assert!(matches_filter("anything", &[], 0));
-        // `*` matches all; exact names are case-sensitive.
+        // `*` matches all; exact names match case-insensitively.
         let star = vec![("All".to_owned(), vec![(0u32, "*".to_owned())])];
         assert!(matches_filter("x.bin", &star, 0));
         let exact = vec![("Make".to_owned(), vec![(0u32, "Makefile".to_owned())])];
         assert!(matches_filter("Makefile", &exact, 0));
-        assert!(!matches_filter("makefile", &exact, 0));
+        assert!(matches_filter("makefile", &exact, 0));
+        assert!(!matches_filter("Makefile.old", &exact, 0));
         // MIME filter: the type guessed from the name must match the rule.
         let mime = vec![("Img".to_owned(), vec![(1u32, "image/png".to_owned())])];
         assert!(matches_filter("photo.png", &mime, 0));
@@ -2729,26 +2853,29 @@ mod tests {
         // Generation 1 is "live" throughout these calls (cancel stays == my_gen).
         let live = AtomicU64::new(1);
 
+        // Collects the streamed batches into one sorted list of basenames.
+        let run = |query: &str, hidden: bool, cancel: &AtomicU64, generation: u64| {
+            let mut names = Vec::new();
+            walk_search(&root, query, hidden, cancel, generation, &mut |batch| {
+                names.extend(batch.iter().map(|p| entry_name(p)));
+            });
+            names.sort();
+            names
+        };
+
         // Hidden excluded: finds the top + nested matches, descends subdirs, but
         // skips the dot-file and never descends the dot-directory.
-        let mut got = walk_search(&root, "match", false, &live, 1)
-            .iter()
-            .map(|p| entry_name(p))
-            .collect::<Vec<_>>();
-        got.sort();
-        assert_eq!(got, ["nested_match.txt", "top_match.txt"]);
+        assert_eq!(
+            run("match", false, &live, 1),
+            ["nested_match.txt", "top_match.txt"]
+        );
 
         // Case-insensitive query also matches.
-        assert_eq!(walk_search(&root, "MATCH", false, &live, 1).len(), 2);
+        assert_eq!(run("MATCH", false, &live, 1).len(), 2);
 
         // With hidden shown: the dot-file and the buried-in-dot-dir match appear.
-        let mut got_hidden = walk_search(&root, "match", true, &live, 1)
-            .iter()
-            .map(|p| entry_name(p))
-            .collect::<Vec<_>>();
-        got_hidden.sort();
         assert_eq!(
-            got_hidden,
+            run("match", true, &live, 1),
             [
                 ".secret_match.txt",
                 "buried_match.txt",
@@ -2759,7 +2886,92 @@ mod tests {
 
         // A superseded generation aborts immediately (no matches collected).
         let superseded = AtomicU64::new(2);
-        assert!(walk_search(&root, "match", false, &superseded, 1).is_empty());
+        assert!(run("match", false, &superseded, 1).is_empty());
+
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn gtk4_suffix_filters_match_in_any_case() {
+        // The exact GVariant GTK 4 produces for
+        //   add_suffix("png"); add_suffix("jpg"); add_pattern("*.gif");
+        //   add_mime_type("image/webp")
+        // — `add_suffix` is rewritten into a case-insensitive character-class
+        // glob because the portal has no case-insensitive glob flag.
+        let gtk4 = vec![(
+            "Images".to_owned(),
+            vec![
+                (0u32, "*.[pP][nN][gG]".to_owned()),
+                (0, "*.[jJ][pP][gG]".to_owned()),
+                (0, "*.gif".to_owned()),
+                (1, "image/webp".to_owned()),
+            ],
+        )];
+        for name in [
+            "photo.png",
+            "Photo.PNG",
+            "photo.PnG",
+            "shot.jpg",
+            "SHOT.JPG",
+            "anim.gif",
+            "ANIM.GIF",
+            "sticker.webp",
+        ] {
+            assert!(matches_filter(name, &gtk4, 0), "{name} should match");
+        }
+        for name in ["photo.txt", "notes.md", "png", "photo.png.bak"] {
+            assert!(!matches_filter(name, &gtk4, 0), "{name} should not match");
+        }
+    }
+
+    #[test]
+    fn glob_matcher_handles_wildcards_classes_and_negation() {
+        assert!(matches_glob("archive.tar.gz", "*.tar.*"));
+        assert!(!matches_glob("archive.zip", "*.tar.*"));
+        assert!(matches_glob("image_1.png", "image_?.png"));
+        assert!(!matches_glob("image_10.png", "image_?.png"));
+        assert!(matches_glob("1file", "[!a-z]*"));
+        assert!(!matches_glob("afile", "[!a-z]*"));
+        // Mid-pattern wildcards work, not just a leading `*`.
+        assert!(matches_glob("report_2024.pdf", "report_*.pdf"));
+        // Unparseable pattern degrades to a case-insensitive exact compare
+        // instead of matching everything.
+        assert!(matches_glob("[oops", "[oops"));
+        assert!(!matches_glob("other", "[oops"));
+    }
+
+    #[test]
+    fn text_filter_is_substring_then_glob() {
+        // Plain queries are case-insensitive substrings, matched anywhere.
+        let plain = TextFilter::new("REP");
+        assert!(plain.matches("report.txt"));
+        assert!(plain.matches("my-Report"));
+        assert!(!plain.matches("notes.txt"));
+        // An empty query passes everything.
+        assert!(TextFilter::new("").matches("anything"));
+        // A metacharacter switches it to a glob over the whole basename.
+        let globbed = TextFilter::new("*.rs");
+        assert!(globbed.matches("main.rs"));
+        assert!(globbed.matches("MAIN.RS"));
+        assert!(!globbed.matches("main.rs.bak"));
+    }
+
+    #[test]
+    fn list_dir_returns_everything_but_honors_folder_mode() {
+        let root = std::env::temp_dir().join("wayle_fc_list_test");
+        std::fs::remove_dir_all(&root).ok();
+        std::fs::create_dir_all(root.join("sub")).expect("mk sub");
+        std::fs::write(root.join("visible.txt"), b"").unwrap();
+        std::fs::write(root.join(".hidden.txt"), b"").unwrap();
+
+        // Hidden entries and the file-type filter are *not* applied here — the
+        // cached listing is the unfiltered truth that populate() partitions.
+        let mut all = names(&list_dir(&root, Mode::OpenFile));
+        all.sort();
+        assert_eq!(all, [".hidden.txt", "sub", "visible.txt"]);
+
+        // Folder mode is the one rule that can't change while cached.
+        assert_eq!(names(&list_dir(&root, Mode::Folder)), ["sub"]);
 
         std::fs::remove_dir_all(&root).ok();
     }
