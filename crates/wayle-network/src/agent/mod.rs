@@ -150,6 +150,54 @@ pub(crate) struct SecretAgent {
     state: Arc<SecretAgentState>,
 }
 
+/// Deliberately outside the `#[interface]` block below: everything in *that*
+/// one becomes a D-Bus method, and this is wayle's own.
+impl SecretAgent {
+    /// Signs in to an openconnect VPN and answers with the plugin's secrets.
+    ///
+    /// The three outcomes are three different things to tell NM, and mixing
+    /// them up is what makes a VPN fail in a way nobody can act on:
+    /// `NoSecrets` passes the request to the next agent, `UserCanceled` fails
+    /// the activation with a reason the row can show, and a success clears
+    /// whatever failure was on the row.
+    async fn vpn_secrets(
+        &self,
+        vpn: &openconnect::Profile,
+        setting_name: &str,
+        flags: u32,
+    ) -> Result<HashMap<String, HashMap<String, OwnedValue>>, SecretAgentError> {
+        if !openconnect::is_supported(vpn) {
+            return Err(SecretAgentError::NoSecrets(format!(
+                "no native sign-in for openconnect protocol {}",
+                vpn.protocol
+            )));
+        }
+
+        match openconnect::authenticate(vpn, flags & REQUEST_NEW != 0, &self.state).await {
+            Ok(values) => {
+                self.state.failure.set(None);
+                Ok(reply_map(setting_name, values))
+            }
+            // A gateway wayle could not follow is not a failed sign-in: saying
+            // NoSecrets hands the request on to the plugin's own auth dialog,
+            // so claiming a protocol natively can never leave a VPN worse off
+            // than it was before wayle claimed it.
+            Err(error @ Error::VpnProtocolUnsupported(_)) => {
+                warn!(name = %vpn.name, %error, "VPN sign-in not understood; leaving it to another agent");
+                Err(SecretAgentError::NoSecrets(error.to_string()))
+            }
+            Err(error) => {
+                warn!(name = %vpn.name, %error, "VPN sign-in failed");
+                self.state.failure.set(Some(AuthFailure {
+                    uuid: vpn.uuid.clone(),
+                    reason: error.to_string(),
+                }));
+                Err(SecretAgentError::UserCanceled(error.to_string()))
+            }
+        }
+    }
+}
+
 #[interface(name = "org.freedesktop.NetworkManager.SecretAgent")]
 impl SecretAgent {
     /// NM needs credentials it does not have.
@@ -181,36 +229,7 @@ impl SecretAgent {
         if setting_name == "vpn"
             && let Some(vpn) = openconnect::profile(&connection, &profile.uuid, &profile.id)
         {
-            if !openconnect::is_supported(&vpn) {
-                return Err(SecretAgentError::NoSecrets(format!(
-                    "no native sign-in for openconnect protocol {}",
-                    vpn.protocol
-                )));
-            }
-            return match openconnect::authenticate(&vpn, flags & REQUEST_NEW != 0, &self.state)
-                .await
-            {
-                Ok(values) => {
-                    self.state.failure.set(None);
-                    Ok(reply_map(&setting_name, values))
-                }
-                // A gateway wayle could not follow is not a failed sign-in:
-                // saying NoSecrets hands the request on to the plugin's own
-                // auth dialog, so claiming a protocol natively can never leave
-                // a VPN worse off than it was before wayle claimed it.
-                Err(error @ Error::VpnProtocolUnsupported(_)) => {
-                    warn!(name = %vpn.name, %error, "VPN sign-in not understood; leaving it to another agent");
-                    Err(SecretAgentError::NoSecrets(error.to_string()))
-                }
-                Err(error) => {
-                    warn!(name = %vpn.name, %error, "VPN sign-in failed");
-                    self.state.failure.set(Some(AuthFailure {
-                        uuid: vpn.uuid.clone(),
-                        reason: error.to_string(),
-                    }));
-                    Err(SecretAgentError::UserCanceled(error.to_string()))
-                }
-            };
+            return self.vpn_secrets(&vpn, &setting_name, flags).await;
         }
 
         let Some(fields) = fields::for_request(&setting_name, &hints, &profile.connection_type)
