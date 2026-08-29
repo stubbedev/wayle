@@ -1,18 +1,23 @@
-# Mock GlobalProtect gateways
+# Mock VPN gateways
 
-Two throwaway gateways for the VPN sign-in tests, so nothing has to be pointed
-at a real VPN to prove the sign-in works:
+Three throwaway gateways for the VPN sign-in tests, so nothing has to be
+pointed at a real VPN to prove the sign-in works:
 
-- `127.0.0.1:8443` — username/password, one challenge round, then a cookie;
-- `127.0.0.1:8444` — a SAML portal, which wayle must refuse before posting any
-  credentials at it.
+- `127.0.0.1:8443` — GlobalProtect: username/password, one challenge round,
+  then a cookie;
+- `127.0.0.1:8444` — a GlobalProtect SAML portal, which wayle must refuse
+  before posting any credentials at it;
+- `127.0.0.1:8445` — AnyConnect: an XML form, a challenge, then a `webvpn`
+  cookie. It refuses any reply that does not echo its `<opaque>` blob, which is
+  what the real ones do.
 
 ```sh
 just test-gateway     # up, run the `mock::` tests, down again
 ```
 
-The tests are `#[ignore]`d in the normal suite (`crates/wayle-network/src/vpn/
-openconnect/gp.rs`, `mod mock`) because they need these containers running.
+The tests are `#[ignore]`d in the normal suite (`mod mock` in
+`crates/wayle-network/src/vpn/openconnect/gp.rs` and `anyconnect.rs`) because
+they need these containers running.
 
 ## The certificates
 

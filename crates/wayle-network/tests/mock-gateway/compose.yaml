@@ -26,3 +26,14 @@ services:
       - "127.0.0.1:8444:8444"
     volumes:
       - .:/mock:ro
+
+  anyconnect-gateway:
+    image: python:3.13-alpine
+    command: python /mock/gateway.py
+    environment:
+      MODE: anyconnect
+      PORT: "8445"
+    ports:
+      - "127.0.0.1:8445:8445"
+    volumes:
+      - .:/mock:ro

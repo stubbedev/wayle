@@ -7,15 +7,18 @@
 //! libopenconnect through the whole sign-in.
 //!
 //! wayle authenticates itself instead. For GlobalProtect that is a form POST
-//! and, when the gateway asks, a second one carrying the 2FA answer — plain
-//! HTTPS, no tunnel involved, which is exactly what `openconnect
-//! --authenticate` does before handing the cookie to something else. The
-//! resulting cookie is cached, so a reconnect costs no second factor.
+//! and, when the gateway asks, a second one carrying the 2FA answer; for
+//! AnyConnect it is an XML exchange in which the gateway describes the form it
+//! wants filled in. Either way it is plain HTTPS with no tunnel involved,
+//! which is exactly what `openconnect --authenticate` does before handing the
+//! cookie to something else. The resulting cookie is cached, so a reconnect
+//! costs no second factor.
 //!
 //! The tunnel itself is still NetworkManager's plugin. This module replaces
 //! the sign-in, the helper script and the systemd unit around it — not the
 //! thing that moves packets.
 
+mod anyconnect;
 mod cache;
 mod cert;
 mod form;
@@ -81,6 +84,31 @@ const RETRY_WINDOW: Duration = Duration::from_secs(120);
 static HANDED_OUT: LazyLock<Mutex<HashMap<String, (String, Instant)>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// A completed authentication: what the plugin needs to bring the tunnel up
+/// without signing in again.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Session {
+    /// The `--cookie` string openconnect takes. Its shape is the protocol's:
+    /// `authcookie=…&portal=…` for GlobalProtect, `webvpn=…` for AnyConnect.
+    pub cookie: String,
+    /// The host the cookie was issued for. Handed back as the `gateway`
+    /// secret, so the plugin connects to the same one that authenticated.
+    pub host: String,
+    /// The `pin-sha256:` fingerprint of the certificate that host presented
+    /// while it was issuing the cookie. See [`cert`].
+    pub gwcert: String,
+}
+
+/// A finished sign-in, and whatever of it is worth remembering.
+#[derive(Debug)]
+pub(crate) struct SignIn {
+    /// The session to hand to the plugin.
+    pub session: Session,
+    /// A password the user typed that turned out to work, to be cached so the
+    /// next connect only asks for the second factor.
+    pub remember_password: Option<String>,
+}
+
 /// The openconnect settings wayle needs out of an NM profile.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Profile {
@@ -127,13 +155,15 @@ fn data_dict(value: &OwnedValue) -> Option<HashMap<String, String>> {
     HashMap::<String, String>::try_from(value.clone()).ok()
 }
 
+/// The protocols wayle signs into itself. Everything else in the openconnect
+/// family — `nc`, `pulse`, `f5`, `fortinet`, `array` — falls through to the
+/// normal no-secrets answer, which lets another agent (or the plugin's own
+/// auth dialog, if it is installed) have a go rather than failing outright.
+const NATIVE_PROTOCOLS: &[&str] = &["gp", "anyconnect"];
+
 /// Whether wayle can produce this profile's secrets natively.
-///
-/// Only GlobalProtect for now. Anything else falls through to the normal
-/// no-secrets answer, which lets another agent — or the plugin's own auth
-/// dialog, if it is installed — have a go rather than failing outright.
 pub(crate) fn is_supported(profile: &Profile) -> bool {
-    profile.protocol == "gp" && !profile.gateway.is_empty()
+    NATIVE_PROTOCOLS.contains(&profile.protocol.as_str()) && !profile.gateway.is_empty()
 }
 
 /// Authenticates and returns the secrets the openconnect plugin asked for.
@@ -156,25 +186,41 @@ pub(crate) async fn authenticate(
     }
 
     let client = client()?;
-    let (username, password, password_was_typed) = credentials(profile, state, &client).await?;
     // A failed sign-in drops the stored password: the likeliest thing that
     // went stale, and keeping it would make every later attempt fail the same
     // way with no way for the user to correct it.
-    let session = sign_in(profile, &client, &username, &password, state)
-        .await
-        .inspect_err(|_| cache::forget_password(&profile.uuid))?;
+    let signed_in = match profile.protocol.as_str() {
+        "anyconnect" => anyconnect::sign_in(profile, &client, state).await,
+        _ => globalprotect(profile, &client, state).await,
+    }
+    .inspect_err(|_| cache::forget_password(&profile.uuid))?;
 
-    cache::store_session(&profile.uuid, &session);
-    if password_was_typed {
-        cache::store_password(&profile.uuid, &password);
+    cache::store_session(&profile.uuid, &signed_in.session);
+    if let Some(password) = &signed_in.remember_password {
+        cache::store_password(&profile.uuid, password);
     }
     info!(name = %profile.name, "VPN sign-in complete");
-    Ok(hand_out(&profile.uuid, &session))
+    Ok(hand_out(&profile.uuid, &signed_in.session))
+}
+
+/// The GlobalProtect sign-in: ask the gateway what it wants, ask the user for
+/// what is missing, then post it.
+async fn globalprotect(
+    profile: &Profile,
+    client: &reqwest::Client,
+    state: &SecretAgentState,
+) -> Result<SignIn, Error> {
+    let (username, password, password_was_typed) = credentials(profile, state, client).await?;
+    let session = sign_in(profile, client, &username, &password, state).await?;
+    Ok(SignIn {
+        session,
+        remember_password: password_was_typed.then_some(password),
+    })
 }
 
 /// Records which cookie NM is being given, so the next request for the same
 /// profile can tell a rejected cookie from a fresh reconnect.
-fn hand_out(uuid: &str, session: &gp::Session) -> HashMap<String, String> {
+fn hand_out(uuid: &str, session: &Session) -> HashMap<String, String> {
     if let Ok(mut handed) = HANDED_OUT.lock() {
         handed.insert(String::from(uuid), (session.cookie.clone(), Instant::now()));
     }
@@ -198,7 +244,7 @@ pub(crate) fn forget(uuid: &str) {
 /// The cached session to reuse, or `None` when there is none to reuse — either
 /// because nothing is cached or because NM has just told us what was cached
 /// did not work.
-fn reusable_session(profile: &Profile, request_new: bool) -> Option<gp::Session> {
+fn reusable_session(profile: &Profile, request_new: bool) -> Option<Session> {
     if request_new {
         debug!(name = %profile.name, "previous VPN credentials rejected, discarding them");
         cache::forget_session(&profile.uuid);
@@ -240,7 +286,7 @@ async fn sign_in(
     username: &str,
     password: &str,
     state: &SecretAgentState,
-) -> Result<gp::Session, Error> {
+) -> Result<Session, Error> {
     let computer = hostname();
     let mut input_str = String::new();
     let mut answer = String::from(password);
@@ -279,7 +325,7 @@ async fn sign_in(
 /// missing until it is present, so a reply without it makes NM report "final
 /// secrets request failed to provide sufficient secrets" and never launch
 /// openconnect at all. Trust and the plugin's key set are separate questions.
-fn secrets(session: &gp::Session) -> HashMap<String, String> {
+fn secrets(session: &Session) -> HashMap<String, String> {
     HashMap::from([
         (String::from("cookie"), session.cookie.clone()),
         (String::from("gateway"), session.host.clone()),
@@ -386,6 +432,20 @@ fn cancelled() -> Error {
 /// (see [`LOGIN_TIMEOUT`]) and a client-wide one would cap them all at the
 /// shortest. `tls_info` is what makes the gateway's certificate readable off
 /// the response, which is where the `gwcert` secret comes from.
+/// The certificate pin of whoever answered this response.
+///
+/// `None` when the client was not built with `tls_info(true)`, or on a plain
+/// HTTP response — neither of which happens here, but a pin invented for a
+/// connection nobody verified would be worse than no sign-in at all.
+fn peer_pin(response: &reqwest::Response) -> Option<String> {
+    cert::pin(
+        response
+            .extensions()
+            .get::<reqwest::tls::TlsInfo>()?
+            .peer_certificate()?,
+    )
+}
+
 pub(super) fn client() -> Result<reqwest::Client, Error> {
     reqwest::Client::builder()
         .user_agent(USER_AGENT)
@@ -479,9 +539,7 @@ mod tests {
     }
 
     #[test]
-    fn a_non_globalprotect_openconnect_profile_is_left_to_someone_else() {
-        // AnyConnect and friends are the same plugin but a different sign-in;
-        // claiming them would break VPNs that work today via the auth dialog.
+    fn anyconnect_is_signed_into_natively_too() {
         let profile = profile(
             &connection(
                 SERVICE_TYPE,
@@ -491,7 +549,26 @@ mod tests {
             "Work",
         )
         .expect("still an openconnect profile");
-        assert!(!is_supported(&profile));
+        assert!(is_supported(&profile));
+    }
+
+    #[test]
+    fn the_rest_of_the_protocol_family_is_left_to_someone_else() {
+        // Same plugin, a different sign-in each. Claiming one without
+        // implementing it would break a VPN that works today through the
+        // plugin's own auth dialog.
+        for protocol in ["nc", "pulse", "f5", "fortinet", "array"] {
+            let profile = profile(
+                &connection(
+                    SERVICE_TYPE,
+                    &[("gateway", "vpn.example.com"), ("protocol", protocol)],
+                ),
+                "uuid-1",
+                "Work",
+            )
+            .expect("still an openconnect profile");
+            assert!(!is_supported(&profile), "{protocol} has no native sign-in");
+        }
     }
 
     #[test]
@@ -503,7 +580,8 @@ mod tests {
         )
         .expect("profile");
         assert_eq!(profile.protocol, "anyconnect");
-        assert!(!is_supported(&profile));
+        // And openconnect's default is one wayle now signs into.
+        assert!(is_supported(&profile));
     }
 
     #[test]
@@ -517,8 +595,8 @@ mod tests {
         assert!(!is_supported(&profile));
     }
 
-    fn session() -> gp::Session {
-        gp::Session {
+    fn session() -> Session {
+        Session {
             cookie: String::from("authcookie=abc"),
             host: String::from("vpn.example.com"),
             gwcert: String::from("pin-sha256:AAAA"),

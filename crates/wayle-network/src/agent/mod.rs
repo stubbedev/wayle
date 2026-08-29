@@ -29,6 +29,7 @@ use zbus::{
 };
 
 use crate::{
+    Error,
     types::agent::{SecretReply, SecretRequest},
     vpn::openconnect,
 };
@@ -103,7 +104,7 @@ pub struct SecretAgentState {
 }
 
 impl SecretAgentState {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             request: Property::new(None),
             failure: Property::new(None),
@@ -192,6 +193,14 @@ impl SecretAgent {
                 Ok(values) => {
                     self.state.failure.set(None);
                     Ok(reply_map(&setting_name, values))
+                }
+                // A gateway wayle could not follow is not a failed sign-in:
+                // saying NoSecrets hands the request on to the plugin's own
+                // auth dialog, so claiming a protocol natively can never leave
+                // a VPN worse off than it was before wayle claimed it.
+                Err(error @ Error::VpnProtocolUnsupported(_)) => {
+                    warn!(name = %vpn.name, %error, "VPN sign-in not understood; leaving it to another agent");
+                    Err(SecretAgentError::NoSecrets(error.to_string()))
                 }
                 Err(error) => {
                     warn!(name = %vpn.name, %error, "VPN sign-in failed");

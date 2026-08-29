@@ -24,7 +24,7 @@ use std::{
 
 use tracing::{debug, warn};
 
-use super::gp::Session;
+use super::Session;
 
 /// `$XDG_STATE_HOME/wayle/vpn`, or the default state directory under `$HOME`.
 fn directory() -> Option<PathBuf> {

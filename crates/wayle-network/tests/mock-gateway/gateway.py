@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-"""A GlobalProtect gateway, in as much detail as wayle's sign-in can tell.
+"""A VPN gateway, in as much detail as wayle's sign-in can tell.
 
-Speaks the two endpoints `crates/wayle-network/src/vpn/openconnect/gp.rs`
-talks to, over TLS with the certificate next to this file — the sign-in reads
-the peer certificate off that connection to produce the `gwcert` secret, so a
-plaintext mock would not exercise the thing most worth exercising.
+Speaks the endpoints `crates/wayle-network/src/vpn/openconnect/` talks to —
+GlobalProtect's two `.esp` endpoints and AnyConnect's XML exchange — over TLS
+with the certificate next to this file. The sign-in reads the peer certificate
+off that connection to produce the `gwcert` secret, so a plaintext mock would
+not exercise the thing most worth exercising.
 
 MODE picks which gateway this is:
 
-  form  — username/password, then one challenge round, then a cookie.
-  saml  — a portal that answers prelogin with a SAML redirect, which wayle
-          must refuse *before* posting any credentials at it.
+  form        — GlobalProtect: username/password, one challenge round, cookie.
+  saml        — a GlobalProtect portal that answers prelogin with a SAML
+                redirect, which wayle must refuse *before* posting any
+                credentials at it.
+  anyconnect  — Cisco: an XML form, a challenge, then a `webvpn` cookie.
 
 Nothing here is a fixture of a real gateway's traffic; the response shapes come
-from openconnect's `auth-globalprotect.c`, which is also where gp.rs got them.
+from openconnect's `auth-globalprotect.c` and `auth.c`, which is also where
+gp.rs and anyconnect.rs got them.
 """
 
 import os
@@ -50,6 +54,41 @@ CHALLENGE = f"""<?xml version="1.0" encoding="UTF-8" ?>
 
 REJECTED = """<?xml version="1.0" encoding="UTF-8" ?>
 <response status="error"><msg>Invalid username or password</msg></response>"""
+
+OPAQUE = (
+    '<opaque is-for="sg"><tunnel-group>DefaultWEBVPNGroup</tunnel-group>'
+    "<config-hash>1699999999999</config-hash></opaque>"
+)
+
+AC_MAIN = f"""<?xml version="1.0" encoding="UTF-8"?>
+<config-auth client="vpn" type="auth-request" aggregate-auth-version="2">
+{OPAQUE}
+<auth id="main"><title>Login</title>
+<message>Please enter your username and password.</message>
+<form><input type="text" name="username" label="Username:"/>
+<input type="password" name="password" label="Password:"/>
+<select name="group_list" label="GROUP:">
+<option value="Employees" selected="true">Employees</option>
+</select></form></auth></config-auth>"""
+
+AC_CHALLENGE = f"""<?xml version="1.0" encoding="UTF-8"?>
+<config-auth client="vpn" type="auth-request" aggregate-auth-version="2">
+{OPAQUE}
+<auth id="challenge"><message>Answer with the code from your token.</message>
+<form><input type="password" name="secondary_password" label="Code:"/></form>
+</auth></config-auth>"""
+
+AC_SUCCESS = """<?xml version="1.0" encoding="UTF-8"?>
+<config-auth client="vpn" type="complete" aggregate-auth-version="2">
+<auth id="success"><title>SSL VPN Service</title></auth>
+<session-token>SESSIONTOKEN</session-token></config-auth>"""
+
+AC_REJECTED = """<?xml version="1.0" encoding="UTF-8"?>
+<config-auth client="vpn" type="auth-request" aggregate-auth-version="2">
+<auth id="main"><error id="88" param1="">Login failed.</error>
+<form><input type="text" name="username" label="Username:"/>
+<input type="password" name="password" label="Password:"/></form>
+</auth></config-auth>"""
 
 
 def success(computer: str) -> str:
@@ -105,7 +144,51 @@ class Gateway(BaseHTTPRequestHandler):
         mode = os.environ.get("MODE", "form")
         self._reply(PRELOGIN_SAML if mode == "saml" else PRELOGIN_FORM)
 
+    def _anyconnect(self, body: str) -> None:
+        """One exchange of Cisco's XML authentication."""
+        if "<config-auth" not in body:
+            self._reply("<html>not a gateway</html>", 400)
+            return
+        if 'type="init"' in body:
+            # The cookie a gateway clears before there is a session: wayle
+            # must not mistake it for one.
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml")
+            self.send_header(
+                "Set-Cookie", "webvpn=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/"
+            )
+            encoded = AC_MAIN.encode()
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
+
+        # Every reply has to echo the opaque blob back, or the gateway does
+        # not recognise the conversation.
+        if "<tunnel-group>DefaultWEBVPNGroup</tunnel-group>" not in body:
+            self._reply(AC_REJECTED)
+            return
+
+        if f"<secondary_password>{CHALLENGE_ANSWER}</secondary_password>" in body:
+            encoded = AC_SUCCESS.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml")
+            self.send_header("Set-Cookie", "webvpn=SESSIONVALUE; path=/; secure; HttpOnly")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
+
+        if f"<username>{USER}</username>" in body and f"<password>{PASSWORD}</password>" in body:
+            self._reply(AC_CHALLENGE)
+            return
+        self._reply(AC_REJECTED)
+
     def do_POST(self) -> None:
+        if os.environ.get("MODE") == "anyconnect":
+            length = int(self.headers.get("Content-Length", "0"))
+            self._anyconnect(self.rfile.read(length).decode())
+            return
         if not self.path.startswith("/ssl-vpn/login.esp"):
             self._reply("<html>not a gateway</html>", 404)
             return

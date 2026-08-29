@@ -57,6 +57,15 @@ pub enum Error {
     #[error("{0}")]
     VpnAuthenticationFailed(String),
 
+    /// A VPN gateway answered in a shape wayle's sign-in does not recognise.
+    ///
+    /// Distinct from a refused authentication on purpose: this one means
+    /// "someone else should try", and the secret agent turns it into NM's
+    /// `NoSecrets` so the plugin's own auth dialog — or another agent — gets
+    /// the chance wayle would otherwise have taken away.
+    #[error("{0}")]
+    VpnProtocolUnsupported(String),
+
     /// Monitoring requires a cancellation token.
     #[error("cannot start monitoring: cancellation token not provided")]
     MissingCancellationToken,

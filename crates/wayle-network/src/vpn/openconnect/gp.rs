@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use super::{LOGIN_TIMEOUT, PRELOGIN_TIMEOUT, cert, form, xml};
+use super::{LOGIN_TIMEOUT, PRELOGIN_TIMEOUT, Session, form, peer_pin, xml};
 use crate::Error;
 
 /// The client version every GlobalProtect gateway expects, and the one it
@@ -98,20 +98,6 @@ impl Default for Prelogin {
             password_label: String::from("Password"),
         }
     }
-}
-
-/// A completed authentication.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Session {
-    /// The `--cookie` string openconnect takes: `authcookie=…&portal=…&…`.
-    pub cookie: String,
-    /// The host the cookie was issued for. Handed back as the `gateway`
-    /// secret, so the plugin connects to the same one that authenticated.
-    pub host: String,
-    /// The `pin-sha256:` fingerprint of the certificate that gateway presented
-    /// while it was issuing the cookie. The plugin will not start without it;
-    /// see [`cert`].
-    pub gwcert: String,
 }
 
 /// Builds a login request body.
@@ -356,20 +342,6 @@ pub(super) async fn login(
     }
 
     parse_login(&body, gateway, computer, &gwcert)
-}
-
-/// The certificate pin of whoever answered this response.
-///
-/// `None` when the client was not built with `tls_info(true)`, or on a plain
-/// HTTP response — neither of which happens here, but a pin invented for a
-/// connection nobody verified would be worse than no sign-in at all.
-fn peer_pin(response: &reqwest::Response) -> Option<String> {
-    cert::pin(
-        response
-            .extensions()
-            .get::<reqwest::tls::TlsInfo>()?
-            .peer_certificate()?,
-    )
 }
 
 #[cfg(test)]
