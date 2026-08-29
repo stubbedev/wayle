@@ -483,6 +483,14 @@ dropdown-network-error-ip-config = Impossible d'obtenir une adresse IP
 dropdown-network-error-not-found = Réseau introuvable
 dropdown-network-error-generic = Échec de la connexion
 
+## VPN
+
+dropdown-network-vpn = VPN
+dropdown-network-vpn-connected = Connecté
+dropdown-network-vpn-connecting = Connexion...
+dropdown-network-vpn-disconnected = Déconnecté
+dropdown-network-vpn-failed = Échec de la connexion
+
 ### Menu Treeman
 
 dropdown-treeman-title = Treeman

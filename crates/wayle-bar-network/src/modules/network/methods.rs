@@ -1,5 +1,5 @@
-use wayle_config::schemas::modules::NetworkConfig;
-use wayle_network::{NetworkService, types::connectivity::ConnectionType};
+use wayle_config::schemas::modules::{NetworkConfig, VpnShow};
+use wayle_network::{NetworkService, types::connectivity::ConnectionType, vpn::VpnState};
 
 use super::{
     NetworkModule,
@@ -8,7 +8,37 @@ use super::{
 use crate::i18n::t;
 
 impl NetworkModule {
+    /// Icon + label for the current network state.
+    ///
+    /// A VPN, when one is being shown, takes over the icon: what the user needs
+    /// at a glance is whether their traffic is tunnelled, and the underlying
+    /// link is still described by the label. Everything else falls through to
+    /// the wifi/wired display unchanged.
     pub fn compute_display(config: &NetworkConfig, network: &NetworkService) -> (String, String) {
+        let (link_icon, link_label) = Self::compute_link_display(config, network);
+        match Self::vpn_icon(config, network) {
+            Some(icon) => (icon, link_label),
+            None => (link_icon, link_label),
+        }
+    }
+
+    /// The VPN overlay icon, or `None` when the VPN state shouldn't be shown.
+    ///
+    /// `auto` (the default) shows nothing until a VPN is actually configured,
+    /// so adding the keys changes nothing on a machine without one.
+    fn vpn_icon(config: &NetworkConfig, network: &NetworkService) -> Option<String> {
+        let show = config.vpn_show.get();
+        if show == VpnShow::Never || (show == VpnShow::Auto && network.vpn.is_empty()) {
+            return None;
+        }
+        Some(match network.vpn.aggregate.get() {
+            VpnState::Connected => config.vpn_connected_icon.get().clone(),
+            VpnState::Connecting => config.vpn_connecting_icon.get().clone(),
+            VpnState::Disconnected | VpnState::Failed => config.vpn_disconnected_icon.get().clone(),
+        })
+    }
+
+    fn compute_link_display(config: &NetworkConfig, network: &NetworkService) -> (String, String) {
         let primary = network.primary.get();
 
         match primary {

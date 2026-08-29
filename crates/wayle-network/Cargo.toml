@@ -19,6 +19,7 @@ tokio.workspace = true
 tokio-stream.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
+wayle-config.workspace = true
 wayle-core.workspace = true
 wayle-traits.workspace = true
 zbus.workspace = true

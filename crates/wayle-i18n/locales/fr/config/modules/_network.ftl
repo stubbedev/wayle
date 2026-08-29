@@ -26,6 +26,21 @@ settings-modules-network-wired-acquiring-icon = Icône connexion filaire
 settings-modules-network-wired-disconnected-icon = Icône filaire déconnectée
     .description = Icône lorsque l'Ethernet est déconnecté
 
+settings-modules-network-vpn-connected-icon = Icône VPN connecté
+    .description = Icône lorsqu'un VPN est connecté
+
+settings-modules-network-vpn-connecting-icon = Icône VPN en connexion
+    .description = Icône pendant une tentative de connexion VPN
+
+settings-modules-network-vpn-disconnected-icon = Icône VPN déconnecté
+    .description = Icône lorsqu'un VPN est configuré mais déconnecté
+
+settings-modules-network-vpn-show = Afficher l'état du VPN
+    .description = Quand l'état du VPN remplace l'icône WiFi/Ethernet
+
+settings-modules-network-vpn = VPN
+    .description = VPN à surveiller et à proposer dans le menu déroulant
+
 settings-modules-network-border-show = Afficher la bordure
     .description = Afficher une bordure autour du bouton
 

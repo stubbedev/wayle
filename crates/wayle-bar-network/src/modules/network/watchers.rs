@@ -28,6 +28,13 @@ pub fn spawn_watchers(
         let _ = out.send(NetworkCmd::WiredDeviceChanged);
     });
 
+    // One watch on the folded VPN state, not one per entry: the module only
+    // ever shows the aggregate.
+    let vpn = network.vpn.aggregate.clone();
+    watch!(sender, [vpn.watch()], |out| {
+        let _ = out.send(NetworkCmd::StateChanged);
+    });
+
     spawn_icon_config_watchers(sender, config);
 }
 
@@ -85,6 +92,10 @@ fn spawn_icon_config_watchers(sender: &ComponentSender<NetworkModule>, config: &
     let wired_connected_icon = config.wired_connected_icon.clone();
     let wired_acquiring_icon = config.wired_acquiring_icon.clone();
     let wired_disconnected_icon = config.wired_disconnected_icon.clone();
+    let vpn_connected_icon = config.vpn_connected_icon.clone();
+    let vpn_connecting_icon = config.vpn_connecting_icon.clone();
+    let vpn_disconnected_icon = config.vpn_disconnected_icon.clone();
+    let vpn_show = config.vpn_show.clone();
 
     watch!(
         sender,
@@ -96,7 +107,11 @@ fn spawn_icon_config_watchers(sender: &ComponentSender<NetworkModule>, config: &
             wifi_signal_icons.watch(),
             wired_connected_icon.watch(),
             wired_acquiring_icon.watch(),
-            wired_disconnected_icon.watch()
+            wired_disconnected_icon.watch(),
+            vpn_connected_icon.watch(),
+            vpn_connecting_icon.watch(),
+            vpn_disconnected_icon.watch(),
+            vpn_show.watch()
         ],
         |out| {
             let _ = out.send(NetworkCmd::IconConfigChanged);

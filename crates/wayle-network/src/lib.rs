@@ -79,6 +79,7 @@
 //! | `wired` | `Property<Option<Arc<Wired>>>` | Ethernet device (reactive for hot-plug) |
 //! | `settings` | `Settings` | Connection profile management |
 //! | `primary` | `Property<ConnectionType>` | Active connection type |
+//! | `vpn` | `VpnService` | Configured VPNs and their state |
 
 /// Core network domain models.
 pub mod core;
@@ -89,6 +90,8 @@ mod proxy;
 mod service;
 /// Network type definitions
 pub mod types;
+/// VPN state and control (NetworkManager, systemd units, tunnel interfaces).
+pub mod vpn;
 /// WiFi device functionality
 pub mod wifi;
 /// Wired device functionality

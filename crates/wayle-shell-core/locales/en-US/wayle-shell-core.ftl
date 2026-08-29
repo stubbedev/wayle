@@ -501,6 +501,14 @@ dropdown-network-error-ip-config = Failed to obtain IP address
 dropdown-network-error-not-found = Network not found
 dropdown-network-error-generic = Connection failed
 
+## VPN
+
+dropdown-network-vpn = VPN
+dropdown-network-vpn-connected = Connected
+dropdown-network-vpn-connecting = Connecting...
+dropdown-network-vpn-disconnected = Disconnected
+dropdown-network-vpn-failed = Connection failed
+
 ### Recorder Dropdown
 
 dropdown-recorder-title = Screen Recorder

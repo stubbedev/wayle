@@ -436,6 +436,12 @@
       },
       "type": "array"
     },
+    "Array_of_VpnEntry": {
+      "items": {
+        "$ref": "#/$defs/VpnEntry"
+      },
+      "type": "array"
+    },
     "Array_of_string": {
       "items": {
         "type": "string"
@@ -4983,6 +4989,11 @@
             "right-click": "",
             "scroll-down": "",
             "scroll-up": "",
+            "vpn": [],
+            "vpn-connected-icon": "ld-lock-symbolic",
+            "vpn-connecting-icon": "ld-refresh-cw-symbolic",
+            "vpn-disconnected-icon": "ld-unplug-symbolic",
+            "vpn-show": "auto",
             "wifi-acquiring-icon": "cm-wireless-acquiring-symbolic",
             "wifi-connected-icon": "cm-wireless-connected-symbolic",
             "wifi-disabled-icon": "cm-wireless-disabled-symbolic",
@@ -5622,6 +5633,31 @@
           "$ref": "#/$defs/ClickAction",
           "default": "",
           "description": "Action on scroll up."
+        },
+        "vpn": {
+          "$ref": "#/$defs/Array_of_VpnEntry",
+          "default": [],
+          "description": "VPNs to watch and offer in the dropdown.\n\nEach entry names where its state comes from — a NetworkManager profile,\na systemd unit, or a network interface. See [`VpnEntry`].\n\n```toml\n[[modules.network.vpn]]\nid = \"konform\"\nbackend = \"systemd\"\nunit = \"openconnect-konform.service\"\ninterface = \"oc-konform\"\nconnect = \"vpn-konform-connect\"\n```"
+        },
+        "vpn-connected-icon": {
+          "$ref": "#/$defs/string",
+          "default": "ld-lock-symbolic",
+          "description": "Icon when a VPN is connected."
+        },
+        "vpn-connecting-icon": {
+          "$ref": "#/$defs/string",
+          "default": "ld-refresh-cw-symbolic",
+          "description": "Icon while a VPN connection is in flight."
+        },
+        "vpn-disconnected-icon": {
+          "$ref": "#/$defs/string",
+          "default": "ld-unplug-symbolic",
+          "description": "Icon when a VPN is configured but disconnected."
+        },
+        "vpn-show": {
+          "$ref": "#/$defs/VpnShow",
+          "default": "auto",
+          "description": "When the VPN state replaces the wifi/wired icon.\n\n`auto` shows it only once a VPN exists to report on, so adding the key\nchanges nothing on a machine with no VPN."
         },
         "wifi-acquiring-icon": {
           "$ref": "#/$defs/string",
@@ -8178,6 +8214,131 @@
       },
       "type": "object"
     },
+    "VpnBackend": {
+      "description": "Where a VPN entry's state comes from, and what a toggle acts on.",
+      "oneOf": [
+        {
+          "const": "networkmanager",
+          "description": "A NetworkManager VPN or WireGuard profile, matched by `id`.",
+          "type": "string"
+        },
+        {
+          "const": "systemd",
+          "description": "A systemd unit, started and stopped over `org.freedesktop.systemd1`.",
+          "type": "string"
+        },
+        {
+          "const": "link",
+          "description": "A network interface, watched over netlink. Read-only unless `connect` /\n`disconnect` commands are configured.",
+          "type": "string"
+        }
+      ]
+    },
+    "VpnBus": {
+      "description": "Which systemd bus a unit lives on.",
+      "oneOf": [
+        {
+          "const": "system",
+          "description": "System units (`systemctl start`), authorized by polkit.",
+          "type": "string"
+        },
+        {
+          "const": "user",
+          "description": "User units (`systemctl --user start`).",
+          "type": "string"
+        }
+      ]
+    },
+    "VpnEntry": {
+      "description": "One VPN in `[[modules.network.vpn]]`.\n\n## Examples\n\nA NetworkManager profile needs nothing but its name:\n\n```toml\n[[modules.network.vpn]]\nid = \"work-openvpn\"\n```\n\nopenconnect as a systemd system unit, with the tunnel interface as the\nground truth for \"connected\" and a helper doing the interactive 2FA:\n\n```toml\n[[modules.network.vpn]]\nid = \"konform\"\nlabel = \"Konform\"\nbackend = \"systemd\"\nunit = \"openconnect-konform.service\"\nbus = \"system\"\ninterface = \"oc-konform\"\nconnect = \"vpn-konform-connect\"\ndisconnect = \"vpn-konform-disconnect\"\nconnect-timeout = 90\n```\n\n`wg-quick`, which needs no helper — `StartUnit` is the whole story:\n\n```toml\n[[modules.network.vpn]]\nid = \"wg0\"\nbackend = \"systemd\"\nunit = \"wg-quick@wg0.service\"\ninterface = \"wg0\"\n```",
+      "properties": {
+        "backend": {
+          "$ref": "#/$defs/VpnBackend",
+          "default": "networkmanager",
+          "description": "Where state comes from and what a toggle acts on."
+        },
+        "bus": {
+          "$ref": "#/$defs/VpnBus",
+          "default": "system",
+          "description": "Which bus `unit` lives on."
+        },
+        "connect": {
+          "default": null,
+          "description": "Command run to connect, instead of the backend's own action. Needed\nwhen connecting is interactive — an openconnect helper doing 2FA and\ncaching a session cookie, for instance.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "connect-timeout": {
+          "default": 60,
+          "description": "Seconds to stay in `connecting` before falling back to disconnected.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "disconnect": {
+          "default": null,
+          "description": "Command run to disconnect, instead of the backend's own action.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Stable identifier. For the `networkmanager` backend this is the\nconnection's NM id (its name in `nmcli connection show`).",
+          "type": "string"
+        },
+        "interface": {
+          "default": null,
+          "description": "Tunnel interface. On the `link` backend this is the state source; on the\n`systemd` backend it is an additional cross-check, so a unit that is\nrunning with a dead tunnel reads as disconnected rather than connected.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label": {
+          "default": null,
+          "description": "Display name in the dropdown. Defaults to `id`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unit": {
+          "default": null,
+          "description": "Unit name for the `systemd` backend, e.g. `wg-quick@wg0.service`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "VpnShow": {
+      "description": "Whether the VPN indicator is part of the network module.",
+      "oneOf": [
+        {
+          "const": "auto",
+          "description": "Show the VPN state only once a VPN is configured or NM knows one.",
+          "type": "string"
+        },
+        {
+          "const": "always",
+          "description": "Always overlay the VPN state on the network icon.",
+          "type": "string"
+        },
+        {
+          "const": "never",
+          "description": "Never show it; the dropdown still lists VPNs.",
+          "type": "string"
+        }
+      ]
+    },
     "WallpaperConfig": {
       "description": "Wallpaper rendering, cycling, and per-monitor overrides.",
       "properties": {
@@ -9604,6 +9765,11 @@
           "right-click": "",
           "scroll-down": "",
           "scroll-up": "",
+          "vpn": [],
+          "vpn-connected-icon": "ld-lock-symbolic",
+          "vpn-connecting-icon": "ld-refresh-cw-symbolic",
+          "vpn-disconnected-icon": "ld-unplug-symbolic",
+          "vpn-show": "auto",
           "wifi-acquiring-icon": "cm-wireless-acquiring-symbolic",
           "wifi-connected-icon": "cm-wireless-connected-symbolic",
           "wifi-disabled-icon": "cm-wireless-disabled-symbolic",

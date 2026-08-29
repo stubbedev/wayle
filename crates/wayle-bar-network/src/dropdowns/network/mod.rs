@@ -5,6 +5,7 @@ pub mod helpers;
 mod messages;
 mod methods;
 mod password_form;
+mod vpn_connections;
 mod watchers;
 
 use std::sync::Arc;
@@ -22,6 +23,7 @@ use self::{
         AvailableNetworks, AvailableNetworksInit, AvailableNetworksInput, AvailableNetworksOutput,
     },
     messages::{NetworkDropdownCmd, NetworkDropdownInit, NetworkDropdownMsg},
+    vpn_connections::{VpnConnections, VpnConnectionsInit},
 };
 use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
@@ -38,6 +40,7 @@ pub struct NetworkDropdown {
     wifi_available: bool,
     scanning: bool,
     active_connections: Controller<ActiveConnections>,
+    vpn_connections: Controller<VpnConnections>,
     available_networks: Controller<AvailableNetworks>,
     wifi_watcher: WatcherToken,
 }
@@ -122,6 +125,11 @@ impl Component for NetworkDropdown {
                     #[local_ref]
                     active_connections_widget -> gtk::Box {},
 
+                    // Above the scan list: a VPN is a property of the
+                    // connection you already have, not another network to join.
+                    #[local_ref]
+                    vpn_connections_widget -> gtk::Box {},
+
                     #[local_ref]
                     available_networks_widget -> gtk::Box {
                         set_vexpand: true,
@@ -138,6 +146,12 @@ impl Component for NetworkDropdown {
     ) -> ComponentParts<Self> {
         let active_connections = ActiveConnections::builder()
             .launch(ActiveConnectionsInit {
+                network: init.network.clone(),
+            })
+            .detach();
+
+        let vpn_connections = VpnConnections::builder()
+            .launch(VpnConnectionsInit {
                 network: init.network.clone(),
             })
             .detach();
@@ -167,6 +181,7 @@ impl Component for NetworkDropdown {
             wifi_available,
             scanning: false,
             active_connections,
+            vpn_connections,
             available_networks,
             wifi_watcher: WatcherToken::new(),
         };
@@ -174,6 +189,7 @@ impl Component for NetworkDropdown {
         model.reset_wifi_watchers(&sender);
 
         let active_connections_widget = model.active_connections.widget();
+        let vpn_connections_widget = model.vpn_connections.widget();
         let available_networks_widget = model.available_networks.widget();
         let widgets = view_output!();
 

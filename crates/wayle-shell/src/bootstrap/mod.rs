@@ -323,7 +323,8 @@ async fn init_core_services(
             .build()
             .await
     });
-    let network_task = tokio::spawn(NetworkService::new());
+    let vpn_entries = modules.network.vpn.get();
+    let network_task = tokio::spawn(NetworkService::new(vpn_entries));
     let wallpaper_cfg = config.wallpaper.clone();
     let wallpaper_task = tokio::spawn(async move {
         wallpaper::build_wallpaper_service(&wallpaper_cfg, theming_monitor, color_extractor).await

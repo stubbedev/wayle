@@ -4,6 +4,7 @@ use derive_more::Debug;
 use futures::{Stream, StreamExt};
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, warn};
+use wayle_config::schemas::modules::VpnEntry;
 use wayle_core::Property;
 use wayle_traits::{Reactive, ServiceMonitoring, Static};
 use zbus::{Connection, zvariant::OwnedObjectPath};
@@ -38,6 +39,7 @@ use crate::{
     discovery::NetworkServiceDiscovery,
     proxy::manager::NetworkManagerProxy,
     types::states::NMState,
+    vpn::VpnService,
     wifi::LiveWifiParams,
     wired::LiveWiredParams,
 };
@@ -57,6 +59,9 @@ pub struct NetworkService {
     pub wired: Property<Option<Arc<Wired>>>,
     /// Primary connection type as reported by NetworkManager.
     pub primary: Property<ConnectionType>,
+    /// Configured VPNs and their live state. Empty unless
+    /// `[[modules.network.vpn]]` declares any.
+    pub vpn: Arc<VpnService>,
 }
 
 impl NetworkService {
@@ -71,8 +76,8 @@ impl NetworkService {
     /// - D-Bus connection fails
     /// - Device discovery encounters errors
     /// - Device proxy creation fails
-    #[instrument]
-    pub async fn new() -> Result<Self, Error> {
+    #[instrument(skip(vpn_entries))]
+    pub async fn new(vpn_entries: Vec<VpnEntry>) -> Result<Self, Error> {
         let connection = Connection::system().await.map_err(|err| {
             Error::ServiceInitializationFailed(format!("D-Bus connection failed: {err}"))
         })?;
@@ -129,6 +134,7 @@ impl NetworkService {
         };
 
         let primary = Property::new(ConnectionType::None);
+        let vpn = Arc::new(VpnService::new(vpn_entries, connection.clone()).await);
 
         let service = Self {
             zbus_connection: connection.clone(),
@@ -137,6 +143,7 @@ impl NetworkService {
             wifi: Property::new(wifi),
             wired: Property::new(wired),
             primary,
+            vpn,
         };
 
         service.start_monitoring().await?;
