@@ -512,6 +512,21 @@ impl Launcher {
                     widgets.entry.set_text(&text);
                     widgets.entry.set_position(-1);
                 }
+                Action::Copy(text) => {
+                    copy_to_clipboard(&text);
+                    self.end_session(
+                        Some(ServerFrame::Result {
+                            code: 0,
+                            selected: vec![Selected {
+                                index: 0,
+                                text: text.clone(),
+                            }],
+                            filter: widgets.entry.text().to_string(),
+                        }),
+                        widgets,
+                        root,
+                    );
+                }
                 Action::Reload(_) | Action::SwitchMode(_) | Action::Nothing => {}
             },
         }
@@ -941,4 +956,17 @@ fn rebuild_tabs(
         });
         widgets.tabs.append(&button);
     }
+}
+
+/// Puts text on the clipboard (calc mode's accept).
+///
+/// `gdk::Clipboard` rather than spawning `wl-copy`: the shell already owns a
+/// display connection, and a spawned copier has to outlive the launcher to
+/// keep serving the selection.
+fn copy_to_clipboard(text: &str) {
+    let Some(display) = gtk::gdk::Display::default() else {
+        warn!("no display for the clipboard copy");
+        return;
+    };
+    display.clipboard().set_text(text);
 }

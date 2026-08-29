@@ -58,6 +58,11 @@ impl Session {
         } else {
             query.to_owned()
         };
+        // Modes that answer the query rather than being searched by it get to
+        // rebuild their list first, so the engine matches against the answer.
+        if let Some(state) = self.modes[self.active].query(&self.query) {
+            self.apply_state(state);
+        }
         self.engine.set_query(&self.query);
     }
 

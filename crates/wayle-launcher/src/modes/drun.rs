@@ -51,6 +51,12 @@ pub struct DrunConfig {
     pub terminal: String,
     /// History cap (rofi `max-history-size`).
     pub max_history: u32,
+    /// Icon name for entries whose desktop file names none (rofi
+    /// `-application-fallback-icon`). Empty = no icon, as before.
+    pub fallback_icon: String,
+    /// Entries whose command starts with one of these are not recorded in
+    /// history (rofi `-ignored-prefixes`).
+    pub ignored_prefixes: Vec<String>,
 }
 
 impl Default for DrunConfig {
@@ -71,6 +77,8 @@ impl Default for DrunConfig {
             url_launcher: "xdg-open".to_owned(),
             terminal: String::new(),
             max_history: 25,
+            fallback_icon: String::new(),
+            ignored_prefixes: Vec::new(),
         }
     }
 }
@@ -111,6 +119,9 @@ impl DrunMode {
     }
 
     fn record(&self, desktop_id: &str) {
+        if crate::modes::is_ignored(desktop_id, &self.config.ignored_prefixes) {
+            return;
+        }
         if let Some(store) = &self.history
             && let Err(error) = store.record("drun", desktop_id, self.config.max_history)
         {
@@ -306,7 +317,12 @@ fn app_item(app: &DesktopAppInfo, action: Option<&str>, config: &DrunConfig) -> 
     Item {
         display,
         match_text,
-        icon: app.string("Icon").map(|raw| icon_source(raw.as_str())),
+        icon: app
+            .string("Icon")
+            .map(|raw| icon_source(raw.as_str()))
+            .or_else(|| {
+                (!config.fallback_icon.is_empty()).then(|| icon_source(&config.fallback_icon))
+            }),
         info: None,
         flags: crate::item::ItemFlags::MARKUP,
     }

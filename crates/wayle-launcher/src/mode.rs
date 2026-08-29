@@ -28,6 +28,8 @@ pub enum Action {
     SwitchMode(String),
     /// Replace the query text (script `new-selection` companion).
     SetInput(String),
+    /// Put this text on the clipboard and end the session (calc mode).
+    Copy(String),
     /// Terminate the session with an exit code and the accepted rows
     /// (dmenu mode only; forwarded to the waiting CLI).
     Exit {
@@ -78,6 +80,17 @@ pub trait Mode: Send {
 
     /// Produce the initial list state.
     async fn load(&mut self) -> ModeState;
+
+    /// React to the query itself, for modes whose rows *are* the query's
+    /// answer rather than something to search through (calc).
+    ///
+    /// Returns the new state, or `None` to leave the list as it is — which is
+    /// what every mode that is a list of things to search does. Synchronous
+    /// on purpose: it runs on every keystroke, so anything that needs to wait
+    /// for the world belongs in [`Mode::load`].
+    fn query(&mut self, _query: &str) -> Option<ModeState> {
+        None
+    }
 
     /// Handle acceptance of a row (`Some(index)`) or of custom input
     /// (`None`). `input` is the query text at accept time (`ROFI_INPUT`).

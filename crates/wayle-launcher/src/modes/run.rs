@@ -27,6 +27,9 @@ pub struct RunConfig {
     pub terminal: String,
     /// History cap.
     pub max_history: u32,
+    /// Commands starting with one of these are not recorded in history
+    /// (rofi `-ignored-prefixes`).
+    pub ignored_prefixes: Vec<String>,
 }
 
 impl Default for RunConfig {
@@ -37,6 +40,7 @@ impl Default for RunConfig {
             list_command: String::new(),
             terminal: String::new(),
             max_history: 25,
+            ignored_prefixes: Vec::new(),
         }
     }
 }
@@ -73,6 +77,9 @@ impl RunMode {
             })
         };
         spawn::run_shell(&rendered);
+        if crate::modes::is_ignored(command, &self.config.ignored_prefixes) {
+            return;
+        }
         if let Some(store) = &self.history
             && let Err(error) = store.record("run", command, self.config.max_history)
         {

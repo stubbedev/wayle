@@ -214,6 +214,10 @@ pub struct SessionOptions {
     pub drun_show_actions: Option<bool>,
     /// `-drun-url-launcher`.
     pub drun_url_launcher: Option<String>,
+    /// `-application-fallback-icon`: icon for drun entries with none.
+    pub application_fallback_icon: Option<String>,
+    /// `-ignored-prefixes`: run/drun commands kept out of history.
+    pub ignored_prefixes: Option<Vec<String>>,
     /// `-combi-modes`.
     pub combi_modes: Option<Vec<String>>,
     /// `-combi-display-format`.

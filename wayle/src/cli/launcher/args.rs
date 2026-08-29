@@ -46,7 +46,6 @@ const IGNORED_WITH_VALUE: &[&str] = &[
     "config",
     "pid",
     "dpi",
-    "plugin-path",
     "w",
     "scroll-method",
     "eh",
@@ -64,8 +63,6 @@ const IGNORED_BARE: &[&str] = &[
     "no-lazy-grab",
     "normal-window",
     "transient-window",
-    "no-plugins",
-    "plugins",
     "steal-focus",
     "no-steal-focus",
     "click-to-exit",
@@ -225,6 +222,12 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
             "drun-show-actions" => opts.drun_show_actions = Some(true),
             "no-drun-show-actions" => opts.drun_show_actions = Some(false),
             "drun-url-launcher" => opts.drun_url_launcher = Some(value("drun-url-launcher")?),
+            "application-fallback-icon" => {
+                opts.application_fallback_icon = Some(value("application-fallback-icon")?);
+            }
+            "ignored-prefixes" => {
+                opts.ignored_prefixes = Some(split_list(&value("ignored-prefixes")?));
+            }
             "combi-modes" | "combi-modi" => {
                 opts.combi_modes = Some(split_list(&value("combi-modes")?));
             }
@@ -246,6 +249,18 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
             // rasi themes have no equivalent: wayle's launcher is styled by
             // `[styling]` / `[styling.palette]` in config.toml. Say so rather
             // than swallowing the flag with a generic "not supported".
+            // rofi's plugin ABI has no equivalent, and is not planned: a
+            // script mode is the same thing without a C ABI, and takes a
+            // `name:script` argument or a `[launcher.scripts]` entry.
+            "plugin-path" | "plugins" | "no-plugins" => {
+                if flag == "plugin-path" {
+                    let _ = value(flag);
+                }
+                eprintln!(
+                    "wayle launcher: -{flag} is ignored — wayle has no plugin ABI; \
+                     use a script mode (-modes 'name:/path/to/script' or [launcher.scripts])"
+                );
+            }
             "theme" | "theme-str" => {
                 let _ = value(flag);
                 eprintln!(
@@ -389,6 +404,17 @@ mod tests {
     }
 
     #[test]
+    fn plugin_flags_are_swallowed_with_their_value() {
+        // -plugin-path takes a value; consuming the flag but not the value
+        // would leave the path to be read as the next flag.
+        let inv = parse_ok(&["-plugin-path", "/usr/lib/rofi", "-show", "drun"]);
+        assert_eq!(inv.options.mode.as_deref(), Some("drun"));
+        // The bare ones take none, so the mode after them still parses.
+        let inv = parse_ok(&["-no-plugins", "-plugins", "-show", "run"]);
+        assert_eq!(inv.options.mode.as_deref(), Some("run"));
+    }
+
+    #[test]
     fn width_takes_all_three_rofi_forms() {
         // Bare number = percent of the monitor, which is what a real config
         // means by `rofi -show drun -location 0 -width 60`.
@@ -430,6 +456,30 @@ mod tests {
         let plain = parse_ok(&["-show", "window"]);
         assert_eq!(wide.options.width, Some(LauncherWidth::Percent(60.0)));
         assert_eq!(plain.options.width, None);
+    }
+
+    #[test]
+    fn history_and_icon_flags_reach_the_session() {
+        let inv = parse_ok(&[
+            "-show",
+            "drun",
+            "-ignored-prefixes",
+            "sudo ,tmp-",
+            "-application-fallback-icon",
+            "application-x-executable",
+        ]);
+        assert_eq!(
+            inv.options.ignored_prefixes,
+            Some(vec!["sudo".to_owned(), "tmp-".to_owned()])
+        );
+        assert_eq!(
+            inv.options.application_fallback_icon.as_deref(),
+            Some("application-x-executable")
+        );
+        // Absent unless asked, so the mode default stands.
+        let plain = parse_ok(&["-show", "drun"]);
+        assert_eq!(plain.options.ignored_prefixes, None);
+        assert_eq!(plain.options.application_fallback_icon, None);
     }
 
     #[test]

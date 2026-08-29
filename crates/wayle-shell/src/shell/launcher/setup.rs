@@ -16,9 +16,9 @@ use wayle_launcher::{
     CaseMode, MatchMethod, MatcherOptions, Mode, SortMethod,
     history::HistoryStore,
     modes::{
-        CombiMode, DmenuConfig, DmenuMode, DrunConfig, DrunField, DrunMode, FileBrowserConfig,
-        FileBrowserMode, FileSort, KeysMode, RunConfig, RunMode, ScriptMode, SshConfig, SshMode,
-        WindowConfig, WindowField, WindowMode,
+        CalcMode, CombiMode, DmenuConfig, DmenuMode, DrunConfig, DrunField, DrunMode,
+        FileBrowserConfig, FileBrowserMode, FileSort, KeysMode, RunConfig, RunMode, ScriptMode,
+        SshConfig, SshMode, WindowConfig, WindowField, WindowMode,
     },
 };
 
@@ -249,6 +249,7 @@ fn build_mode(
             config, true,
         )))),
         "keys" => Some(Box::new(KeysMode::new(bindings.to_vec()))),
+        "calc" => Some(Box::new(CalcMode::new())),
         "combi" => {
             let combi = &config.launcher.combi;
             let children: Vec<Box<dyn Mode>> = combi
@@ -451,6 +452,11 @@ fn drun_config(options: &SessionOptions, config: &Config, max_history: u32) -> D
             .unwrap_or_else(|| drun.url_launcher.get()),
         terminal: terminal(options, config),
         max_history,
+        fallback_icon: options
+            .application_fallback_icon
+            .clone()
+            .unwrap_or_default(),
+        ignored_prefixes: options.ignored_prefixes.clone().unwrap_or_default(),
     }
 }
 
@@ -471,6 +477,7 @@ fn run_config(options: &SessionOptions, config: &Config, max_history: u32) -> Ru
             .unwrap_or_else(|| run.list_command.get()),
         terminal: terminal(options, config),
         max_history,
+        ignored_prefixes: options.ignored_prefixes.clone().unwrap_or_default(),
     }
 }
 
