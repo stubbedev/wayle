@@ -30,13 +30,20 @@ pub async fn run(invocation: Invocation) -> i32 {
     };
     let (mut reader, writer) = client.split();
 
-    let pump = dmenu.then(|| {
-        tokio::spawn(pump_rows(
+    // The write half must outlive the session: dropping it half-closes the
+    // socket, and the daemon reads that FIN as the client dying and tears the
+    // surface down (a -show session would flash open and vanish).
+    let mut idle_writer = None;
+    let pump = if dmenu {
+        Some(tokio::spawn(pump_rows(
             writer,
             input_file,
             row_separator.unwrap_or_else(|| "\n".to_owned()),
-        ))
-    });
+        )))
+    } else {
+        idle_writer = Some(writer);
+        None
+    };
 
     let code = loop {
         let frame = tokio::select! {
@@ -74,6 +81,7 @@ pub async fn run(invocation: Invocation) -> i32 {
     if let Some(pump) = pump {
         pump.abort();
     }
+    drop(idle_writer);
     code
 }
 
