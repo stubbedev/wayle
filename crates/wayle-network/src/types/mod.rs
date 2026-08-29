@@ -1,3 +1,5 @@
+/// NetworkManager secret-agent prompt types.
+pub mod agent;
 /// Connectivity and metering types.
 pub mod connectivity;
 /// Device type enumeration.

@@ -22,6 +22,11 @@ pub fn spawn(
     watch!(sender, [wifi.watch()], |out| {
         let _ = out.send(NetworkDropdownCmd::WifiDeviceChanged);
     });
+
+    let secret_request = network.secret_request.clone();
+    watch!(sender, [secret_request.watch()], |out| {
+        let _ = out.send(NetworkDropdownCmd::SecretRequestChanged);
+    });
 }
 
 pub fn spawn_wifi_watchers(

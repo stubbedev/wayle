@@ -1,12 +1,13 @@
 use gtk::{pango, prelude::*};
 use relm4::{gtk, prelude::*};
 use wayle_network::vpn::VpnState;
+use wayle_widgets::prelude::*;
 
 use crate::i18n::t;
 
 pub struct VpnItemInit {
-    /// Config id, used to address the entry when the row is clicked.
-    pub id: String,
+    /// NM profile UUID, used to address the entry when the row is clicked.
+    pub uuid: String,
     pub name: String,
     pub state: VpnState,
     /// Failure reason, shown instead of the state line when there is one.
@@ -14,7 +15,7 @@ pub struct VpnItemInit {
 }
 
 pub struct VpnItem {
-    pub id: String,
+    pub uuid: String,
     name: String,
     state: VpnState,
     detail: Option<String>,
@@ -22,8 +23,9 @@ pub struct VpnItem {
 
 #[derive(Debug)]
 pub enum VpnItemInput {
-    /// The backend reported new state for this entry.
-    StateChanged {
+    /// NetworkManager reported new state for this profile, or it was renamed.
+    Changed {
+        name: String,
         state: VpnState,
         detail: Option<String>,
     },
@@ -33,6 +35,8 @@ pub enum VpnItemInput {
 pub enum VpnItemOutput {
     /// The row was clicked — connect if down, disconnect if up.
     ToggleRequested(String),
+    /// The row's edit button was clicked.
+    EditRequested(String),
 }
 
 /// Icon for a VPN state. Kept out of config: these are the dropdown's own row
@@ -110,12 +114,24 @@ impl FactoryComponent for VpnItem {
                     set_label: &self.detail.clone().unwrap_or_else(|| state_label(self.state)),
                 },
             },
+
+            #[name = "edit_button"]
+            #[template]
+            GhostIconButton {
+                add_css_class: "network-vpn-edit",
+                set_icon_name: "ld-settings-symbolic",
+                set_valign: gtk::Align::Center,
+                set_tooltip_text: Some(&t!("dropdown-network-vpn-edit")),
+                connect_clicked[sender, uuid = self.uuid.clone()] => move |_| {
+                    sender.output_sender().emit(VpnItemOutput::EditRequested(uuid.clone()));
+                },
+            },
         }
     }
 
     fn init_model(init: Self::Init, _index: &Self::Index, _sender: FactorySender<Self>) -> Self {
         Self {
-            id: init.id,
+            uuid: init.uuid,
             name: init.name,
             state: init.state,
             detail: init.detail,
@@ -124,7 +140,12 @@ impl FactoryComponent for VpnItem {
 
     fn update(&mut self, msg: VpnItemInput, _sender: FactorySender<Self>) {
         match msg {
-            VpnItemInput::StateChanged { state, detail } => {
+            VpnItemInput::Changed {
+                name,
+                state,
+                detail,
+            } => {
+                self.name = name;
                 self.state = state;
                 self.detail = detail;
             }
@@ -139,11 +160,11 @@ impl FactoryComponent for VpnItem {
         sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let click = gtk::GestureClick::new();
-        let id = self.id.clone();
+        let uuid = self.uuid.clone();
         let click_sender = sender.output_sender().clone();
         click.connect_released(move |gesture, _, _, _| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
-            click_sender.emit(VpnItemOutput::ToggleRequested(id.clone()));
+            click_sender.emit(VpnItemOutput::ToggleRequested(uuid.clone()));
         });
         root.add_controller(click);
 

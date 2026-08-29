@@ -2,7 +2,7 @@ mod vpn;
 
 #[cfg(feature = "schema")]
 use schemars::schema_for;
-pub use vpn::{VpnBackend, VpnBus, VpnEntry, VpnShow};
+pub use vpn::VpnShow;
 use wayle_derive::wayle_config;
 
 #[cfg(feature = "schema")]
@@ -125,28 +125,11 @@ pub struct NetworkConfig {
 
     /// When the VPN state replaces the wifi/wired icon.
     ///
-    /// `auto` shows it only once a VPN exists to report on, so adding the key
-    /// changes nothing on a machine with no VPN.
+    /// `auto` shows it only once NetworkManager holds a VPN profile, so adding
+    /// the key changes nothing on a machine with no VPN.
     #[serde(rename = "vpn-show")]
     #[default(VpnShow::default())]
     pub vpn_show: ConfigProperty<VpnShow>,
-
-    /// VPNs to watch and offer in the dropdown.
-    ///
-    /// Each entry names where its state comes from — a NetworkManager profile,
-    /// a systemd unit, or a network interface. See [`VpnEntry`].
-    ///
-    /// ```toml
-    /// [[modules.network.vpn]]
-    /// id = "konform"
-    /// backend = "systemd"
-    /// unit = "openconnect-konform.service"
-    /// interface = "oc-konform"
-    /// connect = "vpn-konform-connect"
-    /// ```
-    #[serde(rename = "vpn")]
-    #[default(Vec::new())]
-    pub vpn: ConfigProperty<Vec<VpnEntry>>,
 
     /// Action on left click.
     #[serde(rename = "left-click")]

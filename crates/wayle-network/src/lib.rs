@@ -79,8 +79,9 @@
 //! | `wired` | `Property<Option<Arc<Wired>>>` | Ethernet device (reactive for hot-plug) |
 //! | `settings` | `Settings` | Connection profile management |
 //! | `primary` | `Property<ConnectionType>` | Active connection type |
-//! | `vpn` | `VpnService` | Configured VPNs and their state |
+//! | `vpn` | `VpnService` | NetworkManager VPN profiles and their state |
 
+mod agent;
 /// Core network domain models.
 pub mod core;
 mod discovery;
@@ -90,7 +91,7 @@ mod proxy;
 mod service;
 /// Network type definitions
 pub mod types;
-/// VPN state and control (NetworkManager, systemd units, tunnel interfaces).
+/// VPN state and control, backed by NetworkManager profiles.
 pub mod vpn;
 /// WiFi device functionality
 pub mod wifi;

@@ -1,0 +1,76 @@
+// The credential prompt and the add/edit form both reuse the password card's
+// shell; only what they add on top lives here.
+
+.network-secret-message {
+    font-size: var(--text-base);
+    color: var(--fg-subtle);
+    margin: var(--space-xs) var(--space-xs) 0;
+}
+
+.network-secret-label {
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    color: var(--fg-subtle);
+    margin: var(--space-sm) var(--space-xs) 0;
+}
+
+.network-secret-fields {
+    // The entries bring their own top margin; without this the first label
+    // sits twice as far from the header as the rest.
+    margin-top: calc(-1 * var(--space-xs));
+}
+
+.network-vpn-raw {
+    background: var(--bg-surface);
+    border-radius: var(--rounding-element);
+    padding: var(--space-sm);
+    margin-top: var(--space-sm);
+    font-size: var(--text-base);
+    color: var(--fg-default);
+    min-height: 6em;
+}
+
+.network-vpn-kind {
+    margin-top: var(--space-sm);
+}
+
+button.network-vpn-delete label {
+    color: var(--status-error);
+}
+
+button.network-vpn-edit {
+    border-radius: var(--rounding-element);
+    margin-left: var(--space-sm);
+
+    image {
+        -gtk-icon-size: var(--icon-sm);
+        color: var(--fg-subtle);
+    }
+
+    &:hover image {
+        color: var(--fg-default);
+    }
+}
+
+.network-item.vpn-add {
+    // The add row lives outside the factory's box, so the list's own
+    // sibling separator cannot reach it.
+    &.separated {
+        border-top: 1px solid var(--border-subtle);
+    }
+
+    image.network-item-signal {
+        color: var(--fg-subtle);
+    }
+
+    label.network-item-name {
+        color: var(--fg-subtle);
+    }
+
+    &:hover {
+        image.network-item-signal,
+        label.network-item-name {
+            color: var(--fg-default);
+        }
+    }
+}

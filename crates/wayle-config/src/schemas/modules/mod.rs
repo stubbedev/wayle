@@ -66,7 +66,7 @@ pub use mango_workspaces::MangoWorkspacesConfig;
 pub use media::{BUILTIN_MAPPINGS, MediaConfig, MediaIconType};
 pub use microphone::MicrophoneConfig;
 pub use netstat::NetstatConfig;
-pub use network::{NetworkConfig, VpnBackend, VpnBus, VpnEntry, VpnShow};
+pub use network::{NetworkConfig, VpnShow};
 pub use niri_workspaces::{
     LabelStrategy, NiriWorkspacesConfig, WorkspaceClickAction, WorkspaceMap as NiriWorkspaceMap,
 };

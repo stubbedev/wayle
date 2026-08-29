@@ -1,116 +1,108 @@
-//! NetworkManager backend: NM owns both the state and the control surface.
+//! The NetworkManager side of a VPN: activating a profile, tearing one down,
+//! and turning NM's active-connection states into [`VpnState`].
 //!
-//! Covers every profile NM manages — OpenVPN, WireGuard, OpenConnect, L2TP,
-//! PPTP, Fortinet, and anything else with a VPN plugin — because the profile
-//! type never has to be known here: a connection whose type is `vpn` or
-//! `wireguard` is a VPN, and NM activates it the same way regardless.
-//!
-//! An entry's `id` is the connection's NM id (its name in `nmcli connection
-//! show`), matched against the saved profiles rather than a D-Bus path, so the
-//! config survives NM re-creating the profile.
+//! Profiles themselves are not listed here — they come from the live
+//! [`Settings::connections`](crate::core::settings::Settings) list the service
+//! already maintains, so there is no second sweep of the settings tree.
 
-use futures::StreamExt;
-use tokio_util::sync::CancellationToken;
-use tracing::{debug, warn};
-use wayle_core::Property;
+use std::collections::HashMap;
+
 use zbus::{Connection, zvariant::OwnedObjectPath};
 
 use super::VpnState;
 use crate::{
     Error,
-    proxy::{
-        active_connection::ConnectionActiveProxy,
-        manager::NetworkManagerProxy,
-        settings::{SettingsProxy, connection::SettingsConnectionProxy},
+    proxy::{active_connection::ConnectionActiveProxy, manager::NetworkManagerProxy},
+    types::{
+        connectivity::ConnectionType,
+        states::{NMActiveConnectionState, NMActiveConnectionStateReason},
     },
-    types::{connectivity::ConnectionType, states::NMActiveConnectionState},
 };
 
-/// The root path, NM's "no specific object" placeholder.
-fn root_path() -> OwnedObjectPath {
+/// NM's "no specific object" placeholder.
+pub(super) fn root_path() -> OwnedObjectPath {
     OwnedObjectPath::try_from("/").unwrap_or_default()
 }
 
-/// Whether a connection type is a VPN as far as the indicator is concerned.
-/// WireGuard is included: NM models it as its own type rather than as a VPN
-/// plugin, but it is a tunnel and users expect it in the VPN list.
-fn is_vpn_type(connection_type: &ConnectionType) -> bool {
+/// Whether a connection type belongs in the VPN list.
+///
+/// WireGuard is included: NM models it as its own connection type rather than
+/// as a VPN plugin — it needs no plugin at all, the kernel carries it — but it
+/// is a tunnel and users expect it here.
+pub(super) fn is_vpn_type(connection_type: &ConnectionType) -> bool {
     matches!(
         connection_type,
         ConnectionType::Vpn | ConnectionType::WireGuard
     )
 }
 
-/// The saved profile whose NM id is `id`.
-async fn find_profile(connection: &Connection, id: &str) -> Result<Option<OwnedObjectPath>, Error> {
-    let settings = SettingsProxy::new(connection).await?;
-    for path in settings.list_connections().await? {
-        let Ok(proxy) = SettingsConnectionProxy::new(connection, &path).await else {
-            continue;
-        };
-        let Ok(config) = proxy.get_settings().await else {
-            continue;
-        };
-        let Some(section) = config.get("connection") else {
-            continue;
-        };
-        let profile_id = section
-            .get("id")
-            .and_then(|value| String::try_from(value.clone()).ok());
-        let profile_type = section
-            .get("type")
-            .and_then(|value| String::try_from(value.clone()).ok())
-            .map(|raw| ConnectionType::from_nm_type(&raw));
-        if profile_id.as_deref() == Some(id) && profile_type.as_ref().is_some_and(is_vpn_type) {
-            return Ok(Some(path));
-        }
-    }
-    Ok(None)
-}
-
-/// The active connection currently running profile `id`, if any.
-async fn find_active(connection: &Connection, id: &str) -> Result<Option<OwnedObjectPath>, Error> {
+/// The active connection currently running the profile with this UUID.
+///
+/// Matched on UUID rather than id: the id is the user-facing name and can be
+/// edited from the widget, the UUID cannot.
+pub(super) async fn find_active(
+    connection: &Connection,
+    uuid: &str,
+) -> Result<Option<OwnedObjectPath>, Error> {
     let manager = NetworkManagerProxy::new(connection).await?;
     for path in manager.active_connections().await? {
         let Ok(proxy) = ConnectionActiveProxy::new(connection, &path).await else {
             continue;
         };
-        if proxy.id().await.ok().as_deref() == Some(id) {
+        if proxy.uuid().await.ok().as_deref() == Some(uuid) {
             return Ok(Some(path));
         }
     }
     Ok(None)
 }
 
-/// Activates the profile named `id`.
+/// Every active VPN-ish connection, keyed by profile UUID.
+///
+/// Used to resync the whole list in one pass whenever NM's active-connection
+/// list changes, rather than asking per entry.
+pub(super) async fn active_by_uuid(
+    connection: &Connection,
+) -> Result<HashMap<String, OwnedObjectPath>, Error> {
+    let manager = NetworkManagerProxy::new(connection).await?;
+    let mut active = HashMap::new();
+    for path in manager.active_connections().await? {
+        let Ok(proxy) = ConnectionActiveProxy::new(connection, &path).await else {
+            continue;
+        };
+        if let Ok(uuid) = proxy.uuid().await {
+            active.insert(uuid, path);
+        }
+    }
+    Ok(active)
+}
+
+/// Activates a saved profile and hands back its active-connection object.
+///
+/// Both `device` and `specific_object` are `/`: NM picks the base connection a
+/// VPN rides on itself, which is what `nmcli connection up` does.
 ///
 /// # Errors
 ///
-/// Returns an error when no saved VPN profile carries that id, or when NM
-/// refuses the activation.
-pub(super) async fn activate(connection: &Connection, id: &str) -> Result<(), Error> {
-    let Some(profile) = find_profile(connection, id).await? else {
-        return Err(Error::ServiceInitializationFailed(format!(
-            "no NetworkManager VPN profile named {id}"
-        )));
-    };
+/// Returns an error when NM refuses the activation — a missing plugin, a
+/// polkit denial, or a profile NM cannot make sense of.
+pub(super) async fn activate(
+    connection: &Connection,
+    profile: &OwnedObjectPath,
+) -> Result<OwnedObjectPath, Error> {
     let manager = NetworkManagerProxy::new(connection).await?;
-    // Both device and specific_object are "/" — NM picks the base connection
-    // for a VPN itself, which is what `nmcli connection up` does.
-    manager
-        .activate_connection(&profile, &root_path(), &root_path())
+    let active = manager
+        .activate_connection(profile, &root_path(), &root_path())
         .await?;
-    Ok(())
+    Ok(active)
 }
 
-/// Deactivates the active connection running profile `id`. A profile that is
-/// already down is not an error.
+/// Tears down whatever is running this profile. Already down is not an error.
 ///
 /// # Errors
 ///
 /// Returns an error when NM refuses the deactivation.
-pub(super) async fn deactivate(connection: &Connection, id: &str) -> Result<(), Error> {
-    let Some(active) = find_active(connection, id).await? else {
+pub(super) async fn deactivate(connection: &Connection, uuid: &str) -> Result<(), Error> {
+    let Some(active) = find_active(connection, uuid).await? else {
         return Ok(());
     };
     let manager = NetworkManagerProxy::new(connection).await?;
@@ -118,8 +110,18 @@ pub(super) async fn deactivate(connection: &Connection, id: &str) -> Result<(), 
     Ok(())
 }
 
+/// Reads one active connection's current state.
+pub(super) async fn state_at(connection: &Connection, path: &OwnedObjectPath) -> VpnState {
+    let Ok(proxy) = ConnectionActiveProxy::new(connection, path).await else {
+        return VpnState::Disconnected;
+    };
+    state_of(NMActiveConnectionState::from_u32(
+        proxy.state().await.unwrap_or(0),
+    ))
+}
+
 /// Maps NM's active-connection state to a VPN state.
-fn state_of(state: NMActiveConnectionState) -> VpnState {
+pub(super) const fn state_of(state: NMActiveConnectionState) -> VpnState {
     match state {
         NMActiveConnectionState::Activated => VpnState::Connected,
         NMActiveConnectionState::Activating => VpnState::Connecting,
@@ -127,67 +129,27 @@ fn state_of(state: NMActiveConnectionState) -> VpnState {
     }
 }
 
-/// Watches NM's active-connection list and drives `state` for profile `id`.
+/// A short, human-readable reason for a state change, or `None` when the
+/// reason carries no information worth putting in front of the user.
 ///
-/// The list property is the subscription point rather than the VPN connection's
-/// own signal: a VPN that is down has no active-connection object to watch at
-/// all, so watching only the object would miss every connect.
-pub(super) fn spawn_watcher(
-    connection: Connection,
-    id: String,
-    state: Property<VpnState>,
-    detail: Property<Option<String>>,
-    token: CancellationToken,
-) {
-    tokio::spawn(async move {
-        let Ok(manager) = NetworkManagerProxy::new(&connection).await else {
-            warn!(vpn = %id, "cannot reach NetworkManager");
-            state.set(VpnState::Failed);
-            detail.set(Some(String::from("NetworkManager unavailable")));
-            return;
-        };
-
-        let refresh = || async {
-            match find_active(&connection, &id).await {
-                Ok(Some(path)) => {
-                    let raw = match ConnectionActiveProxy::new(&connection, &path).await {
-                        Ok(proxy) => proxy.state().await.unwrap_or(0),
-                        Err(_) => 0,
-                    };
-                    state_of(NMActiveConnectionState::from_u32(raw))
-                }
-                Ok(None) => VpnState::Disconnected,
-                Err(error) => {
-                    debug!(vpn = %id, %error, "cannot read active connections");
-                    VpnState::Disconnected
-                }
-            }
-        };
-
-        let next = refresh().await;
-        // Never clobber an in-flight attempt with "disconnected": NM has no
-        // active connection yet while the profile is still being brought up.
-        if !(next == VpnState::Disconnected && state.get().is_connecting()) {
-            state.set(next);
-        }
-
-        let mut changes = manager.receive_active_connections_changed().await;
-        loop {
-            tokio::select! {
-                () = token.cancelled() => break,
-                change = changes.next() => {
-                    if change.is_none() {
-                        break;
-                    }
-                    let next = refresh().await;
-                    if next == VpnState::Disconnected && state.get().is_connecting() {
-                        continue;
-                    }
-                    state.set(next);
-                }
-            }
-        }
-    });
+/// Only failures get text: a VPN the user themselves disconnected does not
+/// need a caption explaining that they did so.
+pub(super) fn reason_text(reason: u32) -> Option<String> {
+    let text = match NMActiveConnectionStateReason::from_u32(reason) {
+        NMActiveConnectionStateReason::NoSecrets => "credentials not provided",
+        NMActiveConnectionStateReason::LoginFailed => "authentication failed",
+        NMActiveConnectionStateReason::ConnectTimeout => "connection timed out",
+        NMActiveConnectionStateReason::ServiceStartTimeout => "VPN service did not start in time",
+        NMActiveConnectionStateReason::ServiceStartFailed => "VPN service failed to start",
+        NMActiveConnectionStateReason::ServiceStopped => "VPN service stopped",
+        NMActiveConnectionStateReason::IpConfigInvalid => "invalid IP configuration",
+        NMActiveConnectionStateReason::DependencyFailed => "the connection it depends on failed",
+        NMActiveConnectionStateReason::DeviceRealizeFailed => "cannot create the tunnel device",
+        NMActiveConnectionStateReason::DeviceRemoved
+        | NMActiveConnectionStateReason::DeviceDisconnected => "the underlying network went away",
+        _ => return None,
+    };
+    Some(String::from(text))
 }
 
 #[cfg(test)]
@@ -215,6 +177,27 @@ mod tests {
         assert_eq!(
             state_of(NMActiveConnectionState::Deactivated),
             VpnState::Disconnected
+        );
+    }
+
+    #[test]
+    fn only_failures_get_a_reason_caption() {
+        assert_eq!(
+            reason_text(NMActiveConnectionStateReason::LoginFailed as u32).as_deref(),
+            Some("authentication failed")
+        );
+        assert_eq!(
+            reason_text(NMActiveConnectionStateReason::NoSecrets as u32).as_deref(),
+            Some("credentials not provided")
+        );
+        // The user pulling the plug is not a failure to explain back to them.
+        assert_eq!(
+            reason_text(NMActiveConnectionStateReason::UserDisconnected as u32),
+            None
+        );
+        assert_eq!(
+            reason_text(NMActiveConnectionStateReason::None as u32),
+            None
         );
     }
 }

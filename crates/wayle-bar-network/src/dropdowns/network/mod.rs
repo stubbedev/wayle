@@ -5,7 +5,9 @@ pub mod helpers;
 mod messages;
 mod methods;
 mod password_form;
+mod secret_form;
 mod vpn_connections;
+mod vpn_form;
 mod watchers;
 
 use std::sync::Arc;
@@ -23,7 +25,9 @@ use self::{
         AvailableNetworks, AvailableNetworksInit, AvailableNetworksInput, AvailableNetworksOutput,
     },
     messages::{NetworkDropdownCmd, NetworkDropdownInit, NetworkDropdownMsg},
-    vpn_connections::{VpnConnections, VpnConnectionsInit},
+    secret_form::{SecretForm, SecretFormOutput},
+    vpn_connections::{VpnConnections, VpnConnectionsInit, VpnConnectionsOutput},
+    vpn_form::{VpnForm, VpnFormInput},
 };
 use crate::{i18n::t, shell::bar::dropdowns::resolve_dimension};
 
@@ -40,7 +44,9 @@ pub struct NetworkDropdown {
     wifi_available: bool,
     scanning: bool,
     active_connections: Controller<ActiveConnections>,
+    secret_form: Controller<SecretForm>,
     vpn_connections: Controller<VpnConnections>,
+    vpn_form: Controller<VpnForm>,
     available_networks: Controller<AvailableNetworks>,
     wifi_watcher: WatcherToken,
 }
@@ -125,8 +131,17 @@ impl Component for NetworkDropdown {
                     #[local_ref]
                     active_connections_widget -> gtk::Box {},
 
+                    // Above everything: NetworkManager is blocked on this
+                    // prompt, so nothing else in the dropdown can make
+                    // progress while it is up.
+                    #[local_ref]
+                    secret_form_widget -> gtk::Box {},
+
                     // Above the scan list: a VPN is a property of the
                     // connection you already have, not another network to join.
+                    #[local_ref]
+                    vpn_form_widget -> gtk::Box {},
+
                     #[local_ref]
                     vpn_connections_widget -> gtk::Box {},
 
@@ -154,7 +169,15 @@ impl Component for NetworkDropdown {
             .launch(VpnConnectionsInit {
                 network: init.network.clone(),
             })
-            .detach();
+            .forward(sender.input_sender(), NetworkDropdownMsg::VpnConnections);
+
+        let vpn_form = VpnForm::builder()
+            .launch(())
+            .forward(sender.input_sender(), NetworkDropdownMsg::VpnForm);
+
+        let secret_form = SecretForm::builder()
+            .launch(())
+            .forward(sender.input_sender(), NetworkDropdownMsg::SecretForm);
 
         let available_networks = AvailableNetworks::builder()
             .launch(AvailableNetworksInit {
@@ -181,15 +204,20 @@ impl Component for NetworkDropdown {
             wifi_available,
             scanning: false,
             active_connections,
+            secret_form,
             vpn_connections,
+            vpn_form,
             available_networks,
             wifi_watcher: WatcherToken::new(),
         };
 
         model.reset_wifi_watchers(&sender);
+        model.show_pending_secret_request();
 
         let active_connections_widget = model.active_connections.widget();
+        let secret_form_widget = model.secret_form.widget();
         let vpn_connections_widget = model.vpn_connections.widget();
+        let vpn_form_widget = model.vpn_form.widget();
         let available_networks_widget = model.available_networks.widget();
         let widgets = view_output!();
 
@@ -205,6 +233,20 @@ impl Component for NetworkDropdown {
                 self.available_networks
                     .emit(AvailableNetworksInput::ScanRequested);
             }
+            NetworkDropdownMsg::SecretForm(output) => {
+                let network = Arc::clone(&self.network);
+                relm4::spawn(async move {
+                    match output {
+                        SecretFormOutput::Submit(values) => network.submit_secrets(values).await,
+                        SecretFormOutput::Cancel => network.cancel_secrets().await,
+                    }
+                });
+            }
+            NetworkDropdownMsg::VpnConnections(output) => match output {
+                VpnConnectionsOutput::Add => self.vpn_form.emit(VpnFormInput::ShowNew),
+                VpnConnectionsOutput::Edit(uuid) => self.load_vpn_settings(uuid, &sender),
+            },
+            NetworkDropdownMsg::VpnForm(output) => self.apply_vpn_form(output, &sender),
             NetworkDropdownMsg::AvailableNetworks(output) => match output {
                 AvailableNetworksOutput::ScanStarted => {
                     self.scanning = true;
@@ -269,6 +311,30 @@ impl Component for NetworkDropdown {
 
                 self.reset_wifi_watchers(&sender);
             }
+
+            NetworkDropdownCmd::SecretRequestChanged => {
+                self.show_pending_secret_request();
+            }
+
+            NetworkDropdownCmd::VpnSettingsLoaded {
+                uuid,
+                name,
+                kind,
+                values,
+            } => {
+                self.vpn_form.emit(VpnFormInput::ShowEdit {
+                    uuid,
+                    name,
+                    kind,
+                    values,
+                });
+            }
+
+            NetworkDropdownCmd::VpnWriteFailed(reason) => {
+                self.vpn_form.emit(VpnFormInput::Failed(reason));
+            }
+
+            NetworkDropdownCmd::VpnWriteSucceeded => {}
 
             NetworkDropdownCmd::WifiEnabledChanged(enabled) => {
                 self.wifi_enabled = enabled;

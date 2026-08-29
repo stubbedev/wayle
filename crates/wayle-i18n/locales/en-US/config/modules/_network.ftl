@@ -38,8 +38,6 @@ settings-modules-network-vpn-disconnected-icon = VPN Disconnected Icon
 settings-modules-network-vpn-show = Show VPN State
     .description = When the VPN state replaces the WiFi/wired icon
 
-settings-modules-network-vpn = VPNs
-    .description = VPNs to watch and offer in the dropdown
 
 settings-modules-network-border-show = Show Border
     .description = Display border around button

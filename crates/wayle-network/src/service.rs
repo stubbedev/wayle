@@ -1,10 +1,9 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use derive_more::Debug;
 use futures::{Stream, StreamExt};
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, warn};
-use wayle_config::schemas::modules::VpnEntry;
 use wayle_core::Property;
 use wayle_traits::{Reactive, ServiceMonitoring, Static};
 use zbus::{Connection, zvariant::OwnedObjectPath};
@@ -17,6 +16,7 @@ use super::{
     wired::Wired,
 };
 use crate::{
+    agent::{self, SecretAgentState},
     core::{
         access_point::AccessPoint,
         config::{
@@ -38,7 +38,7 @@ use crate::{
     },
     discovery::NetworkServiceDiscovery,
     proxy::manager::NetworkManagerProxy,
-    types::states::NMState,
+    types::{agent::SecretRequest, states::NMState},
     vpn::VpnService,
     wifi::LiveWifiParams,
     wired::LiveWiredParams,
@@ -59,9 +59,18 @@ pub struct NetworkService {
     pub wired: Property<Option<Arc<Wired>>>,
     /// Primary connection type as reported by NetworkManager.
     pub primary: Property<ConnectionType>,
-    /// Configured VPNs and their live state. Empty unless
-    /// `[[modules.network.vpn]]` declares any.
+    /// Every VPN NetworkManager holds a profile for, and its live state.
     pub vpn: Arc<VpnService>,
+    /// The credential prompt NetworkManager is waiting on, if any.
+    ///
+    /// Set when NM asks wayle — as its registered secret agent — for a
+    /// password, a 2FA challenge response, or a wifi key it does not have.
+    /// Answer it with [`Self::submit_secrets`] or dismiss it with
+    /// [`Self::cancel_secrets`]; NM's activation is blocked until one of the
+    /// two happens or it times out.
+    pub secret_request: Property<Option<SecretRequest>>,
+    #[debug(skip)]
+    secret_agent: Arc<SecretAgentState>,
 }
 
 impl NetworkService {
@@ -76,8 +85,8 @@ impl NetworkService {
     /// - D-Bus connection fails
     /// - Device discovery encounters errors
     /// - Device proxy creation fails
-    #[instrument(skip(vpn_entries))]
-    pub async fn new(vpn_entries: Vec<VpnEntry>) -> Result<Self, Error> {
+    #[instrument]
+    pub async fn new() -> Result<Self, Error> {
         let connection = Connection::system().await.map_err(|err| {
             Error::ServiceInitializationFailed(format!("D-Bus connection failed: {err}"))
         })?;
@@ -134,7 +143,16 @@ impl NetworkService {
         };
 
         let primary = Property::new(ConnectionType::None);
-        let vpn = Arc::new(VpnService::new(vpn_entries, connection.clone()).await);
+
+        // A VPN that needs a password has nowhere to ask unless something is
+        // registered as NM's secret agent, so this is set up before anything
+        // can activate.
+        let secret_agent = agent::serve(&connection, cancellation_token.child_token()).await?;
+        let vpn = Arc::new(VpnService::new(
+            &settings,
+            connection.clone(),
+            &secret_agent,
+        ));
 
         let service = Self {
             zbus_connection: connection.clone(),
@@ -144,11 +162,27 @@ impl NetworkService {
             wired: Property::new(wired),
             primary,
             vpn,
+            secret_request: secret_agent.request.clone(),
+            secret_agent,
         };
 
         service.start_monitoring().await?;
 
         Ok(service)
+    }
+
+    /// Answers the pending credential prompt, unblocking NM's activation.
+    ///
+    /// Values are keyed by the [`SecretField::key`](crate::types::agent::SecretField)
+    /// they were collected for. A reply with no prompt outstanding is dropped.
+    pub async fn submit_secrets(&self, values: HashMap<String, String>) {
+        self.secret_agent.submit(values).await;
+    }
+
+    /// Dismisses the pending credential prompt. NM's activation fails, which
+    /// is the correct outcome: the user declined to authenticate.
+    pub async fn cancel_secrets(&self) {
+        self.secret_agent.cancel().await;
     }
 
     /// Objects that implement the Connection.Active interface represent an attempt to

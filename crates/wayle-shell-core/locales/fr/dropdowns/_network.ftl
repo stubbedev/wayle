@@ -53,3 +53,45 @@ dropdown-network-vpn-connected = Connecté
 dropdown-network-vpn-connecting = Connexion...
 dropdown-network-vpn-disconnected = Déconnecté
 dropdown-network-vpn-failed = Échec de la connexion
+
+## Credentials
+
+dropdown-network-secret-title = Authentification requise
+dropdown-network-secret-submit = Valider
+dropdown-network-secret-password = Mot de passe
+dropdown-network-secret-username = Nom d'utilisateur
+dropdown-network-secret-pin = Code PIN
+dropdown-network-secret-group = Groupe
+dropdown-network-secret-domain = Domaine
+dropdown-network-secret-wep-key = Clé WEP
+dropdown-network-secret-private-key = Clé privée
+dropdown-network-secret-private-key-password = Mot de passe de la clé privée
+
+## VPN configuration
+
+dropdown-network-vpn-add = Ajouter un VPN
+dropdown-network-vpn-edit = Modifier
+dropdown-network-vpn-new = Nouveau VPN
+dropdown-network-vpn-name = Nom
+dropdown-network-vpn-type = Type
+dropdown-network-vpn-save = Enregistrer
+dropdown-network-vpn-delete = Supprimer
+dropdown-network-vpn-raw-hint = Une paire clé = valeur par ligne
+dropdown-network-vpn-name-required = Un nom est requis
+dropdown-network-vpn-field-required = { $field } est requis
+dropdown-network-vpn-field-interface = Interface
+dropdown-network-vpn-field-private-key = Clé privée
+dropdown-network-vpn-field-address = Adresses
+dropdown-network-vpn-field-dns = DNS
+dropdown-network-vpn-field-peer-public-key = Clé publique du pair
+dropdown-network-vpn-field-peer-endpoint = Point de terminaison du pair
+dropdown-network-vpn-field-peer-allowed-ips = IP autorisées
+dropdown-network-vpn-field-peer-preshared-key = Clé partagée
+dropdown-network-vpn-field-peer-keepalive = Maintien de connexion (secondes)
+dropdown-network-vpn-field-gateway = Passerelle
+dropdown-network-vpn-field-protocol = Protocole
+dropdown-network-vpn-field-wayle-username = Nom d'utilisateur
+dropdown-network-vpn-field-remote = Serveur
+dropdown-network-vpn-field-username = Nom d'utilisateur
+dropdown-network-vpn-field-password = Mot de passe
+dropdown-network-vpn-field-ca = Certificat CA

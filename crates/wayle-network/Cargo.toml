@@ -13,6 +13,8 @@ async-trait.workspace = true
 bitflags.workspace = true
 derive_more.workspace = true
 futures.workspace = true
+rand.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
@@ -23,6 +25,9 @@ wayle-config.workspace = true
 wayle-core.workspace = true
 wayle-traits.workspace = true
 zbus.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints]
 workspace = true

@@ -48,6 +48,15 @@ pub enum Error {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 
+    /// A VPN gateway refused an authentication, or asked for something wayle
+    /// cannot do.
+    ///
+    /// Carries its reason in the message rather than in a source: this one is
+    /// shown to the user in the VPN row, and "cannot authenticate" without the
+    /// gateway's own wording is not something anyone can act on.
+    #[error("{0}")]
+    VpnAuthenticationFailed(String),
+
     /// Monitoring requires a cancellation token.
     #[error("cannot start monitoring: cancellation token not provided")]
     MissingCancellationToken,
