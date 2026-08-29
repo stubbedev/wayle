@@ -31,6 +31,48 @@ pub fn socket_path() -> PathBuf {
     }
 }
 
+/// A rofi `-width` value, in the three forms rofi accepts.
+///
+/// rofi overloads one flag with three units, distinguished by syntax rather
+/// than by a suffix, so the sign and the `px` suffix are the units.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum LauncherWidth {
+    /// `-width 60`: percent of the monitor's width.
+    Percent(f32),
+    /// `-width -30`: a character count, resolved against the font's advance.
+    Chars(u32),
+    /// `-width 600px`: absolute pixels.
+    Pixels(i32),
+}
+
+impl LauncherWidth {
+    /// Parses a rofi `-width` value. `NNpx` is pixels, a negative number is a
+    /// character count, anything else is a percentage of the monitor.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message naming the bad value when it is not a number.
+    pub fn parse(raw: &str) -> Result<Self, String> {
+        let raw = raw.trim();
+        if let Some(px) = raw.strip_suffix("px") {
+            return px
+                .trim()
+                .parse()
+                .map(Self::Pixels)
+                .map_err(|_| format!("-width: {raw} is not a pixel count"));
+        }
+        let value: f32 = raw
+            .parse()
+            .map_err(|_| format!("-width: {raw} is not a number"))?;
+        if value < 0.0 {
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            return Ok(Self::Chars((-value) as u32));
+        }
+        Ok(Self::Percent(value))
+    }
+}
+
 /// Per-invocation options carried by the `open` frame: the rofi CLI flag
 /// surface. Every field is optional — the daemon merges `Some` values over
 /// the `[launcher]` config.
@@ -113,6 +155,12 @@ pub struct SessionOptions {
 
     /// `-location`: rofi 0-8 grid position.
     pub location: Option<u8>,
+    /// `-width`: per-invocation surface width, overriding `[launcher] width`.
+    pub width: Option<LauncherWidth>,
+    /// `-xoffset`: horizontal offset from the anchored edge, in pixels.
+    pub xoffset: Option<i32>,
+    /// `-yoffset`: vertical offset from the anchored edge, in pixels.
+    pub yoffset: Option<i32>,
     /// `-monitor`: output connector name or rofi numeric.
     pub monitor: Option<String>,
     /// `-no-fixed-num-lines`.

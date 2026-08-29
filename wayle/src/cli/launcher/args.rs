@@ -6,7 +6,7 @@
 //! unsupported flags are accepted with a warning (friendlier than rofi's
 //! hard error for a shim), and a few are handled locally in the CLI.
 
-use wayle_ipc::launcher_socket::SessionOptions;
+use wayle_ipc::launcher_socket::{LauncherWidth, SessionOptions};
 
 /// Commands resolved entirely in the CLI, no daemon involved.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,8 +43,6 @@ pub struct Invocation {
 /// Value-taking flags accepted and ignored (X11-only, rasi theming, or
 /// daemon-irrelevant). Each produces one stderr warning.
 const IGNORED_WITH_VALUE: &[&str] = &[
-    "theme",
-    "theme-str",
     "config",
     "pid",
     "dpi",
@@ -121,7 +119,10 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
 
             // ---- session: display ----
             "p" => opts.prompt = Some(value("p")?),
-            "l" => opts.lines = value("l")?.parse().ok(),
+            "l" | "lines" => opts.lines = value(flag)?.parse().ok(),
+            "width" => opts.width = Some(LauncherWidth::parse(&value("width")?)?),
+            "xoffset" => opts.xoffset = value("xoffset")?.parse().ok(),
+            "yoffset" => opts.yoffset = value("yoffset")?.parse().ok(),
             "mesg" => opts.mesg = Some(value("mesg")?),
             "filter" => opts.filter = Some(value("filter")?),
             "select" => opts.select = Some(value("select")?),
@@ -242,6 +243,16 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
             }
 
             // ---- accepted + ignored ----
+            // rasi themes have no equivalent: wayle's launcher is styled by
+            // `[styling]` / `[styling.palette]` in config.toml. Say so rather
+            // than swallowing the flag with a generic "not supported".
+            "theme" | "theme-str" => {
+                let _ = value(flag);
+                eprintln!(
+                    "wayle launcher: -{flag} is ignored — wayle has no rasi themes; \
+                     style the launcher with [styling] in config.toml"
+                );
+            }
             _ if IGNORED_WITH_VALUE.contains(&flag) => {
                 let _ = value(flag);
                 warn_ignored(flag);
@@ -250,7 +261,26 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
             _ => eprintln!("wayle launcher: unknown option -{flag} (skipped)"),
         }
     }
+    warn_centered_offsets(&inv.options);
     Ok(inv)
+}
+
+/// `-xoffset`/`-yoffset` are margins from the anchored edge, and a centered
+/// axis has no anchored edge to measure from — the layer-shell protocol
+/// ignores a margin there. Rather than silently doing nothing, say so and
+/// point at the flag that makes the offset meaningful.
+fn warn_centered_offsets(opts: &SessionOptions) {
+    // rofi location 0 is "center"; an absent -location means the configured
+    // location, which we can't see from here, so only 0 is diagnosed.
+    if opts.location != Some(0) {
+        return;
+    }
+    if opts.xoffset.is_some() || opts.yoffset.is_some() {
+        eprintln!(
+            "wayle launcher: -xoffset/-yoffset have no effect with -location 0 (centered); \
+             pick an edge location (1-8) to offset from"
+        );
+    }
 }
 
 fn warn_ignored(flag: &str) {
@@ -356,6 +386,50 @@ mod tests {
     fn ignored_flags_do_not_error() {
         let inv = parse_ok(&["-theme", "gruvbox", "-no-lazy-grab", "-show", "run"]);
         assert_eq!(inv.options.mode.as_deref(), Some("run"));
+    }
+
+    #[test]
+    fn width_takes_all_three_rofi_forms() {
+        // Bare number = percent of the monitor, which is what a real config
+        // means by `rofi -show drun -location 0 -width 60`.
+        assert_eq!(
+            parse_ok(&["-width", "60"]).options.width,
+            Some(LauncherWidth::Percent(60.0))
+        );
+        // Negative = character count.
+        assert_eq!(
+            parse_ok(&["-width", "-30"]).options.width,
+            Some(LauncherWidth::Chars(30))
+        );
+        // Explicit pixels.
+        assert_eq!(
+            parse_ok(&["-width", "600px"]).options.width,
+            Some(LauncherWidth::Pixels(600))
+        );
+        // Unset unless asked, so the configured width still wins.
+        assert_eq!(parse_ok(&["-show", "window"]).options.width, None);
+        // A non-numeric width is a usage error, not a silent default.
+        assert!(parse(&["-width".to_owned(), "wide".to_owned()]).is_err());
+    }
+
+    #[test]
+    fn lines_alias_and_offsets() {
+        let inv = parse_ok(&["-lines", "5", "-xoffset", "20", "-yoffset", "-8"]);
+        assert_eq!(inv.options.lines, Some(5));
+        assert_eq!(inv.options.xoffset, Some(20));
+        assert_eq!(inv.options.yoffset, Some(-8));
+        // -l still means the same thing.
+        assert_eq!(parse_ok(&["-l", "5"]).options.lines, Some(5));
+    }
+
+    #[test]
+    fn two_invocations_can_ask_for_different_geometry() {
+        // The gap that actually bit: [launcher] width/lines are global, so a
+        // wide drun and a default-width window switcher had to share one width.
+        let wide = parse_ok(&["-show", "drun", "-location", "0", "-width", "60"]);
+        let plain = parse_ok(&["-show", "window"]);
+        assert_eq!(wide.options.width, Some(LauncherWidth::Percent(60.0)));
+        assert_eq!(plain.options.width, None);
     }
 
     #[test]

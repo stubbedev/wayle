@@ -29,7 +29,7 @@ use wayle_config::{
         launcher::LauncherLocation,
     },
 };
-use wayle_ipc::launcher_socket::{Selected, ServerFrame, SessionOptions};
+use wayle_ipc::launcher_socket::{LauncherWidth, Selected, ServerFrame, SessionOptions};
 use wayle_launcher::{Action, ActivateKind};
 use wayle_widgets::prelude::WayleRevealer;
 
@@ -393,8 +393,10 @@ impl Launcher {
         widgets: &LauncherWidgets,
         root: &gtk::Window,
     ) {
-        widgets.surface.set_size_request(ui.width, -1);
-        apply_location(root, ui.location);
+        widgets
+            .surface
+            .set_size_request(resolve_width(ui, widgets, root), -1);
+        apply_location(root, ui.location, ui.offset);
 
         widgets.entry.set_text(ui.filter.as_deref().unwrap_or(""));
         widgets.entry.set_position(-1);
@@ -831,9 +833,58 @@ impl Launcher {
 }
 
 /// Map the location enum onto layer-shell anchors.
-fn apply_location(root: &gtk::Window, location: LauncherLocation) {
+/// Resolves the surface width in pixels: the configured width unless `-width`
+/// overrode it for this invocation.
+///
+/// Percent resolves against the monitor the surface is on (falling back to the
+/// first monitor before the surface is realized), and a character count against
+/// the entry font's advance width — measured with pango rather than guessed, so
+/// it tracks the configured font.
+fn resolve_width(ui: &UiSettings, widgets: &LauncherWidgets, root: &gtk::Window) -> i32 {
+    let Some(width) = ui.width_override else {
+        return ui.width;
+    };
+    match width {
+        LauncherWidth::Pixels(px) => px.max(1),
+        LauncherWidth::Percent(pct) => {
+            let monitor = monitor_width(root).unwrap_or(ui.width);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+            let scaled = (monitor as f32 * pct / 100.0) as i32;
+            scaled.max(1)
+        }
+        LauncherWidth::Chars(chars) => {
+            let layout = widgets.entry.create_pango_layout(Some("0"));
+            let advance = layout.pixel_size().0.max(1);
+            (advance * i32::try_from(chars).unwrap_or(i32::MAX)).max(1)
+        }
+    }
+}
+
+/// Width in pixels of the monitor the launcher is on, or the display's first
+/// monitor when the surface isn't realized yet.
+fn monitor_width(root: &gtk::Window) -> Option<i32> {
+    let display = gtk::prelude::WidgetExt::display(root);
+    let monitor = root
+        .surface()
+        .and_then(|surface| display.monitor_at_surface(&surface))
+        .or_else(|| {
+            display
+                .monitors()
+                .item(0)
+                .and_downcast::<gtk::gdk::Monitor>()
+        })?;
+    Some(monitor.geometry().width())
+}
+
+/// Anchors the surface for `location` and applies the rofi `-xoffset`/`-yoffset`
+/// margins.
+///
+/// Margins only have an effect on an anchored edge, so a centered axis ignores
+/// its offset — the CLI warns about that at parse time.
+fn apply_location(root: &gtk::Window, location: LauncherLocation, offset: (i32, i32)) {
     for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
         root.set_anchor(edge, false);
+        root.set_margin(edge, 0);
     }
     let anchors: &[Edge] = match location {
         LauncherLocation::Center => &[],
@@ -846,8 +897,19 @@ fn apply_location(root: &gtk::Window, location: LauncherLocation) {
         LauncherLocation::West => &[Edge::Left],
         LauncherLocation::NorthWest => &[Edge::Top, Edge::Left],
     };
+    let (xoffset, yoffset) = offset;
     for edge in anchors {
         root.set_anchor(*edge, true);
+        // rofi offsets are measured from the anchor, so the sign follows the
+        // edge: a positive x moves right (away from Left, into Right).
+        let margin = match edge {
+            Edge::Left => xoffset,
+            Edge::Right => -xoffset,
+            Edge::Top => yoffset,
+            Edge::Bottom => -yoffset,
+            _ => 0,
+        };
+        root.set_margin(*edge, margin);
     }
 }
 

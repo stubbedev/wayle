@@ -98,4 +98,12 @@ Accepts the common rofi option surface (-p, -mesg, -multi-select, -matching,
 -theme-str) are accepted but ignored — style via wayle-settings instead.
 Exit codes match rofi: 0 accept, 1 cancel, 10-28 for kb-custom-N.
 
+GEOMETRY (per invocation, overriding [launcher] in config.toml):
+    -width 60        percent of the monitor's width
+    -width -30       width in characters
+    -width 600px     width in pixels
+    -lines N         visible result lines (alias of -l)
+    -xoffset N       pixel offset from the anchored edge (needs -location 1-8)
+    -yoffset N       pixel offset from the anchored edge (needs -location 1-8)
+
 Local commands: -help, -version, -dump-config, -dump-theme, -list-keybindings";

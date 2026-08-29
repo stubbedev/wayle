@@ -11,7 +11,7 @@ use wayle_config::{
         LauncherSorting, LauncherWindowField, WIDTH_BASE_REM,
     },
 };
-use wayle_ipc::launcher_socket::SessionOptions;
+use wayle_ipc::launcher_socket::{LauncherWidth, SessionOptions};
 use wayle_launcher::{
     CaseMode, MatchMethod, MatcherOptions, Mode, SortMethod,
     history::HistoryStore,
@@ -24,8 +24,14 @@ use wayle_launcher::{
 
 /// Resolved UI knobs for one session.
 pub(super) struct UiSettings {
-    /// Surface width in pixels.
+    /// Surface width in pixels, from `[launcher] width`.
     pub width: i32,
+    /// `-width`: per-invocation override for `width`. Resolved late (in
+    /// `apply_ui`) because percent and character widths need the monitor and
+    /// the font, which the config layer can't see.
+    pub width_override: Option<LauncherWidth>,
+    /// `-xoffset`/`-yoffset`: pixel offsets from the anchored edges.
+    pub offset: (i32, i32),
     /// Visible result lines.
     pub lines: u32,
     /// Keep list height fixed at `lines`.
@@ -144,6 +150,11 @@ pub(super) fn build(
         matcher: matcher_options(options, config),
         ui: UiSettings {
             width: launcher.width.get().resolve_rem(WIDTH_BASE_REM, scale) as i32,
+            width_override: options.width,
+            offset: (
+                options.xoffset.unwrap_or_default(),
+                options.yoffset.unwrap_or_default(),
+            ),
             lines: options.lines.unwrap_or_else(|| launcher.lines.get()),
             fixed_num_lines: !options.no_fixed_num_lines && launcher.fixed_num_lines.get(),
             location: options
