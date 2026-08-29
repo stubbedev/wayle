@@ -1,0 +1,28 @@
+# Mock GlobalProtect gateways for the VPN sign-in tests.
+#
+# `just test-gateway` brings these up, runs the tests that need them, and takes
+# them down again. Nothing here talks to anyone's real VPN: the certificate is
+# committed next to this file precisely so the expected `gwcert` pin is a
+# constant the tests can assert against.
+services:
+  gateway:
+    image: python:3.13-alpine
+    command: python /mock/gateway.py
+    environment:
+      MODE: form
+      PORT: "8443"
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - .:/mock:ro
+
+  saml-gateway:
+    image: python:3.13-alpine
+    command: python /mock/gateway.py
+    environment:
+      MODE: saml
+      PORT: "8444"
+    ports:
+      - "127.0.0.1:8444:8444"
+    volumes:
+      - .:/mock:ro

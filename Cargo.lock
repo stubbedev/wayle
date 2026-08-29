@@ -6228,12 +6228,14 @@ name = "wayle-network"
 version = "0.8.35"
 dependencies = [
  "async-trait",
+ "base64",
  "bitflags 2.10.0",
  "derive_more",
  "futures",
  "rand 0.9.2",
  "reqwest",
  "serde",
+ "sha2",
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",

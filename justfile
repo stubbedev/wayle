@@ -194,3 +194,23 @@ _release bump:
 release-patch: (_release "patch")
 release-minor: (_release "minor")
 release-major: (_release "major")
+
+# ─────────────────────────── VPN mock gateway ───────────────────────────
+
+# Run the VPN sign-in tests that need a gateway to talk to.
+#
+# They are `#[ignore]`d in the normal suite because they speak the real
+# protocol over a real TLS connection — which is the only way to cover the
+# `gwcert` certificate pin — against the mock gateways in
+# `crates/wayle-network/tests/mock-gateway`. No real VPN is involved.
+test-gateway:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mock="crates/wayle-network/tests/mock-gateway"
+    docker compose -f "$mock/compose.yaml" up -d
+    trap 'docker compose -f "$mock/compose.yaml" down' EXIT
+    for _ in $(seq 30); do
+        (exec 3<>/dev/tcp/127.0.0.1/8443) 2>/dev/null && break
+        sleep 0.5
+    done
+    {{cargo}} nextest run -p wayle-network --run-ignored all -E 'test(mock::)'

@@ -25,15 +25,12 @@ type Addresses = Vec<(String, u32)>;
 const NOT_SAVED: &str = "2";
 
 /// The openconnect secrets that must come from an agent every time.
-const OPENCONNECT_EPHEMERAL: &[&str] = &[
-    "cookie",
-    "gateway",
-    "gwcert",
-    "resolve",
-    "xmlconfig",
-    "certsigs",
-    "lasthost",
-];
+///
+/// Exactly the three keys the plugin's `need_secrets` looks for. The other
+/// `-flags` keys wayle used to write — `resolve`, `xmlconfig`, `certsigs`,
+/// `lasthost` — were guesses at plugin internals, and flagged nothing that is
+/// a secret.
+const OPENCONNECT_EPHEMERAL: &[&str] = &["cookie", "gateway", "gwcert"];
 
 fn text(value: &str) -> Option<OwnedValue> {
     OwnedValue::try_from(Value::from(value)).ok()
@@ -451,7 +448,22 @@ mod tests {
             data.get("gateway-flags").map(String::as_str),
             Some(NOT_SAVED)
         );
+        assert_eq!(
+            data.get("gwcert-flags").map(String::as_str),
+            Some(NOT_SAVED)
+        );
         assert!(!vpn.contains_key("secrets"));
+
+        // Only the keys the plugin actually asks for. The rest were guesses,
+        // and they read to anyone inspecting the profile as settings wayle
+        // understands.
+        let mut flags: Vec<&str> = data
+            .keys()
+            .filter(|key| key.ends_with("-flags"))
+            .map(String::as_str)
+            .collect();
+        flags.sort_unstable();
+        assert_eq!(flags, ["cookie-flags", "gateway-flags", "gwcert-flags"]);
     }
 
     #[test]

@@ -97,7 +97,7 @@ pub(super) fn store_session(uuid: &str, session: &Session) {
     write_private(
         uuid,
         "cookie",
-        &format!("{}\n{}\n", session.cookie, session.host),
+        &format!("{}\n{}\n{}\n", session.cookie, session.host, session.gwcert),
     );
 }
 
@@ -122,30 +122,41 @@ pub(super) fn forget_password(uuid: &str) {
     remove(uuid, "password");
 }
 
-/// Reads the two-line cookie file back.
+/// Reads the three-line cookie file back.
+///
+/// A file written before the certificate pin was part of a session has two
+/// lines, and reads as no session at all: the plugin refuses a secret set
+/// without a `gwcert`, so reusing one would fail the activation with nothing
+/// to show for it. Signing in again writes the current shape.
 fn parse_session(raw: &str) -> Option<Session> {
     let mut lines = raw.lines();
     let cookie = lines.next()?.trim();
     let host = lines.next()?.trim();
-    if cookie.is_empty() || host.is_empty() {
+    let gwcert = lines.next()?.trim();
+    if cookie.is_empty() || host.is_empty() || gwcert.is_empty() {
         return None;
     }
     Some(Session {
         cookie: String::from(cookie),
         host: String::from(host),
+        gwcert: String::from(gwcert),
     })
 }
 
 #[cfg(test)]
+// The state directory is read from the environment, so one test sets it.
+#[allow(unsafe_code)]
 mod tests {
     use super::*;
 
     #[test]
     fn a_stored_session_round_trips() {
-        let session = parse_session("authcookie=abc&user=alice\nvpn.example.com\n")
-            .expect("a complete file parses");
+        let session =
+            parse_session("authcookie=abc&user=alice\nvpn.example.com\npin-sha256:AAAA\n")
+                .expect("a complete file parses");
         assert_eq!(session.cookie, "authcookie=abc&user=alice");
         assert_eq!(session.host, "vpn.example.com");
+        assert_eq!(session.gwcert, "pin-sha256:AAAA");
     }
 
     #[test]
@@ -153,8 +164,15 @@ mod tests {
         // Handing a half-written cookie to the plugin fails at connect time
         // with no useful message; treating it as absent re-authenticates.
         assert_eq!(parse_session("authcookie=abc\n"), None);
-        assert_eq!(parse_session("\nvpn.example.com\n"), None);
+        assert_eq!(parse_session("\nvpn.example.com\npin-sha256:AAAA\n"), None);
         assert_eq!(parse_session(""), None);
+    }
+
+    #[test]
+    fn a_session_cached_before_certificate_pinning_is_not_reused() {
+        // Two lines is the old shape. It would produce a secret set with no
+        // `gwcert`, which the plugin rejects without ever starting.
+        assert_eq!(parse_session("authcookie=abc\nvpn.example.com\n"), None);
     }
 
     #[test]
@@ -162,6 +180,42 @@ mod tests {
         assert!(path("../../etc/passwd", "cookie").is_none());
         assert!(path("a/b", "cookie").is_none());
         assert!(path("", "cookie").is_none());
+    }
+
+    #[test]
+    fn forgetting_a_profile_removes_both_files_from_disk() {
+        // Deleting a VPN used to leave its session cookie and its password
+        // behind, under a UUID nothing would ever look up again.
+        let base = std::env::temp_dir().join(format!("wayle-vpn-cache-{}", std::process::id()));
+        // SAFETY: the test runner gives every test its own process, and
+        // nothing else in this crate reads `XDG_STATE_HOME`.
+        unsafe { std::env::set_var("XDG_STATE_HOME", &base) };
+
+        let uuid = "cache-round-trip";
+        let stored = Session {
+            cookie: String::from("authcookie=abc"),
+            host: String::from("vpn.example.com"),
+            gwcert: String::from("pin-sha256:AAAA"),
+        };
+        store_session(uuid, &stored);
+        store_password(uuid, "hunter2");
+        assert_eq!(session(uuid).as_ref(), Some(&stored));
+        assert_eq!(password(uuid).as_deref(), Some("hunter2"));
+
+        forget_session(uuid);
+        forget_password(uuid);
+        assert_eq!(session(uuid), None);
+        assert_eq!(password(uuid), None);
+        assert!(
+            !path(uuid, "cookie").is_some_and(|path| path.exists()),
+            "the cookie file survived"
+        );
+        assert!(
+            !path(uuid, "password").is_some_and(|path| path.exists()),
+            "the password file survived"
+        );
+
+        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]

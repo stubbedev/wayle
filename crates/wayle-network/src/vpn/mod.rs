@@ -286,13 +286,21 @@ impl VpnService {
             .await
     }
 
-    /// Deletes a profile.
+    /// Deletes a profile, and whatever wayle cached for it.
+    ///
+    /// The cached session cookie and password are dropped with it: NM's own
+    /// store goes when the profile does, and leaving wayle's behind would keep
+    /// a live credential on disk for a profile that no longer exists, under a
+    /// UUID nothing will ever look up again.
     ///
     /// # Errors
     ///
-    /// Returns an error when the profile is gone, or when NM refuses.
+    /// Returns an error when the profile is gone, or when NM refuses. Nothing
+    /// is forgotten in that case: the profile is still there.
     pub async fn remove(&self, uuid: &str) -> Result<(), Error> {
-        self.profile_for(uuid)?.delete().await
+        self.profile_for(uuid)?.delete().await?;
+        openconnect::forget(uuid);
+        Ok(())
     }
 
     /// The saved settings of a profile, for prefilling the edit form.

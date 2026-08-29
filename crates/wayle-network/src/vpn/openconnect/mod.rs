@@ -1,7 +1,7 @@
 //! Producing the openconnect plugin's secrets without an openconnect binary.
 //!
 //! NetworkManager's openconnect plugin does not ask for a password. It asks
-//! for a `cookie`, a `gateway` and optionally a `gwcert` — the *output* of an
+//! for a `cookie`, a `gateway` and a `gwcert` — the *output* of an
 //! authentication, not its input. Conventionally an agent gets those by
 //! spawning the plugin's own `nm-openconnect-auth-dialog`, which drives
 //! libopenconnect through the whole sign-in.
@@ -17,11 +17,16 @@
 //! thing that moves packets.
 
 mod cache;
+mod cert;
 mod form;
 mod gp;
 mod xml;
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{LazyLock, Mutex},
+    time::{Duration, Instant},
+};
 
 use tracing::{debug, info, warn};
 use zbus::zvariant::OwnedValue;
@@ -47,6 +52,34 @@ const MAX_CHALLENGES: usize = 5;
 
 /// What openconnect reports itself as. Some gateways gate on it.
 const USER_AGENT: &str = "PAN GlobalProtect";
+
+/// How long a request may take to reach the gateway at all. Short, because
+/// nothing about it waits on a person.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// How long a prelogin may take. It is a static document; a gateway that has
+/// not answered in this long is not going to.
+const PRELOGIN_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// How long the login post may take.
+///
+/// Generous on purpose: a gateway doing push MFA holds this request open until
+/// the user has approved it on their phone, so the timeout that fits every
+/// other request would fail exactly the person who is slow to find it.
+const LOGIN_TIMEOUT: Duration = Duration::from_secs(180);
+
+/// How long a cookie stays "just handed over" for. NM re-asks within
+/// milliseconds when the plugin rejects a secret set, so anything on this
+/// scale is a retry rather than a reconnect. See [`is_spent`].
+const RETRY_WINDOW: Duration = Duration::from_secs(120);
+
+/// The cookie last handed to NM per profile, and when.
+///
+/// NM does not set `REQUEST_NEW` on every retry — on a rejected secret set it
+/// often does not set it at all — so without this the same stale cookie is
+/// handed back on every attempt and the activation loops instead of failing.
+static HANDED_OUT: LazyLock<Mutex<HashMap<String, (String, Instant)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// The openconnect settings wayle needs out of an NM profile.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,7 +152,7 @@ pub(crate) async fn authenticate(
     state: &SecretAgentState,
 ) -> Result<HashMap<String, String>, Error> {
     if let Some(session) = reusable_session(profile, request_new) {
-        return Ok(secrets(&session));
+        return Ok(hand_out(&profile.uuid, &session));
     }
 
     let client = client()?;
@@ -136,7 +169,30 @@ pub(crate) async fn authenticate(
         cache::store_password(&profile.uuid, &password);
     }
     info!(name = %profile.name, "VPN sign-in complete");
-    Ok(secrets(&session))
+    Ok(hand_out(&profile.uuid, &session))
+}
+
+/// Records which cookie NM is being given, so the next request for the same
+/// profile can tell a rejected cookie from a fresh reconnect.
+fn hand_out(uuid: &str, session: &gp::Session) -> HashMap<String, String> {
+    if let Ok(mut handed) = HANDED_OUT.lock() {
+        handed.insert(String::from(uuid), (session.cookie.clone(), Instant::now()));
+    }
+    secrets(session)
+}
+
+/// Forgets everything cached for a profile: the session, the password, and
+/// the record of what was last handed over.
+///
+/// Called when the profile is deleted. A session cookie and a password
+/// outliving the profile they belong to is a leak, and a profile recreated
+/// under the same name gets a new UUID, so nothing would ever collect them.
+pub(crate) fn forget(uuid: &str) {
+    cache::forget_session(uuid);
+    cache::forget_password(uuid);
+    if let Ok(mut handed) = HANDED_OUT.lock() {
+        handed.remove(uuid);
+    }
 }
 
 /// The cached session to reuse, or `None` when there is none to reuse — either
@@ -149,9 +205,31 @@ fn reusable_session(profile: &Profile, request_new: bool) -> Option<gp::Session>
         cache::forget_password(&profile.uuid);
         return None;
     }
+
     let session = cache::session(&profile.uuid)?;
+    let spent = HANDED_OUT
+        .lock()
+        .ok()
+        .is_some_and(|handed| is_spent(handed.get(&profile.uuid), &session.cookie, Instant::now()));
+    if spent {
+        info!(name = %profile.name, "the cached VPN cookie was just refused; signing in again");
+        cache::forget_session(&profile.uuid);
+        return None;
+    }
+
     info!(name = %profile.name, "reusing cached VPN session; no sign-in needed");
     Some(session)
+}
+
+/// Whether NM is asking again for a cookie it was given moments ago — which
+/// only happens when whatever it was given did not work.
+///
+/// The window is what separates a retry from a legitimate reconnect: a tunnel
+/// coming back after a suspend asks minutes or hours later, and must get the
+/// cached cookie rather than a fresh second factor.
+fn is_spent(handed: Option<&(String, Instant)>, cookie: &str, now: Instant) -> bool {
+    handed
+        .is_some_and(|(previous, at)| previous == cookie && now.duration_since(*at) < RETRY_WINDOW)
 }
 
 /// Posts the login and follows however many challenge rounds the gateway
@@ -194,20 +272,18 @@ async fn sign_in(
     )))
 }
 
-/// The secrets the openconnect plugin consumes.
+/// The secrets the openconnect plugin consumes — all three of them.
 ///
-/// `gwcert` is deliberately absent. Pinning it would mean asserting a
-/// certificate wayle just validated against the same system trust store the
-/// plugin uses — if the gateway's certificate were untrusted, the sign-in
-/// above would have failed at the TLS handshake and there would be no cookie
-/// to hand over.
-///
-/// ponytail: a gateway with a self-signed certificate needs an explicit pin
-/// here, and a `gwcert` field on the edit form to hold it.
+/// `gwcert` is not optional, whatever its being a pin of an already-trusted
+/// certificate suggests: the plugin's own `need_secrets` counts the key as
+/// missing until it is present, so a reply without it makes NM report "final
+/// secrets request failed to provide sufficient secrets" and never launch
+/// openconnect at all. Trust and the plugin's key set are separate questions.
 fn secrets(session: &gp::Session) -> HashMap<String, String> {
     HashMap::from([
         (String::from("cookie"), session.cookie.clone()),
         (String::from("gateway"), session.host.clone()),
+        (String::from("gwcert"), session.gwcert.clone()),
     ])
 }
 
@@ -304,10 +380,17 @@ fn cancelled() -> Error {
     Error::VpnAuthenticationFailed(String::from("sign-in dismissed"))
 }
 
+/// The HTTPS client the sign-in runs on.
+///
+/// No overall timeout: the per-request ones differ by an order of magnitude
+/// (see [`LOGIN_TIMEOUT`]) and a client-wide one would cap them all at the
+/// shortest. `tls_info` is what makes the gateway's certificate readable off
+/// the response, which is where the `gwcert` secret comes from.
 pub(super) fn client() -> Result<reqwest::Client, Error> {
     reqwest::Client::builder()
         .user_agent(USER_AGENT)
-        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(CONNECT_TIMEOUT)
+        .tls_info(true)
         .build()
         .map_err(|error| {
             Error::VpnAuthenticationFailed(format!("cannot build the HTTPS client: {error}"))
@@ -434,13 +517,23 @@ mod tests {
         assert!(!is_supported(&profile));
     }
 
-    #[test]
-    fn the_secrets_are_the_two_the_plugin_reads() {
-        let session = gp::Session {
+    fn session() -> gp::Session {
+        gp::Session {
             cookie: String::from("authcookie=abc"),
             host: String::from("vpn.example.com"),
-        };
-        let secrets = secrets(&session);
+            gwcert: String::from("pin-sha256:AAAA"),
+        }
+    }
+
+    #[test]
+    fn the_secrets_are_exactly_the_three_keys_the_plugin_asks_for() {
+        // Pinned as a set, not key by key: one missing key makes NM retry
+        // silently rather than error, which is a loop with no message in it.
+        let secrets = secrets(&session());
+        let mut keys: Vec<&str> = secrets.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["cookie", "gateway", "gwcert"]);
+
         assert_eq!(
             secrets.get("cookie").map(String::as_str),
             Some("authcookie=abc")
@@ -449,7 +542,34 @@ mod tests {
             secrets.get("gateway").map(String::as_str),
             Some("vpn.example.com")
         );
-        // Absent on purpose: pinning what system trust already validated.
-        assert!(!secrets.contains_key("gwcert"));
+        assert_eq!(
+            secrets.get("gwcert").map(String::as_str),
+            Some("pin-sha256:AAAA")
+        );
+    }
+
+    #[test]
+    fn a_cookie_asked_for_again_moments_later_is_treated_as_refused() {
+        // NM re-asking straight away means the plugin would not take what it
+        // was given. Handing the same cookie back is the loop this prevents.
+        let now = Instant::now();
+        let handed = (String::from("authcookie=abc"), now);
+        assert!(is_spent(Some(&handed), "authcookie=abc", now));
+    }
+
+    #[test]
+    fn a_reconnect_much_later_still_reuses_its_cached_cookie() {
+        // The whole point of the cache: a tunnel coming back after a suspend
+        // must not cost the user another second factor.
+        let handed = (
+            String::from("authcookie=abc"),
+            Instant::now() - RETRY_WINDOW - Duration::from_secs(1),
+        );
+        assert!(!is_spent(Some(&handed), "authcookie=abc", Instant::now()));
+        // Nor does a profile nothing was ever handed out for.
+        assert!(!is_spent(None, "authcookie=abc", Instant::now()));
+        // Nor a cookie that is not the one that was handed out.
+        let fresh = (String::from("authcookie=old"), Instant::now());
+        assert!(!is_spent(Some(&fresh), "authcookie=new", Instant::now()));
     }
 }

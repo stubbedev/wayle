@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use super::{form, xml};
+use super::{LOGIN_TIMEOUT, PRELOGIN_TIMEOUT, cert, form, xml};
 use crate::Error;
 
 /// The client version every GlobalProtect gateway expects, and the one it
@@ -108,6 +108,10 @@ pub(super) struct Session {
     /// The host the cookie was issued for. Handed back as the `gateway`
     /// secret, so the plugin connects to the same one that authenticated.
     pub host: String,
+    /// The `pin-sha256:` fingerprint of the certificate that gateway presented
+    /// while it was issuing the cookie. The plugin will not start without it;
+    /// see [`cert`].
+    pub gwcert: String,
 }
 
 /// Builds a login request body.
@@ -151,7 +155,7 @@ fn login_body(
 /// Returns an error when the gateway reported one, when it demanded SAML —
 /// which needs a browser wayle deliberately does not embed — or when the reply
 /// is not a shape this code knows.
-fn parse_login(body: &str, gateway: &str, computer: &str) -> Result<Step, Error> {
+fn parse_login(body: &str, gateway: &str, computer: &str, gwcert: &str) -> Result<Step, Error> {
     if let Some(input_str) = xml::value(body, "inputstr") {
         let prompt = xml::value(body, "respmsg").unwrap_or_default();
         return Ok(Step::Challenge { prompt, input_str });
@@ -188,6 +192,7 @@ fn parse_login(body: &str, gateway: &str, computer: &str) -> Result<Step, Error>
     Ok(Step::Authenticated(Session {
         cookie: build_cookie(&named, computer),
         host: String::from(gateway),
+        gwcert: String::from(gwcert),
     }))
 }
 
@@ -274,9 +279,14 @@ pub(super) async fn prelogin(client: &reqwest::Client, gateway: &str) -> Result<
     let url = format!(
         "https://{gateway}/ssl-vpn/prelogin.esp?tmp=tmp&clientVer={CLIENT_VERSION}&clientos=Linux"
     );
-    let response = client.get(&url).send().await.map_err(|error| {
-        Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
-    })?;
+    let response = client
+        .get(&url)
+        .timeout(PRELOGIN_TIMEOUT)
+        .send()
+        .await
+        .map_err(|error| {
+            Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
+        })?;
 
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         return Err(auth_error(
@@ -313,12 +323,23 @@ pub(super) async fn login(
             reqwest::header::CONTENT_TYPE,
             "application/x-www-form-urlencoded",
         )
+        // A gateway doing push MFA holds this open until the user has tapped
+        // approve on their phone, so this is the one request that waits on a
+        // person rather than on a server.
+        .timeout(LOGIN_TIMEOUT)
         .body(body)
         .send()
         .await
         .map_err(|error| {
             Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
         })?;
+
+    // Read off the response rather than a second connection: this is the
+    // certificate that was in front of the gateway while it minted the cookie,
+    // which is exactly what the plugin is asked to pin.
+    let gwcert = peer_pin(&response).ok_or_else(|| {
+        auth_error("cannot read the gateway's certificate, which the VPN plugin requires")
+    })?;
 
     // A gateway answers a bad password with 200 and an error document, so the
     // status is only interesting when it is a real transport failure — most
@@ -334,12 +355,32 @@ pub(super) async fn login(
         ));
     }
 
-    parse_login(&body, gateway, computer)
+    parse_login(&body, gateway, computer, &gwcert)
+}
+
+/// The certificate pin of whoever answered this response.
+///
+/// `None` when the client was not built with `tls_info(true)`, or on a plain
+/// HTTP response — neither of which happens here, but a pin invented for a
+/// connection nobody verified would be worse than no sign-in at all.
+fn peer_pin(response: &reqwest::Response) -> Option<String> {
+    cert::pin(
+        response
+            .extensions()
+            .get::<reqwest::tls::TlsInfo>()?
+            .peer_certificate()?,
+    )
 }
 
 #[cfg(test)]
+// One test sets `SSL_CERT_FILE` so the mock gateway's committed certificate
+// verifies through the same path a real one does.
+#[allow(unsafe_code)]
 mod tests {
     use super::*;
+
+    /// Stands in for the pin `login` reads off the TLS connection.
+    const PIN: &str = "pin-sha256:AAAA";
 
     /// A real gateway's reply, trimmed to the argument list.
     fn success_xml(connection_type: &str, client_version: &str) -> String {
@@ -370,12 +411,19 @@ mod tests {
 
     #[test]
     fn a_successful_login_becomes_openconnects_cookie_string() {
-        let step = parse_login(&success_xml("tunnel", "4100"), "vpn.example.com", "laptop")
-            .expect("authenticated");
+        let step = parse_login(
+            &success_xml("tunnel", "4100"),
+            "vpn.example.com",
+            "laptop",
+            PIN,
+        )
+        .expect("authenticated");
         let Step::Authenticated(session) = step else {
             panic!("expected an authenticated step");
         };
         assert_eq!(session.host, "vpn.example.com");
+        // The plugin refuses to start without this, however good the cookie.
+        assert_eq!(session.gwcert, PIN);
         assert_eq!(
             session.cookie,
             "authcookie=AUTHCOOKIEVALUE&portal=vpn.example.com&user=alice&domain=example\
@@ -410,6 +458,7 @@ mod tests {
             &success_xml("not-a-tunnel", "4100"),
             "vpn.example.com",
             "laptop",
+            PIN,
         )
         .expect_err("must not accept a non-tunnel reply");
         assert!(
@@ -422,14 +471,22 @@ mod tests {
     fn an_unexpected_client_version_is_refused() {
         // A gateway echoing a different version is answering some other
         // protocol; its argument list cannot be trusted to be this one.
-        assert!(parse_login(&success_xml("tunnel", "5000"), "vpn.example.com", "laptop").is_err());
+        assert!(
+            parse_login(
+                &success_xml("tunnel", "5000"),
+                "vpn.example.com",
+                "laptop",
+                PIN
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn a_challenge_is_recognised_with_its_own_wording() {
         let xml = "<challenge><respmsg>Enter your token code</respmsg>\
                    <inputstr>CHALLENGE-1</inputstr></challenge>";
-        let step = parse_login(xml, "vpn.example.com", "laptop").expect("challenge");
+        let step = parse_login(xml, "vpn.example.com", "laptop", PIN).expect("challenge");
         assert_eq!(
             step,
             Step::Challenge {
@@ -443,7 +500,7 @@ mod tests {
     fn a_challenge_is_not_mistaken_for_a_success() {
         let xml = "<challenge><inputstr>C</inputstr></challenge>";
         assert!(!matches!(
-            parse_login(xml, "vpn.example.com", "laptop"),
+            parse_login(xml, "vpn.example.com", "laptop", PIN),
             Ok(Step::Authenticated(_))
         ));
     }
@@ -451,7 +508,7 @@ mod tests {
     #[test]
     fn a_rejection_surfaces_the_gateways_own_message() {
         let xml = "<response status=\"error\"><msg>Invalid username or password</msg></response>";
-        let error = parse_login(xml, "vpn.example.com", "laptop").expect_err("rejected");
+        let error = parse_login(xml, "vpn.example.com", "laptop", PIN).expect_err("rejected");
         assert!(
             error.to_string().contains("Invalid username or password"),
             "got: {error}"
@@ -516,14 +573,14 @@ mod tests {
     fn a_saml_portal_says_so_instead_of_reading_as_malformed() {
         let xml = "<prelogin-response><saml-auth-method>REDIRECT</saml-auth-method>\
                    <saml-request>aHR0cHM6Ly9pZHA=</saml-request></prelogin-response>";
-        let error = parse_login(xml, "vpn.example.com", "laptop").expect_err("saml");
+        let error = parse_login(xml, "vpn.example.com", "laptop", PIN).expect_err("saml");
         assert!(error.to_string().contains("SAML"), "got: {error}");
     }
 
     #[test]
     fn a_login_without_a_cookie_is_a_failure_not_an_empty_success() {
         let xml = success_xml("tunnel", "4100").replace("AUTHCOOKIEVALUE", "");
-        assert!(parse_login(&xml, "vpn.example.com", "laptop").is_err());
+        assert!(parse_login(&xml, "vpn.example.com", "laptop", PIN).is_err());
     }
 
     #[test]
@@ -547,32 +604,108 @@ mod tests {
         assert!(body.contains("passwd=123456"));
     }
 
-    /// Talks to a real gateway. Ignored by default and driven by an
-    /// environment variable, because the hostname is site-specific and the
-    /// repository is not the place for someone's VPN address:
+    /// Tests against the mock gateway in `tests/mock-gateway`, started by
+    /// `just test-gateway`.
     ///
-    /// ```sh
-    /// WAYLE_TEST_GP_GATEWAY=vpn.example.com \
-    ///   cargo test -p wayle-network --lib -- --ignored a_real_gateway
-    /// ```
-    ///
-    /// Unauthenticated: prelogin is what any GlobalProtect client asks before
-    /// showing a login box, so this posts no credentials at anything.
-    #[tokio::test]
-    #[ignore = "needs WAYLE_TEST_GP_GATEWAY and network access to it"]
-    async fn a_real_gateway_answers_prelogin_over_system_trust() {
-        let Ok(gateway) = std::env::var("WAYLE_TEST_GP_GATEWAY") else {
-            panic!("set WAYLE_TEST_GP_GATEWAY to the gateway to probe");
-        };
-        let client = super::super::client().expect("client builds");
+    /// These are the only tests that speak the protocol over a real TLS
+    /// connection, which is the point: the `gwcert` secret is read off that
+    /// connection, so no amount of parsing tests would have caught it missing.
+    /// Nothing here touches anyone's real VPN — the certificate is committed
+    /// beside the mock, which is what makes its pin a constant.
+    mod mock {
+        use super::*;
 
-        let prelogin = prelogin(&client, &gateway)
-            .await
-            .expect("the gateway answers prelogin, and its certificate validates");
+        const GATEWAY: &str = "127.0.0.1:8443";
+        const SAML_GATEWAY: &str = "127.0.0.1:8444";
+        const PIN: &str = "pin-sha256:eQO9gC6TVZtfFqt1YHSe7HUSxgHyRmhNo3UXeSAxvZI=";
 
-        // Labels always come back populated, from the gateway or the default.
-        assert!(!prelogin.username_label.is_empty());
-        assert!(!prelogin.password_label.is_empty());
+        /// A client that trusts the mock's committed certificate.
+        ///
+        /// `SSL_CERT_FILE` rather than a client built differently for tests:
+        /// this is the production client, verifying a gateway for real rather
+        /// than being told to skip the check.
+        fn client() -> reqwest::Client {
+            // SAFETY: nextest runs every test in its own process.
+            unsafe {
+                std::env::set_var(
+                    "SSL_CERT_FILE",
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/mock-gateway/ca.crt"),
+                );
+            }
+            super::super::super::client().expect("the client builds")
+        }
+
+        /// Signs in the way [`super::super::sign_in`] does: a password post,
+        /// then the answer to the challenge it comes back with.
+        async fn sign_in() -> Result<Session, Error> {
+            let client = client();
+            let step = login(&client, GATEWAY, "alice", "hunter2", "laptop", "").await?;
+            let Step::Challenge { input_str, .. } = step else {
+                panic!("the mock gateway always challenges once");
+            };
+            match login(&client, GATEWAY, "alice", "123456", "laptop", &input_str).await? {
+                Step::Authenticated(session) => Ok(session),
+                Step::Challenge { .. } => panic!("the second post completes the sign-in"),
+            }
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn prelogin_carries_the_gateways_own_wording() {
+            let prelogin = prelogin(&client(), GATEWAY)
+                .await
+                .expect("the gateway answers, and its certificate validates");
+            assert_eq!(prelogin.username_label, "Company ID");
+            assert_eq!(prelogin.password_label, "Passphrase");
+            assert_eq!(
+                prelogin.message.as_deref(),
+                Some("Sign in to the mock gateway")
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn a_sign_in_produces_a_cookie_and_the_certificate_pin() {
+            let session = sign_in().await.expect("the mock gateway signs us in");
+
+            assert!(
+                session.cookie.starts_with("authcookie=AUTHCOOKIEVALUE&"),
+                "got: {}",
+                session.cookie
+            );
+            assert!(
+                session.cookie.contains("&user=alice&"),
+                "got: {}",
+                session.cookie
+            );
+            assert_eq!(session.host, GATEWAY);
+            // The whole of #12: without this the plugin never launches
+            // openconnect, however good the cookie is. And it is the pin of
+            // the certificate this connection actually presented, not one this
+            // code could have invented for itself.
+            assert_eq!(session.gwcert, PIN);
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn a_wrong_password_is_a_refusal_in_the_gateways_words() {
+            let error = login(&client(), GATEWAY, "alice", "wrong", "laptop", "")
+                .await
+                .expect_err("a bad password does not sign anyone in");
+            assert!(
+                error.to_string().contains("Invalid username or password"),
+                "got: {error}"
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn a_saml_portal_is_refused_before_any_credentials_are_posted() {
+            let error = prelogin(&client(), SAML_GATEWAY)
+                .await
+                .expect_err("a SAML portal is not something this can sign into");
+            assert!(error.to_string().contains("SAML"), "got: {error}");
+        }
     }
 
     #[test]
