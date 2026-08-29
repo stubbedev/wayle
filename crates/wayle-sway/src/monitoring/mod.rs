@@ -77,7 +77,7 @@ async fn event_loop(
 ) {
     loop {
         tokio::select! {
-            _ = cancellation_token.cancelled() => return,
+            () = cancellation_token.cancelled() => return,
             received = inbound_event_rx.recv() => match received {
                 Ok(SwayEvent::WorkspaceChanged) => {
                     refresh::refresh_workspaces(&command_client, &handles).await;

@@ -20,7 +20,7 @@ pub fn select_icon(ctx: &IconContext<'_>) -> String {
         0
     } else {
         let step = 100.0 / ctx.level_icons.len() as f64;
-        let idx = ((ctx.percentage as f64 - 1.0) / step).floor() as usize;
+        let idx = ((f64::from(ctx.percentage) - 1.0) / step).floor() as usize;
         idx.min(ctx.level_icons.len() - 1)
     };
 

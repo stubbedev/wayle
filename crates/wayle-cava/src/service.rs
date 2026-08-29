@@ -58,7 +58,7 @@ pub struct CavaService {
     /// Visualization update rate, clamped to 1-360 fps.
     pub framerate: Property<Framerate>,
 
-    /// Audio capture backend (default PipeWire).
+    /// Audio capture backend (default `PipeWire`).
     pub input: Property<InputMethod>,
 
     /// Audio source identifier ("auto" for auto-detect).
@@ -88,6 +88,7 @@ impl CavaService {
     }
 
     /// Creates a builder for customizing service configuration.
+    #[must_use]
     pub fn builder() -> CavaServiceBuilder {
         CavaServiceBuilder::new()
     }
@@ -203,7 +204,7 @@ impl CavaService {
     /// Updates the configuration and restarts the visualization service.
     ///
     /// # Errors
-    /// Returns error if low_cutoff is 0 or if service restart fails.
+    /// Returns error if `low_cutoff` is 0 or if service restart fails.
     pub async fn set_low_cutoff(&self, low_cutoff: u32) -> Result<(), Error> {
         if low_cutoff == 0 {
             return Err(Error::InvalidParameter(
@@ -219,7 +220,7 @@ impl CavaService {
     /// Updates the configuration and restarts the visualization service.
     ///
     /// # Errors
-    /// Returns error if high_cutoff is 0 or if service restart fails.
+    /// Returns error if `high_cutoff` is 0 or if service restart fails.
     pub async fn set_high_cutoff(&self, high_cutoff: u32) -> Result<(), Error> {
         if high_cutoff == 0 {
             return Err(Error::InvalidParameter(

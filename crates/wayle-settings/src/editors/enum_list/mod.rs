@@ -42,7 +42,7 @@ fn decode<E: for<'de> Deserialize<'de>>(value: &str) -> Option<E> {
 }
 
 fn value_at<E: EnumVariants + for<'de> Deserialize<'de>>(index: u32) -> Option<E> {
-    let variant = E::variants().get(index as usize)?;
+    let variant = E::variants().get(usize::try_from(index).ok()?)?;
     decode::<E>(variant.value)
 }
 
@@ -50,7 +50,8 @@ fn index_of<E: EnumVariants + PartialEq + for<'de> Deserialize<'de>>(value: &E) 
     E::variants()
         .iter()
         .position(|variant| decode::<E>(variant.value).as_ref() == Some(value))
-        .unwrap_or(0) as u32
+        .and_then(|index| u32::try_from(index).ok())
+        .unwrap_or(0)
 }
 
 struct State<E: EnumVariants + Clone + Send + Sync + PartialEq + 'static> {
@@ -129,12 +130,17 @@ where
     fn move_row(self: &Rc<Self>, dropdown: &gtk::DropDown, delta: i32) {
         let index = self.dropdowns.borrow().iter().position(|dd| dd == dropdown);
         let Some(index) = index else { return };
-        let target = index as i32 + delta;
+        let Some(target) = isize::try_from(delta)
+            .ok()
+            .and_then(|delta| index.checked_add_signed(delta))
+        else {
+            return;
+        };
         let mut values = self.collected();
-        if target < 0 || target as usize >= values.len() {
+        if target >= values.len() {
             return;
         }
-        values.swap(index, target as usize);
+        values.swap(index, target);
         self.property.set(values);
         self.rebuild();
     }

@@ -23,14 +23,14 @@ fn find_cpu_temperature(components: &Components, sensor: &str) -> Option<f32> {
         return components
             .iter()
             .find(|c| c.label().to_lowercase().contains(&sensor.to_lowercase()))
-            .and_then(|c| c.temperature());
+            .and_then(sysinfo::Component::temperature);
     }
 
     for pattern in CPU_TEMP_PATTERNS {
         if let Some(temp) = components
             .iter()
             .find(|c| c.label().to_lowercase().contains(pattern))
-            .and_then(|c| c.temperature())
+            .and_then(sysinfo::Component::temperature)
         {
             return Some(temp);
         }
@@ -52,11 +52,11 @@ pub(crate) fn spawn(
         loop {
             if !cpu.has_subscribers() {
                 tokio::select! {
-                    _ = token.cancelled() => {
+                    () = token.cancelled() => {
                         debug!("CPU polling cancelled");
                         return;
                     }
-                    _ = cpu.wait_for_subscribers() => {}
+                    () = cpu.wait_for_subscribers() => {}
                 }
                 ticker.reset();
             }
@@ -90,9 +90,9 @@ pub(crate) fn spawn(
                             .partial_cmp(&b.usage_percent)
                             .unwrap_or(std::cmp::Ordering::Equal)
                     })
-                    .map(|c| c.frequency_mhz)
-                    .unwrap_or(0);
-                (sum / cores.len() as u64, max, busiest)
+                    .map_or(0, |c| c.frequency_mhz);
+                let count = u64::try_from(cores.len()).unwrap_or(u64::MAX);
+                (sum.checked_div(count).unwrap_or(0), max, busiest)
             };
 
             let temperature = find_cpu_temperature(&components, &temp_sensor);
@@ -107,7 +107,7 @@ pub(crate) fn spawn(
             });
 
             tokio::select! {
-                _ = token.cancelled() => {
+                () = token.cancelled() => {
                     debug!("CPU polling cancelled");
                     return;
                 }

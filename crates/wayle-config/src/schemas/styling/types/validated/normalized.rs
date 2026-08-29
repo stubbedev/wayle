@@ -26,13 +26,13 @@ impl NormalizedF64 {
 
     /// Creates a normalized value, clamping to 0.0-1.0.
     #[must_use]
-    pub fn new(value: f64) -> Self {
+    pub const fn new(value: f64) -> Self {
         Self(value.clamp(Self::MIN, Self::MAX))
     }
 
     /// The raw `f64`.
     #[must_use]
-    pub fn value(self) -> f64 {
+    pub const fn value(self) -> f64 {
         self.0
     }
 }

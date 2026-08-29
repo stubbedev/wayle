@@ -82,7 +82,7 @@ impl SimpleComponent for MainSection {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let has_output = !init.audio.output_devices.get().is_empty();

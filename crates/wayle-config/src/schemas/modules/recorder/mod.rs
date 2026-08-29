@@ -12,7 +12,7 @@ use crate::{
     schemas::styling::{ColorValue, CssToken, Percentage},
 };
 
-/// Native screen recorder backed by a GStreamer pipeline.
+/// Native screen recorder backed by a `GStreamer` pipeline.
 ///
 /// Click the bar button to start/stop; the dropdown exposes the recording
 /// options below. Controllable from the CLI / RPC socket:
@@ -191,7 +191,7 @@ impl ModuleInfoProvider for RecorderConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("recorder"),
-            schema: || schema_for!(RecorderConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("recorder")),
             array_entry: false,
         }

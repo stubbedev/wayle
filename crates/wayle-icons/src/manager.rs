@@ -37,12 +37,14 @@ pub struct InstallFailure {
 
 impl InstallResult {
     /// Returns true if all icons were installed successfully.
-    pub fn all_succeeded(&self) -> bool {
+    #[must_use]
+    pub const fn all_succeeded(&self) -> bool {
         self.failed.is_empty()
     }
 
     /// Returns true if no icons were installed.
-    pub fn all_failed(&self) -> bool {
+    #[must_use]
+    pub const fn all_failed(&self) -> bool {
         self.installed.is_empty()
     }
 }
@@ -73,6 +75,7 @@ impl IconManager {
     /// Creates a manager with a custom registry.
     ///
     /// Useful for testing or custom configurations.
+    #[must_use]
     pub fn with_registry(registry: IconRegistry) -> Self {
         Self {
             registry,
@@ -81,7 +84,8 @@ impl IconManager {
     }
 
     /// Returns the registry used by this manager.
-    pub fn registry(&self) -> &IconRegistry {
+    #[must_use]
+    pub const fn registry(&self) -> &IconRegistry {
         &self.registry
     }
 
@@ -91,7 +95,7 @@ impl IconManager {
     ///
     /// # Arguments
     ///
-    /// * `source` - The icon source (Tabler, SimpleIcons, etc.)
+    /// * `source` - The icon source (Tabler, `SimpleIcons`, etc.)
     /// * `slugs` - Icon identifiers to install (e.g., "home", "settings")
     ///
     /// # Errors
@@ -214,6 +218,7 @@ impl IconManager {
     /// Lists all installed icons.
     ///
     /// Returns icon names without the `.svg` extension.
+    #[must_use]
     pub fn list(&self) -> Vec<String> {
         let mut dirs = vec![self.registry.icons_dir()];
 
@@ -251,6 +256,7 @@ impl IconManager {
     /// # Arguments
     ///
     /// * `icon_name` - Full icon name including prefix (e.g., "tb-home")
+    #[must_use]
     pub fn is_installed(&self, icon_name: &str) -> bool {
         self.registry
             .icons_dir()
@@ -336,7 +342,7 @@ impl IconManager {
         let mut result = InstallResult::default();
         let prefixes = sources::all_prefixes();
 
-        for entry in entries.filter_map(|e| e.ok()) {
+        for entry in entries.filter_map(std::result::Result::ok) {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "svg") {
                 match self.import_single_file(&path, &icons_dir, &prefixes) {

@@ -21,6 +21,10 @@ pub struct LiveDeviceParams<'a> {
     pub cancellation_token: &'a CancellationToken,
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors UPower device property set"
+)]
 pub(crate) struct DeviceProps {
     pub native_path: String,
     pub vendor: String,

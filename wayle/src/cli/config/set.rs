@@ -8,7 +8,7 @@ use crate::{
 /// # Errors
 /// Returns error if config loading fails, value parsing fails, or path cannot be set.
 pub async fn execute(path: String, value: String) -> CliAction {
-    let config_service = ConfigService::load()
+    let config_service = Box::pin(ConfigService::load())
         .await
         .map_err(|e| format!("Failed to load config: {e}"))?;
 
@@ -35,10 +35,12 @@ pub async fn execute(path: String, value: String) -> CliAction {
 fn parse_toml_value(value: &str) -> Result<toml::Value, String> {
     let toml_container = format!("value = {value}");
 
-    match toml::from_str::<toml::Table>(&toml_container) {
-        Ok(mut table) => table
-            .remove("value")
-            .ok_or_else(|| String::from("Failed to parse value")),
-        Err(_) => Ok(toml::Value::String(value.to_string())),
-    }
+    toml::from_str::<toml::Table>(&toml_container).map_or_else(
+        |_| Ok(toml::Value::String(value.to_string())),
+        |mut table| {
+            table
+                .remove("value")
+                .ok_or_else(|| String::from("Failed to parse value"))
+        },
+    )
 }

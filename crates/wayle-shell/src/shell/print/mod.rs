@@ -259,7 +259,7 @@ impl Component for Print {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = Print {
+        let model = Self {
             config: init,
             printers: Vec::new(),
             tokens: HashMap::new(),
@@ -345,12 +345,9 @@ impl Component for Print {
                 reply,
             } => {
                 let job = self.tokens.remove(&token);
-                let _ = reply.send(match job {
-                    Some(job) => spool(&title, document, &job),
-                    None => {
-                        warn!(token, "print: no prepared printer for token");
-                        false
-                    }
+                let _ = reply.send(if let Some(job) = job { spool(&title, document, &job) } else {
+                    warn!(token, "print: no prepared printer for token");
+                    false
                 });
             }
         }

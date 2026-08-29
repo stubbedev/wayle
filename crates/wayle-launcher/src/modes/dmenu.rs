@@ -38,7 +38,7 @@ pub struct DmenuMode {
 impl DmenuMode {
     /// Create the mode over the CLI's row stream.
     #[must_use]
-    pub fn new(config: DmenuConfig, rows: mpsc::Receiver<Vec<String>>) -> Self {
+    pub const fn new(config: DmenuConfig, rows: mpsc::Receiver<Vec<String>>) -> Self {
         Self {
             config,
             rows: Some(rows),
@@ -55,7 +55,7 @@ impl DmenuMode {
 
 #[async_trait]
 impl Mode for DmenuMode {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "dmenu"
     }
 

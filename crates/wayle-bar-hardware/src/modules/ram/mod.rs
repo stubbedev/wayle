@@ -42,7 +42,7 @@ impl Component for RamModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();
@@ -53,7 +53,7 @@ impl Component for RamModule {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: ram_config.icon_name.get().clone(),
+                icon: ram_config.icon_name.get(),
                 label: initial_label,
                 tooltip: None,
                 colors: BarButtonColors {

@@ -19,6 +19,7 @@ type DeviceMap = HashMap<DeviceName, Arc<BacklightDevice>>;
 impl ServiceMonitoring for BrightnessService {
     type Error = Error;
 
+    #[expect(clippy::unused_async, reason = "trait signature")]
     async fn start_monitoring(&self) -> Result<(), Self::Error> {
         let mut event_rx = self.event_tx.subscribe();
 
@@ -32,7 +33,7 @@ impl ServiceMonitoring for BrightnessService {
 
             loop {
                 tokio::select! {
-                    _ = cancellation_token.cancelled() => {
+                    () = cancellation_token.cancelled() => {
                         info!("brightness monitoring stopped");
                         return;
                     }

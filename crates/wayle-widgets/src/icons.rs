@@ -1,4 +1,4 @@
-//! Icon theme utilities with cached IconTheme reference.
+//! Icon theme utilities with cached `IconTheme` reference.
 
 use std::cell::OnceCell;
 
@@ -20,6 +20,7 @@ fn with_icon_theme<R>(f: impl FnOnce(&IconTheme) -> R) -> R {
 }
 
 /// Checks if an icon exists in the current icon theme.
+#[must_use]
 pub fn icon_exists(name: &str) -> bool {
     with_icon_theme(|theme| theme.has_icon(name))
 }

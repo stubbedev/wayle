@@ -10,7 +10,7 @@ use crate::{
     service::{WeatherService, WeatherStatus},
 };
 
-const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(30 * 60);
+const DEFAULT_POLL_INTERVAL: Duration = Duration::from_mins(30);
 
 /// Builder for configuring a [`WeatherService`].
 pub struct WeatherServiceBuilder {
@@ -26,6 +26,7 @@ impl WeatherServiceBuilder {
     /// Creates a new builder with default configuration.
     ///
     /// Defaults to Open-Meteo provider with 30-minute polling interval.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             poll_interval: DEFAULT_POLL_INTERVAL,
@@ -38,36 +39,42 @@ impl WeatherServiceBuilder {
     }
 
     /// Sets the polling interval for weather updates.
-    pub fn poll_interval(mut self, interval: Duration) -> Self {
+    #[must_use]
+    pub const fn poll_interval(mut self, interval: Duration) -> Self {
         self.poll_interval = interval;
         self
     }
 
     /// Sets the weather provider to use.
-    pub fn provider(mut self, kind: WeatherProviderKind) -> Self {
+    #[must_use]
+    pub const fn provider(mut self, kind: WeatherProviderKind) -> Self {
         self.provider_kind = kind;
         self
     }
 
     /// Sets the location for weather data.
+    #[must_use]
     pub fn location(mut self, location: LocationQuery) -> Self {
         self.location = location;
         self
     }
 
     /// Sets the temperature unit for display.
-    pub fn units(mut self, units: TemperatureUnit) -> Self {
+    #[must_use]
+    pub const fn units(mut self, units: TemperatureUnit) -> Self {
         self.units = units;
         self
     }
 
     /// Sets the Visual Crossing API key.
+    #[must_use]
     pub fn visual_crossing_key(mut self, key: impl Into<String>) -> Self {
         self.visual_crossing_key = Some(key.into());
         self
     }
 
     /// Sets the WeatherAPI.com API key.
+    #[must_use]
     pub fn weatherapi_key(mut self, key: impl Into<String>) -> Self {
         self.weatherapi_key = Some(key.into());
         self

@@ -28,7 +28,8 @@ pub enum TextSizeClass {
 
 impl TextSizeClass {
     /// CSS class for font sizing (e.g., `text-md`).
-    pub fn css_class(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::Xs => "text-xs",
             Self::Sm => "text-sm",
@@ -59,7 +60,8 @@ pub enum FontWeightClass {
 
 impl FontWeightClass {
     /// CSS class for font weight (e.g., `weight-medium`).
-    pub fn css_class(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::Normal => "weight-normal",
             Self::Medium => "weight-medium",
@@ -69,7 +71,8 @@ impl FontWeightClass {
     }
 
     /// CSS variable name (e.g., `--weight-medium`).
-    pub fn css_var(self) -> &'static str {
+    #[must_use]
+    pub const fn css_var(self) -> &'static str {
         match self {
             Self::Normal => "--weight-normal",
             Self::Medium => "--weight-medium",

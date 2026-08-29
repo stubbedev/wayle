@@ -17,7 +17,7 @@ pub struct NiriKeyboardLayoutSource {
 }
 
 impl NiriKeyboardLayoutSource {
-    pub fn new(service: Arc<NiriService>) -> Self {
+    pub const fn new(service: Arc<NiriService>) -> Self {
         Self { service }
     }
 }
@@ -31,7 +31,11 @@ impl KeyboardLayoutSource for NiriKeyboardLayoutSource {
         let service = Arc::clone(&self.service);
         let initial = current_layout_from(&service);
         let updates = service.events().filter_map(move |event| {
-            let layout = translate_event(&service, event);
+            let relevant = matches!(
+                event,
+                Event::KeyboardLayoutsChanged { .. } | Event::KeyboardLayoutSwitched { .. }
+            );
+            let layout = relevant.then(|| current_layout_from(&service));
             async move { layout }
         });
 
@@ -39,17 +43,8 @@ impl KeyboardLayoutSource for NiriKeyboardLayoutSource {
     }
 }
 
-fn translate_event(service: &NiriService, event: Event) -> Option<Option<CurrentLayout>> {
-    match event {
-        Event::KeyboardLayoutsChanged { .. } | Event::KeyboardLayoutSwitched { .. } => {
-            Some(current_layout_from(service))
-        }
-        _ => None,
-    }
-}
-
 fn current_layout_from(service: &NiriService) -> Option<CurrentLayout> {
     let layouts = service.keyboard_layouts.get()?;
-    let label = layouts.names.get(layouts.current_idx as usize)?.clone();
+    let label = layouts.names.get(usize::from(layouts.current_idx))?.clone();
     Some(CurrentLayout { label })
 }

@@ -5,9 +5,9 @@ use crate::{Error, HyprlandEvent, Result};
 pub(crate) fn handle_focused_mon(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
-    let monitor_data: Vec<&str> = data.split(",").collect();
+    let monitor_data: Vec<&str> = data.split(',').collect();
     let [name, workspace] = monitor_data.as_slice() else {
         return Err(Error::EventParseError {
             event_data: format!("{event}>>{data}"),
@@ -28,7 +28,7 @@ pub(crate) fn handle_focused_mon(
 pub(crate) fn handle_focused_mon_v2(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let event_data = format!("{event}>>{data}");
     let Some((name, workspace_id)) = data.split_once(',') else {
@@ -48,17 +48,20 @@ pub(crate) fn handle_focused_mon_v2(
 
     let monitor_name = name.to_string();
     hyprland_tx.send(HyprlandEvent::FocusedMonV2 {
-        name: monitor_name.clone(),
+        name: monitor_name,
         workspace_id,
     })?;
 
     Ok(())
 }
 
-pub(crate) fn handle_monitor_removed(data: &str, hyprland_tx: Sender<HyprlandEvent>) -> Result<()> {
+pub(crate) fn handle_monitor_removed(
+    data: &str,
+    hyprland_tx: &Sender<HyprlandEvent>,
+) -> Result<()> {
     let monitor_name = data.to_string();
     hyprland_tx.send(HyprlandEvent::MonitorRemoved {
-        name: monitor_name.clone(),
+        name: monitor_name,
     })?;
 
     Ok(())
@@ -67,7 +70,7 @@ pub(crate) fn handle_monitor_removed(data: &str, hyprland_tx: Sender<HyprlandEve
 pub(crate) fn handle_monitor_removed_v2(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let event_data = format!("{event}>>{data}");
     let parts: Vec<&str> = data.split(',').collect();
@@ -89,14 +92,14 @@ pub(crate) fn handle_monitor_removed_v2(
     let monitor_name = (*name).to_string();
     hyprland_tx.send(HyprlandEvent::MonitorRemovedV2 {
         id,
-        name: monitor_name.clone(),
+        name: monitor_name,
         description: (*description).to_string(),
     })?;
 
     Ok(())
 }
 
-pub(crate) fn handle_monitor_added(data: &str, hyprland_tx: Sender<HyprlandEvent>) -> Result<()> {
+pub(crate) fn handle_monitor_added(data: &str, hyprland_tx: &Sender<HyprlandEvent>) -> Result<()> {
     let monitor_name = data.to_string();
     hyprland_tx.send(HyprlandEvent::MonitorAdded { name: monitor_name })?;
 
@@ -106,7 +109,7 @@ pub(crate) fn handle_monitor_added(data: &str, hyprland_tx: Sender<HyprlandEvent
 pub(crate) fn handle_monitor_added_v2(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let event_data = format!("{event}>>{data}");
     let parts: Vec<&str> = data.split(',').collect();
@@ -128,7 +131,7 @@ pub(crate) fn handle_monitor_added_v2(
     let monitor_name = (*name).to_string();
     hyprland_tx.send(HyprlandEvent::MonitorAddedV2 {
         id,
-        name: monitor_name.clone(),
+        name: monitor_name,
         description: (*description).to_string(),
     })?;
 

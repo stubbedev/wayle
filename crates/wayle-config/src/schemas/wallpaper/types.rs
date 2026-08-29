@@ -53,7 +53,7 @@ impl CyclingInterval {
 
     /// Returns the inner u64 value.
     #[must_use]
-    pub fn value(self) -> u64 {
+    pub const fn value(self) -> u64 {
         self.0
     }
 }

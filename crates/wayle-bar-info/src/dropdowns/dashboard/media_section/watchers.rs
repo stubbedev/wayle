@@ -8,7 +8,7 @@ use wayle_widgets::{watch, watch_cancellable};
 
 use super::{MediaSection, messages::MediaSectionCmd};
 
-pub fn spawn(sender: &ComponentSender<MediaSection>, media: &Option<Arc<MediaService>>) {
+pub fn spawn(sender: &ComponentSender<MediaSection>, media: Option<&Arc<MediaService>>) {
     let Some(media) = media else {
         return;
     };
@@ -65,7 +65,7 @@ pub fn spawn_player_watchers(
         loop {
             tokio::select! {
                 () = &mut shutdown_fut => break,
-                _ = token.cancelled() => break,
+                () = token.cancelled() => break,
                 Some(position) = stream.next() => {
                     let _ = out.send(MediaSectionCmd::PositionTick(position));
                 }

@@ -46,7 +46,7 @@ pub async fn execute(allow_token: bool) -> i32 {
         Err(err) => {
             eprintln!(
                 "{}",
-                dbus::format_error("SharePicker", "open share picker", err)
+                dbus::format_error("SharePicker", "open share picker", &err)
             );
             1
         }

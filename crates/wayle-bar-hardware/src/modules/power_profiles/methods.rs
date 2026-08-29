@@ -9,11 +9,11 @@ use wayle_widgets::prelude::BarButtonInput;
 use super::{PowerProfilesModule, helpers, messages::PowerProfilesCmd};
 
 impl PowerProfilesModule {
+    #[must_use]
     pub fn active_profile(&self) -> PowerProfile {
         self.power_profiles
             .get()
-            .map(|s| s.power_profiles.active_profile.get())
-            .unwrap_or(PowerProfile::Balanced)
+            .map_or(PowerProfile::Balanced, |s| s.power_profiles.active_profile.get())
     }
 
     pub fn update_display(&self, config: &PowerProfilesConfig) {

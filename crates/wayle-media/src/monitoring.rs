@@ -110,7 +110,7 @@ fn spawn_name_monitoring(ctx: &MonitoringContext<'_>) {
 
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("MprisMonitoring received cancellation signal, stopping all discovery");
                     return;
                 }

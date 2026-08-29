@@ -88,7 +88,7 @@ async fn monitor_devices(
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("Bluetooth 'devices' monitoring cancelled");
                     return;
                 }
@@ -159,7 +159,7 @@ async fn monitor_adapters(
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("Bluetooth 'adapter' monitoring cancelled");
                     return;
                 }
@@ -209,7 +209,7 @@ async fn monitor_primary_adapter(
         let mut adapters_stream = adapters_prop.watch();
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("Bluetooth 'primary_adapter' monitoring cancelled");
                     return;
                 }
@@ -278,7 +278,7 @@ async fn monitor_enabled(
 
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("Bluetooth 'enabled' monitor cancelled");
                     return;
                 }
@@ -316,7 +316,7 @@ async fn monitor_available(
 
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("Bluetooth 'available' monitor cancelled");
                     return;
                 }
@@ -342,7 +342,7 @@ async fn monitor_connected(
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("Bluetooth 'connected' monitor cancelled");
                     return;
                 }

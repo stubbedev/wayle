@@ -48,9 +48,11 @@ fn schedule_removal(
 
     let stack = stack.clone();
     let old_widget = old.widget().clone();
-    let delay_ms = stack.transition_duration() + TRANSITION_CLEANUP_BUFFER_MS;
+    let delay_ms = stack
+        .transition_duration()
+        .saturating_add(TRANSITION_CLEANUP_BUFFER_MS);
 
-    glib::timeout_add_local_once(Duration::from_millis(delay_ms as u64), move || {
+    glib::timeout_add_local_once(Duration::from_millis(u64::from(delay_ms)), move || {
         stack.remove(&old_widget);
         drop(old);
     });

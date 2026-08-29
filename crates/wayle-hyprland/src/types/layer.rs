@@ -8,7 +8,7 @@ use serde::Deserialize;
 use crate::{Address, ProcessId};
 
 /// Layer surface level in the compositor stack.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LayerLevel {
     /// Background layer (lowest).
     Background = 0,

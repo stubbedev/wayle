@@ -13,7 +13,7 @@ pub async fn stop() -> CliAction {
     proxy
         .stop_cycling()
         .await
-        .map_err(|e| format_error("stop cycling", e))?;
+        .map_err(|e| format_error("stop cycling", &e))?;
 
     println!("Wallpaper cycling stopped");
     Ok(())
@@ -29,7 +29,7 @@ pub async fn next() -> CliAction {
     proxy
         .next()
         .await
-        .map_err(|e| format_error("advance wallpaper", e))?;
+        .map_err(|e| format_error("advance wallpaper", &e))?;
 
     println!("Advanced to next wallpaper");
     Ok(())
@@ -45,7 +45,7 @@ pub async fn previous() -> CliAction {
     proxy
         .previous()
         .await
-        .map_err(|e| format_error("go to previous wallpaper", e))?;
+        .map_err(|e| format_error("go to previous wallpaper", &e))?;
 
     println!("Went back to previous wallpaper");
     Ok(())

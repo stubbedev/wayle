@@ -1,4 +1,4 @@
-//! Battery monitoring via UPower D-Bus interface.
+//! Battery monitoring via `UPower` D-Bus interface.
 //!
 //! # Quick Start
 //!
@@ -37,9 +37,9 @@
 //! # }
 //! ```
 //!
-//! # DisplayDevice vs Specific Devices
+//! # `DisplayDevice` vs Specific Devices
 //!
-//! By default, [`BatteryService::new`] monitors UPower's DisplayDevice - a composite
+//! By default, [`BatteryService::new`] monitors `UPower`'s `DisplayDevice` - a composite
 //! that aggregates all batteries. For specific device monitoring:
 //!
 //! ```rust,no_run
@@ -58,7 +58,7 @@
 //!
 //! # Control Methods
 //!
-//! The [`Device`](core::device::Device) type exposes UPower operations:
+//! The [`Device`](core::device::Device) type exposes `UPower` operations:
 //! - [`refresh`](core::device::Device::refresh) - Force data refresh from hardware
 //! - [`get_history`](core::device::Device::get_history) - Historical charge/rate data
 //! - [`get_statistics`](core::device::Device::get_statistics) - Charge/discharge statistics

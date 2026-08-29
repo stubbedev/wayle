@@ -68,7 +68,7 @@ impl ModuleInfoProvider for OsdConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("osd"),
-            schema: || schema_for!(OsdConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

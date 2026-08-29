@@ -180,7 +180,7 @@ impl MediaDaemon {
 
     /// Lists all available media players.
     ///
-    /// Returns a list of tuples: (player_id, identity, playback_state).
+    /// Returns a list of tuples: (`player_id`, identity, `playback_state`).
     #[instrument(skip(self))]
     pub async fn list_players(&self) -> Vec<(String, String, String)> {
         self.service

@@ -42,7 +42,7 @@ enum SunTimes {
 /// UTC sunrise/sunset for the calendar date of `now`.
 fn sun_times(now: DateTime<Utc>, latitude: f64, longitude: f64) -> SunTimes {
     // Julian day number (integer, at noon) for the date of `now`.
-    let jdn = now.date_naive().num_days_from_ce() as f64 + 1_721_425.0;
+    let jdn = f64::from(now.date_naive().num_days_from_ce()) + 1_721_425.0;
 
     // Days since J2000, with leap-second fudge. l_w is longitude WEST.
     let l_w = -longitude;
@@ -52,18 +52,18 @@ fn sun_times(now: DateTime<Utc>, latitude: f64, longitude: f64) -> SunTimes {
     let j_star = n - l_w / 360.0;
 
     // Solar mean anomaly (degrees).
-    let m = (357.5291 + 0.985_600_28 * j_star).rem_euclid(360.0);
+    let m = 0.985_600_28f64.mul_add(j_star, 357.5291).rem_euclid(360.0);
     let m_rad = m.to_radians();
 
     // Equation of the center (degrees).
-    let c = 1.9148 * m_rad.sin() + 0.0200 * (2.0 * m_rad).sin() + 0.0003 * (3.0 * m_rad).sin();
+    let c = 0.0003f64.mul_add((3.0 * m_rad).sin(), 0.0200f64.mul_add((2.0 * m_rad).sin(), 1.9148 * m_rad.sin()));
 
     // Ecliptic longitude (degrees).
     let lambda = (m + c + 180.0 + 102.9372).rem_euclid(360.0);
     let lambda_rad = lambda.to_radians();
 
     // Solar transit (Julian date of solar noon).
-    let j_transit = 2_451_545.0 + j_star + 0.0053 * m_rad.sin() - 0.0069 * (2.0 * lambda_rad).sin();
+    let j_transit = 0.0069f64.mul_add(-(2.0 * lambda_rad).sin(), 0.0053f64.mul_add(m_rad.sin(), 2_451_545.0 + j_star));
 
     // Sun declination.
     let sin_decl = lambda_rad.sin() * 23.4397_f64.to_radians().sin();
@@ -71,7 +71,7 @@ fn sun_times(now: DateTime<Utc>, latitude: f64, longitude: f64) -> SunTimes {
 
     // Hour angle (with -0.833° for refraction + solar disc radius).
     let lat_rad = latitude.to_radians();
-    let cos_omega = ((-0.833_f64).to_radians().sin() - lat_rad.sin() * decl.sin())
+    let cos_omega = lat_rad.sin().mul_add(-decl.sin(), (-0.833_f64).to_radians().sin())
         / (lat_rad.cos() * decl.cos());
 
     if cos_omega < -1.0 {
@@ -96,6 +96,11 @@ fn sun_times(now: DateTime<Utc>, latitude: f64, longitude: f64) -> SunTimes {
 /// Convert a Julian Date to a UTC instant.
 fn julian_to_utc(jd: f64) -> Option<DateTime<Utc>> {
     let unix_secs = (jd - 2_440_587.5) * 86_400.0;
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "rounded unix timestamp fits in i64"
+    )]
     DateTime::from_timestamp(unix_secs.round() as i64, 0)
 }
 

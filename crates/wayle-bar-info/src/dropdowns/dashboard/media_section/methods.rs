@@ -15,13 +15,15 @@ impl MediaSection {
     }
 
     pub fn update_artwork_css(&self) {
-        let css = match self.cover_art.as_deref() {
-            Some(path) => format!(
-                ".{} {{ background-image: url(\"file://{path}\"); }}",
-                self.art_css_class
-            ),
-            None => format!(".{} {{ background-image: none; }}", self.art_css_class),
-        };
+        let css = self.cover_art.as_deref().map_or_else(
+            || format!(".{} {{ background-image: none; }}", self.art_css_class),
+            |path| {
+                format!(
+                    ".{} {{ background-image: url(\"file://{path}\"); }}",
+                    self.art_css_class
+                )
+            },
+        );
         self.art_css_provider.load_from_string(&css);
     }
 
@@ -114,8 +116,14 @@ impl MediaSection {
                 .position(|player| player.id == current_player.id)
                 .unwrap_or(0);
 
-            let next_index = (current_index + 1) % players.len();
-            let next_player_id = players[next_index].id.clone();
+            let next_index = current_index
+                .saturating_add(1)
+                .checked_rem(players.len())
+                .unwrap_or(0);
+            let Some(next_player_id) = players.get(next_index).map(|player| player.id.clone())
+            else {
+                return MediaSectionCmd::PlayerChanged;
+            };
 
             if let Err(err) = media.set_active_player(Some(next_player_id)).await {
                 warn!(error = %err, "switch player failed");

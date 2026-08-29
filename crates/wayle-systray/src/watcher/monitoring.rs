@@ -47,7 +47,7 @@ async fn monitor_name_owner_changes(watcher: &StatusNotifierWatcher) -> Result<(
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     return;
                 }
                 Some(signal) = name_owner_changed.next() => {
@@ -150,7 +150,7 @@ pub(crate) async fn unregister_host(
             .await
             .unwrap_or_else(|error| {
                 error!(error = %error, host = %host, "cannot emit unregistered signal for host");
-            })
+            });
     }
 
     Ok(())

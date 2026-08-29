@@ -13,7 +13,7 @@ pub async fn set_theming_monitor(monitor: String) -> CliAction {
     proxy
         .set_theming_monitor(monitor.clone())
         .await
-        .map_err(|e| format_error("set theming monitor", e))?;
+        .map_err(|e| format_error("set theming monitor", &e))?;
 
     if monitor.is_empty() {
         println!("Theming monitor: default");

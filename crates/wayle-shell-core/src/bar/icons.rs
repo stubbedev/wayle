@@ -28,11 +28,12 @@ fn compiled_map() -> &'static [CompiledEntry] {
 }
 
 /// TODO: Replace all generic glob patterns with specific classes (*code* -> code).
+///
 /// This requires launching each application individually and looking at its
 /// window class. If you use one of these applications - please contribute a patch.
 ///
 /// This is a problem, because `*tor*` (instead of `Tor Browser`) also matched something like
-/// `qbit*tor*rent`. The same thing with VSCode's `code`.
+/// `qbit*tor*rent`. The same thing with `VSCode`'s `code`.
 pub const DEFAULT_APP_ICON_MAP: &[(&str, &str)] = &[
     // Browsers
     ("brave-browser", "si-brave-symbolic"),
@@ -262,6 +263,7 @@ pub const DEFAULT_APP_ICON_MAP: &[(&str, &str)] = &[
 ];
 
 /// Matches text against a glob pattern (case-insensitive).
+#[must_use]
 pub fn matches_glob(text: &str, pattern: &str) -> bool {
     let text_lower = text.to_lowercase();
 
@@ -270,11 +272,11 @@ pub fn matches_glob(text: &str, pattern: &str) -> bool {
     }
 
     Pattern::new(pattern)
-        .map(|compiled| compiled.matches(&text_lower))
-        .unwrap_or(false)
+        .is_ok_and(|compiled| compiled.matches(&text_lower))
 }
 
 /// Looks up an icon from the default app icon map by matching against the given name.
+#[must_use]
 pub fn lookup_app_icon(name: &str) -> Option<&'static str> {
     let name_lower = name.to_lowercase();
 

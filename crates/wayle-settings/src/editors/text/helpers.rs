@@ -17,7 +17,7 @@ impl TextLike for Size {
     }
 
     fn from_entry_text(text: &str) -> Self {
-        Size::parse(text).unwrap_or_default()
+        Self::parse(text).unwrap_or_default()
     }
 }
 

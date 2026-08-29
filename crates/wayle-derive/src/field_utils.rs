@@ -115,7 +115,7 @@ fn field_ident_string(field: &Field) -> String {
     field
         .ident
         .as_ref()
-        .map(|ident| ident.to_string())
+        .map(std::string::ToString::to_string)
         .unwrap_or_default()
 }
 

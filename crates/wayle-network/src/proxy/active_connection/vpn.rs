@@ -1,4 +1,4 @@
-//! NetworkManager VPN Connection interface.
+//! `NetworkManager` VPN Connection interface.
 
 use zbus::proxy;
 

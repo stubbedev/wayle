@@ -65,7 +65,7 @@ async fn monitor(
         };
 
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("ActiveConnection monitoring cancelled for {}", active_connection.object_path);
                 return;
             }

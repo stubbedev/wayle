@@ -65,9 +65,8 @@ fn collect_partials_recursive(dir: &Path) -> Vec<PathBuf> {
 }
 
 fn collect_partials_inner(dir: &Path, partials: &mut Vec<PathBuf>) {
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(_) => return,
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
     };
 
     for entry in entries.filter_map(Result::ok) {
@@ -82,9 +81,12 @@ fn collect_partials_inner(dir: &Path, partials: &mut Vec<PathBuf>) {
 }
 
 fn is_partial(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|name| name.starts_with('_') && name.ends_with(".ftl"))
+    path.extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("ftl"))
+        && path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|name| name.starts_with('_'))
 }
 
 fn merge_partials(partials: &[PathBuf]) -> String {

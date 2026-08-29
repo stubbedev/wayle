@@ -103,7 +103,7 @@ impl PairingCard {
         }
     }
 
-    pub fn has_confirm_action(&self) -> bool {
+    pub const fn has_confirm_action(&self) -> bool {
         !matches!(
             self.variant,
             PairingVariant::DisplayPin | PairingVariant::DisplayPasskey | PairingVariant::None
@@ -132,7 +132,7 @@ impl PairingCard {
         }
     }
 
-    pub fn build_reject_output(&self) -> PairingCardOutput {
+    pub const fn build_reject_output(&self) -> PairingCardOutput {
         match self.variant {
             PairingVariant::RequestConfirmation => PairingCardOutput::PasskeyRejected,
             PairingVariant::RequestAuthorization => PairingCardOutput::AuthorizationRejected,
@@ -144,7 +144,7 @@ impl PairingCard {
     }
 }
 
-fn classify_key(key: gdk::Key) -> Option<PinKeyAction> {
+const fn classify_key(key: gdk::Key) -> Option<PinKeyAction> {
     match key {
         gdk::Key::_0 | gdk::Key::KP_0 => Some(PinKeyAction::Digit('0')),
         gdk::Key::_1 | gdk::Key::KP_1 => Some(PinKeyAction::Digit('1')),

@@ -11,7 +11,7 @@ pub async fn execute() -> CliAction {
     let players = proxy
         .list_players()
         .await
-        .map_err(|e| format_error("list players", e))?;
+        .map_err(|e| format_error("list players", &e))?;
 
     if players.is_empty() {
         println!("No media players found");
@@ -27,7 +27,13 @@ pub async fn execute() -> CliAction {
             _ => "Stopped",
         };
 
-        println!("  {}. {} ({}) [{}]", index + 1, identity, id, status);
+        println!(
+            "  {}. {} ({}) [{}]",
+            index.saturating_add(1),
+            identity,
+            id,
+            status
+        );
     }
 
     Ok(())

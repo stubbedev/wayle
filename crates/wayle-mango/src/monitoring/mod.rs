@@ -95,7 +95,7 @@ async fn watch_loop(
 ) {
     loop {
         tokio::select! {
-            _ = cancellation_token.cancelled() => return,
+            () = cancellation_token.cancelled() => return,
             next_line = stream.next_line() => match next_line {
                 Ok(Some(line)) => on_frame(&line),
                 Ok(None) => {

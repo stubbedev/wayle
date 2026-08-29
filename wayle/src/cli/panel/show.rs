@@ -8,7 +8,7 @@ pub async fn execute(monitor: Option<String>) -> CliAction {
     proxy
         .bar_show(monitor)
         .await
-        .map_err(|err| format_ipc_error("show bar", err))?;
+        .map_err(|err| format_ipc_error("show bar", &err))?;
 
     if monitor.is_empty() {
         println!("All bars shown");

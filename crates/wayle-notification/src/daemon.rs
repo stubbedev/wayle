@@ -109,7 +109,7 @@ impl NotificationDaemon {
         Ok(())
     }
 
-    pub async fn get_capabilities(&self) -> Vec<String> {
+    pub fn get_capabilities(&self) -> Vec<String> {
         vec![
             Capabilities::Body.to_string(),
             Capabilities::BodyMarkup.to_string(),
@@ -119,7 +119,7 @@ impl NotificationDaemon {
         ]
     }
 
-    pub async fn get_server_information(&self) -> (Name, Vendor, Version, SpecVersion) {
+    pub fn get_server_information(&self) -> (Name, Vendor, Version, SpecVersion) {
         let name = String::from("wayle");
         let vendor = String::from("jaskir");
         let version = String::from(env!("CARGO_PKG_VERSION"));
@@ -142,7 +142,7 @@ impl NotificationDaemon {
         let owned_by_caller = self
             .id_owners
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(&replaces_id)
             .is_some_and(|owner| owner == app_name);
 
@@ -163,7 +163,7 @@ impl NotificationDaemon {
         let mut owners = self
             .id_owners
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         owners.insert(id, app_name.to_owned());
     }
 
@@ -171,7 +171,7 @@ impl NotificationDaemon {
         let mut owners = self
             .id_owners
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         owners.remove(&id);
     }
 }

@@ -42,6 +42,7 @@ pub struct SysinfoService {
 
 impl SysinfoService {
     /// Returns a builder for configuring the service.
+    #[must_use]
     pub fn builder() -> SysinfoServiceBuilder {
         SysinfoServiceBuilder::new()
     }
@@ -59,7 +60,7 @@ impl SysinfoService {
     pub fn set_cpu_temp_sensor(&self, sensor: &str) {
         debug!(?sensor, "Updating CPU temperature sensor");
         if let Ok(mut guard) = self.cpu_temp_sensor.write() {
-            *guard = sensor.to_owned();
+            sensor.clone_into(&mut guard);
         }
         self.restart_cpu_polling();
     }

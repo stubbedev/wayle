@@ -22,7 +22,7 @@ use super::{
 };
 use crate::{styling::InlineStyling, utils::force_window_resize};
 
-/// Initialization data for BarButton.
+/// Initialization data for `BarButton`.
 #[derive(Debug, Clone)]
 pub struct BarButtonInit {
     /// Icon name (symbolic icon).
@@ -39,7 +39,7 @@ pub struct BarButtonInit {
     pub settings: BarSettings,
 }
 
-/// Input messages for BarButton.
+/// Input messages for `BarButton`.
 #[derive(Debug)]
 pub enum BarButtonInput {
     /// Update the icon.
@@ -183,7 +183,7 @@ impl Component for BarButton {
         let css_provider = gtk::CssProvider::new();
         let scroll_sensitivity = init.settings.scroll_sensitivity;
 
-        let model = BarButton {
+        let model = Self {
             icon: init.icon,
             label: init.label,
             tooltip: init.tooltip,
@@ -325,7 +325,11 @@ impl BarButton {
 
     fn max_width_chars(&self) -> i32 {
         let max = self.behavior.label_max_chars.get();
-        if max > 0 { max as i32 } else { -1 }
+        if max > 0 {
+            i32::try_from(max).unwrap_or(i32::MAX)
+        } else {
+            -1
+        }
     }
 
     /// Whether a label should render: the module asks for it AND the text is

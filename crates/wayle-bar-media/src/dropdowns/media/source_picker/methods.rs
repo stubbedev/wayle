@@ -7,11 +7,11 @@ use super::{SourcePicker, SourcePickerCmd, source_item::SourceItemInit};
 use crate::shell::bar::dropdowns::media::helpers;
 
 impl SourcePicker {
-    pub fn select_source(&self, index: usize, sender: &ComponentSender<SourcePicker>) {
+    pub fn select_source(&self, index: usize, sender: &ComponentSender<Self>) {
         let Some(player_id) = self
             .sources
             .get(index)
-            .map(|source_item| source_item.player_id())
+            .map(super::source_item::SourceItem::player_id)
         else {
             return;
         };

@@ -20,18 +20,18 @@ impl std::fmt::Display for MissingMonitoringComponent {
     }
 }
 
-/// PulseAudio service errors.
+/// `PulseAudio` service errors.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    /// Cannot create PulseAudio context.
+    /// Cannot create `PulseAudio` context.
     #[error("cannot create pulseaudio context")]
     ContextCreationFailed,
 
-    /// Cannot connect to PulseAudio server.
+    /// Cannot connect to `PulseAudio` server.
     #[error("cannot connect to pulseaudio server")]
     ConnectionFailed(#[source] libpulse_binding::error::PAErr),
 
-    /// PulseAudio context entered a failed state.
+    /// `PulseAudio` context entered a failed state.
     #[error("pulseaudio context entered failed state: {0:?}")]
     ContextStateFailed(ContextState),
 

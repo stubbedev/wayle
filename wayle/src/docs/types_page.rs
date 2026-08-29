@@ -14,6 +14,7 @@ use super::{registry::ModuleEntry, rustdoc};
 const TYPE_SECTION_DEPTH: usize = 2;
 
 /// Converts a CamelCase type name to a kebab-case anchor slug.
+#[must_use]
 pub fn type_slug(name: &str) -> String {
     let mut slug = String::with_capacity(name.len() + 4);
     for (index, character) in name.char_indices() {
@@ -65,11 +66,13 @@ pub fn collect_type_defs(modules: &[ModuleEntry]) -> BTreeMap<String, Value> {
 }
 
 /// Set of type names the generator will emit anchors for.
+#[must_use]
 pub fn known_type_names(defs: &BTreeMap<String, Value>) -> BTreeSet<String> {
     defs.keys().cloned().collect()
 }
 
 /// Full text of `config/types.md`.
+#[must_use]
 pub fn render_types_page(defs: &BTreeMap<String, Value>) -> String {
     let mut page = String::new();
 

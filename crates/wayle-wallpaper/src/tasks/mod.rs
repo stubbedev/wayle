@@ -19,6 +19,7 @@ use crate::{
 impl ServiceMonitoring for WallpaperService {
     type Error = Error;
 
+    #[expect(clippy::unused_async, reason = "trait signature")]
     async fn start_monitoring(&self) -> Result<(), Self::Error> {
         discover_initial_outputs(self);
         spawn_cycling_task(self);
@@ -76,7 +77,7 @@ async fn run_output_watcher(
 ) {
     loop {
         tokio::select! {
-            _ = cancellation.cancelled() => {
+            () = cancellation.cancelled() => {
                 info!("Output watcher cancelled");
                 return;
             }
@@ -107,7 +108,7 @@ pub(crate) fn spawn_color_extractor(service: Arc<WallpaperService>) {
 
         loop {
             tokio::select! {
-                _ = cancellation.cancelled() => {
+                () = cancellation.cancelled() => {
                     info!("Color extractor cancelled");
                     return;
                 }

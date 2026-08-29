@@ -59,7 +59,7 @@ impl RestartDelay {
 
     /// Returns the inner millisecond value.
     #[must_use]
-    pub fn value(self) -> u64 {
+    pub const fn value(self) -> u64 {
         self.0
     }
 }
@@ -104,7 +104,7 @@ impl<'de> Deserialize<'de> for RestartDelay {
 /// `icon-map`. Any field left unset falls back to the module's static color of
 /// the same name. Use the `"default"` key as a fallback state.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct StateColors {
     /// Icon foreground color for this state.

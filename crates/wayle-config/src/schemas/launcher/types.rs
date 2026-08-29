@@ -67,7 +67,7 @@ pub enum LauncherCase {
 pub enum LauncherDrunField {
     /// Localized Name.
     Name,
-    /// GenericName.
+    /// `GenericName`.
     Generic,
     /// Exec command line.
     Exec,

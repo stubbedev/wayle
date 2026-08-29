@@ -41,7 +41,7 @@ pub fn spawn(sender: &ComponentSender<Shell>, services: &ShellServices) {
         None => stream::pending().boxed(),
     };
 
-    let config_clone = config.clone();
+    let config_clone = config;
     watch!(sender,
         [
             palette_stream,

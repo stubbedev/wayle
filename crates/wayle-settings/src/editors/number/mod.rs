@@ -1,4 +1,4 @@
-//! SpinButton wired to a typed numeric property via caller-provided conversion functions.
+//! `SpinButton` wired to a typed numeric property via caller-provided conversion functions.
 
 mod row;
 use std::sync::Arc;

@@ -42,13 +42,9 @@ impl WeatherApi {
     fn location_query(location: &LocationQuery) -> String {
         match location {
             LocationQuery::Coordinates { lat, lon } => format!("{lat},{lon}"),
-            LocationQuery::City { name, country } => {
-                if let Some(country_code) = country {
-                    format!("{name},{country_code}")
-                } else {
-                    name.clone()
-                }
-            }
+            LocationQuery::City { name, country } => country
+                .as_ref()
+                .map_or_else(|| name.clone(), |country_code| format!("{name},{country_code}")),
         }
     }
 }

@@ -25,7 +25,7 @@ use crate::{
     },
 };
 
-/// Bluetooth device from BlueZ.
+/// Bluetooth device from `BlueZ`.
 ///
 /// Instances from service fields are **live** and auto-update.
 /// Instances from [`BluetoothService::device()`](crate::BluetoothService::device) are **snapshots**.
@@ -101,7 +101,7 @@ pub struct Device {
 
     /// Indicates if the remote device is currently connected.
     ///
-    /// A PropertiesChanged signal indicate changes to this status.
+    /// A `PropertiesChanged` signal indicate changes to this status.
     pub connected: Property<bool>,
 
     /// Indicates if the remote is seen as trusted.
@@ -144,7 +144,7 @@ pub struct Device {
     /// Set to true if the device was cable paired and it doesn't support the canonical
     /// bonding with encryption, e.g. the Sixaxis gamepad.
     ///
-    /// If true, BlueZ will establish a connection without enforcing encryption.
+    /// If true, `BlueZ` will establish a connection without enforcing encryption.
     pub cable_pairing: Property<bool>,
 
     /// Remote Device ID information in modalias format used by the kernel and udev.
@@ -181,7 +181,7 @@ pub struct Device {
     ///
     /// - byte Rank: Rank of the device in the Set.
     ///
-    /// (BlueZ experimental)
+    /// (`BlueZ` experimental)
     pub sets: Property<Vec<DeviceSet>>,
 
     /// Indicate the preferred bearer when initiating a connection, only available for
@@ -192,7 +192,7 @@ pub struct Device {
     ///
     /// Note: Changes only take effect when the device is disconnected.
     ///
-    /// (BlueZ experimental)
+    /// (`BlueZ` experimental)
     pub preferred_bearer: Property<Option<PreferredBearer>>,
 }
 
@@ -256,7 +256,7 @@ impl Device {
     ///    and check latest seen bearer.
     ///
     /// 3. Connect last used bearer, in case the timestamps are the same BR/EDR
-    ///    takes precedence, or in case PreferredBearer has been set to a specific
+    ///    takes precedence, or in case `PreferredBearer` has been set to a specific
     ///    bearer then that is used instead.
     ///
     /// # Errors
@@ -364,7 +364,7 @@ impl Device {
     /// General applications should instead use the Profile API for services-related
     /// functionality.
     ///
-    /// (BlueZ experimental)
+    /// (`BlueZ` experimental)
     ///
     /// # Errors
     ///
@@ -421,7 +421,7 @@ impl Device {
     ///
     /// Note: Changes only take effect when the device is disconnected.
     ///
-    /// (BlueZ experimental)
+    /// (`BlueZ` experimental)
     ///
     /// # Errors
     /// Returns error if D-Bus operation fails or device is not available.

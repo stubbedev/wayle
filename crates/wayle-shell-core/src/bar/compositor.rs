@@ -9,7 +9,7 @@ pub enum Compositor {
     Hyprland,
     /// niri compositor.
     Niri,
-    /// MangoWM compositor.
+    /// `MangoWM` compositor.
     Mango,
     /// sway compositor.
     Sway,
@@ -19,6 +19,7 @@ pub enum Compositor {
 
 impl Compositor {
     /// Detects the running Wayland compositor.
+    #[must_use]
     pub fn detect() -> Self {
         if env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok() {
             return Self::Hyprland;

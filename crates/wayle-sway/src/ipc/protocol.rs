@@ -48,7 +48,7 @@ impl EventKind {
     /// Decodes the event category from a raw message type with the event bit
     /// set. The low bits select the event: workspace = 0, window = 3,
     /// input = 21.
-    fn from_raw(raw_type: u32) -> Self {
+    const fn from_raw(raw_type: u32) -> Self {
         match raw_type & !EVENT_BIT {
             0 => Self::Workspace,
             3 => Self::Window,
@@ -64,9 +64,17 @@ pub(crate) async fn write_message<W: AsyncWrite + Unpin>(
     message_type: MessageType,
     payload: &[u8],
 ) -> Result<()> {
-    let mut frame = Vec::with_capacity(MAGIC.len() + 8 + payload.len());
+    let payload_len = u32::try_from(payload.len()).map_err(|_| {
+        Error::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "IPC payload exceeds u32::MAX bytes",
+        ))
+    })?;
+
+    let mut frame = Vec::with_capacity(MAGIC.len().saturating_add(8).saturating_add(payload.len()));
     frame.extend_from_slice(MAGIC);
-    frame.extend_from_slice(&(payload.len() as u32).to_ne_bytes());
+    frame.extend_from_slice(&payload_len.to_ne_bytes());
+    #[expect(clippy::as_conversions, reason = "enum discriminant is the wire value")]
     frame.extend_from_slice(&(message_type as u32).to_ne_bytes());
     frame.extend_from_slice(payload);
     writer.write_all(&frame).await?;
@@ -112,7 +120,13 @@ pub(crate) async fn read_message<R: AsyncRead + Unpin>(
         return Err(Error::InvalidMagic);
     }
 
-    let payload_len = u32::from_ne_bytes([header[6], header[7], header[8], header[9]]) as usize;
+    let payload_len = u32::from_ne_bytes([header[6], header[7], header[8], header[9]]);
+    let payload_len = usize::try_from(payload_len).map_err(|_| {
+        Error::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "IPC payload length exceeds usize",
+        ))
+    })?;
     let raw_type = u32::from_ne_bytes([header[10], header[11], header[12], header[13]]);
 
     let mut payload = vec![0_u8; payload_len];

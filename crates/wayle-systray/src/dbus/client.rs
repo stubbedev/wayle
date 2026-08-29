@@ -12,7 +12,7 @@ use zbus::{Result, proxy};
 pub trait SystemTrayWayle {
     /// Lists all current system tray items.
     ///
-    /// Returns array of (id, title, icon_name, status).
+    /// Returns array of (id, title, `icon_name`, status).
     async fn list(&self) -> Result<Vec<(String, String, String, String)>>;
 
     /// Activates a tray item by ID (simulates left-click).
@@ -22,7 +22,7 @@ pub trait SystemTrayWayle {
     #[zbus(property)]
     fn count(&self) -> Result<u32>;
 
-    /// Whether this service is operating as the StatusNotifierWatcher.
+    /// Whether this service is operating as the `StatusNotifierWatcher`.
     #[zbus(property)]
     fn is_watcher(&self) -> Result<bool>;
 }

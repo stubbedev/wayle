@@ -26,7 +26,7 @@ impl MangoTagButton {
         }
     }
 
-    pub fn show_icon(&self) -> bool {
+    pub const fn show_icon(&self) -> bool {
         matches!(self.display_mode, DisplayMode::Icon) && self.icon.is_some()
     }
 
@@ -34,7 +34,7 @@ impl MangoTagButton {
         self.label.as_deref().unwrap_or("")
     }
 
-    pub fn orientation(&self) -> gtk::Orientation {
+    pub const fn orientation(&self) -> gtk::Orientation {
         if self.is_vertical {
             gtk::Orientation::Vertical
         } else {
@@ -42,7 +42,7 @@ impl MangoTagButton {
         }
     }
 
-    pub fn content_halign(&self) -> gtk::Align {
+    pub const fn content_halign(&self) -> gtk::Align {
         if self.is_vertical {
             gtk::Align::Fill
         } else {
@@ -50,7 +50,7 @@ impl MangoTagButton {
         }
     }
 
-    pub fn content_valign(&self) -> gtk::Align {
+    pub const fn content_valign(&self) -> gtk::Align {
         if self.is_vertical {
             gtk::Align::Center
         } else {
@@ -58,7 +58,7 @@ impl MangoTagButton {
         }
     }
 
-    pub fn icons_halign(&self) -> gtk::Align {
+    pub const fn icons_halign(&self) -> gtk::Align {
         if self.is_vertical {
             gtk::Align::Center
         } else {

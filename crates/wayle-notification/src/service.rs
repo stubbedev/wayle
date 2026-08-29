@@ -51,7 +51,8 @@ impl NotificationService {
         Self::builder().build().await
     }
 
-    /// Creates a builder for configuring a NotificationService.
+    /// Creates a builder for configuring a `NotificationService`.
+    #[must_use]
     pub fn builder() -> NotificationServiceBuilder {
         NotificationServiceBuilder::new()
     }
@@ -64,7 +65,7 @@ impl NotificationService {
     pub async fn dismiss_all(&self) -> Result<(), Error> {
         let notifications = self.notifications.get();
 
-        for notif in notifications.iter() {
+        for notif in &notifications {
             if let Err(error) = self.notif_tx.send(NotificationEvent::Remove(
                 notif.id,
                 ClosedReason::DismissedByUser,
@@ -81,17 +82,17 @@ impl NotificationService {
     /// When enabled, new notifications will not appear as popups but will
     /// still be added to the notification list.
     pub fn set_dnd(&self, dnd: bool) {
-        self.dnd.set(dnd)
+        self.dnd.set(dnd);
     }
 
     /// Sets the duration for how long popup notifications are displayed.
     pub fn set_popup_duration(&self, duration: u32) {
-        self.popup_duration.set(duration)
+        self.popup_duration.set(duration);
     }
 
     /// Replaces the blocklist patterns.
     pub fn set_blocklist(&self, patterns: Vec<String>) {
-        self.blocklist.set(patterns)
+        self.blocklist.set(patterns);
     }
 
     /// Removes a popup from the visible list without affecting notification history.

@@ -16,7 +16,7 @@ pub async fn execute(player: Option<String>) -> CliAction {
     proxy
         .next(resolved)
         .await
-        .map_err(|e| format_error("skip to next track", e))?;
+        .map_err(|e| format_error("skip to next track", &e))?;
 
     Ok(())
 }

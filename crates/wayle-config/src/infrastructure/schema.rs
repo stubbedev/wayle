@@ -15,6 +15,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The schema includes the package version in the `$id` field for version tracking.
 ///
 /// Returns `None` if schema serialization fails.
+#[must_use]
 pub fn generate_schema() -> Option<String> {
     generate_schema_for::<Config>(&format!("wayle-config-{VERSION}"))
 }
@@ -22,6 +23,7 @@ pub fn generate_schema() -> Option<String> {
 /// Generates the JSON Schema for theme palette files.
 ///
 /// Returns `None` if schema serialization fails.
+#[must_use]
 pub fn generate_theme_schema() -> Option<String> {
     generate_schema_for::<Palette>(&format!("wayle-theme-{VERSION}"))
 }

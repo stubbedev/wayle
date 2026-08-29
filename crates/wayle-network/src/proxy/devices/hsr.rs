@@ -1,4 +1,4 @@
-//! NetworkManager HSR Device interface.
+//! `NetworkManager` HSR Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

@@ -1,4 +1,4 @@
-//! NetworkManager 6LoWPAN Device interface.
+//! `NetworkManager` 6LoWPAN Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

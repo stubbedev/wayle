@@ -1,4 +1,4 @@
-//! NetworkManager TUN/TAP Device interface.
+//! `NetworkManager` TUN/TAP Device interface.
 
 use zbus::proxy;
 
@@ -23,15 +23,15 @@ pub(crate) trait DeviceTun {
     #[zbus(property)]
     fn group(&self) -> zbus::Result<i64>;
 
-    /// If the device has the IFF_NO_PI flag.
+    /// If the device has the `IFF_NO_PI` flag.
     #[zbus(property)]
     fn no_pi(&self) -> zbus::Result<bool>;
 
-    /// If the device has the IFF_VNET_HDR flag.
+    /// If the device has the `IFF_VNET_HDR` flag.
     #[zbus(property)]
     fn vnet_hdr(&self) -> zbus::Result<bool>;
 
-    /// If the device has the IFF_MULTI_QUEUE flag.
+    /// If the device has the `IFF_MULTI_QUEUE` flag.
     #[zbus(property)]
     fn multi_queue(&self) -> zbus::Result<bool>;
 }

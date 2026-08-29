@@ -20,11 +20,11 @@ pub(crate) fn spawn(
         loop {
             if !memory.has_subscribers() {
                 tokio::select! {
-                    _ = token.cancelled() => {
+                    () = token.cancelled() => {
                         debug!("Memory polling cancelled");
                         return;
                     }
-                    _ = memory.wait_for_subscribers() => {}
+                    () = memory.wait_for_subscribers() => {}
                 }
                 ticker.reset();
             }
@@ -41,12 +41,22 @@ pub(crate) fn spawn(
             let swap_total = system.total_swap();
             let swap_used = system.used_swap();
 
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_precision_loss,
+                reason = "u64 to f32 precision loss acceptable for percent math"
+            )]
             let usage_percent = if total > 0 {
                 (used as f32 / total as f32) * 100.0
             } else {
                 0.0
             };
 
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_precision_loss,
+                reason = "u64 to f32 precision loss acceptable for percent math"
+            )]
             let swap_percent = if swap_total > 0 {
                 (swap_used as f32 / swap_total as f32) * 100.0
             } else {
@@ -64,7 +74,7 @@ pub(crate) fn spawn(
             });
 
             tokio::select! {
-                _ = token.cancelled() => {
+                () = token.cancelled() => {
                     debug!("Memory polling cancelled");
                     return;
                 }

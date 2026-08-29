@@ -53,7 +53,7 @@ impl Component for RecorderModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = &init.config.config().modules.recorder;
@@ -62,7 +62,7 @@ impl Component for RecorderModule {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: config.icon_idle.get().clone(),
+                icon: config.icon_idle.get(),
                 label: String::new(),
                 tooltip: None,
                 colors: BarButtonColors {

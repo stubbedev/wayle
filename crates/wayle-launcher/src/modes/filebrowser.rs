@@ -148,9 +148,7 @@ impl FileBrowserMode {
         } else {
             self.config.command.trim()
         };
-        let quoted = shlex::try_quote(&path.display().to_string())
-            .map(|quoted| quoted.into_owned())
-            .unwrap_or_else(|_| path.display().to_string());
+        let quoted = shlex::try_quote(&path.display().to_string()).map_or_else(|_| path.display().to_string(), std::borrow::Cow::into_owned);
         spawn::run_shell(&format!("{opener} {quoted}"));
     }
 }
@@ -289,8 +287,8 @@ fn sort_entries(entries: &mut [(PathBuf, bool)], sorting: FileSort, directories_
         group.then_with(|| match sorting {
             FileSort::Name => path_a
                 .file_name()
-                .map(|n| n.to_ascii_lowercase())
-                .cmp(&path_b.file_name().map(|n| n.to_ascii_lowercase())),
+                .map(std::ffi::OsStr::to_ascii_lowercase)
+                .cmp(&path_b.file_name().map(std::ffi::OsStr::to_ascii_lowercase)),
             _ => time_key(path_b).cmp(&time_key(path_a)),
         })
     });
@@ -303,9 +301,7 @@ fn entry_item(path: &Path, is_dir: bool, base: &Path, recursive: bool) -> Item {
             .display()
             .to_string()
     } else {
-        path.file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| path.display().to_string())
+        path.file_name().map_or_else(|| path.display().to_string(), |name| name.to_string_lossy().into_owned())
     };
     let icon = if is_dir {
         "folder-symbolic".to_owned()

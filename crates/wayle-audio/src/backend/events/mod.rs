@@ -9,7 +9,6 @@ use tracing::info;
 use super::types::{
     ChangeNotification, DeviceStore, EventSender, InternalCommandSender, StreamStore,
 };
-use crate::error::Error;
 
 pub(crate) mod device;
 pub(crate) mod server;
@@ -24,15 +23,15 @@ pub(crate) fn start_event_processor(
     events_tx: EventSender,
     internal_command_tx: InternalCommandSender,
     cancellation_token: CancellationToken,
-) -> Result<(), Error> {
+) {
     let (change_tx, mut change_rx) = mpsc::unbounded_channel::<ChangeNotification>();
 
-    setup_subscription(context, change_tx)?;
+    setup_subscription(context, change_tx);
 
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     info!("Event processor cancelled, stopping");
                     return;
                 }
@@ -43,8 +42,7 @@ pub(crate) fn start_event_processor(
                         &streams,
                         &events_tx,
                         &internal_command_tx
-                    )
-                    .await;
+                    );
                 }
                 else => {
                     info!("Change notification channel closed");
@@ -53,14 +51,12 @@ pub(crate) fn start_event_processor(
             }
         }
     });
-
-    Ok(())
 }
 
 fn setup_subscription(
     context: &mut Context,
     change_tx: mpsc::UnboundedSender<ChangeNotification>,
-) -> Result<(), Error> {
+) {
     let interest_mask = InterestMaskSet::SINK
         | InterestMaskSet::SOURCE
         | InterestMaskSet::SINK_INPUT
@@ -94,12 +90,10 @@ fn setup_subscription(
     context.set_subscribe_callback(subscription_callback);
 
     context.subscribe(interest_mask, |_success: bool| {});
-
-    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn process_change_notification(
+fn process_change_notification(
     notification: ChangeNotification,
     devices: &DeviceStore,
     streams: &StreamStore,
@@ -112,17 +106,17 @@ async fn process_change_notification(
             operation,
             index,
         } => {
-            device::handle_change(facility, operation, index, devices, events_tx, command_tx).await;
+            device::handle_change(facility, operation, index, devices, events_tx, command_tx);
         }
         ChangeNotification::Stream {
             facility,
             operation,
             index,
         } => {
-            stream::handle_change(facility, operation, index, streams, events_tx, command_tx).await;
+            stream::handle_change(facility, operation, index, streams, events_tx, command_tx);
         }
         ChangeNotification::Server { operation } => {
-            server::handle_change(operation, command_tx).await;
+            server::handle_change(operation, command_tx);
         }
     }
 }

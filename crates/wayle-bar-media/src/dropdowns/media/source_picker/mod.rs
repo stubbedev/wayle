@@ -68,7 +68,7 @@ impl Component for SourcePicker {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let source_list = gtk::ListBox::new();

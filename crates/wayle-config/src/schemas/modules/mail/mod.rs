@@ -164,7 +164,7 @@ impl ModuleInfoProvider for MailConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("mail"),
-            schema: || schema_for!(MailConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("mail")),
             array_entry: false,
         }

@@ -21,7 +21,8 @@ pub fn reset_anchors(root: &gtk::Window) {
 }
 
 /// Maps a config [`ConfigLayer`] to a layer-shell [`Layer`].
-pub fn to_gtk_layer(layer: ConfigLayer) -> Layer {
+#[must_use]
+pub const fn to_gtk_layer(layer: ConfigLayer) -> Layer {
     match layer {
         ConfigLayer::Background => Layer::Background,
         ConfigLayer::Bottom => Layer::Bottom,
@@ -34,6 +35,7 @@ pub fn to_gtk_layer(layer: ConfigLayer) -> Layer {
 ///
 /// Tearing-mode demotes `Overlay` to `Top` so fullscreen tearing works; other
 /// layers pass through unchanged.
+#[must_use]
 pub fn effective_layer(configured: ConfigLayer, tearing: bool) -> ConfigLayer {
     if tearing && configured == ConfigLayer::Overlay {
         ConfigLayer::Top

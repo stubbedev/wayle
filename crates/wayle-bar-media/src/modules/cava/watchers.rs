@@ -105,7 +105,7 @@ pub fn spawn_config_watchers(
         }
     );
 
-    let is_vertical_prop = is_vertical.clone();
+    let is_vertical_prop = is_vertical;
     watch!(sender, [changes_stream(&is_vertical_prop)], |out| {
         let _ = out.send(CavaCmd::OrientationChanged(is_vertical_prop.get()));
     });

@@ -7,8 +7,8 @@ use crate::config::infrastructure::paths::ConfigPaths;
 /// Initialize tracing for the application
 ///
 /// Sets up structured logging with info level by default.
-/// Uses RUST_LOG environment variable if set, otherwise defaults to "info".
-/// Supports both pretty console output and JSON output based on WAYLE_LOG_FORMAT.
+/// Uses `RUST_LOG` environment variable if set, otherwise defaults to "info".
+/// Supports both pretty console output and JSON output based on `WAYLE_LOG_FORMAT`.
 ///
 /// # Errors
 /// Returns error if tracing subscriber initialization fails
@@ -44,8 +44,8 @@ pub fn init() -> Result<(), Box<dyn Error>> {
 
 /// Initialize tracing with file output
 ///
-/// Sets up dual logging: console output respects RUST_LOG (defaults to "warn"),
-/// while file output uses WAYLE_FILE_LOG level (defaults to "info").
+/// Sets up dual logging: console output respects `RUST_LOG` (defaults to "warn"),
+/// while file output uses `WAYLE_FILE_LOG` level (defaults to "info").
 /// File is created in the wayle logs directory.
 ///
 /// # Errors
@@ -70,9 +70,7 @@ fn init_with_file_and_console_option(enable_console: bool) -> Result<(), Box<dyn
 
     let console_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
-    let file_filter = env::var("WAYLE_FILE_LOG")
-        .map(EnvFilter::new)
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let file_filter = env::var("WAYLE_FILE_LOG").map_or_else(|_| EnvFilter::new("info"), EnvFilter::new);
 
     let log_dir = ConfigPaths::log_dir()?;
 
@@ -82,7 +80,7 @@ fn init_with_file_and_console_option(enable_console: bool) -> Result<(), Box<dyn
         .filename_prefix("wayle")
         .filename_suffix("log")
         .build(&log_dir)?;
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     let format = env::var("WAYLE_LOG_FORMAT").unwrap_or_else(|_| String::from("pretty"));
 
@@ -149,7 +147,7 @@ fn init_with_file_and_console_option(enable_console: bool) -> Result<(), Box<dyn
             .try_init()?;
     }
 
-    mem::forget(_guard);
+    mem::forget(guard);
 
     Ok(())
 }

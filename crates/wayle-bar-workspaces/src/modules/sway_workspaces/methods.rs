@@ -33,14 +33,17 @@ use crate::{process, shell::bar::dropdowns};
 const REM_BASE_PX: f32 = 16.0;
 
 impl SwayWorkspaces {
+    #[must_use]
     pub fn bar_monitor(&self) -> Option<&str> {
         self.settings.monitor_name.as_deref()
     }
 
+    #[must_use]
     pub fn is_vertical(&self) -> bool {
         self.settings.is_vertical.get()
     }
 
+    #[must_use]
     pub fn orientation(&self) -> gtk::Orientation {
         if self.is_vertical() {
             gtk::Orientation::Vertical
@@ -119,7 +122,7 @@ impl SwayWorkspaces {
         self.update_border_classes(ws_config.border_show.get());
     }
 
-    pub fn sync_blink(&mut self, sender: &ComponentSender<SwayWorkspaces>) {
+    pub fn sync_blink(&mut self, sender: &ComponentSender<Self>) {
         match (self.urgent_present, self.blink_token.is_some()) {
             (true, false) => self.start_blink_timer(sender),
             (false, true) => self.stop_blink_timer(),
@@ -127,7 +130,7 @@ impl SwayWorkspaces {
         }
     }
 
-    pub fn start_blink_timer(&mut self, sender: &ComponentSender<SwayWorkspaces>) {
+    pub fn start_blink_timer(&mut self, sender: &ComponentSender<Self>) {
         self.stop_blink_timer();
         self.blink_on = true;
 

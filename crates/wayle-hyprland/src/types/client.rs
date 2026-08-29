@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// Window dimensions in pixels.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct ClientSize {
     /// Width in pixels.
     ///
@@ -28,7 +28,7 @@ where
 }
 
 /// Window position in screen coordinates.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct ClientLocation {
     /// X coordinate in pixels.
     pub x: i32,
@@ -48,7 +48,7 @@ where
 }
 
 /// Window fullscreen state matching Hyprland's `eFullscreenMode`.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[serde(from = "u8")]
 pub enum FullscreenMode {
     /// Not fullscreen.
@@ -74,6 +74,10 @@ impl From<u8> for FullscreenMode {
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors Hyprland's client JSON schema"
+)]
 pub(crate) struct ClientData {
     pub address: Address,
     pub mapped: bool,

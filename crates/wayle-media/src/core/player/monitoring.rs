@@ -70,7 +70,7 @@ async fn monitor_properties(
         };
 
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("Player {} monitor received cancellation, stopping", player_id);
                 return;
             }
@@ -155,7 +155,7 @@ async fn monitor_position(
 
     loop {
         tokio::select! {
-            _ = cancellation_token.cancelled() => return,
+            () = cancellation_token.cancelled() => return,
             _ = ticker.tick() => {
                 let Some(player) = weak_player.upgrade() else {
                     return;

@@ -51,7 +51,7 @@ async fn monitor_property_changes(
             };
 
             tokio::select! {
-                _ = cancel_token.cancelled() => {
+                () = cancel_token.cancelled() => {
                     debug!("Power Profiles property monitoring cancelled");
                     return;
                 }
@@ -120,7 +120,7 @@ async fn monitor_daemon_lifecycle(
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancel_token.cancelled() => {
+                () = cancel_token.cancelled() => {
                     debug!("Power Profiles lifecycle monitoring cancelled");
                     return;
                 }

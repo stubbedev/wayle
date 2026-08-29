@@ -13,7 +13,7 @@ pub(crate) fn toggle(property: &ConfigProperty<bool>) -> SettingRowInit {
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |value| value.to_string()),
+        handle: PropertyHandle::new(property, std::string::ToString::to_string),
         control: widget.upcast(),
         keepalive: Box::new(controller),
         full_width: false,

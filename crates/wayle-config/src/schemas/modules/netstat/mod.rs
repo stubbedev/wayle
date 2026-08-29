@@ -137,7 +137,7 @@ impl ModuleInfoProvider for NetstatConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("netstat"),
-            schema: || schema_for!(NetstatConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("netstat")),
             array_entry: false,
         }

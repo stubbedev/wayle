@@ -42,14 +42,13 @@ pub(crate) fn spawn_drm(
 }
 
 fn monitor_loop(event_tx: &EventSender, token: &CancellationToken) -> Result<(), Error> {
-    let socket = match build_monitor_socket(BACKLIGHT_SUBSYSTEM) {
-        Some(socket) => socket,
-        None => return Ok(()),
+    let Some(socket) = build_monitor_socket(BACKLIGHT_SUBSYSTEM) else {
+        return Ok(());
     };
 
     info!("udev backlight hotplug monitor started");
 
-    let timeout_ms = POLL_TIMEOUT.as_millis() as u16;
+    let timeout_ms = u16::try_from(POLL_TIMEOUT.as_millis()).unwrap_or(u16::MAX);
 
     loop {
         if token.is_cancelled() {
@@ -61,8 +60,7 @@ fn monitor_loop(event_tx: &EventSender, token: &CancellationToken) -> Result<(),
         let mut poll_fd = PollFd::new(fd, PollFlags::POLLIN);
 
         match poll(slice::from_mut(&mut poll_fd), PollTimeout::from(timeout_ms)) {
-            Ok(0) => continue,
-            Err(_) => continue,
+            Ok(0) | Err(_) => continue,
             Ok(_) => {}
         }
 
@@ -80,14 +78,13 @@ fn drm_monitor_loop(
     refresh_tx: &UnboundedSender<()>,
     token: &CancellationToken,
 ) -> Result<(), Error> {
-    let socket = match build_monitor_socket(DRM_SUBSYSTEM) {
-        Some(socket) => socket,
-        None => return Ok(()),
+    let Some(socket) = build_monitor_socket(DRM_SUBSYSTEM) else {
+        return Ok(());
     };
 
     info!("udev drm hotplug monitor started");
 
-    let timeout_ms = POLL_TIMEOUT.as_millis() as u16;
+    let timeout_ms = u16::try_from(POLL_TIMEOUT.as_millis()).unwrap_or(u16::MAX);
 
     loop {
         if token.is_cancelled() {
@@ -99,8 +96,7 @@ fn drm_monitor_loop(
         let mut poll_fd = PollFd::new(fd, PollFlags::POLLIN);
 
         match poll(slice::from_mut(&mut poll_fd), PollTimeout::from(timeout_ms)) {
-            Ok(0) => continue,
-            Err(_) => continue,
+            Ok(0) | Err(_) => continue,
             Ok(_) => {}
         }
 

@@ -3,14 +3,14 @@
 //! Features:
 //! - [`IconSource`] trait and implementations for different icon CDNs
 //! - [`IconManager`] for installing and removing icons
-//! - [`IconRegistry`] for registering icons with GTK's IconTheme
+//! - [`IconRegistry`] for registering icons with GTK's `IconTheme`
 //!
 //! # Icon Sources
 //!
 //! | Source | Prefix | Use Case |
 //! |--------|--------|----------|
 //! | Tabler | `tb-` | UI icons (home, settings, bell) |
-//! | TablerFilled | `tbf-` | Solid UI icons |
+//! | `TablerFilled` | `tbf-` | Solid UI icons |
 //! | Simple Icons | `si-` | Brand logos (firefox, spotify) |
 //! | Lucide | `ld-` | Alternative UI icons |
 //!

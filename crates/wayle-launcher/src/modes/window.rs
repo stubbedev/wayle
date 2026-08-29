@@ -64,7 +64,7 @@ impl Default for WindowConfig {
 /// One open window, compositor-agnostic.
 #[derive(Debug, Clone)]
 struct WindowInfo {
-    /// Opaque compositor id (hyprland address / niri id / sway con_id).
+    /// Opaque compositor id (hyprland address / niri id / sway `con_id`).
     id: String,
     title: String,
     class: String,
@@ -115,7 +115,7 @@ impl WindowMode {
         }
     }
 
-    fn mode_name(&self) -> &'static str {
+    const fn mode_name(&self) -> &'static str {
         if self.config.current_desktop_only {
             "windowcd"
         } else {
@@ -131,12 +131,9 @@ impl Mode for WindowMode {
     }
 
     async fn load(&mut self) -> ModeState {
-        let mut windows = match self.backend {
-            Some(backend) => list_windows(backend).await,
-            None => {
-                warn!("window mode: no supported compositor detected");
-                Vec::new()
-            }
+        let mut windows = if let Some(backend) = self.backend { list_windows(backend).await } else {
+            warn!("window mode: no supported compositor detected");
+            Vec::new()
         };
         if self.config.hide_active {
             windows.retain(|window| !window.focused);

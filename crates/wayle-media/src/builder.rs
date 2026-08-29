@@ -1,4 +1,4 @@
-//! Builder for configuring a MediaService.
+//! Builder for configuring a `MediaService`.
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
@@ -16,7 +16,7 @@ use crate::{
     service::MediaService,
 };
 
-/// Builder for configuring and creating a MediaService instance.
+/// Builder for configuring and creating a `MediaService` instance.
 ///
 /// Allows customization of ignored player patterns for filtering out
 /// specific media players from being tracked.
@@ -41,7 +41,8 @@ impl Default for MediaServiceBuilder {
 }
 
 impl MediaServiceBuilder {
-    /// Creates a new MediaServiceBuilder with default values.
+    /// Creates a new `MediaServiceBuilder` with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -49,12 +50,14 @@ impl MediaServiceBuilder {
     /// Sets the patterns for media players to ignore.
     ///
     /// Players whose names match these patterns will not be tracked by the service.
+    #[must_use]
     pub fn ignored_players(mut self, patterns: Vec<String>) -> Self {
         self.ignored_players = patterns;
         self
     }
 
     /// Adds a single pattern for a media player to ignore.
+    #[must_use]
     pub fn ignore_player(mut self, pattern: String) -> Self {
         self.ignored_players.push(pattern);
         self
@@ -64,6 +67,7 @@ impl MediaServiceBuilder {
     ///
     /// Patterns are matched against bus names in order. First match wins.
     /// Players matching earlier patterns are preferred when selecting active player.
+    #[must_use]
     pub fn priority_players(mut self, patterns: Vec<String>) -> Self {
         self.priority_players = patterns;
         self
@@ -74,7 +78,8 @@ impl MediaServiceBuilder {
     /// When enabled, the service will register itself on the session bus
     /// at `com.wayle.Media1`, allowing CLI tools and other applications
     /// to control media playback.
-    pub fn with_daemon(mut self) -> Self {
+    #[must_use]
+    pub const fn with_daemon(mut self) -> Self {
         self.register_daemon = true;
         self
     }
@@ -85,7 +90,8 @@ impl MediaServiceBuilder {
     /// and cached under `$XDG_CACHE_HOME/wayle/media-art/`. File URLs are
     /// resolved directly. Resolved paths appear on
     /// [`TrackMetadata::cover_art`](crate::core::metadata::TrackMetadata::cover_art).
-    pub fn with_art_cache(mut self) -> Self {
+    #[must_use]
+    pub const fn with_art_cache(mut self) -> Self {
         self.enable_art_cache = true;
         self
     }
@@ -94,12 +100,13 @@ impl MediaServiceBuilder {
     ///
     /// This interval is shared across all monitored players and used by a
     /// single polling task per player.
-    pub fn position_poll_interval(mut self, interval: Duration) -> Self {
+    #[must_use]
+    pub const fn position_poll_interval(mut self, interval: Duration) -> Self {
         self.position_poll_interval = interval;
         self
     }
 
-    /// Builds and initializes the MediaService.
+    /// Builds and initializes the `MediaService`.
     ///
     /// This will establish a D-Bus session connection and start monitoring
     /// for media player changes. If `with_daemon()` was called, the service

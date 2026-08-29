@@ -171,7 +171,7 @@ impl Component for Lock {
             sender.input_sender().emit(LockInput::Lock);
         }
 
-        let model = Lock {
+        let model = Self {
             config,
             instance: None,
             surfaces: Vec::new(),

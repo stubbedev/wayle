@@ -98,6 +98,7 @@ impl ConfigPaths {
     ///
     /// Panics if config directory cannot be determined.
     #[allow(clippy::panic)]
+    #[must_use]
     pub fn main_config() -> PathBuf {
         match Self::config_dir() {
             Ok(dir) => dir.join("config.toml"),
@@ -113,6 +114,7 @@ impl ConfigPaths {
     ///
     /// Panics if config directory cannot be determined.
     #[allow(clippy::panic)]
+    #[must_use]
     pub fn runtime_config() -> PathBuf {
         match Self::config_dir() {
             Ok(dir) => dir.join("runtime.toml"),
@@ -128,6 +130,7 @@ impl ConfigPaths {
     ///
     /// Panics if config directory cannot be determined.
     #[allow(clippy::panic)]
+    #[must_use]
     pub fn themes_dir() -> PathBuf {
         match Self::config_dir() {
             Ok(dir) => dir.join("themes"),
@@ -143,6 +146,7 @@ impl ConfigPaths {
     ///
     /// Panics if config directory cannot be determined.
     #[allow(clippy::panic)]
+    #[must_use]
     pub fn schema_json() -> PathBuf {
         match Self::config_dir() {
             Ok(dir) => dir.join("schema.json"),
@@ -158,6 +162,7 @@ impl ConfigPaths {
     ///
     /// Panics if config directory cannot be determined.
     #[allow(clippy::panic)]
+    #[must_use]
     pub fn example_config() -> PathBuf {
         match Self::config_dir() {
             Ok(dir) => dir.join("config.toml.example"),
@@ -173,6 +178,7 @@ impl ConfigPaths {
     ///
     /// Panics if config directory cannot be determined.
     #[allow(clippy::panic)]
+    #[must_use]
     pub fn tombi_config() -> PathBuf {
         match Self::config_dir() {
             Ok(dir) => dir.join("tombi.toml"),

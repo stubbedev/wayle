@@ -16,7 +16,7 @@ const DBUS_TIMEOUT: Duration = Duration::from_secs(5);
 ///
 /// Falls back to direct sysfs write if logind is unavailable.
 pub(crate) async fn set_brightness(
-    connection: &Option<Connection>,
+    connection: Option<&Connection>,
     name: &str,
     value: u32,
 ) -> Result<(), Error> {

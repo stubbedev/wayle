@@ -22,7 +22,7 @@ impl Config {
     ///
     /// Returns error on read failures, invalid TOML, import failures,
     /// deserialization failures, or circular imports.
-    pub fn load_with_imports(path: &Path) -> Result<Config, Error> {
+    pub fn load_with_imports(path: &Path) -> Result<Self, Error> {
         let merged = Self::load_toml_with_imports(path)?;
         merged
             .try_into()
@@ -166,7 +166,7 @@ impl Config {
                 imports
                     .iter()
                     .filter_map(|v| v.as_str())
-                    .map(|s| s.to_owned())
+                    .map(std::borrow::ToOwned::to_owned)
                     .collect::<Vec<String>>()
             } else {
                 Vec::new()

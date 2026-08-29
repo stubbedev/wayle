@@ -134,7 +134,7 @@ impl ModuleInfoProvider for CavaConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("cava"),
-            schema: || schema_for!(CavaConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("cava")),
             array_entry: false,
         }

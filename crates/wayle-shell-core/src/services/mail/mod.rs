@@ -187,7 +187,7 @@ async fn build_batch(
     total: u32,
 ) -> Vec<NewMail> {
     let new = total.saturating_sub(previous);
-    let limit = (new as usize).min(NOTIFY_MAX);
+    let limit = usize::try_from(new).unwrap_or(usize::MAX).min(NOTIFY_MAX);
     let messages = query_new_messages(query, limit).await;
 
     if messages.is_empty() {
@@ -291,9 +291,7 @@ fn notify_icon_arg(icon: &str) -> String {
                 .join("actions")
                 .join(format!("{icon}.svg"))
         })
-        .filter(|path| path.exists())
-        .map(|path| path.to_string_lossy().into_owned())
-        .unwrap_or_else(|| icon.to_owned())
+        .filter(|path| path.exists()).map_or_else(|| icon.to_owned(), |path| path.to_string_lossy().into_owned())
 }
 
 /// Fire one fire-and-forget desktop notification per message in the batch.

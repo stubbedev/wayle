@@ -1,4 +1,4 @@
-//! Reactive bindings to the MangoWM compositor via IPC.
+//! Reactive bindings to the `MangoWM` compositor via IPC.
 //!
 //! [`MangoService::new`] connects to `$MANGO_INSTANCE_SIGNATURE`, subscribes to
 //! Mango's `all-monitors` and `all-clients` watch streams, and exposes

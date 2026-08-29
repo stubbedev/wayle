@@ -286,7 +286,7 @@ impl Component for ActiveConnections {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let wifi = init

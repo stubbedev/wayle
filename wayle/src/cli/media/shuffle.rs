@@ -23,7 +23,7 @@ pub async fn execute(state: Option<ShuffleModeArg>, player: Option<String>) -> C
     proxy
         .set_shuffle(resolved, state_str.to_string())
         .await
-        .map_err(|e| format_error("set shuffle", e))?;
+        .map_err(|e| format_error("set shuffle", &e))?;
 
     Ok(())
 }

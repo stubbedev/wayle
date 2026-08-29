@@ -19,9 +19,10 @@ pub fn spawn_watchers(sender: &ComponentSender<ClockModule>, clock: &ClockConfig
     let prev = Arc::clone(&prev_label);
     watch!(sender, [interval_stream], |out| {
         let label = format_time(&format.get());
-        let mut prev = prev.lock().unwrap_or_else(|poison| poison.into_inner());
+        let mut prev = prev.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if *prev != label {
-            *prev = label.clone();
+            prev.clone_from(&label);
+            drop(prev);
             let _ = out.send(ClockCmd::UpdateTime(label));
         }
     });
@@ -30,15 +31,16 @@ pub fn spawn_watchers(sender: &ComponentSender<ClockModule>, clock: &ClockConfig
     let prev = Arc::clone(&prev_label);
     watch!(sender, [format.watch()], |out| {
         let label = format_time(&format.get());
-        let mut prev = prev.lock().unwrap_or_else(|poison| poison.into_inner());
+        let mut prev = prev.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if *prev != label {
-            *prev = label.clone();
+            prev.clone_from(&label);
+            drop(prev);
             let _ = out.send(ClockCmd::UpdateTime(label));
         }
     });
 
     let icon_name = clock.icon_name.clone();
     watch!(sender, [icon_name.watch()], |out| {
-        let _ = out.send(ClockCmd::UpdateIcon(icon_name.get().clone()));
+        let _ = out.send(ClockCmd::UpdateIcon(icon_name.get()));
     });
 }

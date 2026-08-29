@@ -44,7 +44,7 @@ async fn handle_watcher_mode(service: &SystemTrayService) -> Result<(), Error> {
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     info!("Systray watcher monitoring cancelled");
                     return;
                 }
@@ -92,7 +92,7 @@ async fn handle_host_mode(service: &SystemTrayService) -> Result<(), Error> {
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     info!("Systray host monitoring cancelled");
                     return;
                 }
@@ -190,7 +190,7 @@ async fn monitor_name_owner_changes(service: &SystemTrayService) -> Result<(), E
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     return;
                 }
                 Some(signal) = name_owner_changed.next() => {

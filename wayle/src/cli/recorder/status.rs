@@ -11,7 +11,7 @@ pub async fn execute() -> CliAction {
     let active = proxy
         .active()
         .await
-        .map_err(|e| format_error("get active state", e))?;
+        .map_err(|e| format_error("get active state", &e))?;
 
     if !active {
         println!("Idle");

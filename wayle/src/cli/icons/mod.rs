@@ -32,15 +32,15 @@ pub async fn execute(command: IconsCommands) -> CliAction {
     match command {
         IconsCommands::Setup => setup::execute(),
         IconsCommands::Install { source, slugs } => install::execute(source, slugs).await,
-        IconsCommands::Import { path, name } => import::execute(path, name),
-        IconsCommands::Remove { names } => remove::execute(names),
+        IconsCommands::Import { path, name } => import::execute(&path, name),
+        IconsCommands::Remove { names } => remove::execute(&names),
         IconsCommands::Sources => sources::execute(),
         IconsCommands::List {
             source,
             interactive,
         } => list::execute(source, interactive),
         IconsCommands::Open => open::execute(),
-        IconsCommands::Export { destination } => export::execute(destination),
-        IconsCommands::Sync { dry_run } => sync::execute(dry_run).await,
+        IconsCommands::Export { destination } => export::execute(&destination),
+        IconsCommands::Sync { dry_run } => Box::pin(sync::execute(dry_run)).await,
     }
 }

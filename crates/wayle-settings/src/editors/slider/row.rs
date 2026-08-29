@@ -16,9 +16,9 @@ pub(crate) fn percentage(property: &ConfigProperty<Percentage>) -> SettingRowIni
     let controller = SliderControl::builder()
         .launch(SliderInit {
             property: property.clone(),
-            range_min: Percentage::MIN as f64,
-            range_max: Percentage::MAX as f64,
-            to_slider: |pct| pct.value() as f64,
+            range_min: f64::from(Percentage::MIN),
+            range_max: f64::from(Percentage::MAX),
+            to_slider: |pct| f64::from(pct.value()),
             from_slider: |value| Percentage::new(value.round().clamp(0.0, 100.0) as u8),
             format_label: |value| format!("{value:.0}%"),
         })

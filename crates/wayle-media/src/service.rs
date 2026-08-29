@@ -42,7 +42,7 @@ pub struct MediaService {
 }
 
 impl MediaService {
-    /// Creates a new MediaService with default configuration.
+    /// Creates a new `MediaService` with default configuration.
     ///
     /// # Errors
     ///
@@ -52,7 +52,8 @@ impl MediaService {
         Self::builder().build().await
     }
 
-    /// Creates a builder for configuring a MediaService.
+    /// Creates a builder for configuring a `MediaService`.
+    #[must_use]
     pub fn builder() -> MediaServiceBuilder {
         MediaServiceBuilder::new()
     }
@@ -100,6 +101,7 @@ impl MediaService {
     ///
     /// Returns a snapshot of all currently available MPRIS players,
     /// excluding any that match the ignored patterns configured at startup.
+    #[must_use]
     pub fn players(&self) -> Vec<Arc<Player>> {
         self.player_list.get()
     }
@@ -116,6 +118,7 @@ impl MediaService {
     ///
     /// Returns the player that is currently set as active, or None if
     /// no player is active.
+    #[must_use]
     pub fn active_player(&self) -> Option<Arc<Player>> {
         self.active_player.get()
     }

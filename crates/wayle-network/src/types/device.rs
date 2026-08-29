@@ -1,6 +1,6 @@
 //! NetworkManager device types.
 
-/// NMDeviceType values indicate the type of hardware represented by a device object.
+/// `NMDeviceType` values indicate the type of hardware represented by a device object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NMDeviceType {
     /// unknown device
@@ -17,7 +17,7 @@ pub enum NMDeviceType {
     Bt = 5,
     /// an OLPC XO mesh networking device
     OlpcMesh = 6,
-    /// an 802.16e Mobile WiMAX broadband device
+    /// an 802.16e Mobile `WiMAX` broadband device
     Wimax = 7,
     /// a modem supporting analog telephone, CDMA/EVDO, GSM/UMTS, or LTE network access
     /// protocols
@@ -46,7 +46,7 @@ pub enum NMDeviceType {
     Vxlan = 19,
     /// a VETH interface
     Veth = 20,
-    /// a MACsec interface
+    /// a `MACsec` interface
     Macsec = 21,
     /// a dummy interface
     Dummy = 22,
@@ -62,7 +62,7 @@ pub enum NMDeviceType {
     Wpan = 27,
     /// 6LoWPAN interface
     SixLowpan = 28,
-    /// a WireGuard interface
+    /// a `WireGuard` interface
     Wireguard = 29,
     /// an 802.11 Wi-Fi P2P device. Since: 1.16.
     WifiP2p = 30,
@@ -80,9 +80,9 @@ pub enum NMDeviceType {
 
 impl NMDeviceType {
     /// Converts from the D-Bus u32 representation.
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
-            0 => Self::Unknown,
             1 => Self::Ethernet,
             2 => Self::Wifi,
             3 => Self::Unused1,
@@ -156,9 +156,9 @@ pub enum NMIPTunnelMode {
 
 impl NMIPTunnelMode {
     /// Convert from D-Bus u32 representation
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
-            0 => Self::Unknown,
             1 => Self::Ipip,
             2 => Self::Gre,
             3 => Self::Sit,

@@ -1,4 +1,4 @@
-//! NetworkManager WireGuard Device interface.
+//! `NetworkManager` `WireGuard` Device interface.
 
 use zbus::proxy;
 

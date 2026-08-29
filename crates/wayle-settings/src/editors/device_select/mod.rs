@@ -121,7 +121,10 @@ impl SimpleComponent for DeviceSelectControl {
     fn update(&mut self, msg: Self::Input, _sender: ComponentSender<Self>) {
         match msg {
             DeviceSelectMsg::Selected(index) => {
-                if let Some(choice) = self.choices.get(index as usize) {
+                if let Some(choice) = usize::try_from(index)
+                    .ok()
+                    .and_then(|index| self.choices.get(index))
+                {
                     self.property.set(choice.id.clone());
                 }
             }
@@ -158,5 +161,9 @@ impl SimpleComponent for DeviceSelectControl {
 
 /// Index of `id` within `choices`, defaulting to 0 (the "default" entry).
 fn index_of(choices: &[DeviceChoice], id: &str) -> u32 {
-    choices.iter().position(|c| c.id == id).unwrap_or(0) as u32
+    choices
+        .iter()
+        .position(|c| c.id == id)
+        .and_then(|index| u32::try_from(index).ok())
+        .unwrap_or(0)
 }

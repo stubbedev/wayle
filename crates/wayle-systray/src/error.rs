@@ -9,18 +9,18 @@ pub enum Error {
     #[error("cannot initialize system tray service: {0}")]
     ServiceInitialization(String),
 
-    /// Cannot register as StatusNotifierWatcher.
+    /// Cannot register as `StatusNotifierWatcher`.
     #[error("cannot register as StatusNotifierWatcher: {0}")]
     WatcherRegistration(String),
 
-    /// StatusNotifierItem not found.
+    /// `StatusNotifierItem` not found.
     #[error("cannot find StatusNotifierItem: {service}")]
     ItemNotFound {
         /// D-Bus service name of the missing item.
         service: String,
     },
 
-    /// Cannot connect to StatusNotifierItem.
+    /// Cannot connect to `StatusNotifierItem`.
     #[error("cannot connect to tray item {service}")]
     ItemConnection {
         /// D-Bus service name of the item.
@@ -81,7 +81,7 @@ pub enum Error {
     #[error("invalid bus name format: {0}")]
     InvalidBusName(String),
 
-    /// ZVariant conversion error.
+    /// `ZVariant` conversion error.
     #[error("zvariant conversion failed")]
     ZVariant(#[from] zbus::zvariant::Error),
 }

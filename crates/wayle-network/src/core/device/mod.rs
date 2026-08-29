@@ -1,7 +1,7 @@
 mod controls;
 mod monitoring;
 mod types;
-/// WiFi device functionality and management.
+/// `WiFi` device functionality and management.
 pub mod wifi;
 /// Wired (ethernet) device functionality and management.
 pub mod wired;
@@ -33,9 +33,9 @@ use crate::{
     },
 };
 
-/// Network device managed by NetworkManager.
+/// Network device managed by `NetworkManager`.
 ///
-/// Common functionality for all network interfaces (WiFi, ethernet, etc).
+/// Common functionality for all network interfaces (`WiFi`, ethernet, etc).
 /// Contains hardware information, state, configuration, and statistics.
 #[derive(Debug, Clone)]
 pub struct Device {
@@ -50,25 +50,25 @@ pub struct Device {
     /// Operating-system specific transient device hardware identifier. Opaque
     /// string representing the underlying hardware for the device, and shouldn't be used to
     /// keep track of individual devices. For some device types (Bluetooth, Modems) it is an
-    /// identifier used by the hardware service (eg bluez or ModemManager) to refer to that
+    /// identifier used by the hardware service (eg bluez or `ModemManager`) to refer to that
     /// device, and client programs use it get additional information from those services
     /// which NM does not provide. The Udi is not guaranteed to be consistent across reboots
     /// or hotplugs of the hardware.
     pub udi: Property<String>,
 
-    /// The path of the device as exposed by the udev property ID_PATH.
+    /// The path of the device as exposed by the udev property `ID_PATH`.
     pub udev_path: Property<String>,
 
     /// The name of the device's control (and often data) interface. Note that non UTF-8
     /// characters are backslash escaped, so the resulting name may be longer then 15
-    /// characters. Use g_strcompress() to revert the escaping.
+    /// characters. Use `g_strcompress()` to revert the escaping.
     pub interface: Property<String>,
 
     /// The name of the device's data interface when available. May not refer
     /// to the actual data interface until the device has successfully established a data
     /// connection, indicated by the device's State becoming ACTIVATED. Note that non UTF-8
     /// characters are backslash escaped, so the resulting name may be longer then 15
-    /// characters. Use g_strcompress() to revert the escaping.
+    /// characters. Use `g_strcompress()` to revert the escaping.
     pub ip_interface: Property<String>,
 
     /// The driver handling the device. Non-UTF-8 sequences are backslash escaped.
@@ -81,7 +81,7 @@ pub struct Device {
     /// The firmware version for the device. Non-UTF-8 sequences are backslash escaped.
     pub firmware_version: Property<String>,
 
-    /// Flags describing the capabilities of the device. See NMDeviceCapabilities.
+    /// Flags describing the capabilities of the device. See `NMDeviceCapabilities`.
     pub capabilities: Property<NMDeviceCapabilities>,
 
     /// The current state of the device.
@@ -90,29 +90,29 @@ pub struct Device {
     /// The current state and reason for that state.
     pub state_reason: Property<(NMDeviceState, NMDeviceStateReason)>,
 
-    /// Object path of an ActiveConnection object that "owns" this device during activation.
-    /// The ActiveConnection object tracks the life-cycle of a connection to a specific
+    /// Object path of an `ActiveConnection` object that "owns" this device during activation.
+    /// The `ActiveConnection` object tracks the life-cycle of a connection to a specific
     /// network and implements the org.freedesktop.NetworkManager.Connection.Active D-Bus
     /// interface.
     pub active_connection: Property<OwnedObjectPath>,
 
-    /// Object path of the Ip4Config object describing the configuration of the device. Only
-    /// valid when the device is in the NM_DEVICE_STATE_ACTIVATED state.
+    /// Object path of the `Ip4Config` object describing the configuration of the device. Only
+    /// valid when the device is in the `NM_DEVICE_STATE_ACTIVATED` state.
     pub ip4_config: Property<OwnedObjectPath>,
 
-    /// Object path of the Dhcp4Config object describing the DHCP options returned by the
-    /// DHCP server. Only valid when the device is in the NM_DEVICE_STATE_ACTIVATED state.
+    /// Object path of the `Dhcp4Config` object describing the DHCP options returned by the
+    /// DHCP server. Only valid when the device is in the `NM_DEVICE_STATE_ACTIVATED` state.
     pub dhcp4_config: Property<OwnedObjectPath>,
 
-    /// Object path of the Ip6Config object describing the configuration of the device. Only
-    /// valid when the device is in the NM_DEVICE_STATE_ACTIVATED state.
+    /// Object path of the `Ip6Config` object describing the configuration of the device. Only
+    /// valid when the device is in the `NM_DEVICE_STATE_ACTIVATED` state.
     pub ip6_config: Property<OwnedObjectPath>,
 
-    /// Object path of the Dhcp6Config object describing the DHCP options returned by the
-    /// DHCP server. Only valid when the device is in the NM_DEVICE_STATE_ACTIVATED state.
+    /// Object path of the `Dhcp6Config` object describing the DHCP options returned by the
+    /// DHCP server. Only valid when the device is in the `NM_DEVICE_STATE_ACTIVATED` state.
     pub dhcp6_config: Property<OwnedObjectPath>,
 
-    /// Whether or not this device is managed by NetworkManager. Setting this property has a
+    /// Whether or not this device is managed by `NetworkManager`. Setting this property has a
     /// similar effect to configuring the device as unmanaged via the
     /// keyfile.unmanaged-devices setting in NetworkManager.conf.
     pub managed: Property<bool>,
@@ -127,7 +127,7 @@ pub struct Device {
     /// operation.
     pub firmware_missing: Property<bool>,
 
-    /// If TRUE, indicates the NetworkManager plugin for the device is likely missing or
+    /// If TRUE, indicates the `NetworkManager` plugin for the device is likely missing or
     /// misconfigured.
     pub nm_plugin_missing: Property<bool>,
 
@@ -155,8 +155,8 @@ pub struct Device {
     pub lldp_neighbors: Property<Vec<LldpNeighbor>>,
 
     /// True if the device exists, or False for placeholder devices that do not yet exist but
-    /// could be automatically created by NetworkManager if one of their
-    /// AvailableConnections was activated.
+    /// could be automatically created by `NetworkManager` if one of their
+    /// `AvailableConnections` was activated.
     pub real: Property<bool>,
 
     /// The result of the last IPv4 connectivity check.
@@ -165,7 +165,7 @@ pub struct Device {
     /// The result of the last IPv6 connectivity check.
     pub ip6_connectivity: Property<NMConnectivityState>,
 
-    /// The flags of the network interface. See NMDeviceInterfaceFlags for the currently
+    /// The flags of the network interface. See `NMDeviceInterfaceFlags` for the currently
     /// defined flags.
     pub interface_flags: Property<NMDeviceInterfaceFlags>,
 
@@ -394,7 +394,7 @@ impl Device {
         }
     }
 
-    /// Whether or not this device is managed by NetworkManager.
+    /// Whether or not this device is managed by `NetworkManager`.
     ///
     /// # Errors
     /// Returns error if the D-Bus operation fails.
@@ -458,7 +458,7 @@ impl Device {
         DeviceControls::disconnect(&self.connection, &self.object_path).await
     }
 
-    /// Deletes a software device from NetworkManager and removes the interface from the system.
+    /// Deletes a software device from `NetworkManager` and removes the interface from the system.
     ///
     /// # Errors
     /// Returns error if the delete operation fails.

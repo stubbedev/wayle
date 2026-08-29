@@ -26,10 +26,10 @@ use crate::{
     volume::types::Volume,
 };
 
-/// PulseAudio sink with reactive properties and control methods.
+/// `PulseAudio` sink with reactive properties and control methods.
 ///
 /// Instances from [`AudioService`] fields (e.g., `output_devices`, `default_output`)
-/// are live: their [`Property`] fields update when PulseAudio state changes.
+/// are live: their [`Property`] fields update when `PulseAudio` state changes.
 /// Instances from [`AudioService::output_device`] are snapshots that don't update.
 ///
 /// # Control Methods
@@ -89,7 +89,7 @@ pub struct OutputDevice {
     /// Whether device is muted
     pub muted: Property<bool>,
 
-    /// Device properties from PulseAudio
+    /// Device properties from `PulseAudio`
     pub properties: Property<HashMap<String, String>>,
 
     /// Available ports
@@ -119,7 +119,7 @@ pub struct OutputDevice {
     /// Configured latency in microseconds
     pub configured_latency: Property<MicroSeconds>,
 
-    /// Device flags (raw flags from PulseAudio)
+    /// Device flags (raw flags from `PulseAudio`)
     pub flags: Property<u32>,
 }
 

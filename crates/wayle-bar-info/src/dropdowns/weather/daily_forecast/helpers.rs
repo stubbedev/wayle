@@ -63,7 +63,7 @@ pub fn temp_range(days: &[(Temperature, Temperature)]) -> (f32, f32) {
         }
     }
 
-    if min == f32::MAX {
+    if (min - f32::MAX).abs() < f32::EPSILON {
         return (0.0, 0.0);
     }
 

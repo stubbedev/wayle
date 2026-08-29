@@ -35,14 +35,14 @@ pub struct Cursor {
 impl Cursor {
     /// Fills whichever sides are missing in `self` from `other`.
     #[must_use]
-    pub fn or(self, other: Cursor) -> Cursor {
-        Cursor {
+    pub fn or(self, other: Self) -> Self {
+        Self {
             theme: self.theme.or(other.theme),
             size: self.size.or(other.size),
         }
     }
 
-    fn complete(&self) -> bool {
+    const fn complete(&self) -> bool {
         self.theme.is_some() && self.size.is_some()
     }
 }

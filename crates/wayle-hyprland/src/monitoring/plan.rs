@@ -6,6 +6,10 @@
 use crate::HyprlandEvent;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "set of independent sync-domain flags, not a state machine"
+)]
 pub(super) struct SyncPlan {
     pub(super) clients: bool,
     pub(super) monitors: bool,
@@ -14,7 +18,7 @@ pub(super) struct SyncPlan {
 }
 
 impl SyncPlan {
-    pub(super) fn merge(self, other: Self) -> Self {
+    pub(super) const fn merge(self, other: Self) -> Self {
         Self {
             clients: self.clients || other.clients,
             monitors: self.monitors || other.monitors,
@@ -23,7 +27,7 @@ impl SyncPlan {
         }
     }
 
-    pub(super) fn is_empty(self) -> bool {
+    pub(super) const fn is_empty(self) -> bool {
         !self.clients && !self.monitors && !self.workspaces && !self.layers
     }
 }
@@ -33,12 +37,12 @@ pub(super) fn for_event(event: &HyprlandEvent) -> SyncPlan {
         HyprlandEvent::OpenWindow { .. }
         | HyprlandEvent::CloseWindow { .. }
         | HyprlandEvent::MoveWindow { .. }
-        | HyprlandEvent::MoveWindowV2 { .. } => SyncPlan {
-            clients: true,
-            workspaces: true,
-            ..SyncPlan::default()
-        },
-        HyprlandEvent::ActiveWindow { .. } | HyprlandEvent::ActiveWindowV2 { .. } => SyncPlan {
+        | HyprlandEvent::MoveWindowV2 { .. }
+        | HyprlandEvent::ActiveWindow { .. }
+        | HyprlandEvent::ActiveWindowV2 { .. }
+        | HyprlandEvent::WindowTitle { .. }
+        | HyprlandEvent::WindowTitleV2 { .. }
+        | HyprlandEvent::Fullscreen { .. } => SyncPlan {
             clients: true,
             workspaces: true,
             ..SyncPlan::default()
@@ -50,19 +54,9 @@ pub(super) fn for_event(event: &HyprlandEvent) -> SyncPlan {
             clients: true,
             ..SyncPlan::default()
         },
-        HyprlandEvent::WindowTitle { .. }
-        | HyprlandEvent::WindowTitleV2 { .. }
-        | HyprlandEvent::Fullscreen { .. } => SyncPlan {
-            clients: true,
-            workspaces: true,
-            ..SyncPlan::default()
-        },
-        HyprlandEvent::Workspace { .. } | HyprlandEvent::WorkspaceV2 { .. } => SyncPlan {
-            monitors: true,
-            workspaces: true,
-            ..SyncPlan::default()
-        },
-        HyprlandEvent::CreateWorkspace { .. }
+        HyprlandEvent::Workspace { .. }
+        | HyprlandEvent::WorkspaceV2 { .. }
+        | HyprlandEvent::CreateWorkspace { .. }
         | HyprlandEvent::CreateWorkspaceV2 { .. }
         | HyprlandEvent::DestroyWorkspace { .. }
         | HyprlandEvent::DestroyWorkspaceV2 { .. }

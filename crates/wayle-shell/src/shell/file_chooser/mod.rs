@@ -644,7 +644,7 @@ impl Component for FileChooser {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let (sort_key, sort_asc, view) = load_ui_state();
-        let model = FileChooser {
+        let model = Self {
             config: init,
             active: None,
             places: user_places(),
@@ -1165,12 +1165,12 @@ impl FileChooser {
     /// Index of the first selected entry in the active view, if any.
     fn selected_index(&self, widgets: &FileChooserWidgets) -> Option<usize> {
         let idx = match self.view {
-            ViewMode::List => widgets.file_list.selected_rows().first().map(|r| r.index()),
+            ViewMode::List => widgets.file_list.selected_rows().first().map(gtk4::prelude::ListBoxRowExt::index),
             ViewMode::Grid => widgets
                 .file_grid
                 .selected_children()
                 .first()
-                .map(|c| c.index()),
+                .map(gtk4::prelude::FlowBoxChildExt::index),
         };
         idx.filter(|i| *i >= 0).map(|i| i as usize)
     }
@@ -1314,9 +1314,7 @@ fn start_dir(current_folder: &str) -> PathBuf {
             return path;
         }
     }
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/"))
+    std::env::var_os("HOME").map_or_else(|| PathBuf::from("/"), PathBuf::from)
 }
 
 /// Lists `dir` with each entry's size + mtime. Files are filtered (unless
@@ -1485,9 +1483,7 @@ fn entry_kind(entry: &Entry) -> String {
     }
     entry
         .path
-        .extension()
-        .map(|e| e.to_string_lossy().to_uppercase())
-        .unwrap_or_else(|| "File".to_owned())
+        .extension().map_or_else(|| "File".to_owned(), |e| e.to_string_lossy().to_uppercase())
 }
 
 /// A relevance score for a search hit (lower = better): how well the basename
@@ -2003,9 +1999,7 @@ fn fill_preview(
         let kind = entry
             .path
             .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| format!("{} file", e.to_uppercase()))
-            .unwrap_or_else(|| "File".to_owned());
+            .and_then(|e| e.to_str()).map_or_else(|| "File".to_owned(), |e| format!("{} file", e.to_uppercase()));
         format!(
             "{} · {} · {}",
             kind,
@@ -2096,6 +2090,11 @@ fn other_locations() -> Vec<Place> {
 /// Rebuilds the breadcrumb bar as clickable ancestor buttons. `$HOME` collapses
 /// to a single "Home" crumb; otherwise the trail starts at the filesystem root.
 fn build_breadcrumb(bar: &gtk::Box, dir: &Path, input: &Sender<FileChooserInput>) {
+    // Keep the trail short: past this many segments, collapse the middle into a
+    // single `…` crumb (which jumps to that hidden ancestor) so the bar never
+    // grows wide enough to need scrolling — Home › … › parent › current.
+    const MAX_TAIL: usize = 3;
+
     while let Some(child) = bar.first_child() {
         bar.remove(&child);
     }
@@ -2121,16 +2120,12 @@ fn build_breadcrumb(bar: &gtk::Box, dir: &Path, input: &Sender<FileChooserInput>
 
     append_crumb(bar, &base_label, &acc, input, names.is_empty());
 
-    // Keep the trail short: past this many segments, collapse the middle into a
-    // single `…` crumb (which jumps to that hidden ancestor) so the bar never
-    // grows wide enough to need scrolling — Home › … › parent › current.
-    const MAX_TAIL: usize = 3;
     let collapse_at = names.len().saturating_sub(MAX_TAIL);
     for (i, name) in names.iter().enumerate() {
         acc.push(name);
         // The first time we cross into the kept tail, drop in the `…` crumb that
         // targets everything collapsed before it.
-        if collapse_at > 0 && i + 1 == collapse_at {
+        if collapse_at > 0 && i.saturating_add(1) == collapse_at {
             bar.append(&crumb_separator());
             append_crumb(bar, "…", &acc, input, false);
             continue;
@@ -2144,7 +2139,7 @@ fn build_breadcrumb(bar: &gtk::Box, dir: &Path, input: &Sender<FileChooserInput>
             &name.to_string_lossy(),
             &acc,
             input,
-            i + 1 == names.len(),
+            i.saturating_add(1) == names.len(),
         );
     }
 }
@@ -2196,11 +2191,11 @@ fn clear_list(list: &gtk::ListBox) {
 fn wire_widget_signals(widgets: &FileChooserWidgets, input: &Sender<FileChooserInput>) {
     widgets.places_list.connect_row_activated({
         let input = input.clone();
-        move |_, row| input.emit(FileChooserInput::Place(row.index().max(0) as u32))
+        move |_, row| input.emit(FileChooserInput::Place(row.index().max(0).cast_unsigned()))
     });
     widgets.locations_list.connect_row_activated({
         let input = input.clone();
-        move |_, row| input.emit(FileChooserInput::Location(row.index().max(0) as u32))
+        move |_, row| input.emit(FileChooserInput::Location(row.index().max(0).cast_unsigned()))
     });
     widgets.search_entry.connect_search_changed({
         let input = input.clone();
@@ -2208,11 +2203,11 @@ fn wire_widget_signals(widgets: &FileChooserWidgets, input: &Sender<FileChooserI
     });
     widgets.file_list.connect_row_activated({
         let input = input.clone();
-        move |_, row| input.emit(FileChooserInput::Activate(row.index().max(0) as u32))
+        move |_, row| input.emit(FileChooserInput::Activate(row.index().max(0).cast_unsigned()))
     });
     widgets.file_grid.connect_child_activated({
         let input = input.clone();
-        move |_, child| input.emit(FileChooserInput::Activate(child.index().max(0) as u32))
+        move |_, child| input.emit(FileChooserInput::Activate(child.index().max(0).cast_unsigned()))
     });
     widgets.file_list.connect_selected_rows_changed({
         let input = input.clone();
@@ -2228,7 +2223,7 @@ fn wire_widget_signals(widgets: &FileChooserWidgets, input: &Sender<FileChooserI
     });
     widgets.filter_list.connect_row_activated({
         let input = input.clone();
-        move |_, row| input.emit(FileChooserInput::SelectFilter(row.index().max(0) as u32))
+        move |_, row| input.emit(FileChooserInput::SelectFilter(row.index().max(0).cast_unsigned()))
     });
 }
 
@@ -2267,9 +2262,15 @@ fn install_column_resize(
         move |gesture, x, _| {
             // Pad the 7px grip so it isn't a pixel-hunt to grab.
             const SLOP: f32 = 5.0;
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_possible_truncation,
+                reason = "pointer coordinate, f32 precision suffices"
+            )]
+            let x = x as f32;
             let hit = grips.iter().find_map(|(handle, btn)| {
                 let bounds = handle.compute_bounds(&header)?;
-                (x as f32 >= bounds.x() - SLOP && x as f32 <= bounds.x() + bounds.width() + SLOP)
+                (x >= bounds.x() - SLOP && x <= bounds.x() + bounds.width() + SLOP)
                     .then(|| btn.clone())
             });
             match hit {
@@ -2287,6 +2288,11 @@ fn install_column_resize(
         let target = target.clone();
         move |_, offset_x, _| {
             if let Some((btn, base)) = target.borrow().as_ref() {
+                #[expect(
+                    clippy::as_conversions,
+                    clippy::cast_possible_truncation,
+                    reason = "rounded column width fits i32"
+                )]
                 let new_w = (f64::from(*base) - offset_x).round() as i32;
                 btn.set_width_request(new_w.clamp(50, 400));
             }
@@ -2327,8 +2333,14 @@ fn setup_surface_resize(overlay: &gtk::Overlay, surface: &gtk::Box, root: &gtk::
         let surface = surface.clone();
         let floor = floor.clone();
         move |gesture, x, y| {
-            let in_corner = (x.round() as i32) >= overlay.width() - CORNER_ZONE
-                && (y.round() as i32) >= overlay.height() - CORNER_ZONE;
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_possible_truncation,
+                reason = "rounded pointer position fits i32"
+            )]
+            let (x, y) = (x.round() as i32, y.round() as i32);
+            let in_corner = x >= overlay.width().saturating_sub(CORNER_ZONE)
+                && y >= overlay.height().saturating_sub(CORNER_ZONE);
             if !in_corner {
                 gesture.set_state(gtk::EventSequenceState::Denied);
                 return;
@@ -2343,7 +2355,7 @@ fn setup_surface_resize(overlay: &gtk::Overlay, surface: &gtk::Box, root: &gtk::
                     let (min_w, _, _, _) = c.measure(gtk::Orientation::Horizontal, -1);
                     let (min_h, _, _, _) = c.measure(gtk::Orientation::Vertical, -1);
                     floor_w = floor_w.max(min_w);
-                    floor_h += min_h;
+                    floor_h = floor_h.saturating_add(min_h);
                 }
                 child = c.next_sibling();
             }
@@ -2353,7 +2365,6 @@ fn setup_surface_resize(overlay: &gtk::Overlay, surface: &gtk::Box, root: &gtk::
     drag.connect_drag_update({
         let surface = surface.clone();
         let root = root.clone();
-        let floor = floor.clone();
         // start_point + offset = the cursor's position relative to the overlay's
         // (fixed) top-left, which is the size we want the sheet to be. No feedback
         // from the surface growing, so it tracks the cursor 1:1.
@@ -2362,8 +2373,15 @@ fn setup_surface_resize(overlay: &gtk::Overlay, surface: &gtk::Box, root: &gtk::
                 return;
             };
             let (floor_w, floor_h) = floor.get();
-            let w = ((sx + ox).round() as i32).clamp(floor_w, 1600);
-            let h = ((sy + oy).round() as i32).clamp(floor_h, 1100);
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_possible_truncation,
+                reason = "rounded cursor position fits i32"
+            )]
+            let (w, h) = (
+                ((sx + ox).round() as i32).clamp(floor_w, 1600),
+                ((sy + oy).round() as i32).clamp(floor_h, 1100),
+            );
             surface.set_width_request(w);
             surface.set_height_request(h);
             // The size request alone can fail to shrink the window: GTK keeps
@@ -2398,8 +2416,14 @@ fn setup_surface_move(header: &gtk::CenterBox, root: &gtk::Window) {
     drag.connect_drag_update({
         let root = root.clone();
         move |_, dx, dy| {
-            let x = (root.margin(Edge::Left) + dx.round() as i32).max(0);
-            let y = (root.margin(Edge::Top) + dy.round() as i32).max(0);
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_possible_truncation,
+                reason = "rounded pointer delta fits i32"
+            )]
+            let (dx, dy) = (dx.round() as i32, dy.round() as i32);
+            let x = root.margin(Edge::Left).saturating_add(dx).max(0);
+            let y = root.margin(Edge::Top).saturating_add(dy).max(0);
             root.set_margin(Edge::Left, x);
             root.set_margin(Edge::Top, y);
         }
@@ -2414,10 +2438,12 @@ fn center_margins(w: i32, h: i32) -> (i32, i32) {
         .and_then(|d| d.monitors().item(0))
         .and_downcast::<gtk::gdk::Monitor>()
         .map(|m| m.geometry());
-    match geo {
-        Some(g) => (((g.width() - w) / 2).max(0), ((g.height() - h) / 2).max(0)),
-        None => (200, 150),
-    }
+    geo.map_or((200, 150), |g| {
+        (
+            (g.width().saturating_sub(w) / 2).max(0),
+            (g.height().saturating_sub(h) / 2).max(0),
+        )
+    })
 }
 
 /// Installs the window's keyboard shortcuts (Escape cancels, spacebar Quick
@@ -2707,8 +2733,8 @@ mod tests {
         // (decode preserved real pixels, not blank).
         assert_eq!(width, size);
         assert_eq!(height, size);
-        assert_eq!(stride, (width * 4) as usize);
-        assert_eq!(pixels.len(), (width * height * 4) as usize);
+        assert_eq!(stride, usize::try_from(width * 4).unwrap());
+        assert_eq!(pixels.len(), usize::try_from(width * height * 4).unwrap());
         assert!(pixels[0] > pixels[2], "left edge should be reddish");
     }
 

@@ -145,7 +145,7 @@ pub(crate) fn size_with_base(property: &ConfigProperty<Size>, base_rem: f32) -> 
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |size| size.to_string()),
+        handle: PropertyHandle::new(property, std::string::ToString::to_string),
         control: container.upcast(),
         keepalive: Box::new((handlers, apply, watcher)),
         full_width: false,

@@ -28,14 +28,15 @@ pub struct TrayMenuModel {
 
 /// GTK4 adapter for system tray menus.
 ///
-/// Converts SystemTray Service items into native GTK4 menu widgets.
+/// Converts `SystemTray` Service items into native GTK4 menu widgets.
 pub struct Adapter;
 
 impl Adapter {
-    /// Builds a GTK GMenu model and action group from a tray item.
+    /// Builds a GTK `GMenu` model and action group from a tray item.
     ///
     /// Creates a menu structure with sections separated by separators,
     /// and registers actions for each menu item including checkboxes and radio buttons.
+    #[must_use]
     pub fn build_model(tray_item: &TrayItem) -> TrayMenuModel {
         let menu = Menu::new();
         let actions = SimpleActionGroup::new();
@@ -64,11 +65,12 @@ impl Adapter {
         }
     }
 
-    /// Builds a basic PopoverMenu from a tray item's menu model.
+    /// Builds a basic `PopoverMenu` from a tray item's menu model.
     ///
     /// Returns a popover with actions registered under the "app" group.
     /// The caller is responsible for CSS classes, arrow visibility, and
     /// parenting before display.
+    #[must_use]
     pub fn build_popover(tray_item: &TrayItem) -> PopoverMenu {
         let TrayMenuModel { menu, actions, .. } = Self::build_model(tray_item);
 
@@ -88,8 +90,7 @@ impl Adapter {
         let label = menu_item
             .label
             .as_ref()
-            .map(|label| label.trim_start_matches('_'))
-            .unwrap_or("");
+            .map_or("", |label| label.trim_start_matches('_'));
 
         if menu_item.has_children() {
             let submenu = Menu::new();

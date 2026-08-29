@@ -62,7 +62,7 @@ struct V4l2Capability {
 }
 
 /// `VIDIOC_QUERYCAP` = `_IOR('V', 0, struct v4l2_capability)`.
-const VIDIOC_QUERYCAP: u64 = 0x8068_5600;
+const VIDIOC_QUERYCAP: libc::c_ulong = 0x8068_5600;
 /// `V4L2_CAP_VIDEO_CAPTURE`: the node can capture video.
 const V4L2_CAP_VIDEO_CAPTURE: u32 = 0x0000_0001;
 /// `V4L2_CAP_DEVICE_CAPS`: `device_caps` is filled and per-node accurate.
@@ -74,7 +74,7 @@ fn capture_card(path: &str) -> Option<String> {
     let file = fs::File::open(path).ok()?;
     let mut cap: V4l2Capability = unsafe { mem::zeroed() };
     // SAFETY: `cap` is a correctly-sized, zeroed buffer for VIDIOC_QUERYCAP.
-    let rc = unsafe { libc::ioctl(file.as_raw_fd(), VIDIOC_QUERYCAP as libc::c_ulong, &mut cap) };
+    let rc = unsafe { libc::ioctl(file.as_raw_fd(), VIDIOC_QUERYCAP, &mut cap) };
     if rc != 0 {
         return None;
     }
@@ -91,7 +91,9 @@ fn capture_card(path: &str) -> Option<String> {
         .iter()
         .position(|&b| b == 0)
         .unwrap_or(cap.card.len());
-    let card = String::from_utf8_lossy(&cap.card[..end]).trim().to_owned();
+    let card = String::from_utf8_lossy(cap.card.get(..end).unwrap_or(&cap.card))
+        .trim()
+        .to_owned();
     (!card.is_empty()).then_some(card)
 }
 
@@ -151,5 +153,6 @@ pub fn index_of(choices: &[DeviceChoice], id: &str) -> u32 {
     choices
         .iter()
         .position(|choice| choice.id == id)
-        .unwrap_or(0) as u32
+        .and_then(|index| u32::try_from(index).ok())
+        .unwrap_or(0)
 }

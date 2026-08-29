@@ -86,7 +86,7 @@ pub enum Error {
         path: PathBuf,
         /// The underlying import error.
         #[source]
-        source: Box<Error>,
+        source: Box<Self>,
     },
 
     /// Import path has no parent directory.

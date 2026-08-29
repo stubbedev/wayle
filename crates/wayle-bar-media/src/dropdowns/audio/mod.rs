@@ -31,7 +31,7 @@ pub enum AudioPage {
 }
 
 impl AudioPage {
-    fn name(self) -> &'static str {
+    const fn name(self) -> &'static str {
         match self {
             Self::Main => "main",
             Self::OutputDevices => "output",
@@ -109,7 +109,7 @@ impl Component for AudioDropdown {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let main_section = MainSection::builder()

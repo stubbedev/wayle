@@ -38,7 +38,7 @@ fn spawn_weather_watcher(
         ],
         |out| {
             let Some(weather) = weather_prop.get() else {
-                let _ = out.send(WeatherCmd::UpdateIcon(fallback_icon.get().clone()));
+                let _ = out.send(WeatherCmd::UpdateIcon(fallback_icon.get()));
                 return;
             };
 

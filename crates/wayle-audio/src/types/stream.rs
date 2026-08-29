@@ -12,7 +12,7 @@ pub enum StreamState {
     Ready,
     /// Stream is actively playing or recording.
     Running,
-    /// Stream is paused (corked in PulseAudio).
+    /// Stream is paused (corked in `PulseAudio`).
     Corked,
     /// Stream has failed.
     Failed,
@@ -42,13 +42,14 @@ pub struct StreamKey {
 
 impl StreamKey {
     /// Create a new stream key
-    pub fn new(index: u32, stream_type: StreamType) -> Self {
+    #[must_use]
+    pub const fn new(index: u32, stream_type: StreamType) -> Self {
         Self { index, stream_type }
     }
 }
 
 /// Media information for a stream
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MediaInfo {
     /// Track title
     pub title: Option<String>,
@@ -61,6 +62,7 @@ pub struct MediaInfo {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[expect(clippy::struct_excessive_bools, reason = "config/state struct")]
 pub(crate) struct StreamInfo {
     pub index: u32,
     pub stream_type: StreamType,
@@ -89,7 +91,7 @@ pub(crate) struct StreamInfo {
 }
 
 impl StreamInfo {
-    pub(crate) fn key(&self) -> StreamKey {
+    pub(crate) const fn key(&self) -> StreamKey {
         StreamKey {
             index: self.index,
             stream_type: self.stream_type,

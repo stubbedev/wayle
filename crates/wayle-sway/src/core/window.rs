@@ -25,7 +25,7 @@ pub struct Window {
     pub id: Property<u64>,
     /// Window title if set by the application.
     pub title: Property<Option<String>>,
-    /// Wayland `app_id`, or the XWayland `WM_CLASS` class as a fallback.
+    /// Wayland `app_id`, or the `XWayland` `WM_CLASS` class as a fallback.
     pub app_id: Property<Option<String>>,
     /// PID of the client process, when sway can determine it.
     pub pid: Property<Option<i32>>,

@@ -16,7 +16,7 @@ impl ModelMonitoring for Device {
     type Error = Error;
 
     async fn start_monitoring(self: Arc<Self>) -> Result<(), Self::Error> {
-        let proxy = DeviceProxy::new(&self.zbus_connection, self.device_path.clone()).await?;
+        let proxy = DeviceProxy::new(&self.zbus_connection, self.object_path.clone()).await?;
 
         let weak_self = Arc::downgrade(&self);
         let Some(ref cancellation_token) = self.cancellation_token else {
@@ -83,7 +83,7 @@ async fn monitor_device(
             };
 
             tokio::select! {
-                _ = cancel_token.cancelled() => {
+                () = cancel_token.cancelled() => {
                     debug!("Device monitoring cancelled");
                     return;
                 }

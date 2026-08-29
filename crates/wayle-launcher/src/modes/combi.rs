@@ -78,7 +78,7 @@ impl CombiMode {
 
 #[async_trait]
 impl Mode for CombiMode {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "combi"
     }
 
@@ -87,22 +87,19 @@ impl Mode for CombiMode {
     }
 
     async fn activate(&mut self, index: Option<u32>, kind: ActivateKind, input: &str) -> Action {
-        match index.and_then(|merged| self.locate(merged)) {
-            Some((child, local)) => {
-                let action = self.children[child]
-                    .activate(Some(local), kind, input)
-                    .await;
-                self.forward(action).await
-            }
-            None => {
-                // Custom input goes to the first child that accepts it.
-                let position = self.children.iter().position(|child| child.allows_custom());
-                let Some(child) = position else {
-                    return Action::Nothing;
-                };
-                let action = self.children[child].activate(None, kind, input).await;
-                self.forward(action).await
-            }
+        if let Some((child, local)) = index.and_then(|merged| self.locate(merged)) {
+            let action = self.children[child]
+                .activate(Some(local), kind, input)
+                .await;
+            self.forward(action).await
+        } else {
+            // Custom input goes to the first child that accepts it.
+            let position = self.children.iter().position(|child| child.allows_custom());
+            let Some(child) = position else {
+                return Action::Nothing;
+            };
+            let action = self.children[child].activate(None, kind, input).await;
+            self.forward(action).await
         }
     }
 

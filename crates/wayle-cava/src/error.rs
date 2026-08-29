@@ -24,21 +24,21 @@ pub enum Error {
     /// Failed to acquire mutex lock on audio input data.
     ///
     /// # Errors
-    /// Returned when pthread_mutex_lock fails. The error code is the errno value.
+    /// Returned when `pthread_mutex_lock` fails. The error code is the errno value.
     #[error("Mutex lock operation failed with error code: {0}")]
     MutexLock(i32),
 
     /// Failed to release mutex lock on audio input data.
     ///
     /// # Errors
-    /// Returned when pthread_mutex_unlock fails. The error code is the errno value.
+    /// Returned when `pthread_mutex_unlock` fails. The error code is the errno value.
     #[error("Mutex unlock operation failed with error code: {0}")]
     MutexUnlock(i32),
 
     /// Failed to initialize pthread mutex.
     ///
     /// # Errors
-    /// Returned when pthread_mutex_init fails during AudioInput construction.
+    /// Returned when `pthread_mutex_init` fails during `AudioInput` construction.
     /// The error code is the errno value.
     #[error("Mutex initialization failed with error code: {0}")]
     MutexInit(i32),
@@ -46,7 +46,7 @@ pub enum Error {
     /// Failed to initialize pthread condition variable.
     ///
     /// # Errors
-    /// Returned when pthread_cond_init fails during AudioInput construction.
+    /// Returned when `pthread_cond_init` fails during `AudioInput` construction.
     /// The error code is the errno value.
     #[error("Condition variable initialization failed with error code: {0}")]
     CondInit(i32),
@@ -69,7 +69,7 @@ pub enum Error {
     /// Audio raw output initialization failed.
     ///
     /// # Errors
-    /// Returned when audio_raw_init from libcava fails. The error code indicates
+    /// Returned when `audio_raw_init` from libcava fails. The error code indicates
     /// the specific failure reason.
     #[error("Audio raw initialization failed with error code: {0}")]
     AudioRawInitFailed(i32),

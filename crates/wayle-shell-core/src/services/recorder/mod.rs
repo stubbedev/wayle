@@ -16,7 +16,7 @@ use crate::services::widget_ipc::ToastBus;
 
 /// Screen recorder service.
 ///
-/// Owns the GStreamer engine + shared reactive state and exposes control over
+/// Owns the `GStreamer` engine + shared reactive state and exposes control over
 /// D-Bus at `com.wayle.Recorder1` (driven by `wayle recorder ...`).
 pub struct RecorderService {
     state: RecorderState,
@@ -24,11 +24,11 @@ pub struct RecorderService {
 }
 
 impl RecorderService {
-    /// Creates the service, initializing GStreamer and registering D-Bus.
+    /// Creates the service, initializing `GStreamer` and registering D-Bus.
     ///
     /// # Errors
     ///
-    /// Returns [`Error`] if GStreamer init, the session bus connection, or the
+    /// Returns [`Error`] if `GStreamer` init, the session bus connection, or the
     /// D-Bus registration fails.
     pub async fn new(config: Arc<ConfigService>, toast_bus: ToastBus) -> Result<Self, Error> {
         let recorder = Recorder::new().map_err(|e| Error::Engine(e.to_string()))?;
@@ -60,6 +60,7 @@ impl RecorderService {
     }
 
     /// Returns a clone of the shared state for modules to watch.
+    #[must_use]
     pub fn state(&self) -> RecorderState {
         self.state.clone()
     }

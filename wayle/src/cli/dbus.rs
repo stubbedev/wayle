@@ -15,8 +15,8 @@ pub async fn session() -> Result<Connection, String> {
 /// Formats D-Bus errors into user-friendly messages.
 ///
 /// Provides helpful guidance for common issues like services not running.
-pub fn format_error(service_name: &str, operation: &str, error: ZbusError) -> String {
-    match &error {
+pub fn format_error(service_name: &str, operation: &str, error: &ZbusError) -> String {
+    match error {
         ZbusError::FDO(fdo) => match fdo.as_ref() {
             FdoError::ServiceUnknown(_) | FdoError::NameHasNoOwner(_) => {
                 format!("{service_name} service not running. Start wayle shell first.")

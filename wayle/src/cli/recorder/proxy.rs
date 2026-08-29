@@ -20,6 +20,6 @@ pub async fn connect() -> Result<(Connection, RecorderProxy<'static>), String> {
 }
 
 /// Transforms zbus errors into user-friendly messages.
-pub fn format_error(operation: &str, error: ZbusError) -> String {
+pub fn format_error(operation: &str, error: &ZbusError) -> String {
     dbus::format_error(SERVICE_NAME, operation, error)
 }

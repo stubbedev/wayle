@@ -13,7 +13,7 @@ use crate::shell::bar::modules::hyprland_workspaces::helpers::{
 };
 
 impl WorkspaceButton {
-    pub fn id(&self) -> WorkspaceId {
+    pub const fn id(&self) -> WorkspaceId {
         self.id
     }
 
@@ -59,7 +59,7 @@ impl WorkspaceButton {
         )
     }
 
-    pub fn orientation(&self) -> gtk::Orientation {
+    pub const fn orientation(&self) -> gtk::Orientation {
         if self.is_vertical {
             gtk::Orientation::Vertical
         } else {
@@ -67,7 +67,7 @@ impl WorkspaceButton {
         }
     }
 
-    pub fn content_halign(&self) -> gtk::Align {
+    pub const fn content_halign(&self) -> gtk::Align {
         if self.is_vertical {
             gtk::Align::Fill
         } else {
@@ -75,7 +75,7 @@ impl WorkspaceButton {
         }
     }
 
-    pub fn content_valign(&self) -> gtk::Align {
+    pub const fn content_valign(&self) -> gtk::Align {
         if self.is_vertical {
             gtk::Align::Center
         } else {
@@ -83,7 +83,7 @@ impl WorkspaceButton {
         }
     }
 
-    pub fn icons_halign(&self) -> gtk::Align {
+    pub const fn icons_halign(&self) -> gtk::Align {
         if self.is_vertical {
             gtk::Align::Center
         } else {

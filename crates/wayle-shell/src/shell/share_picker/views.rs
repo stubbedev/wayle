@@ -101,7 +101,7 @@ pub(super) fn build_windows_page(
 ///
 /// The synthetic ids are display-only: unlike the XDPH list, they do **not**
 /// round-trip to a portal (XDPH's `window:<id>` is its own wlr-foreign-toplevel
-/// resource id). Capture instead re-matches the chosen window by app_id + title
+/// resource id). Capture instead re-matches the chosen window by `app_id` + title
 /// in [`capture_window_buffer`]'s `ext` branch, so the synthetic id is never
 /// resolved against anything.
 fn ext_fallback_toplevels(con: &Connection) -> Vec<Toplevel> {
@@ -254,7 +254,7 @@ fn request_window_frame(
 }
 
 /// Captures a window: Hyprland toplevel-export when a handle is present,
-/// otherwise the generic `ext` path matching by app_id/title.
+/// otherwise the generic `ext` path matching by `app_id/title`.
 fn capture_window_buffer(address: Option<u64>, class: &str, title: &str) -> Result<Buffer, String> {
     let connection =
         Connection::connect_to_env().map_err(|e| format!("cannot connect to wayland: {e}"))?;
@@ -317,7 +317,7 @@ impl From<&[OutputInfo]> for MonitorArea {
             max_y,
             width,
             height,
-            aspect_ratio: width as f64 / height.max(1) as f64,
+            aspect_ratio: f64::from(width) / f64::from(height.max(1)),
             offset_x: -min_x,
             offset_y: -min_y,
         }
@@ -505,21 +505,21 @@ fn append_output_on_allocation(
             if alloc_w == 0 || alloc_h == 0 {
                 return glib::ControlFlow::Continue;
             }
-            let container_aspect_ratio = alloc_w as f64 / alloc_h as f64;
-            let monitors_width_f = monitors_width.max(1) as f64;
-            let monitors_height_f = monitors_height.max(1) as f64;
+            let container_aspect_ratio = f64::from(alloc_w) / f64::from(alloc_h);
+            let monitors_width_f = f64::from(monitors_width.max(1));
+            let monitors_height_f = f64::from(monitors_height.max(1));
             let transform_x = |x: i32| {
                 if aspect_ratio > container_aspect_ratio {
-                    (x as f64 / monitors_width_f) * alloc_w as f64
+                    (f64::from(x) / monitors_width_f) * f64::from(alloc_w)
                 } else {
-                    (x as f64 / monitors_width_f) * alloc_h as f64 * aspect_ratio
+                    (f64::from(x) / monitors_width_f) * f64::from(alloc_h) * aspect_ratio
                 }
             };
             let transform_y = |y: i32| {
                 if aspect_ratio > container_aspect_ratio {
-                    (y as f64 / monitors_height_f) * alloc_w as f64 / aspect_ratio
+                    (f64::from(y) / monitors_height_f) * f64::from(alloc_w) / aspect_ratio
                 } else {
-                    (y as f64 / monitors_height_f) * alloc_h as f64
+                    (f64::from(y) / monitors_height_f) * f64::from(alloc_h)
                 }
             };
 
@@ -528,8 +528,8 @@ fn append_output_on_allocation(
 
             let transformed_monitor_width = transform_x(monitors_width);
             let transformed_monitor_height = transform_y(monitors_height);
-            let px_offset_x = (alloc_w as f64 - transformed_monitor_width).max(0.0) / 2.0;
-            let px_offset_y = (alloc_h as f64 - transformed_monitor_height).max(0.0) / 2.0;
+            let px_offset_x = (f64::from(alloc_w) - transformed_monitor_width).max(0.0) / 2.0;
+            let px_offset_y = (f64::from(alloc_h) - transformed_monitor_height).max(0.0) / 2.0;
 
             container.put(
                 &card,
@@ -578,27 +578,23 @@ pub(super) fn build_region_page(input: &Sender<SharePickerInput>) -> ScrolledWin
                 #[strong]
                 root,
                 async move {
-                    match crate::services::region_overlay::request_region(
+                    if let Some(sel) = crate::services::region_overlay::request_region(
                         std::collections::HashMap::new(),
                     )
-                    .await
-                    {
-                        Some(sel) => {
-                            // Restore the picker before emitting: in single
-                            // select the `Select` handler re-hides it as it
-                            // confirms, but in multi-select the picker stays up
-                            // to accept more sources / the Share button, so it
-                            // must be back on screen either way.
-                            root.set_visible(true);
-                            input.emit(SharePickerInput::Select(format!(
-                                "region:{}@{},{},{},{}",
-                                sel.output, sel.x, sel.y, sel.width, sel.height
-                            )));
-                        }
-                        None => {
-                            debug!("region selection cancelled");
-                            root.set_visible(true);
-                        }
+                    .await {
+                        // Restore the picker before emitting: in single
+                        // select the `Select` handler re-hides it as it
+                        // confirms, but in multi-select the picker stays up
+                        // to accept more sources / the Share button, so it
+                        // must be back on screen either way.
+                        root.set_visible(true);
+                        input.emit(SharePickerInput::Select(format!(
+                            "region:{}@{},{},{},{}",
+                            sel.output, sel.x, sel.y, sel.width, sel.height
+                        )));
+                    } else {
+                        debug!("region selection cancelled");
+                        root.set_visible(true);
                     }
                 }
             ));

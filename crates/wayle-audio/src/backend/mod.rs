@@ -70,6 +70,10 @@ impl PulseBackend {
         })
     }
 
+    #[expect(
+        clippy::future_not_send,
+        reason = "PulseAudio types are !Send; runs on a dedicated blocking thread"
+    )]
     async fn new() -> Result<Self, Error> {
         use libpulse_binding::context::State;
 
@@ -104,13 +108,10 @@ impl PulseBackend {
         &mut self,
         event_tx: EventSender,
         cancellation_token: CancellationToken,
-    ) -> Result<
-        (
-            mpsc::UnboundedSender<InternalRefresh>,
-            mpsc::UnboundedReceiver<InternalRefresh>,
-        ),
-        Error,
-    > {
+    ) -> (
+        mpsc::UnboundedSender<InternalRefresh>,
+        mpsc::UnboundedReceiver<InternalRefresh>,
+    ) {
         let (internal_command_tx, internal_command_rx) =
             mpsc::unbounded_channel::<InternalRefresh>();
 
@@ -122,14 +123,14 @@ impl PulseBackend {
             event_tx,
             internal_command_tx.clone(),
             cancellation_token,
-        )?;
+        );
 
         info!("Triggering initial device and stream discovery");
         let _ = internal_command_tx.send(InternalRefresh::Devices);
         let _ = internal_command_tx.send(InternalRefresh::Streams);
         let _ = internal_command_tx.send(InternalRefresh::ServerInfo);
 
-        Ok((internal_command_tx, internal_command_rx))
+        (internal_command_tx, internal_command_rx)
     }
 
     fn spawn_command_processor(
@@ -144,7 +145,7 @@ impl PulseBackend {
         spawn(async move {
             loop {
                 tokio::select! {
-                    _ = cancellation_token.cancelled() => {
+                    () = cancellation_token.cancelled() => {
                         info!("PulseBackend command handler cancelled");
                         return;
                     }
@@ -173,36 +174,38 @@ impl PulseBackend {
                 device_key,
                 responder,
             } => {
-                let result = if let Ok(devices_guard) = devices.read() {
-                    devices_guard
-                        .values()
-                        .find(|d| d.key() == device_key)
-                        .cloned()
-                        .ok_or(Error::DeviceNotFound {
-                            index: device_key.index,
-                            device_type: device_key.device_type,
-                        })
-                } else {
-                    Err(Error::LockPoisoned)
-                };
+                let result = devices.read().map_or_else(
+                    |_| Err(Error::LockPoisoned),
+                    |devices_guard| {
+                        devices_guard
+                            .values()
+                            .find(|d| d.key() == device_key)
+                            .cloned()
+                            .ok_or(Error::DeviceNotFound {
+                                index: device_key.index,
+                                device_type: device_key.device_type,
+                            })
+                    },
+                );
                 let _ = responder.send(result);
             }
             Command::GetStream {
                 stream_key,
                 responder,
             } => {
-                let result = if let Ok(streams_guard) = streams.read() {
-                    streams_guard
-                        .values()
-                        .find(|s| s.key() == stream_key)
-                        .cloned()
-                        .ok_or(Error::StreamNotFound {
-                            index: stream_key.index,
-                            stream_type: stream_key.stream_type,
-                        })
-                } else {
-                    Err(Error::LockPoisoned)
-                };
+                let result = streams.read().map_or_else(
+                    |_| Err(Error::LockPoisoned),
+                    |streams_guard| {
+                        streams_guard
+                            .values()
+                            .find(|s| s.key() == stream_key)
+                            .cloned()
+                            .ok_or(Error::StreamNotFound {
+                                index: stream_key.index,
+                                stream_type: stream_key.stream_type,
+                            })
+                    },
+                );
                 let _ = responder.send(result);
             }
             Command::SetVolume {
@@ -282,6 +285,10 @@ impl PulseBackend {
     }
 
     #[allow(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::future_not_send,
+        reason = "PulseAudio types are !Send; runs on a dedicated blocking thread"
+    )]
     async fn run(
         mut self,
         command_rx: CommandReceiver,
@@ -291,7 +298,7 @@ impl PulseBackend {
         let event_token = cancellation_token.child_token();
         let command_token = cancellation_token.child_token();
 
-        let (_, mut internal_rx) = self.setup_event_monitoring(event_tx.clone(), event_token)?;
+        let (_, mut internal_rx) = self.setup_event_monitoring(event_tx.clone(), event_token);
 
         let (external_tx, mut external_rx) = mpsc::unbounded_channel::<ExternalCommand>();
 
@@ -304,7 +311,7 @@ impl PulseBackend {
             tokio::select! {
                 biased;
 
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     info!("PulseAudio backend cancelled");
                     break;
                 }

@@ -82,7 +82,7 @@ pub(crate) fn spawn(services: &ShellServices) {
         }
     });
 
-    let theming_monitor = styling.theming_monitor.clone();
+    let theming_monitor = styling.theming_monitor;
     tokio::spawn(async move {
         let mut stream = theming_monitor.watch();
         while let Some(monitor) = stream.next().await {

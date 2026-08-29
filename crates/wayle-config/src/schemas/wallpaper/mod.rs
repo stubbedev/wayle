@@ -74,7 +74,7 @@ impl ModuleInfoProvider for WallpaperConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("wallpaper"),
-            schema: || schema_for!(WallpaperConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

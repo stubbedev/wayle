@@ -30,7 +30,7 @@ impl AudioOutput {
             dimension_value: ptr::null_mut(),
             userEQ_keys_to_bars_ratio: 0.0,
             channels: 0,
-            number_of_bars: bars as i32,
+            number_of_bars: i32::try_from(bars).unwrap_or(i32::MAX),
             output_channels: 0,
             height: 0,
             lines: 0,
@@ -62,7 +62,7 @@ impl AudioOutput {
                 audio_input.as_ptr(),
                 self.as_ptr(),
                 config.as_ptr(),
-                &mut plan_ptr,
+                &raw mut plan_ptr,
             )
         };
 
@@ -75,7 +75,7 @@ impl AudioOutput {
     }
 
     pub(crate) fn as_ptr(&mut self) -> *mut audio_raw {
-        &mut *self.inner as *mut _
+        &raw mut *self.inner
     }
 
     pub fn values(&self) -> &[f64] {
@@ -83,7 +83,8 @@ impl AudioOutput {
         // The data is valid for the lifetime of this struct.
         unsafe {
             let output_data = self.inner.as_ref().get_ref();
-            slice::from_raw_parts(output_data.cava_out, output_data.number_of_bars as usize)
+            let len = usize::try_from(output_data.number_of_bars).unwrap_or(0);
+            slice::from_raw_parts(output_data.cava_out, len)
         }
     }
 }
@@ -98,6 +99,10 @@ impl Drop for AudioOutput {
     }
 }
 
+#[expect(
+    clippy::non_send_fields_in_send_ty,
+    reason = "raw pointers reference C-owned buffers kept alive by this struct"
+)]
 unsafe impl Send for AudioOutput {}
 
 unsafe impl Sync for AudioOutput {}

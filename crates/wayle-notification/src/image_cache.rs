@@ -50,14 +50,10 @@ fn cache_image_data(
         return None;
     }
 
+    let width_px = u32::try_from(width).ok()?;
+    let height_px = u32::try_from(height).ok()?;
     let pixel_data = strip_rowstride_padding(width, channels, rowstride, data);
-    encode_png(
-        &path,
-        width as u32,
-        height as u32,
-        color_type,
-        pixel_data.as_ref(),
-    )?;
+    encode_png(&path, width_px, height_px, color_type, pixel_data.as_ref())?;
 
     debug!(path = %path.display(), "cached notification image");
     Some(path_to_string(&path))
@@ -82,14 +78,18 @@ fn png_color_type(bits_per_sample: i32, channels: i32) -> Option<ColorType> {
     }
 }
 
-fn strip_rowstride_padding<'a>(
+fn strip_rowstride_padding(
     width: i32,
     channels: i32,
     rowstride: i32,
-    data: &'a [u8],
-) -> Cow<'a, [u8]> {
-    let row_bytes = (channels * width) as usize;
-    let rowstride = rowstride as usize;
+    data: &[u8],
+) -> Cow<'_, [u8]> {
+    let Ok(row_bytes) = usize::try_from(channels.saturating_mul(width)) else {
+        return Cow::Borrowed(data);
+    };
+    let Ok(rowstride) = usize::try_from(rowstride) else {
+        return Cow::Borrowed(data);
+    };
 
     if rowstride == row_bytes {
         return Cow::Borrowed(data);
@@ -97,7 +97,7 @@ fn strip_rowstride_padding<'a>(
 
     Cow::Owned(
         data.chunks(rowstride)
-            .flat_map(|row| &row[..row_bytes.min(row.len())])
+            .flat_map(|row| row.get(..row_bytes).unwrap_or(row))
             .copied()
             .collect(),
     )

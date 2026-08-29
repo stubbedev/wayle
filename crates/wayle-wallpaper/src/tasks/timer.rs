@@ -7,19 +7,19 @@ pub(super) struct CyclingTimer {
 }
 
 impl CyclingTimer {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { fires_at: None }
     }
 
     pub fn schedule(&mut self, delay: Duration) {
-        self.fires_at = Some(Instant::now() + delay);
+        self.fires_at = Instant::now().checked_add(delay);
     }
 
-    pub fn cancel(&mut self) {
+    pub const fn cancel(&mut self) {
         self.fires_at = None;
     }
 
-    pub fn is_scheduled(&self) -> bool {
+    pub const fn is_scheduled(&self) -> bool {
         self.fires_at.is_some()
     }
 

@@ -114,7 +114,7 @@ impl TryFrom<HashMap<String, OwnedValue>> for Profile {
 
         let profile = PowerProfile::from(profile_str.as_str());
 
-        Ok(Profile { driver, profile })
+        Ok(Self { driver, profile })
     }
 }
 
@@ -140,7 +140,7 @@ impl TryFrom<HashMap<String, OwnedValue>> for ProfileHold {
                 field: "ApplicationId".to_string(),
                 expected: "String".to_string(),
             })?
-            .clone();
+            ;
 
         let profile_str = dict
             .get("Profile")
@@ -159,9 +159,9 @@ impl TryFrom<HashMap<String, OwnedValue>> for ProfileHold {
                 field: "Reason".to_string(),
                 expected: "String".to_string(),
             })?
-            .clone();
+            ;
 
-        Ok(ProfileHold {
+        Ok(Self {
             application_id,
             profile,
             reason,
@@ -439,7 +439,7 @@ mod tests {
         for original in profiles {
             let string = original.to_string();
             let parsed = PowerProfile::from(string.as_str());
-            assert_eq!(original, parsed, "Round-trip failed for {:?}", original);
+            assert_eq!(original, parsed, "Round-trip failed for {original:?}");
         }
     }
 
@@ -454,7 +454,7 @@ mod tests {
         for original in reasons {
             let string = original.to_string();
             let parsed = PerformanceDegradationReason::from(string.as_str());
-            assert_eq!(original, parsed, "Round-trip failed for {:?}", original);
+            assert_eq!(original, parsed, "Round-trip failed for {original:?}");
         }
     }
 }

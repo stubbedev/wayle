@@ -19,7 +19,7 @@ pub enum DeviceState {
 }
 
 /// Device port information
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DevicePort {
     /// Port name
     pub name: String,
@@ -51,7 +51,8 @@ pub struct DeviceKey {
 
 impl DeviceKey {
     /// Create a new device key
-    pub fn new(index: u32, device_type: DeviceType) -> Self {
+    #[must_use]
+    pub const fn new(index: u32, device_type: DeviceType) -> Self {
         Self { index, device_type }
     }
 }
@@ -96,7 +97,7 @@ pub(crate) struct SourceInfo {
 }
 
 impl DeviceInfo {
-    pub(crate) fn key(&self, device_type: DeviceType) -> DeviceKey {
+    pub(crate) const fn key(&self, device_type: DeviceType) -> DeviceKey {
         DeviceKey {
             index: self.index,
             device_type,
@@ -105,13 +106,13 @@ impl DeviceInfo {
 }
 
 impl SinkInfo {
-    pub(crate) fn key(&self) -> DeviceKey {
+    pub(crate) const fn key(&self) -> DeviceKey {
         self.device.key(DeviceType::Output)
     }
 }
 
 impl SourceInfo {
-    pub(crate) fn key(&self) -> DeviceKey {
+    pub(crate) const fn key(&self) -> DeviceKey {
         self.device.key(DeviceType::Input)
     }
 }
@@ -123,10 +124,10 @@ pub(crate) enum Device {
 }
 
 impl Device {
-    pub(crate) fn key(&self) -> DeviceKey {
+    pub(crate) const fn key(&self) -> DeviceKey {
         match self {
-            Device::Sink(sink) => sink.key(),
-            Device::Source(source) => source.key(),
+            Self::Sink(sink) => sink.key(),
+            Self::Source(source) => source.key(),
         }
     }
 }

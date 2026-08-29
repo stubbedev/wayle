@@ -2,7 +2,7 @@
 //! add / remove / reorder controls. Replaces the raw-TOML fallback for icon
 //! lists, ignore lists, priority lists, etc.
 //!
-//! Edits read-modify-write the whole `Vec` (ConfigProperty is atomic). Text
+//! Edits read-modify-write the whole `Vec` (`ConfigProperty` is atomic). Text
 //! edits update in place (no rebuild, so focus is kept); structural changes
 //! (add/remove/reorder) rebuild the rows. A watcher rebuilds when the value
 //! changes externally (reset, config reload).
@@ -106,12 +106,17 @@ impl StringListState {
         let Some(index) = self.index_of(entry) else {
             return;
         };
-        let target = index as i32 + delta;
+        let Some(target) = isize::try_from(delta)
+            .ok()
+            .and_then(|delta| index.checked_add_signed(delta))
+        else {
+            return;
+        };
         let mut values = self.values();
-        if target < 0 || target as usize >= values.len() {
+        if target >= values.len() {
             return;
         }
-        values.swap(index, target as usize);
+        values.swap(index, target);
         self.rebuild(&values);
         self.commit();
     }

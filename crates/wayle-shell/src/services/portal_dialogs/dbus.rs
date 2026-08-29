@@ -23,7 +23,7 @@ impl PortalDialogsDaemon {
         icon: &str,
     ) -> zbus::fdo::Result<bool> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.dispatch(PortalDialogInput::Access {
+        dispatch(PortalDialogInput::Access {
             title: title.to_owned(),
             subtitle: subtitle.to_owned(),
             body: body.to_owned(),
@@ -39,7 +39,7 @@ impl PortalDialogsDaemon {
     #[instrument(skip(self))]
     pub async fn account(&self, reason: &str) -> zbus::fdo::Result<bool> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.dispatch(PortalDialogInput::Account {
+        dispatch(PortalDialogInput::Account {
             reason: reason.to_owned(),
             reply: reply_tx,
         })?;
@@ -50,7 +50,7 @@ impl PortalDialogsDaemon {
     #[instrument(skip(self))]
     pub async fn confirm_wallpaper(&self, uri: &str) -> zbus::fdo::Result<bool> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.dispatch(PortalDialogInput::WallpaperPreview {
+        dispatch(PortalDialogInput::WallpaperPreview {
             uri: uri.to_owned(),
             reply: reply_tx,
         })?;
@@ -66,7 +66,7 @@ impl PortalDialogsDaemon {
         uri: &str,
     ) -> zbus::fdo::Result<String> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.dispatch(PortalDialogInput::ChooseApp {
+        dispatch(PortalDialogInput::ChooseApp {
             choices,
             content_type: content_type.to_owned(),
             uri: uri.to_owned(),
@@ -79,7 +79,7 @@ impl PortalDialogsDaemon {
     #[instrument(skip(self))]
     pub async fn confirm_install(&self, name: &str, icon_name: &str) -> zbus::fdo::Result<bool> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.dispatch(PortalDialogInput::ConfirmInstall {
+        dispatch(PortalDialogInput::ConfirmInstall {
             name: name.to_owned(),
             icon_name: icon_name.to_owned(),
             reply: reply_tx,
@@ -88,15 +88,13 @@ impl PortalDialogsDaemon {
     }
 }
 
-impl PortalDialogsDaemon {
-    fn dispatch(&self, input: PortalDialogInput) -> zbus::fdo::Result<()> {
-        let Some(sender) = host_sender() else {
-            warn!("portal dialog requested before the shell UI registered its sender");
-            return Err(zbus::fdo::Error::Failed("shell UI not ready".to_owned()));
-        };
-        sender.emit(input);
-        Ok(())
-    }
+fn dispatch(input: PortalDialogInput) -> zbus::fdo::Result<()> {
+    let Some(sender) = host_sender() else {
+        warn!("portal dialog requested before the shell UI registered its sender");
+        return Err(zbus::fdo::Error::Failed("shell UI not ready".to_owned()));
+    };
+    sender.emit(input);
+    Ok(())
 }
 
 fn dropped() -> zbus::fdo::Error {

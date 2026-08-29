@@ -26,7 +26,7 @@ impl AppVolumes {
 
     pub fn resume_stream_watchers(&mut self, sender: &ComponentSender<Self>) {
         let token = self.streams_watcher.reset();
-        super::watchers::spawn_per_stream(sender, &self.playback_streams, token);
+        super::watchers::spawn_per_stream(sender, &self.playback_streams, &token);
     }
 
     fn resolve_stream_icon(
@@ -84,7 +84,7 @@ impl AppVolumes {
 
         items.sort_by(|left, right| left.name.cmp(&right.name));
 
-        let mut guard = self.app_volumes.guard();
+        let mut guard = self.items.guard();
         guard.clear();
         for init in items {
             guard.push_back(init);
@@ -101,14 +101,14 @@ impl AppVolumes {
         };
 
         let item_index = {
-            let guard = self.app_volumes.guard();
+            let guard = self.items.guard();
             guard
                 .iter()
                 .position(|volume_item| volume_item.stream_index == stream_index)
         };
 
         if let Some(item_index) = item_index {
-            self.app_volumes.send(
+            self.items.send(
                 item_index,
                 AppVolumeItemMsg::SetBackendState {
                     volume: stream.volume.get().average_percentage(),

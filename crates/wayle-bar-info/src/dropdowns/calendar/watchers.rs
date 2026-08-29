@@ -74,7 +74,7 @@ fn spawn_week_start_watcher(
     });
 }
 
-pub fn week_start_to_weekday(ws: WeekStart) -> Weekday {
+pub const fn week_start_to_weekday(ws: WeekStart) -> Weekday {
     match ws {
         WeekStart::Monday => Weekday::Mon,
         WeekStart::Tuesday => Weekday::Tue,

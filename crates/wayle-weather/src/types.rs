@@ -13,6 +13,7 @@ impl Percentage {
     pub const MAX: Self = Self(100);
 
     /// Returns `None` if `value > 100`.
+    #[must_use]
     pub fn new(value: u8) -> Option<Self> {
         (value <= 100).then_some(Self(value))
     }
@@ -25,7 +26,7 @@ impl Percentage {
 
     /// The underlying `u8`.
     #[must_use]
-    pub fn get(self) -> u8 {
+    pub const fn get(self) -> u8 {
         self.0
     }
 }
@@ -51,25 +52,26 @@ impl WindDirection {
     pub const WEST: Self = Self(270);
 
     /// Returns `None` if `degrees >= 360`.
+    #[must_use]
     pub fn new(degrees: u16) -> Option<Self> {
         (degrees < 360).then_some(Self(degrees))
     }
 
     /// Wraps using modulo 360 to normalize out-of-range values.
     #[must_use]
-    pub fn saturating(degrees: u16) -> Self {
+    pub const fn saturating(degrees: u16) -> Self {
         Self(degrees % 360)
     }
 
     /// The bearing as degrees.
     #[must_use]
-    pub fn degrees(self) -> u16 {
+    pub const fn degrees(self) -> u16 {
         self.0
     }
 
     /// Converts to 8-point compass (N, NE, E, SE, S, SW, W, NW).
     #[must_use]
-    pub fn cardinal(self) -> &'static str {
+    pub const fn cardinal(self) -> &'static str {
         match self.0 {
             0..=22 | 338..=359 => "N",
             23..=67 => "NE",
@@ -98,6 +100,7 @@ impl UvIndex {
     pub const ZERO: Self = Self(0);
 
     /// Returns `None` if `value > 15`.
+    #[must_use]
     pub fn new(value: u8) -> Option<Self> {
         (value <= 15).then_some(Self(value))
     }
@@ -110,13 +113,13 @@ impl UvIndex {
 
     /// The underlying index.
     #[must_use]
-    pub fn get(self) -> u8 {
+    pub const fn get(self) -> u8 {
         self.0
     }
 
     /// WHO classification: Low, Moderate, High, Very High, or Extreme.
     #[must_use]
-    pub fn risk_level(self) -> &'static str {
+    pub const fn risk_level(self) -> &'static str {
         match self.0 {
             0..=2 => "Low",
             3..=5 => "Moderate",
@@ -139,13 +142,14 @@ pub struct Temperature(f32);
 
 impl Temperature {
     /// Returns `None` for NaN or infinity.
+    #[must_use]
     pub fn new(celsius: f32) -> Option<Self> {
         celsius.is_finite().then_some(Self(celsius))
     }
 
     /// Value in degrees Celsius.
     #[must_use]
-    pub fn celsius(self) -> f32 {
+    pub const fn celsius(self) -> f32 {
         self.0
     }
 
@@ -171,20 +175,21 @@ impl Speed {
     pub const ZERO: Self = Self(0.0);
 
     /// Returns `None` for negative or non-finite values.
+    #[must_use]
     pub fn new(kmh: f32) -> Option<Self> {
         (kmh >= 0.0 && kmh.is_finite()).then_some(Self(kmh))
     }
 
     /// Value in kilometers per hour.
     #[must_use]
-    pub fn kmh(self) -> f32 {
+    pub const fn kmh(self) -> f32 {
         self.0
     }
 
     /// Converted to miles per hour.
     #[must_use]
     pub fn mph(self) -> f32 {
-        self.0 * 0.621371
+        self.0 * 0.621_371
     }
 }
 
@@ -203,25 +208,27 @@ impl Distance {
     pub const ZERO: Self = Self(0.0);
 
     /// Returns `None` for negative or non-finite values.
+    #[must_use]
     pub fn new(km: f32) -> Option<Self> {
         (km >= 0.0 && km.is_finite()).then_some(Self(km))
     }
 
     /// Creates from meters since Open-Meteo reports visibility in meters.
+    #[must_use]
     pub fn from_meters(m: f32) -> Option<Self> {
         Self::new(m / 1000.0)
     }
 
     /// Value in kilometers.
     #[must_use]
-    pub fn km(self) -> f32 {
+    pub const fn km(self) -> f32 {
         self.0
     }
 
     /// Converted to miles.
     #[must_use]
     pub fn miles(self) -> f32 {
-        self.0 * 0.621371
+        self.0 * 0.621_371
     }
 }
 
@@ -237,13 +244,14 @@ pub struct Pressure(f32);
 
 impl Pressure {
     /// Returns `None` for negative or non-finite values.
+    #[must_use]
     pub fn new(hpa: f32) -> Option<Self> {
         (hpa >= 0.0 && hpa.is_finite()).then_some(Self(hpa))
     }
 
     /// Value in hectopascals.
     #[must_use]
-    pub fn hpa(self) -> f32 {
+    pub const fn hpa(self) -> f32 {
         self.0
     }
 
@@ -269,20 +277,21 @@ impl Precipitation {
     pub const ZERO: Self = Self(0.0);
 
     /// Returns `None` for negative or non-finite values.
+    #[must_use]
     pub fn new(mm: f32) -> Option<Self> {
         (mm >= 0.0 && mm.is_finite()).then_some(Self(mm))
     }
 
     /// Value in millimeters.
     #[must_use]
-    pub fn mm(self) -> f32 {
+    pub const fn mm(self) -> f32 {
         self.0
     }
 
     /// Converted to inches.
     #[must_use]
     pub fn inches(self) -> f32 {
-        self.0 * 0.0393701
+        self.0 * 0.039_370_1
     }
 }
 

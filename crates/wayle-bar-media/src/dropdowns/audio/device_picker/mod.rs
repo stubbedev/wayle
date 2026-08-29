@@ -68,7 +68,7 @@ impl Component for DevicePicker {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let device_list = gtk::ListBox::new();

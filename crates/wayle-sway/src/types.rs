@@ -25,10 +25,10 @@ pub(crate) struct WorkspaceReply {
     pub output: String,
 }
 
-/// X11 window properties, present only for XWayland surfaces.
+/// X11 window properties, present only for `XWayland` surfaces.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub(crate) struct WindowProperties {
-    /// X11 `WM_CLASS` class, used as the app id fallback for XWayland windows.
+    /// X11 `WM_CLASS` class, used as the app id fallback for `XWayland` windows.
     #[serde(default)]
     pub class: Option<String>,
 }
@@ -60,15 +60,15 @@ pub(crate) struct TreeNode {
     /// Whether this node has signalled urgency.
     #[serde(default)]
     pub urgent: bool,
-    /// X11 window properties for XWayland surfaces.
+    /// X11 window properties for `XWayland` surfaces.
     #[serde(default)]
     pub window_properties: Option<WindowProperties>,
     /// Tiled child nodes.
     #[serde(default)]
-    pub nodes: Vec<TreeNode>,
+    pub nodes: Vec<Self>,
     /// Floating child nodes.
     #[serde(default)]
-    pub floating_nodes: Vec<TreeNode>,
+    pub floating_nodes: Vec<Self>,
 }
 
 impl TreeNode {
@@ -86,7 +86,7 @@ impl TreeNode {
     }
 
     /// Resolved application id: the Wayland `app_id`, falling back to the
-    /// XWayland `WM_CLASS` class.
+    /// `XWayland` `WM_CLASS` class.
     pub(crate) fn resolved_app_id(&self) -> Option<String> {
         self.app_id.clone().or_else(|| {
             self.window_properties

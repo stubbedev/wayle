@@ -11,12 +11,12 @@ pub async fn execute() -> CliAction {
     let profiles = proxy
         .list_profiles()
         .await
-        .map_err(|e| format_error("list profiles", e))?;
+        .map_err(|e| format_error("list profiles", &e))?;
 
     let active = proxy
         .active_profile()
         .await
-        .map_err(|e| format_error("get active profile", e))?;
+        .map_err(|e| format_error("get active profile", &e))?;
 
     println!("Available profiles:");
     for profile in &profiles {

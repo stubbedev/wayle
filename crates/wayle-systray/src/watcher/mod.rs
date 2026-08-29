@@ -133,7 +133,7 @@ impl StatusNotifierWatcher {
     }
 
     #[zbus(property)]
-    fn protocol_version(&self) -> i32 {
+    const fn protocol_version(&self) -> i32 {
         PROTOCOL_VERSION
     }
 

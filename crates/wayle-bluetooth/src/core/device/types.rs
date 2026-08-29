@@ -13,7 +13,7 @@ use crate::types::{ServiceNotification, device::DisconnectReason};
 pub struct DisconnectedEvent {
     /// Reason for the disconnection.
     pub reason: DisconnectReason,
-    /// Human-readable message from BlueZ.
+    /// Human-readable message from `BlueZ`.
     pub message: String,
 }
 

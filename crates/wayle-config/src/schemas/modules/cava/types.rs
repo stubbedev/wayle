@@ -30,7 +30,7 @@ impl BarCount {
 
     /// Returns the inner u16 value.
     #[must_use]
-    pub fn value(self) -> u16 {
+    pub const fn value(self) -> u16 {
         self.0
     }
 }
@@ -96,7 +96,7 @@ impl Framerate {
 
     /// Returns the inner u32 value.
     #[must_use]
-    pub fn value(self) -> u32 {
+    pub const fn value(self) -> u32 {
         self.0
     }
 }
@@ -142,7 +142,7 @@ const FREQUENCY_MIN: u32 = 1;
 
 /// Frequency value in Hz, minimum 1 Hz.
 ///
-/// Cross-field constraints (high_cutoff > low_cutoff, samplerate/2 > high_cutoff)
+/// Cross-field constraints (`high_cutoff` > `low_cutoff`, samplerate/2 > `high_cutoff`)
 /// are validated at the service builder.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -159,7 +159,7 @@ impl FrequencyHz {
 
     /// Returns the inner u32 value.
     #[must_use]
-    pub fn value(self) -> u32 {
+    pub const fn value(self) -> u32 {
         self.0
     }
 }
@@ -223,10 +223,10 @@ pub enum CavaDirection {
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum CavaInput {
-    /// PipeWire multimedia server.
+    /// `PipeWire` multimedia server.
     #[default]
     PipeWire,
-    /// PulseAudio sound server.
+    /// `PulseAudio` sound server.
     Pulse,
     /// Advanced Linux Sound Architecture.
     Alsa,
@@ -234,7 +234,7 @@ pub enum CavaInput {
     Jack,
     /// Named pipe (FIFO) input.
     Fifo,
-    /// PortAudio cross-platform library.
+    /// `PortAudio` cross-platform library.
     PortAudio,
     /// sndio audio subsystem (BSD).
     Sndio,

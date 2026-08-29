@@ -33,7 +33,7 @@ impl BrightnessServiceBuilder {
     /// Enabled by default. Requires the `i2c-dev` kernel module and access to
     /// `/dev/i2c-*`. Disable to skip the (slow) DDC enumeration entirely.
     #[must_use]
-    pub fn external_monitors(mut self, enabled: bool) -> Self {
+    pub const fn external_monitors(mut self, enabled: bool) -> Self {
         self.external_monitors = enabled;
         self
     }

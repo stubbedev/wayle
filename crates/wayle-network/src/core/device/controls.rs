@@ -56,6 +56,7 @@ impl DeviceControls {
             .await
             .map_err(Error::DbusError)?;
 
+        #[expect(clippy::as_conversions, reason = "enum discriminant to D-Bus u32")]
         proxy
             .set_managed_ext(managed as u32, flags.bits())
             .await

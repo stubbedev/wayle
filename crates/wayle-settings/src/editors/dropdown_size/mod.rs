@@ -98,7 +98,6 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
     apply_size(get(), &inherit, &mode, &spin);
 
     let commit = {
-        let set = Rc::clone(&set);
         let inherit = inherit.clone();
         let mode = mode.clone();
         let spin = spin.clone();
@@ -108,6 +107,11 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
                 return;
             }
             let raw = spin.value();
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_possible_truncation,
+                reason = "UI size values fit f32 precision"
+            )]
             let size = if mode.selected() == PX_INDEX {
                 Size::px(raw.round() as f32)
             } else {
@@ -151,7 +155,7 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
         spin_handler,
     ));
 
-    let refresh = {
+    let refresh: Rc<dyn Fn()> = {
         let handlers = Rc::clone(&handlers);
         Rc::new(move || {
             let (inherit, ih, mode, mh, spin, sh) = &*handlers;
@@ -162,7 +166,7 @@ fn size_control(get: Rc<dyn Fn() -> Option<Size>>, set: Rc<dyn Fn(Option<Size>)>
             spin.unblock_signal(sh);
             mode.unblock_signal(mh);
             inherit.unblock_signal(ih);
-        }) as Rc<dyn Fn()>
+        })
     };
 
     SizeControl {

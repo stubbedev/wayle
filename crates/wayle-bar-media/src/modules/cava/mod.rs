@@ -107,7 +107,7 @@ impl Component for CavaModule {
             drawing_area.set_vexpand(true);
         }
 
-        let frame_data: Rc<Cell<Vec<f64>>> = Rc::new(Cell::new(vec![0.0; bars as usize]));
+        let frame_data: Rc<Cell<Vec<f64>>> = Rc::new(Cell::new(vec![0.0; usize::from(bars)]));
 
         Self::setup_draw_func(&drawing_area, &frame_data, is_vertical, config);
 
@@ -135,7 +135,7 @@ impl Component for CavaModule {
 
         let model = Self {
             container,
-            drawing_area: drawing_area.clone(),
+            drawing_area,
             frame_data,
             frame_watcher: WatcherToken::new(),
             is_vertical,
@@ -175,7 +175,7 @@ impl Component for CavaModule {
             CavaCmd::ServiceConfigChanged => {
                 self.cava = None;
                 let bars = self.config.config().modules.cava.bars.get().value();
-                self.frame_data.set(vec![0.0; bars as usize]);
+                self.frame_data.set(vec![0.0; usize::from(bars)]);
                 self.update_size();
                 Self::setup_draw_func(
                     &self.drawing_area,

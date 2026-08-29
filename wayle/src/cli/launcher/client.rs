@@ -97,13 +97,10 @@ async fn pump_rows(mut writer: FrameWriter, input_file: Option<String>, separato
 }
 
 async fn read_input(input_file: Option<String>) -> std::io::Result<String> {
-    match input_file {
-        Some(path) => tokio::fs::read_to_string(path).await,
-        None => {
-            let mut raw = String::new();
-            tokio::io::stdin().read_to_string(&mut raw).await?;
-            Ok(raw)
-        }
+    if let Some(path) = input_file { tokio::fs::read_to_string(path).await } else {
+        let mut raw = String::new();
+        tokio::io::stdin().read_to_string(&mut raw).await?;
+        Ok(raw)
     }
 }
 
@@ -126,11 +123,11 @@ fn split_rows(raw: &str, separator: &str) -> Vec<String> {
 /// rofi `-format`: s selection text, i input index (0-based), d 1-based,
 /// q quoted s, p prompt, f filter, F quoted filter.
 fn print_result(format: &str, selected: &[Selected], filter: &str, prompt: &str) {
-    let quote = |text: &str| shlex::try_quote(text).map(|q| q.into_owned());
+    let quote = |text: &str| shlex::try_quote(text).map(std::borrow::Cow::into_owned);
     for row in selected {
         let line = match format {
             "i" => row.index.to_string(),
-            "d" => (row.index + 1).to_string(),
+            "d" => row.index.saturating_add(1).to_string(),
             "q" => quote(&row.text).unwrap_or_else(|_| row.text.clone()),
             "p" => prompt.to_owned(),
             "f" => filter.to_owned(),

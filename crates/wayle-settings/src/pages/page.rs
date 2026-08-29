@@ -1,4 +1,4 @@
-//! Generic settings page component. Each page is just a PageSpec
+//! Generic settings page component. Each page is just a `PageSpec`
 //! describing its header and sections.
 
 use relm4::{gtk, gtk::prelude::*, prelude::*};

@@ -80,7 +80,7 @@ async fn pump_events(
 ) {
     loop {
         tokio::select! {
-            _ = cancellation_token.cancelled() => return,
+            () = cancellation_token.cancelled() => return,
             message = protocol::read_message(&mut reader, SocketKind::EventStream) => {
                 match message {
                     Ok(message) => {

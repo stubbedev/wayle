@@ -76,6 +76,7 @@ fn collect_env_files(config_dir: &Path) -> Vec<PathBuf> {
 }
 
 /// Returns true if the path is a `.env` or `.*.env` file.
+#[must_use]
 pub fn is_env_file(path: &Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
@@ -92,12 +93,9 @@ pub fn resolve(value: Option<String>) -> Option<String> {
     let value = value?;
 
     if let Some(var_name) = value.strip_prefix('$') {
-        match std::env::var(var_name) {
-            Ok(resolved) => Some(resolved),
-            Err(_) => {
-                warn!(var = %var_name, "Environment variable not set");
-                None
-            }
+        if let Ok(resolved) = std::env::var(var_name) { Some(resolved) } else {
+            warn!(var = %var_name, "Environment variable not set");
+            None
         }
     } else {
         Some(value)

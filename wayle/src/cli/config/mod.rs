@@ -23,9 +23,9 @@ use super::CliAction;
 /// Returns error if the command execution fails.
 pub async fn execute(command: ConfigCommands) -> CliAction {
     match command {
-        ConfigCommands::Get { path } => get::execute(path).await,
-        ConfigCommands::Set { path, value } => set::execute(path, value).await,
-        ConfigCommands::Reset { path } => reset::execute(path).await,
+        ConfigCommands::Get { path } => Box::pin(get::execute(path)).await,
+        ConfigCommands::Set { path, value } => Box::pin(set::execute(path, value)).await,
+        ConfigCommands::Reset { path } => Box::pin(reset::execute(path)).await,
         ConfigCommands::Schema { stdout } => schema::execute(stdout),
         ConfigCommands::Default { stdout } => default::execute(stdout),
         ConfigCommands::Docs { out, only } => docs::execute(out, only),

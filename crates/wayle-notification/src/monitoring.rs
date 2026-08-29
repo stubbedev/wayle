@@ -46,7 +46,7 @@ async fn handle_notifications(service: &NotificationService) -> Result<(), Error
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     info!("Notification monitoring cancelled, stopping");
                     return;
                 }
@@ -56,7 +56,7 @@ async fn handle_notifications(service: &NotificationService) -> Result<(), Error
                             handle_notification_added(
                                 &notif,
                                 &notification_list,
-                                &store,
+                                store.as_ref(),
                                 &remove_expired,
                                 &notif_tx
                             );
@@ -64,7 +64,7 @@ async fn handle_notifications(service: &NotificationService) -> Result<(), Error
                                 &notif,
                                 &popup_list,
                                 &popup_dur,
-                                dnd.clone(),
+                                &dnd,
                                 &popup_timers,
                             );
                         }
@@ -74,7 +74,7 @@ async fn handle_notifications(service: &NotificationService) -> Result<(), Error
                                 reason,
                                 &notification_list,
                                 &popup_list,
-                                &store,
+                                store.as_ref(),
                                 &connection,
                                 &popup_timers,
                             ).await;
@@ -92,7 +92,7 @@ fn handle_popup_added(
     incoming_popup: &Notification,
     popups: &Property<Vec<Arc<Notification>>>,
     popup_duration: &Property<u32>,
-    dnd: Property<bool>,
+    dnd: &Property<bool>,
     popup_timers: &Arc<PopupTimerManager>,
 ) {
     if dnd.get() {
@@ -105,12 +105,12 @@ fn handle_popup_added(
     list.insert(0, incoming_popup.clone());
     popups.replace(list);
 
-    let default_duration = Duration::from_millis(popup_duration.get() as u64);
+    let default_duration = Duration::from_millis(u64::from(popup_duration.get()));
 
     match incoming_popup.expire_timeout.get() {
         Some(0) => {}
         Some(ttl) => {
-            let expire = Duration::from_millis(ttl as u64);
+            let expire = Duration::from_millis(u64::from(ttl));
             popup_timers.start(incoming_popup.id, default_duration.min(expire));
         }
         None => {
@@ -122,7 +122,7 @@ fn handle_popup_added(
 fn handle_notification_added(
     incoming_notif: &Notification,
     notifications: &Property<Vec<Arc<Notification>>>,
-    store: &Option<NotificationStore>,
+    store: Option<&NotificationStore>,
     remove_expired: &Property<bool>,
     notif_tx: &broadcast::Sender<NotificationEvent>,
 ) {
@@ -160,9 +160,9 @@ fn handle_notification_added(
 
     notifications.replace(list);
 
-    if let Some(store) = store.as_ref() {
+    if let Some(store) = store {
         let _ = store.add(incoming_notif);
-    };
+    }
 
     if !remove_expired.get() {
         return;
@@ -172,7 +172,13 @@ fn handle_notification_added(
         return;
     };
 
-    let expiration_time = notif_arc.timestamp.get() + Duration::from_millis(ttl as u64);
+    let Some(expiration_time) = notif_arc
+        .timestamp
+        .get()
+        .checked_add_signed(chrono::Duration::milliseconds(i64::from(ttl)))
+    else {
+        return;
+    };
     let now = Utc::now();
 
     if expiration_time <= now {
@@ -182,7 +188,10 @@ fn handle_notification_added(
         return;
     }
 
-    let time_until_expiration = (expiration_time - now).to_std().unwrap_or(Duration::ZERO);
+    let time_until_expiration = expiration_time
+        .signed_duration_since(now)
+        .to_std()
+        .unwrap_or(Duration::ZERO);
     let id = notif_arc.id;
     let tx = notif_tx.clone();
 
@@ -197,7 +206,7 @@ async fn handle_notification_removed(
     reason: ClosedReason,
     notifications: &Property<Vec<Arc<Notification>>>,
     popups: &Property<Vec<Arc<Notification>>>,
-    store: &Option<NotificationStore>,
+    store: Option<&NotificationStore>,
     connection: &Connection,
     popup_timers: &Arc<PopupTimerManager>,
 ) {
@@ -219,9 +228,9 @@ async fn handle_notification_removed(
 
     notifications.set(notif_list);
 
-    if let Some(store) = store.as_ref() {
+    if let Some(store) = store {
         let _ = store.remove(id);
-    };
+    }
 
     debug!(id = id, ?reason, "emitting NotificationClosed");
     if let Err(err) = connection
@@ -230,7 +239,7 @@ async fn handle_notification_removed(
             SERVICE_PATH,
             SERVICE_INTERFACE,
             Signal::NotificationClosed.as_str(),
-            &(id, reason as u32),
+            &(id, u32::from(reason)),
         )
         .await
     {

@@ -138,7 +138,7 @@ impl Component for VolumeSection {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let default_device = match init.kind {

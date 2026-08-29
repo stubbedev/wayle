@@ -36,14 +36,14 @@ impl BatterySection {
         });
     }
 
-    pub fn is_charging(&self) -> bool {
+    pub const fn is_charging(&self) -> bool {
         matches!(
             self.state,
             DeviceState::Charging | DeviceState::PendingCharge
         )
     }
 
-    pub fn is_fully_charged(&self) -> bool {
+    pub const fn is_fully_charged(&self) -> bool {
         matches!(self.state, DeviceState::FullyCharged)
     }
 
@@ -90,7 +90,7 @@ impl BatterySection {
         }
     }
 
-    pub fn has_time_display(&self) -> bool {
+    pub const fn has_time_display(&self) -> bool {
         if self.is_charging() {
             self.time_to_full > 0
         } else {
@@ -129,7 +129,7 @@ impl BatterySection {
         helpers::format_watt_hours(self.energy_full)
     }
 
-    pub fn resume_threshold(&self) -> u32 {
+    pub const fn resume_threshold(&self) -> u32 {
         self.charge_end_threshold.saturating_sub(5)
     }
 }

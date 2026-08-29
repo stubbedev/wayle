@@ -24,7 +24,7 @@ pub async fn connect() -> Result<Connection, String> {
         .map_err(|e| format!("D-Bus session unavailable: {e}"))
 }
 
-/// Creates a proxy for the panel's GtkActions interface.
+/// Creates a proxy for the panel's `GtkActions` interface.
 ///
 /// # Errors
 ///
@@ -58,7 +58,7 @@ pub async fn is_running() -> Result<bool, String> {
 
 /// Waits for the panel's D-Bus name to be released.
 ///
-/// Subscribes to NameOwnerChanged and waits until the name has no owner,
+/// Subscribes to `NameOwnerChanged` and waits until the name has no owner,
 /// with a timeout to prevent hanging if shutdown fails.
 ///
 /// # Errors
@@ -90,7 +90,7 @@ pub async fn wait_for_shutdown(connection: &Connection) -> Result<(), String> {
         .map_err(|_| "Timeout waiting for panel to stop".to_string())?
 }
 
-/// Creates a ShellIpcProxy for shell commands.
+/// Creates a `ShellIpcProxy` for shell commands.
 ///
 /// # Errors
 ///
@@ -106,6 +106,6 @@ pub async fn shell_ipc_proxy() -> Result<(Connection, ShellIpcProxy<'static>), S
 }
 
 /// Formats a shell IPC D-Bus error for CLI output.
-pub fn format_ipc_error(operation: &str, error: ZbusError) -> String {
+pub fn format_ipc_error(operation: &str, error: &ZbusError) -> String {
     dbus::format_error("Shell", operation, error)
 }

@@ -88,7 +88,7 @@ pub fn spawn_external_watcher(
 ///
 /// If `cancel_token` is triggered before the debounce period expires, the
 /// action is cancelled. Reset the token before each scroll to coalesce
-/// rapid scrolls into a single on_action execution.
+/// rapid scrolls into a single `on_action` execution.
 pub fn spawn_scroll_debounce(
     sender: &ComponentSender<CustomModule>,
     cancel_token: CancellationToken,

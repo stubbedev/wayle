@@ -183,7 +183,7 @@ impl ModuleInfoProvider for WeatherConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("weather"),
-            schema: || schema_for!(WeatherConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("weather")),
             array_entry: false,
         }

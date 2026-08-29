@@ -11,22 +11,22 @@ pub async fn execute() -> CliAction {
     let count = proxy
         .count()
         .await
-        .map_err(|e| format_error("get notification count", e))?;
+        .map_err(|e| format_error("get notification count", &e))?;
 
     let popup_count = proxy
         .popup_count()
         .await
-        .map_err(|e| format_error("get popup count", e))?;
+        .map_err(|e| format_error("get popup count", &e))?;
 
     let dnd = proxy
         .dnd()
         .await
-        .map_err(|e| format_error("get DND state", e))?;
+        .map_err(|e| format_error("get DND state", &e))?;
 
     let popup_duration = proxy
         .popup_duration()
         .await
-        .map_err(|e| format_error("get popup duration", e))?;
+        .map_err(|e| format_error("get popup duration", &e))?;
 
     let dnd_status = if dnd { "enabled" } else { "disabled" };
     println!("Notifications: {count}");

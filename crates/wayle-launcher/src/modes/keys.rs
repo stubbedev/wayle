@@ -15,14 +15,14 @@ pub struct KeysMode {
 impl KeysMode {
     /// Create from the session's effective bindings.
     #[must_use]
-    pub fn new(bindings: Vec<(String, String)>) -> Self {
+    pub const fn new(bindings: Vec<(String, String)>) -> Self {
         Self { bindings }
     }
 }
 
 #[async_trait]
 impl Mode for KeysMode {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "keys"
     }
 

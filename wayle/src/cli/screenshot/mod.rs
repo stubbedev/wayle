@@ -23,7 +23,7 @@ pub async fn execute(command: ScreenshotCommands) -> CliAction {
     let path = proxy
         .capture(mode, &target)
         .await
-        .map_err(|e| format_error("capture screenshot", e))?;
+        .map_err(|e| format_error("capture screenshot", &e))?;
 
     if path.is_empty() {
         println!("Screenshot cancelled");

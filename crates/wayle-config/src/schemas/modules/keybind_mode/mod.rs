@@ -112,7 +112,7 @@ impl ModuleInfoProvider for KeybindModeConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("keybind-mode"),
-            schema: || schema_for!(KeybindModeConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("keybind-mode")),
             array_entry: false,
         }

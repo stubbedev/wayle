@@ -1,4 +1,4 @@
-//! Tokio mainloop for PulseAudio
+//! Tokio mainloop for `PulseAudio`
 //!
 //! This code is from Daniel De Graaf's pulse-binding-rust project.
 //! Original: <https://github.com/danieldg/pulse-binding-rust/tree/master/pulse-tokio>
@@ -84,19 +84,19 @@ enum Item {
 }
 
 impl Item {
-    fn is_dead(&self) -> bool {
+    const fn is_dead(&self) -> bool {
         match self {
-            Item::Defer { dead, .. } | Item::Timer { dead, .. } => *dead,
-            Item::Event { dead, .. } => dead.get(),
+            Self::Defer { dead, .. } | Self::Timer { dead, .. } => *dead,
+            Self::Event { dead, .. } => dead.get(),
         }
     }
 
     fn kill(&mut self) {
         match self {
-            Item::Defer { dead, .. } | Item::Timer { dead, .. } => {
+            Self::Defer { dead, .. } | Self::Timer { dead, .. } => {
                 *dead = true;
             }
-            Item::Event { dead, .. } => {
+            Self::Event { dead, .. } => {
                 dead.set(true);
             }
         }
@@ -138,7 +138,7 @@ impl MainloopInnerType for MainInner {
     }
 
     fn get_api_ptr(&self) -> *const MainloopApi {
-        &self.api
+        &raw const self.api
     }
 
     fn get_api(&self) -> &MainloopApi {
@@ -154,12 +154,12 @@ impl Drop for MainInner {
     fn drop(&mut self) {
         // SAFETY: userdata is the Weak ptr from new_cyclic's into_raw()
         unsafe {
-            Weak::from_raw(self.api.userdata as *mut MainInner);
+            Weak::from_raw(self.api.userdata.cast::<Self>());
 
             let api = &self.api;
             for item in self.items.get_mut().drain(..) {
                 let mut boxed = Box::from_raw(item);
-                let raw_item = &mut *boxed as *mut Item;
+                let raw_item = &raw mut *boxed;
 
                 // SAFETY: free callbacks expect the same api/item/userdata from registration
                 match boxed.as_ref() {
@@ -168,21 +168,21 @@ impl Drop for MainInner {
                         userdata,
                         ..
                     } => {
-                        cb(api, raw_item as *mut _, *userdata);
+                        cb(api, raw_item.cast(), *userdata);
                     }
                     Item::Timer {
                         free: Some(cb),
                         userdata,
                         ..
                     } => {
-                        cb(api, raw_item as *mut _, *userdata);
+                        cb(api, raw_item.cast(), *userdata);
                     }
                     Item::Event {
                         free: Some(cb),
                         userdata,
                         ..
                     } => {
-                        cb(api, raw_item as *mut _, *userdata);
+                        cb(api, raw_item.cast(), *userdata);
                     }
                     _ => {}
                 }
@@ -199,14 +199,14 @@ impl Default for TokioMain {
 }
 
 impl TokioMain {
-    /// Create a new tokio mainloop for PulseAudio.
+    /// Create a new tokio mainloop for `PulseAudio`.
     pub fn new() -> Self {
         let mi = Rc::new_cyclic(|weak| {
             let weak_ptr = weak.clone().into_raw();
 
             MainInner {
                 api: MainloopApi {
-                    userdata: weak_ptr as *mut c_void,
+                    userdata: weak_ptr.cast_mut().cast::<c_void>(),
                     io_new: Some(MainInner::io_new),
                     io_enable: Some(MainInner::io_enable),
                     io_free: Some(MainInner::io_free),
@@ -227,47 +227,47 @@ impl TokioMain {
                 quit: Cell::new(None),
             }
         });
-        TokioMain { mi }
+        Self { mi }
     }
 
     fn iter_get_item(&mut self, i: usize) -> Option<(&MainloopApi, &Item)> {
         let api = &self.mi.api;
         let items = unsafe { &mut *self.mi.items.get() };
         loop {
-            if i >= items.len() {
+            let Some(&item_ptr) = items.get(i) else {
                 return None;
-            }
-            if unsafe { (*items[i]).is_dead() } {
+            };
+            if unsafe { (*item_ptr).is_dead() } {
                 let mut dead = unsafe { Box::from_raw(items.swap_remove(i)) };
-                let raw_item = &mut *dead as *mut Item;
+                let raw_item = &raw mut *dead;
                 match dead.as_ref() {
                     Item::Defer {
                         free: Some(cb),
                         userdata,
                         ..
                     } => {
-                        cb(api, raw_item as *mut _, *userdata);
+                        cb(api, raw_item.cast(), *userdata);
                     }
                     Item::Timer {
                         free: Some(cb),
                         userdata,
                         ..
                     } => {
-                        cb(api, raw_item as *mut _, *userdata);
+                        cb(api, raw_item.cast(), *userdata);
                     }
                     Item::Event {
                         free: Some(cb),
                         userdata,
                         ..
                     } => {
-                        cb(api, raw_item as *mut _, *userdata);
+                        cb(api, raw_item.cast(), *userdata);
                     }
                     _ => {}
                 }
                 drop(dead);
                 continue;
             }
-            let item = unsafe { &*items[i] };
+            let item = unsafe { &*item_ptr };
             return Some((api, item));
         }
     }
@@ -283,8 +283,8 @@ impl TokioMain {
         let mut i = 0;
         self.mi.waker.set(Some(ctx.waker().clone()));
         while let Some((api, item)) = self.iter_get_item(i) {
-            let raw_item = item as *const Item;
-            i += 1;
+            let raw_item = std::ptr::from_ref::<Item>(item);
+            i = i.saturating_add(1);
             match item {
                 Item::Defer {
                     enabled: true,
@@ -292,10 +292,9 @@ impl TokioMain {
                     userdata,
                     ..
                 } => {
-                    cb(api, raw_item as *mut _, *userdata);
+                    cb(api, raw_item.cast_mut().cast(), *userdata);
                 }
-                Item::Defer { .. } => continue,
-                Item::Timer { cb: None, .. } => continue,
+                Item::Defer { .. } | Item::Timer { cb: None, .. } => {}
                 Item::Timer {
                     cb: Some(cb),
                     userdata,
@@ -306,10 +305,10 @@ impl TokioMain {
                         Some(ts) if ts < now => {
                             rv = task::Poll::Ready(None);
                             let tv = timeval {
-                                tv_sec: ts.as_secs() as i64,
-                                tv_usec: ts.subsec_micros() as i64,
+                                tv_sec: ts.as_secs().cast_signed(),
+                                tv_usec: i64::from(ts.subsec_micros()),
                             };
-                            cb(api, raw_item as *mut _, &tv, *userdata);
+                            cb(api, raw_item.cast_mut().cast(), &raw const tv, *userdata);
                         }
                         later => ts.set(later),
                     }
@@ -322,7 +321,7 @@ impl TokioMain {
                         }
                     }
                 }
-                Item::Event { cb: None, .. } => continue,
+                Item::Event { cb: None, .. } => {}
                 Item::Event {
                     cb: Some(cb),
                     userdata,
@@ -334,15 +333,12 @@ impl TokioMain {
                 } => {
                     let mut local_fd = afd.take();
 
-                    let async_fd = match local_fd {
-                        Some(ref fd) => fd,
-                        None => {
-                            let Ok(fd) = AsyncFd::new(Fd(*fd)) else {
-                                afd.set(None);
-                                continue;
-                            };
-                            local_fd.insert(fd)
-                        }
+                    let async_fd = if let Some(ref fd) = local_fd { fd } else {
+                        let Ok(fd) = AsyncFd::new(Fd(*fd)) else {
+                            afd.set(None);
+                            continue;
+                        };
+                        local_fd.insert(fd)
                     };
                     let mut ready = IoEventFlagSet::NULL;
                     let mut rg = None;
@@ -383,7 +379,7 @@ impl TokioMain {
                     } else {
                         IoEventFlagSet::NULL
                     };
-                    cb(api, raw_item as *mut _, *fd, ready, *userdata);
+                    cb(api, raw_item.cast_mut().cast(), *fd, ready, *userdata);
                     if dead.get() {
                         continue;
                     }
@@ -401,7 +397,7 @@ impl TokioMain {
                             pfd.events |= libc::POLLOUT;
                         }
                         unsafe {
-                            libc::poll(&mut pfd, 1, 0);
+                            libc::poll(&raw mut pfd, 1, 0);
                         }
                         if let Some(mut g) = rg {
                             if (pfd.revents & libc::POLLIN) != 0 {
@@ -427,10 +423,9 @@ impl TokioMain {
         }
         if rv.is_pending() {
             let mut sleep = unsafe { Pin::new_unchecked(&mut *self.mi.sleep.get()) };
-            if let Some(d) = wake {
-                sleep.set(Some(tokio::time::sleep_until(inow + d)));
-                if let Some(task::Poll::Ready(())) =
-                    sleep.as_mut().as_pin_mut().map(|f| f.poll(ctx))
+            if let Some(deadline) = wake.and_then(|d| inow.checked_add(d)) {
+                sleep.set(Some(tokio::time::sleep_until(deadline)));
+                if sleep.as_mut().as_pin_mut().map(|f| f.poll(ctx)) == Some(task::Poll::Ready(()))
                 {
                     sleep.set(None);
                     rv = task::Poll::Ready(None);
@@ -446,6 +441,10 @@ impl TokioMain {
     ///
     /// # Errors
     /// Returns error if the mainloop quits with an error retval
+    #[expect(
+        clippy::future_not_send,
+        reason = "PulseAudio mainloop types are !Send; runs on a dedicated thread"
+    )]
     pub async fn wait_for_ready(&mut self, ctx: &Context) -> Result<context::State, Retval> {
         loop {
             if let Some(rv) = poll_fn(|ctx| self.tick(ctx)).await {
@@ -471,7 +470,7 @@ impl Drop for TokioMain {
 
 impl MainInner {
     unsafe fn from_api(api: *const MainloopApi) -> Rc<Self> {
-        let ptr = unsafe { Weak::from_raw((*api).userdata as *const Self) };
+        let ptr = unsafe { Weak::from_raw((*api).userdata.cast::<Self>().cast_const()) };
         let rv = ptr.upgrade().expect(
             "MainloopApi callback called after TokioMain was dropped. \
              This indicates a shutdown ordering bug - ensure Context is \
@@ -486,7 +485,7 @@ impl MainInner {
         items.push(Box::into_raw(item));
     }
 
-    fn wake(main: &Weak<MainInner>) {
+    fn wake(main: &Weak<Self>) {
         if let Some(inner) = main.upgrade() {
             inner.wake_real();
         }
@@ -506,7 +505,7 @@ impl MainInner {
         userdata: *mut c_void,
     ) -> *mut IoEventInternal {
         unsafe {
-            let inner = MainInner::from_api(a);
+            let inner = Self::from_api(a);
             let events = Cell::new(events);
             let mut item = Box::new(Item::Event {
                 fd,
@@ -518,7 +517,7 @@ impl MainInner {
                 dead: Cell::new(false),
                 main: Rc::downgrade(&inner),
             });
-            let rv = &mut *item as *mut Item as *mut _;
+            let rv = (&raw mut *item).cast();
             inner.push(item);
             inner.wake_real();
             rv
@@ -529,7 +528,7 @@ impl MainInner {
             let item: *mut Item = e.cast();
             if let Item::Event { main, events, .. } = &*item {
                 events.set(new);
-                MainInner::wake(main);
+                Self::wake(main);
             }
         }
     }
@@ -560,10 +559,11 @@ impl MainInner {
         userdata: *mut c_void,
     ) -> *mut TimeEventInternal {
         unsafe {
-            let inner = MainInner::from_api(a);
+            let inner = Self::from_api(a);
             let tv = tv.read();
             let ts = Cell::new(Some(
-                Duration::from_secs(tv.tv_sec as u64) + Duration::from_micros(tv.tv_usec as u64),
+                Duration::from_secs(tv.tv_sec.cast_unsigned())
+                    .saturating_add(Duration::from_micros(tv.tv_usec.cast_unsigned())),
             ));
             let mut item = Box::new(Item::Timer {
                 main: Rc::downgrade(&inner),
@@ -573,7 +573,7 @@ impl MainInner {
                 free: None,
                 dead: false,
             });
-            let rv = &mut *item as *mut Item as *mut _;
+            let rv = (&raw mut *item).cast();
             inner.push(item);
             inner.wake_real();
             rv
@@ -586,10 +586,10 @@ impl MainInner {
                 Item::Timer { main, ts, .. } => {
                     let tv = tv.read();
                     ts.set(Some(
-                        Duration::from_secs(tv.tv_sec as u64)
-                            + Duration::from_micros(tv.tv_usec as u64),
+                        Duration::from_secs(tv.tv_sec.cast_unsigned())
+                            .saturating_add(Duration::from_micros(tv.tv_usec.cast_unsigned())),
                     ));
-                    MainInner::wake(main);
+                    Self::wake(main);
                 }
                 _ => panic!(),
             }
@@ -618,7 +618,7 @@ impl MainInner {
         userdata: *mut c_void,
     ) -> *mut DeferEventInternal {
         unsafe {
-            let inner = MainInner::from_api(a);
+            let inner = Self::from_api(a);
             let mut item = Box::new(Item::Defer {
                 main: Rc::downgrade(&inner),
                 cb,
@@ -627,7 +627,7 @@ impl MainInner {
                 dead: false,
                 enabled: true,
             });
-            let rv = &mut *item as *mut Item as *mut _;
+            let rv = (&raw mut *item).cast();
             inner.push(item);
             inner.wake_real();
             rv
@@ -640,11 +640,10 @@ impl MainInner {
                 Item::Defer { main, enabled, .. } => {
                     *enabled = b != 0;
                     if b != 0 {
-                        MainInner::wake(main);
+                        Self::wake(main);
                     }
                 }
-                Item::Timer { .. } => {}
-                Item::Event { .. } => {}
+                Item::Timer { .. } | Item::Event { .. } => {}
             }
         }
     }
@@ -667,7 +666,7 @@ impl MainInner {
     }
     extern "C" fn quit(a: *const MainloopApi, retval: RetvalActual) {
         unsafe {
-            let inner = MainInner::from_api(a);
+            let inner = Self::from_api(a);
             inner.quit.set(Some(retval));
             inner.wake_real();
         }

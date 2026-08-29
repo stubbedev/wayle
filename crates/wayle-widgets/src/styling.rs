@@ -46,6 +46,7 @@ pub trait InlineStyling {
 /// `Custom(hex)` is used as-is under Wayle's built-in palette. Under a dynamic
 /// provider it falls back to the field's default value, since a fixed hex has
 /// no meaningful mapping to a generated palette.
+#[must_use]
 pub fn resolve_color(prop: &ConfigProperty<ColorValue>, is_wayle_theme: bool) -> Cow<'static, str> {
     match prop.get() {
         ColorValue::Custom(_) if !is_wayle_theme => prop.default().to_css(),

@@ -51,18 +51,18 @@ pub struct NetworkService {
     pub(crate) cancellation_token: CancellationToken,
     /// Connection profile management.
     pub settings: Arc<Settings>,
-    /// WiFi device, if present (live-updated on hot-plug).
+    /// `WiFi` device, if present (live-updated on hot-plug).
     pub wifi: Property<Option<Arc<Wifi>>>,
     /// Wired device, if present (live-updated on hot-plug).
     pub wired: Property<Option<Arc<Wired>>>,
-    /// Primary connection type as reported by NetworkManager.
+    /// Primary connection type as reported by `NetworkManager`.
     pub primary: Property<ConnectionType>,
 }
 
 impl NetworkService {
     /// Starts the network service and initializes all components.
     ///
-    /// Performs device discovery, creates WiFi and wired service instances
+    /// Performs device discovery, creates `WiFi` and wired service instances
     /// for available devices, and sets up property monitoring. Handles
     /// the actual initialization logic for the service.
     ///
@@ -149,7 +149,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the connection doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn connection(&self, path: OwnedObjectPath) -> Result<ActiveConnection, Error> {
         ActiveConnection::get(ActiveConnectionParams {
@@ -165,7 +165,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the connection doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn connection_monitored(
         &self,
@@ -216,7 +216,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the connection profile doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn connection_settings(
         &self,
@@ -234,7 +234,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the connection profile doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn connection_settings_monitored(
         &self,
@@ -252,7 +252,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the device doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn device(&self, path: OwnedObjectPath) -> Result<Device, Error> {
         Device::get(DeviceParams {
@@ -267,7 +267,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the device doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn device_monitored(&self, path: OwnedObjectPath) -> Result<Arc<Device>, Error> {
         Device::get_live(LiveDeviceParams {
@@ -282,7 +282,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the device doesn't exist.
-    /// Returns `NetworkError::WrongObjectType` if the device is not a WiFi device.
+    /// Returns `NetworkError::WrongObjectType` if the device is not a `WiFi` device.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn device_wifi(&self, path: OwnedObjectPath) -> Result<DeviceWifi, Error> {
         DeviceWifi::get(DeviceWifiParams {
@@ -297,7 +297,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the device doesn't exist.
-    /// Returns `NetworkError::WrongObjectType` if the device is not a WiFi device.
+    /// Returns `NetworkError::WrongObjectType` if the device is not a `WiFi` device.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn device_wifi_monitored(
         &self,
@@ -348,7 +348,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the configuration doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn ip4_config(&self, path: OwnedObjectPath) -> Result<Ip4Config, Error> {
         Ip4Config::get(Ip4ConfigParams {
@@ -362,7 +362,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the configuration doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn ip6_config(&self, path: OwnedObjectPath) -> Result<Ip6Config, Error> {
         Ip6Config::get(Ip6ConfigParams {
@@ -376,7 +376,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the configuration doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn dhcp4_config(&self, path: OwnedObjectPath) -> Result<Dhcp4Config, Error> {
         Dhcp4Config::get(Dhcp4ConfigParams {
@@ -390,7 +390,7 @@ impl NetworkService {
     ///
     /// # Errors
     /// Returns `NetworkError::ObjectNotFound` if the configuration doesn't exist.
-    /// Returns `NetworkError::DbusError` if DBus operations fail.
+    /// Returns `NetworkError::DbusError` if `DBus` operations fail.
     #[instrument(skip(self, path), fields(path = ?path), err)]
     pub async fn dhcp6_config(&self, path: OwnedObjectPath) -> Result<Dhcp6Config, Error> {
         Dhcp6Config::get(Dhcp6ConfigParams {
@@ -411,7 +411,7 @@ impl NetworkService {
         Ok(stream.filter_map(|_signal| async move { Some(()) }))
     }
 
-    /// NetworkManager's state changed.
+    /// `NetworkManager`'s state changed.
     ///
     /// # Errors
     /// Returns error if D-Bus proxy creation fails.

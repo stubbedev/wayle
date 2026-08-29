@@ -14,7 +14,7 @@ fn format_time_12h(time: NaiveTime) -> String {
     let period = if hour < 12 { "AM" } else { "PM" };
     let display_hour = match hour {
         0 => 12,
-        13..=23 => hour - 12,
+        13..=23 => hour.saturating_sub(12),
         other => other,
     };
     format!("{display_hour}:{minute:02} {period}")

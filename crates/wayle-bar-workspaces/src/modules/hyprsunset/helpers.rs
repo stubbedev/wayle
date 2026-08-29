@@ -89,11 +89,17 @@ async fn send_socket_command(socket_path: &PathBuf, command: &str) -> Option<Str
         return None;
     }
 
-    str::from_utf8(&buf[..bytes_read]).ok().map(String::from)
+    str::from_utf8(buf.get(..bytes_read)?).ok().map(String::from)
 }
 
 fn parse_numeric_response(response: &str, command: &str) -> Option<u32> {
     match response.trim().parse::<f32>() {
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "hyprsunset reports small non-negative values"
+        )]
         Ok(value) => Some(value.round() as u32),
         Err(err) => {
             debug!(error = %err, command, response = response.trim(), "float parse failed");
@@ -107,7 +113,7 @@ fn parse_numeric_response(response: &str, command: &str) -> Option<u32> {
 // ponytail: one global child — there is only ever one hyprsunset.
 static CHILD: Mutex<Option<Child>> = Mutex::new(None);
 
-pub async fn start(temperature: u32, gamma: u32) -> io::Result<()> {
+pub fn start(temperature: u32, gamma: u32) -> io::Result<()> {
     let child = Command::new("hyprsunset")
         .arg("-t")
         .arg(temperature.to_string())
@@ -115,14 +121,16 @@ pub async fn start(temperature: u32, gamma: u32) -> io::Result<()> {
         .arg(gamma.to_string())
         .spawn()?;
     // Terminate any previous child before replacing it, so we never leak one.
-    if let Some(old) = lock_child().replace(child) {
+    let old = lock_child().replace(child);
+    if let Some(old) = old {
         terminate(old);
     }
     Ok(())
 }
 
-pub async fn stop() -> io::Result<()> {
-    if let Some(child) = lock_child().take() {
+pub fn stop() -> io::Result<()> {
+    let old = lock_child().take();
+    if let Some(child) = old {
         terminate(child);
     }
     Ok(())
@@ -131,7 +139,7 @@ pub async fn stop() -> io::Result<()> {
 fn lock_child() -> std::sync::MutexGuard<'static, Option<Child>> {
     CHILD
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 /// SIGTERM the tracked child — the signal `pkill` sent by default, so
@@ -142,7 +150,7 @@ fn terminate(mut child: Child) {
     if let Some(pid) = child.id() {
         // SAFETY: `pid` is a child process we spawned; SIGTERM is a valid signal.
         unsafe {
-            libc::kill(pid as libc::pid_t, libc::SIGTERM);
+            libc::kill(pid.cast_signed(), libc::SIGTERM);
         }
     }
     tokio::spawn(async move {
@@ -154,7 +162,7 @@ fn terminate(mut child: Child) {
 mod tests {
     use super::*;
 
-    fn ctx<'a>(format: &'a str, temp: u32, gamma: u32, enabled: bool) -> LabelContext<'a> {
+    fn ctx(format: &str, temp: u32, gamma: u32, enabled: bool) -> LabelContext<'_> {
         LabelContext {
             format,
             temp,

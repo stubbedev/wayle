@@ -90,6 +90,7 @@
             # straight out of `nix develop` with no manual env setup.
             nativeBuildInputs = with pkgs; [
               rustup # honors rust-toolchain.toml; matches CI's pinned toolchain
+              cargo-nextest # `just test` runs the suite via nextest
               pkg-config
               cmake
               clang

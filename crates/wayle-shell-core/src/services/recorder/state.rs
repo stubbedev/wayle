@@ -133,6 +133,10 @@ impl RecorderState {
     /// claimed synchronously under [`Self::status`], so a second call while a
     /// start is still negotiating (or while recording) is a no-op rather than a
     /// duplicate portal session / pipeline.
+    #[expect(
+        clippy::unused_async,
+        reason = "async is part of the public API; callers await it"
+    )]
     pub async fn start(&self) {
         // Claim the start atomically. Anything other than Idle means a start,
         // recording, or stop is already in flight — bail.
@@ -390,11 +394,11 @@ impl RecorderState {
             preset: None,
             class: None,
         });
-        self.notify(&t!("recorder-notification-failed"), message, ERROR_ICON);
+        Self::notify(&t!("recorder-notification-failed"), message, ERROR_ICON);
     }
 
     /// Fires a fire-and-forget desktop notification.
-    fn notify(&self, summary: &str, body: &str, icon: &str) {
+    fn notify(summary: &str, body: &str, icon: &str) {
         crate::notify::notify("Wayle", summary, body, icon);
     }
 
@@ -404,7 +408,7 @@ impl RecorderState {
         if path.is_empty() {
             return;
         }
-        self.notify(
+        Self::notify(
             &t!("recorder-notification-saved"),
             path,
             "ld-video-symbolic",
@@ -528,7 +532,5 @@ fn videos_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("XDG_VIDEOS_DIR") {
         return PathBuf::from(dir);
     }
-    std::env::var_os("HOME")
-        .map(|home| PathBuf::from(home).join("Videos"))
-        .unwrap_or_else(|| PathBuf::from("."))
+    std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), |home| PathBuf::from(home).join("Videos"))
 }

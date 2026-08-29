@@ -20,7 +20,7 @@ pub struct PopoverItem {
 
 #[relm4::factory(pub)]
 impl FactoryComponent for PopoverItem {
-    type Init = PopoverItem;
+    type Init = Self;
     type Input = ();
     type Output = ();
     type CommandOutput = ();

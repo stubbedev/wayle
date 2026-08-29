@@ -11,12 +11,12 @@ pub async fn execute() -> CliAction {
     let active = proxy
         .active_profile()
         .await
-        .map_err(|e| format_error("get active profile", e))?;
+        .map_err(|e| format_error("get active profile", &e))?;
 
     let degraded = proxy
         .performance_degraded()
         .await
-        .map_err(|e| format_error("get degradation status", e))?;
+        .map_err(|e| format_error("get degradation status", &e))?;
 
     println!("Active profile: {active}");
     if !degraded.is_empty() {

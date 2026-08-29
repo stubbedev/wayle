@@ -19,7 +19,7 @@ use crate::{error::Error, proxy::ip6_config::IP6ConfigProxy};
 /// DNS servers, and other network parameters.
 #[derive(Debug, Clone)]
 pub struct Ip6Config {
-    /// D-Bus object path for this IP6Config
+    /// D-Bus object path for this `IP6Config`
     pub object_path: Property<OwnedObjectPath>,
 
     /// Array of IP address data objects.
@@ -49,7 +49,7 @@ pub struct Ip6Config {
 }
 
 /// IPv6 address with prefix length
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ipv6Address {
     /// The IPv6 address.
     pub address: Ipv6Addr,
@@ -58,7 +58,7 @@ pub struct Ipv6Address {
 }
 
 /// IPv6 route entry
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ipv6Route {
     /// Destination network address.
     pub destination: Ipv6Addr,
@@ -126,7 +126,7 @@ impl Ip6Config {
 
         Ok(Ip6ConfigProperties {
             address_data: Self::parse_address_data(unwrap_dbus!(address_data, path)),
-            gateway: Self::parse_gateway(unwrap_dbus!(gateway, path)),
+            gateway: Self::parse_gateway(&unwrap_dbus!(gateway, path)),
             nameservers: Self::parse_nameserver_data(unwrap_dbus!(nameserver_data, path)),
             domains: unwrap_dbus!(domains, path),
             searches: unwrap_dbus!(searches, path),
@@ -159,14 +159,14 @@ impl Ip6Config {
 
                 let prefix_value = entry.get("prefix")?;
                 let prefix_ref = prefix_value.downcast_ref::<&u32>().ok()?;
-                let prefix = *prefix_ref as u8;
+                let prefix = u8::try_from(*prefix_ref).ok()?;
 
                 Some(Ipv6Address { address, prefix })
             })
             .collect()
     }
 
-    fn parse_gateway(gateway: String) -> Option<Ipv6Addr> {
+    fn parse_gateway(gateway: &str) -> Option<Ipv6Addr> {
         match gateway.parse::<Ipv6Addr>() {
             Ok(addr) if addr.is_unspecified() => None,
             Ok(addr) => Some(addr),
@@ -189,17 +189,14 @@ impl Ip6Config {
             .filter_map(|entry| {
                 let dest_value = entry.get("dest")?;
                 let dest_str = dest_value.downcast_ref::<String>().ok()?;
-                let destination = match dest_str.parse::<Ipv6Addr>() {
-                    Ok(addr) => addr,
-                    Err(_) => {
-                        debug!("Skipping route with invalid destination IPv6: {}", dest_str);
-                        return None;
-                    }
+                let Ok(destination) = dest_str.parse::<Ipv6Addr>() else {
+                    debug!("Skipping route with invalid destination IPv6: {}", dest_str);
+                    return None;
                 };
 
                 let prefix_value = entry.get("prefix")?;
                 let prefix_ref = prefix_value.downcast_ref::<&u32>().ok()?;
-                let prefix = *prefix_ref as u8;
+                let prefix = u8::try_from(*prefix_ref).ok()?;
 
                 let next_hop = entry
                     .get("next-hop")

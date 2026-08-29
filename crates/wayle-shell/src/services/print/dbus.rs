@@ -17,7 +17,7 @@ impl PrintDaemon {
     #[instrument(skip(self))]
     pub async fn prepare(&self, title: &str) -> zbus::fdo::Result<(bool, SettingsPairs, u32)> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.dispatch(PrintInput::Prepare {
+        dispatch(PrintInput::Prepare {
             title: title.to_owned(),
             reply: reply_tx,
         })?;
@@ -37,7 +37,7 @@ impl PrintDaemon {
     ) -> zbus::fdo::Result<bool> {
         let document = OwnedFd::from(document);
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.dispatch(PrintInput::Spool {
+        dispatch(PrintInput::Spool {
             title: title.to_owned(),
             document,
             token,
@@ -47,15 +47,13 @@ impl PrintDaemon {
     }
 }
 
-impl PrintDaemon {
-    fn dispatch(&self, input: PrintInput) -> zbus::fdo::Result<()> {
-        let Some(sender) = host_sender() else {
-            warn!("print requested before the shell UI registered its sender");
-            return Err(zbus::fdo::Error::Failed("shell UI not ready".to_owned()));
-        };
-        sender.emit(input);
-        Ok(())
-    }
+fn dispatch(input: PrintInput) -> zbus::fdo::Result<()> {
+    let Some(sender) = host_sender() else {
+        warn!("print requested before the shell UI registered its sender");
+        return Err(zbus::fdo::Error::Failed("shell UI not ready".to_owned()));
+    };
+    sender.emit(input);
+    Ok(())
 }
 
 fn dropped() -> zbus::fdo::Error {

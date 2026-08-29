@@ -247,7 +247,7 @@ impl Player {
         }
     }
 
-    async fn refresh_properties(player: &Player, proxy: &MediaPlayer2PlayerProxy<'_>) {
+    async fn refresh_properties(player: &Self, proxy: &MediaPlayer2PlayerProxy<'_>) {
         if let Ok(status) = proxy.playback_status().await {
             player
                 .playback_state
@@ -527,7 +527,7 @@ impl Player {
     ///
     /// Returns a stream that emits a clone of the player whenever any property changes,
     /// including metadata, playback state, capabilities, or any other tracked field.
-    pub fn watch(&self) -> impl Stream<Item = Player> + Send {
+    pub fn watch(&self) -> impl Stream<Item = Self> + Send {
         watch_all!(
             self,
             identity,

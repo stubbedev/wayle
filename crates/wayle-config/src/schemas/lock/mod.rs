@@ -104,7 +104,7 @@ impl ModuleInfoProvider for LockConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("lock"),
-            schema: || schema_for!(LockConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

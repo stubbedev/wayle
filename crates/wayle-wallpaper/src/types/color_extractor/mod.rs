@@ -20,6 +20,7 @@ use crate::error::Error;
 const MATUGEN_MAX_SOURCE_COLOR: u8 = 3;
 
 /// Bundled color extractor tool and its parameters.
+#[expect(clippy::struct_excessive_bools, reason = "config struct")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColorExtractorConfig {
     /// Which extraction tool to use.
@@ -179,7 +180,7 @@ pub(super) enum Tool {
 }
 
 impl Tool {
-    pub(super) fn name(self) -> &'static str {
+    pub(super) const fn name(self) -> &'static str {
         match self {
             Self::Pywal => "pywal",
             Self::Matugen => "matugen",

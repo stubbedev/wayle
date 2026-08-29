@@ -14,7 +14,7 @@ pub struct LiveDeviceWifiParams<'a> {
     pub(crate) cancellation_token: &'a CancellationToken,
 }
 
-/// WiFi bitrate in kilobits per second.
+/// `WiFi` bitrate in kilobits per second.
 pub type BitrateKbps = u32;
 
 /// Boot time in milliseconds.

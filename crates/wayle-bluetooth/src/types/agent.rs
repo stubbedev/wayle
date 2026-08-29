@@ -47,7 +47,7 @@ impl Display for AgentCapability {
     }
 }
 
-/// Represents different pairing and authorization requests from BlueZ that require user interaction.
+/// Represents different pairing and authorization requests from `BlueZ` that require user interaction.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PairingRequest {
     /// Requests a PIN code from the user for legacy pairing.

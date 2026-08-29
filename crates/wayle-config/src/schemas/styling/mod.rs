@@ -138,7 +138,7 @@ impl ModuleInfoProvider for StylingConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("styling"),
-            schema: || schema_for!(StylingConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }
@@ -167,6 +167,7 @@ impl StylingConfig {
     /// built-in variant for that mode, the variant's palette is returned
     /// instead. This is non-destructive: `palette-base-theme` is unchanged, so
     /// switching back to `Auto` restores the configured colors.
+    #[must_use]
     pub fn palette(&self) -> Palette {
         let base = Palette {
             bg: self.palette.bg.get().to_string(),

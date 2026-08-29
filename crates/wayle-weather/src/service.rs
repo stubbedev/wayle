@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Categorized error for UI display without implementation details.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WeatherErrorKind {
     /// Provider requires an API key that isn't configured.
     ApiKeyMissing {
@@ -55,7 +55,7 @@ impl From<&Error> for WeatherErrorKind {
 }
 
 /// Fetch lifecycle state exposed to UI consumers.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WeatherStatus {
     /// Initial state or refresh in progress.
     Loading,
@@ -96,6 +96,7 @@ pub struct WeatherService {
 
 impl WeatherService {
     /// Returns a builder for configuring the weather service.
+    #[must_use]
     pub fn builder() -> WeatherServiceBuilder {
         WeatherServiceBuilder::new()
     }
@@ -168,8 +169,7 @@ impl WeatherService {
             poll_interval: self
                 .poll_interval
                 .read()
-                .map(|guard| *guard)
-                .unwrap_or(Duration::from_secs(600)),
+                .map_or(Duration::from_secs(600), |guard| *guard),
             location,
             kind: self
                 .provider_kind

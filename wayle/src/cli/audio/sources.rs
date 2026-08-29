@@ -11,12 +11,12 @@ pub async fn execute() -> CliAction {
     let sources = proxy
         .list_sources()
         .await
-        .map_err(|e| format_error("list sources", e))?;
+        .map_err(|e| format_error("list sources", &e))?;
 
     let default = proxy
         .default_source()
         .await
-        .map_err(|e| format_error("get default source", e))?;
+        .map_err(|e| format_error("get default source", &e))?;
 
     if sources.is_empty() {
         println!("No audio sources found");

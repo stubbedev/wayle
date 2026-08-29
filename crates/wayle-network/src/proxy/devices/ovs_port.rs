@@ -1,4 +1,4 @@
-//! NetworkManager OVS Port Device interface.
+//! `NetworkManager` OVS Port Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

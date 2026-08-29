@@ -29,7 +29,7 @@ use crate::{
     types::agent::{AgentCapability, AgentEvent},
 };
 
-/// Bluetooth connectivity via BlueZ D-Bus.
+/// Bluetooth connectivity via `BlueZ` D-Bus.
 ///
 /// See [crate-level documentation](crate) for reactive property patterns
 /// and live vs snapshot instance behavior.
@@ -229,10 +229,10 @@ impl BluetoothService {
         active_adapter.start_discovery().await?;
 
         tokio::spawn(async move {
-            let _ = sleep(duration).await;
+            let () = sleep(duration).await;
             if let Err(error) = active_adapter.stop_discovery().await {
                 error!(error = %error, "cannot stop timed discovery");
-            };
+            }
         });
 
         Ok(())
@@ -359,7 +359,7 @@ impl BluetoothService {
     ///
     /// For bool-based responders (confirmation, authorization, service authorization),
     /// sends `false` to reject. For value-based responders (pin, passkey), drops the
-    /// sender which causes BlueZ to treat it as a rejection/timeout.
+    /// sender which causes `BlueZ` to treat it as a rejection/timeout.
     pub async fn cancel_pending_request(&self) {
         let responder = self.pairing_responder.lock().await.take();
 

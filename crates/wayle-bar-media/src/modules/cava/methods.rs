@@ -62,8 +62,8 @@ impl CavaModule {
 
         let style = cava_config.style.get();
         let direction = cava_config.direction.get();
-        let bar_width = cava_config.bar_width.get() as f64;
-        let bar_spacing = cava_config.bar_gap.get() as f64;
+        let bar_width = f64::from(cava_config.bar_width.get());
+        let bar_spacing = f64::from(cava_config.bar_gap.get());
         let bar_scale = full_config.bar.scale.get().value();
         let fill_color = color::resolve_rgba(&cava_config.color.get(), config);
         let horizontal_padding =
@@ -78,8 +78,8 @@ impl CavaModule {
         let peak_state = Cell::new(Vec::<f64>::new());
 
         drawing_area.set_draw_func(move |_area, cr, width, height| {
-            let pixel_width = width as f64;
-            let pixel_height = height as f64;
+            let pixel_width = f64::from(width);
+            let pixel_height = f64::from(height);
 
             let values = frame_values.take();
             if values.is_empty() {
@@ -92,7 +92,7 @@ impl CavaModule {
             } else {
                 (pixel_width, pixel_height)
             };
-            let content_width = (canvas_width - horizontal_padding * 2.0).max(0.0);
+            let content_width = horizontal_padding.mul_add(-2.0, canvas_width).max(0.0);
 
             if is_vertical {
                 cr.translate(0.0, pixel_height);

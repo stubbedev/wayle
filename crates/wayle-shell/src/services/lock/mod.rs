@@ -45,10 +45,8 @@ pub(crate) fn lock() -> bool {
 /// session ends, so the next real login locks again. With no runtime dir we
 /// cannot dedupe, so we lock — failing secure for an access gate.
 pub(crate) fn claim_lock_on_start() -> bool {
-    match std::env::var_os("XDG_RUNTIME_DIR") {
-        Some(dir) => claim_marker(std::path::Path::new(&dir)),
-        None => true,
-    }
+    std::env::var_os("XDG_RUNTIME_DIR")
+        .map_or(true, |dir| claim_marker(std::path::Path::new(&dir)))
 }
 
 /// Atomically create-if-absent the marker under `runtime_dir`. Split out from
@@ -65,9 +63,9 @@ fn claim_marker(runtime_dir: &std::path::Path) -> bool {
         .create_new(true)
         .open(&marker)
     {
-        Ok(_) => true,                                                    // first start → lock
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => false, // restart → skip
-        Err(_) => true, // unknown error → fail secure
+        // first start → lock; unknown error → fail secure
+        _ => true,
     }
 }
 

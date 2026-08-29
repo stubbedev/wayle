@@ -11,7 +11,7 @@ pub(crate) struct WallpaperDaemon {
 }
 
 impl WallpaperDaemon {
-    fn monitor_option(monitor: &str) -> Option<&str> {
+    const fn monitor_option(monitor: &str) -> Option<&str> {
         if monitor.is_empty() {
             None
         } else {
@@ -159,13 +159,13 @@ impl WallpaperDaemon {
 
     /// Whether cycling is active.
     #[zbus(property)]
-    pub async fn is_cycling(&self) -> bool {
+    pub fn is_cycling(&self) -> bool {
         self.service.cycling_config().is_some()
     }
 
     /// The monitor used for color extraction theming (empty = default).
     #[zbus(property)]
-    pub async fn theming_monitor(&self) -> String {
+    pub fn theming_monitor(&self) -> String {
         self.service.theming_monitor.get().unwrap_or_default()
     }
 

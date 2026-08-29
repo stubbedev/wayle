@@ -51,7 +51,8 @@ pub struct SshMode {
 
 impl SshMode {
     /// Create the mode.
-    pub fn new(config: SshConfig, history: Option<HistoryStore>) -> Self {
+    #[must_use]
+    pub const fn new(config: SshConfig, history: Option<HistoryStore>) -> Self {
         Self {
             config,
             history,
@@ -78,7 +79,7 @@ impl SshMode {
 
 #[async_trait]
 impl Mode for SshMode {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ssh"
     }
 

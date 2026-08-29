@@ -15,7 +15,7 @@ pub struct SwayKeyboardLayoutSource {
 }
 
 impl SwayKeyboardLayoutSource {
-    pub fn new(service: Arc<SwayService>) -> Self {
+    pub const fn new(service: Arc<SwayService>) -> Self {
         Self { service }
     }
 }
@@ -36,6 +36,6 @@ impl KeyboardLayoutSource for SwayKeyboardLayoutSource {
     }
 }
 
-fn current_layout_from(label: String) -> CurrentLayout {
+const fn current_layout_from(label: String) -> CurrentLayout {
     CurrentLayout { label }
 }

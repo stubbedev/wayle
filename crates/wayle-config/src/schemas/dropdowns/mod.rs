@@ -69,7 +69,7 @@ impl ModuleInfoProvider for DropdownsConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("dropdowns"),
-            schema: || schema_for!(DropdownsConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

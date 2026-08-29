@@ -30,7 +30,7 @@ pub(crate) fn spawn(sender: &ComponentSender<Shell>) {
         tokio::pin!(shutdown_fut);
         loop {
             tokio::select! {
-                _ = &mut shutdown_fut => break,
+                () = &mut shutdown_fut => break,
                 Some(expected_count) = rx.recv() => {
                     debug!(expected_count, "Monitors changed, starting sync");
                     let _ = out.send(ShellCmd::SyncMonitors { expected_count, attempt: 0 });

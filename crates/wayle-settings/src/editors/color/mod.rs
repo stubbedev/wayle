@@ -1,4 +1,4 @@
-//! Color picker for HexColor config properties using GTK's ColorDialog.
+//! Color picker for `HexColor` config properties using GTK's `ColorDialog`.
 
 mod row;
 use relm4::{
@@ -93,6 +93,12 @@ fn hex_to_rgba(hex: &HexColor) -> gdk::RGBA {
     gdk::RGBA::parse(hex.as_str()).unwrap_or(gdk::RGBA::new(0.0, 0.0, 0.0, 1.0))
 }
 
+#[expect(
+    clippy::as_conversions,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "channel floats are 0.0..=1.0; `as` saturates into u8 range"
+)]
 fn rgba_to_hex(rgba: &gdk::RGBA) -> String {
     let red = (rgba.red() * 255.0).round() as u8;
     let green = (rgba.green() * 255.0).round() as u8;

@@ -11,7 +11,7 @@ pub async fn execute(profile: String) -> CliAction {
     proxy
         .set_profile(profile.clone())
         .await
-        .map_err(|e| format_error("set profile", e))?;
+        .map_err(|e| format_error("set profile", &e))?;
 
     println!("Profile set to: {profile}");
 

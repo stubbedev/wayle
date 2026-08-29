@@ -13,6 +13,7 @@ use crate::{
 impl ModelMonitoring for AudioStream {
     type Error = Error;
 
+    #[expect(clippy::unused_async, reason = "trait signature")]
     async fn start_monitoring(self: Arc<Self>) -> Result<(), Self::Error> {
         let Some(ref cancellation_token) = self.cancellation_token else {
             return Err(Error::MonitoringNotInitialized(
@@ -38,7 +39,7 @@ impl ModelMonitoring for AudioStream {
                 };
 
                 tokio::select! {
-                    _ = cancellation_token.cancelled() => {
+                    () = cancellation_token.cancelled() => {
                         debug!("AudioStream monitor cancelled for {:?}", stream_key);
                         return;
                     }

@@ -11,12 +11,12 @@ pub async fn execute() -> CliAction {
     proxy
         .cycle()
         .await
-        .map_err(|e| format_error("cycle profile", e))?;
+        .map_err(|e| format_error("cycle profile", &e))?;
 
     let active = proxy
         .active_profile()
         .await
-        .map_err(|e| format_error("get active profile", e))?;
+        .map_err(|e| format_error("get active profile", &e))?;
 
     println!("Profile: {active}");
 

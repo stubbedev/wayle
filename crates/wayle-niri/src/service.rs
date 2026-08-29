@@ -101,6 +101,7 @@ impl NiriService {
     /// Returns `None` when the id is not present, including the brief
     /// transient window where niri's event stream references a just-deleted
     /// entity.
+    #[must_use]
     pub fn window(&self, id: u64) -> Option<Arc<Window>> {
         self.windows.get().get(&id).cloned()
     }
@@ -109,6 +110,7 @@ impl NiriService {
     /// snapshot.
     ///
     /// Returns `None` when the id is not present.
+    #[must_use]
     pub fn workspace(&self, id: u64) -> Option<Arc<Workspace>> {
         self.workspaces.get().get(&id).cloned()
     }
@@ -120,7 +122,7 @@ impl NiriService {
     /// filtered out here so the caller sees a plain `Stream<Item = Event>`.
     pub fn events(&self) -> impl Stream<Item = Event> + Send + 'static {
         let receiver = self.public_event_tx.subscribe();
-        BroadcastStream::new(receiver).filter_map(|received| received.ok())
+        BroadcastStream::new(receiver).filter_map(std::result::Result::ok)
     }
 
     /// Returns the niri version string reported over IPC.

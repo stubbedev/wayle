@@ -1,4 +1,4 @@
-//! NetworkManager Wi-Fi P2P Device interface.
+//! `NetworkManager` Wi-Fi P2P Device interface.
 
 use std::collections::HashMap;
 

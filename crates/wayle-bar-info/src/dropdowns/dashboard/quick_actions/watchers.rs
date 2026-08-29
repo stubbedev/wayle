@@ -14,9 +14,9 @@ use crate::services::IdleInhibitService;
 
 pub fn spawn(
     sender: &ComponentSender<QuickActionsSection>,
-    network: &Option<Arc<NetworkService>>,
+    network: Option<&Arc<NetworkService>>,
     bluetooth: &DeferredService<BluetoothService>,
-    notification: &Option<Arc<NotificationService>>,
+    notification: Option<&Arc<NotificationService>>,
     power_profiles: &DeferredService<PowerProfilesService>,
     idle_inhibit: &Arc<IdleInhibitService>,
 ) {
@@ -39,7 +39,7 @@ pub fn spawn(
         });
     }
 
-    let active = idle_inhibit.state().active.clone();
+    let active = idle_inhibit.state().active;
 
     watch!(sender, [active.watch()], |out| {
         let _ = out.send(QuickActionsCmd::IdleInhibitChanged(active.get()));

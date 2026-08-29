@@ -40,7 +40,7 @@ pub struct AvailableNetworks {
     scan_watcher: WatcherToken,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum ListState {
     Normal,
     PasswordEntry,
@@ -150,7 +150,7 @@ impl Component for AvailableNetworks {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let password_form = PasswordForm::builder()

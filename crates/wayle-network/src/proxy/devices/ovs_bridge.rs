@@ -1,4 +1,4 @@
-//! NetworkManager OVS Bridge Device interface.
+//! `NetworkManager` OVS Bridge Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

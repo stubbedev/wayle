@@ -78,7 +78,7 @@ impl<T: Clone + Send + Sync + PartialEq + 'static> ConfigProperty<T> {
     }
 
     /// Fluent message ID for the settings GUI, or `None` for internal fields.
-    pub fn i18n_key(&self) -> Option<&'static str> {
+    pub const fn i18n_key(&self) -> Option<&'static str> {
         self.i18n_key
     }
 
@@ -88,7 +88,7 @@ impl<T: Clone + Send + Sync + PartialEq + 'static> ConfigProperty<T> {
     }
 
     /// The compiled default, before any config or runtime layers.
-    pub fn default(&self) -> &T {
+    pub const fn default(&self) -> &T {
         &self.default
     }
 
@@ -106,10 +106,8 @@ impl<T: Clone + Send + Sync + PartialEq + 'static> ConfigProperty<T> {
     pub fn source(&self) -> ValueSource {
         let has_runtime = self
             .runtime
-            .read()
-            .ok()
-            .is_some_and(|guard| guard.is_some());
-        let has_config = self.config.read().ok().is_some_and(|guard| guard.is_some());
+            .read().is_ok_and(|guard| guard.is_some());
+        let has_config = self.config.read().is_ok_and(|guard| guard.is_some());
 
         match (has_runtime, has_config) {
             (true, true) => ValueSource::Overridden,
@@ -137,9 +135,7 @@ impl<T: Clone + Send + Sync + PartialEq + 'static> ConfigProperty<T> {
         if resolves_without_runtime {
             let has_runtime = self
                 .runtime
-                .read()
-                .ok()
-                .is_some_and(|guard| guard.is_some());
+                .read().is_ok_and(|guard| guard.is_some());
 
             if has_runtime {
                 self.clear_runtime();
@@ -191,7 +187,7 @@ impl<T: Clone + Send + Sync + PartialEq + 'static> ConfigProperty<T> {
     }
 
     /// Resolves layers and always notifies watchers, even if unchanged.
-    /// Used by `clear_runtime` so PersistenceWatcher saves even when
+    /// Used by `clear_runtime` so `PersistenceWatcher` saves even when
     /// the runtime value happened to match the config value.
     fn flush_forced(&self) {
         let effective = self.resolve();
@@ -253,7 +249,7 @@ impl<'de, T: Clone + Send + Sync + PartialEq + Deserialize<'de> + 'static> Deser
         D: Deserializer<'de>,
     {
         let value = T::deserialize(deserializer)?;
-        Ok(ConfigProperty::new(value))
+        Ok(Self::new(value))
     }
 }
 

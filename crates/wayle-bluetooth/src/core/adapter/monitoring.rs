@@ -71,7 +71,7 @@ async fn monitor(
         };
 
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("AdapterMonitor cancelled for {}", adapter.object_path);
                 return;
             }

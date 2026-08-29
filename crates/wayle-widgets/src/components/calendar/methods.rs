@@ -31,9 +31,9 @@ fn clear_grid(grid: &gtk::Grid) {
 fn attach_weekday_headers(grid: &gtk::Grid, weekdays: &[String; 7], week_start: Weekday) {
     // Compute which columns land on Saturday and Sunday for the chosen week_start.
     // num_days_from_monday: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
-    let start = week_start.num_days_from_monday() as usize;
-    let sat_col = (5usize + 7 - start) % 7;
-    let sun_col = (6usize + 7 - start) % 7;
+    let start = usize::try_from(week_start.num_days_from_monday()).unwrap_or(0);
+    let sat_col = 12usize.saturating_sub(start) % 7;
+    let sun_col = 13usize.saturating_sub(start) % 7;
 
     for (col, weekday_name) in weekdays.iter().enumerate() {
         let label = gtk::Label::new(Some(weekday_name));
@@ -44,7 +44,7 @@ fn attach_weekday_headers(grid: &gtk::Grid, weekdays: &[String; 7], week_start: 
             label.add_css_class("weekend");
         }
 
-        grid.attach(&label, col as i32, 0, 1, 1);
+        grid.attach(&label, i32::try_from(col).unwrap_or(0), 0, 1, 1);
     }
 }
 
@@ -59,8 +59,8 @@ fn attach_day_cells(
     let cells = build_month_grid(displayed_month, today, selected_day, week_start);
 
     for (idx, cell) in cells.iter().enumerate() {
-        let col = (idx % 7) as i32;
-        let row = (idx / 7) as i32 + 1;
+        let col = i32::try_from(idx % 7).unwrap_or(0);
+        let row = i32::try_from(idx / 7).unwrap_or(0).saturating_add(1);
 
         let day_label = create_day_label(cell);
 

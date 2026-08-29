@@ -5,13 +5,13 @@ use libpulse_binding::{def::PortAvailable, format::Info as PulseFormatInfo, prop
 use crate::types::{device::DevicePort, format::AudioFormat, stream::MediaInfo};
 
 pub(super) fn cow_to_string(cow: Option<&Cow<'_, str>>) -> String {
-    cow.map(|s| s.to_string()).unwrap_or_default()
+    cow.map(std::string::ToString::to_string).unwrap_or_default()
 }
 
 pub(super) fn collect_proplist(proplist: &Proplist) -> HashMap<String, String> {
     proplist
         .iter()
-        .filter_map(|key| proplist.get_str(&key).map(|value| (key.to_string(), value)))
+        .filter_map(|key| proplist.get_str(&key).map(|value| (key.clone(), value)))
         .collect()
 }
 
@@ -40,7 +40,7 @@ pub(super) fn convert_ports(ports: &[impl PulsePort]) -> Vec<DevicePort> {
 pub(super) fn active_port_name(active_port: &Option<Box<impl PulsePort>>) -> Option<String> {
     active_port
         .as_ref()
-        .and_then(|port| port.port_name().map(|name| name.to_string()))
+        .and_then(|port| port.port_name().map(std::string::ToString::to_string))
 }
 
 pub(super) fn extract_media_info(proplist: &Proplist) -> MediaInfo {

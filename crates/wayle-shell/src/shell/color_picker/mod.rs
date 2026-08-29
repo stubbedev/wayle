@@ -99,7 +99,7 @@ impl Component for ColorPicker {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = ColorPicker {
+        let model = Self {
             reply: None,
             surfaces: Vec::new(),
             history: Rc::new(RefCell::new(load_history())),
@@ -117,10 +117,16 @@ impl Component for ColorPicker {
                 }
                 self.close();
                 self.reply = Some(reply);
-                self.open(&sender, frames);
+                self.open(&sender, &frames);
             }
             ColorPickerInput::Finish(color) => {
                 if let Some((r, g, b)) = color {
+                    #[expect(
+                        clippy::as_conversions,
+                        clippy::cast_possible_truncation,
+                        clippy::cast_sign_loss,
+                        reason = "unit-range channel → 0..=255, rounding intended"
+                    )]
                     self.push_history((
                         (r * 255.0).round() as u8,
                         (g * 255.0).round() as u8,
@@ -138,7 +144,7 @@ impl Component for ColorPicker {
 
 impl ColorPicker {
     /// Builds and shows one frozen-frame surface per monitor that has a frame.
-    fn open(&mut self, sender: &ComponentSender<Self>, frames: HashMap<String, FrameData>) {
+    fn open(&mut self, sender: &ComponentSender<Self>, frames: &HashMap<String, FrameData>) {
         for (connector, monitor) in current_monitors() {
             let Some(frame) = frames.get(&connector) else {
                 continue;
@@ -195,7 +201,7 @@ impl ColorPicker {
         }
     }
 
-    fn push_history(&mut self, color: (u8, u8, u8)) {
+    fn push_history(&self, color: (u8, u8, u8)) {
         let mut history = self.history.borrow_mut();
         history.retain(|c| *c != color);
         history.insert(0, color);
@@ -206,10 +212,22 @@ impl ColorPicker {
 
 /// Samples the source pixel under a surface-local logical point.
 fn sample(image: &RgbImage, logical: (i32, i32), lx: f64, ly: f64) -> (u8, u8, u8) {
-    let sx = image.width() as f64 / logical.0.max(1) as f64;
-    let sy = image.height() as f64 / logical.1.max(1) as f64;
-    let px = ((lx * sx) as i64).clamp(0, image.width() as i64 - 1) as u32;
-    let py = ((ly * sy) as i64).clamp(0, image.height() as i64 - 1) as u32;
+    let sx = f64::from(image.width()) / f64::from(logical.0.max(1));
+    let sy = f64::from(image.height()) / f64::from(logical.1.max(1));
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "float→pixel index, clamped to image bounds"
+    )]
+    let px = ((lx * sx) as i64).clamp(0, i64::from(image.width()).saturating_sub(1)) as u32;
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "float→pixel index, clamped to image bounds"
+    )]
+    let py = ((ly * sy) as i64).clamp(0, i64::from(image.height()).saturating_sub(1)) as u32;
     let p = image.get_pixel(px, py);
     (p[0], p[1], p[2])
 }
@@ -311,10 +329,20 @@ fn draw_loupe(
     height: i32,
     history: &[(u8, u8, u8)],
 ) {
-    let sx = image.width() as f64 / logical.0.max(1) as f64;
-    let sy = image.height() as f64 / logical.1.max(1) as f64;
-    let center_px = ((cx * sx) as i64).clamp(0, image.width() as i64 - 1) as i32;
-    let center_py = ((cy * sy) as i64).clamp(0, image.height() as i64 - 1) as i32;
+    let sx = f64::from(image.width()) / f64::from(logical.0.max(1));
+    let sy = f64::from(image.height()) / f64::from(logical.1.max(1));
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "float→pixel index, clamped to image bounds"
+    )]
+    let center_px = ((cx * sx) as i64).clamp(0, i64::from(image.width()).saturating_sub(1)) as i32;
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "float→pixel index, clamped to image bounds"
+    )]
+    let center_py = ((cy * sy) as i64).clamp(0, i64::from(image.height()).saturating_sub(1)) as i32;
 
     let grid = f64::from(2 * RADIUS + 1);
     let loupe_size = grid * ZOOM;
@@ -352,26 +380,23 @@ fn draw_loupe(
     draw_grid(cr, image, center_px, center_py, px, py);
 
     // Crosshair box on the exact center pixel.
-    let center = px + f64::from(RADIUS) * ZOOM;
+    let center = f64::from(RADIUS).mul_add(ZOOM, px);
     cr.set_source_rgba(1.0, 1.0, 1.0, 0.95);
     cr.set_line_width(1.5);
-    cr.rectangle(center, py + f64::from(RADIUS) * ZOOM, ZOOM, ZOOM);
+    cr.rectangle(center, f64::from(RADIUS).mul_add(ZOOM, py), ZOOM, ZOOM);
     let _ = cr.stroke();
     cr.set_source_rgba(0.0, 0.0, 0.0, 0.9);
     cr.set_line_width(1.5);
     cr.rectangle(
         center - 1.0,
-        py + f64::from(RADIUS) * ZOOM - 1.0,
+        f64::from(RADIUS).mul_add(ZOOM, py) - 1.0,
         ZOOM + 2.0,
         ZOOM + 2.0,
     );
     let _ = cr.stroke();
 
-    let (r, g, b) = (
-        image.get_pixel(center_px as u32, center_py as u32)[0],
-        image.get_pixel(center_px as u32, center_py as u32)[1],
-        image.get_pixel(center_px as u32, center_py as u32)[2],
-    );
+    let center_pixel = image.get_pixel(center_px.cast_unsigned(), center_py.cast_unsigned());
+    let (r, g, b) = (center_pixel[0], center_pixel[1], center_pixel[2]);
 
     // Readout: a colour chip + hex string.
     let ry = py + loupe_size;
@@ -411,16 +436,22 @@ fn draw_grid(
 ) {
     for gy in -RADIUS..=RADIUS {
         for gx in -RADIUS..=RADIUS {
-            let sxp = (center_px + gx).clamp(0, image.width() as i32 - 1) as u32;
-            let syp = (center_py + gy).clamp(0, image.height() as i32 - 1) as u32;
+            let sxp = center_px
+                .saturating_add(gx)
+                .clamp(0, image.width().cast_signed().saturating_sub(1))
+                .cast_unsigned();
+            let syp = center_py
+                .saturating_add(gy)
+                .clamp(0, image.height().cast_signed().saturating_sub(1))
+                .cast_unsigned();
             let p = image.get_pixel(sxp, syp);
             cr.set_source_rgb(
                 f64::from(p[0]) / 255.0,
                 f64::from(p[1]) / 255.0,
                 f64::from(p[2]) / 255.0,
             );
-            let rx = px + f64::from(gx + RADIUS) * ZOOM;
-            let ry = py + f64::from(gy + RADIUS) * ZOOM;
+            let rx = f64::from(gx.saturating_add(RADIUS)).mul_add(ZOOM, px);
+            let ry = f64::from(gy.saturating_add(RADIUS)).mul_add(ZOOM, py);
             cr.rectangle(rx, ry, ZOOM, ZOOM);
             let _ = cr.fill();
         }
@@ -439,7 +470,12 @@ fn draw_history(
     gap: f64,
 ) {
     for (i, (hr, hg, hb)) in history.iter().enumerate() {
-        let hx = px + i as f64 * (swatch + gap);
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_precision_loss,
+            reason = "swatch index is tiny, exact in f64"
+        )]
+        let hx = (i as f64).mul_add(swatch + gap, px);
         if hx + swatch > px + panel_w {
             break;
         }
@@ -489,10 +525,11 @@ fn save_history(history: &[(u8, u8, u8)]) {
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let body: String = history
-        .iter()
-        .map(|(r, g, b)| format!("#{r:02X}{g:02X}{b:02X}\n"))
-        .collect();
+    let body = history.iter().fold(String::new(), |mut out, (r, g, b)| {
+        use std::fmt::Write as _;
+        let _ = writeln!(out, "#{r:02X}{g:02X}{b:02X}");
+        out
+    });
     let _ = std::fs::write(path, body);
 }
 
@@ -502,9 +539,9 @@ fn parse_hex(line: &str) -> Option<(u8, u8, u8)> {
     if hex.len() != 6 {
         return None;
     }
-    let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
-    let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
-    let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+    let r = u8::from_str_radix(hex.get(0..2)?, 16).ok()?;
+    let g = u8::from_str_radix(hex.get(2..4)?, 16).ok()?;
+    let b = u8::from_str_radix(hex.get(4..6)?, 16).ok()?;
     Some((r, g, b))
 }
 
@@ -537,9 +574,9 @@ mod tests {
         // 120x120 red→green horizontal, green→blue vertical gradient.
         let src = RgbImage::from_fn(120, 120, |x, y| {
             image::Rgb([
-                (x * 255 / 119) as u8,
-                (y * 255 / 119) as u8,
-                ((x + y) * 255 / 238) as u8,
+                u8::try_from(x * 255 / 119).unwrap(),
+                u8::try_from(y * 255 / 119).unwrap(),
+                u8::try_from((x + y) * 255 / 238).unwrap(),
             ])
         });
 
@@ -556,16 +593,16 @@ mod tests {
         // Convert the cairo surface (premultiplied BGRA, little-endian ARGB32)
         // into an RgbImage and save via the `image` crate — cairo's own
         // `write_to_png` needs a feature we don't enable.
-        let stride = surface.stride() as usize;
+        let stride = usize::try_from(surface.stride()).unwrap();
         let (w, h) = (800usize, 600usize);
         let data = surface.take_data().unwrap();
-        let mut img = RgbImage::new(w as u32, h as u32);
+        let mut img = RgbImage::new(800, 600);
         for y in 0..h {
             for x in 0..w {
                 let i = y * stride + x * 4;
                 img.put_pixel(
-                    x as u32,
-                    y as u32,
+                    u32::try_from(x).unwrap(),
+                    u32::try_from(y).unwrap(),
                     image::Rgb([data[i + 2], data[i + 1], data[i]]),
                 );
             }

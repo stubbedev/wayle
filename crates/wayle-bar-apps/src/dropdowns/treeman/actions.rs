@@ -31,7 +31,7 @@ pub struct Actions {
 }
 
 impl Actions {
-    pub fn new(treeman: Arc<TreemanService>, toast: ToastBus) -> Self {
+    pub const fn new(treeman: Arc<TreemanService>, toast: ToastBus) -> Self {
         Self { treeman, toast }
     }
 

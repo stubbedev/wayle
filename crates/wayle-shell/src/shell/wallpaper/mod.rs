@@ -229,7 +229,7 @@ fn decode(path: &Path) -> Result<Decoded, String> {
 }
 
 /// Maps a [`FitMode`] to the equivalent GTK [`gtk::ContentFit`].
-fn content_fit(fit: FitMode) -> gtk::ContentFit {
+const fn content_fit(fit: FitMode) -> gtk::ContentFit {
     match fit {
         FitMode::Fill => gtk::ContentFit::Cover,
         FitMode::Fit => gtk::ContentFit::Contain,
@@ -240,7 +240,7 @@ fn content_fit(fit: FitMode) -> gtk::ContentFit {
 
 /// Maps a shared [`AnimationType`] to a `gtk::Stack` transition. `Stack` has no
 /// swing/bounce/genie variants, so those fall back to a crossfade.
-fn stack_transition(anim: AnimationType) -> gtk::StackTransitionType {
+const fn stack_transition(anim: AnimationType) -> gtk::StackTransitionType {
     match anim {
         AnimationType::None => gtk::StackTransitionType::None,
         AnimationType::SlideUp => gtk::StackTransitionType::SlideUp,

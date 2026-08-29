@@ -32,7 +32,7 @@ pub(crate) struct PageSpec {
     pub(crate) footer: Option<gtk::Widget>,
 }
 
-pub(crate) fn page_spec(header_key: &'static str, sections: Vec<SectionSpec>) -> PageSpec {
+pub(crate) const fn page_spec(header_key: &'static str, sections: Vec<SectionSpec>) -> PageSpec {
     PageSpec {
         header_key,
         sections,

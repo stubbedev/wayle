@@ -122,7 +122,7 @@ impl ModuleInfoProvider for IdleInhibitConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("idle-inhibit"),
-            schema: || schema_for!(IdleInhibitConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("idle-inhibit")),
             array_entry: false,
         }

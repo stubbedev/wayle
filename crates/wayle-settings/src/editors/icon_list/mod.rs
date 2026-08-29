@@ -4,7 +4,7 @@
 //! preview-driven [`icon_picker_widget`] instead of a bare text entry — used
 //! for icon lists like the battery level icons.
 //!
-//! Edits read-modify-write the whole `Vec` (ConfigProperty is atomic). Each
+//! Edits read-modify-write the whole `Vec` (`ConfigProperty` is atomic). Each
 //! row owns a cell the picker writes; structural changes (add/remove/reorder)
 //! rebuild the rows. A watcher rebuilds when the value changes externally
 //! (reset, config reload).
@@ -137,12 +137,17 @@ impl IconListState {
         let Some(index) = self.index_of(trigger) else {
             return;
         };
-        let target = index as i32 + delta;
+        let Some(target) = isize::try_from(delta)
+            .ok()
+            .and_then(|delta| index.checked_add_signed(delta))
+        else {
+            return;
+        };
         let mut values = self.values();
-        if target < 0 || target as usize >= values.len() {
+        if target >= values.len() {
             return;
         }
-        values.swap(index, target as usize);
+        values.swap(index, target);
         self.rebuild(&values);
         self.commit();
     }

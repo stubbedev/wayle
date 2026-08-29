@@ -18,7 +18,7 @@ pub fn label_for(idx: u8, name: Option<&str>, strategy: LabelStrategy) -> Option
     match strategy {
         LabelStrategy::Index => Some(idx.to_string()),
         LabelStrategy::NameOrIndex => {
-            Some(name.map(String::from).unwrap_or_else(|| idx.to_string()))
+            Some(name.map_or_else(|| idx.to_string(), String::from))
         }
         LabelStrategy::NameOnly => name.map(String::from),
         LabelStrategy::IndexAndName => match name {

@@ -23,7 +23,7 @@ pub enum ModalIcon {
 }
 
 impl ModalIcon {
-    fn icon_name(self) -> Option<&'static str> {
+    const fn icon_name(self) -> Option<&'static str> {
         match self {
             Self::Warning => Some("tb-alert-triangle-symbolic"),
             Self::Error => Some("tb-xbox-x-symbolic"),
@@ -33,7 +33,7 @@ impl ModalIcon {
         }
     }
 
-    fn css_classes(self) -> &'static [&'static str] {
+    const fn css_classes(self) -> &'static [&'static str] {
         match self {
             Self::Warning => &["modal-icon", "warning"],
             Self::Error => &["modal-icon", "error"],
@@ -245,15 +245,12 @@ impl SimpleComponent for ConfirmModal {
         let widgets = view_output!();
 
         let key_controller = gtk::EventControllerKey::new();
-        key_controller.connect_key_pressed({
-            let sender = sender.clone();
-            move |_, key, _, _| {
-                if key == gtk::gdk::Key::Escape {
-                    sender.input(ConfirmModalMsg::Cancel);
-                    glib::Propagation::Stop
-                } else {
-                    glib::Propagation::Proceed
-                }
+        key_controller.connect_key_pressed(move |_, key, _, _| {
+            if key == gtk::gdk::Key::Escape {
+                sender.input(ConfirmModalMsg::Cancel);
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
             }
         });
         root.add_controller(key_controller);

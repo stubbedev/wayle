@@ -51,11 +51,11 @@ impl DeviceItem {
         self.device_path = snapshot.device.object_path.clone();
     }
 
-    pub fn clear_pending(&mut self) {
+    pub const fn clear_pending(&mut self) {
         self.pending = None;
     }
 
-    pub fn is_my_device(&self) -> bool {
+    pub const fn is_my_device(&self) -> bool {
         matches!(
             self.category,
             DeviceCategory::Connected | DeviceCategory::Paired
@@ -82,7 +82,7 @@ impl DeviceItem {
         String::new()
     }
 
-    pub fn status_visible(&self) -> bool {
+    pub const fn status_visible(&self) -> bool {
         self.connected || self.paired || self.pending.is_some()
     }
 

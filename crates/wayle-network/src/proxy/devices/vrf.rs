@@ -1,4 +1,4 @@
-//! NetworkManager VRF Device interface.
+//! `NetworkManager` VRF Device interface.
 
 use zbus::proxy;
 

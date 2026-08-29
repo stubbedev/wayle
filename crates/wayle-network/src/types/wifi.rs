@@ -21,9 +21,9 @@ pub enum NM80211Mode {
 
 impl NM80211Mode {
     /// Convert from D-Bus u32 representation
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
-            0 => Self::Unknown,
             1 => Self::Adhoc,
             2 => Self::Infra,
             3 => Self::Ap,

@@ -112,9 +112,9 @@ impl SimpleComponent for BarLayoutControl {
     fn update(&mut self, msg: Self::Input, _sender: ComponentSender<Self>) {
         match msg {
             BarLayoutMsg::Add => self.on_add(),
-            BarLayoutMsg::Remove(index) => self.on_remove(index),
+            BarLayoutMsg::Remove(index) => self.on_remove(&index),
             BarLayoutMsg::CardChanged => self.commit(),
-            BarLayoutMsg::ItemDropped(from, to) => self.on_item_dropped(from, to),
+            BarLayoutMsg::ItemDropped(from, to) => self.on_item_dropped(&from, &to),
             BarLayoutMsg::Refresh => self.on_refresh(),
         }
     }

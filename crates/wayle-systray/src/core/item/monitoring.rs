@@ -154,12 +154,12 @@ async fn monitor_properties(
         };
 
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("Tray item '{bus_name}' monitor received cancellation, stopping");
                 return;
             }
 
-            _ = &mut menu_debounce, if menu_dirty => {
+            () = &mut menu_debounce, if menu_dirty => {
                 debug!("menu debounce fired, fetching layout");
                 menu_dirty = false;
 

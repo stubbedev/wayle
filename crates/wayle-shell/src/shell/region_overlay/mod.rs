@@ -123,7 +123,7 @@ impl Component for RegionOverlay {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = RegionOverlay {
+        let model = Self {
             reply: None,
             surfaces: Vec::new(),
             drag: Rc::new(RefCell::new(None)),
@@ -185,7 +185,7 @@ impl RegionOverlay {
 
         for (connector, monitor) in monitors {
             let g = monitor.geometry();
-            let offset = (g.x() as f64, g.y() as f64);
+            let offset = (f64::from(g.x()), f64::from(g.y()));
             debug!(connector = %connector, x = g.x(), y = g.y(), "region overlay surface");
 
             let window = gtk::Window::builder().decorated(false).build();

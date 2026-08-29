@@ -5,16 +5,16 @@ use relm4::{gtk, gtk::prelude::*};
 use super::picker::FontPicker;
 
 impl FontPicker {
-    pub(super) fn apply_search(&mut self, query: &str) {
+    pub(super) fn apply_search(&self, query: &str) {
         let value = if query.is_empty() { None } else { Some(query) };
         self.filter.set_search(value);
     }
 
-    pub(super) fn reset_search(&mut self) {
+    pub(super) fn reset_search(&self) {
         self.filter.set_search(None);
     }
 
-    pub(super) fn select_and_close(&mut self, position: u32, popover: &gtk::Popover) {
+    pub(super) fn select_and_close(&self, position: u32, popover: &gtk::Popover) {
         let Some(family) = self.family_at(position) else {
             return;
         };

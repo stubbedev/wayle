@@ -14,7 +14,7 @@ use gdk4::Display;
 use gtk::prelude::*;
 use gtk4::{CssProvider, glib, style_context_add_provider_for_display};
 use relm4::{gtk, prelude::*};
-use wayle_media::{core::player::Player, types::*};
+use wayle_media::{core::player::Player, types::{PlaybackState, LoopMode, ShuffleMode}};
 use wayle_widgets::{WatcherToken, prelude::*};
 
 pub use self::messages::*;
@@ -30,6 +30,7 @@ fn next_art_css_class() -> String {
     format!("media-artwork-instance-{id}")
 }
 
+#[expect(clippy::struct_excessive_bools, reason = "config/state struct")]
 pub struct PlayerView {
     player: Option<Arc<Player>>,
     player_watcher: WatcherToken,
@@ -324,7 +325,7 @@ impl Component for PlayerView {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         watchers::spawn_static(&sender, &init.media);
@@ -354,7 +355,7 @@ impl Component for PlayerView {
             is_active: false,
             art_css_provider,
             art_css_class: next_art_css_class(),
-            seek_slider: seek_slider.clone(),
+            seek_slider,
 
             has_player: false,
             title: String::new(),

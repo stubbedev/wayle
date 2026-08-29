@@ -54,7 +54,7 @@ fn spawn_config_watchers(sender: &ComponentSender<KeyboardInput>, config: &Keybo
 
     let icon_name = config.icon_name.clone();
     watch!(sender, [icon_name.watch()], |out| {
-        let _ = out.send(KeyboardInputCmd::UpdateIcon(icon_name.get().clone()));
+        let _ = out.send(KeyboardInputCmd::UpdateIcon(icon_name.get()));
     });
 
     let layout_alias_map = config.layout_alias_map.clone();

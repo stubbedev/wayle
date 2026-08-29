@@ -1,4 +1,4 @@
-//! Hex-string <-> GdkRGBA conversion.
+//! Hex-string <-> `GdkRGBA` conversion.
 
 use relm4::gtk::gdk;
 
@@ -6,6 +6,12 @@ pub(super) fn hex_to_rgba(hex: &str) -> gdk::RGBA {
     gdk::RGBA::parse(hex).unwrap_or(gdk::RGBA::new(0.0, 0.0, 0.0, 1.0))
 }
 
+#[expect(
+    clippy::as_conversions,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "channel floats are 0.0..=1.0; `as` saturates into u8 range"
+)]
 pub(super) fn rgba_to_hex(rgba: &gdk::RGBA) -> String {
     let red = (rgba.red() * 255.0).round() as u8;
     let green = (rgba.green() * 255.0).round() as u8;

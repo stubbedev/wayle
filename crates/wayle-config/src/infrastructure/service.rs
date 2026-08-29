@@ -97,6 +97,7 @@ impl ConfigService {
     }
 
     /// Reference to the config root.
+    #[must_use]
     pub fn config(&self) -> &Config {
         &self.config
     }
@@ -134,11 +135,12 @@ impl ConfigService {
     ///
     /// Returns a receiver that fires whenever `.env` files are reloaded.
     /// Returns `None` if the watcher is not initialized.
+    #[must_use]
     pub fn subscribe_secrets_reload(&self) -> Option<tokio::sync::watch::Receiver<()>> {
         self.watcher.read().ok().and_then(|guard| {
             guard
                 .as_ref()
-                .map(|watcher| watcher.subscribe_secrets_reload())
+                .map(super::watcher::FileWatcher::subscribe_secrets_reload)
         })
     }
 

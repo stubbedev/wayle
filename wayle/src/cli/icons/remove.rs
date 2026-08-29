@@ -7,10 +7,10 @@ use crate::cli::CliAction;
 /// # Errors
 ///
 /// Returns error if icon doesn't exist or deletion fails.
-pub fn execute(names: Vec<String>) -> CliAction {
+pub fn execute(names: &[String]) -> CliAction {
     let manager = IconManager::new().map_err(|err| err.to_string())?;
 
-    for name in &names {
+    for name in names {
         manager.remove(name).map_err(|err| err.to_string())?;
         println!("Removed: {name}");
     }

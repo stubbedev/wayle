@@ -19,9 +19,9 @@ use crate::shell::bar::modules::hyprland_workspaces::messages::WorkspacesCmd;
 pub fn spawn_watchers(
     sender: &ComponentSender<HyprlandWorkspaces>,
     config: &HyprlandWorkspacesConfig,
-    hyprland: &Option<Arc<HyprlandService>>,
-    theme_provider: ConfigProperty<ThemeProvider>,
-    bar_scale: ConfigProperty<ScaleFactor>,
+    hyprland: Option<&Arc<HyprlandService>>,
+    theme_provider: &ConfigProperty<ThemeProvider>,
+    bar_scale: &ConfigProperty<ScaleFactor>,
     settings: &BarSettings,
 ) {
     spawn_hyprland_watchers(sender, hyprland);
@@ -30,9 +30,9 @@ pub fn spawn_watchers(
 
 fn spawn_hyprland_watchers(
     sender: &ComponentSender<HyprlandWorkspaces>,
-    hyprland: &Option<Arc<HyprlandService>>,
+    hyprland: Option<&Arc<HyprlandService>>,
 ) {
-    let Some(hyprland) = hyprland.clone() else {
+    let Some(hyprland) = hyprland.cloned() else {
         warn!(
             service = "HyprlandService",
             module = "hyprland-workspaces",
@@ -52,11 +52,11 @@ fn spawn_hyprland_watchers(
     });
 
     let hyprland_clone = hyprland.clone();
-    sender.command(move |out, shutdown| watch_title_events(hyprland_clone.clone(), out, shutdown));
+    sender.command(move |out, shutdown| watch_title_events(hyprland_clone, out, shutdown));
 
     sender.command({
-        let hyprland_clone = hyprland.clone();
-        move |out, shutdown| watch_workspace_events(hyprland_clone.clone(), out, shutdown)
+        let hyprland_clone = hyprland;
+        move |out, shutdown| watch_workspace_events(hyprland_clone, out, shutdown)
     });
 }
 
@@ -142,8 +142,8 @@ async fn watch_title_events(
 fn spawn_config_watchers(
     sender: &ComponentSender<HyprlandWorkspaces>,
     config: &HyprlandWorkspacesConfig,
-    theme_provider: ConfigProperty<ThemeProvider>,
-    bar_scale: ConfigProperty<ScaleFactor>,
+    theme_provider: &ConfigProperty<ThemeProvider>,
+    bar_scale: &ConfigProperty<ScaleFactor>,
     settings: &BarSettings,
 ) {
     let min_count = config.min_workspace_count.clone();

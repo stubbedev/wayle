@@ -67,7 +67,7 @@ impl OutputWatcher {
     }
 
     /// Returns the receiver for output events.
-    pub fn events(&mut self) -> &mut tokio_mpsc::UnboundedReceiver<OutputEvent> {
+    pub const fn events(&mut self) -> &mut tokio_mpsc::UnboundedReceiver<OutputEvent> {
         &mut self.event_rx
     }
 
@@ -110,7 +110,7 @@ impl OutputWatcher {
                 state
                     .output_state
                     .info(&output)
-                    .and_then(|info| info.name.clone())
+                    .and_then(|info| info.name)
             })
             .collect();
 

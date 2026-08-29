@@ -85,6 +85,7 @@ impl BacklightDevice {
     }
 
     /// Computes percentage from raw brightness and max.
+    #[must_use]
     pub fn percentage(&self) -> Percentage {
         if self.max_brightness == 0 {
             return Percentage::new(0.0);
@@ -100,6 +101,12 @@ impl BacklightDevice {
     ///
     /// Returns error if the write fails via both logind and sysfs.
     pub async fn set_percentage(&self, percent: Percentage) -> Result<(), Error> {
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "fraction is 0.0-1.0, product rounds to a valid u32"
+        )]
         let raw = (percent.fraction() * f64::from(self.max_brightness)).round() as u32;
         self.set_brightness(raw).await
     }

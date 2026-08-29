@@ -24,7 +24,7 @@ pub enum Size {
 }
 
 impl Size {
-    fn css_class(self) -> &'static str {
+    const fn css_class(self) -> &'static str {
         match self {
             Self::Sm => "sm",
             Self::Md => "md",
@@ -51,7 +51,7 @@ pub enum ColorVariant {
 }
 
 impl ColorVariant {
-    fn css_class(self) -> Option<&'static str> {
+    const fn css_class(self) -> Option<&'static str> {
         match self {
             Self::Default => None,
             Self::Success => Some("success"),
@@ -134,7 +134,7 @@ impl SimpleComponent for ProgressRing {
             draw_ring(area, cr, width, height, fraction_for_draw.get());
         });
 
-        let model = ProgressRing {
+        let model = Self {
             fraction,
             label_text: String::new(),
             current_color: init.color,
@@ -181,9 +181,9 @@ impl SimpleComponent for ProgressRing {
 }
 
 fn draw_ring(area: &gtk::DrawingArea, cr: &cairo::Context, width: i32, height: i32, fraction: f64) {
-    let size = width.min(height) as f64;
-    let center_x = width as f64 / 2.0;
-    let center_y = height as f64 / 2.0;
+    let size = f64::from(width.min(height));
+    let center_x = f64::from(width) / 2.0;
+    let center_y = f64::from(height) / 2.0;
 
     let stroke_width = stroke_width_from_css(area);
     let radius = (size / 2.0) - (stroke_width / 2.0);
@@ -210,7 +210,7 @@ fn draw_ring(area: &gtk::DrawingArea, cr: &cairo::Context, width: i32, height: i
     if fraction > 0.0 {
         set_source_color(cr, &fill_color);
         let start_angle = -PI / 2.0;
-        let end_angle = start_angle + (2.0 * PI * fraction);
+        let end_angle = (2.0 * PI).mul_add(fraction, start_angle);
         cr.arc(center_x, center_y, radius, start_angle, end_angle);
         let _ = cr.stroke();
     }
@@ -228,7 +228,7 @@ fn set_source_color(cr: &cairo::Context, color: &RGBA) {
 #[allow(deprecated)]
 fn stroke_width_from_css(widget: &gtk::DrawingArea) -> f64 {
     let style_context = widget.style_context();
-    let border_width = style_context.border().top() as f64;
+    let border_width = f64::from(style_context.border().top());
     if border_width > 0.0 {
         border_width
     } else {

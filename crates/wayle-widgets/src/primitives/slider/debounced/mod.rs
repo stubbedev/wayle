@@ -18,12 +18,14 @@ glib::wrapper! {
 }
 
 impl DebouncedSlider {
+    #[must_use]
     pub fn new(initial_value: f64) -> Self {
         glib::Object::builder()
             .property("value", initial_value)
             .build()
     }
 
+    #[must_use]
     pub fn with_label(initial_value: f64) -> Self {
         glib::Object::builder()
             .property("value", initial_value)
@@ -44,11 +46,13 @@ impl DebouncedSlider {
     }
 
     /// The internal Scale widget, for adding CSS classes.
+    #[must_use]
     pub fn scale(&self) -> Option<gtk4::Scale> {
         self.imp().scale()
     }
 
     /// The internal Label widget, for adding CSS classes.
+    #[must_use]
     pub fn label_widget(&self) -> Option<gtk4::Label> {
         self.imp().label_widget()
     }

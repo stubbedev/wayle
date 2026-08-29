@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer};
 use crate::{Address, MonitorId, WorkspaceInfo, deserialize_optional_address};
 
 /// Reserved screen space on a monitor for panels, bars, etc.
-#[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq, PartialOrd)]
 pub struct Reserved {
     /// Reserved space at the top edge in pixels.
     pub top: u32,
@@ -59,7 +59,6 @@ where
 {
     let value: u8 = Deserialize::deserialize(deserializer)?;
     Ok(match value {
-        0 => Transform::Normal,
         1 => Transform::Transform90,
         2 => Transform::Transform180,
         3 => Transform::Transform270,
@@ -338,6 +337,10 @@ where
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors Hyprland's monitor JSON schema"
+)]
 pub(crate) struct MonitorData {
     pub id: MonitorId,
     pub name: String,

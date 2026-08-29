@@ -59,8 +59,8 @@ pub(super) fn attach<M>(
 
     populate_list(&list, "", &custom_modules, &sender, &popover, &build_msg);
 
-    let filter_list = list.clone();
-    let filter_sender = sender.clone();
+    let filter_list = list;
+    let filter_sender = sender;
     let filter_popover = popover.clone();
     let filter_build = Rc::clone(&build_msg);
     let filter_custom = Rc::clone(&custom_modules);
@@ -77,7 +77,7 @@ pub(super) fn attach<M>(
         );
     });
 
-    let search_reset = search.clone();
+    let search_reset = search;
     popover.connect_show(move |_popover| {
         search_reset.set_text("");
     });
@@ -86,7 +86,7 @@ pub(super) fn attach<M>(
 fn all_module_names(custom_modules: &ConfigProperty<Vec<CustomModuleDefinition>>) -> Vec<String> {
     let builtin: Vec<String> = BarModule::builtin_names()
         .iter()
-        .map(|module_name| module_name.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
 
     let custom: Vec<String> = custom_modules

@@ -22,6 +22,7 @@ impl ServiceMonitoring for AudioService {
     type Error = Error;
 
     #[allow(clippy::too_many_lines)]
+    #[expect(clippy::unused_async, reason = "trait signature")]
     async fn start_monitoring(&self) -> Result<(), Self::Error> {
         let mut event_rx = self.event_tx.subscribe();
         let mut output_devs: HashMap<DeviceKey, Arc<OutputDevice>> = HashMap::new();
@@ -41,7 +42,7 @@ impl ServiceMonitoring for AudioService {
         tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    _ = cancellation_token.cancelled() => {
+                    () = cancellation_token.cancelled() => {
                         info!("AudioMonitoring cancelled, stopping");
                         return;
                     }
@@ -117,7 +118,7 @@ impl ServiceMonitoring for AudioService {
                                 if let Some(device) =  output_devs.remove(&key) {
                                     if let Some(ref cancel_token) = device.cancellation_token {
                                         cancel_token.cancel();
-                                    };
+                                    }
 
                                     output_devices.set(output_devs.values().cloned().collect());
                                 }
@@ -172,7 +173,7 @@ impl ServiceMonitoring for AudioService {
                                             let key = source.key();
                                             input_devs.get(&key).cloned()
                                         }
-                                        _ => None,
+                                        Device::Sink(_) => None,
                                     }
                                 });
                                 default_input.set(device);
@@ -185,7 +186,7 @@ impl ServiceMonitoring for AudioService {
                                             let key = sink.key();
                                             output_devs.get(&key).cloned()
                                         }
-                                        _ => None,
+                                        Device::Source(_) => None,
                                     }
                                 });
                                 default_output.set(device);
@@ -244,7 +245,7 @@ mod tests {
         let stream_info = StreamInfo {
             index,
             stream_type,
-            name: format!("test-stream-{}", index),
+            name: format!("test-stream-{index}"),
             application_name: None,
             binary: None,
             pid: None,

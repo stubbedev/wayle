@@ -178,7 +178,7 @@ impl ThresholdState {
         optional_number_f64_widget(
             Rc::new(move || get_state.entries().get(get_index.get()).and_then(get)),
             Rc::new(move |value| {
-                set_state.update_entry(set_index.get(), |entry| set(entry, value))
+                set_state.update_entry(set_index.get(), |entry| set(entry, value));
             }),
             0.0,
             MAX_THRESHOLD,
@@ -201,7 +201,7 @@ impl ThresholdState {
         color_value_widget(
             Rc::new(move || get_state.entries().get(get_index.get()).and_then(get)),
             Rc::new(move |value| {
-                set_state.update_entry(set_index.get(), |entry| set(entry, value))
+                set_state.update_entry(set_index.get(), |entry| set(entry, value));
             }),
         )
     }
@@ -258,9 +258,7 @@ pub(crate) fn threshold_list(property: &ConfigProperty<Vec<ThresholdEntry>>) -> 
 
     let watcher_state = Rc::clone(&state);
     let watcher = spawn_property_watcher(property, move || {
-        if watcher_state.entries().len() != watcher_state.cards.borrow().len() {
-            watcher_state.rebuild();
-        } else {
+        if watcher_state.entries().len() == watcher_state.cards.borrow().len() {
             let entries = watcher_state.entries();
             for card in watcher_state.cards.borrow().iter() {
                 for control in &card.controls {
@@ -271,6 +269,8 @@ pub(crate) fn threshold_list(property: &ConfigProperty<Vec<ThresholdEntry>>) -> 
                         .set_label(&card_title(entry, card.index.get() + 1));
                 }
             }
+        } else {
+            watcher_state.rebuild();
         }
         true
     });

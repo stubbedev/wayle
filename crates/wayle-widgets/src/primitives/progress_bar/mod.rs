@@ -4,7 +4,7 @@
 use gtk4::prelude::WidgetExt;
 use relm4::{WidgetTemplate, gtk};
 
-/// CSS class constants for ProgressBar color variants.
+/// CSS class constants for `ProgressBar` color variants.
 ///
 /// ```ignore
 /// #[template]

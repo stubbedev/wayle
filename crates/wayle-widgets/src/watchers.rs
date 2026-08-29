@@ -38,7 +38,8 @@ pub struct WatcherToken(Option<CancellationToken>);
 
 impl WatcherToken {
     /// Creates an empty watcher token with no active watcher.
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self(None)
     }
 
@@ -77,6 +78,16 @@ pub fn changes_stream<T: SubscribeChanges>(subscribable: &T) -> UnboundedReceive
 
 /// Type alias for boxed streams used internally by the watch macro.
 pub type BoxedStream = Pin<Box<dyn Stream<Item = ()> + Send>>;
+
+/// Boxes and type-erases a stream for the watch macros, mapping every item
+/// to `()`.
+pub fn boxed_unit_stream<S>(stream: S) -> BoxedStream
+where
+    S: Stream + Send + 'static,
+{
+    use futures::stream::StreamExt;
+    Box::pin(stream.map(|_| ()))
+}
 
 /// Watches multiple streams and runs a handler when any emits.
 ///

@@ -174,7 +174,7 @@ async fn monitor_wifi(
             };
 
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("WifiMonitor cancelled");
                     return;
                 }
@@ -325,34 +325,31 @@ async fn handle_access_point_changed(
         };
     }
 
-    match AccessPointProxy::new(connection, new_ap_path).await {
-        Ok(ap_proxy) => {
-            if let Ok(raw_ssid) = ap_proxy.ssid().await {
-                ssid_prop.set(Some(Ssid::new(raw_ssid).to_string()));
-            }
-
-            if let Ok(strength) = ap_proxy.strength().await {
-                strength_prop.set(Some(strength));
-            }
-
-            if let Ok(freq) = ap_proxy.frequency().await {
-                frequency_prop.set(Some(freq));
-            }
-
-            ActiveAccessPointStreams {
-                ssid: Some(ap_proxy.receive_ssid_changed().await),
-                strength: Some(ap_proxy.receive_strength_changed().await),
-            }
+    if let Ok(ap_proxy) = AccessPointProxy::new(connection, new_ap_path).await {
+        if let Ok(raw_ssid) = ap_proxy.ssid().await {
+            ssid_prop.set(Some(Ssid::new(raw_ssid).to_string()));
         }
-        Err(_) => {
-            ssid_prop.set(None);
-            strength_prop.set(None);
-            frequency_prop.set(None);
 
-            ActiveAccessPointStreams {
-                ssid: None,
-                strength: None,
-            }
+        if let Ok(strength) = ap_proxy.strength().await {
+            strength_prop.set(Some(strength));
+        }
+
+        if let Ok(freq) = ap_proxy.frequency().await {
+            frequency_prop.set(Some(freq));
+        }
+
+        ActiveAccessPointStreams {
+            ssid: Some(ap_proxy.receive_ssid_changed().await),
+            strength: Some(ap_proxy.receive_strength_changed().await),
+        }
+    } else {
+        ssid_prop.set(None);
+        strength_prop.set(None);
+        frequency_prop.set(None);
+
+        ActiveAccessPointStreams {
+            ssid: None,
+            strength: None,
         }
     }
 }

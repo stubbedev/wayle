@@ -33,6 +33,7 @@ impl PowerProfilesService {
     }
 
     /// Returns a builder for advanced configuration.
+    #[must_use]
     pub fn builder() -> PowerProfilesServiceBuilder {
         PowerProfilesServiceBuilder::new()
     }

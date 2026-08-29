@@ -25,7 +25,7 @@ pub mod actions {
     pub const INSPECTOR: &str = "inspector";
 }
 
-/// Proxy for GApplication's org.gtk.Actions interface.
+/// Proxy for `GApplication`'s org.gtk.Actions interface.
 ///
 /// Used by the CLI to send actions to the running shell via D-Bus.
 #[zbus::proxy(

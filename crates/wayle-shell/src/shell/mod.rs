@@ -190,7 +190,7 @@ impl Component for Shell {
             .clone()
             .map(|service| Wallpaper::spawn(service, init.services.config.clone()));
 
-        let model = Shell {
+        let model = Self {
             css_provider,
             bars,
             services: init.services,

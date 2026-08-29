@@ -58,7 +58,7 @@ impl TryFrom<&str> for ScreencastOwner {
 }
 
 /// Workspace information for a monitor.
-#[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq, PartialOrd)]
 pub struct WorkspaceInfo {
     /// Workspace ID.
     pub id: WorkspaceId,
@@ -73,17 +73,20 @@ pub struct Address(String);
 
 impl Address {
     /// Creates a new address from a string.
-    pub fn new(address: String) -> Self {
-        let normalized = address.strip_prefix("0x").unwrap_or(&address).to_string();
+    #[must_use]
+    pub fn new(address: &str) -> Self {
+        let normalized = address.strip_prefix("0x").unwrap_or(address).to_string();
         Self(normalized)
     }
 
     /// Returns the address as a string slice.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Consumes the address and returns the inner string.
+    #[must_use]
     pub fn into_inner(self) -> String {
         self.0
     }
@@ -103,7 +106,7 @@ impl AsRef<str> for Address {
 
 impl From<String> for Address {
     fn from(s: String) -> Self {
-        Self::new(s)
+        Self::new(&s)
     }
 }
 
@@ -117,7 +120,7 @@ where
     if s == "0" || s.is_empty() {
         Ok(None)
     } else {
-        Ok(Some(Address::new(s)))
+        Ok(Some(Address::new(&s)))
     }
 }
 
@@ -149,14 +152,14 @@ mod tests {
 
     #[test]
     fn address_new_strips_0x_prefix() {
-        let address = Address::new("0xdeadbeef".to_string());
+        let address = Address::new("0xdeadbeef");
 
         assert_eq!(address.as_str(), "deadbeef");
     }
 
     #[test]
     fn address_new_preserves_address_without_prefix() {
-        let address = Address::new("deadbeef".to_string());
+        let address = Address::new("deadbeef");
 
         assert_eq!(address.as_str(), "deadbeef");
     }

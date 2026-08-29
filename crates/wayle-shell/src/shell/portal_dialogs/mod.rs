@@ -1,7 +1,7 @@
 //! Portal dialog host — a custom animated layer-shell surface.
 //!
 //! Replaces the native `gtk::AlertDialog`/app-chooser with our own overlay so
-//! the Access / Account / AppChooser / DynamicLauncher prompts animate
+//! the Access / Account / `AppChooser` / `DynamicLauncher` prompts animate
 //! congruently through the `[animations]` config (`AnimSurface::Dialog`), like
 //! the share picker. Backs `com.wayle.PortalDialogs1`.
 //!
@@ -205,7 +205,7 @@ impl Component for PortalDialogs {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = PortalDialogs {
+        let model = Self {
             config: init,
             pending: None,
             app_names: Rc::new(RefCell::new(Vec::new())),
@@ -232,8 +232,7 @@ impl Component for PortalDialogs {
             filter_names
                 .borrow()
                 .get(idx)
-                .map(|name| name.to_lowercase().contains(query.as_str()))
-                .unwrap_or(true)
+                .is_none_or(|name| name.to_lowercase().contains(query.as_str()))
         });
 
         add_escape(&root, sender.input_sender().clone());
@@ -282,10 +281,10 @@ impl Component for PortalDialogs {
                 );
             }
             PortalDialogInput::Account { reason, reply } => {
-                self.show_account(widgets, root, reason, reply)
+                self.show_account(widgets, root, reason, reply);
             }
             PortalDialogInput::WallpaperPreview { uri, reply } => {
-                self.show_wallpaper_preview(widgets, root, uri, reply)
+                self.show_wallpaper_preview(widgets, root, uri, reply);
             }
             PortalDialogInput::ConfirmInstall {
                 name,
@@ -554,7 +553,7 @@ fn app_row(app: &gio::AppInfo, name: &str) -> gtk::Box {
 fn set_default_handler(id: &str, content_type: &str) {
     let Some(app) = gio::AppInfo::all()
         .into_iter()
-        .find(|app| app.id().map(|i| i.as_str() == id).unwrap_or(false))
+        .find(|app| app.id().is_some_and(|i| i.as_str() == id))
     else {
         warn!(%id, "appchooser: cannot resolve app for set-default");
         return;
@@ -614,8 +613,7 @@ fn candidate_apps(choices: &[String], content_type: &str) -> Vec<gio::AppInfo> {
             .into_iter()
             .filter(|app| {
                 app.id()
-                    .map(|id| choices.iter().any(|c| c == id.as_str()))
-                    .unwrap_or(false)
+                    .is_some_and(|id| choices.iter().any(|c| c == id.as_str()))
             })
             .collect();
     }

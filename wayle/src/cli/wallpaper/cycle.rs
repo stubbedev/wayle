@@ -23,7 +23,7 @@ pub async fn execute(directory: PathBuf, interval: u32, mode: CyclingModeArg) ->
     proxy
         .start_cycling(dir_str, interval, mode_str.to_string())
         .await
-        .map_err(|e| format_error("start cycling", e))?;
+        .map_err(|e| format_error("start cycling", &e))?;
 
     println!(
         "Started cycling wallpapers from {} every {interval} seconds",

@@ -15,7 +15,7 @@ pub struct SwayFocusedWindowSource {
 }
 
 impl SwayFocusedWindowSource {
-    pub fn new(service: Arc<SwayService>) -> Self {
+    pub const fn new(service: Arc<SwayService>) -> Self {
         Self { service }
     }
 }

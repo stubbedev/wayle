@@ -16,34 +16,32 @@ pub async fn execute(player: Option<String>) -> CliAction {
     let info = proxy
         .get_player_info(resolved)
         .await
-        .map_err(|e| format_error("get player info", e))?;
+        .map_err(|e| format_error("get player info", &e))?;
 
     let mut output = vec![
         format!(
             "Player: {}",
             info.get("identity")
-                .map(String::as_str)
-                .unwrap_or("Unknown")
+                .map_or("Unknown", String::as_str)
         ),
         format!(
             "Status: {}",
             info.get("playback_state")
-                .map(String::as_str)
-                .unwrap_or("Unknown")
+                .map_or("Unknown", String::as_str)
         ),
     ];
 
     output.push(format!(
         "Title: {}",
-        info.get("title").map(String::as_str).unwrap_or("Unknown")
+        info.get("title").map_or("Unknown", String::as_str)
     ));
     output.push(format!(
         "Artist: {}",
-        info.get("artist").map(String::as_str).unwrap_or("Unknown")
+        info.get("artist").map_or("Unknown", String::as_str)
     ));
     output.push(format!(
         "Album: {}",
-        info.get("album").map(String::as_str).unwrap_or("Unknown")
+        info.get("album").map_or("Unknown", String::as_str)
     ));
 
     if let Some(length_us) = info.get("length_us")
@@ -57,36 +55,32 @@ pub async fn execute(player: Option<String>) -> CliAction {
 
     output.push(format!(
         "Volume: {}%",
-        info.get("volume").map(String::as_str).unwrap_or("0")
+        info.get("volume").map_or("0", String::as_str)
     ));
     output.push(format!(
         "Shuffle: {}",
         info.get("shuffle_mode")
-            .map(String::as_str)
-            .unwrap_or("Unknown")
+            .map_or("Unknown", String::as_str)
     ));
     output.push(format!(
         "Loop: {}",
         info.get("loop_mode")
-            .map(String::as_str)
-            .unwrap_or("Unknown")
+            .map_or("Unknown", String::as_str)
     ));
 
     let mut capabilities = vec![];
-    if info.get("can_seek").map(|s| s == "true").unwrap_or(false) {
+    if info.get("can_seek").is_some_and(|s| s == "true") {
         capabilities.push("Seek");
     }
     if info
         .get("can_go_next")
-        .map(|s| s == "true")
-        .unwrap_or(false)
+        .is_some_and(|s| s == "true")
     {
         capabilities.push("Next");
     }
     if info
         .get("can_go_previous")
-        .map(|s| s == "true")
-        .unwrap_or(false)
+        .is_some_and(|s| s == "true")
     {
         capabilities.push("Previous");
     }

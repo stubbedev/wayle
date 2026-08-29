@@ -17,6 +17,10 @@ pub use self::messages::QuickActionsInit;
 use self::messages::{QuickActionsCmd, QuickActionsInput};
 use crate::{i18n::t, services::IdleInhibitService};
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors independent toggle states"
+)]
 pub struct QuickActionsSection {
     network: Option<Arc<NetworkService>>,
     bluetooth: DeferredService<BluetoothService>,
@@ -274,7 +278,7 @@ impl Component for QuickActionsSection {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let has_wifi = init
@@ -302,9 +306,9 @@ impl Component for QuickActionsSection {
 
         watchers::spawn(
             &sender,
-            &init.network,
+            init.network.as_ref(),
             &init.bluetooth,
-            &init.notification,
+            init.notification.as_ref(),
             &init.power_profiles,
             &init.idle_inhibit,
         );

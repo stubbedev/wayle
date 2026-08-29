@@ -1,4 +1,4 @@
-//! Shared section builders for modules that use the standard bar_button pattern.
+//! Shared section builders for modules that use the standard `bar_button` pattern.
 
 use wayle_config::{ClickAction, ConfigProperty, schemas::styling::ColorValue};
 

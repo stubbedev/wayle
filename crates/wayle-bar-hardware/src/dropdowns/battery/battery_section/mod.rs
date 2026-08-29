@@ -298,7 +298,7 @@ impl Component for BatterySection {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let device = &init.battery.device;

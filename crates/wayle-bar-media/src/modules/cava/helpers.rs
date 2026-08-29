@@ -14,7 +14,7 @@ pub fn resolve_padding_px(size: Size, scale: f32) -> f64 {
     f64::from(size.resolve_px(REM_BASE, scale))
 }
 
-pub fn map_input(input: CavaInput) -> InputMethod {
+pub const fn map_input(input: CavaInput) -> InputMethod {
     match input {
         CavaInput::PipeWire => InputMethod::PipeWire,
         CavaInput::Pulse => InputMethod::Pulse,
@@ -60,7 +60,13 @@ pub fn calculate_widget_length(bars: u16, bar_width: u32, bar_gap: u32, padding:
     let pad_space = padding * 2.0;
 
     let total = bar_space + gap_space + pad_space;
-    total.round().max(1.0) as i32
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "widget length in pixels fits i32"
+    )]
+    let length = total.round().max(1.0) as i32;
+    length
 }
 
 #[cfg(test)]

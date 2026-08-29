@@ -35,7 +35,8 @@ impl RoundingLevel {
     /// CSS variable references for element and container rounding.
     ///
     /// Containers get one step larger for perceptual consistency.
-    pub fn to_css_values(self) -> RoundingCssValues {
+    #[must_use]
+    pub const fn to_css_values(self) -> RoundingCssValues {
         match self {
             Self::None => RoundingCssValues {
                 element: "var(--radius-none)",
@@ -61,7 +62,8 @@ impl RoundingLevel {
     }
 
     /// Bar-specific CSS variable references using `--bar-radius-*` tokens.
-    pub fn to_bar_css_values(self) -> RoundingCssValues {
+    #[must_use]
+    pub const fn to_bar_css_values(self) -> RoundingCssValues {
         match self {
             Self::None => RoundingCssValues {
                 element: "var(--radius-none)",
@@ -87,7 +89,8 @@ impl RoundingLevel {
     }
 
     /// Bar-specific Button/Group CSS variable references using `--bar-button-radius-*` tokens.
-    pub fn to_bar_element_css_values(self) -> RoundingCssValues {
+    #[must_use]
+    pub const fn to_bar_element_css_values(self) -> RoundingCssValues {
         match self {
             Self::None => RoundingCssValues {
                 element: "var(--radius-none)",
@@ -135,7 +138,8 @@ pub enum RadiusClass {
 
 impl RadiusClass {
     /// CSS class for border radius (e.g., `radius-md`).
-    pub fn css_class(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::None => "radius-none",
             Self::Sm => "radius-sm",
@@ -147,7 +151,8 @@ impl RadiusClass {
     }
 
     /// CSS variable name (e.g., `--radius-md`).
-    pub fn css_var(self) -> &'static str {
+    #[must_use]
+    pub const fn css_var(self) -> &'static str {
         match self {
             Self::None => "--radius-none",
             Self::Sm => "--radius-sm",

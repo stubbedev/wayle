@@ -1,4 +1,4 @@
-//! MangoWM implementation of [`KeyboardLayoutSource`].
+//! `MangoWM` implementation of [`KeyboardLayoutSource`].
 //!
 //! Mango exposes the active layout as a single reactive property, so the
 //! source watches it directly.
@@ -15,7 +15,7 @@ pub struct MangoKeyboardLayoutSource {
 }
 
 impl MangoKeyboardLayoutSource {
-    pub fn new(service: Arc<MangoService>) -> Self {
+    pub const fn new(service: Arc<MangoService>) -> Self {
         Self { service }
     }
 }
@@ -35,6 +35,6 @@ impl KeyboardLayoutSource for MangoKeyboardLayoutSource {
     }
 }
 
-fn current_layout_from(label: String) -> CurrentLayout {
+const fn current_layout_from(label: String) -> CurrentLayout {
     CurrentLayout { label }
 }

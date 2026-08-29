@@ -36,12 +36,14 @@ impl Default for DocsGenerator {
 
 impl DocsGenerator {
     /// Creates a generator that writes to `docs/config`.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Sets the output directory. The generator creates it (and the
     /// `modules/` subdirectory for bar modules) on demand.
+    #[must_use]
     pub fn with_output_dir(mut self, output_dir: impl Into<PathBuf>) -> Self {
         self.output_dir = output_dir.into();
         self
@@ -57,7 +59,7 @@ impl DocsGenerator {
     /// schema can't be converted into a JSON value.
     #[instrument(skip(self), fields(output_dir = %self.output_dir.display()))]
     pub fn generate_all(&self) -> Result<(), Error> {
-        self.ensure_dir(&self.output_dir)?;
+        Self::ensure_dir(&self.output_dir)?;
 
         let modules = ModuleRegistry::entries();
         let type_defs = collect_type_defs(&modules);
@@ -94,6 +96,7 @@ impl DocsGenerator {
     }
 
     /// Every registered module name, sorted alphabetically.
+    #[must_use]
     pub fn list_modules(&self) -> Vec<String> {
         ModuleRegistry::names()
     }
@@ -105,22 +108,22 @@ impl DocsGenerator {
     ) -> Result<(), Error> {
         let content = generate_module_page(entry, known_types)?;
         let target_dir = self.dir_for(entry);
-        self.ensure_dir(&target_dir)?;
+        Self::ensure_dir(&target_dir)?;
 
         let filepath = target_dir.join(format!("{}.md", entry.info.name));
-        self.write_page(&filepath, &content)
+        Self::write_page(&filepath, &content)
     }
 
     #[instrument(skip(self, type_defs))]
     fn write_types_page(&self, type_defs: &BTreeMap<String, Value>) -> Result<(), Error> {
         let filepath = self.output_dir.join("types.md");
-        self.write_page(&filepath, &render_types_page(type_defs))
+        Self::write_page(&filepath, &render_types_page(type_defs))
     }
 
     #[instrument(skip(self, modules))]
     fn write_index_page(&self, modules: &[ModuleEntry]) -> Result<(), Error> {
         let filepath = self.output_dir.join("index.md");
-        self.write_page(&filepath, &render_config_index(modules))
+        Self::write_page(&filepath, &render_config_index(modules))
     }
 
     /// Resolves the output directory for `entry`: bar modules live in
@@ -133,14 +136,14 @@ impl DocsGenerator {
         }
     }
 
-    fn ensure_dir(&self, dir: &Path) -> Result<(), Error> {
+    fn ensure_dir(dir: &Path) -> Result<(), Error> {
         fs::create_dir_all(dir).map_err(|source| Error::Write {
             path: dir.to_path_buf(),
             source,
         })
     }
 
-    fn write_page(&self, filepath: &Path, content: &str) -> Result<(), Error> {
+    fn write_page(filepath: &Path, content: &str) -> Result<(), Error> {
         fs::write(filepath, content).map_err(|source| Error::Write {
             path: filepath.to_path_buf(),
             source,

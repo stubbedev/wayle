@@ -59,7 +59,7 @@ async fn monitor_dbus(
         };
 
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("metadata D-Bus monitor cancelled");
                 return;
             }
@@ -90,7 +90,7 @@ async fn resolve_art_changes(
 
     loop {
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 abort_pending(&mut pending_download);
                 debug!("art resolver cancelled");
                 return;

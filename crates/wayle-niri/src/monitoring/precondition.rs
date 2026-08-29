@@ -88,7 +88,7 @@ fn require_all_windows_in_state(
     Ok(())
 }
 
-fn require_keyboard_layouts_loaded(state: &EventStreamState) -> Result<(), DesyncReason> {
+const fn require_keyboard_layouts_loaded(state: &EventStreamState) -> Result<(), DesyncReason> {
     if state.keyboard_layouts.keyboard_layouts.is_some() {
         return Ok(());
     }

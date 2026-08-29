@@ -44,14 +44,17 @@ struct TagLayout {
 }
 
 impl MangoWorkspaces {
+    #[must_use]
     pub fn bar_monitor(&self) -> Option<&str> {
         self.settings.monitor_name.as_deref()
     }
 
+    #[must_use]
     pub fn is_vertical(&self) -> bool {
         self.settings.is_vertical.get()
     }
 
+    #[must_use]
     pub fn orientation(&self) -> gtk::Orientation {
         if self.is_vertical() {
             gtk::Orientation::Vertical
@@ -139,7 +142,7 @@ impl MangoWorkspaces {
         }
     }
 
-    pub fn sync_blink(&mut self, sender: &ComponentSender<MangoWorkspaces>) {
+    pub fn sync_blink(&mut self, sender: &ComponentSender<Self>) {
         match (self.urgent_present, self.blink_token.is_some()) {
             (true, false) => self.start_blink_timer(sender),
             (false, true) => self.stop_blink_timer(),
@@ -147,7 +150,7 @@ impl MangoWorkspaces {
         }
     }
 
-    fn start_blink_timer(&mut self, sender: &ComponentSender<MangoWorkspaces>) {
+    fn start_blink_timer(&mut self, sender: &ComponentSender<Self>) {
         self.stop_blink_timer();
         self.blink_on = true;
 

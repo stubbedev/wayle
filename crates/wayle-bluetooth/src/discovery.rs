@@ -87,8 +87,8 @@ impl BluetoothDiscovery {
 
         Ok(Self {
             adapters,
-            devices,
             primary_adapter,
+            devices,
             available,
             enabled,
             connected,

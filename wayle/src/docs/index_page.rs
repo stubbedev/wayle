@@ -19,6 +19,7 @@ struct IndexRows {
 }
 
 /// Full text of `config/index.md`.
+#[must_use]
 pub fn render_config_index(modules: &[ModuleEntry]) -> String {
     let rows = partition_rows(modules);
 

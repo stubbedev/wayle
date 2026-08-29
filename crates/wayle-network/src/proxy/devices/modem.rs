@@ -1,4 +1,4 @@
-//! NetworkManager Modem Device interface.
+//! `NetworkManager` Modem Device interface.
 
 use zbus::proxy;
 

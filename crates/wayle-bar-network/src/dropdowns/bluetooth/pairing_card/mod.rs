@@ -348,8 +348,8 @@ impl SimpleComponent for PairingCard {
 
     fn init(
         _init: Self::Init,
-        _root: Self::Root,
-        _sender: ComponentSender<Self>,
+        root: Self::Root,
+        sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let mut model = Self {
             variant: PairingVariant::None,

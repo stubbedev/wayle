@@ -1,5 +1,5 @@
-//! Dropdown for ColorValue config properties. Shows grouped token options
-//! with color dots, plus Auto, Transparent, and Custom (with ColorDialogButton).
+//! Dropdown for `ColorValue` config properties. Shows grouped token options
+//! with color dots, plus Auto, Transparent, and Custom (with `ColorDialogButton`).
 
 mod conversion;
 mod dropdown;

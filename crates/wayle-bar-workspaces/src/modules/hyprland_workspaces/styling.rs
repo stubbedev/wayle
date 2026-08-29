@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Write, sync::Arc};
 
 use relm4::gtk;
 use wayle_config::{
@@ -33,16 +33,31 @@ pub fn apply_styling(
     let bar_scale = config.bar.scale.get().value();
     let is_vertical = settings.is_vertical.get();
 
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "rounded f32 size fits in i32 pixel range"
+    )]
     let icon_size_px = ws_config
         .icon_size
         .get()
         .resolve_rem(ICON_BASE_REM, bar_scale)
         .round() as i32;
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "rounded f32 size fits in i32 pixel range"
+    )]
     let label_size_px = ws_config
         .label_size
         .get()
         .resolve_rem(LABEL_BASE_REM, bar_scale)
         .round() as i32;
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "rounded f32 size fits in i32 pixel range"
+    )]
     let workspace_padding_px = ws_config
         .workspace_padding
         .get()
@@ -78,9 +93,10 @@ pub fn apply_styling(
 
         let id_class = workspace_id_css_class(i64::from(*workspace_id));
         let color_css = color.to_css();
-        css.push_str(&format!(
+        let _ = write!(
+            css,
             ".workspaces .workspace.{id_class} {{ --ws-override-color: {color_css}; }}"
-        ));
+        );
     }
 
     provider.load_from_string(&css);

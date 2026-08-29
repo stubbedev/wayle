@@ -71,7 +71,7 @@ impl ThresholdEntry {
 /// Resolved color overrides from threshold evaluation.
 ///
 /// `None` means no override — use the module's configured color.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ThresholdColors {
     /// Icon color override.
     pub icon_color: Option<ColorValue>,
@@ -87,7 +87,8 @@ pub struct ThresholdColors {
 
 impl ThresholdColors {
     /// Returns `true` if no color overrides are set.
-    pub fn is_empty(&self) -> bool {
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.icon_color.is_none()
             && self.label_color.is_none()
             && self.icon_background.is_none()
@@ -97,6 +98,7 @@ impl ThresholdColors {
 
     /// Resolves a single color slot: threshold override if present, otherwise
     /// the config property value resolved for the current theme.
+    #[must_use]
     pub fn resolve_or<'a>(
         override_color: &'a Option<ColorValue>,
         config_css: Cow<'static, str>,
@@ -122,6 +124,7 @@ impl ThresholdColors {
 /// above = 90           # matches 90-100, overrides yellow
 /// icon-color = "red"
 /// ```
+#[must_use]
 pub fn evaluate_thresholds(value: f64, entries: &[ThresholdEntry]) -> ThresholdColors {
     let mut result = ThresholdColors::default();
 

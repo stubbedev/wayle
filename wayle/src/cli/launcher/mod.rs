@@ -23,7 +23,7 @@ pub async fn execute(arguments: Vec<String>) -> CliAction {
     let invocation = args::parse(&arguments)?;
 
     if let Some(local) = invocation.local {
-        return run_local(local).await;
+        return Box::pin(run_local(local)).await;
     }
     if invocation.options.mode.is_none()
         && !invocation.options.dmenu
@@ -37,6 +37,10 @@ pub async fn execute(arguments: Vec<String>) -> CliAction {
 
     let code = client::run(invocation).await;
     if code != 0 {
+        #[expect(
+            clippy::exit,
+            reason = "rofi exit codes (1, 10-28) must reach the process without an error message"
+        )]
         std::process::exit(code);
     }
     Ok(())
@@ -53,7 +57,7 @@ async fn run_local(local: LocalCmd) -> CliAction {
             Ok(())
         }
         LocalCmd::DumpConfig => {
-            let service = ConfigService::load()
+            let service = Box::pin(ConfigService::load())
                 .await
                 .map_err(|error| format!("failed to load config: {error}"))?;
             let value = service
@@ -74,7 +78,7 @@ async fn run_local(local: LocalCmd) -> CliAction {
             Ok(())
         }
         LocalCmd::ListKeybindings => {
-            let service = ConfigService::load()
+            let service = Box::pin(ConfigService::load())
                 .await
                 .map_err(|error| format!("failed to load config: {error}"))?;
             let overrides = service.config().launcher.keybindings.get();

@@ -320,7 +320,7 @@ impl ModuleInfoProvider for LauncherConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("launcher"),
-            schema: || schema_for!(LauncherConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

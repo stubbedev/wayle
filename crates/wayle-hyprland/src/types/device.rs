@@ -17,7 +17,7 @@ pub struct MouseDevice {
 }
 
 /// Keyboard device configuration from Hyprland.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyboardDevice {
     /// Unique memory address identifying this device.
@@ -67,7 +67,7 @@ pub struct DeviceInfo {
 ///
 /// The `tablets` array mixes actual tablets, tablet pads, and tablet tools.
 /// Only actual tablets have a `name` field; pads and tools omit it.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct TabletDevice {
     /// Unique memory address identifying this device.
     pub address: Address,
@@ -77,7 +77,7 @@ pub struct TabletDevice {
 }
 
 /// Touchscreen device from Hyprland.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct TouchDevice {
     /// Unique memory address identifying this device.
     pub address: Address,
@@ -86,7 +86,7 @@ pub struct TouchDevice {
 }
 
 /// Switch device from Hyprland (e.g., laptop lid switch).
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct SwitchDevice {
     /// Unique memory address identifying this device.
     pub address: Address,

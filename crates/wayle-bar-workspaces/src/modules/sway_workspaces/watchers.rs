@@ -30,7 +30,7 @@ pub fn spawn_watchers(
 }
 
 fn spawn_sway_events(sender: &ComponentSender<SwayWorkspaces>, sway: Arc<SwayService>) {
-    sender.command(move |out, shutdown| watch_state_changes(sway.clone(), out, shutdown));
+    sender.command(move |out, shutdown| watch_state_changes(sway, out, shutdown));
 }
 
 async fn watch_state_changes(

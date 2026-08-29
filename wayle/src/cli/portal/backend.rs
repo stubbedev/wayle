@@ -7,7 +7,7 @@
 
 /// Runs the portal backend, returning the process exit code.
 pub async fn execute() -> i32 {
-    match wayle_portal::run().await {
+    match Box::pin(wayle_portal::run()).await {
         Ok(()) => 0,
         Err(err) => {
             eprintln!("portal backend failed: {err}");

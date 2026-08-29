@@ -51,6 +51,7 @@ const TERMINAL_FALLBACKS: &[&str] = &[
 
 /// Resolve the terminal emulator: explicit config, `$TERMINAL`, then the
 /// first fallback present in `$PATH`.
+#[must_use]
 pub fn detect_terminal(configured: &str) -> String {
     if !configured.trim().is_empty() {
         return configured.trim().to_owned();

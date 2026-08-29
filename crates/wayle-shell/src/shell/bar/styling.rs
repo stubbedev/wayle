@@ -21,17 +21,29 @@ const REM_BASE: f32 = 16.0;
 /// perfectly within the pixel boundary. So we make sure that they are with this
 /// little workaround.
 fn rem_to_px_rounded(rem: f32, scale: f32) -> i32 {
-    (rem * scale * REM_BASE).round() as i32
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "rounded pixel value, truncation intended"
+    )]
+    let px = (rem * scale * REM_BASE).round() as i32;
+    px
 }
 
 /// Resolves a [`Size`] to rounded pixels: scale multipliers use the rem base
 /// and bar scale, pixel values are taken literally (ignoring scale).
 fn size_to_px_rounded(size: Size, scale: f32) -> i32 {
-    size.resolve_px(REM_BASE, scale).round() as i32
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "rounded pixel value, truncation intended"
+    )]
+    let px = size.resolve_px(REM_BASE, scale).round() as i32;
+    px
 }
 
 impl InlineStyling for Bar {
-    type Sender = ComponentSender<Bar>;
+    type Sender = ComponentSender<Self>;
     type Cmd = BarCmd;
 
     fn css_provider(&self) -> &gtk::CssProvider {
@@ -82,7 +94,7 @@ impl InlineStyling for Bar {
                         loop {
                             tokio::select! {
                                 () = &mut shutdown_fut => return,
-                                Some(()) = rx.recv() => continue,
+                                Some(()) = rx.recv() => {},
                                 () = tokio::time::sleep(DEBOUNCE) => {
                                     let _ = out.send(BarCmd::StyleChanged);
                                     break;
@@ -126,6 +138,11 @@ impl InlineStyling for Bar {
         let padding_ends_px = size_to_px_rounded(bar.padding_ends.get(), scale);
         let module_gap_px = size_to_px_rounded(bar.module_gap.get(), scale);
         let group_module_gap_px = size_to_px_rounded(bar.button_group_module_gap.get(), scale);
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "rounded pixel value, truncation intended"
+        )]
         let group_padding_px = match bar.button_group_padding.get() {
             // Scale keeps the historical 0.25 rem fine-tuning factor; pixels are
             // taken literally.

@@ -27,13 +27,13 @@ impl ScaleFactor {
 
     /// Creates a scale factor, clamping to 0.25-3.0.
     #[must_use]
-    pub fn new(value: f32) -> Self {
+    pub const fn new(value: f32) -> Self {
         Self(value.clamp(Self::MIN, Self::MAX))
     }
 
     /// The raw `f32`.
     #[must_use]
-    pub fn value(self) -> f32 {
+    pub const fn value(self) -> f32 {
         self.0
     }
 }

@@ -10,7 +10,7 @@ use crate::{
     schemas::styling::{ColorValue, CssToken, Size},
 };
 
-/// System tray icons via the StatusNotifierItem protocol.
+/// System tray icons via the `StatusNotifierItem` protocol.
 #[wayle_config(bar_container, i18n_prefix = "settings-modules-systray")]
 pub struct SystrayConfig {
     /// Tray item icon size. Accepts a scale multiplier or pixels (e.g. `"20px"`).
@@ -72,7 +72,7 @@ impl ModuleInfoProvider for SystrayConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("systray"),
-            schema: || schema_for!(SystrayConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("systray")),
             array_entry: false,
         }
@@ -85,7 +85,7 @@ impl ModuleInfoProvider for SystrayConfig {
 
 /// Custom icon and color override for tray items matching a pattern.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrayItemOverride {
     /// Glob pattern to match against item ID or title.
     ///

@@ -21,11 +21,11 @@ pub(crate) mod types;
 
 pub use self::types::{SecurityType, Ssid};
 
-/// WiFi access point representation.
+/// `WiFi` access point representation.
 ///
-/// Provides information about a detected WiFi access point including its
+/// Provides information about a detected `WiFi` access point including its
 /// security configuration, signal strength, frequency, and identification.
-/// Access points are discovered and monitored through the WiFi device interface.
+/// Access points are discovered and monitored through the `WiFi` device interface.
 #[derive(Debug, Clone)]
 pub struct AccessPoint {
     #[debug(skip)]
@@ -34,15 +34,15 @@ pub struct AccessPoint {
     pub(crate) object_path: OwnedObjectPath,
     #[debug(skip)]
     pub(crate) cancellation_token: Option<CancellationToken>,
-    /// Flags describing the capabilities of the access point. See NM80211ApFlags.
+    /// Flags describing the capabilities of the access point. See `NM80211ApFlags`.
     pub flags: Property<NM80211ApFlags>,
 
     /// Flags describing the access point's capabilities according to WPA (Wifi Protected Access).
-    /// See NM80211ApSecurityFlags.
+    /// See `NM80211ApSecurityFlags`.
     pub wpa_flags: Property<NM80211ApSecurityFlags>,
 
     /// Flags describing the access point's capabilities according to the
-    /// RSN (Robust Secure Network) protocol. See NM80211ApSecurityFlags.
+    /// RSN (Robust Secure Network) protocol. See `NM80211ApSecurityFlags`.
     pub rsn_flags: Property<NM80211ApSecurityFlags>,
 
     /// The Service Set Identifier identifying the access point.
@@ -67,7 +67,7 @@ pub struct AccessPoint {
     /// The current signal quality of the access point, in percent.
     pub strength: Property<u8>,
 
-    /// The timestamp (in CLOCK_BOOTTIME seconds) for the last time the access point
+    /// The timestamp (in `CLOCK_BOOTTIME` seconds) for the last time the access point
     /// was found in scan results. A value of -1 means the access point has never
     /// been found in scan results.
     pub last_seen: Property<i32>,
@@ -131,7 +131,8 @@ impl PartialEq for AccessPoint {
 
 impl AccessPoint {
     /// Returns the D-Bus object path for this access point.
-    pub fn object_path(&self) -> &OwnedObjectPath {
+    #[must_use]
+    pub const fn object_path(&self) -> &OwnedObjectPath {
         &self.object_path
     }
 

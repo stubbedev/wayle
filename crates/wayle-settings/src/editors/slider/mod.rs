@@ -1,4 +1,4 @@
-//! Slider backed by DebouncedSlider. Throttled at 100ms during drag,
+//! Slider backed by `DebouncedSlider`. Throttled at 100ms during drag,
 //! with a final commit on release.
 
 mod row;

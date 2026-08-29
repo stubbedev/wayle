@@ -10,6 +10,7 @@ pub struct FormatContext<'a> {
     pub units: TemperatureUnit,
 }
 
+#[must_use]
 pub fn format_label(ctx: &FormatContext<'_>) -> String {
     let current = &ctx.weather.current;
     let daily_today = ctx.weather.daily.first();
@@ -42,6 +43,7 @@ pub fn format_label(ctx: &FormatContext<'_>) -> String {
     crate::template::render(ctx.format, template_ctx).unwrap_or_default()
 }
 
+#[must_use]
 pub fn condition_label(condition: WeatherCondition) -> String {
     match condition {
         WeatherCondition::Clear => t!("weather-clear"),
@@ -65,6 +67,7 @@ pub fn condition_label(condition: WeatherCondition) -> String {
     }
 }
 
+#[must_use]
 pub fn format_temp_value(temp: Temperature, units: TemperatureUnit) -> String {
     let value = match units {
         TemperatureUnit::Metric => temp.celsius(),
@@ -73,13 +76,15 @@ pub fn format_temp_value(temp: Temperature, units: TemperatureUnit) -> String {
     format!("{value:.0}")
 }
 
-pub fn temp_unit_symbol(units: TemperatureUnit) -> &'static str {
+#[must_use]
+pub const fn temp_unit_symbol(units: TemperatureUnit) -> &'static str {
     match units {
         TemperatureUnit::Metric => "°C",
         TemperatureUnit::Imperial => "°F",
     }
 }
 
+#[must_use]
 pub fn format_speed(speed: wayle_weather::Speed, units: TemperatureUnit) -> String {
     match units {
         TemperatureUnit::Metric => format!("{:.0} km/h", speed.kmh()),
@@ -87,14 +92,16 @@ pub fn format_speed(speed: wayle_weather::Speed, units: TemperatureUnit) -> Stri
     }
 }
 
-pub fn convert_temp_unit(config_unit: ConfigTempUnit) -> TemperatureUnit {
+#[must_use]
+pub const fn convert_temp_unit(config_unit: ConfigTempUnit) -> TemperatureUnit {
     match config_unit {
         ConfigTempUnit::Metric => TemperatureUnit::Metric,
         ConfigTempUnit::Imperial => TemperatureUnit::Imperial,
     }
 }
 
-pub fn condition_color_class(condition: WeatherCondition) -> &'static str {
+#[must_use]
+pub const fn condition_color_class(condition: WeatherCondition) -> &'static str {
     match condition {
         WeatherCondition::Clear | WeatherCondition::PartlyCloudy => "sunny",
         WeatherCondition::Cloudy
@@ -115,7 +122,8 @@ pub fn condition_color_class(condition: WeatherCondition) -> &'static str {
     }
 }
 
-pub fn condition_icon(condition: WeatherCondition, is_day: bool) -> &'static str {
+#[must_use]
+pub const fn condition_icon(condition: WeatherCondition, is_day: bool) -> &'static str {
     match condition {
         WeatherCondition::Clear if is_day => "ld-sun-symbolic",
         WeatherCondition::Clear => "ld-moon-symbolic",

@@ -189,12 +189,12 @@ enum AuthMessageType {
 
 impl AuthMessageType {
     /// Maps a greetd auth message to the UI-facing [`AuthPrompt`].
-    fn into_prompt(self, message: String) -> AuthPrompt {
+    const fn into_prompt(self, message: String) -> AuthPrompt {
         match self {
-            AuthMessageType::Visible => AuthPrompt::Visible(message),
-            AuthMessageType::Secret => AuthPrompt::Secret(message),
-            AuthMessageType::Info => AuthPrompt::Info(message),
-            AuthMessageType::Error => AuthPrompt::Error(message),
+            Self::Visible => AuthPrompt::Visible(message),
+            Self::Secret => AuthPrompt::Secret(message),
+            Self::Info => AuthPrompt::Info(message),
+            Self::Error => AuthPrompt::Error(message),
         }
     }
 }

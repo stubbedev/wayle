@@ -9,32 +9,34 @@ use crate::{
     service::BatteryService,
 };
 
-/// Builder for configuring a BatteryService.
+/// Builder for configuring a `BatteryService`.
 pub struct BatteryServiceBuilder {
     device_path: Option<OwnedObjectPath>,
 }
 
 impl BatteryServiceBuilder {
     /// Creates a new builder with default configuration.
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self { device_path: None }
     }
 
-    /// Sets a specific UPower device path.
+    /// Sets a specific `UPower` device path.
     ///
-    /// If not set, defaults to the DisplayDevice which aggregates all batteries.
+    /// If not set, defaults to the `DisplayDevice` which aggregates all batteries.
     ///
     /// # Arguments
-    /// * `path` - D-Bus path to the UPower device (e.g., "/org/freedesktop/UPower/devices/battery_BAT0")
+    /// * `path` - D-Bus path to the `UPower` device (e.g., "/`org/freedesktop/UPower/devices/battery_BAT0`")
+    #[must_use]
     pub fn device_path(mut self, path: impl Into<OwnedObjectPath>) -> Self {
         self.device_path = Some(path.into());
         self
     }
 
-    /// Builds the BatteryService.
+    /// Builds the `BatteryService`.
     ///
-    /// Uses the DisplayDevice if no specific device path was set.
-    /// The DisplayDevice is UPower's composite device that represents the overall
+    /// Uses the `DisplayDevice` if no specific device path was set.
+    /// The `DisplayDevice` is `UPower`'s composite device that represents the overall
     /// battery status, automatically handling multiple batteries if present.
     ///
     /// # Errors
@@ -53,16 +55,16 @@ impl BatteryServiceBuilder {
 
         let cancellation_token = CancellationToken::new();
 
-        let device = Device::get_live(LiveDeviceParams {
+        let device = Box::pin(Device::get_live(LiveDeviceParams {
             connection: &connection,
             device_path: &device_path,
             cancellation_token: &cancellation_token,
-        })
+        }))
         .await?;
 
         Ok(BatteryService {
-            device,
             cancellation_token,
+            device,
         })
     }
 }

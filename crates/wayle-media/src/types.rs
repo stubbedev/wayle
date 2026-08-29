@@ -8,11 +8,13 @@ pub struct PlayerId(String);
 
 impl PlayerId {
     /// Creates from a D-Bus bus name.
+    #[must_use]
     pub fn from_bus_name(bus_name: &str) -> Self {
         Self(bus_name.to_string())
     }
 
     /// Returns the D-Bus bus name.
+    #[must_use]
     pub fn bus_name(&self) -> &str {
         &self.0
     }
@@ -25,7 +27,7 @@ impl fmt::Display for PlayerId {
 }
 
 /// MPRIS playback status.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlaybackState {
     /// Media is playing.
     Playing,
@@ -46,7 +48,7 @@ impl From<&str> for PlaybackState {
 }
 
 /// MPRIS loop status.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoopMode {
     /// No looping.
     None,
@@ -70,7 +72,7 @@ impl From<&str> for LoopMode {
 }
 
 /// Shuffle mode for randomizing playback order
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShuffleMode {
     /// Shuffle enabled
     On,
@@ -94,11 +96,13 @@ pub struct Volume(f64);
 
 impl Volume {
     /// Creates a volume, floored at 0.0. Values above 1.0 are valid (amplification).
-    pub fn new(value: f64) -> Self {
+    #[must_use]
+    pub const fn new(value: f64) -> Self {
         Self(value.max(0.0))
     }
 
     /// Volume as a percentage (1.0 = 100%). Can exceed 100% for amplified players.
+    #[must_use]
     pub fn as_percentage(&self) -> f64 {
         self.0 * 100.0
     }

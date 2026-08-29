@@ -67,7 +67,7 @@ pub fn spawn<C>(
         tokio::pin!(shutdown_fut);
 
         tokio::select! {
-            _ = &mut shutdown_fut => {}
+            () = &mut shutdown_fut => {}
             () = run_event_loop(watcher, rx, out, config_service, into_cmd) => {}
         }
     });

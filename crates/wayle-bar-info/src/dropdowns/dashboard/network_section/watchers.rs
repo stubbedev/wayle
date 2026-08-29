@@ -15,7 +15,7 @@ use super::{NetworkSection, helpers, messages::NetworkSectionCmd};
 
 pub fn spawn(
     sender: &ComponentSender<NetworkSection>,
-    network: &Option<Arc<NetworkService>>,
+    network: Option<&Arc<NetworkService>>,
     sysinfo: &Arc<SysinfoService>,
     token: CancellationToken,
 ) {
@@ -30,7 +30,8 @@ pub fn spawn(
             [primary.watch(), wifi.watch(), wired.watch()],
             |out| {
                 let connection_type = primary.get();
-                let connected = resolve_connected(connection_type, &wired.get(), &wifi.get());
+                let connected =
+                    resolve_connected(&connection_type, wired.get().as_ref(), wifi.get().as_ref());
 
                 let _ = out.send(NetworkSectionCmd::ConnectionChanged { connected });
             }
@@ -43,7 +44,10 @@ pub fn spawn(
         let data = net_data.get();
 
         let (total_rx, total_tx) = data.iter().fold((0u64, 0u64), |(rx, tx), iface| {
-            (rx + iface.rx_bytes_per_sec, tx + iface.tx_bytes_per_sec)
+            (
+                rx.saturating_add(iface.rx_bytes_per_sec),
+                tx.saturating_add(iface.tx_bytes_per_sec),
+            )
         });
 
         let upload = helpers::format_speed(total_tx);
@@ -58,22 +62,20 @@ pub fn spawn(
     });
 }
 
-fn is_wired_connected(wired: &Option<Arc<Wired>>) -> bool {
-    wired
-        .as_ref()
-        .is_some_and(|device| device.connectivity.get() == NetworkStatus::Connected)
+fn is_wired_connected(wired: Option<&Arc<Wired>>) -> bool {
+    wired.is_some_and(|device| device.connectivity.get() == NetworkStatus::Connected)
 }
 
-fn is_wifi_connected(wifi: &Option<Arc<Wifi>>) -> bool {
-    wifi.as_ref().is_some_and(|device| {
+fn is_wifi_connected(wifi: Option<&Arc<Wifi>>) -> bool {
+    wifi.is_some_and(|device| {
         device.enabled.get() && device.ssid.get().is_some_and(|ssid| !ssid.is_empty())
     })
 }
 
 fn resolve_connected(
-    connection_type: ConnectionType,
-    wired: &Option<Arc<Wired>>,
-    wifi: &Option<Arc<Wifi>>,
+    connection_type: &ConnectionType,
+    wired: Option<&Arc<Wired>>,
+    wifi: Option<&Arc<Wifi>>,
 ) -> bool {
     match connection_type {
         ConnectionType::Wired => is_wired_connected(wired),

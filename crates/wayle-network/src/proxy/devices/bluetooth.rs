@@ -1,4 +1,4 @@
-//! NetworkManager Bluetooth Device interface.
+//! `NetworkManager` Bluetooth Device interface.
 
 use zbus::proxy;
 

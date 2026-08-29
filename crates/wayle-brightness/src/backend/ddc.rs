@@ -141,13 +141,15 @@ impl DdcManager {
         let raw = u16::try_from(clamped).unwrap_or(u16::MAX);
         let max = display.max;
 
-        with_retry(|| {
+        let result = with_retry(|| {
             display
                 .handle
                 .set_vcp_feature(VCP_LUMINANCE, raw)
                 .map_err(|err| format!("{err:?}"))
-        })
-        .map_err(|detail| Error::Ddc {
+        });
+        drop(map);
+
+        result.map_err(|detail| Error::Ddc {
             device: name.to_owned(),
             detail,
         })?;

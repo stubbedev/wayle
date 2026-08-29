@@ -20,7 +20,7 @@ use crate::{
 
 const EVENT_CHANNEL_CAPACITY: usize = 256;
 
-/// Builder for configuring a SystemTrayService.
+/// Builder for configuring a `SystemTrayService`.
 pub struct SystemTrayServiceBuilder {
     mode: TrayMode,
     register_daemon: bool,
@@ -28,7 +28,8 @@ pub struct SystemTrayServiceBuilder {
 
 impl SystemTrayServiceBuilder {
     /// Creates a new builder with default configuration.
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             mode: TrayMode::Auto,
             register_daemon: false,
@@ -37,10 +38,11 @@ impl SystemTrayServiceBuilder {
 
     /// Sets the operating mode for the service.
     ///
-    /// - `TrayMode::Watcher` - Act as the StatusNotifierWatcher registry
-    /// - `TrayMode::Host` - Act as a StatusNotifierHost consumer
+    /// - `TrayMode::Watcher` - Act as the `StatusNotifierWatcher` registry
+    /// - `TrayMode::Host` - Act as a `StatusNotifierHost` consumer
     /// - `TrayMode::Auto` - Auto-detect based on name availability (default)
-    pub fn mode(mut self, mode: TrayMode) -> Self {
+    #[must_use]
+    pub const fn mode(mut self, mode: TrayMode) -> Self {
         self.mode = mode;
         self
     }
@@ -49,12 +51,13 @@ impl SystemTrayServiceBuilder {
     ///
     /// When enabled, the service registers at `com.wayle.SystemTray1`,
     /// allowing CLI tools to list and activate tray items.
-    pub fn with_daemon(mut self) -> Self {
+    #[must_use]
+    pub const fn with_daemon(mut self) -> Self {
         self.register_daemon = true;
         self
     }
 
-    /// Builds the SystemTrayService.
+    /// Builds the `SystemTrayService`.
     ///
     /// # Errors
     /// Returns error if service initialization fails.
@@ -147,7 +150,7 @@ impl SystemTrayServiceBuilder {
         Ok(service)
     }
 
-    /// Attempts to become the StatusNotifierWatcher.
+    /// Attempts to become the `StatusNotifierWatcher`.
     ///
     /// Returns `true` if name was acquired, `false` if fell back to host mode.
     #[instrument(skip(connection, event_tx, cancellation_token), err)]
@@ -174,7 +177,7 @@ impl SystemTrayServiceBuilder {
             .await?;
 
         match connection.request_name(WATCHER_BUS_NAME).await {
-            Ok(_) => {
+            Ok(()) => {
                 info!("Operating as StatusNotifierWatcher");
 
                 discovery::spawn_orphan_scan(

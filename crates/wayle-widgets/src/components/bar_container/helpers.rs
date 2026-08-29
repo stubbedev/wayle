@@ -19,7 +19,7 @@ pub(crate) fn compute_css_classes(
     classes
 }
 
-pub(super) fn compute_orientation(is_vertical: bool) -> gtk4::Orientation {
+pub(super) const fn compute_orientation(is_vertical: bool) -> gtk4::Orientation {
     if is_vertical {
         gtk4::Orientation::Vertical
     } else {

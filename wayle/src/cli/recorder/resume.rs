@@ -7,7 +7,7 @@ pub async fn execute() -> CliAction {
     proxy
         .resume()
         .await
-        .map_err(|e| format_error("resume recording", e))?;
+        .map_err(|e| format_error("resume recording", &e))?;
 
     println!("Resumed");
 

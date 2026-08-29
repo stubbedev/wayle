@@ -6,7 +6,7 @@ use std::{
 use zbus::zvariant::OwnedValue;
 
 /// Raw menu item properties from D-Bus.
-/// (item_id, properties)
+/// (`item_id`, properties)
 pub type RawMenuItemProps = (i32, HashMap<String, OwnedValue>);
 
 /// Collection of menu items with properties.
@@ -17,11 +17,11 @@ pub(crate) type RawMenuItemKeys = (i32, Vec<String>);
 #[allow(dead_code)]
 pub(crate) type RawMenuItemKeysList = Vec<RawMenuItemKeys>;
 
-/// Raw menu layout data from D-Bus GetLayout method.
-/// (revision, (item_id, properties, children))
+/// Raw menu layout data from D-Bus `GetLayout` method.
+/// (revision, (`item_id`, properties, children))
 pub type RawMenuLayout = (u32, (i32, HashMap<String, OwnedValue>, Vec<OwnedValue>));
 
-/// Type of a DBusMenu item.
+/// Type of a `DBusMenu` item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MenuItemType {
     /// Standard clickable menu item.
@@ -173,7 +173,7 @@ impl Display for Disposition {
     }
 }
 
-/// DBusMenu event types.
+/// `DBusMenu` event types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuEvent {
     /// Item was clicked.
@@ -209,9 +209,9 @@ impl Display for MenuEvent {
     }
 }
 
-/// Parsed menu item from DBusMenu.
+/// Parsed menu item from `DBusMenu`.
 ///
-/// Contains all official properties from the DBusMenu specification.
+/// Contains all official properties from the `DBusMenu` specification.
 /// Properties map from com.canonical.dbusmenu as defined in libdbusmenu.
 #[derive(Clone, PartialEq)]
 pub struct MenuItem {
@@ -273,7 +273,7 @@ pub struct MenuItem {
     pub children_display: ChildrenDisplay,
 
     /// Child menu items (may be empty).
-    pub children: Vec<MenuItem>,
+    pub children: Vec<Self>,
 }
 
 impl From<RawMenuLayout> for MenuItem {
@@ -288,22 +288,26 @@ impl From<RawMenuLayout> for MenuItem {
 
 impl MenuItem {
     /// Check if this is a separator item.
+    #[must_use]
     pub fn is_separator(&self) -> bool {
         self.item_type == MenuItemType::Separator
     }
 
     /// Check if this item has children.
-    pub fn has_children(&self) -> bool {
+    #[must_use]
+    pub const fn has_children(&self) -> bool {
         !self.children.is_empty()
     }
 
     /// Check if this item has a submenu.
-    pub fn has_submenu(&self) -> bool {
+    #[must_use]
+    pub const fn has_submenu(&self) -> bool {
         !self.children.is_empty()
     }
 
     /// Check if this item is checkable.
-    pub fn is_checkable(&self) -> bool {
+    #[must_use]
+    pub const fn is_checkable(&self) -> bool {
         matches!(self.toggle_type, ToggleType::Checkmark | ToggleType::Radio)
     }
 

@@ -14,7 +14,7 @@ pub struct BarVisibility {
 }
 
 impl BarVisibility {
-    pub fn new(state: ShellIpcState) -> Self {
+    pub const fn new(state: ShellIpcState) -> Self {
         Self { state }
     }
 
@@ -62,7 +62,8 @@ impl BarVisibility {
     #[instrument(skip(self), fields(monitor))]
     pub fn toggle(&self, monitor: &str) -> fdo::Result<()> {
         if monitor.is_empty() {
-            return self.toggle_all();
+            self.toggle_all();
+            return Ok(());
         }
 
         if !self.is_known_connector(monitor) {
@@ -80,7 +81,7 @@ impl BarVisibility {
         Ok(())
     }
 
-    fn toggle_all(&self) -> fdo::Result<()> {
+    fn toggle_all(&self) {
         let set = self.state.hidden_bars.get();
 
         let hidden_bars = if set.is_empty() {
@@ -90,7 +91,5 @@ impl BarVisibility {
         };
 
         self.state.hidden_bars.set(hidden_bars);
-
-        Ok(())
     }
 }

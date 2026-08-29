@@ -22,7 +22,7 @@ pub fn spawn_watchers(sender: &ComponentSender<WorldClockModule>, config: &World
     let prev = Arc::clone(&prev_label);
     watch!(sender, [interval_stream], |out| {
         let label = format_world_clock(&format.get()).unwrap_or_default();
-        let mut prev = prev.lock().unwrap_or_else(|poison| poison.into_inner());
+        let mut prev = prev.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if *prev != label {
             *prev = label.clone();
             let _ = out.send(WorldClockCmd::UpdateLabel(label));
@@ -33,7 +33,7 @@ pub fn spawn_watchers(sender: &ComponentSender<WorldClockModule>, config: &World
     let prev = Arc::clone(&prev_label);
     watch!(sender, [format.watch()], |out| {
         let label = render_label(&format.get());
-        let mut prev = prev.lock().unwrap_or_else(|poison| poison.into_inner());
+        let mut prev = prev.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if *prev != label {
             *prev = label.clone();
             let _ = out.send(WorldClockCmd::UpdateLabel(label));
@@ -42,7 +42,7 @@ pub fn spawn_watchers(sender: &ComponentSender<WorldClockModule>, config: &World
 
     let icon_name = config.icon_name.clone();
     watch!(sender, [icon_name.watch()], |out| {
-        let _ = out.send(WorldClockCmd::UpdateIcon(icon_name.get().clone()));
+        let _ = out.send(WorldClockCmd::UpdateIcon(icon_name.get()));
     });
 }
 

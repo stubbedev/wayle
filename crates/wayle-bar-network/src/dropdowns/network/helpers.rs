@@ -17,7 +17,8 @@ pub struct AccessPointSnapshot {
     pub known: bool,
 }
 
-pub fn signal_strength_icon(strength: u8) -> &'static str {
+#[must_use]
+pub const fn signal_strength_icon(strength: u8) -> &'static str {
     match strength {
         0..=19 => "cm-wireless-signal-none-symbolic",
         20..=39 => "cm-wireless-signal-weak-symbolic",
@@ -27,7 +28,8 @@ pub fn signal_strength_icon(strength: u8) -> &'static str {
     }
 }
 
-pub fn frequency_to_band(freq_mhz: u32) -> Option<&'static str> {
+#[must_use]
+pub const fn frequency_to_band(freq_mhz: u32) -> Option<&'static str> {
     match freq_mhz {
         2400..=2500 => Some("2.4 GHz"),
         5000..=5900 => Some("5 GHz"),
@@ -37,9 +39,10 @@ pub fn frequency_to_band(freq_mhz: u32) -> Option<&'static str> {
     }
 }
 
+#[must_use]
 pub fn format_wired_speed(speed_mbps: u32) -> String {
     if speed_mbps >= 1000 {
-        let gbps = speed_mbps as f64 / 1000.0;
+        let gbps = f64::from(speed_mbps) / 1000.0;
         if speed_mbps.is_multiple_of(1000) {
             format!("{} Gbps", speed_mbps / 1000)
         } else {
@@ -50,13 +53,15 @@ pub fn format_wired_speed(speed_mbps: u32) -> String {
     }
 }
 
-pub fn requires_password(security: SecurityType) -> bool {
+#[must_use]
+pub const fn requires_password(security: SecurityType) -> bool {
     !matches!(security, SecurityType::None | SecurityType::Enterprise)
 }
 
 /// Deduplicates access points by SSID (keeping strongest signal),
 /// filters out hidden networks and the currently connected SSID,
 /// and sorts by signal strength descending.
+#[must_use]
 pub fn sorted_unique_access_points(
     access_points: &[Arc<AccessPoint>],
     connected_ssid: Option<&str>,

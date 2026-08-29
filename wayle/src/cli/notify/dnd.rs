@@ -11,12 +11,12 @@ pub async fn execute() -> CliAction {
     proxy
         .toggle_dnd()
         .await
-        .map_err(|e| format_error("toggle DND", e))?;
+        .map_err(|e| format_error("toggle DND", &e))?;
 
     let dnd = proxy
         .dnd()
         .await
-        .map_err(|e| format_error("get DND state", e))?;
+        .map_err(|e| format_error("get DND state", &e))?;
 
     if dnd {
         println!("Do Not Disturb: enabled");

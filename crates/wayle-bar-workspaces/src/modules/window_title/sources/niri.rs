@@ -14,7 +14,7 @@ pub struct NiriFocusedWindowSource {
 }
 
 impl NiriFocusedWindowSource {
-    pub fn new(service: Arc<NiriService>) -> Self {
+    pub const fn new(service: Arc<NiriService>) -> Self {
         Self { service }
     }
 }

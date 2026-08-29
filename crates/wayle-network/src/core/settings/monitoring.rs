@@ -54,7 +54,7 @@ async fn monitor(
         };
 
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("SettingsMonitor cancelled");
                 return Ok(());
             }
@@ -67,7 +67,7 @@ async fn monitor(
             Some(event) = async { connection_removed.as_mut().ok()?.next().await }, if
                 connection_removed.is_ok() => {
                     if let Ok(args) = event.args() {
-                        let _ = remove_connection(args.connection, &settings).await;
+                        remove_connection(args.connection, &settings);
                     }
             }
             Some(change) = hostname_changed.next() => {
@@ -120,10 +120,6 @@ async fn add_connection(
     Ok(())
 }
 
-async fn remove_connection(
-    connection_path: OwnedObjectPath,
-    settings: &Arc<Settings>,
-) -> Result<(), Error> {
+fn remove_connection(connection_path: OwnedObjectPath, settings: &Arc<Settings>) {
     remove_and_cancel!(settings.connections.clone(), connection_path);
-    Ok(())
 }

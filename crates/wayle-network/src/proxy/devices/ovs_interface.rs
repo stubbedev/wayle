@@ -1,4 +1,4 @@
-//! NetworkManager OVS Interface Device interface.
+//! `NetworkManager` OVS Interface Device interface.
 
 use zbus::proxy;
 

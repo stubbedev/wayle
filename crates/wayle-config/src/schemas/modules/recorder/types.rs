@@ -9,6 +9,6 @@ pub enum RecorderFormat {
     /// H.264 in a Matroska container (resilient to crashes).
     #[default]
     Mkv,
-    /// VP9 in a WebM container.
+    /// VP9 in a `WebM` container.
     Webm,
 }

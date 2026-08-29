@@ -2,7 +2,7 @@
 //!
 //! Real (human) accounts are read from `/etc/passwd`: uid in the regular-user
 //! range with a real login shell. Each user gets a best-effort avatar from
-//! AccountsService (`/var/lib/AccountsService/icons/<name>`, what gdm/sddm
+//! `AccountsService` (`/var/lib/AccountsService/icons/<name>`, what gdm/sddm
 //! use) or `~/.face`, when the greeter user can read them.
 
 use std::path::{Path, PathBuf};
@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 /// accounts; 65534 = nobody. 60000+ covers other reserved ranges.
 const UID_RANGE: std::ops::RangeInclusive<u32> = 1000..=59999;
 
-/// AccountsService avatar directory (world-readable on typical setups).
+/// `AccountsService` avatar directory (world-readable on typical setups).
 const ACCOUNTS_SERVICE_ICONS: &str = "/var/lib/AccountsService/icons";
 
 /// A login account offered in the greeter's user list.
@@ -79,7 +79,7 @@ fn is_login_shell(shell: &str) -> bool {
         && shell != "/bin/sync"
 }
 
-/// Best-effort avatar lookup: AccountsService icon, then `~/.face`. Only paths
+/// Best-effort avatar lookup: `AccountsService` icon, then `~/.face`. Only paths
 /// the greeter user can actually read are returned (GTK would render a broken
 /// image otherwise).
 fn find_avatar(name: &str, home: &Path) -> Option<PathBuf> {

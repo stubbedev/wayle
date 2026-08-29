@@ -14,7 +14,7 @@ impl CheckboxClass {
 /// Checkbox for multi-select options.
 ///
 /// Based on `gtk::CheckButton` without grouping. For single-select behavior,
-/// multiple CheckButtons can be linked via `set_group()`.
+/// multiple `CheckButtons` can be linked via `set_group()`.
 #[relm4::widget_template(pub)]
 impl WidgetTemplate for Checkbox {
     view! {

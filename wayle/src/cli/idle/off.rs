@@ -7,7 +7,7 @@ pub async fn execute() -> CliAction {
     proxy
         .disable()
         .await
-        .map_err(|e| format_error("disable idle inhibit", e))?;
+        .map_err(|e| format_error("disable idle inhibit", &e))?;
 
     println!("Disabled");
 

@@ -1,4 +1,4 @@
-//! Font family picker. MenuButton opens a searchable popover of system fonts.
+//! Font family picker. `MenuButton` opens a searchable popover of system fonts.
 
 mod helpers;
 mod methods;

@@ -36,10 +36,9 @@ impl PowerProfilesDaemon {
     pub async fn cycle(&self) -> fdo::Result<()> {
         let current = self.service.power_profiles.active_profile.get();
         let next = match current {
-            PowerProfile::PowerSaver => PowerProfile::Balanced,
+            PowerProfile::PowerSaver | PowerProfile::Unknown => PowerProfile::Balanced,
             PowerProfile::Balanced => PowerProfile::Performance,
             PowerProfile::Performance => PowerProfile::PowerSaver,
-            PowerProfile::Unknown => PowerProfile::Balanced,
         };
 
         self.service
@@ -61,12 +60,12 @@ impl PowerProfilesDaemon {
     }
 
     #[zbus(property)]
-    pub async fn active_profile(&self) -> String {
+    pub fn active_profile(&self) -> String {
         self.service.power_profiles.active_profile.get().to_string()
     }
 
     #[zbus(property)]
-    pub async fn performance_degraded(&self) -> String {
+    pub fn performance_degraded(&self) -> String {
         self.service
             .power_profiles
             .performance_degraded
@@ -75,7 +74,7 @@ impl PowerProfilesDaemon {
     }
 
     #[zbus(property)]
-    pub async fn profile_count(&self) -> u32 {
-        self.service.power_profiles.profiles.get().len() as u32
+    pub fn profile_count(&self) -> u32 {
+        u32::try_from(self.service.power_profiles.profiles.get().len()).unwrap_or(u32::MAX)
     }
 }

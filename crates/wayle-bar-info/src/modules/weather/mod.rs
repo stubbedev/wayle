@@ -46,7 +46,7 @@ impl Component for WeatherModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();
@@ -54,7 +54,7 @@ impl Component for WeatherModule {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: weather_config.icon_name.get().clone(),
+                icon: weather_config.icon_name.get(),
                 label: String::from("--"),
                 tooltip: None,
                 colors: BarButtonColors {

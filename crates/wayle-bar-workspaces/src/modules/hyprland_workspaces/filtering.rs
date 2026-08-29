@@ -89,7 +89,7 @@ fn should_include_workspace(
     true
 }
 
-fn exceeds_min_count_limit(
+const fn exceeds_min_count_limit(
     id: WorkspaceId,
     windows: u16,
     max_id: WorkspaceId,
@@ -227,17 +227,21 @@ pub fn relative_workspace_number(
     monitor_workspaces
         .iter()
         .position(|&ws_id| ws_id == id)
-        .map(|pos| (pos + 1) as WorkspaceId)
-        .unwrap_or(id)
+        .map_or(id, |pos| {
+            WorkspaceId::try_from(pos.saturating_add(1)).unwrap_or(id)
+        })
 }
 
-pub fn calculate_navigation_index(current_idx: usize, direction: i64, total: usize) -> usize {
+pub const fn calculate_navigation_index(current_idx: usize, direction: i64, total: usize) -> usize {
     if direction > 0 {
-        (current_idx + 1) % total
+        match current_idx.saturating_add(1).checked_rem(total) {
+            Some(next) => next,
+            None => 0,
+        }
     } else if current_idx == 0 {
-        total - 1
+        total.saturating_sub(1)
     } else {
-        current_idx - 1
+        current_idx.saturating_sub(1)
     }
 }
 
@@ -385,8 +389,7 @@ mod tests {
             };
 
             let result = filter_workspaces(&workspaces, &ctx);
-            let ids: Vec<_> = result.iter().map(|ws| ws.id).collect();
-            assert!(ids.contains(&5));
+            assert!(result.iter().any(|ws| ws.id == 5));
         }
 
         #[test]
@@ -404,8 +407,7 @@ mod tests {
             };
 
             let result = filter_workspaces(&workspaces, &ctx);
-            let ids: Vec<_> = result.iter().map(|ws| ws.id).collect();
-            assert!(ids.contains(&9));
+            assert!(result.iter().any(|ws| ws.id == 9));
         }
 
         #[test]
@@ -423,8 +425,7 @@ mod tests {
             };
 
             let result = filter_workspaces(&workspaces, &ctx);
-            let ids: Vec<_> = result.iter().map(|ws| ws.id).collect();
-            assert!(!ids.contains(&9));
+            assert!(!result.iter().any(|ws| ws.id == 9));
         }
 
         #[test]
@@ -442,8 +443,7 @@ mod tests {
             };
 
             let result = filter_workspaces(&workspaces, &ctx);
-            let ids: Vec<_> = result.iter().map(|ws| ws.id).collect();
-            assert!(!ids.contains(&9));
+            assert!(!result.iter().any(|ws| ws.id == 9));
         }
 
         #[test]
@@ -463,8 +463,7 @@ mod tests {
             };
 
             let result = filter_workspaces(&workspaces, &ctx);
-            let ids: Vec<_> = result.iter().map(|ws| ws.id).collect();
-            assert!(!ids.contains(&9));
+            assert!(!result.iter().any(|ws| ws.id == 9));
         }
 
         #[test]
@@ -482,8 +481,7 @@ mod tests {
             };
 
             let result = filter_workspaces(&workspaces, &ctx);
-            let ids: Vec<_> = result.iter().map(|ws| ws.id).collect();
-            assert!(ids.contains(&9));
+            assert!(result.iter().any(|ws| ws.id == 9));
         }
 
         #[test]
@@ -501,8 +499,7 @@ mod tests {
             };
 
             let result = filter_workspaces(&workspaces, &ctx);
-            let ids: Vec<_> = result.iter().map(|ws| ws.id).collect();
-            assert!(!ids.contains(&9));
+            assert!(!result.iter().any(|ws| ws.id == 9));
         }
 
         #[test]
@@ -522,8 +519,7 @@ mod tests {
             };
 
             let result = filter_workspaces(&workspaces, &ctx);
-            let ids: Vec<_> = result.iter().map(|ws| ws.id).collect();
-            assert!(ids.contains(&9));
+            assert!(result.iter().any(|ws| ws.id == 9));
         }
 
         #[test]
@@ -611,9 +607,8 @@ mod tests {
             };
 
             let result = filter_workspaces(&workspaces, &ctx);
-            let ids: Vec<_> = result.iter().map(|ws| ws.id).collect();
 
-            assert!(!ids.contains(&10));
+            assert!(!result.iter().any(|ws| ws.id == 10));
         }
     }
 

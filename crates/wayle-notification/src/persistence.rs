@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     env, fs,
     sync::{Arc, Mutex},
-    time::Duration,
 };
 
 use chrono::{DateTime, Utc};
@@ -38,14 +37,14 @@ impl From<&Notification> for StoredNotification {
     fn from(notification: &Notification) -> Self {
         Self {
             id: notification.id,
-            app_name: notification.app_name.get().clone(),
+            app_name: notification.app_name.get(),
             replaces_id: notification.replaces_id.get(),
-            app_icon: notification.app_icon.get().clone(),
-            summary: notification.summary.get().clone(),
-            body: notification.body.get().clone(),
+            app_icon: notification.app_icon.get(),
+            summary: notification.summary.get(),
+            body: notification.body.get(),
             actions: Action::to_dbus_format(&notification.actions.get()),
-            hints: notification.hints.get().clone().unwrap_or_default(),
-            image_path: notification.image_path.get().clone(),
+            hints: notification.hints.get().unwrap_or_default(),
+            image_path: notification.image_path.get(),
             expire_timeout: notification.expire_timeout.get(),
             timestamp: notification.timestamp.get().timestamp_millis(),
         }
@@ -220,6 +219,8 @@ impl NotificationStore {
             .map_err(|err| Error::DatabaseError(format!("cannot query notifications: {err}")))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|err| Error::DatabaseError(format!("cannot parse notifications: {err}")))?;
+        drop(stmt);
+        drop(conn);
 
         if !remove_expired {
             debug!(count = notifications.len(), "loaded stored notifications");
@@ -237,7 +238,9 @@ impl NotificationStore {
                 else {
                     return false;
                 };
-                timestamp + Duration::from_millis(timeout as u64) > now
+                timestamp
+                    .checked_add_signed(chrono::Duration::milliseconds(i64::from(timeout)))
+                    .is_none_or(|expiry| expiry > now)
             })
             .collect();
 

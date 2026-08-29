@@ -3,11 +3,11 @@
 //! High level flow tldr:
 //!   Workspace switch -> clear urgency, rebuild or update state
 //!   Window open/close/move -> full rebuild (icons change)
-//!   Urgent -> addr into urgent_windows, start blink timer,
-//!     update_active_state sends UpdateState w/ urgent_addresses.
+//!   Urgent -> addr into `urgent_windows`, start blink timer,
+//!     `update_active_state` sends `UpdateState` w/ `urgent_addresses`.
 //!     urgent-mode=application -> button matches addrs, blinks individual icons.
 //!     urgent-mode=workspace (default) -> empty addrs, whole workspace blinks.
-//!   BlinkTick -> flip blink_on, update_active_state again (the pulse)
+//!   `BlinkTick` -> flip `blink_on`, `update_active_state` again (the pulse)
 //!   Switch to urgent ws -> clear addrs, stop timer if set empty
 
 mod button;
@@ -90,7 +90,7 @@ impl Component for HyprlandWorkspaces {
         let workspaces_config = &config.modules.hyprland_workspaces;
         let monitor_specific = workspaces_config.monitor_specific.get();
         let monitor_specific_highlight = workspaces_config.highlight_active_on_other_monitor.get();
-        let theme_provider = config.styling.theme_provider.clone();
+        let theme_provider = &config.styling.theme_provider;
 
         let active_id = Self::initial_active_workspace(
             &init.hyprland,
@@ -99,14 +99,14 @@ impl Component for HyprlandWorkspaces {
         );
         let active_any_monitor = Self::initial_active_workspace_other_monitor(&init.hyprland);
         let focused_monitor = Self::initial_focused_monitor(&init.hyprland);
-        let bar_scale = config.bar.scale.clone();
+        let bar_scale = &config.bar.scale;
 
         Self::spawn_load_workspace_rules(&sender, &init.hyprland);
 
         watchers::spawn_watchers(
             &sender,
             workspaces_config,
-            &init.hyprland,
+            init.hyprland.as_ref(),
             theme_provider,
             bar_scale,
             &init.settings,

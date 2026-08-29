@@ -26,6 +26,7 @@ impl Volume {
     /// - 0.0 = Muted
     /// - 1.0 = Normal volume (100%)
     /// - 4.0 = Maximum amplification (400%)
+    #[must_use]
     pub fn new(volumes: Vec<f64>) -> Self {
         let volumes = volumes.into_iter().map(|v| {
             let clamped = v.clamp(0.0, 4.0);
@@ -63,6 +64,7 @@ impl Volume {
     ///
     /// Volume is automatically clamped to valid range (0.0 to 4.0).
     /// A value of 1.0 represents normal volume, and values above 1.0 provide amplification.
+    #[must_use]
     pub fn mono(volume: f64) -> Self {
         Self::new(vec![volume])
     }
@@ -71,11 +73,13 @@ impl Volume {
     ///
     /// Volume levels are automatically clamped to valid range (0.0 to 4.0).
     /// A value of 1.0 represents normal volume, and values above 1.0 provide amplification.
+    #[must_use]
     pub fn stereo(left: f64, right: f64) -> Self {
         Self::new(vec![left, right])
     }
 
     /// Get volume for a specific channel
+    #[must_use]
     pub fn channel(&self, channel: usize) -> Option<f64> {
         self.volumes.get(channel).copied()
     }
@@ -88,27 +92,33 @@ impl Volume {
     /// Returns error if channel index is out of bounds.
     #[allow(clippy::cognitive_complexity)]
     pub fn set_channel(&mut self, channel: usize, volume: f64) -> Result<(), Error> {
-        if let Some(vol) = self.volumes.get_mut(channel) {
-            let clamped = volume.clamp(0.0, 4.0);
-            if volume > 2.0 && volume <= 4.0 {
-                warn!(
-                    "Volume {volume} exceeds safe limit (2.0). Audio damage possible at high amplification."
-                );
-            } else if volume > 4.0 {
-                warn!(
-                    "Volume {volume} clamped to maximum (4.0). Use values ≤2.0 for safe operation."
-                );
-            } else if volume < 0.0 {
-                warn!("Negative volume {volume} clamped to 0.0.");
-            }
-            *vol = clamped;
-            Ok(())
-        } else {
-            Err(Error::InvalidChannel { channel })
-        }
+        self.volumes
+            .get_mut(channel)
+            .map_or(Err(Error::InvalidChannel { channel }), |vol| {
+                let clamped = volume.clamp(0.0, 4.0);
+                if volume > 2.0 && volume <= 4.0 {
+                    warn!(
+                        "Volume {volume} exceeds safe limit (2.0). Audio damage possible at high amplification."
+                    );
+                } else if volume > 4.0 {
+                    warn!(
+                        "Volume {volume} clamped to maximum (4.0). Use values ≤2.0 for safe operation."
+                    );
+                } else if volume < 0.0 {
+                    warn!("Negative volume {volume} clamped to 0.0.");
+                }
+                *vol = clamped;
+                Ok(())
+            })
     }
 
     /// Get average volume across all channels
+    #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_precision_loss,
+        reason = "channel counts are tiny; exactly representable in f64"
+    )]
     pub fn average(&self) -> f64 {
         if self.volumes.is_empty() {
             0.0
@@ -118,49 +128,58 @@ impl Volume {
     }
 
     /// Get number of channels
-    pub fn channels(&self) -> usize {
+    #[must_use]
+    pub const fn channels(&self) -> usize {
         self.volumes.len()
     }
 
     /// Get all channel volumes
+    #[must_use]
     pub fn as_slice(&self) -> &[f64] {
         &self.volumes
     }
 
     /// Create a muted volume (0.0)
+    #[must_use]
     pub fn muted(channels: usize) -> Self {
         Self::new(vec![0.0; channels])
     }
 
     /// Create a normal volume (1.0 = 100%)
+    #[must_use]
     pub fn normal(channels: usize) -> Self {
         Self::new(vec![1.0; channels])
     }
 
     /// Create a volume from percentage (0-100% maps to 0.0-1.0)
+    #[must_use]
     pub fn from_percentage(percentage: f64, channels: usize) -> Self {
         let volume = percentage / 100.0;
         Self::new(vec![volume; channels])
     }
 
     /// Get volume as percentage (1.0 = 100%)
+    #[must_use]
     pub fn to_percentage(&self) -> Vec<f64> {
         self.volumes.iter().map(|&v| v * 100.0).collect()
     }
 
     /// Get average volume as percentage (1.0 = 100%).
+    #[must_use]
     pub fn average_percentage(&self) -> f64 {
         self.average() * 100.0
     }
 
     /// Check if volume is muted (all channels at 0.0)
+    #[must_use]
     pub fn is_muted(&self) -> bool {
         self.volumes.iter().all(|&v| v == 0.0)
     }
 
     /// Check if volume is at normal level (all channels at 1.0)
+    #[must_use]
     pub fn is_normal(&self) -> bool {
-        self.volumes.iter().all(|&v| v == 1.0)
+        self.volumes.iter().all(|&v| (v - 1.0).abs() < f64::EPSILON)
     }
 }
 
@@ -293,7 +312,7 @@ mod tests {
     fn average_returns_zero_for_empty_channels() {
         let volume = Volume::new(vec![]);
 
-        assert_eq!(volume.average(), 0.0);
+        assert!(volume.average().abs() < f64::EPSILON);
     }
 
     #[test]

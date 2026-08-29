@@ -44,7 +44,7 @@ impl Component for DashboardModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();

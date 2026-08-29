@@ -12,27 +12,27 @@ use crate::{
 /// Network connection status with a dropdown for switching connections.
 #[wayle_config(bar_button, i18n_prefix = "settings-modules-network")]
 pub struct NetworkConfig {
-    /// WiFi icon when disabled.
+    /// `WiFi` icon when disabled.
     #[serde(rename = "wifi-disabled-icon")]
     #[default(String::from("cm-wireless-disabled-symbolic"))]
     pub wifi_disabled_icon: ConfigProperty<String>,
 
-    /// WiFi icon when connecting.
+    /// `WiFi` icon when connecting.
     #[serde(rename = "wifi-acquiring-icon")]
     #[default(String::from("cm-wireless-acquiring-symbolic"))]
     pub wifi_acquiring_icon: ConfigProperty<String>,
 
-    /// WiFi icon when disconnected.
+    /// `WiFi` icon when disconnected.
     #[serde(rename = "wifi-offline-icon")]
     #[default(String::from("cm-wireless-offline-symbolic"))]
     pub wifi_offline_icon: ConfigProperty<String>,
 
-    /// WiFi icon when connected but signal strength unavailable.
+    /// `WiFi` icon when connected but signal strength unavailable.
     #[serde(rename = "wifi-connected-icon")]
     #[default(String::from("cm-wireless-connected-symbolic"))]
     pub wifi_connected_icon: ConfigProperty<String>,
 
-    /// WiFi signal strength icons from weak to excellent.
+    /// `WiFi` signal strength icons from weak to excellent.
     ///
     /// The signal percentage maps to icons: 0-25% uses icons\[0\], 26-50% uses
     /// icons\[1\], etc.
@@ -85,7 +85,7 @@ pub struct NetworkConfig {
     #[default(ColorValue::Token(CssToken::Accent))]
     pub icon_bg_color: ConfigProperty<ColorValue>,
 
-    /// Display connection label (SSID for WiFi, "Wired" for ethernet).
+    /// Display connection label (SSID for `WiFi`, "Wired" for ethernet).
     #[serde(rename = "label-show")]
     #[default(true)]
     pub label_show: ConfigProperty<bool>,
@@ -136,7 +136,7 @@ impl ModuleInfoProvider for NetworkConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("network"),
-            schema: || schema_for!(NetworkConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("network")),
             array_entry: false,
         }

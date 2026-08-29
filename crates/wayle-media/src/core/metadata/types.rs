@@ -58,7 +58,7 @@ impl TrackProperties {
             return Some(s);
         }
         if let Ok(s) = value.downcast_ref::<String>() {
-            return Some(s.clone());
+            return Some(s);
         }
         if let Ok(s) = value.downcast_ref::<&str>() {
             return Some(s.to_string());
@@ -72,7 +72,7 @@ impl TrackProperties {
                 .iter()
                 .filter_map(|item| {
                     item.downcast_ref::<String>()
-                        .or_else(|_| item.downcast_ref::<&str>().map(|s| s.to_string()))
+                        .or_else(|_| item.downcast_ref::<&str>().map(std::string::ToString::to_string))
                         .ok()
                 })
                 .collect();

@@ -78,11 +78,11 @@ pub enum Error {
 }
 
 impl Error {
-    pub(crate) fn http(provider: &'static str, source: reqwest::Error) -> Self {
+    pub(crate) const fn http(provider: &'static str, source: reqwest::Error) -> Self {
         Self::Http { provider, source }
     }
 
-    pub(crate) fn status(provider: &'static str, status: reqwest::StatusCode) -> Self {
+    pub(crate) const fn status(provider: &'static str, status: reqwest::StatusCode) -> Self {
         Self::ProviderStatus { provider, status }
     }
 

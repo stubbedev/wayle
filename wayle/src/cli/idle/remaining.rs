@@ -14,7 +14,7 @@ pub async fn execute(value: String) -> CliAction {
         proxy
             .adjust_remaining(delta)
             .await
-            .map_err(|e| format_error("adjust remaining", e))?;
+            .map_err(|e| format_error("adjust remaining", &e))?;
 
         println!("Added {delta} minutes to remaining");
     } else if value.starts_with('-') {
@@ -25,7 +25,7 @@ pub async fn execute(value: String) -> CliAction {
         proxy
             .adjust_remaining(delta)
             .await
-            .map_err(|e| format_error("adjust remaining", e))?;
+            .map_err(|e| format_error("adjust remaining", &e))?;
 
         println!("Subtracted {} minutes from remaining", delta.abs());
     } else {
@@ -36,7 +36,7 @@ pub async fn execute(value: String) -> CliAction {
         proxy
             .set_remaining(minutes)
             .await
-            .map_err(|e| format_error("set remaining", e))?;
+            .map_err(|e| format_error("set remaining", &e))?;
 
         println!("Set remaining to {minutes} minutes");
     }

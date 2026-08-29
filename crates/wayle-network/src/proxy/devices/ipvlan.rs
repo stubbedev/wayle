@@ -1,4 +1,4 @@
-//! NetworkManager IPVLAN Device interface.
+//! `NetworkManager` IPVLAN Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

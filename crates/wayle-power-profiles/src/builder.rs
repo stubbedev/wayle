@@ -12,7 +12,7 @@ use crate::{
     service::PowerProfilesService,
 };
 
-/// Builder for configuring and creating a PowerProfilesService instance.
+/// Builder for configuring and creating a `PowerProfilesService` instance.
 ///
 /// Allows optional D-Bus daemon registration for external control.
 #[derive(Default)]
@@ -21,7 +21,8 @@ pub struct PowerProfilesServiceBuilder {
 }
 
 impl PowerProfilesServiceBuilder {
-    /// Creates a new PowerProfilesServiceBuilder with default values.
+    /// Creates a new `PowerProfilesServiceBuilder` with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -31,12 +32,13 @@ impl PowerProfilesServiceBuilder {
     /// When enabled, the service will register itself on the session bus
     /// at `com.wayle.PowerProfiles1`, allowing CLI tools and other applications
     /// to control power profiles.
-    pub fn with_daemon(mut self) -> Self {
+    #[must_use]
+    pub const fn with_daemon(mut self) -> Self {
         self.register_daemon = true;
         self
     }
 
-    /// Builds and initializes the PowerProfilesService.
+    /// Builds and initializes the `PowerProfilesService`.
     ///
     /// Establishes a system D-Bus connection and starts monitoring
     /// for power profile changes. If `with_daemon()` was called, the service

@@ -17,7 +17,8 @@ pub enum ShadowPreset {
 
 impl ShadowPreset {
     /// Margin in pixels needed for this shadow to render without clipping.
-    pub fn margin_px(self) -> u32 {
+    #[must_use]
+    pub const fn margin_px(self) -> u32 {
         match self {
             Self::None => 0,
             Self::Drop => 4,
@@ -26,7 +27,8 @@ impl ShadowPreset {
     }
 
     /// CSS box-shadow value based on bar position.
-    pub fn css_shadow(self, location: Location) -> &'static str {
+    #[must_use]
+    pub const fn css_shadow(self, location: Location) -> &'static str {
         match self {
             Self::None => "none",
             Self::Drop => match location {
@@ -40,7 +42,8 @@ impl ShadowPreset {
     }
 
     /// Margin in pixels for the edge opposite to the anchor where shadow extends.
-    pub fn opposite_margin(self) -> u32 {
+    #[must_use]
+    pub const fn opposite_margin(self) -> u32 {
         self.margin_px()
     }
 }

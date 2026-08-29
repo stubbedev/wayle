@@ -1,4 +1,4 @@
-//! One-shot location lookup via GeoClue2 (system D-Bus), so the auto-schedule
+//! One-shot location lookup via `GeoClue2` (system D-Bus), so the auto-schedule
 //! can find sunrise/sunset without hand-entered coordinates.
 //!
 //! Best-effort: any failure (no daemon, no agent, denied, timeout) returns
@@ -10,7 +10,7 @@ use futures::StreamExt;
 use tracing::debug;
 use zbus::{Connection, Result, proxy, zvariant::OwnedObjectPath};
 
-/// GeoClue accuracy level "city" — plenty for a sunrise/sunset schedule, and
+/// `GeoClue` accuracy level "city" — plenty for a sunrise/sunset schedule, and
 /// the least privacy-invasive level that still yields coordinates.
 const ACCURACY_CITY: u32 = 4;
 
@@ -56,7 +56,7 @@ trait Location {
     fn longitude(&self) -> Result<f64>;
 }
 
-/// Resolve the current `(latitude, longitude)` via GeoClue2, or `None`.
+/// Resolve the current `(latitude, longitude)` via `GeoClue2`, or `None`.
 pub async fn query_location() -> Option<(f64, f64)> {
     match try_query().await {
         Ok(coords) => Some(coords),

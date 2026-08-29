@@ -11,12 +11,12 @@ pub async fn execute() -> CliAction {
     let sinks = proxy
         .list_sinks()
         .await
-        .map_err(|e| format_error("list sinks", e))?;
+        .map_err(|e| format_error("list sinks", &e))?;
 
     let default = proxy
         .default_sink()
         .await
-        .map_err(|e| format_error("get default sink", e))?;
+        .map_err(|e| format_error("get default sink", &e))?;
 
     if sinks.is_empty() {
         println!("No audio sinks found");

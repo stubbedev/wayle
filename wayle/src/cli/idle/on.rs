@@ -8,13 +8,13 @@ pub async fn execute(minutes: Option<u32>, indefinite: bool) -> CliAction {
         proxy
             .set_duration(mins)
             .await
-            .map_err(|e| format_error("set duration", e))?;
+            .map_err(|e| format_error("set duration", &e))?;
     }
 
     proxy
         .enable(indefinite)
         .await
-        .map_err(|e| format_error("enable idle inhibit", e))?;
+        .map_err(|e| format_error("enable idle inhibit", &e))?;
 
     let duration = proxy.duration().await.unwrap_or(0);
     if indefinite || duration == 0 {

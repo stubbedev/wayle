@@ -1,4 +1,4 @@
-//! NetworkManager VXLAN Device interface.
+//! `NetworkManager` VXLAN Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

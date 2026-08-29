@@ -1,4 +1,4 @@
-//! NetworkManager ADSL Device interface.
+//! `NetworkManager` ADSL Device interface.
 
 use zbus::proxy;
 

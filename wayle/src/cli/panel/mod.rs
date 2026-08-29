@@ -33,7 +33,7 @@ pub async fn execute(command: PanelCommands) -> CliAction {
         PanelCommands::Stop => stop::execute().await,
         PanelCommands::Restart => restart::execute().await,
         PanelCommands::Status => status::execute().await,
-        PanelCommands::Settings => settings::execute().await,
+        PanelCommands::Settings => settings::execute(),
         PanelCommands::Inspect => inspect::execute().await,
         PanelCommands::Hide { monitor } => hide::execute(monitor).await,
         PanelCommands::Show { monitor } => show::execute(monitor).await,

@@ -189,7 +189,7 @@ fn rebuild_section(
     for old_item in old_layout {
         if let Some(matched) = remaining.iter().position(|item| *item == old_item) {
             remaining.remove(matched);
-            removal_cursor += 1;
+            removal_cursor = removal_cursor.saturating_add(1);
         } else {
             guard.remove(removal_cursor);
         }

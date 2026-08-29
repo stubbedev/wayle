@@ -1,10 +1,10 @@
-//! System tray management via the StatusNotifier (SNI) and DBusMenu protocols.
+//! System tray management via the `StatusNotifier` (SNI) and `DBusMenu` protocols.
 //!
 //! # Overview
 //!
 //! The service discovers and monitors system tray items registered on D-Bus,
 //! providing reactive access to item properties, icons, and menus. It can operate
-//! as either a StatusNotifierWatcher (central registry) or a StatusNotifierHost
+//! as either a `StatusNotifierWatcher` (central registry) or a `StatusNotifierHost`
 //! (consumer of items from an existing watcher).
 //!
 //! # Reactive Pattern
@@ -98,7 +98,7 @@ mod monitoring;
 mod proxy;
 /// Main service implementation.
 pub mod service;
-/// SNI and DBusMenu protocol types.
+/// SNI and `DBusMenu` protocol types.
 pub mod types;
 mod watcher;
 

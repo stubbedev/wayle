@@ -78,6 +78,7 @@ pub fn from_cli_name(name: &str) -> Result<Box<dyn IconSource>> {
 }
 
 /// Returns all available icon sources.
+#[must_use]
 pub fn all() -> Vec<Box<dyn IconSource>> {
     vec![
         Box::new(Tabler),
@@ -89,6 +90,7 @@ pub fn all() -> Vec<Box<dyn IconSource>> {
 }
 
 /// Returns all known icon prefixes including custom.
+#[must_use]
 pub fn all_prefixes() -> Vec<&'static str> {
     let mut prefixes: Vec<_> = all().iter().map(|s| s.prefix()).collect();
     prefixes.push(CUSTOM_PREFIX);

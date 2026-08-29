@@ -16,7 +16,7 @@ use crate::cli::{
     widget::commands::WidgetCommands,
 };
 
-fn get_styles() -> Styles {
+const fn get_styles() -> Styles {
     Styles::styled()
         .header(AnsiColor::Yellow.on_default().effects(Effects::BOLD))
         .usage(AnsiColor::Green.on_default().effects(Effects::BOLD))

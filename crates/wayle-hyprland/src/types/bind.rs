@@ -1,8 +1,12 @@
 use serde::Deserialize;
 
 /// Keybind configuration from Hyprland.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors Hyprland's bind JSON schema"
+)]
 pub struct BindData {
     /// Bind works even when the screen is locked.
     pub locked: bool,

@@ -15,7 +15,7 @@ use crate::{
     types::ColorExtractorConfig,
 };
 
-/// Builder for configuring a WallpaperService.
+/// Builder for configuring a `WallpaperService`.
 #[derive(Debug, Default)]
 pub struct WallpaperServiceBuilder {
     color_extractor: ColorExtractorConfig,
@@ -25,11 +25,12 @@ pub struct WallpaperServiceBuilder {
 
 impl WallpaperServiceBuilder {
     /// Creates a new builder with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Builds and initializes the WallpaperService.
+    /// Builds and initializes the `WallpaperService`.
     ///
     /// # Errors
     ///
@@ -57,19 +58,22 @@ impl WallpaperServiceBuilder {
     }
 
     /// Sets the color extraction configuration.
+    #[must_use]
     pub fn color_extractor(mut self, config: ColorExtractorConfig) -> Self {
         self.color_extractor = config;
         self
     }
 
     /// Sets which monitor's wallpaper drives color extraction.
+    #[must_use]
     pub fn theming_monitor(mut self, monitor: Option<String>) -> Self {
         self.theming_monitor = monitor;
         self
     }
 
     /// Synchronizes cycling across all monitors in shuffle mode.
-    pub fn shared_cycle(mut self, shared: bool) -> Self {
+    #[must_use]
+    pub const fn shared_cycle(mut self, shared: bool) -> Self {
         self.shared_cycle = shared;
         self
     }

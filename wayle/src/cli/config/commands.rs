@@ -19,7 +19,7 @@ pub enum ConfigCommands {
     },
     /// Reset a configuration path to its default value
     Reset {
-        /// The configuration path to reset (e.g., "bar.button_gap")
+        /// The configuration path to reset (e.g., "`bar.button_gap`")
         path: String,
     },
     /// Output JSON Schema for the configuration (for editor intellisense)

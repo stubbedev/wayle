@@ -65,9 +65,9 @@ pub struct TrayItem {
     /// or sending `ContextMenu()` instead of `Activate()`
     pub item_is_menu: Property<bool>,
 
-    /// The StatusNotifierItem can carry an icon that can be used by the visualization to identify
+    /// The `StatusNotifierItem` can carry an icon that can be used by the visualization to identify
     /// the item. An icon can either be identified by its Freedesktop-compliant icon name, carried
-    /// by this property of by the icon data itself, carried by the property IconPixmap.
+    /// by this property of by the icon data itself, carried by the property `IconPixmap`.
     pub icon_name: Property<Option<String>>,
 
     /// Carries an ARGB32 binary representation of the icon.
@@ -81,13 +81,13 @@ pub struct TrayItem {
     pub overlay_icon_pixmap: Property<Vec<IconPixmap>>,
 
     /// The Freedesktop-compliant name of an icon. this can be used by the visualization to
-    /// indicate that the item is in RequestingAttention state.
+    /// indicate that the item is in `RequestingAttention` state.
     pub attention_icon_name: Property<Option<String>>,
 
     /// ARGB32 binary representation of the requesting attention icon.
     pub attention_icon_pixmap: Property<Vec<IconPixmap>>,
 
-    /// An item can also specify an animation associated to the RequestingAttention state.
+    /// An item can also specify an animation associated to the `RequestingAttention` state.
     /// This should be either a Freedesktop-compliant icon name or a full path.
     pub attention_movie_name: Property<Option<String>>,
 
@@ -97,10 +97,10 @@ pub struct TrayItem {
     /// Data structure that contains information for a tooltip.
     pub tooltip: Property<Tooltip>,
 
-    /// Hierarchical menu structure from DBusMenu interface.
+    /// Hierarchical menu structure from `DBusMenu` interface.
     pub menu: Property<Option<MenuItem>>,
 
-    /// DBus path to an object which should implement the com.canonical.dbusmenu interface.
+    /// `DBus` path to an object which should implement the com.canonical.dbusmenu interface.
     pub menu_path: Property<OwnedObjectPath>,
 }
 
@@ -158,7 +158,7 @@ impl Reactive for TrayItem {
 }
 
 impl TrayItem {
-    /// Passes an XDG activation token before calling Activate or ContextMenu.
+    /// Passes an XDG activation token before calling Activate or `ContextMenu`.
     /// Required on Wayland for the item to raise its window.
     ///
     /// # Errors
@@ -291,7 +291,7 @@ impl TrayItem {
 
     /// Pokes the app with `AboutToShow` and grabs a fresh menu layout.
     ///
-    /// Some apps (like EasyEffects) lazily populate menu items such as device
+    /// Some apps (like `EasyEffects`) lazily populate menu items such as device
     /// names only after receiving this signal. Updates the `menu` property
     /// before returning.
     ///
@@ -445,7 +445,7 @@ impl TrayItem {
     /// Gets a single property from a single menu item.
     ///
     /// Primarily useful for debugging. For production use, prefer getting
-    /// properties from the MenuItem structure.
+    /// properties from the `MenuItem` structure.
     ///
     /// # Arguments
     /// * `id` - Menu item ID

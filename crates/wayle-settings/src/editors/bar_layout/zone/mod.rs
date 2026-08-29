@@ -52,7 +52,7 @@ impl FromStr for ZoneId {
 }
 
 impl ZoneId {
-    pub(crate) fn i18n_key(&self) -> &'static str {
+    pub(crate) const fn i18n_key(self) -> &'static str {
         match self {
             Self::Left => "settings-layout-zone-left",
             Self::Center => "settings-layout-zone-center",

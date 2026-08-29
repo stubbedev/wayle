@@ -30,6 +30,6 @@ impl IconSource for Lucide {
     }
 
     fn cdn_url(&self, slug: &str) -> String {
-        format!("https://unpkg.com/lucide-static@latest/icons/{}.svg", slug)
+        format!("https://unpkg.com/lucide-static@latest/icons/{slug}.svg")
     }
 }

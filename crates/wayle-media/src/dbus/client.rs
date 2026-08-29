@@ -50,7 +50,7 @@ pub trait Media {
 
     /// Lists all available media players.
     ///
-    /// Returns a list of tuples: (player_id, identity, playback_state).
+    /// Returns a list of tuples: (`player_id`, identity, `playback_state`).
     async fn list_players(&self) -> Result<Vec<(String, String, String)>>;
 
     /// Gets the active player ID.

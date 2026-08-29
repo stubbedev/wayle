@@ -26,6 +26,7 @@ pub struct SysinfoServiceBuilder {
 
 impl SysinfoServiceBuilder {
     /// Creates a new builder with default intervals.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             cpu_interval: DEFAULT_CPU_INTERVAL,
@@ -37,25 +38,29 @@ impl SysinfoServiceBuilder {
     }
 
     /// Sets the CPU polling interval.
-    pub fn cpu_interval(mut self, interval: Duration) -> Self {
+    #[must_use]
+    pub const fn cpu_interval(mut self, interval: Duration) -> Self {
         self.cpu_interval = interval;
         self
     }
 
     /// Sets the memory polling interval.
-    pub fn memory_interval(mut self, interval: Duration) -> Self {
+    #[must_use]
+    pub const fn memory_interval(mut self, interval: Duration) -> Self {
         self.memory_interval = interval;
         self
     }
 
     /// Sets the disk polling interval.
-    pub fn disk_interval(mut self, interval: Duration) -> Self {
+    #[must_use]
+    pub const fn disk_interval(mut self, interval: Duration) -> Self {
         self.disk_interval = interval;
         self
     }
 
     /// Sets the network polling interval.
-    pub fn network_interval(mut self, interval: Duration) -> Self {
+    #[must_use]
+    pub const fn network_interval(mut self, interval: Duration) -> Self {
         self.network_interval = interval;
         self
     }
@@ -64,6 +69,7 @@ impl SysinfoServiceBuilder {
     ///
     /// Use `"auto"` for automatic detection, or specify a sensor label
     /// (e.g., `"Tctl"`, `"Package id 0"`, `"coretemp"`).
+    #[must_use]
     pub fn cpu_temp_sensor(mut self, sensor: impl Into<String>) -> Self {
         self.cpu_temp_sensor = sensor.into();
         self

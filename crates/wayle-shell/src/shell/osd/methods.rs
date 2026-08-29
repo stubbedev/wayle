@@ -73,7 +73,7 @@ impl Osd {
 
     /// Unmaps the window after the exit animation, unless a newer event has
     /// re-shown the OSD in the meantime.
-    pub(super) fn finish_hide(&mut self, dismiss_id: u32) {
+    pub(super) const fn finish_hide(&mut self, dismiss_id: u32) {
         if dismiss_id == self.dismiss_id {
             self.visible = false;
         }
@@ -377,12 +377,12 @@ impl Osd {
     }
 
     pub(super) fn schedule_dismiss(
-        sender: &ComponentSender<Osd>,
+        sender: &ComponentSender<Self>,
         duration_ms: u32,
         dismiss_id: u32,
     ) {
         sender.oneshot_command(async move {
-            tokio::time::sleep(Duration::from_millis(duration_ms as u64)).await;
+            tokio::time::sleep(Duration::from_millis(u64::from(duration_ms))).await;
             OsdCmd::Dismiss(dismiss_id)
         });
     }
@@ -490,7 +490,7 @@ pub(super) fn toast_align(model: &Osd) -> gtk::Align {
 
 pub(super) fn event_icon(event: &Option<OsdEvent>) -> Option<&str> {
     match event {
-        Some(OsdEvent::Slider { icon, .. }) | Some(OsdEvent::Toggle { icon, .. }) => {
+        Some(OsdEvent::Slider { icon, .. } | OsdEvent::Toggle { icon, .. }) => {
             Some(icon.as_str())
         }
         Some(OsdEvent::Custom { icon, .. }) => icon.as_deref(),
@@ -500,12 +500,8 @@ pub(super) fn event_icon(event: &Option<OsdEvent>) -> Option<&str> {
 
 pub(super) fn event_slider_label(event: &Option<OsdEvent>) -> String {
     match event {
-        Some(OsdEvent::Slider { label, .. })
-        | Some(OsdEvent::Custom {
-            label,
-            percentage: Some(_),
-            ..
-        }) => label.clone(),
+        Some(OsdEvent::Slider { label, .. } | OsdEvent::Custom {
+label, percentage: Some(_), .. }) => label.clone(),
         _ => String::new(),
     }
 }
@@ -538,22 +534,16 @@ pub(super) fn event_label(event: &Option<OsdEvent>) -> String {
 
 pub(super) fn event_value(event: &Option<OsdEvent>) -> String {
     match event {
-        Some(OsdEvent::Slider { percentage, .. })
-        | Some(OsdEvent::Custom {
-            percentage: Some(percentage),
-            ..
-        }) => format!("{}%", percentage.round() as u32),
+        Some(OsdEvent::Slider { percentage, .. } | OsdEvent::Custom {
+percentage: Some(percentage), .. }) => format!("{}%", percentage.round() as u32),
         _ => String::new(),
     }
 }
 
 pub(super) fn event_fraction(event: &Option<OsdEvent>) -> f64 {
     match event {
-        Some(OsdEvent::Slider { percentage, .. })
-        | Some(OsdEvent::Custom {
-            percentage: Some(percentage),
-            ..
-        }) => (*percentage / 100.0).clamp(0.0, 1.0),
+        Some(OsdEvent::Slider { percentage, .. } | OsdEvent::Custom {
+percentage: Some(percentage), .. }) => (*percentage / 100.0).clamp(0.0, 1.0),
         _ => 0.0,
     }
 }

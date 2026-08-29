@@ -184,7 +184,8 @@ pub enum MediaIconType {
 
 impl MediaIconType {
     /// Returns the kebab-case string representation.
-    pub fn as_str(self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Default => "default",
             Self::Application => "application",
@@ -199,7 +200,7 @@ impl ModuleInfoProvider for MediaConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("media"),
-            schema: || schema_for!(MediaConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("media")),
             array_entry: false,
         }

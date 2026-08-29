@@ -133,7 +133,7 @@ impl Component for NetworkDropdown {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let active_connections = ActiveConnections::builder()

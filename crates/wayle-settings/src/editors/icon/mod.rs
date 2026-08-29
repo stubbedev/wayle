@@ -231,7 +231,7 @@ pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPi
     // Search filters the grid; Enter commits the typed text verbatim so any
     // system-theme icon name can be entered, not just the bundled ones.
     {
-        let flow = flow.clone();
+        let flow = flow;
         search.connect_changed(move |entry| {
             let query = entry.text().to_lowercase();
             flow.set_filter_func(move |child| {
@@ -240,8 +240,7 @@ pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPi
                 }
                 child
                     .child()
-                    .map(|w| w.widget_name().to_lowercase().contains(&query))
-                    .unwrap_or(false)
+                    .is_some_and(|w| w.widget_name().to_lowercase().contains(&query))
             });
         });
     }
@@ -261,8 +260,8 @@ pub(crate) fn icon_picker_widget(initial: &str, set: Rc<dyn Fn(&str)>) -> IconPi
     }
 
     let set_display: Rc<dyn Fn(&str)> = {
-        let image = image.clone();
-        let label = label.clone();
+        let image = image;
+        let label = label;
         Rc::new(move |name: &str| update_display(&image, &label, name))
     };
 

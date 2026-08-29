@@ -11,7 +11,7 @@ pub async fn execute(id: u32) -> CliAction {
     proxy
         .dismiss(id)
         .await
-        .map_err(|e| format_error("dismiss notification", e))?;
+        .map_err(|e| format_error("dismiss notification", &e))?;
 
     println!("Dismissed notification {id}");
 

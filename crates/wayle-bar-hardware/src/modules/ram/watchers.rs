@@ -22,7 +22,7 @@ pub fn spawn_watchers(
     let sysinfo_thresholds = sysinfo.clone();
     watch!(sender, [thresholds_watch.watch()], |out| {
         let mem = sysinfo_thresholds.memory.get();
-        let colors = evaluate_thresholds(mem.usage_percent as f64, &thresholds_watch.get());
+        let colors = evaluate_thresholds(f64::from(mem.usage_percent), &thresholds_watch.get());
         let _ = out.send(RamCmd::UpdateThresholdColors(colors));
     });
 
@@ -31,7 +31,7 @@ pub fn spawn_watchers(
         let label = format_label(&format.get(), &mem);
         let _ = out.send(RamCmd::UpdateLabel(label));
 
-        let colors = evaluate_thresholds(mem.usage_percent as f64, &thresholds.get());
+        let colors = evaluate_thresholds(f64::from(mem.usage_percent), &thresholds.get());
         let _ = out.send(RamCmd::UpdateThresholdColors(colors));
     });
 
@@ -44,6 +44,6 @@ pub fn spawn_watchers(
 
     let icon_name = config.icon_name.clone();
     watch!(sender, [icon_name.watch()], |out| {
-        let _ = out.send(RamCmd::UpdateIcon(icon_name.get().clone()));
+        let _ = out.send(RamCmd::UpdateIcon(icon_name.get()));
     });
 }

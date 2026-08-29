@@ -25,9 +25,7 @@ pub(crate) fn spawn(
     let config = config_service.config().clone();
     let ipc = ipc_state.clone();
     let connector = monitor
-        .connector()
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "unknown".to_string());
+        .connector().map_or_else(|| "unknown".to_string(), |s| s.to_string());
 
     let mut layout_stream = config.bar.layout.watch();
     let mut hidden_stream = ipc.hidden_bars.watch();

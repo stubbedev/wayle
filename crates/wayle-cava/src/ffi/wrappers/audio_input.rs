@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{Error, Result};
 
-struct SendPtr(usize);
+struct SendPtr(*mut audio_data);
 
 unsafe impl Send for SendPtr {}
 
@@ -21,10 +21,15 @@ impl AudioInput {
     pub fn new(buffer_size: usize, channels: u32, samplerate: u32) -> Result<Self> {
         const PER_READ_CHUNK_SIZE: usize = 512;
 
+        let chunk_size =
+            PER_READ_CHUNK_SIZE.saturating_mul(usize::try_from(channels).unwrap_or(usize::MAX));
+        let input_buffer_size = i32::try_from(chunk_size).unwrap_or(i32::MAX);
+        let cava_buffer_size = i32::try_from(buffer_size).unwrap_or(i32::MAX);
+
         let mut audio = Box::new(audio_data {
             cava_in: ptr::null_mut(),
-            input_buffer_size: (PER_READ_CHUNK_SIZE * channels as usize) as i32,
-            cava_buffer_size: buffer_size as i32,
+            input_buffer_size,
+            cava_buffer_size,
             format: 16,
             rate: samplerate,
             channels,
@@ -48,7 +53,7 @@ impl AudioInput {
         // pthread_mutex_init returns 0 on success.
         let ret = unsafe {
             libc::pthread_mutex_init(
-                ptr::addr_of_mut!(audio.lock) as *mut libc::pthread_mutex_t,
+                ptr::addr_of_mut!(audio.lock).cast::<libc::pthread_mutex_t>(),
                 ptr::null(),
             )
         };
@@ -60,7 +65,7 @@ impl AudioInput {
         // pthread_cond_init returns 0 on success.
         let ret = unsafe {
             libc::pthread_cond_init(
-                ptr::addr_of_mut!(audio.resumeCond) as *mut libc::pthread_cond_t,
+                ptr::addr_of_mut!(audio.resumeCond).cast::<libc::pthread_cond_t>(),
                 ptr::null(),
             )
         };
@@ -68,7 +73,7 @@ impl AudioInput {
             // SAFETY: We successfully initialized the mutex above, so we must destroy it.
             unsafe {
                 libc::pthread_mutex_destroy(
-                    ptr::addr_of_mut!(audio.lock) as *mut libc::pthread_mutex_t
+                    ptr::addr_of_mut!(audio.lock).cast::<libc::pthread_mutex_t>()
                 );
             }
             return Err(Error::CondInit(ret));
@@ -100,27 +105,31 @@ impl AudioInput {
             return;
         }
 
-        let audio_ptr = SendPtr(self.as_ptr() as usize);
+        let audio_ptr = SendPtr(self.as_ptr());
 
         // SAFETY: The input function expects a void pointer to audio_data.
         // The pointer remains valid because:
         // 1. AudioInput owns the audio_data and is pinned
         // 2. The thread is joined in Drop before audio_data is deallocated
         let handle = thread::spawn(move || unsafe {
-            input_fn(audio_ptr.0 as *mut ffi::c_void);
+            input_fn(audio_ptr.0.cast::<ffi::c_void>());
         });
 
         self.input_thread = Some(handle);
     }
 
     pub(crate) fn as_ptr(&mut self) -> *mut audio_data {
-        &mut *self.inner as *mut _
+        &raw mut *self.inner
     }
 
     pub fn lock(&self) -> Result<()> {
         // SAFETY: The mutex was initialized in `new()` and remains valid.
         let ret = unsafe {
-            libc::pthread_mutex_lock(ptr::addr_of!(self.inner.lock) as *mut libc::pthread_mutex_t)
+            libc::pthread_mutex_lock(
+                ptr::addr_of!(self.inner.lock)
+                    .cast::<libc::pthread_mutex_t>()
+                    .cast_mut(),
+            )
         };
         if ret != 0 {
             return Err(Error::MutexLock(ret));
@@ -132,7 +141,11 @@ impl AudioInput {
     pub fn unlock(&self) -> Result<()> {
         // SAFETY: The mutex was initialized in `new()` and is currently locked.
         let ret = unsafe {
-            libc::pthread_mutex_unlock(ptr::addr_of!(self.inner.lock) as *mut libc::pthread_mutex_t)
+            libc::pthread_mutex_unlock(
+                ptr::addr_of!(self.inner.lock)
+                    .cast::<libc::pthread_mutex_t>()
+                    .cast_mut(),
+            )
         };
         if ret != 0 {
             return Err(Error::MutexUnlock(ret));
@@ -162,10 +175,10 @@ impl Drop for AudioInput {
         // We're destroying them after the input thread has terminated.
         unsafe {
             libc::pthread_cond_destroy(
-                ptr::addr_of_mut!(self.inner.resumeCond) as *mut libc::pthread_cond_t
+                ptr::addr_of_mut!(self.inner.resumeCond).cast::<libc::pthread_cond_t>()
             );
             libc::pthread_mutex_destroy(
-                ptr::addr_of_mut!(self.inner.lock) as *mut libc::pthread_mutex_t
+                ptr::addr_of_mut!(self.inner.lock).cast::<libc::pthread_mutex_t>()
             );
         }
 
@@ -173,12 +186,16 @@ impl Drop for AudioInput {
         // audio_raw_init) via malloc. free(NULL) is safe if setup_input was
         // never called.
         unsafe {
-            libc::free(self.inner.cava_in as *mut ffi::c_void);
-            libc::free(self.inner.source as *mut ffi::c_void);
+            libc::free(self.inner.cava_in.cast::<ffi::c_void>());
+            libc::free(self.inner.source.cast::<ffi::c_void>());
         }
     }
 }
 
+#[expect(
+    clippy::non_send_fields_in_send_ty,
+    reason = "raw pointers reference C-owned buffers kept alive by this struct"
+)]
 unsafe impl Send for AudioInput {}
 
 unsafe impl Sync for AudioInput {}

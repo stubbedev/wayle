@@ -7,7 +7,7 @@
 //! preserved) and the selection is cropped from the in-memory frame. Window
 //! capture prefers Hyprland's toplevel-export when a Hyprland handle is
 //! supplied, otherwise falls back to the generic `ext-image-copy-capture` path
-//! (`ExtToplevelManager`), matching the target window by app_id/title.
+//! (`ExtToplevelManager`), matching the target window by `app_id/title`.
 //!
 //! All functions here block (the underlying capture drives a Wayland event loop
 //! synchronously); callers run them on the GTK thread where a brief stall is
@@ -260,8 +260,8 @@ pub(super) fn crop_frozen(
     logical_height: i32,
     sel: &RegionSelection,
 ) -> RgbImage {
-    let scale_x = image.width() as f64 / f64::from(logical_width.max(1));
-    let scale_y = image.height() as f64 / f64::from(logical_height.max(1));
+    let scale_x = f64::from(image.width()) / f64::from(logical_width.max(1));
+    let scale_y = f64::from(image.height()) / f64::from(logical_height.max(1));
 
     let x = (f64::from(sel.x) * scale_x).round() as u32;
     let y = (f64::from(sel.y) * scale_y).round() as u32;
@@ -318,7 +318,7 @@ fn capture_window(connection: &Connection, target: &WindowTarget) -> Result<RgbI
     to_rgb(buffer, Transforms::Normal)
 }
 
-/// Matches an ext toplevel against the requested target by app_id then title.
+/// Matches an ext toplevel against the requested target by `app_id` then title.
 /// Requires at least one key to be present and to match.
 fn matches_target(app_id: Option<&str>, title: Option<&str>, target: &WindowTarget) -> bool {
     let app_id_ok = match (target.app_id.as_deref(), app_id) {

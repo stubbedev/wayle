@@ -20,12 +20,12 @@ async fn show_volume(proxy: &AudioProxy<'_>) -> CliAction {
     let volume = proxy
         .output_volume()
         .await
-        .map_err(|e| format_error("get volume", e))?;
+        .map_err(|e| format_error("get volume", &e))?;
 
     let muted = proxy
         .output_muted()
         .await
-        .map_err(|e| format_error("get mute state", e))?;
+        .map_err(|e| format_error("get mute state", &e))?;
 
     print_volume(volume, muted);
     Ok(())
@@ -43,7 +43,7 @@ async fn set_volume(proxy: &AudioProxy<'_>, value: &str) -> CliAction {
     let muted = proxy
         .output_muted()
         .await
-        .map_err(|e| format_error("get mute state", e))?;
+        .map_err(|e| format_error("get mute state", &e))?;
 
     let new_volume = if let Some(delta_str) = value.strip_prefix('+') {
         let delta: f64 = delta_str
@@ -52,7 +52,7 @@ async fn set_volume(proxy: &AudioProxy<'_>, value: &str) -> CliAction {
         proxy
             .adjust_output_volume(delta)
             .await
-            .map_err(|e| format_error("adjust volume", e))?
+            .map_err(|e| format_error("adjust volume", &e))?
     } else if let Some(delta_str) = value.strip_prefix('-') {
         let delta: f64 = delta_str
             .parse()
@@ -60,7 +60,7 @@ async fn set_volume(proxy: &AudioProxy<'_>, value: &str) -> CliAction {
         proxy
             .adjust_output_volume(-delta)
             .await
-            .map_err(|e| format_error("adjust volume", e))?
+            .map_err(|e| format_error("adjust volume", &e))?
     } else {
         let volume: f64 = value
             .parse()
@@ -68,7 +68,7 @@ async fn set_volume(proxy: &AudioProxy<'_>, value: &str) -> CliAction {
         proxy
             .set_output_volume(volume)
             .await
-            .map_err(|e| format_error("set volume", e))?
+            .map_err(|e| format_error("set volume", &e))?
     };
 
     print_volume(new_volume, muted);

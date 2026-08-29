@@ -201,8 +201,8 @@ pub(crate) fn optional_number_widget(
     });
     let spin_handler = Rc::new(spin_handler);
 
-    let refresh_inherit = inherit.clone();
-    let refresh_spin = spin.clone();
+    let refresh_inherit = inherit;
+    let refresh_spin = spin;
     let refresh_inherit_handler = Rc::clone(&inherit_handler);
     let refresh_spin_handler = Rc::clone(&spin_handler);
     let refresh: Rc<dyn Fn()> = Rc::new(move || {
@@ -375,8 +375,8 @@ pub(crate) fn optional_number_f64_widget(
     });
     let spin_handler = Rc::new(spin_handler);
 
-    let refresh_inherit = inherit.clone();
-    let refresh_spin = spin.clone();
+    let refresh_inherit = inherit;
+    let refresh_spin = spin;
     let refresh_inherit_handler = Rc::clone(&inherit_handler);
     let refresh_spin_handler = Rc::clone(&spin_handler);
     let refresh: Rc<dyn Fn()> = Rc::new(move || {
@@ -398,7 +398,7 @@ pub(crate) fn optional_number_f64_widget(
     }
 }
 
-/// Builds a bare ColorValue editor (no override switch) for an
+/// Builds a bare `ColorValue` editor (no override switch) for an
 /// `Option<ColorValue>` field where `Auto` already means "defer / no override".
 /// The field always carries a value: the picker writes `Some(_)`, and `Auto` is
 /// the calm default — so the switch the [`optional_color_widget`] gate provides
@@ -421,7 +421,7 @@ pub(crate) fn color_value_widget(
         true
     });
 
-    let refresh_scratch = scratch.clone();
+    let refresh_scratch = scratch;
     // Keep the component + scratch watcher alive for the widget's lifetime.
     let keep = (controller, scratch_watcher);
     let refresh: Rc<dyn Fn()> = Rc::new(move || {
@@ -438,8 +438,8 @@ pub(crate) fn color_value_widget(
     }
 }
 
-/// Builds an *Inherit* checkbox + the full ColorValue editor for an
-/// `Option<ColorValue>` field. The ColorValue editor is reused unchanged by
+/// Builds an *Inherit* checkbox + the full `ColorValue` editor for an
+/// `Option<ColorValue>` field. The `ColorValue` editor is reused unchanged by
 /// driving it through a scratch property mirrored back to the field.
 pub(crate) fn optional_color_widget(
     get: Rc<dyn Fn() -> Option<ColorValue>>,
@@ -492,9 +492,9 @@ pub(crate) fn optional_color_widget(
         true
     });
 
-    let refresh_inherit = inherit.clone();
-    let refresh_widget = color_widget.clone();
-    let refresh_scratch = scratch.clone();
+    let refresh_inherit = inherit;
+    let refresh_widget = color_widget;
+    let refresh_scratch = scratch;
     let refresh_inherit_handler = Rc::clone(&inherit_handler);
     // Keep the component + scratch watcher alive for the widget's lifetime.
     let keep = (controller, scratch_watcher);
@@ -502,18 +502,15 @@ pub(crate) fn optional_color_widget(
         let _ = &keep;
         let value = get();
         refresh_inherit.block_signal(&refresh_inherit_handler);
-        match value {
-            Some(color) => {
-                refresh_inherit.set_active(true);
-                refresh_widget.set_sensitive(true);
-                if refresh_scratch.get() != color {
-                    refresh_scratch.set(color);
-                }
+        if let Some(color) = value {
+            refresh_inherit.set_active(true);
+            refresh_widget.set_sensitive(true);
+            if refresh_scratch.get() != color {
+                refresh_scratch.set(color);
             }
-            None => {
-                refresh_inherit.set_active(false);
-                refresh_widget.set_sensitive(false);
-            }
+        } else {
+            refresh_inherit.set_active(false);
+            refresh_widget.set_sensitive(false);
         }
         refresh_inherit.unblock_signal(&refresh_inherit_handler);
     });

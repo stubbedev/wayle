@@ -36,7 +36,7 @@ impl ModuleInfoProvider for GeneralConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("general"),
-            schema: || schema_for!(GeneralConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

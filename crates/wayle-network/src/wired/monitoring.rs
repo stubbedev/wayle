@@ -55,7 +55,7 @@ async fn monitor_wired_connectivity(
         };
 
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("Wired monitoring cancelled for {}", wired.device.core.object_path);
                 return Ok(());
             }

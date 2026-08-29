@@ -99,6 +99,7 @@ pub fn wayle_enum(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// Lists all variants of a config enum for the settings GUI dropdown.
+///
 /// Reads `#[serde(rename_all)]` to produce correct TOML values, and
 /// generates fluent keys from the enum + variant name (e.g.
 /// `Location::TopLeft` becomes `"enum-location-top-left"`).

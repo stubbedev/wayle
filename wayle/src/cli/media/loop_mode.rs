@@ -23,7 +23,7 @@ pub async fn execute(mode: LoopModeArg, player: Option<String>) -> CliAction {
     proxy
         .set_loop_status(resolved, mode_str.to_string())
         .await
-        .map_err(|e| format_error("set loop mode", e))?;
+        .map_err(|e| format_error("set loop mode", &e))?;
 
     println!("Loop mode set to {mode_str}");
     Ok(())

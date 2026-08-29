@@ -26,7 +26,7 @@ impl MonitorWallpaperControl {
     pub(super) fn on_refresh(&mut self) {
         let incoming = self.property.get();
         let current: Vec<MonitorWallpaperConfig> =
-            self.cards.iter().map(|card| card.to_config()).collect();
+            self.cards.iter().map(super::card::MonitorCard::to_config).collect();
 
         if incoming == current {
             return;
@@ -42,7 +42,7 @@ impl MonitorWallpaperControl {
 
     pub(super) fn commit(&self) {
         let configs: Vec<MonitorWallpaperConfig> =
-            self.cards.iter().map(|card| card.to_config()).collect();
+            self.cards.iter().map(super::card::MonitorCard::to_config).collect();
 
         self.property.set(configs);
     }

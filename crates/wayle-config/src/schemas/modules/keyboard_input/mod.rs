@@ -122,7 +122,7 @@ impl ModuleInfoProvider for KeyboardInputConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("keyboard-input"),
-            schema: || schema_for!(KeyboardInputConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("keyboard-input")),
             array_entry: false,
         }

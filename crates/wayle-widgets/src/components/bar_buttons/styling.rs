@@ -83,14 +83,13 @@ impl InlineStyling for BarButton {
 
         format!(
             "* {{ \
-             --bar-btn-icon-color: {}; \
-             --bar-btn-label-color: {}; \
-             --bar-btn-icon-bg: {}; \
-             --bar-btn-bg: {}; \
-             --bar-btn-border-color: {}; \
-             --bar-btn-border-width: {}px; \
-             }}",
-            icon_color, label_color, icon_bg, button_bg, border_color, border_width
+             --bar-btn-icon-color: {icon_color}; \
+             --bar-btn-label-color: {label_color}; \
+             --bar-btn-icon-bg: {icon_bg}; \
+             --bar-btn-bg: {button_bg}; \
+             --bar-btn-border-color: {border_color}; \
+             --bar-btn-border-width: {border_width}px; \
+             }}"
         )
     }
 }

@@ -5,7 +5,7 @@ use crate::types::FitMode;
 /// Per-monitor wallpaper state.
 ///
 /// Tracks wallpaper path, scaling mode, and cycling position for one monitor.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MonitorState {
     /// Current wallpaper displayed on this monitor.
     pub wallpaper: Option<PathBuf>,
@@ -17,11 +17,13 @@ pub struct MonitorState {
 
 impl MonitorState {
     /// Creates a new monitor state with no wallpaper and default fit mode.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Creates a new monitor state with a specific cycle index.
+    #[must_use]
     pub fn with_cycle_index(cycle_index: usize) -> Self {
         Self {
             cycle_index,
@@ -30,19 +32,19 @@ impl MonitorState {
     }
 
     /// Advances the cycle index, wrapping around at the given count.
-    pub fn advance(&mut self, image_count: usize) {
-        if image_count > 0 {
-            self.cycle_index = (self.cycle_index + 1) % image_count;
+    pub const fn advance(&mut self, image_count: usize) {
+        if let Some(rem) = self.cycle_index.saturating_add(1).checked_rem(image_count) {
+            self.cycle_index = rem;
         }
     }
 
     /// Goes back in the cycle, wrapping around at the given count.
-    pub fn previous(&mut self, image_count: usize) {
+    pub const fn previous(&mut self, image_count: usize) {
         if image_count > 0 {
             self.cycle_index = if self.cycle_index == 0 {
-                image_count - 1
+                image_count.saturating_sub(1)
             } else {
-                self.cycle_index - 1
+                self.cycle_index.saturating_sub(1)
             };
         }
     }

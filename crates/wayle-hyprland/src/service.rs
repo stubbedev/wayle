@@ -114,7 +114,7 @@ impl HyprlandService {
     pub fn events(&self) -> impl Stream<Item = HyprlandEvent> {
         let hyprland_rx = self.hyprland_tx.subscribe();
 
-        BroadcastStream::new(hyprland_rx).filter_map(|result| result.ok())
+        BroadcastStream::new(hyprland_rx).filter_map(std::result::Result::ok)
     }
 
     /// Executes a Hyprland dispatcher command.

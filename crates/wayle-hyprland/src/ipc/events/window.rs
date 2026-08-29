@@ -5,7 +5,7 @@ use crate::{Address, Error, HyprlandEvent, Result};
 pub(crate) fn handle_active_window(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let Some((class, title)) = data.split_once(',') else {
         return Err(Error::EventParseError {
@@ -26,11 +26,11 @@ pub(crate) fn handle_active_window(
 
 pub(crate) fn handle_active_window_v2(
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
-    let address = Address::new(data.to_string());
+    let address = Address::new(data);
     hyprland_tx.send(HyprlandEvent::ActiveWindowV2 {
-        address: address.clone(),
+        address,
     })?;
 
     Ok(())
@@ -39,7 +39,7 @@ pub(crate) fn handle_active_window_v2(
 pub(crate) fn handle_open_window(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let event_data = format!("{event}>>{data}");
     let Some((address, rest)) = data.split_once(',') else {
@@ -67,10 +67,10 @@ pub(crate) fn handle_open_window(
         });
     };
 
-    let address = Address::new(address.to_string());
+    let address = Address::new(address);
 
     hyprland_tx.send(HyprlandEvent::OpenWindow {
-        address: address.clone(),
+        address,
         workspace: workspace.to_string(),
         class: class.to_string(),
         title: title.to_string(),
@@ -79,10 +79,10 @@ pub(crate) fn handle_open_window(
     Ok(())
 }
 
-pub(crate) fn handle_close_window(data: &str, hyprland_tx: Sender<HyprlandEvent>) -> Result<()> {
-    let address = Address::new(data.to_string());
+pub(crate) fn handle_close_window(data: &str, hyprland_tx: &Sender<HyprlandEvent>) -> Result<()> {
+    let address = Address::new(data);
     hyprland_tx.send(HyprlandEvent::CloseWindow {
-        address: address.clone(),
+        address,
     })?;
 
     Ok(())
@@ -91,7 +91,7 @@ pub(crate) fn handle_close_window(data: &str, hyprland_tx: Sender<HyprlandEvent>
 pub(crate) fn handle_move_window(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let Some((address, workspace)) = data.split_once(',') else {
         return Err(Error::EventParseError {
@@ -103,7 +103,7 @@ pub(crate) fn handle_move_window(
     };
 
     hyprland_tx.send(HyprlandEvent::MoveWindow {
-        address: Address::new(address.to_string()),
+        address: Address::new(address),
         workspace: workspace.to_string(),
     })?;
 
@@ -113,7 +113,7 @@ pub(crate) fn handle_move_window(
 pub(crate) fn handle_move_window_v2(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let event_data = format!("{event}>>{data}");
     let parts: Vec<&str> = data.split(',').collect();
@@ -132,9 +132,9 @@ pub(crate) fn handle_move_window_v2(
         value: (*workspace_id).to_string(),
     })?;
 
-    let address = Address::new((*address).to_string());
+    let address = Address::new(address);
     hyprland_tx.send(HyprlandEvent::MoveWindowV2 {
-        address: address.clone(),
+        address,
         workspace_id,
         workspace: (*workspace).to_string(),
     })?;
@@ -142,17 +142,17 @@ pub(crate) fn handle_move_window_v2(
     Ok(())
 }
 
-pub(crate) fn handle_urgent(data: &str, hyprland_tx: Sender<HyprlandEvent>) -> Result<()> {
-    let address = Address::new(data.to_string());
+pub(crate) fn handle_urgent(data: &str, hyprland_tx: &Sender<HyprlandEvent>) -> Result<()> {
+    let address = Address::new(data);
     hyprland_tx.send(HyprlandEvent::Urgent { address })?;
 
     Ok(())
 }
 
-pub(crate) fn handle_window_title(data: &str, hyprland_tx: Sender<HyprlandEvent>) -> Result<()> {
-    let address = Address::new(data.to_string());
+pub(crate) fn handle_window_title(data: &str, hyprland_tx: &Sender<HyprlandEvent>) -> Result<()> {
+    let address = Address::new(data);
     hyprland_tx.send(HyprlandEvent::WindowTitle {
-        address: address.clone(),
+        address,
     })?;
 
     Ok(())
@@ -161,7 +161,7 @@ pub(crate) fn handle_window_title(data: &str, hyprland_tx: Sender<HyprlandEvent>
 pub(crate) fn handle_window_title_v2(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let Some((address, title)) = data.split_once(',') else {
         return Err(Error::EventParseError {
@@ -172,19 +172,22 @@ pub(crate) fn handle_window_title_v2(
         });
     };
 
-    let address = Address::new(address.to_string());
+    let address = Address::new(address);
     hyprland_tx.send(HyprlandEvent::WindowTitleV2 {
-        address: address.clone(),
+        address,
         title: title.to_string(),
     })?;
 
     Ok(())
 }
 
-pub(crate) fn handle_move_into_group(data: &str, hyprland_tx: Sender<HyprlandEvent>) -> Result<()> {
-    let address = Address::new(data.to_string());
+pub(crate) fn handle_move_into_group(
+    data: &str,
+    hyprland_tx: &Sender<HyprlandEvent>,
+) -> Result<()> {
+    let address = Address::new(data);
     hyprland_tx.send(HyprlandEvent::MoveIntoGroup {
-        address: address.clone(),
+        address,
     })?;
 
     Ok(())
@@ -192,11 +195,11 @@ pub(crate) fn handle_move_into_group(data: &str, hyprland_tx: Sender<HyprlandEve
 
 pub(crate) fn handle_move_out_of_group(
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
-    let address = Address::new(data.to_string());
+    let address = Address::new(data);
     hyprland_tx.send(HyprlandEvent::MoveOutOfGroup {
-        address: address.clone(),
+        address,
     })?;
 
     Ok(())
@@ -205,7 +208,7 @@ pub(crate) fn handle_move_out_of_group(
 pub(crate) fn handle_pin(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let event_data = format!("{event}>>{data}");
     let Some((address, pinned)) = data.split_once(',') else {
@@ -229,9 +232,9 @@ pub(crate) fn handle_pin(
         }
     };
 
-    let address = Address::new(address.to_string());
+    let address = Address::new(address);
     hyprland_tx.send(HyprlandEvent::Pin {
-        address: address.clone(),
+        address,
         pinned,
     })?;
 
@@ -241,7 +244,7 @@ pub(crate) fn handle_pin(
 pub(crate) fn handle_minimized(
     event: &str,
     data: &str,
-    hyprland_tx: Sender<HyprlandEvent>,
+    hyprland_tx: &Sender<HyprlandEvent>,
 ) -> Result<()> {
     let event_data = format!("{event}>>{data}");
     let Some((address, minimized)) = data.split_once(',') else {
@@ -266,7 +269,7 @@ pub(crate) fn handle_minimized(
     };
 
     hyprland_tx.send(HyprlandEvent::Minimized {
-        address: Address::new(address.to_string()),
+        address: Address::new(address),
         minimized,
     })?;
 

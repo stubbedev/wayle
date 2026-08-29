@@ -109,6 +109,7 @@ impl<T: Clone + Send + Sync + 'static> Property<T> {
     /// let name = Property::new(String::from("default"));
     /// assert_eq!(name.get(), "default");
     /// ```
+    #[must_use]
     pub fn get(&self) -> T {
         self.rx.borrow().clone()
     }
@@ -140,6 +141,7 @@ impl<T: Clone + Send + Sync + 'static> Property<T> {
     }
 
     /// Whether any [`.watch()`](Self::watch) streams are alive.
+    #[must_use]
     pub fn has_subscribers(&self) -> bool {
         self.subscriber_count.load(Ordering::Acquire) > 0
     }

@@ -239,7 +239,7 @@ impl ModuleInfoProvider for NotificationConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("notifications"),
-            schema: || schema_for!(NotificationConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("notifications")),
             array_entry: false,
         }

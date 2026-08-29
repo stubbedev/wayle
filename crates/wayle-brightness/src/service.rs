@@ -42,6 +42,7 @@ impl BrightnessService {
     }
 
     /// Custom service configuration.
+    #[must_use]
     pub fn builder() -> BrightnessServiceBuilder {
         BrightnessServiceBuilder::new()
     }

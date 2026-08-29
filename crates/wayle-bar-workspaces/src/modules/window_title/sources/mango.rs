@@ -1,4 +1,4 @@
-//! MangoWM implementation of [`FocusedWindowSource`].
+//! `MangoWM` implementation of [`FocusedWindowSource`].
 //!
 //! Mango exposes the focused client as a single reactive property, so the
 //! source watches it directly.
@@ -15,7 +15,7 @@ pub struct MangoFocusedWindowSource {
 }
 
 impl MangoFocusedWindowSource {
-    pub fn new(service: Arc<MangoService>) -> Self {
+    pub const fn new(service: Arc<MangoService>) -> Self {
         Self { service }
     }
 }

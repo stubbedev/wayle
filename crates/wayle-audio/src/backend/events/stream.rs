@@ -6,7 +6,7 @@ use crate::{
     types::stream::{StreamKey, StreamType},
 };
 
-pub(crate) async fn handle_change(
+pub(crate) fn handle_change(
     facility: Facility,
     operation: Operation,
     stream_index: u32,
@@ -27,11 +27,9 @@ pub(crate) async fn handle_change(
 
     match operation {
         Operation::Removed => {
-            let removed_stream = if let Ok(mut streams_guard) = streams.write() {
-                streams_guard.remove(&stream_key)
-            } else {
-                None
-            };
+            let removed_stream = streams
+                .write()
+                .map_or(None, |mut streams_guard| streams_guard.remove(&stream_key));
 
             if removed_stream.is_some() {
                 let _ = events_tx.send(AudioEvent::StreamRemoved(stream_key));

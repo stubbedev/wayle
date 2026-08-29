@@ -47,7 +47,7 @@ pub fn execute() -> CliAction {
                 "Installed: {}",
                 filename.to_string_lossy().trim_end_matches(".svg")
             );
-            count += 1;
+            count = count.saturating_add(1_u32);
         }
     }
 

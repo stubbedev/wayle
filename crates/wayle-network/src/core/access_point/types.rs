@@ -35,7 +35,7 @@ impl NetworkIdentifier {
     ///
     /// SSIDs are typically UTF-8 strings but 802.11 allows
     /// arbitrary byte sequences up to 32 octets.
-    pub fn new(bytes: Vec<u8>) -> Self {
+    pub const fn new(bytes: Vec<u8>) -> Self {
         Self(bytes)
     }
 
@@ -53,7 +53,7 @@ impl NetworkIdentifier {
     }
 
     /// Checks if this is empty (hidden network for SSIDs).
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 }
@@ -89,11 +89,11 @@ pub enum SecurityType {
     None,
     /// WEP (Wired Equivalent Privacy) - deprecated and insecure.
     Wep,
-    /// WPA (WiFi Protected Access) version 1.
+    /// WPA (`WiFi` Protected Access) version 1.
     Wpa,
-    /// WPA2 (WiFi Protected Access) version 2 - most common.
+    /// WPA2 (`WiFi` Protected Access) version 2 - most common.
     Wpa2,
-    /// WPA3 (WiFi Protected Access) version 3 - latest standard.
+    /// WPA3 (`WiFi` Protected Access) version 3 - latest standard.
     Wpa3,
     /// Enterprise security (802.1X) - requires authentication server.
     Enterprise,
@@ -101,7 +101,8 @@ pub enum SecurityType {
 
 impl SecurityType {
     /// Returns a human-readable string representation of the security type.
-    pub fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::None => "Open",
             Self::Wep => "WEP",
@@ -116,7 +117,8 @@ impl SecurityType {
     ///
     /// Analyzes WPA and RSN flags to determine the highest
     /// level of security supported by the access point.
-    pub fn from_flags(
+    #[must_use]
+    pub const fn from_flags(
         flags: NM80211ApFlags,
         wpa_flags: NM80211ApSecurityFlags,
         rsn_flags: NM80211ApSecurityFlags,

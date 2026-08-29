@@ -1,4 +1,4 @@
-//! NetworkManager Settings Connection interface.
+//! `NetworkManager` Settings Connection interface.
 
 use std::collections::HashMap;
 
@@ -55,7 +55,7 @@ pub(crate) trait SettingsConnection {
     ///
     /// # Arguments
     /// * `settings` - Optional settings to update
-    /// * `flags` - NMSettingsUpdate2Flags
+    /// * `flags` - `NMSettingsUpdate2Flags`
     /// * `args` - Optional arguments
     ///
     /// # Returns

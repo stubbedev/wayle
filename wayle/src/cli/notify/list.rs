@@ -11,7 +11,7 @@ pub async fn execute() -> CliAction {
     let notifications = proxy
         .list()
         .await
-        .map_err(|e| format_error("list notifications", e))?;
+        .map_err(|e| format_error("list notifications", &e))?;
 
     if notifications.is_empty() {
         println!("No notifications");

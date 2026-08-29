@@ -26,11 +26,11 @@ pub fn build_label(format: &str, ctx: &LabelContext) -> String {
     } else {
         t!("bar-idle-inhibit-off")
     };
-    let remaining = if !ctx.active {
-        String::from("-")
-    } else {
+    let remaining = if ctx.active {
         ctx.remaining_secs
             .map_or_else(|| String::from("∞"), format_duration)
+    } else {
+        String::from("-")
     };
     let duration = if ctx.duration_mins == 0 {
         String::from("∞")

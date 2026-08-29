@@ -11,7 +11,7 @@ pub async fn execute() -> CliAction {
     let muted = proxy
         .toggle_input_mute()
         .await
-        .map_err(|e| format_error("toggle input mute", e))?;
+        .map_err(|e| format_error("toggle input mute", &e))?;
 
     if muted {
         println!("Input muted");

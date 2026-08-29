@@ -1,6 +1,6 @@
 //! NetworkManager state types.
 
-/// NMState values indicate the current overall networking state.
+/// `NMState` values indicate the current overall networking state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NMState {
     /// Networking state is unknown. Indicates a daemon error that makes it unable to
@@ -36,9 +36,9 @@ pub enum NMState {
 
 impl NMState {
     /// Convert from D-Bus u32 representation
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
-            0 => Self::Unknown,
             10 => Self::Asleep,
             20 => Self::Disconnected,
             30 => Self::Disconnecting,
@@ -56,9 +56,9 @@ impl NMState {
 pub enum NMDeviceState {
     /// the device's state is unknown
     Unknown = 0,
-    /// the device is recognized, but not managed by NetworkManager
+    /// the device is recognized, but not managed by `NetworkManager`
     Unmanaged = 10,
-    /// the device is managed by NetworkManager, but is not available for use. Reasons may
+    /// the device is managed by `NetworkManager`, but is not available for use. Reasons may
     /// include the wireless switched off, missing firmware, no ethernet carrier, missing
     /// supplicant or modem manager, etc.
     Unavailable = 20,
@@ -73,7 +73,7 @@ pub enum NMDeviceState {
     /// Bluetooth device, etc.
     Config = 50,
     /// Device requires more information to continue connecting to the requested
-    /// network. Includes secrets like WiFi passphrases, login passwords, PIN codes,
+    /// network. Includes secrets like `WiFi` passphrases, login passwords, PIN codes,
     /// etc.
     NeedAuth = 60,
     /// the device is requesting IPv4 and/or IPv6 addresses and routing information from
@@ -99,9 +99,9 @@ pub enum NMDeviceState {
 
 impl NMDeviceState {
     /// Convert from D-Bus u32 representation
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
-            0 => Self::Unknown,
             10 => Self::Unmanaged,
             20 => Self::Unavailable,
             30 => Self::Disconnected,
@@ -119,7 +119,7 @@ impl NMDeviceState {
     }
 }
 
-/// NMActiveConnectionState values indicate the state of a connection to a specific
+/// `NMActiveConnectionState` values indicate the state of a connection to a specific
 /// network while it is starting, connected, or disconnecting from that network.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NMActiveConnectionState {
@@ -137,9 +137,9 @@ pub enum NMActiveConnectionState {
 
 impl NMActiveConnectionState {
     /// Convert from D-Bus u32 representation
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
-            0 => Self::Unknown,
             1 => Self::Activating,
             2 => Self::Activated,
             3 => Self::Deactivating,
@@ -172,9 +172,9 @@ pub enum NMVpnConnectionState {
 
 impl NMVpnConnectionState {
     /// Convert from D-Bus u32 representation
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
-            0 => Self::Unknown,
             1 => Self::Prepare,
             2 => Self::NeedAuth,
             3 => Self::Connect,
@@ -230,11 +230,11 @@ pub enum NMDeviceStateReason {
     SharedStartFailed = 18,
     /// Shared connection service failed
     SharedFailed = 19,
-    /// AutoIP service failed to start
+    /// `AutoIP` service failed to start
     AutoIpStartFailed = 20,
-    /// AutoIP service error
+    /// `AutoIP` service error
     AutoIpError = 21,
-    /// AutoIP service failed
+    /// `AutoIP` service failed
     AutoIpFailed = 22,
     /// The line is busy
     ModemBusy = 23,
@@ -264,7 +264,7 @@ pub enum NMDeviceStateReason {
     FirmwareMissing = 35,
     /// The device was removed
     Removed = 36,
-    /// NetworkManager went to sleep
+    /// `NetworkManager` went to sleep
     Sleeping = 37,
     /// The device's active connection disappeared
     ConnectionRemoved = 38,
@@ -294,13 +294,13 @@ pub enum NMDeviceStateReason {
     DependencyFailed = 50,
     /// Problem with the RFC 2684 Ethernet over ADSL bridge
     Br2684Failed = 51,
-    /// ModemManager not running
+    /// `ModemManager` not running
     ModemManagerUnavailable = 52,
     /// The Wi-Fi network could not be found
     SsidNotFound = 53,
     /// A secondary connection of the base connection failed
     SecondaryConnectionFailed = 54,
-    /// DCB or FCoE setup failed
+    /// DCB or `FCoE` setup failed
     DcbFcoeFailed = 55,
     /// teamd control failed
     TeamdControlFailed = 56,
@@ -334,7 +334,7 @@ pub enum NMDeviceStateReason {
     UnmanagedExternalDown = 70,
     /// The link is not initialized by udev. Since: 1.48
     UnmanagedLinkNotInit = 71,
-    /// NetworkManager is quitting. Since: 1.48
+    /// `NetworkManager` is quitting. Since: 1.48
     UnmanagedQuitting = 72,
     /// Networking is disabled or the system is suspended. Since: 1.56
     UnmanagedManagerDisabled = 73,
@@ -346,7 +346,7 @@ pub enum NMDeviceStateReason {
     UnmanagedUserSettings = 76,
     /// Unmanaged via udev rule. Since: 1.48
     UnmanagedUserUdev = 77,
-    /// NetworkManager was disabled (networking off). Since: 1.56
+    /// `NetworkManager` was disabled (networking off). Since: 1.56
     NetworkingOff = 78,
     /// The modem's operator code wasn't available, and auto-configuration was requested. Since: 1.56
     ModemNoOperatorCode = 79,
@@ -354,10 +354,10 @@ pub enum NMDeviceStateReason {
 
 impl NMDeviceStateReason {
     /// Converts from the D-Bus u32 representation.
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
             0 => Self::None,
-            1 => Self::Unknown,
             2 => Self::NowManaged,
             3 => Self::NowUnmanaged,
             4 => Self::ConfigFailed,
@@ -481,9 +481,9 @@ pub enum NMActiveConnectionStateReason {
 
 impl NMActiveConnectionStateReason {
     /// Convert from D-Bus u32 representation
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
-            0 => Self::Unknown,
             1 => Self::None,
             2 => Self::UserDisconnected,
             3 => Self::DeviceDisconnected,
@@ -534,9 +534,9 @@ pub enum NMVpnConnectionStateReason {
 
 impl NMVpnConnectionStateReason {
     /// Convert from D-Bus u32 representation
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
-            0 => Self::Unknown,
             1 => Self::None,
             2 => Self::UserDisconnected,
             3 => Self::DeviceDisconnected,
@@ -553,7 +553,7 @@ impl NMVpnConnectionStateReason {
     }
 }
 
-/// The result of a checkpoint Rollback() operation for a specific device.
+/// The result of a checkpoint `Rollback()` operation for a specific device.
 ///
 /// Since: 1.4
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -570,12 +570,12 @@ pub enum NMRollbackResult {
 
 impl NMRollbackResult {
     /// Convert from D-Bus u32 representation
-    pub fn from_u32(value: u32) -> Self {
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
         match value {
             0 => Self::Ok,
             1 => Self::ErrNoDevice,
             2 => Self::ErrDeviceUnmanaged,
-            3 => Self::ErrFailed,
             _ => Self::ErrFailed,
         }
     }
@@ -583,9 +583,9 @@ impl NMRollbackResult {
 
 /// Current network connectivity status.
 ///
-/// Simplified view of network state that combines multiple NetworkManager
+/// Simplified view of network state that combines multiple `NetworkManager`
 /// states into broader categories.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NetworkStatus {
     /// Full network connectivity with internet access
     Connected,
@@ -601,9 +601,10 @@ pub enum NetworkStatus {
 impl NetworkStatus {
     /// Derive network status from device state.
     ///
-    /// Maps the detailed NetworkManager device states to simplified
+    /// Maps the detailed `NetworkManager` device states to simplified
     /// connectivity status for UI display.
-    pub fn from_device_state(state: NMDeviceState) -> Self {
+    #[must_use]
+    pub const fn from_device_state(state: NMDeviceState) -> Self {
         match state {
             NMDeviceState::Activated => Self::Connected,
             NMDeviceState::Prepare

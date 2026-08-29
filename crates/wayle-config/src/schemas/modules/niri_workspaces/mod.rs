@@ -133,7 +133,7 @@ impl schemars::JsonSchema for WorkspaceClickAction {
 /// color = "accent"
 /// ```
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", schemars(transparent))]
 pub struct WorkspaceMap(BTreeMap<String, WorkspaceStyle>);
@@ -372,7 +372,7 @@ impl ModuleInfoProvider for NiriWorkspacesConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("niri-workspaces"),
-            schema: || schema_for!(NiriWorkspacesConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("niri-workspaces")),
             array_entry: false,
         }

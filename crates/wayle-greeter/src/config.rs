@@ -176,7 +176,7 @@ pub fn load(path: &Path) -> Config {
     match Config::load_toml_with_imports(path) {
         Ok(toml) => config.apply_config_layer(&toml, ""),
         Err(err) => {
-            warn!(path = %path.display(), error = %err, "greeter: config load failed; using defaults")
+            warn!(path = %path.display(), error = %err, "greeter: config load failed; using defaults");
         }
     }
     let runtime_path = path.with_file_name("runtime.toml");
@@ -188,7 +188,7 @@ pub fn load(path: &Path) -> Config {
                 let _ = config.apply_runtime_layer(&toml, "");
             }
             Err(err) => {
-                warn!(path = %runtime_path.display(), error = %err, "greeter: runtime.toml ignored")
+                warn!(path = %runtime_path.display(), error = %err, "greeter: runtime.toml ignored");
             }
         }
     }

@@ -37,11 +37,11 @@ pub(crate) fn from_sink_input(input: &SinkInputInfo) -> StreamInfo {
         media: extract_media_info(&input.proplist),
         buffer_latency: input.buffer_usec.0,
         device_latency: input.sink_usec.0,
-        resample_method: input.resample_method.as_ref().map(|s| s.to_string()),
+        resample_method: input.resample_method.as_ref().map(std::string::ToString::to_string),
         driver: input
             .driver
             .as_ref()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .unwrap_or_default(),
         format: Some(format!("{:?}", input.format.get_encoding())),
     }
@@ -77,11 +77,11 @@ pub(crate) fn from_source_output(output: &SourceOutputInfo) -> StreamInfo {
         media: extract_media_info(&output.proplist),
         buffer_latency: output.buffer_usec.0,
         device_latency: output.source_usec.0,
-        resample_method: output.resample_method.as_ref().map(|s| s.to_string()),
+        resample_method: output.resample_method.as_ref().map(std::string::ToString::to_string),
         driver: output
             .driver
             .as_ref()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .unwrap_or_default(),
         format: Some(format!("{:?}", output.format.get_encoding())),
     }

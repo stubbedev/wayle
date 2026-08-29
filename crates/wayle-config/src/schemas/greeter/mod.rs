@@ -67,7 +67,7 @@ pub struct GreeterConfig {
     pub cursor_theme: ConfigProperty<String>,
 
     /// Logical cursor size on the login screen. Scaled automatically per
-    /// display, so HiDPI outputs get a matching high-resolution cursor.
+    /// display, so `HiDPI` outputs get a matching high-resolution cursor.
     #[serde(rename = "cursor-size")]
     #[default(24u32)]
     pub cursor_size: ConfigProperty<u32>,
@@ -78,7 +78,7 @@ impl ModuleInfoProvider for GreeterConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("greeter"),
-            schema: || schema_for!(GreeterConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

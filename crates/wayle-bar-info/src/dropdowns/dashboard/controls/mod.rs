@@ -102,7 +102,7 @@ impl Component for ControlsSection {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let slider = DebouncedSlider::with_label(0.0);
@@ -123,14 +123,14 @@ impl Component for ControlsSection {
             }),
         );
 
-        watchers::spawn(&sender, &init.audio);
+        watchers::spawn(&sender, init.audio.as_ref());
 
         let model = Self {
             audio: init.audio,
             has_device: false,
             muted: false,
             device_name: t!("dropdown-dashboard-no-device"),
-            slider: slider.clone(),
+            slider,
             device_watcher: WatcherToken::new(),
         };
 

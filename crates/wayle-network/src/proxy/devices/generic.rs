@@ -1,4 +1,4 @@
-//! NetworkManager Generic Device interface.
+//! `NetworkManager` Generic Device interface.
 
 use zbus::proxy;
 

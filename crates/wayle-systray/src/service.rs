@@ -41,7 +41,7 @@ pub struct SystemTrayService {
 impl SystemTrayService {
     /// Creates a new system tray service with default configuration.
     ///
-    /// Automatically detects whether to act as StatusNotifierWatcher
+    /// Automatically detects whether to act as `StatusNotifierWatcher`
     /// or connect to an existing one.
     ///
     /// For more control over initialization, see [`Self::builder()`].
@@ -57,7 +57,8 @@ impl SystemTrayService {
     ///
     /// The builder provides advanced configuration options such as enabling D-Bus
     /// daemon registration for CLI control.
-    pub fn builder() -> SystemTrayServiceBuilder {
+    #[must_use]
+    pub const fn builder() -> SystemTrayServiceBuilder {
         SystemTrayServiceBuilder::new()
     }
 
@@ -131,8 +132,8 @@ impl SystemTrayService {
         Ok(())
     }
 
-    /// Returns whether this service is acting as the StatusNotifierWatcher.
-    pub fn is_watcher(&self) -> bool {
+    /// Returns whether this service is acting as the `StatusNotifierWatcher`.
+    pub const fn is_watcher(&self) -> bool {
         self.is_watcher
     }
 
@@ -141,10 +142,10 @@ impl SystemTrayService {
         self.cancellation_token.cancel();
     }
 
-    /// A new StatusNotifierItem has been registered, the argument of the signal is the session
+    /// A new `StatusNotifierItem` has been registered, the argument of the signal is the session
     /// bus name of the instance.
     ///
-    /// StatusNotifierHost instances typically refresh their item list representation in response
+    /// `StatusNotifierHost` instances typically refresh their item list representation in response
     /// to this signal.
     ///
     /// # Errors
@@ -158,10 +159,10 @@ impl SystemTrayService {
         Ok(stream.filter_map(|signal| async move { signal.args().ok().map(|args| args.service) }))
     }
 
-    /// A StatusNotifierItem instance has disappeared from the bus, the argument of the signal is
+    /// A `StatusNotifierItem` instance has disappeared from the bus, the argument of the signal is
     /// the session bus name of the instance.
     ///
-    /// StatusNotifierHost instances typically refresh their item list representation in response
+    /// `StatusNotifierHost` instances typically refresh their item list representation in response
     /// to this signal.
     ///
     /// # Errors
@@ -175,9 +176,9 @@ impl SystemTrayService {
         Ok(stream.filter_map(|signal| async move { signal.args().ok().map(|args| args.service) }))
     }
 
-    /// A new StatusNotifierHost has been registered.
+    /// A new `StatusNotifierHost` has been registered.
     ///
-    /// StatusNotifierItem instances that previously skipped registration due to no available hosts
+    /// `StatusNotifierItem` instances that previously skipped registration due to no available hosts
     /// may now proceed with registration.
     ///
     /// # Errors
@@ -191,9 +192,9 @@ impl SystemTrayService {
         Ok(stream.filter_map(|_signal| async move { Some(()) }))
     }
 
-    /// There are no more StatusNotifierHost instances running.
+    /// There are no more `StatusNotifierHost` instances running.
     ///
-    /// StatusNotifierItem instances can skip registration when no hosts are available.
+    /// `StatusNotifierItem` instances can skip registration when no hosts are available.
     ///
     /// # Errors
     /// Returns error if D-Bus proxy creation fails.

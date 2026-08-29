@@ -96,7 +96,7 @@ impl ModuleInfoProvider for SharePickerConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("share-picker"),
-            schema: || schema_for!(SharePickerConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

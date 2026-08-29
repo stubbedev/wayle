@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::Path};
 
 use wayle_icons::IconManager;
 
@@ -9,7 +9,7 @@ use crate::cli::CliAction;
 /// # Errors
 ///
 /// Returns error if icon manager fails or file operations fail.
-pub fn execute(destination: PathBuf) -> CliAction {
+pub fn execute(destination: &Path) -> CliAction {
     let manager = IconManager::new().map_err(|err| err.to_string())?;
     let icons = manager.list();
 
@@ -18,7 +18,7 @@ pub fn execute(destination: PathBuf) -> CliAction {
         return Ok(());
     }
 
-    fs::create_dir_all(&destination)
+    fs::create_dir_all(destination)
         .map_err(|err| format!("cannot create {}: {err}", destination.display()))?;
 
     let source_dir = manager.registry().icons_dir();
@@ -32,7 +32,7 @@ pub fn execute(destination: PathBuf) -> CliAction {
             eprintln!("Failed to copy {icon}: {err}");
             continue;
         }
-        copied += 1;
+        copied = copied.saturating_add(1_u32);
     }
 
     println!("Exported {copied} icons to {}", destination.display());

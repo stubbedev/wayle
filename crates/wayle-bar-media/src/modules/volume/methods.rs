@@ -29,7 +29,7 @@ impl VolumeModule {
 
     pub fn apply_thresholds(&self, config: &VolumeConfig, device: &OutputDevice) {
         let percentage = device.volume.get().average_percentage().round() as u16;
-        let colors = evaluate_thresholds(percentage as f64, &config.thresholds.get());
+        let colors = evaluate_thresholds(f64::from(percentage), &config.thresholds.get());
         self.bar_button
             .emit(BarButtonInput::SetThresholdColors(colors));
     }

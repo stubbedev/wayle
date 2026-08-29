@@ -93,7 +93,8 @@ pub enum CssToken {
 
 impl CssToken {
     /// CSS variable reference (e.g., `var(--accent)`).
-    pub fn css_var(self) -> &'static str {
+    #[must_use]
+    pub const fn css_var(self) -> &'static str {
         match self {
             Self::BgBase => "var(--bg-base)",
             Self::BgSurface => "var(--bg-surface)",
@@ -137,7 +138,8 @@ impl CssToken {
     }
 
     /// Token name without `var()` wrapper (e.g., `--accent`).
-    pub fn as_str(self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::BgBase => "--bg-base",
             Self::BgSurface => "--bg-surface",
@@ -245,7 +247,7 @@ impl FromStr for CssToken {
 ///
 /// Token references (e.g., `"accent"`) use CSS variables that update with themes.
 /// Custom hex values (e.g., `"#414868"`) remain fixed.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ColorValue {
     /// CSS token reference. Uses CSS variables that respond to theme changes.
     Token(CssToken),
@@ -272,6 +274,7 @@ impl ColorValue {
     ///
     /// Token returns `var(--*)`, custom returns hex string.
     /// Auto falls back to accent - components should resolve Auto before calling this.
+    #[must_use]
     pub fn to_css(&self) -> Cow<'static, str> {
         match self {
             Self::Token(token) => Cow::Borrowed(token.css_var()),
@@ -282,7 +285,8 @@ impl ColorValue {
     }
 
     /// Returns true if this is the Auto variant.
-    pub fn is_auto(&self) -> bool {
+    #[must_use]
+    pub const fn is_auto(&self) -> bool {
         matches!(self, Self::Auto)
     }
 }
@@ -376,7 +380,7 @@ impl Appearance {
     /// Forced light state: `Some(true)` for light, `Some(false)` for dark,
     /// `None` for auto.
     #[must_use]
-    pub fn forced_light(self) -> Option<bool> {
+    pub const fn forced_light(self) -> Option<bool> {
         match self {
             Self::Auto => None,
             Self::Light => Some(true),

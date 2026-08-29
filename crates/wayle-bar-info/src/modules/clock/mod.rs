@@ -46,7 +46,7 @@ impl Component for ClockModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();
@@ -56,7 +56,7 @@ impl Component for ClockModule {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: clock.icon_name.get().clone(),
+                icon: clock.icon_name.get(),
                 label: formatted_time,
                 tooltip: None,
                 colors: BarButtonColors {

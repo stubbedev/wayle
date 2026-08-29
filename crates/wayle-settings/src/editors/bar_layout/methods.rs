@@ -15,12 +15,12 @@ impl BarLayoutControl {
         self.commit();
     }
 
-    pub(super) fn on_remove(&mut self, index: DynamicIndex) {
+    pub(super) fn on_remove(&mut self, index: &DynamicIndex) {
         self.cards.guard().remove(index.current_index());
         self.commit();
     }
 
-    pub(super) fn on_item_dropped(&mut self, from: DragPayload, to: DropLocation) {
+    pub(super) fn on_item_dropped(&mut self, from: &DragPayload, to: &DropLocation) {
         self.handle_drop(from, to);
         self.commit();
         self.rebuild_cards();
@@ -28,7 +28,7 @@ impl BarLayoutControl {
 
     pub(super) fn on_refresh(&mut self) {
         let incoming = self.property.get();
-        let current: Vec<BarLayout> = self.cards.iter().map(|card| card.to_layout()).collect();
+        let current: Vec<BarLayout> = self.cards.iter().map(super::card::LayoutCard::to_layout).collect();
 
         if incoming == current {
             return;
@@ -38,23 +38,21 @@ impl BarLayoutControl {
     }
 
     pub(super) fn commit(&self) {
-        let layouts: Vec<BarLayout> = self.cards.iter().map(|card| card.to_layout()).collect();
+        let layouts: Vec<BarLayout> = self.cards.iter().map(super::card::LayoutCard::to_layout).collect();
         self.property.set(layouts);
     }
 
-    fn handle_drop(&mut self, from: DragPayload, to: DropLocation) {
+    fn handle_drop(&mut self, from: &DragPayload, to: &DropLocation) {
         let mut guard = self.cards.guard();
         let same_card = from.card_index == to.card_index;
-
-        if guard.get(from.card_index).is_none() {
-            return;
-        }
 
         if !same_card && guard.get(to.card_index).is_none() {
             return;
         }
 
-        let source_card = &mut guard[from.card_index];
+        let Some(source_card) = guard.get_mut(from.card_index) else {
+            return;
+        };
         let source_zone = source_card.zone_mut(from.zone);
 
         if from.item_index >= source_zone.len() {
@@ -64,7 +62,9 @@ impl BarLayoutControl {
         let item = source_zone.remove(from.item_index);
 
         if !same_card {
-            let target_card = &mut guard[to.card_index];
+            let Some(target_card) = guard.get_mut(to.card_index) else {
+                return;
+            };
             let target_zone = target_card.zone_mut(to.zone);
             let position = to.position.min(target_zone.len());
             target_zone.insert(position, item);

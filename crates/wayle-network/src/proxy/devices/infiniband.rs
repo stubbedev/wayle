@@ -1,4 +1,4 @@
-//! NetworkManager InfiniBand Device interface.
+//! `NetworkManager` InfiniBand Device interface.
 
 use zbus::proxy;
 

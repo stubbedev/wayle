@@ -1,0 +1,63 @@
+thread 'rustc' panicked at /rustc-dev/c1b22f44c3f30e186b829de95f59740c3a690aba/compiler/rustc_middle/src/verify_ich.rs:82:9:
+Found unstable fingerprints for explicit_supertraits_containing_assoc_item(c6c76b0acf4d1d77-5c8985f496d359b3): EarlyBinder { value: [(Binder { value: TraitPredicate(<Self as std::marker::MetaSized>, polarity:Positive), bound_vars: [] }, crates/wayle-widgets/src/styling.rs:16:1: 39:2 (#2668))], .. }
+stack backtrace:
+   0:     0x7ffff4b49bcb - <std[58ec6781e0b32d64]::backtrace::Backtrace>::create
+   1:     0x7ffff4b49b15 - <std[58ec6781e0b32d64]::backtrace::Backtrace>::force_capture
+   2:     0x7ffff38f98dd - std[58ec6781e0b32d64]::panicking::update_hook::<alloc[8299b52266a8b48e]::boxed::Box<rustc_driver_impl[2dfc0f4b83ec99f1]::install_ice_hook::{closure#1}>>::{closure#0}
+   3:     0x7ffff4b5d752 - std[58ec6781e0b32d64]::panicking::panic_with_hook
+   4:     0x7ffff4b3fb42 - std[58ec6781e0b32d64]::panicking::panic_handler::{closure#0}
+   5:     0x7ffff4b34069 - std[58ec6781e0b32d64]::sys::backtrace::__rust_end_short_backtrace::<std[58ec6781e0b32d64]::panicking::panic_handler::{closure#0}, !>
+   6:     0x7ffff4b415ad - __rustc[a98ed591411b0eff]::rust_begin_unwind
+   7:     0x7ffff15c64fc - core[3328b24b9a8a26a4]::panicking::panic_fmt
+   8:     0x7ffff3ff66a6 - rustc_middle[235aa6b98c34df8b]::verify_ich::incremental_verify_ich_failed
+   9:     0x7ffff5439a38 - rustc_middle[235aa6b98c34df8b]::verify_ich::incremental_verify_ich::<rustc_middle[235aa6b98c34df8b]::query::erase::ErasedData<[u8; 16usize]>>
+  10:     0x7ffff62e9fff - rustc_query_impl[e1d4db3fbe04065a]::execution::try_execute_query::<rustc_middle[235aa6b98c34df8b]::query::caches::DefaultCache<(rustc_span[915bdbba2d51fcad]::def_id::DefId, rustc_span[915bdbba2d51fcad]::symbol::Ident), rustc_middle[235aa6b98c34df8b]::query::erase::ErasedData<[u8; 16usize]>>, true>
+  11:     0x7ffff62e95a9 - rustc_query_impl[e1d4db3fbe04065a]::query_impl::explicit_supertraits_containing_assoc_item::execute_query_incr::__rust_end_short_backtrace
+  12:     0x7ffff5fe37e9 - <core[3328b24b9a8a26a4]::iter::sources::from_fn::FromFn<rustc_infer[7461f85687d3b916]::traits::util::transitive_bounds_that_define_assoc_item<core[3328b24b9a8a26a4]::iter::adapters::filter_map::FilterMap<core[3328b24b9a8a26a4]::iter::adapters::map::Map<rustc_type_ir[fe36081f8b859f62]::binder::IterIdentityCopied<rustc_middle[235aa6b98c34df8b]::ty::context::TyCtxt, &[(rustc_middle[235aa6b98c34df8b]::ty::predicate::Clause, rustc_span[915bdbba2d51fcad]::span_encoding::Span)]>, <rustc_type_ir[fe36081f8b859f62]::unnormalized::Unnormalized<rustc_middle[235aa6b98c34df8b]::ty::context::TyCtxt, (rustc_middle[235aa6b98c34df8b]::ty::predicate::Clause, rustc_span[915bdbba2d51fcad]::span_encoding::Span)>>::skip_norm_wip>, <dyn rustc_hir_analysis[56a0d3a937edeec9]::hir_ty_lowering::HirTyLowerer>::probe_single_ty_param_bound_for_assoc_item::{closure#0}::{closure#0}::{closure#0}>>::{closure#0}> as core[3328b24b9a8a26a4]::iter::traits::iterator::Iterator>::next
+  13:     0x7ffff5fe087e - <dyn rustc_hir_analysis[56a0d3a937edeec9]::hir_ty_lowering::HirTyLowerer>::probe_single_bound_for_assoc_item::<core[3328b24b9a8a26a4]::iter::sources::from_fn::FromFn<rustc_infer[7461f85687d3b916]::traits::util::transitive_bounds_that_define_assoc_item<core[3328b24b9a8a26a4]::iter::adapters::filter_map::FilterMap<core[3328b24b9a8a26a4]::iter::adapters::map::Map<rustc_type_ir[fe36081f8b859f62]::binder::IterIdentityCopied<rustc_middle[235aa6b98c34df8b]::ty::context::TyCtxt, &[(rustc_middle[235aa6b98c34df8b]::ty::predicate::Clause, rustc_span[915bdbba2d51fcad]::span_encoding::Span)]>, <rustc_type_ir[fe36081f8b859f62]::unnormalized::Unnormalized<rustc_middle[235aa6b98c34df8b]::ty::context::TyCtxt, (rustc_middle[235aa6b98c34df8b]::ty::predicate::Clause, rustc_span[915bdbba2d51fcad]::span_encoding::Span)>>::skip_norm_wip>, <dyn rustc_hir_analysis[56a0d3a937edeec9]::hir_ty_lowering::HirTyLowerer>::probe_single_ty_param_bound_for_assoc_item::{closure#0}::{closure#0}::{closure#0}>>::{closure#0}>, <dyn rustc_hir_analysis[56a0d3a937edeec9]::hir_ty_lowering::HirTyLowerer>::probe_single_ty_param_bound_for_assoc_item::{closure#0}::{closure#0}>::{closure#0}
+  14:     0x7ffff5fdb9cc - <dyn rustc_hir_analysis[56a0d3a937edeec9]::hir_ty_lowering::HirTyLowerer>::resolve_type_relative_path
+  15:     0x7ffff5733908 - <dyn rustc_hir_analysis[56a0d3a937edeec9]::hir_ty_lowering::HirTyLowerer>::lower_type_relative_path::{closure#0}
+  16:     0x7ffff573e7a2 - <dyn rustc_hir_analysis[56a0d3a937edeec9]::hir_ty_lowering::HirTyLowerer>::lower_type_relative_ty_path::{closure#0}
+  17:     0x7ffff57439a4 - <dyn rustc_hir_analysis[56a0d3a937edeec9]::hir_ty_lowering::HirTyLowerer>::lower_ty
+  18:     0x7ffff574327f - <dyn rustc_hir_analysis[56a0d3a937edeec9]::hir_ty_lowering::HirTyLowerer>::lower_ty
+  19:     0x7ffff3aa0147 - rustc_hir_analysis[56a0d3a937edeec9]::lower_ty
+  20:     0x555555e0ddc5 - <clippy_lints[71767933ef4deafe]::zero_sized_map_values::ZeroSizedMapValues as rustc_lint[83ec2349c573e1dc]::passes::LateLintPass>::check_ty
+  21:     0x555555ed3453 - <clippy_lints[71767933ef4deafe]::CombinedLateLintPass as rustc_lint[83ec2349c573e1dc]::passes::LateLintPass>::check_ty
+  22:     0x7ffff3f1668e - <rustc_lint[83ec2349c573e1dc]::late::LateContextAndPass<rustc_lint[83ec2349c573e1dc]::late::RuntimeCombinedLateLintPass> as rustc_hir[e77cc562922f08f4]::intravisit::Visitor>::visit_ty
+  23:     0x7ffff3f2af51 - <rustc_lint[83ec2349c573e1dc]::late::LateContextAndPass<rustc_lint[83ec2349c573e1dc]::late::RuntimeCombinedLateLintPass> as rustc_hir[e77cc562922f08f4]::intravisit::Visitor>::visit_fn_decl
+  24:     0x7ffff3f2c3a7 - <rustc_lint[83ec2349c573e1dc]::late::LateContextAndPass<rustc_lint[83ec2349c573e1dc]::late::RuntimeCombinedLateLintPass> as rustc_hir[e77cc562922f08f4]::intravisit::Visitor>::visit_nested_item
+  25:     0x7ffff3eb6179 - <rustc_lint[83ec2349c573e1dc]::late::LateContextAndPass<rustc_lint[83ec2349c573e1dc]::late::RuntimeCombinedLateLintPass>>::process_mod
+  26:     0x7ffff3f2b425 - <rustc_lint[83ec2349c573e1dc]::late::LateContextAndPass<rustc_lint[83ec2349c573e1dc]::late::RuntimeCombinedLateLintPass> as rustc_hir[e77cc562922f08f4]::intravisit::Visitor>::visit_nested_item
+  27:     0x7ffff3eb6179 - <rustc_lint[83ec2349c573e1dc]::late::LateContextAndPass<rustc_lint[83ec2349c573e1dc]::late::RuntimeCombinedLateLintPass>>::process_mod
+  28:     0x7ffff616fa71 - rustc_lint[83ec2349c573e1dc]::late::check_crate::{closure#0}
+  29:     0x7ffff3e93510 - rustc_thread_pool[60182b66a2dd54c4]::join::join_context::<rustc_thread_pool[60182b66a2dd54c4]::join::join::call<core[3328b24b9a8a26a4]::option::Option<rustc_data_structures[5769aa4f95d0557a]::sync::mode::FromDyn<()>>, rustc_data_structures[5769aa4f95d0557a]::sync::parallel::par_join<rustc_lint[83ec2349c573e1dc]::late::check_crate::{closure#0}, rustc_lint[83ec2349c573e1dc]::late::check_crate::{closure#1}, (), ()>::{closure#0}::{closure#0}>::{closure#0}, rustc_thread_pool[60182b66a2dd54c4]::join::join::call<core[3328b24b9a8a26a4]::option::Option<rustc_data_structures[5769aa4f95d0557a]::sync::mode::FromDyn<()>>, rustc_data_structures[5769aa4f95d0557a]::sync::parallel::par_join<rustc_lint[83ec2349c573e1dc]::late::check_crate::{closure#0}, rustc_lint[83ec2349c573e1dc]::late::check_crate::{closure#1}, (), ()>::{closure#0}::{closure#1}>::{closure#0}, core[3328b24b9a8a26a4]::option::Option<rustc_data_structures[5769aa4f95d0557a]::sync::mode::FromDyn<()>>, core[3328b24b9a8a26a4]::option::Option<rustc_data_structures[5769aa4f95d0557a]::sync::mode::FromDyn<()>>>::{closure#0}
+  30:     0x7ffff616fe31 - rustc_lint[83ec2349c573e1dc]::late::check_crate
+  31:     0x7ffff616e430 - rustc_interface[a4c086a451752023]::passes::analysis::{closure#0}::{closure#0}::{closure#2}
+  32:     0x7ffff38d77b2 - <rustc_thread_pool[60182b66a2dd54c4]::job::HeapJob<<rustc_thread_pool[60182b66a2dd54c4]::scope::Scope>::spawn<rustc_data_structures[5769aa4f95d0557a]::sync::parallel::par_fns::{closure#0}::{closure#0}::{closure#0}>::{closure#0}> as rustc_thread_pool[60182b66a2dd54c4]::job::Job>::execute
+  33:     0x7ffff38d314f - rustc_thread_pool[60182b66a2dd54c4]::scope::scope::<rustc_data_structures[5769aa4f95d0557a]::sync::parallel::par_fns::{closure#0}::{closure#0}, ()>::{closure#0}
+  34:     0x7ffff616e250 - rustc_data_structures[5769aa4f95d0557a]::sync::parallel::par_fns
+  35:     0x7ffff616e1bf - rustc_interface[a4c086a451752023]::passes::analysis::{closure#0}::{closure#0}
+  36:     0x7ffff38d328d - rustc_thread_pool[60182b66a2dd54c4]::scope::scope::<rustc_data_structures[5769aa4f95d0557a]::sync::parallel::par_fns::{closure#0}::{closure#0}, ()>::{closure#0}
+  37:     0x7ffff616e250 - rustc_data_structures[5769aa4f95d0557a]::sync::parallel::par_fns
+  38:     0x7ffff5665b87 - rustc_interface[a4c086a451752023]::passes::analysis
+  39:     0x7ffff640c842 - rustc_query_impl[e1d4db3fbe04065a]::execution::try_execute_query::<rustc_middle[235aa6b98c34df8b]::query::caches::SingleCache<rustc_middle[235aa6b98c34df8b]::query::erase::ErasedData<[u8; 0usize]>>, true>
+  40:     0x7ffff640c177 - rustc_query_impl[e1d4db3fbe04065a]::query_impl::analysis::execute_query_incr::__rust_end_short_backtrace
+  41:     0x7ffff634add2 - rustc_interface[a4c086a451752023]::interface::run_compiler::<(), rustc_driver_impl[2dfc0f4b83ec99f1]::run_compiler::{closure#0}>::{closure#1}
+  42:     0x7ffff390e551 - <rustc_thread_pool[60182b66a2dd54c4]::job::StackJob<rustc_thread_pool[60182b66a2dd54c4]::latch::LatchRef<rustc_thread_pool[60182b66a2dd54c4]::latch::LockLatch>, <rustc_thread_pool[60182b66a2dd54c4]::registry::Registry>::in_worker_cold<<rustc_thread_pool[60182b66a2dd54c4]::thread_pool::ThreadPool>::install<rustc_interface[a4c086a451752023]::util::run_in_thread_pool_with_globals<rustc_interface[a4c086a451752023]::interface::run_compiler<(), rustc_driver_impl[2dfc0f4b83ec99f1]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#5}::{closure#0}::{closure#1}::{closure#0}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()> as rustc_thread_pool[60182b66a2dd54c4]::job::Job>::execute
+  43:     0x7ffff478431f - <rustc_thread_pool[60182b66a2dd54c4]::registry::WorkerThread>::wait_or_steal_until_cold
+  44:     0x7ffff4782d72 - <rustc_thread_pool[60182b66a2dd54c4]::registry::ThreadBuilder>::run
+  45:     0x7ffff38f216c - std[58ec6781e0b32d64]::sys::backtrace::__rust_begin_short_backtrace::<<rustc_thread_pool[60182b66a2dd54c4]::ThreadPoolBuilder>::build_scoped<rustc_interface[a4c086a451752023]::util::run_in_thread_pool_with_globals<rustc_interface[a4c086a451752023]::interface::run_compiler<(), rustc_driver_impl[2dfc0f4b83ec99f1]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#5}::{closure#0}::{closure#0}, rustc_interface[a4c086a451752023]::util::run_in_thread_pool_with_globals<rustc_interface[a4c086a451752023]::interface::run_compiler<(), rustc_driver_impl[2dfc0f4b83ec99f1]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#5}::{closure#0}::{closure#1}, ()>::{closure#0}::{closure#0}::{closure#0}, ()>
+  46:     0x7ffff38fb9ea - <std[58ec6781e0b32d64]::thread::lifecycle::spawn_unchecked<<rustc_thread_pool[60182b66a2dd54c4]::ThreadPoolBuilder>::build_scoped<rustc_interface[a4c086a451752023]::util::run_in_thread_pool_with_globals<rustc_interface[a4c086a451752023]::interface::run_compiler<(), rustc_driver_impl[2dfc0f4b83ec99f1]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#5}::{closure#0}::{closure#0}, rustc_interface[a4c086a451752023]::util::run_in_thread_pool_with_globals<rustc_interface[a4c086a451752023]::interface::run_compiler<(), rustc_driver_impl[2dfc0f4b83ec99f1]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#5}::{closure#0}::{closure#1}, ()>::{closure#0}::{closure#0}::{closure#0}, ()>::{closure#1} as core[3328b24b9a8a26a4]::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  47:     0x7ffff637d6d0 - <std[58ec6781e0b32d64]::sys::thread::unix::Thread>::new::thread_start
+  48:     0x7fffef89dd53 - start_thread
+  49:     0x7fffef92563c - __clone3
+  50:                0x0 - <unknown>
+
+
+rustc version: 1.98.0-nightly (c1b22f44c 2026-06-17)
+platform: x86_64-unknown-linux-gnu
+
+query stack during panic:
+#0 [explicit_supertraits_containing_assoc_item] computing the super traits of `styling::InlineStyling` with associated type name `Sender`
+#1 [analysis] running analysis passes on crate `wayle_widgets`
+end of query stack

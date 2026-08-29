@@ -13,8 +13,7 @@ pub fn format_label(
 ) -> String {
     let alias = layout_alias_map
         .get(layout)
-        .map(String::as_str)
-        .unwrap_or(layout);
+        .map_or(layout, String::as_str);
     let ctx = json!({ "layout": layout, "alias": alias });
     template::render(format, ctx).unwrap_or_default()
 }

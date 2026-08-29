@@ -137,7 +137,7 @@ impl ModuleInfoProvider for PowerProfilesConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("power-profiles"),
-            schema: || schema_for!(PowerProfilesConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("power-profiles")),
             array_entry: false,
         }

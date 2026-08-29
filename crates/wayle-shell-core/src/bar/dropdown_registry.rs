@@ -60,6 +60,7 @@ pub struct DropdownInstance {
 }
 
 impl DropdownInstance {
+    #[must_use]
     pub fn new(popover: gtk::Popover, controller: Box<dyn Any>) -> Self {
         let thaw_target: Rc<Cell<Option<relm4::Sender<BarButtonInput>>>> = Rc::default();
         let original_height = Cell::new(None);
@@ -116,13 +117,11 @@ impl DropdownInstance {
                 return;
             };
             let display = gtk::prelude::WidgetExt::display(&root);
-            let monitor = if let Some(native) = root.dynamic_cast_ref::<gtk::Native>() {
+            let monitor = root.dynamic_cast_ref::<gtk::Native>().and_then(|native| {
                 native
                     .surface()
                     .and_then(|surface| display.monitor_at_surface(&surface))
-            } else {
-                None
-            };
+            });
             let monitor = monitor.or_else(|| {
                 let monitors = display.monitors();
                 if monitors.n_items() > 0 {
@@ -134,7 +133,7 @@ impl DropdownInstance {
 
             if let Some(monitor) = monitor {
                 let monitor_height = monitor.geometry().height();
-                let max_allowed_height = monitor_height - 100;
+                let max_allowed_height = monitor_height.saturating_sub(100);
 
                 Self::find_and_clamp_scrolled_windows(popover.upcast_ref(), max_allowed_height);
 
@@ -212,7 +211,7 @@ impl DropdownInstance {
     /// If the popover is already open for this button, it closes; otherwise it
     /// opens anchored to the current button. Margins are applied from the
     /// registry so individual dropdowns never handle positioning.
-    fn toggle_for(&self, bar_button: &Controller<BarButton>, style: DropdownStyle) {
+    fn toggle_for(&self, bar_button: &Controller<BarButton>, style: &DropdownStyle) {
         let widget = bar_button.widget();
         let widget_ref = widget.upcast_ref::<gtk::Widget>();
         let visible = self.popover.is_visible();
@@ -227,7 +226,7 @@ impl DropdownInstance {
         );
 
         if visible && same_parent {
-            self.animate_out(&style);
+            self.animate_out(style);
             return;
         }
 
@@ -244,12 +243,12 @@ impl DropdownInstance {
     ///
     /// Unlike `toggle_for`, this does not freeze/thaw a `BarButton` or lock
     /// parent size.
-    fn toggle_for_widget(&self, widget: &impl IsA<gtk::Widget>, style: DropdownStyle) {
+    fn toggle_for_widget(&self, widget: &impl IsA<gtk::Widget>, style: &DropdownStyle) {
         let widget_ref = widget.upcast_ref::<gtk::Widget>();
         let same_parent = self.popover.parent().as_ref() == Some(widget_ref);
 
         if self.popover.is_visible() && same_parent {
-            self.animate_out(&style);
+            self.animate_out(style);
             return;
         }
 
@@ -257,10 +256,10 @@ impl DropdownInstance {
         self.show_for_widget(style);
     }
 
-    fn show_for_widget(&self, style: DropdownStyle) {
+    fn show_for_widget(&self, style: &DropdownStyle) {
         self.apply_position();
         self.apply_margins(style.margins);
-        self.apply_style(&style);
+        self.apply_style(style);
         self.clamp_height();
         set_bar_keyboard_mode(&self.popover, KeyboardMode::OnDemand);
         debug!(
@@ -270,10 +269,10 @@ impl DropdownInstance {
             "popup (widget path)"
         );
         self.popover.popup();
-        self.animate_in(&style);
+        self.animate_in(style);
     }
 
-    fn reparent_and_show(&self, bar_button: &Controller<BarButton>, style: DropdownStyle) {
+    fn reparent_and_show(&self, bar_button: &Controller<BarButton>, style: &DropdownStyle) {
         if let Some(sender) = self.thaw_target.take() {
             sender.emit(BarButtonInput::ThawSize);
         }
@@ -301,7 +300,7 @@ impl DropdownInstance {
         });
     }
 
-    fn freeze_and_show(&self, bar_button: &Controller<BarButton>, style: DropdownStyle) {
+    fn freeze_and_show(&self, bar_button: &Controller<BarButton>, style: &DropdownStyle) {
         if style.freeze_label {
             self.thaw_target.set(Some(bar_button.sender().clone()));
             bar_button.emit(BarButtonInput::FreezeSize);
@@ -310,7 +309,7 @@ impl DropdownInstance {
 
         self.apply_position();
         self.apply_margins(style.margins);
-        self.apply_style(&style);
+        self.apply_style(style);
         self.clamp_height();
         set_bar_keyboard_mode(&self.popover, KeyboardMode::OnDemand);
         debug!(
@@ -320,7 +319,7 @@ impl DropdownInstance {
             "popup (button path)"
         );
         self.popover.popup();
-        self.animate_in(&style);
+        self.animate_in(style);
     }
 
     fn clamp_height(&self) {
@@ -339,13 +338,11 @@ impl DropdownInstance {
             return;
         };
         let display = gtk::prelude::WidgetExt::display(&root);
-        let monitor = if let Some(native) = root.dynamic_cast_ref::<gtk::Native>() {
+        let monitor = root.dynamic_cast_ref::<gtk::Native>().and_then(|native| {
             native
                 .surface()
                 .and_then(|surface| display.monitor_at_surface(&surface))
-        } else {
-            None
-        };
+        });
         let monitor = monitor.or_else(|| {
             let monitors = display.monitors();
             if monitors.n_items() > 0 {
@@ -357,7 +354,7 @@ impl DropdownInstance {
 
         if let Some(monitor) = monitor {
             let monitor_height = monitor.geometry().height();
-            let max_allowed_height = monitor_height - 100;
+            let max_allowed_height = monitor_height.saturating_sub(100);
 
             Self::find_and_clamp_scrolled_windows(self.popover.upcast_ref(), max_allowed_height);
 
@@ -384,7 +381,7 @@ impl DropdownInstance {
 
     fn find_and_clamp_scrolled_windows(widget: &gtk::Widget, max_allowed_height: i32) {
         if let Some(scrolled) = widget.downcast_ref::<gtk::ScrolledWindow>() {
-            let content_max = max_allowed_height - 80;
+            let content_max = max_allowed_height.saturating_sub(80);
             let current_min = scrolled.min_content_height();
             if current_min > content_max {
                 scrolled.set_min_content_height(content_max);
@@ -426,7 +423,6 @@ impl DropdownInstance {
         }
         let class = match position {
             gtk::PositionType::Top => "position-top",
-            gtk::PositionType::Bottom => "position-bottom",
             gtk::PositionType::Left => "position-left",
             gtk::PositionType::Right => "position-right",
             _ => "position-bottom",
@@ -540,6 +536,11 @@ impl DropdownMargins {
         }
     }
 
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "rounded rem-to-px value fits comfortably in i32"
+    )]
     fn round(rem: f32, scale: f32) -> i32 {
         (rem * REM_PX * scale).round() as i32
     }
@@ -627,7 +628,7 @@ pub fn dispatch_click(
     bar_button: &Controller<BarButton>,
 ) {
     dispatch_action(action, registry, |dropdown, style| {
-        dropdown.toggle_for(bar_button, style);
+        dropdown.toggle_for(bar_button, &style);
     });
 }
 
@@ -638,7 +639,7 @@ pub fn dispatch_click_widget(
     widget: &impl IsA<gtk::Widget>,
 ) {
     dispatch_action(action, registry, |dropdown, style| {
-        dropdown.toggle_for_widget(widget, style);
+        dropdown.toggle_for_widget(widget, &style);
     });
 }
 
@@ -953,19 +954,12 @@ fn try_wallpaper(verb: Option<&str>, services: &ShellServices) -> bool {
 /// Resolves a volume level string (`"+5"`, `"-10"`, or `"50"`) against the
 /// current percentage, clamped to 0–100.
 fn adjusted_pct(level: &str, current_pct: f64) -> Option<f64> {
-    if let Some(delta) = level.strip_prefix('+') {
-        delta
-            .parse::<f64>()
-            .ok()
-            .map(|d| (current_pct + d).clamp(0.0, 100.0))
-    } else if let Some(delta) = level.strip_prefix('-') {
-        delta
-            .parse::<f64>()
-            .ok()
-            .map(|d| (current_pct - d).clamp(0.0, 100.0))
-    } else {
-        level.parse::<f64>().ok().map(|v| v.clamp(0.0, 100.0))
-    }
+    let target = match level.split_at_checked(1) {
+        Some(("+", delta)) => current_pct + delta.parse::<f64>().ok()?,
+        Some(("-", delta)) => current_pct - delta.parse::<f64>().ok()?,
+        _ => level.parse::<f64>().ok()?,
+    };
+    Some(target.clamp(0.0, 100.0))
 }
 
 fn set_bar_keyboard_mode(popover: &gtk::Popover, mode: KeyboardMode) {

@@ -16,7 +16,7 @@ use crate::{
     types::{ClientId, FocusedClient, TagId},
 };
 
-/// Reactive bindings to the MangoWM compositor. See [crate-level docs](crate).
+/// Reactive bindings to the `MangoWM` compositor. See [crate-level docs](crate).
 ///
 /// All public fields are [`Property`] values that update as Mango pushes new
 /// frames. Every method either reads a cached snapshot or sends a one-shot
@@ -82,6 +82,7 @@ impl MangoService {
     /// Looks up a monitor by connector name in the current snapshot.
     ///
     /// Returns `None` when the name is not present.
+    #[must_use]
     pub fn monitor(&self, name: &str) -> Option<Monitor> {
         self.monitors
             .get()

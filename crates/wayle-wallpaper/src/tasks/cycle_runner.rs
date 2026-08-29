@@ -51,21 +51,21 @@ impl CyclingTask {
 
         loop {
             select! {
-                _ = cancellation.cancelled() => {
+                () = cancellation.cancelled() => {
                     info!("Cycling task cancelled");
                     return;
                 }
 
                 Some(config) = cycling_stream.next() => {
-                    self.handle_cycling_change(config).await;
+                    self.handle_cycling_change(config);
                 }
 
                 Some(shared) = shared_cycle_stream.next() => {
-                    self.handle_shared_cycle_change(shared).await;
+                    self.handle_shared_cycle_change(shared);
                 }
 
                 Some(()) = self.timer.wait(), if self.timer.is_scheduled() => {
-                    self.handle_timer_fired().await;
+                    self.handle_timer_fired();
                 }
 
                 Some(directory) = self.directory_change_receiver.recv() => {
@@ -75,32 +75,29 @@ impl CyclingTask {
         }
     }
 
-    async fn handle_cycling_change(&mut self, config: Option<CyclingConfig>) {
-        match config {
-            Some(ref cfg) => {
-                info!(
-                    directory = %cfg.directory.display(),
-                    images = cfg.image_count(),
-                    interval_secs = cfg.interval.as_secs(),
-                    "Cycling started"
-                );
+    fn handle_cycling_change(&mut self, config: Option<CyclingConfig>) {
+        if let Some(ref cfg) = config {
+            info!(
+                directory = %cfg.directory.display(),
+                images = cfg.image_count(),
+                interval_secs = cfg.interval.as_secs(),
+                "Cycling started"
+            );
 
-                self.render_current(cfg).await;
-                self.timer.schedule(cfg.interval);
-                self.ensure_directory_watcher(&cfg.directory);
+            self.render_current(cfg);
+            self.timer.schedule(cfg.interval);
+            self.ensure_directory_watcher(&cfg.directory);
+        } else {
+            if self.timer.is_scheduled() {
+                info!("Cycling stopped");
             }
-            None => {
-                if self.timer.is_scheduled() {
-                    info!("Cycling stopped");
-                }
-                self.timer.cancel();
-                self.directory_watcher = None;
-                self.watched_directory = None;
-            }
+            self.timer.cancel();
+            self.directory_watcher = None;
+            self.watched_directory = None;
         }
     }
 
-    async fn handle_shared_cycle_change(&self, shared: bool) {
+    fn handle_shared_cycle_change(&self, shared: bool) {
         let Some(config) = self.cycling.get() else {
             return;
         };
@@ -153,7 +150,7 @@ impl CyclingTask {
         self.watched_directory = Some(directory.clone());
     }
 
-    fn handle_directory_changed(&mut self, directory: &PathBuf) {
+    fn handle_directory_changed(&self, directory: &PathBuf) {
         let Some(watched) = &self.watched_directory else {
             return;
         };
@@ -176,7 +173,7 @@ impl CyclingTask {
         self.cycling.set(cycling);
     }
 
-    async fn handle_timer_fired(&mut self) {
+    fn handle_timer_fired(&mut self) {
         let Some(config) = self.cycling.get() else {
             return;
         };
@@ -205,7 +202,7 @@ impl CyclingTask {
         self.timer.schedule(config.interval);
     }
 
-    async fn render_current(&self, config: &CyclingConfig) {
+    fn render_current(&self, config: &CyclingConfig) {
         let mut monitors = self.monitors.get();
 
         for state in monitors.values_mut() {

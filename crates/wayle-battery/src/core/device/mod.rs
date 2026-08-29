@@ -19,7 +19,7 @@ use crate::{
     types::{BatteryLevel, BatteryTechnology, DeviceState, DeviceType, WarningLevel},
 };
 
-/// UPower battery device with reactive properties.
+/// `UPower` battery device with reactive properties.
 ///
 /// The [`Device`] from [`BatteryService::device`](crate::BatteryService::device) is live -
 /// all properties auto-update via D-Bus signals.
@@ -37,7 +37,7 @@ pub struct Device {
     #[debug(skip)]
     pub(crate) zbus_connection: Connection,
     #[debug(skip)]
-    pub(crate) device_path: OwnedObjectPath,
+    pub(crate) object_path: OwnedObjectPath,
 
     /// OS specific native path of the power source.
     pub native_path: Property<String>,
@@ -123,7 +123,8 @@ impl Reactive for Device {
     type Context<'a> = DeviceParams<'a>;
 
     async fn get(context: Self::Context<'_>) -> Result<Self, Self::Error> {
-        let device_props = Self::from_connection(context.connection, context.device_path).await?;
+        let device_props =
+            Box::pin(Self::from_connection(context.connection, context.device_path)).await?;
         Ok(Self::from_props(
             device_props,
             context.connection,
@@ -133,7 +134,8 @@ impl Reactive for Device {
     }
 
     async fn get_live(context: Self::LiveContext<'_>) -> Result<Arc<Self>, Self::Error> {
-        let device_props = Self::from_connection(context.connection, context.device_path).await?;
+        let device_props =
+            Box::pin(Self::from_connection(context.connection, context.device_path)).await?;
         let device = Self::from_props(
             device_props,
             context.connection,
@@ -154,7 +156,7 @@ impl Device {
     /// # Errors
     /// Returns error if refresh operation fails.
     pub async fn refresh(&self) -> Result<(), Error> {
-        DeviceController::refresh(&self.zbus_connection, &self.device_path).await
+        DeviceController::refresh(&self.zbus_connection, &self.object_path).await
     }
 
     /// Gets history for the power device that is persistent across reboots.
@@ -166,7 +168,7 @@ impl Device {
     ///
     /// # Returns
     /// History data as (time, value, state) tuples where:
-    /// - time: The time value in seconds from the gettimeofday() method.
+    /// - time: The time value in seconds from the `gettimeofday()` method.
     /// - value: The data value, for instance the rate in W or the charge in %.
     /// - state: The state of the device, for instance charging or discharging.
     ///
@@ -180,7 +182,7 @@ impl Device {
     ) -> Result<Vec<(u32, f64, u32)>, Error> {
         DeviceController::get_history(
             &self.zbus_connection,
-            &self.device_path,
+            &self.object_path,
             history_type,
             timespan,
             resolution,
@@ -201,18 +203,18 @@ impl Device {
     /// # Errors
     /// Returns error if getting statistics fails.
     pub async fn get_statistics(&self, stat_type: &str) -> Result<Vec<(f64, f64)>, Error> {
-        DeviceController::get_statistics(&self.zbus_connection, &self.device_path, stat_type).await
+        DeviceController::get_statistics(&self.zbus_connection, &self.object_path, stat_type).await
     }
 
     /// Limiting the battery charge to the configured thresholds.
     ///
-    /// If it is true, the battery charge will be limited to ChargeEndThreshold and start to charge
-    /// when the battery is lower than ChargeStartThreshold.
+    /// If it is true, the battery charge will be limited to `ChargeEndThreshold` and start to charge
+    /// when the battery is lower than `ChargeStartThreshold`.
     ///
     /// # Errors
     /// Returns error if setting charge threshold fails.
     pub async fn enable_charge_threshold(&self, enabled: bool) -> Result<(), Error> {
-        DeviceController::enable_charge_threshold(&self.zbus_connection, &self.device_path, enabled)
+        DeviceController::enable_charge_threshold(&self.zbus_connection, &self.object_path, enabled)
             .await
     }
 
@@ -353,7 +355,7 @@ impl Device {
     ) -> Self {
         Self {
             zbus_connection: connection.clone(),
-            device_path,
+            object_path: device_path,
             cancellation_token,
             native_path: Property::new(props.native_path),
             vendor: Property::new(props.vendor),

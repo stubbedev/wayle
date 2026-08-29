@@ -54,7 +54,7 @@ pub fn device_subtitle(device_name: &str, kind: BacklightType, multi: bool) -> O
     ))
 }
 
-pub fn backlight_type_label(kind: BacklightType) -> &'static str {
+pub const fn backlight_type_label(kind: BacklightType) -> &'static str {
     match kind {
         BacklightType::Ddc => "external",
         BacklightType::Raw => "raw",

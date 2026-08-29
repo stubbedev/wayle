@@ -31,7 +31,7 @@ pub trait WayleNotifications {
 
     /// Lists all notifications.
     ///
-    /// Returns a list of tuples: (id, app_name, summary, body).
+    /// Returns a list of tuples: (id, `app_name`, summary, body).
     async fn list(&self) -> Result<Vec<(u32, String, String, String)>>;
 
     /// Do Not Disturb status.

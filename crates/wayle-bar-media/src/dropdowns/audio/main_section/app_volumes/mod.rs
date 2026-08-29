@@ -21,7 +21,7 @@ use crate::i18n::t;
 pub struct AppVolumes {
     config: Arc<ConfigService>,
     playback_streams: Vec<Arc<AudioStream>>,
-    app_volumes: FactoryVecDeque<AppVolumeItem>,
+    items: FactoryVecDeque<AppVolumeItem>,
     streams_watcher: WatcherToken,
 }
 
@@ -79,12 +79,12 @@ impl Component for AppVolumes {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let playback_streams = init.audio.playback_streams.get();
 
-        let app_volumes = FactoryVecDeque::builder()
+        let items = FactoryVecDeque::builder()
             .launch(gtk::Box::default())
             .forward(sender.input_sender(), |item_output| match item_output {
                 AppVolumeItemOutput::VolumeChanged(stream_index, percentage) => {
@@ -100,14 +100,14 @@ impl Component for AppVolumes {
         let mut model = Self {
             config: init.config,
             playback_streams,
-            app_volumes,
+            items,
             streams_watcher: WatcherToken::new(),
         };
 
         model.sync_app_volumes();
         model.resume_stream_watchers(&sender);
 
-        let app_volume_list = model.app_volumes.widget();
+        let app_volume_list = model.items.widget();
         let widgets = view_output!();
 
         ComponentParts { model, widgets }

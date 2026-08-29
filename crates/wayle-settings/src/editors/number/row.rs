@@ -37,7 +37,7 @@ pub(crate) fn number_u8(property: &ConfigProperty<u8>) -> SettingRowInit {
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |value| value.to_string()),
+        handle: PropertyHandle::new(property, std::string::ToString::to_string),
         control: widget.upcast(),
         keepalive: Box::new(controller),
         full_width: false,
@@ -72,7 +72,7 @@ pub(crate) fn number_u32(property: &ConfigProperty<u32>) -> SettingRowInit {
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |value| value.to_string()),
+        handle: PropertyHandle::new(property, std::string::ToString::to_string),
         control: widget.upcast(),
         keepalive: Box::new(controller),
         full_width: false,
@@ -83,7 +83,7 @@ pub(crate) fn number_u32(property: &ConfigProperty<u32>) -> SettingRowInit {
 }
 
 /// Row with an integer spin for a `u32` property constrained to a caller-given
-/// `[min, max]` range and step. The SpinButton clamps input to the range; use
+/// `[min, max]` range and step. The `SpinButton` clamps input to the range; use
 /// when an unbounded `number_u32` would let a user enter a value the consumer
 /// can't handle (e.g. a 0 framerate).
 pub(crate) fn number_u32_range(
@@ -115,7 +115,7 @@ pub(crate) fn number_u32_range(
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |value| value.to_string()),
+        handle: PropertyHandle::new(property, std::string::ToString::to_string),
         control: widget.upcast(),
         keepalive: Box::new(controller),
         full_width: false,
@@ -148,7 +148,7 @@ pub(crate) fn number_u64(property: &ConfigProperty<u64>) -> SettingRowInit {
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |value| value.to_string()),
+        handle: PropertyHandle::new(property, std::string::ToString::to_string),
         control: widget.upcast(),
         keepalive: Box::new(controller),
         full_width: false,
@@ -197,15 +197,15 @@ pub(crate) fn scale(property: &ConfigProperty<ScaleFactor>) -> SettingRowInit {
     let controller = NumberControl::builder()
         .launch(NumberInit {
             property: property.clone(),
-            range_min: ScaleFactor::MIN as f64,
-            range_max: ScaleFactor::MAX as f64,
+            range_min: f64::from(ScaleFactor::MIN),
+            range_max: f64::from(ScaleFactor::MAX),
             step: 0.05,
             digits: 2,
-            to_f64: |sf| sf.value() as f64,
+            to_f64: |sf| f64::from(sf.value()),
             from_f64: |value| {
                 let clean = if value.is_finite() { value } else { 0.0 };
                 ScaleFactor::new(
-                    clean.clamp(ScaleFactor::MIN as f64, ScaleFactor::MAX as f64) as f32,
+                    clean.clamp(f64::from(ScaleFactor::MIN), f64::from(ScaleFactor::MAX)) as f32,
                 )
             },
         })
@@ -254,7 +254,7 @@ where
 
     SettingRowInit {
         i18n_key: property.i18n_key(),
-        handle: PropertyHandle::new(property, |value| value.to_string()),
+        handle: PropertyHandle::new(property, std::string::ToString::to_string),
         control: widget.upcast(),
         keepalive: Box::new(controller),
         full_width: false,

@@ -32,28 +32,28 @@ pub(crate) trait ActionValue: Clone + Send + Sync + PartialEq + 'static {
 impl ActionValue for ClickAction {
     fn to_command(&self) -> String {
         match self {
-            ClickAction::Shell(cmd) => cmd.clone(),
-            ClickAction::Dropdown(name) => format!("dropdown:{name}"),
-            ClickAction::Brightness(delta) => format!("brightness:{delta}"),
-            ClickAction::BrightnessToggle => "brightness:toggle".to_owned(),
-            ClickAction::None => String::new(),
+            Self::Shell(cmd) => cmd.clone(),
+            Self::Dropdown(name) => format!("dropdown:{name}"),
+            Self::Brightness(delta) => format!("brightness:{delta}"),
+            Self::BrightnessToggle => "brightness:toggle".to_owned(),
+            Self::None => String::new(),
         }
     }
 
     fn from_command(value: &str) -> Self {
         if value.is_empty() {
-            ClickAction::None
+            Self::None
         } else if let Some(name) = value.strip_prefix("dropdown:") {
-            ClickAction::Dropdown(name.to_owned())
+            Self::Dropdown(name.to_owned())
         } else if let Some(rest) = value.strip_prefix("brightness:") {
             match rest {
-                "toggle" => ClickAction::BrightnessToggle,
+                "toggle" => Self::BrightnessToggle,
                 _ => rest
                     .parse::<i32>()
-                    .map_or(ClickAction::None, ClickAction::Brightness),
+                    .map_or(Self::None, ClickAction::Brightness),
             }
         } else {
-            ClickAction::Shell(value.to_owned())
+            Self::Shell(value.to_owned())
         }
     }
 }
@@ -61,27 +61,27 @@ impl ActionValue for ClickAction {
 impl ActionValue for WorkspaceClickAction {
     fn to_command(&self) -> String {
         match self {
-            WorkspaceClickAction::None => String::new(),
-            WorkspaceClickAction::FocusWorkspace => "focus:this".to_owned(),
-            WorkspaceClickAction::FocusNext => "focus:next".to_owned(),
-            WorkspaceClickAction::FocusPrevious => "focus:previous".to_owned(),
-            WorkspaceClickAction::FocusLast => "focus:last".to_owned(),
-            WorkspaceClickAction::Dropdown(name) => format!("dropdown:{name}"),
-            WorkspaceClickAction::Shell(cmd) => cmd.clone(),
+            Self::None => String::new(),
+            Self::FocusWorkspace => "focus:this".to_owned(),
+            Self::FocusNext => "focus:next".to_owned(),
+            Self::FocusPrevious => "focus:previous".to_owned(),
+            Self::FocusLast => "focus:last".to_owned(),
+            Self::Dropdown(name) => format!("dropdown:{name}"),
+            Self::Shell(cmd) => cmd.clone(),
         }
     }
 
     fn from_command(value: &str) -> Self {
         match value {
-            "" => WorkspaceClickAction::None,
-            "focus:this" => WorkspaceClickAction::FocusWorkspace,
-            "focus:next" => WorkspaceClickAction::FocusNext,
-            "focus:previous" => WorkspaceClickAction::FocusPrevious,
-            "focus:last" => WorkspaceClickAction::FocusLast,
-            _ => match value.strip_prefix("dropdown:") {
-                Some(name) => WorkspaceClickAction::Dropdown(name.to_owned()),
-                None => WorkspaceClickAction::Shell(value.to_owned()),
-            },
+            "" => Self::None,
+            "focus:this" => Self::FocusWorkspace,
+            "focus:next" => Self::FocusNext,
+            "focus:previous" => Self::FocusPrevious,
+            "focus:last" => Self::FocusLast,
+            _ => value.strip_prefix("dropdown:").map_or_else(
+                || Self::Shell(value.to_owned()),
+                |name| Self::Dropdown(name.to_owned()),
+            ),
         }
     }
 }
@@ -217,13 +217,17 @@ impl<T: ActionValue> SimpleComponent for ActionControl<T> {
     fn update(&mut self, msg: Self::Input, _sender: ComponentSender<Self>) {
         match msg {
             ActionMsg::Selected(index) => {
-                let none_index = self.choices.len() as u32;
+                let none_index = none_index(&self.choices);
                 let custom = custom_index(&self.choices);
                 if index < none_index {
                     self.custom_mode = false;
                     self.revealer.set_reveal_child(false);
-                    self.property
-                        .set(self.choices[index as usize].action.clone());
+                    if let Some(choice) = usize::try_from(index)
+                        .ok()
+                        .and_then(|i| self.choices.get(i))
+                    {
+                        self.property.set(choice.action.clone());
+                    }
                 } else if index == none_index {
                     self.custom_mode = false;
                     self.revealer.set_reveal_child(false);
@@ -277,18 +281,18 @@ fn labels<T: ActionValue>(choices: &[ActionChoice<T>]) -> Vec<String> {
 }
 
 fn none_index<T: ActionValue>(choices: &[ActionChoice<T>]) -> u32 {
-    choices.len() as u32
+    u32::try_from(choices.len()).unwrap_or(u32::MAX)
 }
 
 fn custom_index<T: ActionValue>(choices: &[ActionChoice<T>]) -> u32 {
-    choices.len() as u32 + 1
+    none_index(choices).saturating_add(1)
 }
 
 fn index_of_choice<T: ActionValue>(choices: &[ActionChoice<T>], command: &str) -> Option<u32> {
     choices
         .iter()
         .position(|c| c.action.to_command() == command)
-        .map(|i| i as u32)
+        .and_then(|i| u32::try_from(i).ok())
 }
 
 /// Resolves which dropdown row represents the current command string.
@@ -297,11 +301,14 @@ fn selection_index<T: ActionValue>(
     command: &str,
     custom_mode: bool,
 ) -> u32 {
-    if let Some(index) = index_of_choice(choices, command) {
-        index
-    } else if command.is_empty() && !custom_mode {
-        none_index(choices)
-    } else {
-        custom_index(choices)
-    }
+    index_of_choice(choices, command).map_or_else(
+        || {
+            if command.is_empty() && !custom_mode {
+                none_index(choices)
+            } else {
+                custom_index(choices)
+            }
+        },
+        |index| index,
+    )
 }

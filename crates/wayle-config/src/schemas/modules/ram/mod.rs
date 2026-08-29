@@ -146,7 +146,7 @@ impl ModuleInfoProvider for RamConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("ram"),
-            schema: || schema_for!(RamConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("ram")),
             array_entry: false,
         }

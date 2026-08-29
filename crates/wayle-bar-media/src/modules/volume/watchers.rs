@@ -36,7 +36,7 @@ pub fn spawn_watchers(
     watch!(sender, [thresholds.watch()], |out| {
         if let Some(device) = audio_thresholds.get() {
             let percentage = device.volume.get().average_percentage().round() as u16;
-            let colors = evaluate_thresholds(percentage as f64, &thresholds.get());
+            let colors = evaluate_thresholds(f64::from(percentage), &thresholds.get());
             let _ = out.send(VolumeCmd::UpdateThresholdColors(colors));
         }
     });

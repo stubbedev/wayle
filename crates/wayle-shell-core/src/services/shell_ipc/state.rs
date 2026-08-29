@@ -24,6 +24,7 @@ impl Default for ShellIpcState {
 }
 
 impl ShellIpcState {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             hidden_bars: Property::new(HashSet::new()),

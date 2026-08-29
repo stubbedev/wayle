@@ -112,13 +112,17 @@ pub async fn is_already_running() -> bool {
 
     let result = dbus.name_has_owner(name).await.unwrap_or(false);
     debug!(
-        duration_ms = start.elapsed().as_millis() as u64,
+        duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
         "DBus instance check"
     );
     result
 }
 
 #[allow(clippy::cognitive_complexity)]
+#[expect(
+    clippy::future_not_send,
+    reason = "runs on the main-thread runtime, never spawned across threads"
+)]
 pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Error>> {
     let mut timer = StartupTimer::new();
 
@@ -130,7 +134,7 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
         crate::services::power_menu::show();
     });
 
-    let config_service = timer.time("Config", ConfigService::load()).await?;
+    let config_service = Box::pin(timer.time("Config", ConfigService::load())).await?;
 
     let bluetooth: DeferredService<BluetoothService> = DeferredService::new(None);
     let power_profiles: DeferredService<PowerProfilesService> = DeferredService::new(None);
@@ -258,7 +262,7 @@ async fn init_print() {
     }
 }
 
-/// Initializes the recorder service, returning `None` (non-fatal) if GStreamer
+/// Initializes the recorder service, returning `None` (non-fatal) if `GStreamer`
 /// or the D-Bus registration is unavailable.
 async fn init_recorder(
     config: Arc<ConfigService>,
@@ -373,9 +377,9 @@ fn spawn_deferred_bluetooth(property: DeferredService<BluetoothService>) {
     tokio::spawn(async move {
         let start = Instant::now();
 
-        match BluetoothService::new().await {
+        match Box::pin(BluetoothService::new()).await {
             Ok(service) => {
-                let duration_ms = start.elapsed().as_millis() as u64;
+                let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
                 info!(duration_ms, "Bluetooth ready (deferred)");
                 property.replace(Some(Arc::new(service)));
             }
@@ -392,7 +396,7 @@ fn spawn_deferred_power_profiles(property: DeferredService<PowerProfilesService>
 
         match PowerProfilesService::builder().with_daemon().build().await {
             Ok(service) => {
-                let duration_ms = start.elapsed().as_millis() as u64;
+                let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
                 info!(duration_ms, "PowerProfiles ready (deferred)");
                 property.replace(Some(service));
             }
@@ -407,8 +411,8 @@ async fn init_daemon_services(
     timer: &StartupTimer,
     modules: &wayle_config::schemas::modules::ModulesConfig,
 ) -> DaemonServices {
-    let ignored = modules.media.players_ignored.get().clone();
-    let priority = modules.media.player_priority.get().clone();
+    let ignored = modules.media.players_ignored.get();
+    let priority = modules.media.player_priority.get();
 
     let audio_task = tokio::spawn(AudioService::builder().with_daemon().build());
     let media_task = tokio::spawn(

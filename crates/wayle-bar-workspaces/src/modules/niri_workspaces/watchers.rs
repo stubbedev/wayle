@@ -30,7 +30,7 @@ pub fn spawn_watchers(
 }
 
 fn spawn_niri_events(sender: &ComponentSender<NiriWorkspaces>, niri: Arc<NiriService>) {
-    sender.command(move |out, shutdown| watch_workspace_events(niri.clone(), out, shutdown));
+    sender.command(move |out, shutdown| watch_workspace_events(niri, out, shutdown));
 }
 
 async fn watch_workspace_events(

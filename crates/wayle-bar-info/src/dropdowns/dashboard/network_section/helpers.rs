@@ -7,6 +7,11 @@ pub struct FormattedSpeed {
 
 /// Formats bytes per second into a human-readable speed value and unit flag.
 pub fn format_speed(bytes_per_sec: u64) -> FormattedSpeed {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_precision_loss,
+        reason = "speed display; precision loss at >4 PiB/s is irrelevant"
+    )]
     let kbps = bytes_per_sec as f64 / BYTES_PER_KB;
     if kbps < BYTES_PER_KB {
         FormattedSpeed {

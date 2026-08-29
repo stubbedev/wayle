@@ -7,7 +7,7 @@ pub async fn execute() -> CliAction {
     proxy
         .start()
         .await
-        .map_err(|e| format_error("start recording", e))?;
+        .map_err(|e| format_error("start recording", &e))?;
 
     println!("Recording started");
 

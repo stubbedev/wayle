@@ -8,9 +8,7 @@ pub(crate) fn init() -> Result<(), Box<dyn Error>> {
 
     let console_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
-    let file_filter = env::var("WAYLE_FILE_LOG")
-        .map(EnvFilter::new)
-        .unwrap_or_else(|_| EnvFilter::new("warn,wayle_=info"));
+    let file_filter = env::var("WAYLE_FILE_LOG").map_or_else(|_| EnvFilter::new("warn,wayle_=info"), EnvFilter::new);
 
     let log_dir = ConfigPaths::log_dir()?;
 

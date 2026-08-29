@@ -21,7 +21,7 @@ pub fn spawn_watchers(
     let sysinfo_thresholds = sysinfo.clone();
     watch!(sender, [thresholds_watch.watch()], |out| {
         let cpu = sysinfo_thresholds.cpu.get();
-        let colors = evaluate_thresholds(cpu.usage_percent as f64, &thresholds_watch.get());
+        let colors = evaluate_thresholds(f64::from(cpu.usage_percent), &thresholds_watch.get());
         let _ = out.send(CpuCmd::UpdateThresholdColors(colors));
     });
 
@@ -30,7 +30,7 @@ pub fn spawn_watchers(
         let label = format_label(&format.get(), &cpu);
         let _ = out.send(CpuCmd::UpdateLabel(label));
 
-        let colors = evaluate_thresholds(cpu.usage_percent as f64, &thresholds.get());
+        let colors = evaluate_thresholds(f64::from(cpu.usage_percent), &thresholds.get());
         let _ = out.send(CpuCmd::UpdateThresholdColors(colors));
     });
 
@@ -44,7 +44,7 @@ pub fn spawn_watchers(
 
     let icon_name = config.icon_name.clone();
     watch!(sender, [icon_name.watch()], |out| {
-        let _ = out.send(CpuCmd::UpdateIcon(icon_name.get().clone()));
+        let _ = out.send(CpuCmd::UpdateIcon(icon_name.get()));
     });
 
     let temp_sensor = config.temp_sensor.clone();

@@ -31,9 +31,9 @@ enum ClassValue {
 impl ClassValue {
     fn into_vec(self) -> Vec<String> {
         match self {
-            ClassValue::None => Vec::new(),
-            ClassValue::Single(s) => vec![s],
-            ClassValue::Multiple(v) => v,
+            Self::None => Vec::new(),
+            Self::Single(s) => vec![s],
+            Self::Multiple(v) => v,
         }
     }
 }
@@ -100,7 +100,7 @@ impl ParsedOutput {
         let mut ctx = self
             .json
             .clone()
-            .filter(|v| v.is_object())
+            .filter(serde_json::Value::is_object)
             .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
 
         if let Value::Object(map) = &mut ctx {

@@ -11,12 +11,12 @@ pub async fn execute() -> CliAction {
     let active = proxy
         .active()
         .await
-        .map_err(|e| format_error("get active state", e))?;
+        .map_err(|e| format_error("get active state", &e))?;
 
     let duration = proxy
         .duration()
         .await
-        .map_err(|e| format_error("get duration", e))?;
+        .map_err(|e| format_error("get duration", &e))?;
 
     if !active {
         let dur_str = if duration == 0 {
@@ -36,7 +36,7 @@ pub async fn execute() -> CliAction {
     let remaining = proxy
         .remaining()
         .await
-        .map_err(|e| format_error("get remaining", e))?;
+        .map_err(|e| format_error("get remaining", &e))?;
 
     let remaining_mins = remaining / 60;
     let remaining_secs = remaining % 60;

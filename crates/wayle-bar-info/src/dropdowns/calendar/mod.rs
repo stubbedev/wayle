@@ -163,7 +163,7 @@ impl Component for CalendarDropdown {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let now = Local::now();
@@ -196,7 +196,7 @@ impl Component for CalendarDropdown {
 
         let day_names = day_names_array();
         // day_names is always Sunday-indexed, so index with num_days_from_sunday.
-        let weekday_idx = now.weekday().num_days_from_sunday() as usize;
+        let weekday_idx = usize::try_from(now.weekday().num_days_from_sunday()).unwrap_or_default();
 
         let model = Self {
             calendar,
@@ -212,7 +212,7 @@ impl Component for CalendarDropdown {
             minutes: helpers::minutes_text(&now),
             seconds: helpers::seconds_text(&now),
             ampm: helpers::ampm_text(&now),
-            day_name: day_names[weekday_idx].clone(),
+            day_name: day_names.get(weekday_idx).cloned().unwrap_or_default(),
             date_rest: format_date_rest(&months, &now),
             day_names,
             months,
@@ -243,8 +243,13 @@ impl Component for CalendarDropdown {
                 self.seconds = helpers::seconds_text(&now);
                 self.ampm = helpers::ampm_text(&now);
 
-                let weekday_idx = now.weekday().num_days_from_sunday() as usize;
-                self.day_name = self.day_names[weekday_idx].clone();
+                let weekday_idx = usize::try_from(now.weekday().num_days_from_sunday())
+                    .unwrap_or_default();
+                self.day_name = self
+                    .day_names
+                    .get(weekday_idx)
+                    .cloned()
+                    .unwrap_or_default();
                 self.date_rest = format_date_rest(&self.months, &now);
 
                 let new_today = now.date_naive();

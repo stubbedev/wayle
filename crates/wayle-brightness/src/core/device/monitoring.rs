@@ -33,6 +33,7 @@ impl ModelMonitoring for BacklightDevice {
     ///
     /// inotify doesn't work on sysfs - the kernel uses `sysfs_notify()`
     /// which only triggers `POLLPRI`, not filesystem change events.
+    #[expect(clippy::unused_async, reason = "trait signature")]
     async fn start_monitoring(self: Arc<Self>) -> Result<(), Error> {
         // External DDC monitors have no sysfs `actual_brightness` file to
         // poll; their state is refreshed by the backend on each write.
@@ -102,9 +103,8 @@ fn poll_once(file: &File, path_str: &str) -> Result<Option<PollFlags>, Error> {
     );
 
     match poll_result {
-        Ok(0) => Ok(None),
+        Ok(0) | Err(Errno::EINTR) => Ok(None),
         Ok(_) => Ok(Some(poll_fd.revents().unwrap_or(PollFlags::empty()))),
-        Err(Errno::EINTR) => Ok(None),
 
         Err(err) => {
             warn!(error = %err, "poll failed");

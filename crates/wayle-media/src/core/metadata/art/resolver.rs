@@ -96,12 +96,10 @@ impl ArtResolver {
 }
 
 fn cache_base_dir() -> PathBuf {
-    std::env::var("XDG_CACHE_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
+    std::env::var("XDG_CACHE_HOME").map_or_else(|_| {
             let home = std::env::var("HOME").unwrap_or_else(|_| String::from(FALLBACK_CACHE_BASE));
             PathBuf::from(home).join(DEFAULT_CACHE_DIR)
-        })
+        }, PathBuf::from)
         .join(CACHE_SUBDIR)
         .join(CACHE_ART_SUBDIR)
 }

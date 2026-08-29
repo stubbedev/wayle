@@ -16,6 +16,7 @@ pub enum BacklightType {
 
 impl BacklightType {
     /// Parses the sysfs `type` file content.
+    #[must_use]
     pub fn from_sysfs(value: &str) -> Option<Self> {
         match value.trim() {
             "firmware" => Some(Self::Firmware),
@@ -48,7 +49,8 @@ impl Percentage {
     /// Creates a percentage, clamping to 0.0-100.0.
     ///
     /// NaN is treated as 0.0.
-    pub fn new(value: f64) -> Self {
+    #[must_use]
+    pub const fn new(value: f64) -> Self {
         if value.is_nan() {
             return Self(0.0);
         }
@@ -57,16 +59,19 @@ impl Percentage {
     }
 
     /// Creates a percentage from a 0.0-1.0 fraction.
+    #[must_use]
     pub fn from_fraction(fraction: f64) -> Self {
         Self::new(fraction * 100.0)
     }
 
     /// Clamped value between 0.0 and 100.0.
-    pub fn value(self) -> f64 {
+    #[must_use]
+    pub const fn value(self) -> f64 {
         self.0
     }
 
     /// The value as a 0.0-1.0 fraction.
+    #[must_use]
     pub fn fraction(self) -> f64 {
         self.0 / 100.0
     }
@@ -74,7 +79,14 @@ impl Percentage {
 
 impl Display for Percentage {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}%", self.0.round() as u32)
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "value is clamped to 0.0-100.0, rounding fits u32"
+        )]
+        let rounded = self.0.round() as u32;
+        write!(f, "{rounded}%")
     }
 }
 
@@ -89,6 +101,7 @@ impl DeviceName {
     }
 
     /// Borrowed view of the device name.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }

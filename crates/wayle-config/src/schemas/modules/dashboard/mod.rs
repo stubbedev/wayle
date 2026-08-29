@@ -165,7 +165,7 @@ impl ModuleInfoProvider for DashboardConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("dashboard"),
-            schema: || schema_for!(DashboardConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("dashboard")),
             array_entry: false,
         }
@@ -196,7 +196,7 @@ impl ModuleInfoProvider for UserSessionConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("dropdown-dashboard-user-session"),
-            schema: || schema_for!(UserSessionConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("user-session")),
             array_entry: false,
         }

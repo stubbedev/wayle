@@ -60,10 +60,10 @@ fn generate(
         quote! {}
     };
 
-    let default_rename_all = if !has_rename_all {
-        quote! { #[serde(rename_all = "kebab-case")] }
-    } else {
+    let default_rename_all = if has_rename_all {
         quote! {}
+    } else {
+        quote! { #[serde(rename_all = "kebab-case")] }
     };
 
     quote! {

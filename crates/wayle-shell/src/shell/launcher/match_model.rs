@@ -25,7 +25,7 @@ pub(super) struct Row {
 mod imp {
     use std::cell::RefCell;
 
-    use super::*;
+    use super::{glib, Arc, Item, ObjectSubclass, gio, TypeModuleExt, ObjectSubclassType, ObjectExt, SocketExt, SocketClientExt, ObjectInterfaceType, ObjectImpl, ListModelImpl, StaticType, SettingsExtManual, UnixFDListExtManual, DBusInterfaceExt, Cast, Row};
 
     #[derive(Default)]
     pub struct MatchModel {

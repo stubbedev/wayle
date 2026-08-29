@@ -12,14 +12,15 @@ const MAJOR_WEARABLE: u32 = 0x07;
 const MAJOR_TOY: u32 = 0x08;
 const MAJOR_HEALTH: u32 = 0x09;
 
-fn major_class(raw: u32) -> u32 {
+const fn major_class(raw: u32) -> u32 {
     (raw >> 8) & 0x1F
 }
 
-fn minor_class(raw: u32) -> u32 {
+const fn minor_class(raw: u32) -> u32 {
     (raw >> 2) & 0x3F
 }
 
+#[must_use]
 pub fn device_icon(icon_hint: Option<&str>, class: Option<u32>) -> &'static str {
     if let Some(hint) = icon_hint {
         match hint {
@@ -49,7 +50,7 @@ pub fn device_icon(icon_hint: Option<&str>, class: Option<u32>) -> &'static str 
     }
 }
 
-fn computer_icon(minor: u32) -> &'static str {
+const fn computer_icon(minor: u32) -> &'static str {
     match minor {
         0x03 => "ld-laptop-symbolic",
         0x07 => "ld-tablet-symbolic",
@@ -57,23 +58,19 @@ fn computer_icon(minor: u32) -> &'static str {
     }
 }
 
-fn av_icon(minor: u32) -> &'static str {
+const fn av_icon(minor: u32) -> &'static str {
     match minor {
-        0x01 | 0x02 => "ld-headphones-symbolic",
         0x04 => "ld-mic-symbolic",
         0x05 | 0x07 | 0x08 | 0x0A => "ld-speaker-symbolic",
-        0x06 => "ld-headphones-symbolic",
-        0x09 => "tb-device-tv-symbolic",
-        0x0B => "tb-device-tv-symbolic",
+        0x09 | 0x0B => "tb-device-tv-symbolic",
         0x0C | 0x0D => "ld-camera-symbolic",
-        0x0E | 0x0F => "ld-monitor-symbolic",
-        0x10 => "ld-monitor-symbolic",
+        0x0E | 0x0F | 0x10 => "ld-monitor-symbolic",
         0x12 => "ld-gamepad-2-symbolic",
         _ => "ld-headphones-symbolic",
     }
 }
 
-fn peripheral_icon(minor: u32) -> &'static str {
+const fn peripheral_icon(minor: u32) -> &'static str {
     let kb_pointing = minor >> 4;
     let subtype = minor & 0x0F;
     match kb_pointing {
@@ -87,7 +84,7 @@ fn peripheral_icon(minor: u32) -> &'static str {
     }
 }
 
-fn imaging_icon(minor: u32) -> &'static str {
+const fn imaging_icon(minor: u32) -> &'static str {
     if minor & 0x08 != 0 {
         return "ld-printer-symbolic";
     }
@@ -100,7 +97,8 @@ fn imaging_icon(minor: u32) -> &'static str {
     "ld-printer-symbolic"
 }
 
-pub fn battery_level_icon(percent: u8) -> &'static str {
+#[must_use]
+pub const fn battery_level_icon(percent: u8) -> &'static str {
     match percent {
         0..=5 => "tb-battery-vertical-symbolic",
         6..=25 => "tb-battery-vertical-1-symbolic",
@@ -110,6 +108,7 @@ pub fn battery_level_icon(percent: u8) -> &'static str {
     }
 }
 
+#[must_use]
 pub fn device_type_key(icon_hint: Option<&str>, class: Option<u32>) -> &'static str {
     if let Some(hint) = icon_hint {
         match hint {
@@ -144,7 +143,7 @@ pub fn device_type_key(icon_hint: Option<&str>, class: Option<u32>) -> &'static 
     }
 }
 
-fn av_type_key(minor: u32) -> &'static str {
+const fn av_type_key(minor: u32) -> &'static str {
     match minor {
         0x01 => "dropdown-bluetooth-type-headset",
         0x02 => "dropdown-bluetooth-type-handsfree",
@@ -166,7 +165,7 @@ fn av_type_key(minor: u32) -> &'static str {
     }
 }
 
-fn computer_type_key(minor: u32) -> &'static str {
+const fn computer_type_key(minor: u32) -> &'static str {
     match minor {
         0x01 => "dropdown-bluetooth-type-desktop",
         0x02 => "dropdown-bluetooth-type-server",
@@ -179,7 +178,7 @@ fn computer_type_key(minor: u32) -> &'static str {
     }
 }
 
-fn phone_type_key(minor: u32) -> &'static str {
+const fn phone_type_key(minor: u32) -> &'static str {
     match minor {
         0x01 => "dropdown-bluetooth-type-cellular",
         0x02 => "dropdown-bluetooth-type-cordless",
@@ -189,7 +188,7 @@ fn phone_type_key(minor: u32) -> &'static str {
     }
 }
 
-fn wearable_type_key(minor: u32) -> &'static str {
+const fn wearable_type_key(minor: u32) -> &'static str {
     match minor {
         0x01 => "dropdown-bluetooth-type-wrist-watch",
         0x02 => "dropdown-bluetooth-type-pager",
@@ -200,7 +199,7 @@ fn wearable_type_key(minor: u32) -> &'static str {
     }
 }
 
-fn toy_type_key(minor: u32) -> &'static str {
+const fn toy_type_key(minor: u32) -> &'static str {
     match minor {
         0x01 => "dropdown-bluetooth-type-robot",
         0x02 => "dropdown-bluetooth-type-vehicle",
@@ -211,7 +210,7 @@ fn toy_type_key(minor: u32) -> &'static str {
     }
 }
 
-fn imaging_type_key(minor: u32) -> &'static str {
+const fn imaging_type_key(minor: u32) -> &'static str {
     if minor & 0x08 != 0 {
         return "dropdown-bluetooth-type-printer";
     }
@@ -227,7 +226,7 @@ fn imaging_type_key(minor: u32) -> &'static str {
     "dropdown-bluetooth-type-imaging"
 }
 
-fn peripheral_type_key(minor: u32) -> &'static str {
+const fn peripheral_type_key(minor: u32) -> &'static str {
     let kb_pointing = minor >> 4;
     let subtype = minor & 0x0F;
     match kb_pointing {
@@ -246,6 +245,7 @@ fn peripheral_type_key(minor: u32) -> &'static str {
     }
 }
 
+#[must_use]
 pub fn format_passkey(passkey: u32) -> String {
     format!("{passkey:06}")
 }
@@ -264,6 +264,7 @@ fn extract_short_uuid(uuid: &str) -> Option<u16> {
 ///
 /// Gotten from the Bluetooth SIG Assigned Numbers:
 /// <https://www.bluetooth.com/specifications/assigned-numbers/>
+#[must_use]
 pub fn service_name_key(uuid: &str) -> &'static str {
     let Some(short) = extract_short_uuid(uuid) else {
         return "dropdown-bluetooth-service-proprietary";
@@ -306,6 +307,7 @@ impl Default for DeviceDisplayInfo {
     }
 }
 
+#[must_use]
 pub fn resolve_device_display(device: &Device) -> DeviceDisplayInfo {
     let alias = device.alias.get();
     let name = if alias.is_empty() {
@@ -342,6 +344,7 @@ pub struct DeviceSnapshot {
     pub device: Arc<Device>,
 }
 
+#[must_use]
 pub fn categorize_device(device: &Arc<Device>) -> Option<DeviceSnapshot> {
     let connected = device.connected.get();
     let paired = device.paired.get();
@@ -383,6 +386,22 @@ pub struct SplitDeviceLists {
     pub available_devices: Vec<DeviceSnapshot>,
 }
 
+fn sort_devices(list: &mut [DeviceSnapshot]) {
+    const fn category_order(cat: &DeviceCategory) -> u8 {
+        match cat {
+            DeviceCategory::Connected => 0,
+            DeviceCategory::Paired => 1,
+            DeviceCategory::Available => 2,
+        }
+    }
+    list.sort_by(|left, right| {
+        category_order(&left.category)
+            .cmp(&category_order(&right.category))
+            .then_with(|| left.name.cmp(&right.name))
+    });
+}
+
+#[must_use]
 pub fn build_split_device_lists(devices: &[Arc<Device>]) -> SplitDeviceLists {
     let mut my_devices = Vec::new();
     let mut available_devices = Vec::new();
@@ -399,21 +418,6 @@ pub fn build_split_device_lists(devices: &[Arc<Device>]) -> SplitDeviceLists {
                 available_devices.push(snapshot);
             }
         }
-    }
-
-    fn sort_devices(list: &mut [DeviceSnapshot]) {
-        list.sort_by(|left, right| {
-            fn category_order(cat: &DeviceCategory) -> u8 {
-                match cat {
-                    DeviceCategory::Connected => 0,
-                    DeviceCategory::Paired => 1,
-                    DeviceCategory::Available => 2,
-                }
-            }
-            category_order(&left.category)
-                .cmp(&category_order(&right.category))
-                .then_with(|| left.name.cmp(&right.name))
-        });
     }
 
     sort_devices(&mut my_devices);
@@ -749,8 +753,8 @@ mod tests {
     fn passkey_zero_padded() {
         assert_eq!(format_passkey(0), "000000");
         assert_eq!(format_passkey(42), "000042");
-        assert_eq!(format_passkey(123456), "123456");
-        assert_eq!(format_passkey(999999), "999999");
+        assert_eq!(format_passkey(123_456), "123456");
+        assert_eq!(format_passkey(999_999), "999999");
     }
 
     #[test]

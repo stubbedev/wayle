@@ -29,7 +29,7 @@ pub struct Workspace {
 impl Workspace {
     pub(crate) fn from_reply(reply: &WorkspaceReply) -> Self {
         Self {
-            id: Property::new(reply.id as u64),
+            id: Property::new(reply.id.cast_unsigned()),
             num: Property::new(reply.num),
             name: Property::new(reply.name.clone()),
             output: Property::new(reply.output.clone()),
@@ -40,7 +40,7 @@ impl Workspace {
     }
 
     pub(crate) fn refresh_from_reply(&self, reply: &WorkspaceReply) {
-        self.id.set(reply.id as u64);
+        self.id.set(reply.id.cast_unsigned());
         self.num.set(reply.num);
         self.name.set(reply.name.clone());
         self.output.set(reply.output.clone());

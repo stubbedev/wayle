@@ -31,7 +31,7 @@ pub fn spawn_watchers(
 }
 
 fn spawn_service_watcher(sender: &ComponentSender<MangoWorkspaces>, mango: Arc<MangoService>) {
-    sender.command(move |out, shutdown| watch_service_changes(mango.clone(), out, shutdown));
+    sender.command(move |out, shutdown| watch_service_changes(mango, out, shutdown));
 }
 
 async fn watch_service_changes(

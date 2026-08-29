@@ -20,7 +20,7 @@ impl SettingRow {
             && !self.config_matches_default
     }
 
-    pub(super) fn source_css_class(&self) -> &'static str {
+    pub(super) const fn source_css_class(&self) -> &'static str {
         match self.source {
             ValueSource::Default => "",
             ValueSource::Config => "info",

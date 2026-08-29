@@ -1,8 +1,10 @@
 //! Custom revealer driving enter/exit transitions via a per-frame
-//! `GskTransform` + opacity, so it can do effects GtkRevealer can't (bounce,
-//! genie) on top of the GtkRevealer-equivalent set. Consumes
-//! [`AnimationType`] directly; pair with a `gtk::Window` map/unmap like the old
-//! revealers (see `shell::helpers::surface_anim`).
+//! `GskTransform` + opacity.
+//!
+//! Can do effects `GtkRevealer` can't (bounce, genie) on top of the
+//! `GtkRevealer`-equivalent set. Consumes [`AnimationType`] directly; pair
+//! with a `gtk::Window` map/unmap like the old revealers (see
+//! `shell::helpers::surface_anim`).
 
 mod imp;
 
@@ -70,7 +72,7 @@ impl WayleRevealer {
     /// Sets (or clears with `None`) the single child.
     pub fn set_child(&self, child: Option<&impl IsA<gtk4::Widget>>) {
         self.imp()
-            .set_child(child.map(|c| c.upcast_ref::<gtk4::Widget>()));
+            .set_child(child.map(glib::object::Cast::upcast_ref::<gtk4::Widget>));
     }
 
     /// The current child, if any.

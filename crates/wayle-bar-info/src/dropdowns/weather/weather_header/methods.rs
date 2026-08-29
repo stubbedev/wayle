@@ -53,7 +53,7 @@ impl WeatherHeader {
         &self.icon_name
     }
 
-    pub fn icon_color_class(&self) -> &str {
+    pub const fn icon_color_class(&self) -> &str {
         self.icon_color_class
     }
 
@@ -61,7 +61,7 @@ impl WeatherHeader {
         &self.temp_value
     }
 
-    pub fn temp_unit(&self) -> &str {
+    pub const fn temp_unit(&self) -> &str {
         self.temp_unit
     }
 

@@ -1,13 +1,13 @@
 use std::{borrow::Cow, future::Future, sync::Arc, time::Duration};
 
 use relm4::ComponentSender;
-use wayle_media::{core::player::Player, types::*};
+use wayle_media::{core::player::Player, types::{PlaybackState, LoopMode, ShuffleMode}};
 
 use super::{PlayerView, PlayerViewCmd};
 use crate::{i18n::t, shell::bar::dropdowns::media::helpers};
 
 impl PlayerView {
-    pub fn set_active(&mut self, active: bool, sender: &ComponentSender<PlayerView>) {
+    pub fn set_active(&mut self, active: bool, sender: &ComponentSender<Self>) {
         if self.is_active == active {
             return;
         }
@@ -22,7 +22,7 @@ impl PlayerView {
 
     pub fn fire_player_command<F, Fut>(
         &self,
-        sender: &ComponentSender<PlayerView>,
+        sender: &ComponentSender<Self>,
         action: F,
         label: &'static str,
     ) where
@@ -43,9 +43,9 @@ impl PlayerView {
     pub fn update_player(
         &mut self,
         player: Option<Arc<Player>>,
-        sender: &ComponentSender<PlayerView>,
+        sender: &ComponentSender<Self>,
     ) {
-        self.player = player.clone();
+        self.player.clone_from(&player);
         self.has_player = player.is_some();
 
         let Some(player) = player else {
@@ -88,6 +88,7 @@ impl PlayerView {
         self.can_shuffle = player.can_shuffle.get();
     }
 
+    #[must_use]
     pub fn display_title(&self) -> Cow<'_, str> {
         if self.title.is_empty() {
             Cow::Owned(t!("dropdown-media-unknown-title"))
@@ -96,6 +97,7 @@ impl PlayerView {
         }
     }
 
+    #[must_use]
     pub fn display_artist(&self) -> Cow<'_, str> {
         if self.artist.is_empty() {
             Cow::Owned(t!("dropdown-media-unknown-artist"))
@@ -104,6 +106,7 @@ impl PlayerView {
         }
     }
 
+    #[must_use]
     pub fn display_album(&self) -> Cow<'_, str> {
         if self.album.is_empty() {
             Cow::Owned(t!("dropdown-media-unknown-album"))
@@ -112,6 +115,7 @@ impl PlayerView {
         }
     }
 
+    #[must_use]
     pub fn progress_fraction(&self) -> f64 {
         let Some(length) = self.length else {
             return 0.0;
@@ -120,26 +124,28 @@ impl PlayerView {
     }
 
     pub fn update_artwork_css(&self) {
-        let css = match self.cover_art.as_deref() {
-            Some(path) => {
+        let css = self.cover_art.as_deref().map_or_else(
+            || format!(".{} {{ background-image: none; }}", self.art_css_class),
+            |path| {
                 format!(
                     ".{} {{ background-image: url(\"file://{path}\"); }}",
                     self.art_css_class
                 )
-            }
-            None => format!(".{} {{ background-image: none; }}", self.art_css_class),
-        };
+            },
+        );
         self.art_css_provider.load_from_string(&css);
     }
 
-    pub fn play_pause_icon(&self) -> &'static str {
+    #[must_use]
+    pub const fn play_pause_icon(&self) -> &'static str {
         match self.playback_state {
             PlaybackState::Playing => "ld-pause-symbolic",
             PlaybackState::Paused | PlaybackState::Stopped => "ld-play-symbolic",
         }
     }
 
-    pub fn loop_icon(&self) -> &'static str {
+    #[must_use]
+    pub const fn loop_icon(&self) -> &'static str {
         match self.loop_mode {
             LoopMode::Track => "ld-repeat-1-symbolic",
             LoopMode::None | LoopMode::Playlist | LoopMode::Unsupported => "ld-repeat-symbolic",
@@ -164,7 +170,7 @@ impl PlayerView {
         self.seek_slider.set_value(self.progress_fraction() * 100.0);
     }
 
-    fn refresh_position_now(&self, sender: &ComponentSender<PlayerView>) {
+    fn refresh_position_now(&self, sender: &ComponentSender<Self>) {
         let Some(player) = self.player.clone() else {
             return;
         };

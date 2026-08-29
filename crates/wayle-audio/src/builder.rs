@@ -1,4 +1,4 @@
-//! Builder for configuring an AudioService.
+//! Builder for configuring an `AudioService`.
 
 use std::sync::Arc;
 
@@ -16,7 +16,7 @@ use crate::{
     service::AudioService,
 };
 
-/// Builder for configuring and creating an AudioService instance.
+/// Builder for configuring and creating an `AudioService` instance.
 ///
 /// Allows optional D-Bus daemon registration for external control.
 #[derive(Default)]
@@ -25,7 +25,8 @@ pub struct AudioServiceBuilder {
 }
 
 impl AudioServiceBuilder {
-    /// Creates a new AudioServiceBuilder with default values.
+    /// Creates a new `AudioServiceBuilder` with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -35,19 +36,20 @@ impl AudioServiceBuilder {
     /// When enabled, the service will register itself on the session bus
     /// at `com.wayle.Audio1`, allowing CLI tools and other applications
     /// to control audio devices.
-    pub fn with_daemon(mut self) -> Self {
+    #[must_use]
+    pub const fn with_daemon(mut self) -> Self {
         self.register_daemon = true;
         self
     }
 
-    /// Builds and initializes the AudioService.
+    /// Builds and initializes the `AudioService`.
     ///
-    /// This will establish a PulseAudio connection and start monitoring
+    /// This will establish a `PulseAudio` connection and start monitoring
     /// for device changes. If `with_daemon()` was called, the service
     /// will also register on the session bus for external control.
     ///
     /// # Errors
-    /// Returns error if PulseAudio connection fails or monitoring cannot be started.
+    /// Returns error if `PulseAudio` connection fails or monitoring cannot be started.
     pub async fn build(self) -> Result<Arc<AudioService>, Error> {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let (event_tx, _) = broadcast::channel(100);

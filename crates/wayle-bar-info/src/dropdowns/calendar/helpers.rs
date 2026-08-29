@@ -27,10 +27,10 @@ pub fn ampm_text(now: &DateTime<Local>) -> String {
 }
 
 pub fn format_date_rest(months: &[String; 12], now: &DateTime<Local>) -> String {
-    let month_idx = now.month0() as usize;
+    let month_idx = usize::try_from(now.month0()).unwrap_or_default();
     t!(
         "cal-clock-date-rest",
-        month = months[month_idx].clone(),
+        month = months.get(month_idx).cloned().unwrap_or_default(),
         day = now.day().to_string(),
         year = now.year().to_string()
     )
@@ -60,8 +60,12 @@ pub fn weekdays_array(week_start: Weekday) -> [String; 7] {
         t!("cal-weekday-sat"),
     ];
     // Rotate left by the start day's Sunday-offset so week_start lands at col 0.
-    let rot = week_start.num_days_from_sunday() as usize;
-    std::array::from_fn(|i| base[(rot + i) % 7].clone())
+    let rot = usize::try_from(week_start.num_days_from_sunday()).unwrap_or_default();
+    std::array::from_fn(|i| {
+        base.get(rot.saturating_add(i) % 7)
+            .cloned()
+            .unwrap_or_default()
+    })
 }
 
 pub fn months_array() -> [String; 12] {

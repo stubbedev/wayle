@@ -150,7 +150,7 @@ impl Component for BatterySection {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let current_service = init.power_profiles.get();
@@ -158,8 +158,7 @@ impl Component for BatterySection {
 
         let power_profile = current_service
             .as_ref()
-            .map(|service| service.power_profiles.active_profile.get())
-            .unwrap_or(PowerProfile::Balanced);
+            .map_or(PowerProfile::Balanced, |service| service.power_profiles.active_profile.get());
 
         watchers::spawn_power_profiles_watcher(&sender, &init.power_profiles);
 
@@ -173,11 +172,10 @@ impl Component for BatterySection {
         let percentage = init
             .battery
             .as_ref()
-            .map(|battery| {
+            .map_or(0.0, |battery| {
                 watchers::spawn(&sender, battery);
                 battery.device.percentage.get()
-            })
-            .unwrap_or(0.0);
+            });
 
         let model = Self {
             power_profiles: current_service,

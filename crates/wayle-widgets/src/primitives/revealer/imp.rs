@@ -112,12 +112,18 @@ impl WidgetImpl for WayleRevealerImp {
         child.allocate(width, height, baseline, None);
     }
 
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        reason = "rendering math: f64 progress and i32 sizes narrowed to f32 for graphene"
+    )]
     fn snapshot(&self, snapshot: &gtk4::Snapshot) {
         let Some(child) = self.child.borrow().clone() else {
             return;
         };
         let transition = self.transition.get();
-        let p = self.progress.get();
+        let progress = self.progress.get();
         let obj = self.obj();
 
         // None never tweens: show the child whenever it is meant to be revealed.
@@ -127,84 +133,97 @@ impl WidgetImpl for WayleRevealerImp {
             }
             return;
         }
-        if p <= 0.0 {
+        if progress <= 0.0 {
             return;
         }
 
-        let w = obj.width() as f32;
-        let h = obj.height() as f32;
+        let width = obj.width() as f32;
+        let height = obj.height() as f32;
 
         // Slides translate the full-size child from its entry edge toward rest;
         // the revealer's overflow clip (set for slides in `set_transition`) turns
         // the offset child into a growing strip.
         if slide_axis(transition).is_some() {
             snapshot.save();
-            apply_slide(snapshot, transition, ease_in_out_cubic(p) as f32, w, h);
+            apply_slide(
+                snapshot,
+                transition,
+                ease_in_out_cubic(progress) as f32,
+                width,
+                height,
+            );
             obj.snapshot_child(&child, snapshot);
             snapshot.restore();
             return;
         }
         // Fully shown: cheap fast-path, no transform stack.
-        if p >= 1.0 {
+        if progress >= 1.0 {
             obj.snapshot_child(&child, snapshot);
             return;
         }
 
         snapshot.save();
         let alpha = match transition {
-            AnimationType::Fade => p as f32,
             AnimationType::Bounce => {
-                let s = ease_out_back(p) as f32;
-                snapshot.translate(&graphene::Point::new(w / 2.0, h / 2.0));
+                let s = ease_out_back(progress) as f32;
+                snapshot.translate(&graphene::Point::new(width / 2.0, height / 2.0));
                 snapshot.scale(s, s);
-                snapshot.translate(&graphene::Point::new(-w / 2.0, -h / 2.0));
-                p as f32
+                snapshot.translate(&graphene::Point::new(-width / 2.0, -height / 2.0));
+                progress as f32
             }
             AnimationType::Genie => {
                 apply_genie(
                     snapshot,
                     self.genie_edge.get(),
-                    ease_in_out_cubic(p) as f32,
-                    w,
-                    h,
+                    ease_in_out_cubic(progress) as f32,
+                    width,
+                    height,
                 );
-                p as f32
+                progress as f32
             }
             AnimationType::Zoom => {
-                let s = ease_in_out_cubic(p) as f32;
-                snapshot.translate(&graphene::Point::new(w / 2.0, h / 2.0));
+                let s = ease_in_out_cubic(progress) as f32;
+                snapshot.translate(&graphene::Point::new(width / 2.0, height / 2.0));
                 snapshot.scale(s, s);
-                snapshot.translate(&graphene::Point::new(-w / 2.0, -h / 2.0));
-                p as f32
+                snapshot.translate(&graphene::Point::new(-width / 2.0, -height / 2.0));
+                progress as f32
             }
             AnimationType::Rotate => {
-                let t = ease_in_out_cubic(p) as f32;
-                let s = 0.3 + 0.7 * t;
-                snapshot.translate(&graphene::Point::new(w / 2.0, h / 2.0));
+                let t = ease_in_out_cubic(progress) as f32;
+                let s = 0.7f32.mul_add(t, 0.3);
+                snapshot.translate(&graphene::Point::new(width / 2.0, height / 2.0));
                 snapshot.rotate((1.0 - t) * 180.0);
                 snapshot.scale(s, s);
-                snapshot.translate(&graphene::Point::new(-w / 2.0, -h / 2.0));
-                p as f32
+                snapshot.translate(&graphene::Point::new(-width / 2.0, -height / 2.0));
+                progress as f32
             }
             AnimationType::Flip => {
-                let t = ease_in_out_cubic(p) as f32;
-                snapshot.translate(&graphene::Point::new(w / 2.0, h / 2.0));
+                let t = ease_in_out_cubic(progress) as f32;
+                snapshot.translate(&graphene::Point::new(width / 2.0, height / 2.0));
                 snapshot.scale(t.max(0.001), 1.0);
-                snapshot.translate(&graphene::Point::new(-w / 2.0, -h / 2.0));
-                p as f32
+                snapshot.translate(&graphene::Point::new(-width / 2.0, -height / 2.0));
+                progress as f32
             }
-            // None and slides return before the transform stack (handled above).
-            AnimationType::None
+            // None and slides return before the transform stack (handled above);
+            // fade applies opacity only.
+            AnimationType::Fade
+            | AnimationType::None
             | AnimationType::SlideUp
             | AnimationType::SlideDown
             | AnimationType::SlideLeft
-            | AnimationType::SlideRight => p as f32,
+            | AnimationType::SlideRight => progress as f32,
             swing @ (AnimationType::SwingUp
             | AnimationType::SwingDown
             | AnimationType::SwingLeft
             | AnimationType::SwingRight) => {
-                apply_swing(snapshot, swing, ease_in_out_cubic(p) as f32, w, h);
-                p as f32
+                apply_swing(
+                    snapshot,
+                    swing,
+                    ease_in_out_cubic(progress) as f32,
+                    width,
+                    height,
+                );
+                progress as f32
             }
         };
         snapshot.push_opacity(f64::from(alpha.clamp(0.0, 1.0)));
@@ -263,7 +282,7 @@ impl WayleRevealerImp {
         self.genie_edge.set(edge);
     }
 
-    pub(super) fn reveal_child(&self) -> bool {
+    pub(super) const fn reveal_child(&self) -> bool {
         self.reveal.get()
     }
 
@@ -320,7 +339,7 @@ impl WayleRevealerImp {
 
         let from = self.start_progress.get();
         let to = self.target.get();
-        self.progress.set(from + (to - from) * frac);
+        self.progress.set((to - from).mul_add(frac, from));
         self.invalidate();
 
         if frac >= 1.0 {
@@ -336,7 +355,7 @@ impl WayleRevealerImp {
 
 /// Travel axis for a slide transition (the axis whose allocation is animated so
 /// the parent reflows). `None` for transitions that keep a full-size slot.
-fn slide_axis(transition: AnimationType) -> Option<gtk4::Orientation> {
+const fn slide_axis(transition: AnimationType) -> Option<gtk4::Orientation> {
     match transition {
         AnimationType::SlideUp | AnimationType::SlideDown => Some(gtk4::Orientation::Vertical),
         AnimationType::SlideLeft | AnimationType::SlideRight => Some(gtk4::Orientation::Horizontal),
@@ -347,7 +366,7 @@ fn slide_axis(transition: AnimationType) -> Option<gtk4::Orientation> {
 /// Whether the transition animates the widget's allocation (so siblings are
 /// pushed and the parent must relayout each frame). Only `None` reflows; slides
 /// keep a constant allocation and move the child in `snapshot`.
-fn animates_size(transition: AnimationType) -> bool {
+const fn animates_size(transition: AnimationType) -> bool {
     matches!(transition, AnimationType::None)
 }
 
@@ -367,7 +386,7 @@ fn apply_slide(snapshot: &gtk4::Snapshot, transition: AnimationType, t: f32, w: 
 }
 
 /// Rotate about the relevant edge for a swing transition (affine approximation
-/// of GtkRevealer's swing).
+/// of `GtkRevealer`'s swing).
 fn apply_swing(snapshot: &gtk4::Snapshot, transition: AnimationType, t: f32, w: f32, h: f32) {
     let angle = (1.0 - t) * 90.0;
     let (pivot, deg) = match transition {
@@ -385,7 +404,7 @@ fn apply_swing(snapshot: &gtk4::Snapshot, transition: AnimationType, t: f32, w: 
 /// Scale the child toward its anchored edge ("suck to a point") for genie.
 fn apply_genie(snapshot: &gtk4::Snapshot, edge: GenieEdge, t: f32, w: f32, h: f32) {
     // The collapsing axis goes to ~0; the cross axis only narrows a little.
-    let narrow = 0.15 + 0.85 * t;
+    let narrow = 0.85f32.mul_add(t, 0.15);
     let (pivot, sx, sy) = match edge {
         GenieEdge::Bottom => (graphene::Point::new(w / 2.0, h), narrow, t),
         GenieEdge::Top => (graphene::Point::new(w / 2.0, 0.0), narrow, t),
@@ -402,7 +421,7 @@ fn ease_in_out_cubic(t: f64) -> f64 {
     if t < 0.5 {
         4.0 * t * t * t
     } else {
-        let f = -2.0 * t + 2.0;
+        let f = (-2.0f64).mul_add(t, 2.0);
         1.0 - f * f * f / 2.0
     }
 }
@@ -412,7 +431,7 @@ fn ease_out_back(t: f64) -> f64 {
     const C1: f64 = 1.70158;
     const C3: f64 = C1 + 1.0;
     let f = t - 1.0;
-    1.0 + C3 * f * f * f + C1 * f * f
+    (C1 * f).mul_add(f, (C3 * f * f).mul_add(f, 1.0))
 }
 
 #[cfg(test)]

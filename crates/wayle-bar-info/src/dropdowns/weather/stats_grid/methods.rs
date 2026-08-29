@@ -14,9 +14,7 @@ impl StatsGrid {
         self.uv_index = weather.current.uv_index.get().to_string();
         self.rain_chance = weather
             .daily
-            .first()
-            .map(|day| format!("{}%", day.rain_chance.get()))
-            .unwrap_or_else(|| String::from("--"));
+            .first().map_or_else(|| String::from("--"), |day| format!("{}%", day.rain_chance.get()));
     }
 
     pub fn humidity(&self) -> &str {

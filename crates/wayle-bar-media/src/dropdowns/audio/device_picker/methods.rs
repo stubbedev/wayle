@@ -55,19 +55,21 @@ impl DevicePicker {
 
     pub fn build_device_list(audio: &AudioService, kind: VolumeSectionKind) -> Vec<DeviceInfo> {
         match kind {
-            VolumeSectionKind::Output => {
-                build_output_device_list(&audio.output_devices.get(), &audio.default_output.get())
-            }
-            VolumeSectionKind::Input => {
-                build_input_device_list(&audio.input_devices.get(), &audio.default_input.get())
-            }
+            VolumeSectionKind::Output => build_output_device_list(
+                &audio.output_devices.get(),
+                audio.default_output.get().as_ref(),
+            ),
+            VolumeSectionKind::Input => build_input_device_list(
+                &audio.input_devices.get(),
+                audio.default_input.get().as_ref(),
+            ),
         }
     }
 }
 
 pub fn build_output_device_list(
     devices: &[Arc<OutputDevice>],
-    default: &Option<Arc<OutputDevice>>,
+    default: Option<&Arc<OutputDevice>>,
 ) -> Vec<DeviceInfo> {
     devices
         .iter()
@@ -82,16 +84,14 @@ pub fn build_output_device_list(
                 &device.description.get(),
                 &device.properties.get(),
             ),
-            is_active: default
-                .as_ref()
-                .is_some_and(|default_device| default_device.key == device.key),
+            is_active: default.is_some_and(|default_device| default_device.key == device.key),
         })
         .collect()
 }
 
 pub fn build_input_device_list(
     devices: &[Arc<InputDevice>],
-    default: &Option<Arc<InputDevice>>,
+    default: Option<&Arc<InputDevice>>,
 ) -> Vec<DeviceInfo> {
     devices
         .iter()
@@ -107,9 +107,7 @@ pub fn build_input_device_list(
                 &device.description.get(),
                 &device.properties.get(),
             ),
-            is_active: default
-                .as_ref()
-                .is_some_and(|default_device| default_device.key == device.key),
+            is_active: default.is_some_and(|default_device| default_device.key == device.key),
         })
         .collect()
 }

@@ -47,7 +47,7 @@ impl Component for WorldClockModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();
@@ -57,7 +57,7 @@ impl Component for WorldClockModule {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: world_clock.icon_name.get().clone(),
+                icon: world_clock.icon_name.get(),
                 label,
                 tooltip: None,
                 colors: BarButtonColors {

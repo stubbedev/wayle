@@ -1,4 +1,4 @@
-//! NetworkManager VLAN Device interface.
+//! `NetworkManager` VLAN Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

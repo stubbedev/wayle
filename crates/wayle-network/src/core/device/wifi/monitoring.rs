@@ -56,7 +56,7 @@ async fn monitor_wifi(
         };
 
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("DeviceWifi monitoring cancelled for {}", device.core.object_path);
                 return;
             }

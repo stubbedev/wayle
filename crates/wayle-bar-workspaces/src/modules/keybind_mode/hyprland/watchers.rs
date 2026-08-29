@@ -13,7 +13,7 @@ use crate::shell::bar::modules::keybind_mode::messages::KeybindModeCmd;
 pub fn spawn_watchers(
     sender: &ComponentSender<HyprlandKeybindMode>,
     config: &KeybindModeConfig,
-    hyprland: &Option<Arc<HyprlandService>>,
+    hyprland: Option<&Arc<HyprlandService>>,
 ) {
     spawn_mode_watcher(sender, config, hyprland);
     spawn_config_watchers(sender, config);
@@ -22,9 +22,9 @@ pub fn spawn_watchers(
 fn spawn_mode_watcher(
     sender: &ComponentSender<HyprlandKeybindMode>,
     config: &KeybindModeConfig,
-    hyprland: &Option<Arc<HyprlandService>>,
+    hyprland: Option<&Arc<HyprlandService>>,
 ) {
-    let Some(hyprland) = hyprland.clone() else {
+    let Some(hyprland) = hyprland.cloned() else {
         warn!(
             service = "HyprlandService",
             module = "keybind-mode",
@@ -35,7 +35,7 @@ fn spawn_mode_watcher(
 
     let format = config.format.clone();
     sender.command(move |out, shutdown| {
-        watch_mode_events(hyprland.clone(), format.clone(), out, shutdown)
+        watch_mode_events(hyprland.clone(), format, out, shutdown)
     });
 }
 
@@ -88,6 +88,6 @@ fn spawn_config_watchers(
 
     let icon_name = config.icon_name.clone();
     watch!(sender, [icon_name.watch()], |out| {
-        let _ = out.send(KeybindModeCmd::UpdateIcon(icon_name.get().clone()));
+        let _ = out.send(KeybindModeCmd::UpdateIcon(icon_name.get()));
     });
 }

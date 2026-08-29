@@ -16,12 +16,12 @@ pub struct WiredContext {
 
 pub fn wifi_icon(config: &NetworkConfig, ctx: &WifiContext<'_>) -> String {
     if !ctx.enabled {
-        return config.wifi_disabled_icon.get().clone();
+        return config.wifi_disabled_icon.get();
     }
 
     match ctx.connectivity {
-        NetworkStatus::Connecting => config.wifi_acquiring_icon.get().clone(),
-        NetworkStatus::Disconnected => config.wifi_offline_icon.get().clone(),
+        NetworkStatus::Connecting => config.wifi_acquiring_icon.get(),
+        NetworkStatus::Disconnected => config.wifi_offline_icon.get(),
         NetworkStatus::Connected => {
             let icons = config.wifi_signal_icons.get();
             match ctx.strength {
@@ -30,9 +30,9 @@ pub fn wifi_icon(config: &NetworkConfig, ctx: &WifiContext<'_>) -> String {
                     icons
                         .get(idx)
                         .cloned()
-                        .unwrap_or_else(|| config.wifi_connected_icon.get().clone())
+                        .unwrap_or_else(|| config.wifi_connected_icon.get())
                 }
-                _ => config.wifi_connected_icon.get().clone(),
+                _ => config.wifi_connected_icon.get(),
             }
         }
     }
@@ -41,9 +41,7 @@ pub fn wifi_icon(config: &NetworkConfig, ctx: &WifiContext<'_>) -> String {
 pub fn wifi_label(ctx: &WifiContext<'_>) -> String {
     match ctx.connectivity {
         NetworkStatus::Connected => ctx
-            .ssid
-            .map(String::from)
-            .unwrap_or_else(|| t!("bar-network-wifi-fallback")),
+            .ssid.map_or_else(|| t!("bar-network-wifi-fallback"), String::from),
         NetworkStatus::Connecting => t!("bar-network-connecting"),
         NetworkStatus::Disconnected => t!("bar-network-disconnected"),
     }
@@ -51,9 +49,9 @@ pub fn wifi_label(ctx: &WifiContext<'_>) -> String {
 
 pub fn wired_icon(config: &NetworkConfig, ctx: &WiredContext) -> String {
     match ctx.connectivity {
-        NetworkStatus::Connected => config.wired_connected_icon.get().clone(),
-        NetworkStatus::Connecting => config.wired_acquiring_icon.get().clone(),
-        NetworkStatus::Disconnected => config.wired_disconnected_icon.get().clone(),
+        NetworkStatus::Connected => config.wired_connected_icon.get(),
+        NetworkStatus::Connecting => config.wired_acquiring_icon.get(),
+        NetworkStatus::Disconnected => config.wired_disconnected_icon.get(),
     }
 }
 

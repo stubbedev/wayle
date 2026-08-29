@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-/// Applies TOML values to the config layer of ConfigProperty fields.
+/// Applies TOML values to the config layer of `ConfigProperty` fields.
 ///
 /// Used when loading or hot-reloading config.toml. The config layer sits
 /// between defaults and runtime overrides in precedence.
@@ -15,7 +15,7 @@ pub trait ApplyConfigLayer {
     fn apply_config_layer(&self, value: &toml::Value, path: &str);
 }
 
-/// Applies TOML values to the runtime layer of ConfigProperty fields.
+/// Applies TOML values to the runtime layer of `ConfigProperty` fields.
 ///
 /// Used when loading runtime.toml (GUI overrides). The runtime layer
 /// has highest precedence, overriding both config and default values.
@@ -91,7 +91,7 @@ pub trait ResetRuntimeLayer {
 pub trait CommitConfigReload {
     /// Recomputes effective values and notifies watchers of changes.
     ///
-    /// Thanks to change detection in Property::set, watchers are only
+    /// Thanks to change detection in `Property::set`, watchers are only
     /// notified if the effective value actually changed.
     fn commit_config_reload(&self);
 }

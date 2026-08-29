@@ -202,7 +202,7 @@ impl Component for Launcher {
     ) -> ComponentParts<Self> {
         let model_data = MatchModel::default();
         let selection = gtk::SingleSelection::new(Some(model_data.clone()));
-        let model = Launcher {
+        let model = Self {
             config: init,
             session: None,
             model: model_data,

@@ -48,8 +48,7 @@ impl NotificationDropdown {
             .filter(|&idx| {
                 self.groups
                     .get(idx)
-                    .map(|group| !active_keys.contains(&group.app_name))
-                    .unwrap_or(false)
+                    .is_some_and(|group| !active_keys.contains(&group.app_name))
             })
             .collect();
 
@@ -99,8 +98,7 @@ impl NotificationDropdown {
             let current_idx = (target_idx..guard.len()).find(|&idx| {
                 guard
                     .get(idx)
-                    .map(|group| &group.app_name == key)
-                    .unwrap_or(false)
+                    .is_some_and(|group| &group.app_name == key)
             });
 
             if let Some(current) = current_idx.filter(|&pos| pos != target_idx) {
@@ -113,8 +111,7 @@ impl NotificationDropdown {
         (0..self.groups.len()).find(|&idx| {
             self.groups
                 .get(idx)
-                .map(|group| &group.app_name == app_name)
-                .unwrap_or(false)
+                .is_some_and(|group| &group.app_name == app_name)
         })
     }
 }

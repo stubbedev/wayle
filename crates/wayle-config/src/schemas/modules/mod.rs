@@ -126,7 +126,7 @@ pub struct ModulesConfig {
     pub keyboard_input: KeyboardInputConfig,
     /// Unread mail count module.
     pub mail: MailConfig,
-    /// MangoWM tag switcher module.
+    /// `MangoWM` tag switcher module.
     #[serde(rename = "mango-workspaces")]
     pub mango_workspaces: MangoWorkspacesConfig,
     /// Media player module.

@@ -14,17 +14,17 @@ pub struct BluetoothContext<'a> {
 
 pub fn select_icon(config: &BluetoothConfig, ctx: &BluetoothContext<'_>) -> String {
     if !ctx.available || !ctx.enabled {
-        return config.disabled_icon.get().clone();
+        return config.disabled_icon.get();
     }
 
     if ctx.discovering {
-        return config.searching_icon.get().clone();
+        return config.searching_icon.get();
     }
 
     if ctx.connected_devices.is_empty() {
-        config.disconnected_icon.get().clone()
+        config.disconnected_icon.get()
     } else {
-        config.connected_icon.get().clone()
+        config.connected_icon.get()
     }
 }
 

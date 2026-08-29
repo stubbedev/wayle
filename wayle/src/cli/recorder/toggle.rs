@@ -7,7 +7,7 @@ pub async fn execute() -> CliAction {
     proxy
         .toggle()
         .await
-        .map_err(|e| format_error("toggle recording", e))?;
+        .map_err(|e| format_error("toggle recording", &e))?;
 
     let active = proxy.active().await.unwrap_or(false);
     println!(

@@ -108,7 +108,7 @@ impl ModuleInfoProvider for BluetoothConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("bluetooth"),
-            schema: || schema_for!(BluetoothConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("bluetooth")),
             array_entry: false,
         }

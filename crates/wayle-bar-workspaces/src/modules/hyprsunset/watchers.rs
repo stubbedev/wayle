@@ -9,8 +9,8 @@ use wayle_widgets::{watch, watch_async};
 
 use super::{HyprsunsetModule, geoclue, helpers, messages::HyprsunsetCmd};
 
-/// How often to refresh the GeoClue location once auto-schedule is running.
-const LOCATION_REFRESH: Duration = Duration::from_secs(6 * 60 * 60);
+/// How often to refresh the `GeoClue` location once auto-schedule is running.
+const LOCATION_REFRESH: Duration = Duration::from_hours(6);
 
 pub fn spawn_config_watchers(
     sender: &ComponentSender<HyprsunsetModule>,
@@ -67,7 +67,7 @@ pub fn spawn_schedule_config_watcher(
     );
 }
 
-/// Resolve the schedule location via GeoClue: once at startup (if auto-schedule
+/// Resolve the schedule location via `GeoClue`: once at startup (if auto-schedule
 /// is on), again whenever it is toggled, and refreshed on a slow timer. Failures
 /// emit nothing, so the schedule falls back to the configured lat/long.
 pub fn spawn_location_watcher(

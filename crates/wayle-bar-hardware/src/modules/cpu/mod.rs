@@ -42,7 +42,7 @@ impl Component for CpuModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();
@@ -53,7 +53,7 @@ impl Component for CpuModule {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: cpu_config.icon_name.get().clone(),
+                icon: cpu_config.icon_name.get(),
                 label: initial_label,
                 tooltip: None,
                 colors: BarButtonColors {

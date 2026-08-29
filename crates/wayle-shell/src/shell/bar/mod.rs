@@ -7,7 +7,7 @@ mod watchers;
 
 use std::rc::Rc;
 
-use factory::*;
+use factory::BarItemFactory;
 use gtk::prelude::*;
 use gtk4_layer_shell::{KeyboardMode, LayerShell};
 use relm4::{factory::FactoryVecDeque, gtk, gtk::gdk, prelude::*};
@@ -58,7 +58,7 @@ impl Component for Bar {
             add_css_class: "bar",
             set_size_request: (1, 1),
 
-            #[name = "center_box"]
+            #[name = "container"]
             gtk::CenterBox {
                 #[wrap(Some)]
                 #[name = "left_box"]
@@ -189,7 +189,7 @@ impl Component for Bar {
 
         let is_vert = model.settings.is_vertical.get();
         Self::apply_orientations(
-            &widgets.center_box,
+            &widgets.container,
             &widgets.left_box,
             &widgets.middle_box,
             &widgets.right_box,

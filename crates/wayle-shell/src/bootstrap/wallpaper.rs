@@ -67,7 +67,7 @@ fn start_cycling_from_config(
     }
 
     let mode = wallpaper_map::cycling_mode(cfg.cycling_mode.get());
-    let interval = Duration::from_secs(cfg.cycling_interval_mins.get().value() * 60);
+    let interval = Duration::from_secs(cfg.cycling_interval_mins.get().value().saturating_mul(60));
 
     if let Err(e) = service.start_cycling(PathBuf::from(directory), interval, mode) {
         warn!(error = %e, "could not start wallpaper cycling from config");

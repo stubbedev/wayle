@@ -5,9 +5,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{builder::BatteryServiceBuilder, core::device::Device, error::Error};
 
-/// Battery service for monitoring power devices via UPower.
+/// Battery service for monitoring power devices via `UPower`.
 ///
-/// Provides a high-level interface to UPower's battery monitoring,
+/// Provides a high-level interface to `UPower`'s battery monitoring,
 /// allowing access to battery state, capacity, charge status, and reactive
 /// monitoring of changes through the D-Bus interface.
 #[derive(Debug)]
@@ -15,14 +15,14 @@ pub struct BatteryService {
     #[debug(skip)]
     pub(crate) cancellation_token: CancellationToken,
 
-    /// The UPower battery device proxy for power metrics and charging state.
+    /// The `UPower` battery device proxy for power metrics and charging state.
     pub device: Arc<Device>,
 }
 
 impl BatteryService {
-    /// Creates a new battery service for the default DisplayDevice.
+    /// Creates a new battery service for the default `DisplayDevice`.
     ///
-    /// The DisplayDevice is UPower's composite device that represents the overall
+    /// The `DisplayDevice` is `UPower`'s composite device that represents the overall
     /// battery status, automatically handling multiple batteries if present.
     /// This is the recommended way to monitor battery status for most applications.
     ///
@@ -31,14 +31,15 @@ impl BatteryService {
     /// Returns `Error::InvalidObjectPath` if the device path is invalid, or
     /// `Error::Dbus` if D-Bus connection fails.
     pub async fn new() -> Result<Self, Error> {
-        Self::builder().build().await
+        Box::pin(Self::builder().build()).await
     }
 
-    /// Returns a builder for configuring a BatteryService.
+    /// Returns a builder for configuring a `BatteryService`.
     ///
     /// The builder allows monitoring a specific battery device rather than
-    /// the default aggregated DisplayDevice.
-    pub fn builder() -> BatteryServiceBuilder {
+    /// the default aggregated `DisplayDevice`.
+    #[must_use]
+    pub const fn builder() -> BatteryServiceBuilder {
         BatteryServiceBuilder::new()
     }
 }

@@ -20,11 +20,11 @@ pub(crate) fn spawn(
         loop {
             if !disks.has_subscribers() {
                 tokio::select! {
-                    _ = token.cancelled() => {
+                    () = token.cancelled() => {
                         debug!("Disk polling cancelled");
                         return;
                     }
-                    _ = disks.wait_for_subscribers() => {}
+                    () = disks.wait_for_subscribers() => {}
                 }
                 ticker.reset();
             }
@@ -42,6 +42,11 @@ pub(crate) fn spawn(
                     let available = disk.available_space();
                     let used = total.saturating_sub(available);
 
+                    #[expect(
+                        clippy::as_conversions,
+                        clippy::cast_precision_loss,
+                        reason = "u64 to f32 precision loss acceptable for percent math"
+                    )]
                     let usage_percent = if total > 0 {
                         (used as f32 / total as f32) * 100.0
                     } else {
@@ -62,7 +67,7 @@ pub(crate) fn spawn(
             disks.set(data);
 
             tokio::select! {
-                _ = token.cancelled() => {
+                () = token.cancelled() => {
                     debug!("Disk polling cancelled");
                     return;
                 }

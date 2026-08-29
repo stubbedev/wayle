@@ -1,4 +1,4 @@
-//! MangoWM tag switcher bar module.
+//! `MangoWM` tag switcher bar module.
 
 mod button;
 mod factory;

@@ -23,7 +23,7 @@ use crate::{
 /// hardware address while inheriting all base device properties through Deref.
 #[derive(Debug, Clone)]
 pub struct DeviceWired {
-    /// The underlying NetworkManager device providing core network functionality.
+    /// The underlying `NetworkManager` device providing core network functionality.
     pub core: Device,
 
     /// Permanent hardware address of the device.
@@ -76,7 +76,7 @@ impl DeviceWired {
 
         let device_type = device_proxy.device_type().await.map_err(Error::DbusError)?;
 
-        if device_type != NMDeviceType::Ethernet as u32 {
+        if NMDeviceType::from_u32(device_type) != NMDeviceType::Ethernet {
             return Err(Error::WrongObjectType {
                 object_path: device_path.clone(),
                 expected: String::from("Ethernet device"),

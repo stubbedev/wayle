@@ -23,7 +23,7 @@ pub async fn resolve_player(
     let players = proxy
         .list_players()
         .await
-        .map_err(|e| format_error("list players", e))?;
+        .map_err(|e| format_error("list players", &e))?;
 
     if players.is_empty() {
         return Err("No media players available".to_string());
@@ -33,7 +33,7 @@ pub async fn resolve_player(
         if index == 0 {
             return Err("Player numbers start at 1".to_string());
         }
-        if let Some((id, _, _)) = players.get(index - 1) {
+        if let Some((id, _, _)) = players.get(index.saturating_sub(1)) {
             return Ok(id.clone());
         }
         return Err(format!(
@@ -55,7 +55,7 @@ pub async fn resolve_player(
     let available: Vec<_> = players
         .iter()
         .enumerate()
-        .map(|(i, (_, identity, _))| format!("{}. {}", i + 1, identity))
+        .map(|(i, (_, identity, _))| format!("{}. {}", i.saturating_add(1), identity))
         .collect();
 
     Err(format!(

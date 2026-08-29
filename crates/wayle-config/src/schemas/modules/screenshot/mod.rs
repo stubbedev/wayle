@@ -121,7 +121,7 @@ impl ModuleInfoProvider for ScreenshotConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("screenshot"),
-            schema: || schema_for!(ScreenshotConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("screenshot")),
             array_entry: false,
         }

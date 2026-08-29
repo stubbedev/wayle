@@ -56,11 +56,10 @@ impl InlineStyling for BarContainer {
 
         format!(
             "* {{ \
-             --bar-container-bg: {}; \
-             --bar-container-border-color: {}; \
-             --bar-container-border-width: {}px; \
-             }}",
-            bg, border_color, border_width
+             --bar-container-bg: {bg}; \
+             --bar-container-border-color: {border_color}; \
+             --bar-container-border-width: {border_width}px; \
+             }}"
         )
     }
 }

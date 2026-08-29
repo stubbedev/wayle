@@ -17,7 +17,7 @@ pub async fn execute(player: Option<String>) -> CliAction {
         proxy
             .set_active_player(resolved.clone())
             .await
-            .map_err(|e| format_error("set active player", e))?;
+            .map_err(|e| format_error("set active player", &e))?;
 
         println!("Set active player to: {resolved}");
         return Ok(());
@@ -26,7 +26,7 @@ pub async fn execute(player: Option<String>) -> CliAction {
     let active = proxy
         .get_active_player()
         .await
-        .map_err(|e| format_error("get active player", e))?;
+        .map_err(|e| format_error("get active player", &e))?;
 
     if active.is_empty() {
         println!("No active player set");
@@ -36,17 +36,15 @@ pub async fn execute(player: Option<String>) -> CliAction {
     let info = proxy
         .get_player_info(active)
         .await
-        .map_err(|e| format_error("get player info", e))?;
+        .map_err(|e| format_error("get player info", &e))?;
 
     let name = info
         .get("identity")
-        .map(String::as_str)
-        .unwrap_or("Unknown");
+        .map_or("Unknown", String::as_str);
     let status = info
         .get("playback_state")
-        .map(String::as_str)
-        .unwrap_or("Unknown");
-    let track = info.get("title").map(String::as_str).unwrap_or("Unknown");
+        .map_or("Unknown", String::as_str);
+    let track = info.get("title").map_or("Unknown", String::as_str);
 
     println!("Active player: {name} - {track} [{status}]");
 

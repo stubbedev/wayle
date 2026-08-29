@@ -22,7 +22,7 @@ pub(crate) async fn start(
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("Agent event processor cancelled");
                     return;
                 }

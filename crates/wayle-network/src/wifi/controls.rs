@@ -281,28 +281,24 @@ impl WifiControls {
         let flags = ap_proxy
             .flags()
             .await
-            .map(NM80211ApFlags::from_bits_truncate)
-            .unwrap_or(NM80211ApFlags::NONE);
+            .map_or(NM80211ApFlags::NONE, NM80211ApFlags::from_bits_truncate);
 
         let wpa_flags = ap_proxy
             .wpa_flags()
             .await
-            .map(NM80211ApSecurityFlags::from_bits_truncate)
-            .unwrap_or(NM80211ApSecurityFlags::NONE);
+            .map_or(NM80211ApSecurityFlags::NONE, NM80211ApSecurityFlags::from_bits_truncate);
 
         let rsn_flags = ap_proxy
             .rsn_flags()
             .await
-            .map(NM80211ApSecurityFlags::from_bits_truncate)
-            .unwrap_or(NM80211ApSecurityFlags::NONE);
+            .map_or(NM80211ApSecurityFlags::NONE, NM80211ApSecurityFlags::from_bits_truncate);
 
         SecurityType::from_flags(flags, wpa_flags, rsn_flags)
     }
 
-    fn key_mgmt_for_security_type(security_type: SecurityType) -> &'static str {
+    const fn key_mgmt_for_security_type(security_type: SecurityType) -> &'static str {
         match security_type {
-            SecurityType::None => "none",
-            SecurityType::Wep => "none",
+            SecurityType::None | SecurityType::Wep => "none",
             SecurityType::Wpa | SecurityType::Wpa2 => "wpa-psk",
             SecurityType::Wpa3 => "sae",
             SecurityType::Enterprise => "wpa-eap",

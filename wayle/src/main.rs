@@ -4,7 +4,7 @@
 //! The `shell` subcommand runs the GUI directly and manages its own
 //! tokio runtime. All other commands share a single runtime.
 
-use std::process;
+use std::process::ExitCode;
 
 use clap::Parser;
 use tokio::runtime::Runtime;
@@ -13,7 +13,7 @@ use wayle::{
     core::{init, tracing as tracing_init},
 };
 
-fn main() {
+fn main() -> ExitCode {
     // `rofi` symlink/hardlink support: invoked under that name, the whole
     // arg vector is rofi-style flags — bypass clap entirely.
     if invoked_as_rofi() {
@@ -26,7 +26,7 @@ fn main() {
         Commands::Shell => return run_shell(),
         Commands::Completions { shell } => {
             cli::app::generate_completions(shell);
-            return;
+            return ExitCode::SUCCESS;
         }
         // The portal backend and picker manage their own runtime and tracing,
         // so they bypass the shared runtime below.
@@ -36,7 +36,7 @@ fn main() {
 
     let Ok(runtime) = Runtime::new() else {
         eprintln!("Failed to create tokio runtime");
-        process::exit(1);
+        return ExitCode::FAILURE;
     };
 
     let result = runtime.block_on(async {
@@ -50,8 +50,8 @@ fn main() {
 
         match cli.command {
             Commands::Audio { command } => cli::audio::execute(command).await,
-            Commands::Config { command } => cli::config::execute(command).await,
-            Commands::Icons { command } => cli::icons::execute(command).await,
+            Commands::Config { command } => Box::pin(cli::config::execute(command)).await,
+            Commands::Icons { command } => Box::pin(cli::icons::execute(command)).await,
             Commands::Media { command } => cli::media::execute(command).await,
             Commands::Notify { command } => cli::notify::execute(command).await,
             Commands::Panel { command } => cli::panel::execute(command).await,
@@ -59,7 +59,7 @@ fn main() {
             Commands::Systray { command } => cli::systray::execute(command).await,
             Commands::Wallpaper { command } => cli::wallpaper::execute(command).await,
             Commands::Idle { command } => cli::idle::execute(command).await,
-            Commands::Launcher { args } => cli::launcher::execute(args).await,
+            Commands::Launcher { args } => Box::pin(cli::launcher::execute(args)).await,
             Commands::Lock => cli::lock::execute().await,
             Commands::Recorder { command } => cli::recorder::execute(command).await,
             Commands::Screenshot { command } => cli::screenshot::execute(command).await,
@@ -83,15 +83,20 @@ fn main() {
                 .await
             }
             Commands::Shell | Commands::Completions { .. } | Commands::Portal { .. } => {
-                unreachable!()
+                #[expect(
+                    clippy::unreachable,
+                    reason = "these variants return before the runtime is created"
+                )]
+                unreachable!();
             }
         }
     });
 
     if let Err(err) = result {
         eprintln!("Error: {err}");
-        process::exit(1);
+        return ExitCode::FAILURE;
     }
+    ExitCode::SUCCESS
 }
 
 fn invoked_as_rofi() -> bool {
@@ -104,19 +109,20 @@ fn invoked_as_rofi() -> bool {
 }
 
 /// Runs the launcher with the full argv as rofi-style flags.
-fn run_rofi_compat() {
+fn run_rofi_compat() -> ExitCode {
     let Ok(runtime) = Runtime::new() else {
         eprintln!("Failed to create tokio runtime");
-        process::exit(1);
+        return ExitCode::FAILURE;
     };
     let result = runtime.block_on(cli::launcher::execute(std::env::args().skip(1).collect()));
     if let Err(err) = result {
         eprintln!("Error: {err}");
-        process::exit(1);
+        return ExitCode::FAILURE;
     }
+    ExitCode::SUCCESS
 }
 
-fn run_shell() {
+fn run_shell() -> ExitCode {
     // Editor-support schema files (config.toml JSON schema + tombi config).
     // Lives here rather than in wayle-shell's bootstrap so only this binary
     // needs wayle-config's `schema` feature (schemars stays out of the
@@ -127,8 +133,9 @@ fn run_shell() {
 
     if let Err(err) = wayle_shell::run() {
         eprintln!("Error: {err}");
-        process::exit(1);
+        return ExitCode::FAILURE;
     }
+    ExitCode::SUCCESS
 }
 
 /// Runs a `wayle portal` subcommand in a dedicated runtime, then exits with its
@@ -138,10 +145,10 @@ fn run_shell() {
 /// selection to stdout for the portal frontend to parse, so it must not
 /// initialize stdout tracing; the backend (the default) and the dialog
 /// previewer both do. The backend blocks until terminated.
-fn run_portal(command: Option<PortalCommands>) {
+fn run_portal(command: Option<PortalCommands>) -> ExitCode {
     let Ok(runtime) = Runtime::new() else {
         eprintln!("Failed to create tokio runtime");
-        process::exit(1);
+        return ExitCode::FAILURE;
     };
 
     let code = runtime.block_on(async {
@@ -165,9 +172,9 @@ fn run_portal(command: Option<PortalCommands>) {
                 if let Err(err) = tracing_init::init_cli_mode() {
                     eprintln!("Failed to initialize tracing: {err}");
                 }
-                cli::portal::backend::execute().await
+                Box::pin(cli::portal::backend::execute()).await
             }
         }
     });
-    process::exit(code);
+    u8::try_from(code).map_or(ExitCode::FAILURE, ExitCode::from)
 }

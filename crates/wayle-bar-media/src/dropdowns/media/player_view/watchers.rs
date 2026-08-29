@@ -73,7 +73,7 @@ pub fn spawn_player(
         loop {
             tokio::select! {
                 () = &mut shutdown_fut => break,
-                _ = token.cancelled() => break,
+                () = token.cancelled() => break,
                 Some(position) = stream.next() => {
                     let _ = out.send(PlayerViewCmd::PositionTick(position));
                 }

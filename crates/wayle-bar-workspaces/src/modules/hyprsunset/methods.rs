@@ -22,11 +22,11 @@ impl HyprsunsetModule {
         sender.oneshot_command(async move {
             if enabled {
                 debug!("stopping hyprsunset");
-                let _ = helpers::stop().await;
+                let _ = helpers::stop();
                 HyprsunsetCmd::StateChanged(None)
             } else {
                 debug!(temp, gamma, "starting hyprsunset");
-                let _ = helpers::start(temp, gamma).await;
+                let _ = helpers::start(temp, gamma);
                 HyprsunsetCmd::StateChanged(Some(helpers::HyprsunsetState { temp, gamma }))
             }
         });
@@ -48,7 +48,7 @@ impl HyprsunsetModule {
         // GeoClue location wins when available; otherwise the configured coords.
         let (lat, lng) = self
             .geo_location
-            .unwrap_or((config.latitude.get(), config.longitude.get()));
+            .unwrap_or_else(|| (config.latitude.get(), config.longitude.get()));
         let phase = solar::phase_at(Utc::now(), lat, lng);
         let phase_changed = self.auto_phase != Some(phase);
         self.auto_phase = Some(phase);
@@ -72,13 +72,13 @@ impl HyprsunsetModule {
             let gamma = config.gamma.get();
             debug!(temp, gamma, "auto-schedule: night, enabling filter");
             sender.oneshot_command(async move {
-                let _ = helpers::start(temp, gamma).await;
+                let _ = helpers::start(temp, gamma);
                 HyprsunsetCmd::StateChanged(Some(helpers::HyprsunsetState { temp, gamma }))
             });
         } else {
             debug!("auto-schedule: day, disabling filter");
             sender.oneshot_command(async move {
-                let _ = helpers::stop().await;
+                let _ = helpers::stop();
                 HyprsunsetCmd::StateChanged(None)
             });
         }

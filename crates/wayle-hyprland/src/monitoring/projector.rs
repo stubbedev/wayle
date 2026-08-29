@@ -24,7 +24,7 @@ pub(super) fn spawn(runtime: SyncRuntime) {
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = runtime.cancellation_token.cancelled() => {
+                () = runtime.cancellation_token.cancelled() => {
                     return;
                 }
                 event = event_rx.recv() => {
@@ -60,7 +60,7 @@ async fn project_event_burst(
             Ok(event) => {
                 record_event(&mut events, &mut merged_plan, event);
             }
-            Err(TryRecvError::Empty) | Err(TryRecvError::Closed) => {
+            Err(TryRecvError::Empty | TryRecvError::Closed) => {
                 break;
             }
             Err(TryRecvError::Lagged(skipped)) => {

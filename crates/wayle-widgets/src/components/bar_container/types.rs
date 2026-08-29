@@ -42,7 +42,7 @@ impl Debug for BarContainerBehavior {
     }
 }
 
-/// Initialization data for BarContainer.
+/// Initialization data for `BarContainer`.
 #[derive(Debug, Clone)]
 pub struct BarContainerInit {
     /// Container-specific color configuration.

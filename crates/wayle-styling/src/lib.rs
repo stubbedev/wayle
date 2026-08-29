@@ -44,6 +44,7 @@ pub const COMPONENT_CSS_PRIORITY: u32 = 1000;
 /// Returns the SCSS source directory path.
 ///
 /// Only useful during development for hot-reload watching.
+#[must_use]
 pub fn scss_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("scss")
 }
@@ -51,6 +52,7 @@ pub fn scss_dir() -> PathBuf {
 /// Generates CSS custom property overrides for the current theme.
 ///
 /// Returns a `:root { ... }` block that sets all dynamic values.
+#[must_use]
 pub fn theme_css(
     palette: &Palette,
     general: &GeneralConfig,
@@ -67,7 +69,7 @@ pub fn theme_css(
     let bar_values = bar_rounding.to_bar_css_values();
     let bar_button_values = button_rounding.to_bar_element_css_values();
     let bar_group_values = group_rounding.to_bar_element_css_values();
-    let dropdown_opacity = (bar.dropdown_opacity.get().value() as f32) / 100.0;
+    let dropdown_opacity = f32::from(bar.dropdown_opacity.get().value()) / 100.0;
     let dropdown_surface = hex_to_rgba(&resolved.surface, dropdown_opacity);
 
     // Bar button sizes accept a scale multiplier or absolute pixels. The scale
@@ -207,6 +209,7 @@ pub fn try_user_css(config_dir: &Path) -> Result<String, Error> {
 }
 
 /// Returns `<config_dir>/styles/` if it exists, otherwise `None`.
+#[must_use]
 pub fn user_styles_dir(config_dir: &Path) -> Option<PathBuf> {
     let dir = config_dir.join("styles");
 
@@ -258,6 +261,7 @@ pub fn ensure_user_styles_scaffold(config_dir: &Path) {
 /// # Errors
 ///
 /// Never errors -- falls back to the built-in palette if provider loading fails.
+#[must_use]
 pub fn resolve_palette(fallback: &Palette, styling: &StylingConfig) -> Palette {
     use palette_provider::{matugen, pywal, wallust};
 

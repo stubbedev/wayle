@@ -38,6 +38,10 @@ impl NetworkServiceDiscovery {
 
             let device_type = device_proxy.device_type().await.map_err(Error::DbusError)?;
 
+            #[expect(
+                clippy::as_conversions,
+                reason = "enum discriminant comparison with D-Bus u32"
+            )]
             if device_type == target_type as u32 {
                 if !prefer_active {
                     return Ok(Some(path));

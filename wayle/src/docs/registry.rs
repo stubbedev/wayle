@@ -21,6 +21,7 @@ pub struct ModuleRegistry;
 
 impl ModuleRegistry {
     /// Every registered entry, sorted by name for deterministic output.
+    #[must_use]
     pub fn entries() -> Vec<ModuleEntry> {
         let mut entries: Vec<ModuleEntry> = docs::inventory::iter::<ModuleRegistration>()
             .map(|registration| {
@@ -35,6 +36,7 @@ impl ModuleRegistry {
 
     /// The entry whose name matches, or `None` if nothing is registered under
     /// that name.
+    #[must_use]
     pub fn find(name: &str) -> Option<ModuleEntry> {
         Self::entries()
             .into_iter()
@@ -42,6 +44,7 @@ impl ModuleRegistry {
     }
 
     /// Sorted names of every registered entry.
+    #[must_use]
     pub fn names() -> Vec<String> {
         Self::entries()
             .into_iter()

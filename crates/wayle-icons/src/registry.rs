@@ -16,7 +16,7 @@ use crate::{
 
 const SYSTEM_ICONS_PATH: &str = "/usr/share/wayle/icons";
 
-const INDEX_THEME_CONTENT: &str = r#"[Icon Theme]
+const INDEX_THEME_CONTENT: &str = r"[Icon Theme]
 Name=Wayle Icons
 Comment=Icons installed by Wayle
 Directories=hicolor/scalable/actions
@@ -26,9 +26,9 @@ Size=48
 MinSize=16
 MaxSize=512
 Type=Scalable
-"#;
+";
 
-/// Manages GTK IconTheme registration for Wayle icons.
+/// Manages GTK `IconTheme` registration for Wayle icons.
 ///
 /// [`IconRegistry::init`] should be invoked at application startup to ensure
 /// GTK can discover icons installed via `wayle icons install`.
@@ -54,7 +54,8 @@ impl IconRegistry {
     /// Creates a registry with a custom icon directory.
     ///
     /// Useful for testing or custom configurations.
-    pub fn with_path(base_path: PathBuf) -> Self {
+    #[must_use]
+    pub const fn with_path(base_path: PathBuf) -> Self {
         Self { base_path }
     }
 
@@ -66,25 +67,24 @@ impl IconRegistry {
     ///
     /// Returns error if `$HOME` is not set and `$XDG_DATA_HOME` is also unset.
     pub fn default_path() -> Result<PathBuf> {
-        let data_home = match std::env::var("XDG_DATA_HOME") {
-            Ok(path) => PathBuf::from(path),
-            Err(_) => {
-                let home = std::env::var("HOME").map_err(|_| Error::HomeNotSet)?;
-                PathBuf::from(home).join(".local").join("share")
-            }
+        let data_home = if let Ok(path) = std::env::var("XDG_DATA_HOME") { PathBuf::from(path) } else {
+            let home = std::env::var("HOME").map_err(|_| Error::HomeNotSet)?;
+            PathBuf::from(home).join(".local").join("share")
         };
 
         Ok(data_home.join("wayle").join("icons"))
     }
 
     /// Returns the base path for this registry.
-    pub fn base_path(&self) -> &PathBuf {
+    #[must_use]
+    pub const fn base_path(&self) -> &PathBuf {
         &self.base_path
     }
 
     /// Returns the directory where SVG icons are stored.
     ///
     /// This is `<base_path>/hicolor/scalable/actions/`.
+    #[must_use]
     pub fn icons_dir(&self) -> PathBuf {
         self.base_path
             .join("hicolor")
@@ -111,7 +111,7 @@ impl IconRegistry {
     ///
     /// 1. Creates the icon directory structure if it doesn't exist
     /// 2. Creates the `index.theme` file if missing
-    /// 3. Registers the directory with GTK's IconTheme
+    /// 3. Registers the directory with GTK's `IconTheme`
     /// 4. Starts a background watcher that refreshes icons when files change
     ///
     /// Should be invoked once at application startup before displaying any
@@ -217,7 +217,7 @@ impl IconRegistry {
 
     /// Forces GTK to rescan icon directories and pick up newly installed icons.
     ///
-    /// GTK's IconTheme caches directory contents at startup and doesn't
+    /// GTK's `IconTheme` caches directory contents at startup and doesn't
     /// automatically detect new files. This is needed after installing icons
     /// via CLI while a GUI application is running.
     ///
@@ -250,7 +250,7 @@ impl IconRegistry {
         }
         paths.extend(existing);
 
-        let path_refs: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
+        let path_refs: Vec<&std::path::Path> = paths.iter().map(std::path::PathBuf::as_path).collect();
         icon_theme.set_search_path(&path_refs);
 
         Ok(())
@@ -280,6 +280,7 @@ impl IconRegistry {
     /// Returns `true` if:
     /// - The icons directory exists
     /// - The index.theme file exists
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         self.icons_dir().exists() && self.base_path.join("index.theme").exists()
     }

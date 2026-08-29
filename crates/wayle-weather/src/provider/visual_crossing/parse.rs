@@ -58,7 +58,7 @@ pub fn build_hourly(data: &ApiResponse, count: usize) -> Result<Vec<HourlyForeca
                 &day.sunrise,
                 &day.sunset,
             )?);
-            collected += 1;
+            collected = collected.saturating_add(1);
         }
 
         if collected >= count {
@@ -112,7 +112,7 @@ fn build_daily_forecast(day_data: &DayData) -> Result<DailyForecast> {
 
     let temp_high = temperature(day_data.tempmax)?;
     let temp_low = temperature(day_data.tempmin)?;
-    let avg = (temp_high.celsius() + temp_low.celsius()) / 2.0;
+    let avg = f32::midpoint(temp_high.celsius(), temp_low.celsius());
 
     Ok(DailyForecast {
         date,
@@ -142,36 +142,86 @@ fn parse_time(s: &str) -> Result<NaiveTime> {
 }
 
 fn temperature(celsius: f64) -> Result<Temperature> {
-    Temperature::new(celsius as f32).ok_or_else(|| Error::parse(PROVIDER, "invalid temperature"))
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for temperature"
+    )]
+    let celsius = celsius as f32;
+    Temperature::new(celsius).ok_or_else(|| Error::parse(PROVIDER, "invalid temperature"))
 }
 
 fn percentage(percent: f64) -> Percentage {
-    Percentage::saturating(percent.clamp(0.0, 100.0) as u8)
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "clamped to 0..=100 before cast"
+    )]
+    let percent = percent.clamp(0.0, 100.0) as u8;
+    Percentage::saturating(percent)
 }
 
 fn speed(kmh: f64) -> Result<Speed> {
-    Speed::new(kmh.max(0.0) as f32).ok_or_else(|| Error::parse(PROVIDER, "invalid speed"))
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for wind speed"
+    )]
+    let kmh = kmh.max(0.0) as f32;
+    Speed::new(kmh).ok_or_else(|| Error::parse(PROVIDER, "invalid speed"))
 }
 
-fn wind_dir(degrees: f64) -> WindDirection {
-    WindDirection::saturating(degrees.max(0.0) as u16)
+const fn wind_dir(degrees: f64) -> WindDirection {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "clamped to non-negative, wind direction fits u16"
+    )]
+    let degrees = degrees.max(0.0) as u16;
+    WindDirection::saturating(degrees)
 }
 
 fn uv(index: f64) -> UvIndex {
-    UvIndex::saturating(index.clamp(0.0, 15.0) as u8)
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "clamped to 0..=15 before cast"
+    )]
+    let index = index.clamp(0.0, 15.0) as u8;
+    UvIndex::saturating(index)
 }
 
 fn pressure(hpa: f64) -> Result<Pressure> {
-    Pressure::new(hpa.max(0.0) as f32).ok_or_else(|| Error::parse(PROVIDER, "invalid pressure"))
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for pressure"
+    )]
+    let hpa = hpa.max(0.0) as f32;
+    Pressure::new(hpa).ok_or_else(|| Error::parse(PROVIDER, "invalid pressure"))
 }
 
 fn visibility(km: f64) -> Result<Distance> {
-    Distance::new(km.max(0.0) as f32).ok_or_else(|| Error::parse(PROVIDER, "invalid visibility"))
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for visibility"
+    )]
+    let km = km.max(0.0) as f32;
+    Distance::new(km).ok_or_else(|| Error::parse(PROVIDER, "invalid visibility"))
 }
 
 fn precip(mm: f64) -> Result<Precipitation> {
-    Precipitation::new(mm.max(0.0) as f32)
-        .ok_or_else(|| Error::parse(PROVIDER, "invalid precipitation"))
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for precipitation"
+    )]
+    let mm = mm.max(0.0) as f32;
+    Precipitation::new(mm).ok_or_else(|| Error::parse(PROVIDER, "invalid precipitation"))
 }
 
 fn is_daytime(current: &str, sunrise: &str, sunset: &str) -> bool {

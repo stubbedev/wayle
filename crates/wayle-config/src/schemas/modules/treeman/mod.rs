@@ -131,7 +131,7 @@ impl ModuleInfoProvider for TreemanConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("treeman"),
-            schema: || schema_for!(TreemanConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("treeman")),
             array_entry: false,
         }

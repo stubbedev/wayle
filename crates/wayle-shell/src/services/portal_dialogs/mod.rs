@@ -1,6 +1,6 @@
 //! Portal dialog service exposing `com.wayle.PortalDialogs1` on the session bus.
 //!
-//! Bridges the portal backend's Access / Account / AppChooser / DynamicLauncher
+//! Bridges the portal backend's Access / Account / `AppChooser` / `DynamicLauncher`
 //! interfaces to the GTK-thread [`PortalDialogs`] host.
 //!
 //! [`PortalDialogs`]: crate::shell::portal_dialogs::PortalDialogs

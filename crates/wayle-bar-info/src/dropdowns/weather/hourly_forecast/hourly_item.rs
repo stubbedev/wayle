@@ -10,7 +10,7 @@ pub struct HourlyItem {
 
 #[relm4::factory(pub)]
 impl FactoryComponent for HourlyItem {
-    type Init = HourlyItem;
+    type Init = Self;
     type Input = ();
     type Output = ();
     type CommandOutput = ();

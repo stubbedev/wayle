@@ -1,4 +1,4 @@
-//! NetworkManager MACsec Device interface.
+//! `NetworkManager` `MACsec` Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 
@@ -43,19 +43,19 @@ pub(crate) trait DeviceMacsec {
     #[zbus(property)]
     fn encrypt(&self) -> zbus::Result<bool>;
 
-    /// Whether the SCI is always included in transmitted SecTAG.
+    /// Whether the SCI is always included in transmitted `SecTAG`.
     #[zbus(property)]
     fn protect(&self) -> zbus::Result<bool>;
 
-    /// Whether the SCI is always included in transmitted SecTAG.
+    /// Whether the SCI is always included in transmitted `SecTAG`.
     #[zbus(property)]
     fn include_sci(&self) -> zbus::Result<bool>;
 
-    /// Whether the ES (End Station) bit is set in transmitted SecTAG.
+    /// Whether the ES (End Station) bit is set in transmitted `SecTAG`.
     #[zbus(property)]
     fn es(&self) -> zbus::Result<bool>;
 
-    /// Whether the SCB (Single Copy Broadcast) bit is set in transmitted SecTAG.
+    /// Whether the SCB (Single Copy Broadcast) bit is set in transmitted `SecTAG`.
     #[zbus(property)]
     fn scb(&self) -> zbus::Result<bool>;
 

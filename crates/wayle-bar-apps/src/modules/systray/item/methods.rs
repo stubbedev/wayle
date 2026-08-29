@@ -306,7 +306,7 @@ fn override_model_button_layout(widget: &gtk::Widget) {
 }
 
 /// GTK4 hides the icon on model buttons that have a label. If the icon
-/// actually has content (a theme icon, GIcon, or paintable), force it visible.
+/// actually has content (a theme icon, `GIcon`, or paintable), force it visible.
 fn force_icon_visible(button: &gtk::Widget) {
     let mut child = button.first_child();
 

@@ -33,14 +33,17 @@ use crate::{process, shell::bar::dropdowns};
 const REM_BASE_PX: f32 = 16.0;
 
 impl NiriWorkspaces {
+    #[must_use]
     pub fn bar_monitor(&self) -> Option<&str> {
         self.settings.monitor_name.as_deref()
     }
 
+    #[must_use]
     pub fn is_vertical(&self) -> bool {
         self.settings.is_vertical.get()
     }
 
+    #[must_use]
     pub fn orientation(&self) -> gtk::Orientation {
         if self.is_vertical() {
             gtk::Orientation::Vertical
@@ -114,7 +117,7 @@ impl NiriWorkspaces {
         self.update_border_classes(ws_config.border_show.get());
     }
 
-    pub fn sync_blink(&mut self, sender: &ComponentSender<NiriWorkspaces>) {
+    pub fn sync_blink(&mut self, sender: &ComponentSender<Self>) {
         match (self.urgent_present, self.blink_token.is_some()) {
             (true, false) => self.start_blink_timer(sender),
             (false, true) => self.stop_blink_timer(),
@@ -122,7 +125,7 @@ impl NiriWorkspaces {
         }
     }
 
-    pub fn start_blink_timer(&mut self, sender: &ComponentSender<NiriWorkspaces>) {
+    pub fn start_blink_timer(&mut self, sender: &ComponentSender<Self>) {
         self.stop_blink_timer();
         self.blink_on = true;
 
@@ -273,7 +276,7 @@ fn any_urgent(displayed: &[WorkspaceSnapshot], windows: &HashMap<u64, Arc<Window
     urgent_workspace || urgent_window
 }
 
-fn action_label(action: &Action) -> &'static str {
+const fn action_label(action: &Action) -> &'static str {
     match action {
         Action::FocusWorkspaceDown { .. } => "FocusWorkspaceDown",
         Action::FocusWorkspaceUp { .. } => "FocusWorkspaceUp",
@@ -294,8 +297,8 @@ fn windows_on_workspace(
 
     result.sort_by_key(|window| {
         let pos = window.layout.get().pos_in_scrolling_layout;
-        let primary = pos.map(|(column, _)| column).unwrap_or(usize::MAX);
-        let secondary = pos.map(|(_, tile)| tile).unwrap_or(0);
+        let primary = pos.map_or(usize::MAX, |(column, _)| column);
+        let secondary = pos.map_or(0, |(_, tile)| tile);
         (primary, secondary, window.id.get())
     });
 

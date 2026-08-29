@@ -106,7 +106,7 @@ impl PropertyHandle {
     }
 
     pub(crate) fn clear_runtime(&self) {
-        (self.clear_runtime)()
+        (self.clear_runtime)();
     }
 
     pub(crate) fn config_display(&self) -> Option<String> {

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::BuildHasher};
 
 use wayle_config::schemas::modules::AppIconSource;
 
@@ -10,13 +10,18 @@ const PA_PROP_APP_ICON_NAME: &str = "application.icon_name";
 const PA_PROP_APP_NAME: &str = "application.name";
 const PA_PROP_APP_PROCESS_BINARY: &str = "application.process.binary";
 
-pub fn is_event_stream(props: &HashMap<String, String>) -> bool {
+#[must_use]
+pub fn is_event_stream(props: &HashMap<String, String, impl BuildHasher>) -> bool {
     props
         .get(PA_PROP_STREAM_RESTORE_ID)
         .is_some_and(|id| id == PA_ROLE_EVENT)
 }
 
-pub fn stream_icon(props: &HashMap<String, String>, icon_source: AppIconSource) -> Option<String> {
+#[must_use]
+pub fn stream_icon(
+    props: &HashMap<String, String, impl BuildHasher>,
+    icon_source: AppIconSource,
+) -> Option<String> {
     if icon_source == AppIconSource::Mapped {
         let candidates = [
             PA_PROP_APP_NAME,
@@ -48,6 +53,7 @@ pub fn stream_icon(props: &HashMap<String, String>, icon_source: AppIconSource) 
     }
 }
 
+#[must_use]
 pub fn volume_icon(percentage: f64, muted: bool) -> &'static str {
     if muted || percentage <= 0.0 {
         "ld-volume-x-symbolic"
@@ -60,7 +66,8 @@ pub fn volume_icon(percentage: f64, muted: bool) -> &'static str {
     }
 }
 
-pub fn input_icon(muted: bool) -> &'static str {
+#[must_use]
+pub const fn input_icon(muted: bool) -> &'static str {
     if muted {
         "ld-mic-off-symbolic"
     } else {
@@ -68,6 +75,7 @@ pub fn input_icon(muted: bool) -> &'static str {
     }
 }
 
+#[must_use]
 pub fn app_display_name(application_name: &Option<String>, stream_name: &str) -> String {
     let name = application_name
         .as_deref()
@@ -75,35 +83,38 @@ pub fn app_display_name(application_name: &Option<String>, stream_name: &str) ->
         .unwrap_or(stream_name);
 
     let mut chars = name.chars();
-    match chars.next() {
-        Some(first) => first.to_uppercase().chain(chars).collect(),
-        None => String::new(),
-    }
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(chars).collect()
+    })
 }
 
 const PA_FORM_FACTOR: &str = "device.form_factor";
 const DEFAULT_OUTPUT_ICON: &str = "tb-device-speaker-symbolic";
 const DEFAULT_INPUT_ICON: &str = "tb-microphone-symbolic";
 
+#[must_use]
 pub fn output_device_icon(
     name: &str,
     description: &str,
-    properties: &HashMap<String, String>,
+    properties: &HashMap<String, String, impl BuildHasher>,
 ) -> &'static str {
     output_icon_from_form_factor(properties)
         .unwrap_or_else(|| output_icon_from_name(name, description))
 }
 
+#[must_use]
 pub fn input_device_icon(
     name: &str,
     description: &str,
-    properties: &HashMap<String, String>,
+    properties: &HashMap<String, String, impl BuildHasher>,
 ) -> &'static str {
     input_icon_from_form_factor(properties)
         .unwrap_or_else(|| input_icon_from_name(name, description))
 }
 
-fn output_icon_from_form_factor(properties: &HashMap<String, String>) -> Option<&'static str> {
+fn output_icon_from_form_factor(
+    properties: &HashMap<String, String, impl BuildHasher>,
+) -> Option<&'static str> {
     match properties.get(PA_FORM_FACTOR)?.as_str() {
         "internal" | "speaker" | "hifi" => Some("tb-device-speaker-symbolic"),
         "headphone" => Some("tb-headphones-symbolic"),
@@ -131,7 +142,9 @@ fn output_icon_from_name(name: &str, description: &str) -> &'static str {
     }
 }
 
-fn input_icon_from_form_factor(properties: &HashMap<String, String>) -> Option<&'static str> {
+fn input_icon_from_form_factor(
+    properties: &HashMap<String, String, impl BuildHasher>,
+) -> Option<&'static str> {
     match properties.get(PA_FORM_FACTOR)?.as_str() {
         "internal" | "microphone" => Some("tb-microphone-symbolic"),
         "headset" => Some("tb-headset-symbolic"),
@@ -155,6 +168,7 @@ fn input_icon_from_name(name: &str, description: &str) -> &'static str {
     }
 }
 
+#[must_use]
 pub fn active_port_description(
     active_port: &Option<String>,
     ports: &[wayle_audio::types::device::DevicePort],

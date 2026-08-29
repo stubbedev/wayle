@@ -92,9 +92,10 @@ lint-check:
     {{cargo}} fmt --all --check
     {{cargo}} clippy --workspace --all-targets -- -D warnings
 
-# Run the test suite.
+# Run the test suite. Doctests separately: nextest doesn't run them.
 test:
-    {{cargo}} test --workspace --no-fail-fast
+    {{cargo}} nextest run --workspace --no-fail-fast
+    {{cargo}} test --doc --workspace
 
 # Format, lint and test. Run before every release.
 check: lint test

@@ -1,4 +1,4 @@
-//! NetworkManager Virtual Ethernet Device interface.
+//! `NetworkManager` Virtual Ethernet Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

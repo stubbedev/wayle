@@ -1,4 +1,4 @@
-//! Emits one module's reference page as VitePress markdown.
+//! Emits one module's reference page as `VitePress` markdown.
 //!
 //! Each page is assembled top to bottom:
 //!
@@ -149,7 +149,7 @@ fn format_number(number: &serde_json::Number) -> String {
     };
 
     let narrowed = float_value as f32;
-    if (narrowed as f64 - float_value).abs() < f64::EPSILON * 64.0 {
+    if (f64::from(narrowed) - float_value).abs() < f64::EPSILON * 64.0 {
         return format!("{narrowed}");
     }
 

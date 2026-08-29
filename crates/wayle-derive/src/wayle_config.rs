@@ -257,7 +257,7 @@ fn validate_required_fields(
     let field_names: Vec<String> = fields
         .named
         .iter()
-        .filter_map(|field| field.ident.as_ref().map(|ident| ident.to_string()))
+        .filter_map(|field| field.ident.as_ref().map(std::string::ToString::to_string))
         .collect();
 
     let missing: Vec<&str> = required

@@ -4,6 +4,9 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 #![allow(clippy::all)]
+// bindgen output included below is generated code; strict workspace lints
+// (pedantic/nursery/restriction) don't apply to it.
+#![allow(clippy::pedantic, clippy::nursery, clippy::restriction)]
 #![allow(unsafe_op_in_unsafe_fn)]
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));

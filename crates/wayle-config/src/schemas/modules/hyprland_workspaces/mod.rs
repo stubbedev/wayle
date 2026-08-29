@@ -70,7 +70,8 @@ pub enum ActiveIndicator {
 
 impl ActiveIndicator {
     /// CSS class for this indicator style.
-    pub fn css_class(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::Background => "indicator-background",
             Self::Underline => "indicator-underline",
@@ -80,7 +81,7 @@ impl ActiveIndicator {
 
 /// Per-workspace styling override.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkspaceStyle {
     /// Custom icon for this workspace. When set, the icon is shown regardless
     /// of the module's `display-mode`, so a row can mix labelled workspaces
@@ -119,7 +120,7 @@ pub struct WorkspaceStyle {
 /// icon = "ld-scratch-symbolic"
 /// ```
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "schema", schemars(transparent))]
 pub struct WorkspaceMap(BTreeMap<i32, WorkspaceStyle>);
 
@@ -171,7 +172,7 @@ impl<'de> Deserialize<'de> for WorkspaceMap {
             let id: i32 = key.parse().map_err(serde::de::Error::custom)?;
             result.insert(id, value);
         }
-        Ok(WorkspaceMap(result))
+        Ok(Self(result))
     }
 }
 
@@ -446,7 +447,7 @@ impl ModuleInfoProvider for HyprlandWorkspacesConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("hyprland-workspaces"),
-            schema: || schema_for!(HyprlandWorkspacesConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("hyprland-workspaces")),
             array_entry: false,
         }

@@ -37,7 +37,7 @@ pub fn spawn_watchers(
         }
     );
 
-    let is_vertical_prop = is_vertical.clone();
+    let is_vertical_prop = is_vertical;
     watch!(sender, [is_vertical_prop.watch()], |out| {
         let _ = out.send(SeparatorCmd::OrientationChanged(is_vertical_prop.get()));
     });

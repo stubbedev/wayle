@@ -205,7 +205,7 @@ fn repo_header(
     button
 }
 
-fn chevron_icon(expanded: bool) -> &'static str {
+const fn chevron_icon(expanded: bool) -> &'static str {
     if expanded {
         "ld-chevron-down-symbolic"
     } else {
@@ -430,7 +430,7 @@ fn bucket_label(bucket: Bucket) -> String {
 }
 
 /// Maps a bucket to the shared `status-dot` / `badge` colour variant.
-fn dot_variant(bucket: Bucket) -> &'static str {
+const fn dot_variant(bucket: Bucket) -> &'static str {
     match bucket {
         Bucket::Stable => "success",
         Bucket::Up => "info",

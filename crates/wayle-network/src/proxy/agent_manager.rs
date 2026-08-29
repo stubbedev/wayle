@@ -15,13 +15,13 @@ pub(crate) trait AgentManager {
     ///   Identifier formatting follows the same rules as D-Bus bus names with the exception that the ':' character is not allowed.
     fn register(&self, identifier: &str) -> zbus::Result<()>;
 
-    /// Like Register() but indicates agent capabilities to NetworkManager.
+    /// Like `Register()` but indicates agent capabilities to `NetworkManager`.
     ///
     /// # Arguments
-    /// * `identifier` - See Register() for details
-    /// * `capabilities` - NMSecretAgentCapabilities flags
+    /// * `identifier` - See `Register()` for details
+    /// * `capabilities` - `NMSecretAgentCapabilities` flags
     fn register_with_capabilities(&self, identifier: &str, capabilities: u32) -> zbus::Result<()>;
 
-    /// Called by secret Agents to notify NetworkManager that they will no longer handle requests for network secrets.
+    /// Called by secret Agents to notify `NetworkManager` that they will no longer handle requests for network secrets.
     fn unregister(&self) -> zbus::Result<()>;
 }

@@ -92,7 +92,7 @@ impl Component for Calendar {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let grid = gtk::Grid::new();
@@ -114,7 +114,7 @@ impl Component for Calendar {
             month_year_pattern,
             weekdays: init.labels.weekdays,
             week_start: init.week_start,
-            grid: grid.clone(),
+            grid,
         };
 
         model.rebuild_grid(&sender);

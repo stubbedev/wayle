@@ -50,7 +50,8 @@ pub struct RunMode {
 
 impl RunMode {
     /// Create the mode. `history` enables recency ordering + recording.
-    pub fn new(config: RunConfig, history: Option<HistoryStore>) -> Self {
+    #[must_use]
+    pub const fn new(config: RunConfig, history: Option<HistoryStore>) -> Self {
         Self {
             config,
             history,
@@ -83,7 +84,7 @@ impl RunMode {
 
 #[async_trait]
 impl Mode for RunMode {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "run"
     }
 

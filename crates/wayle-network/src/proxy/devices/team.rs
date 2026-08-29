@@ -1,4 +1,4 @@
-//! NetworkManager Team Device interface.
+//! `NetworkManager` Team Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

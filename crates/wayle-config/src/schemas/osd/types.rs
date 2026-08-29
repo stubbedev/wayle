@@ -121,7 +121,7 @@ impl de::Visitor<'_> for OsdMonitorVisitor {
 /// # With a progress bar: wayle toast --preset saved --percentage 80
 /// ```
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToastPreset {
     /// Unique identifier. Trigger with `wayle toast --preset <id>`.
@@ -141,7 +141,7 @@ impl crate::docs::ModuleInfoProvider for ToastPreset {
     fn module_info() -> crate::docs::ModuleInfo {
         crate::docs::ModuleInfo {
             name: String::from("toast-preset"),
-            schema: || schemars::schema_for!(ToastPreset),
+            schema: || schemars::schema_for!(Self),
             layout_id: None,
             array_entry: true,
         }

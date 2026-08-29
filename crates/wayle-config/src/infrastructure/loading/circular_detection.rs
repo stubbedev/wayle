@@ -7,7 +7,7 @@ pub(crate) struct CircularDetector {
 }
 
 impl CircularDetector {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             import_chain: Vec::new(),
         }

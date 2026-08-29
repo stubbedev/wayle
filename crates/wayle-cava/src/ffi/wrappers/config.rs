@@ -40,20 +40,33 @@ impl Config {
         let data_format = CString::new("binary")?;
         let audio_source_str = CString::new(audio_source)?;
 
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_wrap,
+            reason = "c_char is i8 or u8 depending on target; ASCII delimiters fit both"
+        )]
+        let bar_delim = b';' as c_char;
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_wrap,
+            reason = "c_char is i8 or u8 depending on target; ASCII delimiters fit both"
+        )]
+        let frame_delim = b'\n' as c_char;
+
         let config = Box::new(config_params {
             color: ptr::null_mut(),
             bcolor: ptr::null_mut(),
-            raw_target: raw_target.as_ptr() as *mut _,
-            audio_source: audio_source_str.as_ptr() as *mut _,
+            raw_target: raw_target.as_ptr().cast_mut(),
+            audio_source: audio_source_str.as_ptr().cast_mut(),
             gradient_colors: ptr::null_mut(),
             horizontal_gradient_colors: ptr::null_mut(),
-            data_format: data_format.as_ptr() as *mut _,
+            data_format: data_format.as_ptr().cast_mut(),
             vertex_shader: ptr::null_mut(),
             fragment_shader: ptr::null_mut(),
             theme: ptr::null_mut(),
 
-            bar_delim: b';' as c_char,
-            frame_delim: b'\n' as c_char,
+            bar_delim,
+            frame_delim,
             monstercat,
             integral: 0.0,
             gravity: 0.0,
@@ -75,7 +88,7 @@ impl Config {
             col: 0,
             bgcol: 0,
             autobars: 0,
-            stereo: stereo as i32,
+            stereo: i32::from(stereo),
             raw_format: 1,
             ascii_range: 1000,
             bit_format: 16,
@@ -83,20 +96,20 @@ impl Config {
             gradient_count: 0,
             horizontal_gradient: 0,
             horizontal_gradient_count: 0,
-            fixedbars: bars as i32,
-            framerate: framerate as i32,
+            fixedbars: i32::try_from(bars).unwrap_or(i32::MAX),
+            framerate: i32::try_from(framerate).unwrap_or(i32::MAX),
             bar_width: 2,
             bar_spacing: 1,
             bar_height: 32,
-            autosens: autosens as i32,
+            autosens: i32::from(autosens),
             overshoot: 0,
-            waves: waves as i32,
+            waves: i32::try_from(waves).unwrap_or(i32::MAX),
             active: 0,
             remix: 0,
             virtual_: 0,
-            samplerate: samplerate as i32,
+            samplerate: i32::try_from(samplerate).unwrap_or(i32::MAX),
             samplebits: 16,
-            channels: channels as i32,
+            channels: i32::try_from(channels).unwrap_or(i32::MAX),
             autoconnect: 2,
             sleep_timer: 0,
             sdl_width: 1000,
@@ -129,10 +142,14 @@ impl Config {
     }
 
     pub(crate) fn as_ptr(&mut self) -> *mut config_params {
-        &mut *self.inner as *mut _
+        &raw mut *self.inner
     }
 }
 
+#[expect(
+    clippy::non_send_fields_in_send_ty,
+    reason = "raw pointers reference C-owned data kept alive by this struct"
+)]
 unsafe impl Send for Config {}
 
 unsafe impl Sync for Config {}

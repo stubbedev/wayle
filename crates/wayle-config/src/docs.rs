@@ -100,6 +100,7 @@ pub enum TypeTag {
 impl TypeTag {
     /// The schema type name this tag corresponds to (matches schemars' `$ref`
     /// output and the schema's `$defs` keys).
+    #[must_use]
     pub const fn schema_name(&self) -> &'static str {
         match self {
             Self::ColorValue => "ColorValue",
@@ -110,6 +111,7 @@ impl TypeTag {
 
 impl ConfigGroup {
     /// Catch-all "General" group. Collects every field no other group claimed.
+    #[must_use]
     pub const fn general() -> Self {
         Self {
             title: "General",
@@ -118,6 +120,7 @@ impl ConfigGroup {
     }
 
     /// "Colors" group: every field typed as `ColorValue`.
+    #[must_use]
     pub const fn colors() -> Self {
         Self {
             title: "Colors",
@@ -126,6 +129,7 @@ impl ConfigGroup {
     }
 
     /// "Click actions" group: every field typed as `ClickAction`.
+    #[must_use]
     pub const fn click() -> Self {
         Self {
             title: "Click actions",
@@ -134,6 +138,7 @@ impl ConfigGroup {
     }
 
     /// Group containing every field whose kebab-case name starts with `prefix`.
+    #[must_use]
     pub const fn prefix(title: &'static str, prefix: &'static str) -> Self {
         Self {
             title,
@@ -142,6 +147,7 @@ impl ConfigGroup {
     }
 
     /// Group containing one field by exact name.
+    #[must_use]
     pub const fn standalone(title: &'static str, field: &'static str) -> Self {
         Self {
             title,
@@ -160,12 +166,14 @@ impl GroupDefaults {
     /// Single "General" catch-all group. Matches the default
     /// [`ModuleInfoProvider::groups`] return value, so schemas rarely need to
     /// call this explicitly.
+    #[must_use]
     pub fn standard() -> Vec<ConfigGroup> {
         vec![ConfigGroup::general()]
     }
 
     /// Four groups for bar-button modules: General, Colors, Click actions,
     /// Dropdown (prefix `dropdown-`).
+    #[must_use]
     pub fn bar_button() -> Vec<ConfigGroup> {
         vec![
             ConfigGroup::general(),
@@ -186,6 +194,7 @@ pub trait ModuleInfoProvider {
 
     /// Groups to render on the page, in order. Defaults to a single
     /// catch-all "General" group.
+    #[must_use]
     fn groups() -> Vec<ConfigGroup> {
         GroupDefaults::standard()
     }

@@ -22,11 +22,11 @@ pub struct WindowTitleConfig {
     /// ## Placeholders
     ///
     /// - `{{ title }}` - Window title
-    /// - `{{ app }}` - Application name (WM_CLASS on Hyprland)
+    /// - `{{ app }}` - Application name (`WM_CLASS` on Hyprland)
     ///
     /// ## Examples
     ///
-    /// - `"{{ title }}"` - "README.md - VSCode"
+    /// - `"{{ title }}"` - "README.md - `VSCode`"
     /// - `"{{ app }}: {{ title }}"` - "firefox: GitHub"
     #[default(String::from("{{ title }}"))]
     pub format: ConfigProperty<String>,
@@ -130,7 +130,7 @@ impl ModuleInfoProvider for WindowTitleConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("window-title"),
-            schema: || schema_for!(WindowTitleConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("window-title")),
             array_entry: false,
         }

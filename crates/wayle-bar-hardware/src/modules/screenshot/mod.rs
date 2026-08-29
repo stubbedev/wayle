@@ -47,15 +47,15 @@ impl Component for ScreenshotModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = &init.config.config().modules.screenshot;
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: config.icon.get().clone(),
-                label: config.label.get().clone(),
+                icon: config.icon.get(),
+                label: config.label.get(),
                 tooltip: None,
                 colors: BarButtonColors {
                     icon_color: config.icon_color.clone(),
@@ -120,9 +120,9 @@ impl Component for ScreenshotModule {
             ScreenshotCmd::ConfigChanged => {
                 let config = &self.config.config().modules.screenshot;
                 self.bar_button
-                    .emit(BarButtonInput::SetIcon(config.icon.get().clone()));
+                    .emit(BarButtonInput::SetIcon(config.icon.get()));
                 self.bar_button
-                    .emit(BarButtonInput::SetLabel(config.label.get().clone()));
+                    .emit(BarButtonInput::SetLabel(config.label.get()));
             }
         }
     }

@@ -16,7 +16,7 @@ pub async fn execute(player: Option<String>) -> CliAction {
     proxy
         .play_pause(resolved)
         .await
-        .map_err(|e| format_error("toggle play/pause", e))?;
+        .map_err(|e| format_error("toggle play/pause", &e))?;
 
     Ok(())
 }

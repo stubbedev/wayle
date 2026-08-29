@@ -244,7 +244,7 @@ fn write_command(out: &mut String, cmd: char, coords: &[f32]) {
         if i > 0 {
             out.push(' ');
         }
-        let _ = write!(out, "{:.2}", coord);
+        let _ = write!(out, "{coord:.2}");
     }
 }
 
@@ -352,7 +352,7 @@ mod tests {
 
         #[test]
         fn returns_none_when_xml_unparseable_and_no_path_d() {
-            assert_eq!(to_symbolic(r#"<svg><not valid xml"#), None);
+            assert_eq!(to_symbolic(r"<svg><not valid xml"), None);
         }
 
         #[test]
@@ -434,7 +434,7 @@ mod tests {
             );
 
             assert!(
-                result.matches("Z").count() >= 1,
+                result.matches('Z').count() >= 1,
                 "Stroke outline must produce at least one closed subpath: {result}"
             );
         }
@@ -447,7 +447,7 @@ mod tests {
             </svg>"#,
             );
 
-            assert!(result.contains("Z"), "{result}");
+            assert!(result.contains('Z'), "{result}");
         }
 
         #[test]
@@ -464,12 +464,12 @@ mod tests {
         #[test]
         fn strips_inkscape_cruft_from_inline_style_attributes() {
             let result = transform(
-                r##"<svg viewBox="0 0 16 16"
+                r#"<svg viewBox="0 0 16 16"
                 xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
                 xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd">
                 <path style="display:inline;stop-color:#000000;stop-opacity:1"
                       d="M 2 2 L 14 2 L 14 14 L 2 14 Z"/>
-            </svg>"##,
+            </svg>"#,
             );
 
             assert!(result.contains("gpa:fill='foreground'"), "{result}");
@@ -581,7 +581,7 @@ mod tests {
 
         #[test]
         fn returns_none_when_no_path_extractable() {
-            assert_eq!(build_fallback_svg(r#"<svg><rect/></svg>"#), None);
+            assert_eq!(build_fallback_svg(r"<svg><rect/></svg>"), None);
         }
     }
 

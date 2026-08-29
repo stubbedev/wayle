@@ -11,7 +11,7 @@ pub enum WeatherPage {
 }
 
 impl WeatherPage {
-    pub fn name(self) -> &'static str {
+    pub const fn name(self) -> &'static str {
         match self {
             Self::Loading => "loading",
             Self::Loaded => "loaded",

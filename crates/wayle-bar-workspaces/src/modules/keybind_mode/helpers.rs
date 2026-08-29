@@ -12,7 +12,7 @@ pub fn format_label(format: &str, mode: &str) -> String {
     crate::template::render(format, ctx).unwrap_or_default()
 }
 
-pub fn compute_visibility(mode: &str, auto_hide: bool) -> bool {
+pub const fn compute_visibility(mode: &str, auto_hide: bool) -> bool {
     !auto_hide || !mode.is_empty()
 }
 

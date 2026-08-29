@@ -99,7 +99,7 @@ impl TreemanStatus {
     /// The most severe bucket present, for a single at-a-glance glyph:
     /// failed > down > up > stable.
     #[must_use]
-    pub fn worst_bucket(&self) -> Bucket {
+    pub const fn worst_bucket(&self) -> Bucket {
         if self.failed > 0 {
             Bucket::Failed
         } else if self.down > 0 {

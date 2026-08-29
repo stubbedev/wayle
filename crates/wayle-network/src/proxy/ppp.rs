@@ -9,7 +9,7 @@ use zbus::{proxy, zvariant::OwnedValue};
     interface = "org.freedesktop.NetworkManager.PPP"
 )]
 pub(crate) trait PPP {
-    /// Asks NetworkManager for PPP secrets.
+    /// Asks `NetworkManager` for PPP secrets.
     ///
     /// # Returns
     /// * (username, password)
@@ -30,7 +30,7 @@ pub(crate) trait PPP {
     /// Set PPP connection state.
     ///
     /// # Arguments
-    /// * `state` - NMPPPState
+    /// * `state` - `NMPPPState`
     fn set_state(&self, state: u32) -> zbus::Result<()>;
 
     /// Set the ifindex of the PPP interface.

@@ -63,6 +63,7 @@ impl NiriCommandClient {
 
         let mut reply_line = String::new();
         let bytes_read = guard.read_line(&mut reply_line).await?;
+        drop(guard);
         if bytes_read == 0 {
             return Err(Error::SocketClosed {
                 kind: SocketKind::Command,

@@ -84,6 +84,7 @@ impl SwayService {
     }
 
     /// Looks up a workspace by id in the current snapshot.
+    #[must_use]
     pub fn workspace(&self, id: u64) -> Option<Arc<Workspace>> {
         self.workspaces.get().get(&id).cloned()
     }
@@ -91,6 +92,7 @@ impl SwayService {
     /// Returns the currently focused window from the current snapshot, or
     /// `None` when focus is held by a layer-shell surface or nothing is
     /// focused.
+    #[must_use]
     pub fn focused_window(&self) -> Option<Arc<Window>> {
         self.windows
             .get()
@@ -162,8 +164,9 @@ impl SwayService {
             WorkspaceRef::Name(name) => {
                 format!("workspace --no-auto-back-and-forth {}", quote(&name))
             }
-            WorkspaceRef::Id(id) => match self.workspace(id) {
-                Some(workspace) => {
+            WorkspaceRef::Id(id) => self.workspace(id).map_or_else(
+                || format!("[con_id={id}] focus"),
+                |workspace| {
                     let num = workspace.num.get();
                     if num >= 0 {
                         format!("workspace --no-auto-back-and-forth number {num}")
@@ -173,9 +176,8 @@ impl SwayService {
                             quote(&workspace.name.get())
                         )
                     }
-                }
-                None => format!("[con_id={id}] focus"),
-            },
+                },
+            ),
         }
     }
 }

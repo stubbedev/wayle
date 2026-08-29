@@ -25,7 +25,7 @@ impl LayoutCard {
         }
     }
 
-    pub(crate) fn zone_mut(&mut self, zone: ZoneId) -> &mut Vec<BarItem> {
+    pub(crate) const fn zone_mut(&mut self, zone: ZoneId) -> &mut Vec<BarItem> {
         match zone {
             ZoneId::Left => &mut self.left,
             ZoneId::Center => &mut self.center,
@@ -33,7 +33,7 @@ impl LayoutCard {
         }
     }
 
-    pub(super) fn chips_mut(&mut self, zone: ZoneId) -> Option<&mut FactoryVecDeque<Chip>> {
+    pub(super) const fn chips_mut(&mut self, zone: ZoneId) -> Option<&mut FactoryVecDeque<Chip>> {
         match zone {
             ZoneId::Left => self.left_chips.as_mut(),
             ZoneId::Center => self.center_chips.as_mut(),
@@ -152,7 +152,7 @@ impl LayoutCard {
     pub(super) fn on_group_name_changed(
         &mut self,
         zone: ZoneId,
-        chip_index: DynamicIndex,
+        chip_index: &DynamicIndex,
         name: String,
     ) -> bool {
         let group_index = chip_index.current_index();
@@ -194,7 +194,7 @@ impl LayoutCard {
         true
     }
 
-    pub(super) fn on_remove_item(&mut self, zone: ZoneId, chip_index: DynamicIndex) -> bool {
+    pub(super) fn on_remove_item(&mut self, zone: ZoneId, chip_index: &DynamicIndex) -> bool {
         let item_index = chip_index.current_index();
         let items = self.zone_mut(zone);
         if item_index >= items.len() {
@@ -208,7 +208,7 @@ impl LayoutCard {
     pub(super) fn on_remove_group_module(
         &mut self,
         zone: ZoneId,
-        chip_index: DynamicIndex,
+        chip_index: &DynamicIndex,
         module_index: usize,
     ) -> bool {
         let group_index = chip_index.current_index();
@@ -221,7 +221,9 @@ impl LayoutCard {
         }
         group.modules.remove(module_index);
 
-        let updated = items[group_index].clone();
+        let Some(updated) = items.get(group_index).cloned() else {
+            return false;
+        };
         self.replace_chip(zone, group_index, updated);
         true
     }
@@ -229,7 +231,7 @@ impl LayoutCard {
     pub(super) fn on_add_module_to_group(
         &mut self,
         zone: ZoneId,
-        chip_index: DynamicIndex,
+        chip_index: &DynamicIndex,
         module: BarModule,
     ) -> bool {
         let group_index = chip_index.current_index();
@@ -238,7 +240,9 @@ impl LayoutCard {
             return false;
         };
         group.modules.push(ModuleRef::Plain(module));
-        let updated = items[group_index].clone();
+        let Some(updated) = items.get(group_index).cloned() else {
+            return false;
+        };
         self.replace_chip(zone, group_index, updated);
         true
     }

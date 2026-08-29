@@ -170,15 +170,14 @@ impl Component for PowerProfileSection {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let current_service = init.power_profiles.get();
 
         let active_profile = current_service
             .as_ref()
-            .map(|service| service.power_profiles.active_profile.get())
-            .unwrap_or(PowerProfile::Balanced);
+            .map_or(PowerProfile::Balanced, |service| service.power_profiles.active_profile.get());
 
         let available_profiles: Vec<PowerProfile> = current_service
             .as_ref()

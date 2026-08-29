@@ -30,7 +30,8 @@ pub enum MatugenScheme {
 
 impl MatugenScheme {
     /// Returns the CLI value for matugen's `--type` flag.
-    pub fn cli_value(self) -> &'static str {
+    #[must_use]
+    pub const fn cli_value(self) -> &'static str {
         match self {
             Self::Content => "scheme-content",
             Self::Expressive => "scheme-expressive",
@@ -96,7 +97,7 @@ pub enum WallustPalette {
     Softlightcomp,
     /// Soft light complementary with 16-color trick.
     Softlightcomp16,
-    /// ANSI-ordered dark palette for LS_COLORS.
+    /// ANSI-ordered dark palette for `LS_COLORS`.
     Ansidark,
     /// ANSI dark with 16-color trick.
     Ansidark16,
@@ -104,7 +105,8 @@ pub enum WallustPalette {
 
 impl WallustPalette {
     /// Whether this palette produces a light background.
-    pub fn is_light(self) -> bool {
+    #[must_use]
+    pub const fn is_light(self) -> bool {
         matches!(
             self,
             Self::Light
@@ -119,7 +121,8 @@ impl WallustPalette {
     }
 
     /// Returns the wallust config value.
-    pub fn config_value(self) -> &'static str {
+    #[must_use]
+    pub const fn config_value(self) -> &'static str {
         match self {
             Self::Dark16 => "dark16",
             Self::Dark => "dark",
@@ -164,7 +167,7 @@ pub enum WallustBackend {
     Full,
     /// Resizes image before sampling.
     Resized,
-    /// Uses ImageMagick convert (pywal method).
+    /// Uses `ImageMagick` convert (pywal method).
     Wal,
     /// Fixed 512x512 thumbnail.
     Thumb,
@@ -177,7 +180,8 @@ pub enum WallustBackend {
 
 impl WallustBackend {
     /// Returns the wallust config value.
-    pub fn config_value(self) -> &'static str {
+    #[must_use]
+    pub const fn config_value(self) -> &'static str {
         match self {
             Self::Full => "full",
             Self::Resized => "resized",
@@ -217,7 +221,8 @@ pub enum WallustColorspace {
 
 impl WallustColorspace {
     /// Returns the wallust config value.
-    pub fn config_value(self) -> &'static str {
+    #[must_use]
+    pub const fn config_value(self) -> &'static str {
         match self {
             Self::Lab => "lab",
             Self::Labmixed => "labmixed",
@@ -249,13 +254,13 @@ pub struct SignedNormalizedF64(
 impl SignedNormalizedF64 {
     /// Creates a value, clamping to -1.0 to 1.0.
     #[must_use]
-    pub fn new(value: f64) -> Self {
+    pub const fn new(value: f64) -> Self {
         Self(value.clamp(SIGNED_MIN, SIGNED_MAX))
     }
 
     /// Returns the inner f64 value.
     #[must_use]
-    pub fn value(self) -> f64 {
+    pub const fn value(self) -> f64 {
         self.0
     }
 }
@@ -313,13 +318,13 @@ pub struct PywalContrast(
 impl PywalContrast {
     /// Creates a contrast value, clamping to 1.0-21.0.
     #[must_use]
-    pub fn new(value: f64) -> Self {
+    pub const fn new(value: f64) -> Self {
         Self(value.clamp(PYWAL_CONTRAST_MIN, PYWAL_CONTRAST_MAX))
     }
 
     /// Returns the inner f64 value.
     #[must_use]
-    pub fn value(self) -> f64 {
+    pub const fn value(self) -> f64 {
         self.0
     }
 }

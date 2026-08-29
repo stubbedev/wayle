@@ -33,7 +33,7 @@ impl MailProvider {
     /// Default symbolic icon name for this provider. Brand icons come from the
     /// Simple Icons set (`si-*`); the generic provider uses the mail glyph.
     #[must_use]
-    pub fn default_icon(self) -> &'static str {
+    pub const fn default_icon(self) -> &'static str {
         match self {
             Self::Generic => "ld-mail-symbolic",
             Self::Gmail => "si-gmail-symbolic",
@@ -47,7 +47,7 @@ impl MailProvider {
 
     /// Simple Icons slug used to install this provider's brand icon, if any.
     #[must_use]
-    pub fn simple_icons_slug(self) -> Option<&'static str> {
+    pub const fn simple_icons_slug(self) -> Option<&'static str> {
         match self {
             Self::Generic => None,
             Self::Gmail => Some("gmail"),
@@ -74,7 +74,7 @@ impl MailProvider {
 /// provider = "gmail"
 /// ```
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct MailAccount {
     /// Display name shown in the dropdown.
@@ -108,7 +108,7 @@ impl ModuleInfoProvider for MailAccount {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("mail-account"),
-            schema: || schema_for!(MailAccount),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: true,
         }

@@ -58,7 +58,7 @@ impl BatterySection {
         }
     }
 
-    pub fn power_profile_icon(&self) -> &'static str {
+    pub const fn power_profile_icon(&self) -> &'static str {
         match self.power_profile {
             PowerProfile::PowerSaver => "ld-leaf-symbolic",
             PowerProfile::Balanced | PowerProfile::Unknown => "ld-scale-symbolic",

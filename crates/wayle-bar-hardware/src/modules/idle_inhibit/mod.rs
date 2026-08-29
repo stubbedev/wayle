@@ -48,7 +48,7 @@ impl Component for IdleInhibitModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = &init.config.config().modules.idle_inhibit;
@@ -57,7 +57,7 @@ impl Component for IdleInhibitModule {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: config.icon_inactive.get().clone(),
+                icon: config.icon_inactive.get(),
                 label: String::new(),
                 tooltip: None,
                 colors: BarButtonColors {

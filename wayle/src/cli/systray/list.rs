@@ -11,7 +11,7 @@ pub async fn execute() -> CliAction {
     let items = proxy
         .list()
         .await
-        .map_err(|e| format_error("list tray items", e))?;
+        .map_err(|e| format_error("list tray items", &e))?;
 
     if items.is_empty() {
         println!("No system tray items");

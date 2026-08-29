@@ -28,7 +28,12 @@ pub(super) fn setup_paned_clamp(paned: &gtk::Paned, config: &Config) {
     let scale_property = config.styling.scale.clone();
 
     paned.connect_position_notify(move |paned| {
-        let scale = scale_property.get().value() as f64;
+        let scale = f64::from(scale_property.get().value());
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "rounded rem-to-pixel math stays well within i32 range"
+        )]
         let max_width = (MAX_SIDEBAR_REM * BASE_PX_PER_REM * scale).round() as i32;
 
         if paned.position() > max_width {

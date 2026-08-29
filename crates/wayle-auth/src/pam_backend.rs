@@ -42,9 +42,9 @@ fn unlock_login_keyring(password: &str) {
 /// `GKD_CONTROL_OP_UNLOCK` over the gnome-keyring control socket.
 ///
 /// Wire format (gnome-keyring `pam/gkr-pam-client.c`, all u32 big-endian):
-/// one credentials byte (0x00; the kernel attaches SCM_CREDENTIALS), then
+/// one credentials byte (0x00; the kernel attaches `SCM_CREDENTIALS`), then
 /// `[packet_len][op][arg_len][arg…]`, answered by `[8][result]` where
-/// result 0 = OK, 1 = DENIED, 2 = FAILED, 3 = NO_DAEMON.
+/// result 0 = OK, 1 = DENIED, 2 = FAILED, 3 = `NO_DAEMON`.
 fn control_socket_unlock(password: &str) -> Result<(), String> {
     const OP_UNLOCK: u32 = 1;
 

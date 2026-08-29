@@ -1,4 +1,4 @@
-//! Pure hit-testing and highlight helpers for FlowBox drop targets.
+//! Pure hit-testing and highlight helpers for `FlowBox` drop targets.
 
 use gtk::prelude::*;
 use relm4::gtk;
@@ -6,8 +6,13 @@ use relm4::gtk;
 pub(super) fn compute_drop_position(container: &gtk::FlowBox, drop_x: f64, drop_y: f64) -> usize {
     let children = flow_children(container);
 
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "pointer coordinates fit comfortably in i32"
+    )]
     if let Some(hit) = container.child_at_pos(drop_x as i32, drop_y as i32) {
-        let hit_index = hit.index() as usize;
+        let hit_index = usize::try_from(hit.index()).unwrap_or(0);
         let Some(bounds) = hit.compute_bounds(container) else {
             return hit_index;
         };
@@ -16,7 +21,7 @@ pub(super) fn compute_drop_position(container: &gtk::FlowBox, drop_x: f64, drop_
         if drop_x < center_x {
             return hit_index;
         }
-        return hit_index + 1;
+        return hit_index.saturating_add(1);
     }
 
     let mut row_last: Option<usize> = None;
@@ -36,7 +41,7 @@ pub(super) fn compute_drop_position(container: &gtk::FlowBox, drop_x: f64, drop_
         row_last = Some(index);
     }
 
-    row_last.map_or(children.len(), |index| index + 1)
+    row_last.map_or(children.len(), |index| index.saturating_add(1))
 }
 
 pub(super) fn highlight_drop_position(container: &gtk::FlowBox, position: usize) {
@@ -65,7 +70,7 @@ fn flow_children(container: &gtk::FlowBox) -> Vec<gtk::FlowBoxChild> {
 
     while let Some(child) = container.child_at_index(index) {
         children.push(child);
-        index += 1;
+        index = index.saturating_add(1);
     }
 
     children

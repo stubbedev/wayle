@@ -19,7 +19,7 @@ use crate::{error::Error, proxy::ip4_config::IP4ConfigProxy};
 /// DNS servers, and other network parameters.
 #[derive(Debug, Clone)]
 pub struct Ip4Config {
-    /// D-Bus object path for this IP4Config
+    /// D-Bus object path for this `IP4Config`
     pub object_path: Property<OwnedObjectPath>,
 
     /// Array of IP address data objects.
@@ -52,7 +52,7 @@ pub struct Ip4Config {
 }
 
 /// IPv4 address with prefix length
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ipv4Address {
     /// The IPv4 address.
     pub address: Ipv4Addr,
@@ -61,7 +61,7 @@ pub struct Ipv4Address {
 }
 
 /// IPv4 route entry
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ipv4Route {
     /// Destination network address.
     pub destination: Ipv4Addr,
@@ -157,7 +157,7 @@ impl Ip4Config {
 
         Ok(Ip4ConfigProperties {
             address_data: Self::parse_address_data(unwrap_dbus!(address_data, path)),
-            gateway: Self::parse_gateway(unwrap_dbus!(gateway, path)),
+            gateway: Self::parse_gateway(&unwrap_dbus!(gateway, path)),
             nameserver_data: Self::parse_nameserver_data(unwrap_dbus!(nameserver_data, path)),
             domains: unwrap_dbus!(domains, path),
             searches: unwrap_dbus!(searches, path),
@@ -196,15 +196,14 @@ impl Ip4Config {
                 let prefix_value = entry.get("prefix")?;
                 let prefix_ref = prefix_value.downcast_ref::<&u32>().ok()?;
 
-                Some(Ipv4Address {
-                    address,
-                    prefix: *prefix_ref as u8,
-                })
+                let prefix = u8::try_from(*prefix_ref).ok()?;
+
+                Some(Ipv4Address { address, prefix })
             })
             .collect()
     }
 
-    fn parse_gateway(gateway: String) -> Option<Ipv4Addr> {
+    fn parse_gateway(gateway: &str) -> Option<Ipv4Addr> {
         match gateway.parse::<Ipv4Addr>() {
             Ok(addr) if addr.is_unspecified() => None,
             Ok(addr) => Some(addr),
@@ -227,12 +226,9 @@ impl Ip4Config {
             .filter_map(|entry| {
                 let dest_value = entry.get("dest")?;
                 let dest_str = dest_value.downcast_ref::<String>().ok()?;
-                let destination = match dest_str.parse::<Ipv4Addr>() {
-                    Ok(addr) => addr,
-                    Err(_) => {
-                        debug!("Skipping route with invalid destination IP: {}", dest_str);
-                        return None;
-                    }
+                let Ok(destination) = dest_str.parse::<Ipv4Addr>() else {
+                    debug!("Skipping route with invalid destination IP: {}", dest_str);
+                    return None;
                 };
 
                 let prefix_value = entry.get("prefix")?;

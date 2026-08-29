@@ -60,12 +60,12 @@ pub trait Audio {
 
     /// Lists all output devices (sinks).
     ///
-    /// Returns a list of tuples: (device_index, name, description).
+    /// Returns a list of tuples: (`device_index`, name, description).
     async fn list_sinks(&self) -> Result<Vec<(u32, String, String)>>;
 
     /// Lists all input devices (sources).
     ///
-    /// Returns a list of tuples: (device_index, name, description).
+    /// Returns a list of tuples: (`device_index`, name, description).
     async fn list_sources(&self) -> Result<Vec<(u32, String, String)>>;
 
     /// Gets detailed information about the default output device.

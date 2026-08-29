@@ -43,7 +43,7 @@ impl Component for HyprlandKeybindMode {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();
@@ -54,7 +54,7 @@ impl Component for HyprlandKeybindMode {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: mode_config.icon_name.get().clone(),
+                icon: mode_config.icon_name.get(),
                 label: formatted_label,
                 tooltip: None,
                 colors: BarButtonColors {
@@ -82,7 +82,7 @@ impl Component for HyprlandKeybindMode {
                 BarButtonOutput::ScrollDown => KeybindModeMsg::ScrollDown,
             });
 
-        watchers::spawn_watchers(&sender, mode_config, &init.hyprland);
+        watchers::spawn_watchers(&sender, mode_config, init.hyprland.as_ref());
 
         let model = Self {
             bar_button,

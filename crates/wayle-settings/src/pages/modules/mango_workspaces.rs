@@ -1,4 +1,4 @@
-//! MangoWM tag switcher module settings.
+//! `MangoWM` tag switcher module settings.
 
 use wayle_config::{
     Config,

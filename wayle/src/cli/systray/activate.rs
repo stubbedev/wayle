@@ -11,7 +11,7 @@ pub async fn execute(id: String) -> CliAction {
     proxy
         .activate(id.clone())
         .await
-        .map_err(|e| format_error("activate tray item", e))?;
+        .map_err(|e| format_error("activate tray item", &e))?;
 
     println!("Activated: {id}");
 

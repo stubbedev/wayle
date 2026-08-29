@@ -1,4 +1,4 @@
-//! Bluetooth device management via BlueZ D-Bus.
+//! Bluetooth device management via `BlueZ` D-Bus.
 //!
 //! # Quick Start
 //!
@@ -93,7 +93,7 @@ mod error;
 mod monitoring;
 mod proxy;
 mod service;
-/// BlueZ type definitions for adapter/device properties.
+/// `BlueZ` type definitions for adapter/device properties.
 pub mod types;
 
 pub use error::Error;

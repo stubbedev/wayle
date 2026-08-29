@@ -10,7 +10,7 @@ use crate::cli::CliAction;
 
 /// Stops the Wayle GUI panel process via D-Bus.
 ///
-/// Sends a quit action to the running GApplication instance and waits
+/// Sends a quit action to the running `GApplication` instance and waits
 /// for it to release its D-Bus name.
 ///
 /// # Errors

@@ -32,7 +32,7 @@ pub enum ClosedReason {
     Expired = 1,
     /// The notification was dismissed by the user.
     DismissedByUser = 2,
-    /// The notification was closed by a call to CloseNotification.
+    /// The notification was closed by a call to `CloseNotification`.
     Closed = 3,
     /// Undefined/reserved reasons.
     Unknown = 4,
@@ -45,6 +45,17 @@ impl From<u32> for ClosedReason {
             2 => Self::DismissedByUser,
             3 => Self::Closed,
             _ => Self::Unknown,
+        }
+    }
+}
+
+impl From<ClosedReason> for u32 {
+    fn from(value: ClosedReason) -> Self {
+        match value {
+            ClosedReason::Expired => 1,
+            ClosedReason::DismissedByUser => 2,
+            ClosedReason::Closed => 3,
+            ClosedReason::Unknown => 4,
         }
     }
 }
@@ -121,6 +132,7 @@ impl FromStr for Capabilities {
 
 impl Capabilities {
     /// Convert to string representation for D-Bus.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             Self::ActionIcons => "action-icons",
@@ -241,6 +253,7 @@ impl FromStr for Category {
 
 impl Category {
     /// Convert to string representation for hints.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             Self::Call => "call",

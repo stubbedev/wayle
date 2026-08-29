@@ -8,10 +8,13 @@ use crate::bar::icons::lookup_app_icon;
 const FALLBACK_ICON: &str = "ld-bell-symbolic";
 const MINUTES_PER_HOUR: i64 = 60;
 
+/// Escapes notification body text that Pango cannot parse as markup.
+///
 /// Some apps send notification bodies with bare `&` or other broken XML
 /// that Pango chokes on. If the text parses cleanly we leave it alone,
 /// otherwise we escape the whole thing so the label at least shows
 /// something instead of blowing up.
+#[must_use]
 pub fn sanitize_markup(text: &str) -> String {
     if pango::parse_markup(text, '\0').is_ok() {
         return text.to_owned();
@@ -30,7 +33,8 @@ pub enum ResolvedIcon {
 }
 
 /// Returns the CSS class name for a notification's urgency level.
-pub fn urgency_css_class(urgency: Urgency) -> &'static str {
+#[must_use]
+pub const fn urgency_css_class(urgency: Urgency) -> &'static str {
     match urgency {
         Urgency::Low => "low",
         Urgency::Normal => "normal",
@@ -39,11 +43,12 @@ pub fn urgency_css_class(urgency: Urgency) -> &'static str {
 }
 
 /// Whether the urgency bar should be visible for the given urgency and threshold.
-pub fn urgency_bar_visible(urgency: Urgency, threshold: UrgencyBarThreshold) -> bool {
+#[must_use]
+pub const fn urgency_bar_visible(urgency: Urgency, threshold: UrgencyBarThreshold) -> bool {
     match threshold {
         UrgencyBarThreshold::None => false,
-        UrgencyBarThreshold::Critical => urgency as u8 >= Urgency::Critical as u8,
-        UrgencyBarThreshold::Normal => urgency as u8 >= Urgency::Normal as u8,
+        UrgencyBarThreshold::Critical => matches!(urgency, Urgency::Critical),
+        UrgencyBarThreshold::Normal => matches!(urgency, Urgency::Normal | Urgency::Critical),
         UrgencyBarThreshold::Low => true,
     }
 }
@@ -57,6 +62,7 @@ pub enum RelativeTime {
 }
 
 /// Computes the relative time from a timestamp to now.
+#[must_use]
 pub fn relative_time(timestamp: &DateTime<Utc>) -> RelativeTime {
     let duration = Utc::now().signed_duration_since(timestamp);
     let minutes = duration.num_minutes();
@@ -71,6 +77,7 @@ pub fn relative_time(timestamp: &DateTime<Utc>) -> RelativeTime {
 }
 
 /// Resolves the notification icon based on the configured source mode.
+#[must_use]
 pub fn resolve_icon(
     icon_source: IconSource,
     app_name: &Option<String>,
@@ -79,22 +86,22 @@ pub fn resolve_icon(
     desktop_entry: &Option<String>,
 ) -> ResolvedIcon {
     match icon_source {
-        IconSource::Mapped => mapped_icon(app_name),
+        IconSource::Mapped => mapped_icon(app_name.as_deref()),
 
         IconSource::Automatic => {
-            if let Some(resolved) = try_icon_string(image_path) {
+            if let Some(resolved) = try_icon_string(image_path.as_deref()) {
                 return resolved;
             }
 
-            mapped_icon(app_name)
+            mapped_icon(app_name.as_deref())
         }
 
         IconSource::Application => {
-            if let Some(resolved) = try_icon_string(image_path) {
+            if let Some(resolved) = try_icon_string(image_path.as_deref()) {
                 return resolved;
             }
 
-            if let Some(resolved) = try_icon_string(app_icon) {
+            if let Some(resolved) = try_icon_string(app_icon.as_deref()) {
                 return resolved;
             }
 
@@ -104,7 +111,7 @@ pub fn resolve_icon(
                 return ResolvedIcon::Named(entry.clone());
             }
 
-            mapped_icon(app_name)
+            mapped_icon(app_name.as_deref())
         }
     }
 }
@@ -115,8 +122,8 @@ pub fn resolve_icon(
 /// `app_icon` path) is resolved back to its theme name so GTK loads it through
 /// the symbolic code path and recolors it to the foreground — otherwise the
 /// monochrome glyph renders as a flat black shape on the dark popup.
-fn try_icon_string(value: &Option<String>) -> Option<ResolvedIcon> {
-    let icon = value.as_deref().filter(|raw| !raw.is_empty())?;
+fn try_icon_string(value: Option<&str>) -> Option<ResolvedIcon> {
+    let icon = value.filter(|raw| !raw.is_empty())?;
 
     let path = icon.strip_prefix("file://").unwrap_or(icon);
     if path.starts_with('/') {
@@ -139,17 +146,15 @@ fn symbolic_icon_name(path: &str) -> Option<String> {
     stem.ends_with("-symbolic").then(|| stem.to_owned())
 }
 
-fn mapped_icon(app_name: &Option<String>) -> ResolvedIcon {
-    let name = app_name
-        .as_deref()
-        .and_then(lookup_app_icon)
-        .unwrap_or(FALLBACK_ICON);
+fn mapped_icon(app_name: Option<&str>) -> ResolvedIcon {
+    let name = app_name.and_then(lookup_app_icon).unwrap_or(FALLBACK_ICON);
 
     ResolvedIcon::Named(String::from(name))
 }
 
 /// Loads a file-based icon as a scaled texture to avoid keeping oversized
 /// image allocations alive when notifications provide large images.
+#[must_use]
 pub fn load_scaled_file_icon(path: &str, target_px: i32) -> Option<gdk::Texture> {
     if path.is_empty() {
         return None;
@@ -262,29 +267,29 @@ mod tests {
 
     #[test]
     fn try_icon_string_none_returns_none() {
-        assert!(try_icon_string(&None).is_none());
+        assert!(try_icon_string(None).is_none());
     }
 
     #[test]
     fn try_icon_string_empty_returns_none() {
-        assert!(try_icon_string(&Some(String::new())).is_none());
+        assert!(try_icon_string(Some("")).is_none());
     }
 
     #[test]
     fn try_icon_string_file_uri() {
-        let result = try_icon_string(&Some("file:///usr/share/icon.png".into()));
+        let result = try_icon_string(Some("file:///usr/share/icon.png"));
         assert!(matches!(result, Some(ResolvedIcon::File(path)) if path == "/usr/share/icon.png"));
     }
 
     #[test]
     fn try_icon_string_absolute_path() {
-        let result = try_icon_string(&Some("/usr/share/icon.png".into()));
+        let result = try_icon_string(Some("/usr/share/icon.png"));
         assert!(matches!(result, Some(ResolvedIcon::File(path)) if path == "/usr/share/icon.png"));
     }
 
     #[test]
     fn try_icon_string_theme_name() {
-        let result = try_icon_string(&Some("firefox".into()));
+        let result = try_icon_string(Some("firefox"));
         assert!(matches!(result, Some(ResolvedIcon::Named(name)) if name == "firefox"));
     }
 

@@ -150,7 +150,7 @@ impl ModuleInfoProvider for BrightnessConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("brightness"),
-            schema: || schema_for!(BrightnessConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("brightness")),
             array_entry: false,
         }

@@ -87,7 +87,7 @@ pub use core::{client::Client, monitor::Monitor, workspace::Workspace};
 pub use error::{Error, Result};
 pub use ipc::events::types::HyprlandEvent;
 pub use service::HyprlandService;
-pub(crate) use types::*;
+pub(crate) use types::{ClientData, ClientLocation, ClientSize, FullscreenMode, LayerData, LayerLevel, DirectScanoutBlocker, MonitorData, Reserved, SolitaryBlocker, TearingBlocker, Transform, MonitorLayers, deserialize_optional_address, deserialize_optional_string, WorkspaceData};
 pub use types::{
     Address, BindData, CursorPosition, DeviceInfo, FocusHistoryId, MonitorId, ProcessId,
     ScreencastOwner, WorkspaceId, WorkspaceInfo, WorkspaceRule,

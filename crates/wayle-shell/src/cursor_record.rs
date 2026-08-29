@@ -8,7 +8,7 @@
 //! greeter reads that file first (see `wayle-greeter`'s `cursor` module), so the
 //! login screen keeps exactly the theme/size of the last session used.
 
-use std::fs;
+use std::{fmt::Write as _, fs};
 
 use tracing::debug;
 use wayle_core::paths::ConfigPaths;
@@ -39,10 +39,10 @@ pub(crate) fn record() {
     };
     let mut body = String::new();
     if let Some(theme) = theme {
-        body.push_str(&format!("theme={theme}\n"));
+        let _ = writeln!(body, "theme={theme}");
     }
     if let Some(size) = size {
-        body.push_str(&format!("size={size}\n"));
+        let _ = writeln!(body, "size={size}");
     }
     if let Err(err) = fs::write(dir.join(FILE), body) {
         debug!(%err, "could not record cursor for greeter");

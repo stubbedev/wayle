@@ -123,12 +123,14 @@ impl MatchEngine {
     }
 
     /// Current items.
-    pub fn items(&self) -> &Arc<Vec<Item>> {
+    #[must_use]
+    pub const fn items(&self) -> &Arc<Vec<Item>> {
         &self.items
     }
 
     /// Current matching options.
-    pub fn options(&self) -> &MatcherOptions {
+    #[must_use]
+    pub const fn options(&self) -> &MatcherOptions {
         &self.options
     }
 
@@ -203,17 +205,14 @@ impl MatchEngine {
 
     /// Ranked matched item indices, plus trailing PERMANENT rows.
     pub fn matched(&mut self) -> Vec<u32> {
-        let mut out = match &self.scanned {
-            Some(scanned) => scanned.clone(),
-            None => {
-                let snapshot = self.nucleo.snapshot();
-                let mut ids: Vec<u32> = snapshot.matched_items(..).map(|item| *item.data).collect();
-                if !self.options.sort || self.query.is_empty() {
-                    // rofi default: filter, keep list order.
-                    ids.sort_unstable();
-                }
-                ids
+        let mut out = if let Some(scanned) = &self.scanned { scanned.clone() } else {
+            let snapshot = self.nucleo.snapshot();
+            let mut ids: Vec<u32> = snapshot.matched_items(..).map(|item| *item.data).collect();
+            if !self.options.sort || self.query.is_empty() {
+                // rofi default: filter, keep list order.
+                ids.sort_unstable();
             }
+            ids
         };
         if self.options.sort && self.options.sort_method == SortMethod::Levenshtein {
             let query = &self.query;
@@ -253,7 +252,7 @@ fn case_matching(options: &MatcherOptions, query: &str) -> CaseMatching {
     }
 }
 
-fn normalization(options: &MatcherOptions) -> Normalization {
+const fn normalization(options: &MatcherOptions) -> Normalization {
     if options.normalize {
         Normalization::Smart
     } else {
@@ -319,12 +318,11 @@ impl MatchEngine {
             // same as rofi.
             return Vec::new();
         };
-        #[allow(clippy::cast_possible_truncation)]
         self.items
             .iter()
             .enumerate()
             .filter(|(_, item)| re.is_match(&item.match_text))
-            .map(|(index, _)| index as u32)
+            .filter_map(|(index, _)| u32::try_from(index).ok())
             .collect()
     }
 
@@ -358,7 +356,6 @@ impl MatchEngine {
             require_literal_separator: false,
             require_literal_leading_dot: false,
         };
-        #[allow(clippy::cast_possible_truncation)]
         self.items
             .iter()
             .enumerate()
@@ -367,34 +364,39 @@ impl MatchEngine {
                     pattern.matches_with(&item.match_text, glob_options) != *negated
                 })
             })
-            .map(|(index, _)| index as u32)
+            .filter_map(|(index, _)| u32::try_from(index).ok())
             .collect()
     }
 }
 
 fn all_indices(items: &[Item]) -> Vec<u32> {
-    #[allow(clippy::cast_possible_truncation)]
-    (0..items.len() as u32).collect()
+    (0..u32::try_from(items.len()).unwrap_or(u32::MAX)).collect()
 }
 
-/// Levenshtein distance, two-row DP.
+/// Levenshtein distance, single-row DP.
 fn levenshtein(a: &str, b: &str) -> usize {
-    let a: Vec<char> = a.chars().collect();
     let b: Vec<char> = b.chars().collect();
-    if a.is_empty() {
-        return b.len();
-    }
-    let mut prev: Vec<usize> = (0..=b.len()).collect();
-    let mut current = vec![0usize; b.len() + 1];
-    for (i, ca) in a.iter().enumerate() {
-        current[0] = i + 1;
-        for (j, cb) in b.iter().enumerate() {
-            let cost = usize::from(ca != cb);
-            current[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(current[j] + 1);
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        // `prev_diag`/`left` walk the previous/current row without indexing.
+        let mut prev_diag = i;
+        let mut left = i.saturating_add(1);
+        if let Some(first) = row.first_mut() {
+            *first = left;
         }
-        std::mem::swap(&mut prev, &mut current);
+        for (cell, &cb) in row.iter_mut().skip(1).zip(b.iter()) {
+            let up = *cell;
+            let cost = usize::from(ca != cb);
+            let value = prev_diag
+                .saturating_add(cost)
+                .min(up.saturating_add(1))
+                .min(left.saturating_add(1));
+            *cell = value;
+            left = value;
+            prev_diag = up;
+        }
     }
-    prev[b.len()]
+    row.last().copied().unwrap_or_default()
 }
 
 #[cfg(test)]

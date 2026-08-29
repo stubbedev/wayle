@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 
 pub fn updated_ago_minutes(updated_at: DateTime<Utc>) -> i64 {
-    let elapsed = Utc::now() - updated_at;
+    let elapsed = Utc::now().signed_duration_since(updated_at);
     elapsed.num_minutes().max(0)
 }
 

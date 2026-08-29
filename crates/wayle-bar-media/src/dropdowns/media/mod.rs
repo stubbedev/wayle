@@ -28,7 +28,7 @@ enum MediaPage {
 }
 
 impl MediaPage {
-    fn name(self) -> &'static str {
+    const fn name(self) -> &'static str {
         match self {
             Self::Main => "main",
             Self::Sources => "sources",

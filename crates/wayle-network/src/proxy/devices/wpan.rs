@@ -1,4 +1,4 @@
-//! NetworkManager WPAN Device interface.
+//! `NetworkManager` WPAN Device interface.
 
 use zbus::proxy;
 

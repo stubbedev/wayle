@@ -232,7 +232,7 @@ impl ModuleInfoProvider for SwayWorkspacesConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("sway-workspaces"),
-            schema: || schema_for!(SwayWorkspacesConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("sway-workspaces")),
             array_entry: false,
         }

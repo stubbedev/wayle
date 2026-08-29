@@ -25,7 +25,7 @@ use crate::{
 
 const EVENT_CHANNEL_CAPACITY: usize = 10_000;
 
-/// Builder for configuring and creating a NotificationService instance.
+/// Builder for configuring and creating a `NotificationService` instance.
 ///
 /// Allows customization of popup duration, do-not-disturb mode, and
 /// automatic removal of expired notifications.
@@ -51,11 +51,13 @@ impl Default for NotificationServiceBuilder {
 }
 
 impl NotificationServiceBuilder {
-    /// Creates a new NotificationServiceBuilder with default values.
+    /// Creates a new `NotificationServiceBuilder` with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
     /// Sets the duration in milliseconds for how long popups should be displayed.
+    #[must_use]
     pub fn popup_duration(self, duration: u32) -> Self {
         self.popup_duration.set(duration);
         self
@@ -65,12 +67,14 @@ impl NotificationServiceBuilder {
     ///
     /// When enabled, new notifications won't appear as popups but will still
     /// be added to the notification list.
+    #[must_use]
     pub fn dnd(self, dnd: bool) -> Self {
         self.dnd.set(dnd);
         self
     }
 
     /// Sets whether to automatically remove expired notifications.
+    #[must_use]
     pub fn remove_expired(self, remove: bool) -> Self {
         self.remove_expired.set(remove);
         self
@@ -80,6 +84,7 @@ impl NotificationServiceBuilder {
     ///
     /// Notifications from matching apps are silently dropped.
     /// Patterns support `*` and `?` wildcards.
+    #[must_use]
     pub fn blocklist(self, patterns: Property<Vec<String>>) -> Self {
         Self {
             blocklist: patterns,
@@ -91,12 +96,13 @@ impl NotificationServiceBuilder {
     ///
     /// When enabled, the service registers at `com.wayle.Notifications1`,
     /// allowing CLI tools to control notifications (dismiss, toggle DND, etc.).
-    pub fn with_daemon(mut self) -> Self {
+    #[must_use]
+    pub const fn with_daemon(mut self) -> Self {
         self.register_wayle_daemon = true;
         self
     }
 
-    /// Builds and initializes the NotificationService.
+    /// Builds and initializes the `NotificationService`.
     ///
     /// Establishes a D-Bus connection, registers the notification daemon,
     /// restores persisted notifications, and starts monitoring for events.
@@ -113,7 +119,7 @@ impl NotificationServiceBuilder {
 
         let store = init_store();
         let stored_notifications =
-            load_stored_notifications(&store, self.remove_expired.get(), &connection, &notif_tx);
+            load_stored_notifications(store.as_ref(), self.remove_expired.get(), &connection, &notif_tx);
         let max_id = stored_notifications
             .iter()
             .map(|notif| notif.id)
@@ -128,7 +134,7 @@ impl NotificationServiceBuilder {
         }
 
         let freedesktop_daemon = NotificationDaemon {
-            counter: AtomicU32::new(max_id + 1),
+            counter: AtomicU32::new(max_id.saturating_add(1)),
             zbus_connection: connection.clone(),
             notif_tx: notif_tx.clone(),
             blocklist: self.blocklist.clone(),
@@ -186,13 +192,12 @@ fn init_store() -> Option<NotificationStore> {
 }
 
 fn load_stored_notifications(
-    store: &Option<NotificationStore>,
+    store: Option<&NotificationStore>,
     remove_expired: bool,
     connection: &Connection,
     notif_tx: &broadcast::Sender<NotificationEvent>,
 ) -> Vec<Arc<Notification>> {
     store
-        .as_ref()
         .and_then(|store| store.load_all(remove_expired).ok())
         .map(|stored| {
             stored
@@ -220,7 +225,7 @@ fn stored_to_notification(
             body: stored.body.unwrap_or_default(),
             actions: stored.actions,
             hints: stored.hints,
-            expire_timeout: stored.expire_timeout.unwrap_or(0) as i32,
+            expire_timeout: i32::try_from(stored.expire_timeout.unwrap_or(0)).unwrap_or(i32::MAX),
             timestamp: DateTime::<Utc>::from_timestamp_millis(stored.timestamp)
                 .unwrap_or_else(Utc::now),
         },

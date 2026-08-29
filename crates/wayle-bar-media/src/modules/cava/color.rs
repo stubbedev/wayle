@@ -18,43 +18,43 @@ pub fn resolve_rgba(color: &ColorValue, config: &ConfigService) -> Rgba {
             let raw_palette = config.config().styling.palette();
             let palette = resolve_palette(&raw_palette, &config.config().styling);
             match token {
-                CssToken::BgBase => palette.bg.clone(),
-                CssToken::BgSurface | CssToken::BgSurfaceElevated => palette.surface.clone(),
+                CssToken::BgBase => palette.bg,
+                CssToken::BgSurface | CssToken::BgSurfaceElevated => palette.surface,
                 CssToken::BgElevated
                 | CssToken::BgOverlay
                 | CssToken::BgHover
                 | CssToken::BgActive
-                | CssToken::BgSelected => palette.elevated.clone(),
+                | CssToken::BgSelected => palette.elevated,
 
-                CssToken::FgDefault | CssToken::FgOnAccent => palette.fg.clone(),
-                CssToken::FgMuted | CssToken::FgSubtle => palette.fg_muted.clone(),
+                CssToken::FgDefault | CssToken::FgOnAccent => palette.fg,
+                CssToken::FgMuted | CssToken::FgSubtle => palette.fg_muted,
 
                 CssToken::Accent | CssToken::AccentSubtle | CssToken::AccentHover => {
-                    palette.primary.clone()
+                    palette.primary
                 }
 
                 CssToken::Red
                 | CssToken::StatusError
                 | CssToken::StatusErrorSubtle
                 | CssToken::StatusErrorHover
-                | CssToken::BorderError => palette.red.clone(),
+                | CssToken::BorderError => palette.red,
 
                 CssToken::Yellow | CssToken::StatusWarning | CssToken::StatusWarningSubtle => {
-                    palette.yellow.clone()
+                    palette.yellow
                 }
 
                 CssToken::Green | CssToken::StatusSuccess | CssToken::StatusSuccessSubtle => {
-                    palette.green.clone()
+                    palette.green
                 }
 
                 CssToken::Blue | CssToken::StatusInfo | CssToken::StatusInfoSubtle => {
-                    palette.blue.clone()
+                    palette.blue
                 }
 
                 CssToken::BorderSubtle
                 | CssToken::BorderDefault
                 | CssToken::BorderStrong
-                | CssToken::BorderAccent => palette.primary.clone(),
+                | CssToken::BorderAccent => palette.primary,
             }
         }
         ColorValue::Custom(hex) => hex.to_string(),
@@ -69,29 +69,34 @@ pub fn resolve_rgba(color: &ColorValue, config: &ConfigService) -> Rgba {
         ColorValue::Auto => {
             let raw_palette = config.config().styling.palette();
             let palette = resolve_palette(&raw_palette, &config.config().styling);
-            palette.primary.clone()
+            palette.primary
         }
     };
 
     parse_hex_rgba(&hex)
 }
 
+fn hex_byte(hex: &str, range: std::ops::Range<usize>) -> u8 {
+    hex.get(range)
+        .and_then(|part| u8::from_str_radix(part, 16).ok())
+        .unwrap_or(255)
+}
+
 fn parse_hex_rgba(hex: &str) -> Rgba {
     let hex = hex.trim_start_matches('#');
     let (r, g, b, a) = match hex.len() {
-        6 => {
-            let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(255);
-            let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(255);
-            let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(255);
-            (r, g, b, 255u8)
-        }
-        8 => {
-            let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(255);
-            let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(255);
-            let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(255);
-            let a = u8::from_str_radix(&hex[6..8], 16).unwrap_or(255);
-            (r, g, b, a)
-        }
+        6 => (
+            hex_byte(hex, 0..2),
+            hex_byte(hex, 2..4),
+            hex_byte(hex, 4..6),
+            255u8,
+        ),
+        8 => (
+            hex_byte(hex, 0..2),
+            hex_byte(hex, 2..4),
+            hex_byte(hex, 4..6),
+            hex_byte(hex, 6..8),
+        ),
         _ => (255, 255, 255, 255),
     };
 

@@ -88,6 +88,7 @@ impl HistoryStore {
              )",
             params![mode, max_size],
         )?;
+        drop(connection);
         Ok(())
     }
 
@@ -133,10 +134,12 @@ impl HistoryStore {
         let mut weights = HashMap::new();
         for row in rows {
             let (entry, uses, last_used) = row?;
-            #[allow(clippy::cast_precision_loss)]
-            let weight = uses as f64 * recency_bucket(now_secs - last_used);
+            let uses = f64::from(u32::try_from(uses).unwrap_or(u32::MAX));
+            let weight = uses * recency_bucket(now_secs.saturating_sub(last_used));
             weights.insert(entry, weight);
         }
+        drop(statement);
+        drop(connection);
         Ok(weights)
     }
 
@@ -150,7 +153,11 @@ impl HistoryStore {
         let mut statement = connection
             .prepare("SELECT entry FROM history WHERE mode = ?1 ORDER BY last_used DESC")?;
         let rows = statement.query_map(params![mode], |row| row.get::<_, String>(0))?;
-        rows.map(|row| row.map_err(Error::from)).collect()
+        let entries: Result<Vec<String>, Error> =
+            rows.map(|row| row.map_err(Error::from)).collect();
+        drop(statement);
+        drop(connection);
+        entries
     }
 
     #[allow(clippy::unwrap_used)] // mutex poisoning = a panicked writer; propagating is pointless
@@ -162,12 +169,11 @@ impl HistoryStore {
 fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| i64::try_from(duration.as_secs()).unwrap_or(i64::MAX))
-        .unwrap_or(0)
+        .map_or(0, |duration| i64::try_from(duration.as_secs()).unwrap_or(i64::MAX))
 }
 
 /// Mozilla-style recency buckets.
-fn recency_bucket(age_secs: i64) -> f64 {
+const fn recency_bucket(age_secs: i64) -> f64 {
     match age_secs {
         ..=0 => 1.0,
         age if age <= 4 * DAY => 1.0,
@@ -211,7 +217,9 @@ mod tests {
     fn prune_keeps_most_recent() {
         let store = store();
         for (index, name) in ["a", "b", "c", "d"].iter().enumerate() {
-            store.record_at("run", name, index as i64, 2).unwrap();
+            store
+                .record_at("run", name, i64::try_from(index).unwrap(), 2)
+                .unwrap();
         }
         let recent = store.recent("run").unwrap();
         assert_eq!(recent, vec!["d", "c"]);

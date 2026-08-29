@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 /// Sample specification
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SampleSpec {
     /// Sample rate in Hz
     pub rate: u32,
@@ -45,7 +45,7 @@ pub enum SampleFormat {
 }
 
 /// Channel map for audio channels
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelMap {
     /// Number of channels
     pub channels: u8,
@@ -94,12 +94,12 @@ pub enum ChannelPosition {
     TopRearRight,
     /// Top rear center (Microsoft/Apple: "Top Back Center").
     TopRearCenter,
-    /// Unrecognized position from PulseAudio.
+    /// Unrecognized position from `PulseAudio`.
     Unknown,
 }
 
 /// Audio format information
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AudioFormat {
     /// Encoding type
     pub encoding: String,

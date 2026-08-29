@@ -155,7 +155,7 @@ impl ModuleInfoProvider for BatteryConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("battery"),
-            schema: || schema_for!(BatteryConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("battery")),
             array_entry: false,
         }

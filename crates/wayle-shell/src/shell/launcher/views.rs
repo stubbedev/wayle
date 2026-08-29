@@ -84,10 +84,7 @@ pub(super) fn compile_bindings(bindings: &[(String, String)]) -> Vec<KeyBinding>
             continue;
         };
         for key_spec in keys.split(',') {
-            match parse_key(key_spec.trim()) {
-                Some((key, modifiers)) => table.push((key, modifiers, action)),
-                None => warn!(binding = %key_spec, "unparseable launcher keybinding"),
-            }
+            if let Some((key, modifiers)) = parse_key(key_spec.trim()) { table.push((key, modifiers, action)) } else { warn!(binding = %key_spec, "unparseable launcher keybinding") }
         }
     }
     table

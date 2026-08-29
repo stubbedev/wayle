@@ -5,7 +5,7 @@ pub struct TimeParts {
     pub minutes: i64,
 }
 
-pub fn time_parts(seconds: i64) -> Option<TimeParts> {
+pub const fn time_parts(seconds: i64) -> Option<TimeParts> {
     if seconds <= 0 {
         return None;
     }
@@ -48,7 +48,7 @@ pub fn hero_pct_class(percentage: f64, warning_level: &WarningLevel) -> &'static
     }
 }
 
-pub fn hero_state_class(warning_level: &WarningLevel, charging: bool) -> &'static str {
+pub const fn hero_state_class(warning_level: &WarningLevel, charging: bool) -> &'static str {
     match warning_level {
         WarningLevel::Low | WarningLevel::Critical | WarningLevel::Action => "crit",
         _ if charging => "good",
@@ -76,7 +76,7 @@ pub fn health_value(capacity: f64) -> String {
     }
 }
 
-pub fn is_low_battery(warning_level: &WarningLevel) -> bool {
+pub const fn is_low_battery(warning_level: &WarningLevel) -> bool {
     matches!(
         warning_level,
         WarningLevel::Low | WarningLevel::Critical | WarningLevel::Action

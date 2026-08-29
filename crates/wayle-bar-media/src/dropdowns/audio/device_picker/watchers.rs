@@ -24,8 +24,10 @@ pub fn spawn(
                 sender,
                 [output_devices.watch(), default_output.watch()],
                 |out| {
-                    let list =
-                        build_output_device_list(&output_devices.get(), &default_output.get());
+                    let list = build_output_device_list(
+                        &output_devices.get(),
+                        default_output.get().as_ref(),
+                    );
                     let _ = out.send(DevicePickerCmd::DevicesChanged(list));
                 }
             );
@@ -37,7 +39,8 @@ pub fn spawn(
                 sender,
                 [input_devices.watch(), default_input.watch()],
                 |out| {
-                    let list = build_input_device_list(&input_devices.get(), &default_input.get());
+                    let list =
+                        build_input_device_list(&input_devices.get(), default_input.get().as_ref());
                     let _ = out.send(DevicePickerCmd::DevicesChanged(list));
                 }
             );

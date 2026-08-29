@@ -18,7 +18,7 @@ pub enum Error {
     /// Object exists but is of wrong type.
     #[error("object at {object_path} is wrong type: expected {expected}, got {actual}")]
     WrongObjectType {
-        /// DBus object path that has wrong type.
+        /// `DBus` object path that has wrong type.
         object_path: OwnedObjectPath,
         /// Expected object type.
         expected: String,
@@ -31,7 +31,7 @@ pub enum Error {
     ObjectCreationFailed {
         /// Type of object that failed to create.
         object_type: String,
-        /// DBus path where creation failed.
+        /// `DBus` path where creation failed.
         object_path: OwnedObjectPath,
         /// Underlying error that caused the failure.
         #[source]

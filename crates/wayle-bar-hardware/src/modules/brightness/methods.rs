@@ -14,17 +14,14 @@ impl BrightnessModule {
     /// Recomputes the label, icon, and threshold colors from the average
     /// brightness across all monitors (internal panels and external DDC).
     pub fn refresh_display(&self, config: &BrightnessConfig) {
-        match average_percentage(&self.devices) {
-            Some(percentage) => {
-                self.update_display(config, percentage);
-                self.apply_thresholds(config, percentage);
-            }
-            None => {
-                self.bar_button
-                    .emit(BarButtonInput::SetLabel(String::from(NO_DEVICE_LABEL)));
-                if let Some(icon) = config.level_icons.get().first() {
-                    self.bar_button.emit(BarButtonInput::SetIcon(icon.clone()));
-                }
+        if let Some(percentage) = average_percentage(&self.devices) {
+            self.update_display(config, percentage);
+            self.apply_thresholds(config, percentage);
+        } else {
+            self.bar_button
+                .emit(BarButtonInput::SetLabel(String::from(NO_DEVICE_LABEL)));
+            if let Some(icon) = config.level_icons.get().first() {
+                self.bar_button.emit(BarButtonInput::SetIcon(icon.clone()));
             }
         }
     }

@@ -34,7 +34,7 @@ pub fn socket_path() -> PathBuf {
 /// Per-invocation options carried by the `open` frame: the rofi CLI flag
 /// surface. Every field is optional — the daemon merges `Some` values over
 /// the `[launcher]` config.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct SessionOptions {
     /// `-show <mode>`: mode to open in.

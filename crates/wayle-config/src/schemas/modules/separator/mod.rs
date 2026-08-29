@@ -33,7 +33,7 @@ impl ModuleInfoProvider for SeparatorConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("separator"),
-            schema: || schema_for!(SeparatorConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("separator")),
             array_entry: false,
         }

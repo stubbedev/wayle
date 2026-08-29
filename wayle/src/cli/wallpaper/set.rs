@@ -27,14 +27,14 @@ pub async fn execute(path: PathBuf, fit: Option<FitModeArg>, monitor: Option<Str
         proxy
             .set_fit_mode(mode.to_string(), monitor_arg.clone())
             .await
-            .map_err(|e| format_error("set fit mode", e))?;
+            .map_err(|e| format_error("set fit mode", &e))?;
     }
 
     let path_str = path.to_string_lossy().to_string();
     proxy
         .set_wallpaper(path_str, monitor_arg)
         .await
-        .map_err(|e| format_error("set wallpaper", e))?;
+        .map_err(|e| format_error("set wallpaper", &e))?;
 
     match monitor {
         Some(mon) => println!("Wallpaper set to {} on {mon}", path.display()),

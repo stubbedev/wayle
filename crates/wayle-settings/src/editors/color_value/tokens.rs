@@ -1,4 +1,4 @@
-//! ColorValue dropdown item catalog: Auto, Transparent, Custom entries
+//! `ColorValue` dropdown item catalog: Auto, Transparent, Custom entries
 //! plus grouped CSS token entries with headers.
 
 use wayle_config::schemas::styling::{ColorValue, CssToken};
@@ -31,7 +31,8 @@ fn find_by_id(items: &[ColorItem], target: &str) -> u32 {
     items
         .iter()
         .position(|color_item| color_item.id == target)
-        .unwrap_or(0) as u32
+        .and_then(|index| u32::try_from(index).ok())
+        .unwrap_or(0)
 }
 
 pub(super) fn build_items() -> Vec<ColorItem> {
@@ -77,7 +78,7 @@ pub(super) fn build_items() -> Vec<ColorItem> {
     items
 }
 
-fn token_meta(token: CssToken) -> (&'static str, &'static str, &'static str) {
+const fn token_meta(token: CssToken) -> (&'static str, &'static str, &'static str) {
     match token {
         CssToken::BgBase => ("bg-base", "Base", "Backgrounds"),
         CssToken::BgSurface => ("bg-surface", "Surface", "Backgrounds"),

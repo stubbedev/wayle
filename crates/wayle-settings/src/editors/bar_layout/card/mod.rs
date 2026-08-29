@@ -196,17 +196,17 @@ impl FactoryComponent for LayoutCard {
             LayoutCardMsg::MonitorChanged => self.on_monitor_changed(),
             LayoutCardMsg::ExtendsChanged => self.on_extends_changed(),
             LayoutCardMsg::GroupNameChanged(zone, chip_index, name) => {
-                self.on_group_name_changed(zone, chip_index, name)
+                self.on_group_name_changed(zone, &chip_index, name)
             }
             LayoutCardMsg::ShowToggled(active) => self.on_show_toggled(active, &sender),
             LayoutCardMsg::AddModule(zone, module) => self.on_add_module(zone, module),
             LayoutCardMsg::AddGroup(zone) => self.on_add_group(zone),
-            LayoutCardMsg::RemoveItem(zone, chip_index) => self.on_remove_item(zone, chip_index),
+            LayoutCardMsg::RemoveItem(zone, chip_index) => self.on_remove_item(zone, &chip_index),
             LayoutCardMsg::RemoveGroupModule(zone, chip_index, module_index) => {
-                self.on_remove_group_module(zone, chip_index, module_index)
+                self.on_remove_group_module(zone, &chip_index, module_index)
             }
             LayoutCardMsg::AddModuleToGroup(zone, chip_index, module) => {
-                self.on_add_module_to_group(zone, chip_index, module)
+                self.on_add_module_to_group(zone, &chip_index, module)
             }
         };
 

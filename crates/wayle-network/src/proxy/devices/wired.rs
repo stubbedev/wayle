@@ -1,4 +1,4 @@
-//! NetworkManager Wired Device interface.
+//! `NetworkManager` Wired Device interface.
 
 use zbus::proxy;
 

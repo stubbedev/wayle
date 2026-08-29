@@ -149,7 +149,7 @@ impl ModuleInfoProvider for HyprsunsetConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("hyprsunset"),
-            schema: || schema_for!(HyprsunsetConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("hyprsunset")),
             array_entry: false,
         }

@@ -63,7 +63,7 @@ async fn monitor(
         };
 
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("AccessPointMonitor cancelled");
                 return;
             }

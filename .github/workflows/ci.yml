@@ -90,8 +90,15 @@ jobs:
             - name: Check icons exist
               run: ./scripts/ci/check-icons.sh
 
+            - name: Install cargo-nextest
+              uses: taiki-e/install-action@nextest
+
             - name: Run tests
-              run: cargo test --workspace --no-fail-fast
+              run: cargo nextest run --workspace --no-fail-fast
+
+            # nextest doesn't run doctests; keep them via cargo test.
+            - name: Run doctests
+              run: cargo test --doc --workspace
 
             - name: Check config schema is up to date
               run: |

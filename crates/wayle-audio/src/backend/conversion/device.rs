@@ -71,7 +71,7 @@ pub(crate) fn from_source(source: &PulseSourceInfo) -> SourceInfo {
     }
 }
 
-fn convert_sink_state(state: SinkState) -> DeviceState {
+const fn convert_sink_state(state: SinkState) -> DeviceState {
     match state {
         SinkState::Running => DeviceState::Running,
         SinkState::Idle => DeviceState::Idle,
@@ -80,7 +80,7 @@ fn convert_sink_state(state: SinkState) -> DeviceState {
     }
 }
 
-fn convert_source_state(state: SourceState) -> DeviceState {
+const fn convert_source_state(state: SourceState) -> DeviceState {
     match state {
         SourceState::Running => DeviceState::Running,
         SourceState::Idle => DeviceState::Idle,

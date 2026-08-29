@@ -20,7 +20,7 @@ pub(super) fn build_dropdown(
 ) -> (gtk::DropDown, SignalHandlerId) {
     let labels: Vec<String> = items
         .iter()
-        .map(|color_item| color_item.label.to_string())
+        .map(|color_item| color_item.label.clone())
         .collect();
 
     let string_list = gtk::StringList::new(&labels.iter().map(String::as_str).collect::<Vec<_>>());

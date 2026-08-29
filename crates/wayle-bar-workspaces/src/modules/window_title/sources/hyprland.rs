@@ -19,7 +19,7 @@ pub struct HyprlandFocusedWindowSource {
 }
 
 impl HyprlandFocusedWindowSource {
-    pub fn new(service: Arc<HyprlandService>) -> Self {
+    pub const fn new(service: Arc<HyprlandService>) -> Self {
         Self { service }
     }
 }

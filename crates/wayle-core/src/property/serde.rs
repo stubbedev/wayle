@@ -31,7 +31,7 @@ impl<'de, T: Clone + Send + Sync + Deserialize<'de> + 'static> Deserialize<'de> 
         D: Deserializer<'de>,
     {
         let value = T::deserialize(deserializer)?;
-        Ok(Property::new(value))
+        Ok(Self::new(value))
     }
 }
 

@@ -28,7 +28,8 @@ pub fn set_lock_trigger(trigger: fn() -> bool) {
 }
 
 pub(crate) fn lock_trigger() -> fn() -> bool {
-    *LOCK_TRIGGER.get().unwrap_or(&((|| false) as fn() -> bool))
+    const FALLBACK: fn() -> bool = || false;
+    *LOCK_TRIGGER.get().unwrap_or(&FALLBACK)
 }
 
 /// Registers the `com.wayle.Shell1` D-Bus interface and holds the
@@ -74,6 +75,7 @@ impl ShellIpcService {
     }
 
     /// Reactive state that bar components subscribe to for visibility updates.
+    #[must_use]
     pub fn state(&self) -> ShellIpcState {
         self.state.clone()
     }

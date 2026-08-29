@@ -78,10 +78,12 @@ impl HyprlandWorkspaces {
         });
     }
 
+    #[must_use]
     pub fn is_vertical(&self) -> bool {
         self.settings.is_vertical.get()
     }
 
+    #[must_use]
     pub fn orientation(&self) -> gtk::Orientation {
         if self.is_vertical() {
             gtk::Orientation::Vertical
@@ -119,6 +121,7 @@ impl HyprlandWorkspaces {
         });
     }
 
+    #[must_use]
     pub fn workspace_monitor_name(&self, id: WorkspaceId) -> Option<String> {
         if let Some(hyprland) = &self.hyprland
             && let Some(monitor_name) = hyprland
@@ -134,6 +137,7 @@ impl HyprlandWorkspaces {
         self.workspace_monitor_rules.get(&id).cloned()
     }
 
+    #[must_use]
     pub fn display_id(&self, id: WorkspaceId, numbering: Numbering) -> WorkspaceId {
         let monitor_workspaces = self
             .settings
@@ -149,6 +153,7 @@ impl HyprlandWorkspaces {
         )
     }
 
+    #[must_use]
     pub fn initial_focused_monitor(hyprland: &Option<Arc<HyprlandService>>) -> Option<String> {
         let hyprland = hyprland.as_ref()?;
         hyprland
@@ -159,6 +164,7 @@ impl HyprlandWorkspaces {
             .map(|monitor| monitor.name.get())
     }
 
+    #[must_use]
     pub fn initial_active_workspace(
         hyprland: &Option<Arc<HyprlandService>>,
         settings: &BarSettings,
@@ -176,12 +182,12 @@ impl HyprlandWorkspaces {
         }
 
         let runtime = tokio::runtime::Handle::current();
-        match runtime.block_on(hyprland.active_workspace()) {
-            Some(ws) => ws.id.get(),
-            None => 1,
-        }
+        runtime
+            .block_on(hyprland.active_workspace())
+            .map_or(1, |ws| ws.id.get())
     }
 
+    #[must_use]
     pub fn initial_active_workspace_other_monitor(
         hyprland: &Option<Arc<HyprlandService>>,
     ) -> HashSet<WorkspaceId> {
@@ -197,6 +203,7 @@ impl HyprlandWorkspaces {
             .collect::<HashSet<WorkspaceId>>()
     }
 
+    #[must_use]
     pub fn should_apply_workspace_event(&self) -> bool {
         let Some(bar_monitor) = self.settings.monitor_name.as_ref() else {
             return true;
@@ -215,10 +222,10 @@ impl HyprlandWorkspaces {
             .get()
             .into_iter()
             .find(|monitor| monitor.focused.get())
-            .map(|monitor| monitor.name.get() == bar_monitor.as_str())
-            .unwrap_or(true)
+            .is_none_or(|monitor| monitor.name.get() == bar_monitor.as_str())
     }
 
+    #[must_use]
     pub fn should_apply_active_workspace_change(
         &self,
         workspace_id: WorkspaceId,
@@ -232,10 +239,10 @@ impl HyprlandWorkspaces {
             return self.should_apply_workspace_event();
         };
 
-        match self.workspace_monitor_name(workspace_id) {
-            Some(ws_monitor) => ws_monitor == *bar_monitor,
-            None => self.should_apply_workspace_event(),
-        }
+        self.workspace_monitor_name(workspace_id).map_or_else(
+            || self.should_apply_workspace_event(),
+            |ws_monitor| ws_monitor == *bar_monitor,
+        )
     }
 
     pub fn refresh_active_workspace(&mut self) {
@@ -333,6 +340,7 @@ impl HyprlandWorkspaces {
         }
     }
 
+    #[must_use]
     pub fn filtered_workspaces(
         &self,
         hyprland: &Arc<HyprlandService>,
@@ -507,6 +515,7 @@ impl HyprlandWorkspaces {
         }
     }
 
+    #[must_use]
     pub fn workspace_has_urgent_window(
         &self,
         workspace_id: WorkspaceId,
@@ -520,6 +529,7 @@ impl HyprlandWorkspaces {
         workspace_contains_urgent_address(workspace_id, &self.urgent_windows, &client_workspaces)
     }
 
+    #[must_use]
     pub fn window_count_for_workspace(
         &self,
         workspace_id: WorkspaceId,
@@ -530,8 +540,7 @@ impl HyprlandWorkspaces {
             .get()
             .iter()
             .find(|ws| ws.id.get() == workspace_id)
-            .map(|ws| ws.windows.get())
-            .unwrap_or(0)
+            .map_or(0, |ws| ws.windows.get())
     }
 
     pub fn clear_urgent_windows_for_workspace(&mut self, workspace_id: WorkspaceId) {

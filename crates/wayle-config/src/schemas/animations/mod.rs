@@ -243,7 +243,7 @@ impl ModuleInfoProvider for AnimationsConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("animations"),
-            schema: || schema_for!(AnimationsConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

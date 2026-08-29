@@ -9,7 +9,7 @@ use super::{CardCmd, NotificationPopupCard};
 pub(super) fn spawn(sender: &ComponentSender<NotificationPopupCard>, config: &Arc<ConfigService>) {
     let notif_config = config.config().modules.notifications.clone();
     let shadow = notif_config.popup_shadow.clone();
-    let urgency_bar = notif_config.popup_urgency_bar.clone();
+    let urgency_bar = notif_config.popup_urgency_bar;
 
     watch!(sender, [shadow.watch(), urgency_bar.watch()], |out| {
         let _ = out.send(CardCmd::ConfigChanged {

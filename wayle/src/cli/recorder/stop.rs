@@ -7,7 +7,7 @@ pub async fn execute() -> CliAction {
     proxy
         .stop()
         .await
-        .map_err(|e| format_error("stop recording", e))?;
+        .map_err(|e| format_error("stop recording", &e))?;
 
     println!("Recording stopped");
 

@@ -97,7 +97,7 @@ impl StartupTimer {
         pb.finish_and_clear();
 
         let duration_ms = duration.as_millis() as u64;
-        let duration_str = format!("({}ms)", duration_ms);
+        let duration_str = format!("({duration_ms}ms)");
 
         info!(service = name, duration_ms, "Service ready");
 

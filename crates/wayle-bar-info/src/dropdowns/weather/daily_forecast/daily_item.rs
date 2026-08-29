@@ -16,7 +16,7 @@ pub struct DailyItem {
 
 #[relm4::factory(pub)]
 impl FactoryComponent for DailyItem {
-    type Init = DailyItem;
+    type Init = Self;
     type Input = ();
     type Output = ();
     type CommandOutput = ();

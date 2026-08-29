@@ -27,11 +27,11 @@ pub(crate) fn spawn(
                 prev_tx.clear();
 
                 tokio::select! {
-                    _ = token.cancelled() => {
+                    () = token.cancelled() => {
                         debug!("Network polling cancelled");
                         return;
                     }
-                    _ = network.wait_for_subscribers() => {}
+                    () = network.wait_for_subscribers() => {}
                 }
                 ticker.reset();
             }
@@ -54,7 +54,21 @@ pub(crate) fn spawn(
                     let rx_delta = rx.saturating_sub(last_rx);
                     let tx_delta = tx.saturating_sub(last_tx);
 
+                    #[expect(
+                        clippy::as_conversions,
+                        clippy::cast_precision_loss,
+                        clippy::cast_possible_truncation,
+                        clippy::cast_sign_loss,
+                        reason = "byte-rate math; delta is non-negative and fits f64"
+                    )]
                     let rx_per_sec = (rx_delta as f64 / interval_secs) as u64;
+                    #[expect(
+                        clippy::as_conversions,
+                        clippy::cast_precision_loss,
+                        clippy::cast_possible_truncation,
+                        clippy::cast_sign_loss,
+                        reason = "byte-rate math; delta is non-negative and fits f64"
+                    )]
                     let tx_per_sec = (tx_delta as f64 / interval_secs) as u64;
 
                     prev_rx.insert(name.clone(), rx);
@@ -73,7 +87,7 @@ pub(crate) fn spawn(
             network.set(data);
 
             tokio::select! {
-                _ = token.cancelled() => {
+                () = token.cancelled() => {
                     debug!("Network polling cancelled");
                     return;
                 }

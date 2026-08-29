@@ -152,7 +152,7 @@ impl ModuleInfoProvider for ClockConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("clock"),
-            schema: || schema_for!(ClockConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("clock")),
             array_entry: false,
         }

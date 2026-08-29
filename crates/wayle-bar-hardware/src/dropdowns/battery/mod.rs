@@ -82,7 +82,7 @@ impl Component for BatteryDropdown {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let battery_section = BatterySection::builder()

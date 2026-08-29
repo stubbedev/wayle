@@ -111,7 +111,7 @@
 //! ```
 //!
 //! Compiles a pinned, tested version of libcava from source. Requires fftw3 and
-//! libpipewire-0.3 development headers. PulseAudio support included if libpulse
+//! libpipewire-0.3 development headers. `PulseAudio` support included if libpulse
 //! is available.
 //!
 //! **System library:**

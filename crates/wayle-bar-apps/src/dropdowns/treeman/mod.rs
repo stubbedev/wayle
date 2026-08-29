@@ -248,17 +248,14 @@ impl TreemanDropdown {
             .zip(self.status.as_ref())
             .and_then(|(path, status)| views::find_worktree(status, path));
 
-        let page = match found {
-            Some((repo, wt)) => {
-                self.title = wt.branch.clone();
-                views::render_detail(&self.detail_page, repo, wt, &self.ui);
-                PAGE_DETAIL
-            }
-            None => {
-                self.detail = None;
-                self.title = t!("dropdown-treeman-title");
-                PAGE_LIST
-            }
+        let page = if let Some((repo, wt)) = found {
+            self.title = wt.branch.clone();
+            views::render_detail(&self.detail_page, repo, wt, &self.ui);
+            PAGE_DETAIL
+        } else {
+            self.detail = None;
+            self.title = t!("dropdown-treeman-title");
+            PAGE_LIST
         };
 
         if self.stack.visible_child_name().as_deref() == Some(page) {

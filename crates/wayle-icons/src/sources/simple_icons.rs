@@ -30,6 +30,6 @@ impl IconSource for SimpleIcons {
     }
 
     fn cdn_url(&self, slug: &str) -> String {
-        format!("https://unpkg.com/simple-icons@latest/icons/{}.svg", slug)
+        format!("https://unpkg.com/simple-icons@latest/icons/{slug}.svg")
     }
 }

@@ -319,7 +319,7 @@ mod tests {
         #[test]
         fn display_returns_hex_string() {
             let color = HexColor::new("#11111b").unwrap();
-            assert_eq!(format!("{}", color), "#11111b");
+            assert_eq!(format!("{color}"), "#11111b");
         }
 
         #[test]

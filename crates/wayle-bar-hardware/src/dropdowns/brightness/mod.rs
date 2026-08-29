@@ -118,7 +118,7 @@ impl Component for BrightnessDropdown {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let devices = init.brightness.devices.get();

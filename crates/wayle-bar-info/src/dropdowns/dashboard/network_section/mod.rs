@@ -14,6 +14,10 @@ use self::messages::NetworkSectionCmd;
 pub use self::messages::{NetworkSectionInit, NetworkSectionInput};
 use crate::i18n::t;
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors independent connection state flags"
+)]
 pub struct NetworkSection {
     network: Option<Arc<NetworkService>>,
     sysinfo: Arc<SysinfoService>,
@@ -151,7 +155,7 @@ impl Component for NetworkSection {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         _sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let model = Self {
@@ -182,7 +186,7 @@ impl Component for NetworkSection {
                 self.active = active;
                 if active {
                     let token = self.watcher.reset();
-                    watchers::spawn(&sender, &self.network, &self.sysinfo, token);
+                    watchers::spawn(&sender, self.network.as_ref(), &self.sysinfo, token);
                 } else {
                     self.watcher = WatcherToken::new();
                 }

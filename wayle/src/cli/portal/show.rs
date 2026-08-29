@@ -60,7 +60,7 @@ async fn file_chooser(
             .open_file("Preview: Open File", multiple, directory, vec![], "")
             .await
     }
-    .map_err(|e| dbus::format_error("FileChooser", "show file chooser", e))?;
+    .map_err(|e| dbus::format_error("FileChooser", "show file chooser", &e))?;
     print_uris(&uris);
     Ok(())
 }
@@ -72,7 +72,7 @@ async fn screenshot(conn: &Connection, mode: &str, target: &str) -> Result<(), S
     let path = proxy
         .capture(mode, target)
         .await
-        .map_err(|e| dbus::format_error("Screenshot", "capture screenshot", e))?;
+        .map_err(|e| dbus::format_error("Screenshot", "capture screenshot", &e))?;
     print_result(&path);
     Ok(())
 }
@@ -84,7 +84,7 @@ async fn color(conn: &Connection) -> Result<(), String> {
     let (r, g, b) = proxy
         .pick_color()
         .await
-        .map_err(|e| dbus::format_error("Screenshot", "pick color", e))?;
+        .map_err(|e| dbus::format_error("Screenshot", "pick color", &e))?;
     println!("rgb({r:.3}, {g:.3}, {b:.3})");
     Ok(())
 }
@@ -97,7 +97,7 @@ async fn screen_cast(conn: &Connection, allow_token: bool, multiple: bool) -> Re
     let selection = proxy
         .pick("", allow_token, multiple)
         .await
-        .map_err(|e| dbus::format_error("SharePicker", "show share picker", e))?;
+        .map_err(|e| dbus::format_error("SharePicker", "show share picker", &e))?;
     print_result(&selection);
     Ok(())
 }
@@ -109,7 +109,7 @@ async fn print_dialog(conn: &Connection) -> Result<(), String> {
     let (granted, settings, token) = proxy
         .prepare("Preview: Print")
         .await
-        .map_err(|e| dbus::format_error("Print", "show print dialog", e))?;
+        .map_err(|e| dbus::format_error("Print", "show print dialog", &e))?;
     if granted {
         println!("prepared (token {token}, {} settings)", settings.len());
     } else {
@@ -132,7 +132,7 @@ async fn access(conn: &Connection) -> Result<(), String> {
             "dialog-password-symbolic",
         )
         .await
-        .map_err(|e| dbus::format_error("Access", "show access prompt", e))?;
+        .map_err(|e| dbus::format_error("Access", "show access prompt", &e))?;
     println!("{}", if granted { "granted" } else { "denied" });
     Ok(())
 }
@@ -144,7 +144,7 @@ async fn account(conn: &Connection) -> Result<(), String> {
     let shared = proxy
         .account("This is a preview of the account-sharing consent prompt.")
         .await
-        .map_err(|e| dbus::format_error("Account", "show account prompt", e))?;
+        .map_err(|e| dbus::format_error("Account", "show account prompt", &e))?;
     println!("{}", if shared { "shared" } else { "declined" });
     Ok(())
 }
@@ -156,7 +156,7 @@ async fn app_chooser(conn: &Connection) -> Result<(), String> {
     let chosen = proxy
         .choose_application(vec![], "text/plain", "")
         .await
-        .map_err(|e| dbus::format_error("AppChooser", "show app chooser", e))?;
+        .map_err(|e| dbus::format_error("AppChooser", "show app chooser", &e))?;
     print_result(&chosen);
     Ok(())
 }
@@ -168,7 +168,7 @@ async fn dynamic_launcher(conn: &Connection) -> Result<(), String> {
     let approved = proxy
         .confirm_install("Preview Launcher", "application-x-executable")
         .await
-        .map_err(|e| dbus::format_error("DynamicLauncher", "show install confirmation", e))?;
+        .map_err(|e| dbus::format_error("DynamicLauncher", "show install confirmation", &e))?;
     println!("{}", if approved { "approved" } else { "rejected" });
     Ok(())
 }
@@ -180,7 +180,7 @@ async fn wallpaper(conn: &Connection, uri: &str) -> Result<(), String> {
     let accepted = proxy
         .confirm_wallpaper(uri)
         .await
-        .map_err(|e| dbus::format_error("Wallpaper", "show wallpaper preview", e))?;
+        .map_err(|e| dbus::format_error("Wallpaper", "show wallpaper preview", &e))?;
     println!("{}", if accepted { "accepted" } else { "declined" });
     Ok(())
 }

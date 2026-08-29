@@ -1,4 +1,4 @@
-//! SignalListItemFactory wiring for the ColorValue dropdown rows.
+//! `SignalListItemFactory` wiring for the `ColorValue` dropdown rows.
 
 use relm4::{gtk, gtk::prelude::*};
 
@@ -27,9 +27,10 @@ pub(super) fn setup_dropdown_factory(dropdown: &gtk::DropDown, items: &[ColorIte
             return;
         };
 
-        let position = list_item.position() as usize;
-
-        let Some((id, label_text)) = data.get(position) else {
+        let Some((id, label_text)) = usize::try_from(list_item.position())
+            .ok()
+            .and_then(|position| data.get(position))
+        else {
             return;
         };
 

@@ -46,7 +46,7 @@ impl Component for SeparatorModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let is_vertical = init.is_vertical.get();

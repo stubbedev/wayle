@@ -24,6 +24,7 @@ const WORKSPACE_ICONS_CSS: &str = "workspace-icons";
 
 /// Context for building a workspace button.
 #[derive(Debug, Clone)]
+#[expect(clippy::struct_excessive_bools, reason = "config/state struct")]
 pub struct ButtonBuildContext<'a> {
     pub id: WorkspaceId,
     pub display_id: WorkspaceId,
@@ -42,6 +43,7 @@ pub struct AppIconInit {
 }
 
 #[derive(Debug, Clone)]
+#[expect(clippy::struct_excessive_bools, reason = "config/state struct")]
 pub struct WorkspaceButtonInit {
     pub id: WorkspaceId,
     pub display_id: WorkspaceId,
@@ -71,6 +73,7 @@ pub struct AppIcon {
     pub widget: gtk::Image,
 }
 
+#[expect(clippy::struct_excessive_bools, reason = "config/state struct")]
 pub struct WorkspaceButton {
     id: WorkspaceId,
     pub state: WorkspaceState,
@@ -253,7 +256,7 @@ impl FactoryComponent for WorkspaceButton {
         let right = gtk::GestureClick::new();
         right.set_button(gtk::gdk::BUTTON_SECONDARY);
         right.connect_released({
-            let sender = sender.clone();
+            let sender = sender;
             let id = self.id;
             move |_, _, _, _| {
                 sender.output(WorkspaceButtonOutput::RightClick(id)).ok();
@@ -317,6 +320,11 @@ pub fn build_button_init(
         Vec::new()
     };
 
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "rounded f32 size fits in i32 pixel range"
+    )]
     let icon_gap_px = match config.icon_gap.get() {
         Size::Scale(value) => (value * 16.0).round() as i32,
         Size::Px(value) => value.round() as i32,

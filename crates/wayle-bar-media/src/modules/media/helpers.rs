@@ -57,9 +57,7 @@ pub fn resolve_icon(ctx: &IconContext<'_>) -> String {
     match ctx.icon_type {
         MediaIconType::Default => ctx.icon_name.to_string(),
         MediaIconType::Application => ctx
-            .desktop_entry
-            .map(|entry| format!("{entry}-symbolic"))
-            .unwrap_or_else(|| ctx.icon_name.to_string()),
+            .desktop_entry.map_or_else(|| ctx.icon_name.to_string(), |entry| format!("{entry}-symbolic")),
         MediaIconType::SpinningDisc => ctx.spinning_disc_icon.to_string(),
         MediaIconType::ApplicationMapped => {
             if let Some(icon) = glob::find_match(
@@ -75,9 +73,7 @@ pub fn resolve_icon(ctx: &IconContext<'_>) -> String {
                 return icon.to_string();
             }
 
-            ctx.desktop_entry
-                .map(|entry| format!("{entry}-symbolic"))
-                .unwrap_or_else(|| ctx.icon_name.to_string())
+            ctx.desktop_entry.map_or_else(|| ctx.icon_name.to_string(), |entry| format!("{entry}-symbolic"))
         }
     }
 }

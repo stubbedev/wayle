@@ -1,4 +1,4 @@
-//! NetworkManager PPP Device interface.
+//! `NetworkManager` PPP Device interface.
 
 use zbus::proxy;
 

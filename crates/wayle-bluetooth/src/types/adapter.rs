@@ -5,7 +5,7 @@ use std::{
 
 use zbus::zvariant::Value;
 
-/// Bluetooth address type from BlueZ.
+/// Bluetooth address type from `BlueZ`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddressType {
     /// Public address.
@@ -34,7 +34,7 @@ impl From<&str> for AddressType {
 
 /// Power state of a Bluetooth adapter.
 ///
-/// (BlueZ experimental)
+/// (`BlueZ` experimental)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerState {
     /// Adapter is powered on.
@@ -164,11 +164,12 @@ pub struct DiscoveryFilterOptions<'a> {
 
 impl<'a> DiscoveryFilterOptions<'a> {
     /// Creates a new discovery filter options with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Converts options to a discovery filter HashMap for D-Bus transmission.
+    /// Converts options to a discovery filter `HashMap` for D-Bus transmission.
     pub fn to_filter(self) -> DiscoveryFilter<'a> {
         let mut filter = HashMap::new();
 

@@ -57,7 +57,7 @@ async fn spawn_primary_monitoring(
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("NetworkMonitoring primary monitoring cancelled");
                     return;
                 }
@@ -91,7 +91,7 @@ async fn spawn_device_monitoring(
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = cancellation_token.cancelled() => {
+                () = cancellation_token.cancelled() => {
                     debug!("NetworkMonitoring device monitoring cancelled");
                     return;
                 }

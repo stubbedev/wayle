@@ -5,11 +5,9 @@ use wildcard::Wildcard;
 /// Checks if `text` matches a glob `pattern`.
 ///
 /// Patterns support `*` (zero or more characters) and `?` (exactly one character).
+#[must_use]
 pub fn matches(pattern: &str, text: &str) -> bool {
-    Wildcard::new(pattern.as_bytes())
-        .ok()
-        .map(|w| w.is_match(text.as_bytes()))
-        .unwrap_or(false)
+    Wildcard::new(pattern.as_bytes()).is_ok_and(|w| w.is_match(text.as_bytes()))
 }
 
 /// Finds the first pattern that matches `text` and returns the associated value.

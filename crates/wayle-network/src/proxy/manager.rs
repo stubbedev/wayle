@@ -13,10 +13,10 @@ use zbus::{
     default_path = "/org/freedesktop/NetworkManager"
 )]
 pub(crate) trait NetworkManager {
-    /// Reload NetworkManager's configuration and perform certain updates, like flushing a cache or rewriting external state to disk.
+    /// Reload `NetworkManager`'s configuration and perform certain updates, like flushing a cache or rewriting external state to disk.
     ///
-    /// This is similar to sending SIGHUP to NetworkManager but it allows for more fine-grained control over what to reload (see flags).
-    /// It also allows non-root access via PolicyKit and contrary to signals it is synchronous.
+    /// This is similar to sending SIGHUP to `NetworkManager` but it allows for more fine-grained control over what to reload (see flags).
+    /// It also allows non-root access via `PolicyKit` and contrary to signals it is synchronous.
     ///
     /// # Arguments
     /// * `flags` - Optional flags to specify which parts shall be reloaded:
@@ -35,7 +35,7 @@ pub(crate) trait NetworkManager {
     /// Get the list of all network devices.
     ///
     /// # Returns
-    /// List of object paths of network devices and device placeholders (eg, devices that do not yet exist but which can be automatically created by NetworkManager if one of their AvailableConnections was activated).
+    /// List of object paths of network devices and device placeholders (eg, devices that do not yet exist but which can be automatically created by `NetworkManager` if one of their `AvailableConnections` was activated).
     fn get_all_devices(&self) -> zbus::Result<Vec<OwnedObjectPath>>;
 
     /// Return the object path of the network device referenced by its IP interface name.
@@ -52,9 +52,9 @@ pub(crate) trait NetworkManager {
     /// Activate a connection using the supplied device.
     ///
     /// # Arguments
-    /// * `connection` - The connection to activate. If "/" is given, a valid device path must be given, and NetworkManager picks the best connection to activate for the given device. VPN connections must always pass a valid connection path.
-    /// * `device` - The object path of device to be activated for physical connections. This parameter is ignored for VPN connections, because the specific_object (if provided) specifies the device to use.
-    /// * `specific_object` - The path of a connection-type-specific object this activation should use. This parameter is currently ignored for wired and mobile broadband connections, and the value of "/" should be used (ie, no specific object). For Wi-Fi connections, pass the object path of a specific AP from the card's scan list, or "/" to pick an AP automatically. For VPN connections, pass the object path of an ActiveConnection object that should serve as the "base" connection (to which the VPN connections lifetime will be tied), or pass "/" and NM will automatically use the current default device.
+    /// * `connection` - The connection to activate. If "/" is given, a valid device path must be given, and `NetworkManager` picks the best connection to activate for the given device. VPN connections must always pass a valid connection path.
+    /// * `device` - The object path of device to be activated for physical connections. This parameter is ignored for VPN connections, because the `specific_object` (if provided) specifies the device to use.
+    /// * `specific_object` - The path of a connection-type-specific object this activation should use. This parameter is currently ignored for wired and mobile broadband connections, and the value of "/" should be used (ie, no specific object). For Wi-Fi connections, pass the object path of a specific AP from the card's scan list, or "/" to pick an AP automatically. For VPN connections, pass the object path of an `ActiveConnection` object that should serve as the "base" connection (to which the VPN connections lifetime will be tied), or pass "/" and NM will automatically use the current default device.
     ///
     /// # Returns
     /// The path of the active connection object representing this active connection.
@@ -118,13 +118,13 @@ pub(crate) trait NetworkManager {
     /// * `active_connection` - The currently active connection to deactivate
     fn deactivate_connection(&self, active_connection: &OwnedObjectPath) -> zbus::Result<()>;
 
-    /// Control the NetworkManager daemon's sleep state.
+    /// Control the `NetworkManager` daemon's sleep state.
     ///
     /// When asleep, all interfaces that it manages are deactivated. When awake, devices are available to be activated.
     /// This command should not be called directly by users or clients; it is intended for system suspend/resume tracking.
     ///
     /// # Arguments
-    /// * `sleep` - Indicates whether the NetworkManager daemon should sleep or wake
+    /// * `sleep` - Indicates whether the `NetworkManager` daemon should sleep or wake
     fn sleep(&self, sleep: bool) -> zbus::Result<()>;
 
     /// Control whether overall networking is enabled or disabled.
@@ -133,10 +133,10 @@ pub(crate) trait NetworkManager {
     /// This command should be used by clients that provide to users the ability to enable/disable all networking.
     ///
     /// # Arguments
-    /// * `enable` - If FALSE, indicates that all networking should be disabled. If TRUE, indicates that NetworkManager should begin managing network devices.
+    /// * `enable` - If FALSE, indicates that all networking should be disabled. If TRUE, indicates that `NetworkManager` should begin managing network devices.
     fn enable(&self, enable: bool) -> zbus::Result<()>;
 
-    /// Returns the permissions a caller has for various authenticated operations that NetworkManager provides.
+    /// Returns the permissions a caller has for various authenticated operations that `NetworkManager` provides.
     ///
     /// # Returns
     /// Dictionary of available permissions and results. Each permission is represented by a name (ie "org.freedesktop.NetworkManager.Foobar") and each result is one of the following values: "yes" (the permission is available), "auth" (the permission is available after a successful authentication), or "no" (the permission is denied).
@@ -146,7 +146,7 @@ pub(crate) trait NetworkManager {
     ///
     /// # Arguments
     /// * `level` - One of [ERR, WARN, INFO, DEBUG, TRACE, OFF, KEEP]. This level is applied to the domains as specified in the domains argument. Except for the special level "KEEP", all unmentioned domains are disabled entirely. "KEEP" is special and allows not to change the current setting except for the specified domains.
-    /// * `domains` - A combination of logging domains separated by commas (','), or "NONE" to disable logging. Each domain enables logging for operations related to that domain. Available domains are: [PLATFORM, RFKILL, ETHER, WIFI, BT, MB, DHCP4, DHCP6, PPP, WIFI_SCAN, IP4, IP6, AUTOIP4, DNS, VPN, SHARING, SUPPLICANT, AGENTS, SETTINGS, SUSPEND, CORE, DEVICE, OLPC, WIMAX, INFINIBAND, FIREWALL, ADSL, BOND, VLAN, BRIDGE, DBUS_PROPS, TEAM, CONCHECK, DCB, DISPATCH, AUDIT].
+    /// * `domains` - A combination of logging domains separated by commas (','), or "NONE" to disable logging. Each domain enables logging for operations related to that domain. Available domains are: [PLATFORM, RFKILL, ETHER, WIFI, BT, MB, DHCP4, DHCP6, PPP, `WIFI_SCAN`, IP4, IP6, AUTOIP4, DNS, VPN, SHARING, SUPPLICANT, AGENTS, SETTINGS, SUSPEND, CORE, DEVICE, OLPC, WIMAX, INFINIBAND, FIREWALL, ADSL, BOND, VLAN, BRIDGE, `DBUS_PROPS`, TEAM, CONCHECK, DCB, DISPATCH, AUDIT].
     fn set_logging(&self, level: &str, domains: &str) -> zbus::Result<()>;
 
     /// Get current logging verbosity level and operations domains.
@@ -162,7 +162,7 @@ pub(crate) trait NetworkManager {
     /// The current connectivity state
     fn check_connectivity(&self) -> zbus::Result<u32>;
 
-    /// The overall networking state as determined by the NetworkManager daemon, based on the state of network devices under its management.
+    /// The overall networking state as determined by the `NetworkManager` daemon, based on the state of network devices under its management.
     ///
     /// # Returns
     /// Overall network state
@@ -170,12 +170,12 @@ pub(crate) trait NetworkManager {
 
     /// Create a checkpoint of the current networking configuration for given interfaces.
     ///
-    /// If rollback_timeout is not zero, a rollback is automatically performed after the given timeout.
+    /// If `rollback_timeout` is not zero, a rollback is automatically performed after the given timeout.
     ///
     /// # Arguments
     /// * `devices` - A list of device paths for which a checkpoint should be created. An empty list means all devices.
-    /// * `rollback_timeout` - The time in seconds until NetworkManager will automatically rollback to the checkpoint. Set to zero for infinite.
-    /// * `flags` - Flags for the creation (NMCheckpointCreateFlags)
+    /// * `rollback_timeout` - The time in seconds until `NetworkManager` will automatically rollback to the checkpoint. Set to zero for infinite.
+    /// * `flags` - Flags for the creation (`NMCheckpointCreateFlags`)
     ///
     /// # Returns
     /// On success, the path of the new checkpoint
@@ -198,7 +198,7 @@ pub(crate) trait NetworkManager {
     /// * `checkpoint` - The checkpoint to be rolled back
     ///
     /// # Returns
-    /// Dictionary of devices and results. Devices are represented by their original D-Bus path; each result is a RollbackResult.
+    /// Dictionary of devices and results. Devices are represented by their original D-Bus path; each result is a `RollbackResult`.
     fn checkpoint_rollback(
         &self,
         checkpoint: &OwnedObjectPath,
@@ -255,7 +255,7 @@ pub(crate) trait NetworkManager {
 
     /// Flags related to radio devices.
     ///
-    /// See NMRadioFlags for the list of flags supported.
+    /// See `NMRadioFlags` for the list of flags supported.
     #[zbus(property)]
     fn radio_flags(&self) -> zbus::Result<u32>;
 
@@ -283,13 +283,13 @@ pub(crate) trait NetworkManager {
     #[zbus(property)]
     fn startup(&self) -> zbus::Result<bool>;
 
-    /// NetworkManager version.
+    /// `NetworkManager` version.
     #[zbus(property)]
     fn version(&self) -> zbus::Result<String>;
 
-    /// NetworkManager version and capabilities.
+    /// `NetworkManager` version and capabilities.
     ///
-    /// The first element is the NM_VERSION (major << 16 | minor << 8 | micro).
+    /// The first element is the `NM_VERSION` (major << 16 | minor << 8 | micro).
     /// Following elements are a bitfield of static capabilities.
     #[zbus(property)]
     fn version_info(&self) -> zbus::Result<Vec<u32>>;
@@ -300,7 +300,7 @@ pub(crate) trait NetworkManager {
     #[zbus(property)]
     fn capabilities(&self) -> zbus::Result<Vec<u32>>;
 
-    /// The overall state of the NetworkManager daemon.
+    /// The overall state of the `NetworkManager` daemon.
     #[zbus(property, name = "State")]
     fn state_property(&self) -> zbus::Result<u32>;
 
@@ -320,7 +320,7 @@ pub(crate) trait NetworkManager {
     #[zbus(property)]
     fn set_connectivity_check_enabled(&self, enabled: bool) -> zbus::Result<()>;
 
-    /// The URI that NetworkManager will hit to check if there is internet connectivity.
+    /// The URI that `NetworkManager` will hit to check if there is internet connectivity.
     #[zbus(property)]
     fn connectivity_check_uri(&self) -> zbus::Result<String>;
 
@@ -337,7 +337,7 @@ pub(crate) trait NetworkManager {
     #[zbus(signal)]
     fn check_permissions(&self) -> zbus::Result<()>;
 
-    /// NetworkManager's state changed.
+    /// `NetworkManager`'s state changed.
     #[zbus(signal)]
     fn state_changed(&self, state: u32) -> zbus::Result<()>;
 

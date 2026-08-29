@@ -204,18 +204,35 @@ wayle-styling = { path = "crates/wayle-styling" }
 wayle-widgets = { path = "crates/wayle-widgets" }
 
 [workspace.lints.clippy]
-cognitive_complexity = "warn"
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+# Deny panics
+unwrap_used = "deny"
 expect_used = "deny"
+indexing_slicing = "deny"
+arithmetic_side_effects = "deny"
+unreachable = "deny"
+unimplemented = "deny"
+unchecked_time_subtraction = "deny"
+todo = "deny"
+string_slice = "deny"
+panic_in_result_fn = "deny"
+panic = "deny"
+exit = "deny"
+as_conversions = "deny"
+# Pre-existing workspace preferences
+# redundant_pub_crate: false-positives on relm4 #[relm4::component] output —
+# its suggested pub(crate)->pub rewrite doesn't compile (E0446).
+redundant_pub_crate = "allow"
+cognitive_complexity = "warn"
 inefficient_to_string = "warn"
 large_types_passed_by_value = "warn"
 manual_ok_or = "warn"
 missing_errors_doc = "warn"
 missing_panics_doc = "warn"
 module_name_repetitions = "allow"
-panic = "warn"
 similar_names = "allow"
 too_many_lines = "warn"
-unwrap_used = "deny"
 
 [workspace.lints.rust]
 missing_docs = "warn"

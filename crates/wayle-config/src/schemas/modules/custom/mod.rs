@@ -18,7 +18,7 @@ use crate::{
 ///
 /// Full walkthrough with examples in `docs/guide/custom-modules.md`.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct CustomModuleDefinition {
     /// Unique identifier for this module.
@@ -343,7 +343,7 @@ pub struct CustomModuleDefinition {
     pub on_action: Option<String>,
 }
 
-fn default_interval() -> u64 {
+const fn default_interval() -> u64 {
     5000
 }
 
@@ -351,15 +351,15 @@ fn default_format() -> String {
     String::from("{{ output }}")
 }
 
-fn default_true() -> bool {
+const fn default_true() -> bool {
     true
 }
 
-fn default_auto_color() -> ColorValue {
+const fn default_auto_color() -> ColorValue {
     ColorValue::Auto
 }
 
-fn default_button_bg() -> ColorValue {
+const fn default_button_bg() -> ColorValue {
     ColorValue::Token(CssToken::BgSurfaceElevated)
 }
 
@@ -368,7 +368,7 @@ impl ModuleInfoProvider for CustomModuleDefinition {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("custom"),
-            schema: || schema_for!(CustomModuleDefinition),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("custom-<id>")),
             array_entry: true,
         }

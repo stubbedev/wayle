@@ -263,7 +263,7 @@ impl ModuleInfoProvider for BarConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("bar"),
-            schema: || schema_for!(BarConfig),
+            schema: || schema_for!(Self),
             layout_id: None,
             array_entry: false,
         }

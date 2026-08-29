@@ -7,7 +7,7 @@ pub(crate) mod utils;
 
 /// Ten-color palette for CSS generation.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Palette {
     /// Base background color (darkest).
     pub bg: String,

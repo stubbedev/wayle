@@ -187,7 +187,7 @@ impl Component for Greeter {
 
         let show_clock = init.config.greeter.show_clock.get();
         let input = sender.input_sender().clone();
-        let below_widget: gtk::Widget = below.clone().upcast();
+        let below_widget: gtk::Widget = below.upcast();
         let user_row_widget: gtk::Widget = user_row.clone().upcast();
         let cred = CredentialBox::build(
             &CredentialOpts {
@@ -246,7 +246,7 @@ impl Component for Greeter {
             });
         }
 
-        let mut model = Greeter {
+        let mut model = Self {
             config: init.config,
             sessions: init.sessions,
             dropdown,
@@ -511,25 +511,22 @@ fn populate_user_row(row: &gtk::Box, users: &[User], last: Option<&str>, cred: &
 /// Builds one user button: avatar (image or initial-letter fallback) above the
 /// display name.
 fn build_user_button(user: &User) -> gtk::Button {
-    let avatar: gtk::Widget = match &user.icon {
-        Some(path) => {
-            let picture = gtk::Picture::for_filename(path);
-            picture.set_content_fit(gtk::ContentFit::Cover);
-            picture.add_css_class("lock-avatar");
-            picture.upcast()
-        }
-        None => {
-            let initial = user
-                .display_name
-                .chars()
-                .next()
-                .map(|c| c.to_uppercase().to_string())
-                .unwrap_or_default();
-            let label = gtk::Label::new(Some(&initial));
-            label.add_css_class("lock-avatar");
-            label.add_css_class("lock-avatar-fallback");
-            label.upcast()
-        }
+    let avatar: gtk::Widget = if let Some(path) = &user.icon {
+        let picture = gtk::Picture::for_filename(path);
+        picture.set_content_fit(gtk::ContentFit::Cover);
+        picture.add_css_class("lock-avatar");
+        picture.upcast()
+    } else {
+        let initial = user
+            .display_name
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().to_string())
+            .unwrap_or_default();
+        let label = gtk::Label::new(Some(&initial));
+        label.add_css_class("lock-avatar");
+        label.add_css_class("lock-avatar-fallback");
+        label.upcast()
     };
     avatar.set_size_request(64, 64);
 
@@ -618,9 +615,7 @@ fn build_session_dropdown(sessions: &[Session], last: Option<&str>) -> gtk::Drop
 /// to GTK's icon search path, so `from_icon_name` resolves them without any
 /// installed icon theme.
 fn install_icons() {
-    let dir = std::env::var_os("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
+    let dir = std::env::var_os("XDG_RUNTIME_DIR").map_or_else(std::env::temp_dir, PathBuf::from)
         .join("wayle-greeter-icons");
     if let Err(err) = std::fs::create_dir_all(&dir) {
         warn!(dir = %dir.display(), error = %err, "greeter: cannot create icon dir");

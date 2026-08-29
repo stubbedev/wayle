@@ -156,7 +156,7 @@ impl Component for SharePicker {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = PickerConfig::from_config(init.config());
-        let model = SharePicker {
+        let model = Self {
             config_service: init,
             config,
             allow_token: false,

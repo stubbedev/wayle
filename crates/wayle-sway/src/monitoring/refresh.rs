@@ -27,7 +27,7 @@ pub(super) async fn refresh_workspaces(client: &SwayCommandClient, handles: &Mon
     let mut updated: HashMap<u64, Arc<Workspace>> = HashMap::with_capacity(replies.len());
 
     for reply in &replies {
-        let id = reply.id as u64;
+        let id = reply.id.cast_unsigned();
         match current.get(&id) {
             Some(existing) => {
                 existing.refresh_from_reply(reply);
@@ -99,14 +99,14 @@ pub(super) async fn refresh_keyboard_layout(
 /// window node.
 fn collect_windows(node: &TreeNode, workspace_id: Option<u64>, out: &mut Vec<WindowSnapshot>) {
     let workspace_id = if node.node_type == "workspace" {
-        Some(node.id as u64)
+        Some(node.id.cast_unsigned())
     } else {
         workspace_id
     };
 
     if node.is_window() {
         out.push(WindowSnapshot {
-            id: node.id as u64,
+            id: node.id.cast_unsigned(),
             title: node.name.clone(),
             app_id: node.resolved_app_id(),
             pid: node.pid,

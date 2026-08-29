@@ -43,7 +43,7 @@ impl Component for KeyboardInput {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();
@@ -51,9 +51,7 @@ impl Component for KeyboardInput {
 
         let initial_layout = init
             .source
-            .snapshot()
-            .map(|layout| layout.label)
-            .unwrap_or_else(|| UNKNOWN_LAYOUT.to_string());
+            .snapshot().map_or_else(|| UNKNOWN_LAYOUT.to_string(), |layout| layout.label);
 
         let formatted_label = helpers::format_label(
             &initial_layout,
@@ -63,7 +61,7 @@ impl Component for KeyboardInput {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: keyboard_input.icon_name.get().clone(),
+                icon: keyboard_input.icon_name.get(),
                 label: formatted_label,
                 tooltip: None,
                 colors: BarButtonColors {
@@ -127,9 +125,7 @@ impl Component for KeyboardInput {
     ) {
         match msg {
             KeyboardInputCmd::LayoutChanged(layout) => {
-                self.current_layout = layout
-                    .map(|current| current.label)
-                    .unwrap_or_else(|| UNKNOWN_LAYOUT.to_string());
+                self.current_layout = layout.map_or_else(|| UNKNOWN_LAYOUT.to_string(), |current| current.label);
                 self.update_label(root);
             }
             KeyboardInputCmd::LayoutAliasMapChanged | KeyboardInputCmd::FormatChanged => {

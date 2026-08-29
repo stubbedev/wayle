@@ -90,7 +90,7 @@ impl FactoryComponent for BrightnessDeviceItem {
     fn init_widgets(
         &mut self,
         _index: &Self::Index,
-        _root: Self::Root,
+        root: Self::Root,
         _returned_widget: &<Self::ParentWidget as relm4::factory::FactoryView>::ReturnedWidget,
         sender: FactorySender<Self>,
     ) -> Self::Widgets {

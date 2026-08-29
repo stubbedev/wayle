@@ -19,7 +19,7 @@ use crate::{
 pub enum DrunField {
     /// Localized Name.
     Name,
-    /// GenericName.
+    /// `GenericName`.
     Generic,
     /// Exec command line.
     Exec,
@@ -95,7 +95,8 @@ pub struct DrunMode {
 
 impl DrunMode {
     /// Create the mode. `history` enables frecency ordering + recording.
-    pub fn new(config: DrunConfig, history: Option<HistoryStore>) -> Self {
+    #[must_use]
+    pub const fn new(config: DrunConfig, history: Option<HistoryStore>) -> Self {
         Self {
             config,
             history,
@@ -146,7 +147,7 @@ impl DrunMode {
 
 #[async_trait]
 impl Mode for DrunMode {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "drun"
     }
 

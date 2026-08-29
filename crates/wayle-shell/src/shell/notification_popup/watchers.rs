@@ -30,7 +30,7 @@ pub(super) fn spawn(
     let icon_source = notif_config.icon_source.clone();
     let close_behavior = notif_config.popup_close_behavior.clone();
     let hover_pause = notif_config.popup_hover_pause.clone();
-    let popup_layer = notif_config.popup_layer.clone();
+    let popup_layer = notif_config.popup_layer;
     let scale = full_config.styling.scale.clone();
     let tearing_mode = full_config.general.tearing_mode.clone();
 

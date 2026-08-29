@@ -1,4 +1,4 @@
-//! NetworkManager Bond Device interface.
+//! `NetworkManager` Bond Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

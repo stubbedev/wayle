@@ -1,4 +1,4 @@
-//! NetworkManager Loopback Device interface.
+//! `NetworkManager` Loopback Device interface.
 
 use zbus::proxy;
 

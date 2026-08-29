@@ -28,7 +28,7 @@ use crate::{
 /// Connection Settings Profile Manager.
 ///
 /// The Settings interface allows clients to view and administrate
-/// the connections stored and used by NetworkManager.
+/// the connections stored and used by `NetworkManager`.
 #[derive(Debug, Clone)]
 pub struct Settings {
     #[debug(skip)]
@@ -70,7 +70,7 @@ impl Reactive for Settings {
 }
 
 impl Settings {
-    /// List the saved network connections known to NetworkManager.
+    /// List the saved network connections known to `NetworkManager`.
     ///
     /// # Returns
     ///
@@ -78,7 +78,7 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns `NetworkError::DbusError` if the DBus operation fails.
+    /// Returns `NetworkError::DbusError` if the `DBus` operation fails.
     pub async fn list_connections(&self) -> Result<Vec<OwnedObjectPath>, Error> {
         SettingsController::list_connections(&self.zbus_connection).await
     }
@@ -95,7 +95,7 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns `NetworkError::DbusError` if the DBus operation fails or connection not found.
+    /// Returns `NetworkError::DbusError` if the `DBus` operation fails or connection not found.
     pub async fn get_connection_by_uuid(&self, uuid: &str) -> Result<OwnedObjectPath, Error> {
         SettingsController::get_connection_by_uuid(&self.zbus_connection, uuid).await
     }
@@ -117,7 +117,7 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns `NetworkError::DbusError` if the DBus operation fails.
+    /// Returns `NetworkError::DbusError` if the `DBus` operation fails.
     pub async fn add_connection(
         &self,
         connection: HashMap<String, HashMap<String, OwnedValue>>,
@@ -142,7 +142,7 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns `NetworkError::DbusError` if the DBus operation fails.
+    /// Returns `NetworkError::DbusError` if the `DBus` operation fails.
     pub async fn add_connection_unsaved(
         &self,
         connection: HashMap<String, HashMap<String, OwnedValue>>,
@@ -152,7 +152,7 @@ impl Settings {
 
     /// Add a new connection profile.
     ///
-    /// AddConnection2 is an alternative to AddConnection and AddConnectionUnsaved.
+    /// `AddConnection2` is an alternative to `AddConnection` and `AddConnectionUnsaved`.
     /// The new variant can do everything that the older variants could, and more.
     /// Its behavior is extensible via extra flags and args arguments.
     ///
@@ -170,12 +170,12 @@ impl Settings {
     /// # Returns
     ///
     /// Returns a tuple containing:
-    /// - The DBus object path of the newly created connection
+    /// - The `DBus` object path of the newly created connection
     /// - A result dictionary (currently empty but reserved for future use)
     ///
     /// # Errors
     ///
-    /// Returns `NetworkError::DbusError` if the DBus operation fails.
+    /// Returns `NetworkError::DbusError` if the `DBus` operation fails.
     pub async fn add_connection2(
         &self,
         settings: HashMap<String, HashMap<String, OwnedValue>>,
@@ -188,25 +188,25 @@ impl Settings {
     /// Loads or reloads the indicated connections from disk.
     ///
     /// You should call this after making changes directly to an on-disk
-    /// connection file to make sure that NetworkManager sees the changes.
-    /// As with AddConnection(), this operation does not necessarily start
+    /// connection file to make sure that `NetworkManager` sees the changes.
+    /// As with `AddConnection()`, this operation does not necessarily start
     /// the network connection.
     ///
     /// # Arguments
     ///
-    /// * `filenames` - Array of paths to on-disk connection profiles in directories monitored by NetworkManager
+    /// * `filenames` - Array of paths to on-disk connection profiles in directories monitored by `NetworkManager`
     ///
     /// # Returns
     ///
     /// Returns a tuple containing:
-    /// - `status`: Success or failure of the operation as a whole. True if NetworkManager
+    /// - `status`: Success or failure of the operation as a whole. True if `NetworkManager`
     ///   at least tried to load the indicated connections, even if it did not succeed.
     ///   False if an error occurred before trying to load the connections (eg, permission denied).
     /// - `failures`: Paths of connection files that could not be loaded
     ///
     /// # Errors
     ///
-    /// Returns `NetworkError::DbusError` if the DBus operation fails.
+    /// Returns `NetworkError::DbusError` if the `DBus` operation fails.
     pub async fn load_connections(
         &self,
         filenames: Vec<String>,
@@ -214,7 +214,7 @@ impl Settings {
         SettingsController::load_connections(&self.zbus_connection, filenames).await
     }
 
-    /// Tells NetworkManager to reload all connection files from disk.
+    /// Tells `NetworkManager` to reload all connection files from disk.
     ///
     /// Reloads all connection files from disk, including noticing any
     /// added or deleted connection files.
@@ -225,7 +225,7 @@ impl Settings {
     ///
     /// # Errors
     ///
-    /// Returns `NetworkError::DbusError` if the DBus operation fails.
+    /// Returns `NetworkError::DbusError` if the `DBus` operation fails.
     pub async fn reload_connections(&self) -> Result<bool, Error> {
         SettingsController::reload_connections(&self.zbus_connection).await
     }
@@ -247,6 +247,7 @@ impl Settings {
     /// Saved connection profiles matching the given SSID.
     ///
     /// A single SSID may have multiple profiles with different configurations.
+    #[must_use]
     pub fn connections_for_ssid(&self, ssid: &Ssid) -> Vec<ConnectionSettings> {
         self.connections
             .get()

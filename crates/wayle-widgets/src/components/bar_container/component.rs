@@ -16,7 +16,7 @@ use super::{
 };
 use crate::{styling::InlineStyling, utils::force_window_resize};
 
-/// Input messages for BarContainer.
+/// Input messages for `BarContainer`.
 #[derive(Debug)]
 pub enum BarContainerInput {}
 
@@ -78,7 +78,7 @@ impl Component for BarContainer {
     ) -> ComponentParts<Self> {
         let css_provider = gtk::CssProvider::new();
 
-        let model = BarContainer {
+        let model = Self {
             is_vertical: init.is_vertical.get(),
             colors: init.colors,
             behavior: init.behavior,

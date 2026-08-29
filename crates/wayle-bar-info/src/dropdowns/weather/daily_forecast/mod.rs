@@ -50,7 +50,7 @@ impl Component for DailyForecast {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let items = FactoryVecDeque::builder()

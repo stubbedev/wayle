@@ -73,14 +73,14 @@ pub(crate) trait Device {
     /// Disconnects a device and prevents the device from automatically activating further connections without user intervention.
     fn disconnect(&self) -> zbus::Result<()>;
 
-    /// Deletes a software device from NetworkManager and removes the interface from the system.
+    /// Deletes a software device from `NetworkManager` and removes the interface from the system.
     fn delete(&self) -> zbus::Result<()>;
 
     /// Sets the managed state of the device with optional persistence. Since: 1.58.
     ///
     /// # Arguments
     /// * `managed` - 0 = unmanaged, 1 = managed, 2 = reset to default
-    /// * `flags` - NMDeviceManagedFlags
+    /// * `flags` - `NMDeviceManagedFlags`
     #[zbus(name = "SetManaged")]
     fn set_managed_ext(&self, managed: u32, flags: u32) -> zbus::Result<()>;
 
@@ -88,7 +88,7 @@ pub(crate) trait Device {
     #[zbus(property)]
     fn udi(&self) -> zbus::Result<String>;
 
-    /// The path of the device as exposed by the udev property ID_PATH.
+    /// The path of the device as exposed by the udev property `ID_PATH`.
     #[zbus(property)]
     fn path(&self) -> zbus::Result<String>;
 
@@ -124,27 +124,27 @@ pub(crate) trait Device {
     #[zbus(property)]
     fn state_reason(&self) -> zbus::Result<(u32, u32)>;
 
-    /// Object path of an ActiveConnection object that "owns" this device during activation.
+    /// Object path of an `ActiveConnection` object that "owns" this device during activation.
     #[zbus(property)]
     fn active_connection(&self) -> zbus::Result<OwnedObjectPath>;
 
-    /// Object path of the Ip4Config object describing the configuration of the device.
+    /// Object path of the `Ip4Config` object describing the configuration of the device.
     #[zbus(property)]
     fn ip4_config(&self) -> zbus::Result<OwnedObjectPath>;
 
-    /// Object path of the Dhcp4Config object describing the DHCP options returned by the DHCP server.
+    /// Object path of the `Dhcp4Config` object describing the DHCP options returned by the DHCP server.
     #[zbus(property)]
     fn dhcp4_config(&self) -> zbus::Result<OwnedObjectPath>;
 
-    /// Object path of the Ip6Config object describing the configuration of the device.
+    /// Object path of the `Ip6Config` object describing the configuration of the device.
     #[zbus(property)]
     fn ip6_config(&self) -> zbus::Result<OwnedObjectPath>;
 
-    /// Object path of the Dhcp6Config object describing the DHCP options returned by the DHCP server.
+    /// Object path of the `Dhcp6Config` object describing the DHCP options returned by the DHCP server.
     #[zbus(property)]
     fn dhcp6_config(&self) -> zbus::Result<OwnedObjectPath>;
 
-    /// Whether or not this device is managed by NetworkManager.
+    /// Whether or not this device is managed by `NetworkManager`.
     #[zbus(property)]
     fn managed(&self) -> zbus::Result<bool>;
     #[zbus(property)]
@@ -160,7 +160,7 @@ pub(crate) trait Device {
     #[zbus(property)]
     fn firmware_missing(&self) -> zbus::Result<bool>;
 
-    /// If TRUE, indicates the NetworkManager plugin for the device is likely missing or misconfigured.
+    /// If TRUE, indicates the `NetworkManager` plugin for the device is likely missing or misconfigured.
     #[zbus(property)]
     fn nm_plugin_missing(&self) -> zbus::Result<bool>;
 

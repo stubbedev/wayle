@@ -6,7 +6,7 @@ use crate::{
     types::device::{DeviceKey, DeviceType},
 };
 
-pub(crate) async fn handle_change(
+pub(crate) fn handle_change(
     facility: Facility,
     operation: Operation,
     index: u32,
@@ -23,11 +23,9 @@ pub(crate) async fn handle_change(
 
     match operation {
         Operation::Removed => {
-            let removed_device = if let Ok(mut devices_guard) = devices.write() {
-                devices_guard.remove(&device_key)
-            } else {
-                None
-            };
+            let removed_device = devices
+                .write()
+                .map_or(None, |mut devices_guard| devices_guard.remove(&device_key));
 
             if removed_device.is_some() {
                 let _ = events_tx.send(AudioEvent::DeviceRemoved(device_key));

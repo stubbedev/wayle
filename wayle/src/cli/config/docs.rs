@@ -10,12 +10,16 @@ use crate::{cli::CliAction, docs::generator::DocsGenerator};
 /// fails to write.
 pub fn execute(out: PathBuf, only: Option<String>) -> CliAction {
     let generator = DocsGenerator::new().with_output_dir(out);
-    match only {
-        Some(name) => generator
-            .generate_module_by_name(&name)
-            .map_err(|err| format!("cannot generate `{name}`: {err}")),
-        None => generator
-            .generate_all()
-            .map_err(|err| format!("cannot generate docs: {err}")),
-    }
+    only.map_or_else(
+        || {
+            generator
+                .generate_all()
+                .map_err(|err| format!("cannot generate docs: {err}"))
+        },
+        |name| {
+            generator
+                .generate_module_by_name(&name)
+                .map_err(|err| format!("cannot generate `{name}`: {err}"))
+        },
+    )
 }

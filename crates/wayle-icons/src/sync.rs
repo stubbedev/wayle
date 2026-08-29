@@ -59,6 +59,7 @@ pub struct SyncFailure {
 /// Splits each string leaf on non-icon-name characters and keeps chunks
 /// matching `<known-prefix>-<slug>-symbolic`. Schema-agnostic, so new
 /// icon-bearing fields are picked up without code changes.
+#[must_use]
 pub fn extract_referenced_icons(value: &toml::Value) -> BTreeSet<String> {
     let prefixes = all_prefixes();
     let mut icons = BTreeSet::new();
@@ -71,6 +72,7 @@ pub fn extract_referenced_icons(value: &toml::Value) -> BTreeSet<String> {
 /// Names that don't parse into a known prefix are dropped silently; callers
 /// looking for "what's installed but not referenced" should diff the other
 /// direction themselves.
+#[must_use]
 pub fn find_missing(
     referenced: &BTreeSet<String>,
     installed: &BTreeSet<String>,
@@ -137,7 +139,7 @@ fn scan_string(text: &str, prefixes: &[&str], sink: &mut BTreeSet<String>) {
     }
 }
 
-fn is_icon_name_char(character: char) -> bool {
+const fn is_icon_name_char(character: char) -> bool {
     character.is_ascii_alphanumeric() || character == '-' || character == '_'
 }
 

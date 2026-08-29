@@ -1,4 +1,4 @@
-//! NetworkManager OLPC Mesh Device interface.
+//! `NetworkManager` OLPC Mesh Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

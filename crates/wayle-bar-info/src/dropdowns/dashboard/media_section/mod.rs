@@ -29,6 +29,10 @@ fn next_dashboard_art_css_class() -> String {
     format!("dashboard-media-art-instance-{id}")
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors independent player state flags"
+)]
 pub struct MediaSection {
     media: Option<Arc<MediaService>>,
     player: Option<Arc<Player>>,
@@ -270,7 +274,7 @@ impl Component for MediaSection {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let art_css_provider = CssProvider::new();
@@ -294,7 +298,7 @@ impl Component for MediaSection {
             }),
         );
 
-        watchers::spawn(&sender, &init.media);
+        watchers::spawn(&sender, init.media.as_ref());
 
         let model = Self {
             media: init.media,
@@ -304,7 +308,7 @@ impl Component for MediaSection {
 
             art_css_provider,
             art_css_class: next_dashboard_art_css_class(),
-            seek_slider: seek_slider.clone(),
+            seek_slider,
 
             has_player: false,
             has_multiple_players: false,

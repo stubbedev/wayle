@@ -89,7 +89,7 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
         format: String::from("s"),
         ..Invocation::default()
     };
-    let mut iter = args.iter().peekable();
+    let mut iter = args.iter();
 
     while let Some(raw) = iter.next() {
         let flag = raw.trim_start_matches('-');
@@ -210,7 +210,7 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
                 opts.hide_active_window = Some(true);
             }
             "drun-categories" => {
-                opts.drun_categories = Some(split_list(&value("drun-categories")?))
+                opts.drun_categories = Some(split_list(&value("drun-categories")?));
             }
             "drun-exclude-categories" => {
                 opts.drun_exclude_categories = Some(split_list(&value("drun-exclude-categories")?));

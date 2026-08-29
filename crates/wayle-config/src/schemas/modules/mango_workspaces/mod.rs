@@ -20,7 +20,7 @@ use crate::{
     schemas::styling::{ColorValue, CssToken, Size},
 };
 
-/// MangoWM tag switcher module configuration.
+/// `MangoWM` tag switcher module configuration.
 #[wayle_config(i18n_prefix = "settings-modules-mango-workspaces")]
 pub struct MangoWorkspacesConfig {
     /// Hide tags that hold no clients and are not active.
@@ -196,7 +196,7 @@ impl ModuleInfoProvider for MangoWorkspacesConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("mango-workspaces"),
-            schema: || schema_for!(MangoWorkspacesConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("mango-workspaces")),
             array_entry: false,
         }

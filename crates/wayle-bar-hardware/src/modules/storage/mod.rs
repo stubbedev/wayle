@@ -42,7 +42,7 @@ impl Component for StorageModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();
@@ -51,13 +51,11 @@ impl Component for StorageModule {
         let disks = init.sysinfo.disks.get();
         let mount_points = storage_config.mount_point.get();
 
-        let initial_label = helpers::aggregate_storage(&disks, &mount_points)
-            .map(|snapshot| helpers::format_label(&storage_config.format.get(), &snapshot))
-            .unwrap_or_else(|| String::from("--"));
+        let initial_label = helpers::aggregate_storage(&disks, &mount_points).map_or_else(|| String::from("--"), |snapshot| helpers::format_label(&storage_config.format.get(), &snapshot));
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: storage_config.icon_name.get().clone(),
+                icon: storage_config.icon_name.get(),
                 label: initial_label,
                 tooltip: None,
                 colors: BarButtonColors {

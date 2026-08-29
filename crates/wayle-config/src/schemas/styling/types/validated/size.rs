@@ -33,19 +33,19 @@ pub enum Size {
 impl Size {
     /// Creates a scale multiplier, clamping negatives to `0.0`.
     #[must_use]
-    pub fn scale(value: f32) -> Self {
+    pub const fn scale(value: f32) -> Self {
         Self::Scale(value.max(0.0))
     }
 
     /// Creates an absolute pixel size, clamped to `0.0..=PX_MAX`.
     #[must_use]
-    pub fn px(value: f32) -> Self {
+    pub const fn px(value: f32) -> Self {
         Self::Px(value.clamp(0.0, PX_MAX))
     }
 
     /// Returns the scale multiplier, or `None` when this is a pixel size.
     #[must_use]
-    pub fn scale_value(self) -> Option<f32> {
+    pub const fn scale_value(self) -> Option<f32> {
         match self {
             Self::Scale(value) => Some(value),
             Self::Px(_) => None,
@@ -54,7 +54,7 @@ impl Size {
 
     /// Returns the pixel length, or `None` when this is a scale multiplier.
     #[must_use]
-    pub fn px_value(self) -> Option<f32> {
+    pub const fn px_value(self) -> Option<f32> {
         match self {
             Self::Px(value) => Some(value),
             Self::Scale(_) => None,

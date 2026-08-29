@@ -43,11 +43,13 @@ pub fn loader() -> &'static FluentLanguageLoader {
 }
 
 /// Returns the localized string for `key`, or the key itself if no FTL entry exists.
+#[must_use]
 pub fn t(key: &str) -> String {
     loader().get(key)
 }
 
 /// Returns a localized attribute value, or the attribute path if no FTL entry exists.
+#[must_use]
 pub fn t_attr(key: &str, attr: &str) -> String {
     loader().get_attr(key, attr)
 }

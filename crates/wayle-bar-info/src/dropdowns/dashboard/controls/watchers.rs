@@ -7,7 +7,7 @@ use wayle_widgets::{watch, watch_cancellable};
 
 use super::{ControlsSection, messages::ControlsCmd};
 
-pub fn spawn(sender: &ComponentSender<ControlsSection>, audio: &Option<Arc<AudioService>>) {
+pub fn spawn(sender: &ComponentSender<ControlsSection>, audio: Option<&Arc<AudioService>>) {
     let Some(audio) = audio else {
         return;
     };

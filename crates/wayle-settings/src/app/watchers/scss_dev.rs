@@ -56,7 +56,7 @@ pub(crate) fn spawn(sender: &ComponentSender<SettingsApp>, config_service: &Arc<
         tokio::pin!(shutdown_fut);
 
         tokio::select! {
-            _ = &mut shutdown_fut => {}
+            () = &mut shutdown_fut => {}
             () = run_event_loop(watcher, rx, input_sender, config_service) => {}
         }
     });
@@ -95,7 +95,7 @@ async fn run_event_loop(
 
         match maybe_event {
             Some(event) if should_reload(&event) => {
-                deadline = Some(Instant::now() + DEBOUNCE_DURATION);
+                deadline = Instant::now().checked_add(DEBOUNCE_DURATION);
             }
 
             Some(_) => {}

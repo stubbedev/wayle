@@ -88,7 +88,7 @@ async fn pump_events(
 ) {
     loop {
         tokio::select! {
-            _ = cancellation_token.cancelled() => return,
+            () = cancellation_token.cancelled() => return,
             next_line = event_lines.next_line() => {
                 match next_line {
                     Ok(Some(line)) => broadcast_event_from_line(&inbound_event_tx, &line),

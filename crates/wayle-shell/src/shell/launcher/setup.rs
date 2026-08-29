@@ -115,17 +115,14 @@ pub(super) fn build(
     } else {
         let mode_names = requested_modes(options, launcher);
         for name in &mode_names {
-            match build_mode(
+            if let Some(mode) = build_mode(
                 name,
                 options,
                 config,
                 history.clone(),
                 max_history,
                 &effective_bindings,
-            ) {
-                Some(mode) => modes.push(mode),
-                None => warn!(mode = %name, "launcher mode not available; skipped"),
-            }
+            ) { modes.push(mode) } else { warn!(mode = %name, "launcher mode not available; skipped") }
         }
     }
     let initial_mode = options
@@ -514,7 +511,7 @@ fn matcher_options(options: &SessionOptions, config: &Config) -> MatcherOptions 
     }
 }
 
-fn match_method(matching: LauncherMatching) -> MatchMethod {
+const fn match_method(matching: LauncherMatching) -> MatchMethod {
     match matching {
         LauncherMatching::Normal => MatchMethod::Normal,
         LauncherMatching::Regex => MatchMethod::Regex,
@@ -524,7 +521,7 @@ fn match_method(matching: LauncherMatching) -> MatchMethod {
     }
 }
 
-fn drun_field(field: &LauncherDrunField) -> DrunField {
+const fn drun_field(field: &LauncherDrunField) -> DrunField {
     match field {
         LauncherDrunField::Name => DrunField::Name,
         LauncherDrunField::Generic => DrunField::Generic,
@@ -548,7 +545,7 @@ fn drun_field_str(raw: &str) -> Option<DrunField> {
 }
 
 /// rofi numeric `-location` 0-8 → the location enum.
-fn location_from_rofi(location: u8) -> Option<LauncherLocation> {
+const fn location_from_rofi(location: u8) -> Option<LauncherLocation> {
     Some(match location {
         0 => LauncherLocation::Center,
         1 => LauncherLocation::NorthWest,

@@ -5,7 +5,7 @@ use libpulse_binding::{
 
 use crate::types::format::{ChannelMap, ChannelPosition, SampleFormat, SampleSpec};
 
-pub(crate) fn convert_sample_format(format: PulseFormat) -> SampleFormat {
+pub(crate) const fn convert_sample_format(format: PulseFormat) -> SampleFormat {
     match format {
         PulseFormat::U8 => SampleFormat::U8,
         PulseFormat::ALaw => SampleFormat::ALaw,
@@ -38,7 +38,7 @@ pub(super) fn convert_channel_map(pulse_map: &PulseChannelMap) -> ChannelMap {
     }
 }
 
-pub(super) fn convert_sample_spec(spec: &PulseSampleSpec) -> SampleSpec {
+pub(super) const fn convert_sample_spec(spec: &PulseSampleSpec) -> SampleSpec {
     SampleSpec {
         format: convert_sample_format(spec.format),
         rate: spec.rate,
@@ -46,7 +46,7 @@ pub(super) fn convert_sample_spec(spec: &PulseSampleSpec) -> SampleSpec {
     }
 }
 
-fn convert_channel_position(position: Position) -> ChannelPosition {
+const fn convert_channel_position(position: Position) -> ChannelPosition {
     match position {
         Position::Mono => ChannelPosition::Mono,
         Position::FrontLeft => ChannelPosition::FrontLeft,

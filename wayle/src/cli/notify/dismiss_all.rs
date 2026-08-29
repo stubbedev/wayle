@@ -11,7 +11,7 @@ pub async fn execute() -> CliAction {
     proxy
         .dismiss_all()
         .await
-        .map_err(|e| format_error("dismiss notifications", e))?;
+        .map_err(|e| format_error("dismiss notifications", &e))?;
 
     println!("Dismissed all notifications");
 

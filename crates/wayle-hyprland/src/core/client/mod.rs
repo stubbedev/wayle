@@ -34,7 +34,7 @@ pub struct Client {
     pub initial_title: Property<String>,
     /// Process ID.
     pub pid: Property<ProcessId>,
-    /// Running under XWayland.
+    /// Running under `XWayland`.
     pub xwayland: Property<bool>,
     /// Pinned to all workspaces.
     pub pinned: Property<bool>,

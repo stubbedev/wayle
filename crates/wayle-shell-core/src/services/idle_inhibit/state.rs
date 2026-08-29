@@ -25,6 +25,7 @@ pub struct IdleInhibitState {
 }
 
 impl IdleInhibitState {
+    #[must_use]
     pub fn new(initial_duration_mins: u32) -> Self {
         Self {
             active: Property::new(false),
@@ -34,6 +35,7 @@ impl IdleInhibitState {
         }
     }
 
+    #[must_use]
     pub fn indefinite(&self) -> bool {
         self.duration_mins.get() == 0
     }
@@ -47,7 +49,8 @@ impl IdleInhibitState {
 
         let use_timer = !indefinite && self.duration_mins.get() > 0;
         if use_timer {
-            self.remaining_secs.set(Some(self.duration_mins.get() * 60));
+            self.remaining_secs
+                .set(Some(self.duration_mins.get().saturating_mul(60)));
             self.start_timer();
         } else {
             self.remaining_secs.set(None);
@@ -69,7 +72,7 @@ impl IdleInhibitState {
             if minutes == 0 {
                 self.remaining_secs.set(None);
             } else {
-                self.remaining_secs.set(Some(minutes * 60));
+                self.remaining_secs.set(Some(minutes.saturating_mul(60)));
                 self.start_timer();
             }
         }
@@ -78,7 +81,7 @@ impl IdleInhibitState {
     pub fn adjust_duration(&self, delta_minutes: i32) {
         let current = self.duration_mins.get();
         let new_val = if delta_minutes >= 0 {
-            current.saturating_add(delta_minutes as u32)
+            current.saturating_add(delta_minutes.cast_unsigned())
         } else {
             current.saturating_sub(delta_minutes.unsigned_abs())
         };
@@ -93,11 +96,11 @@ impl IdleInhibitState {
             return;
         };
 
-        let duration_secs = self.duration_mins.get() * 60;
-        let delta_secs = delta_minutes * 60;
+        let duration_secs = self.duration_mins.get().saturating_mul(60);
+        let delta_secs = delta_minutes.saturating_mul(60);
         let new_remaining = if delta_secs >= 0 {
             remaining
-                .saturating_add(delta_secs as u32)
+                .saturating_add(delta_secs.cast_unsigned())
                 .min(duration_secs)
         } else {
             remaining.saturating_sub(delta_secs.unsigned_abs())
@@ -115,8 +118,8 @@ impl IdleInhibitState {
             return;
         }
 
-        let duration_secs = self.duration_mins.get() * 60;
-        let new_remaining = (minutes * 60).min(duration_secs);
+        let duration_secs = self.duration_mins.get().saturating_mul(60);
+        let new_remaining = minutes.saturating_mul(60).min(duration_secs);
         if new_remaining == 0 {
             self.disable();
         } else {
@@ -127,7 +130,7 @@ impl IdleInhibitState {
     fn start_timer(&self) {
         let token = CancellationToken::new();
         {
-            let mut guard = self.timer_token.lock().unwrap_or_else(|e| e.into_inner());
+            let mut guard = self.timer_token.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             *guard = token.clone();
         }
 
@@ -138,7 +141,7 @@ impl IdleInhibitState {
 
             loop {
                 tokio::select! {
-                    _ = token.cancelled() => break,
+                    () = token.cancelled() => break,
                     _ = tick.tick() => {
                         let Some(remaining) = state.remaining_secs.get() else {
                             break;
@@ -147,7 +150,7 @@ impl IdleInhibitState {
                             state.disable();
                             break;
                         }
-                        state.remaining_secs.set(Some(remaining - 1));
+                        state.remaining_secs.set(Some(remaining.saturating_sub(1)));
                     }
                 }
             }
@@ -155,7 +158,7 @@ impl IdleInhibitState {
     }
 
     fn cancel_timer(&self) {
-        let guard = self.timer_token.lock().unwrap_or_else(|e| e.into_inner());
+        let guard = self.timer_token.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         guard.cancel();
     }
 }

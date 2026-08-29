@@ -1,6 +1,6 @@
 pub(crate) mod controls;
 pub(crate) mod monitoring;
-/// WiFi device types
+/// `WiFi` device types
 pub mod types;
 
 use std::{collections::HashMap, sync::Arc};
@@ -27,7 +27,7 @@ use crate::{
 /// strength, and scanning while inheriting all base device properties through Deref.
 #[derive(Debug, Clone)]
 pub struct DeviceWifi {
-    /// The underlying NetworkManager device providing core network functionality.
+    /// The underlying `NetworkManager` device providing core network functionality.
     pub core: Device,
 
     /// Permanent hardware address of the device.
@@ -48,7 +48,7 @@ pub struct DeviceWifi {
     /// The capabilities of the wireless device.
     pub wireless_capabilities: Property<WirelessCapabilities>,
 
-    /// The timestamp (in CLOCK_BOOTTIME milliseconds) for the last finished network scan.
+    /// The timestamp (in `CLOCK_BOOTTIME` milliseconds) for the last finished network scan.
     /// A value of -1 means the device never scanned for access points.
     pub last_scan: Property<BootTimeMs>,
 }
@@ -86,7 +86,7 @@ impl Reactive for DeviceWifi {
 impl DeviceWifi {
     /// Request a scan for available access points.
     ///
-    /// Triggers NetworkManager to scan for nearby WiFi networks. The scan runs
+    /// Triggers `NetworkManager` to scan for nearby `WiFi` networks. The scan runs
     /// asynchronously and results will be reflected in the `access_points` property
     /// when complete. The `last_scan` timestamp will update when the scan finishes.
     ///
@@ -122,7 +122,7 @@ impl DeviceWifi {
 
         let device_type = device_proxy.device_type().await.map_err(Error::DbusError)?;
 
-        if device_type != NMDeviceType::Wifi as u32 {
+        if NMDeviceType::from_u32(device_type) != NMDeviceType::Wifi {
             return Err(Error::WrongObjectType {
                 object_path: object_path.clone(),
                 expected: String::from("WiFi device"),
@@ -194,7 +194,7 @@ impl DeviceWifi {
         let device_proxy = DeviceProxy::new(connection, &object_path).await?;
 
         let device_type = device_proxy.device_type().await?;
-        if device_type != NMDeviceType::Wifi as u32 {
+        if NMDeviceType::from_u32(device_type) != NMDeviceType::Wifi {
             warn!(
                 "Device at {object_path} is not a wifi device, got type: {} ({:?})",
                 device_type,

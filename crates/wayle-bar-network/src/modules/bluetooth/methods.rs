@@ -11,6 +11,7 @@ use super::{
 };
 
 impl BluetoothModule {
+    #[must_use]
     pub fn compute_display(
         config: &BluetoothConfig,
         bt: &Option<Arc<BluetoothService>>,
@@ -33,8 +34,7 @@ impl BluetoothModule {
         let discovering = bt
             .primary_adapter
             .get()
-            .map(|adapter| adapter.discovering.get())
-            .unwrap_or(false);
+            .is_some_and(|adapter| adapter.discovering.get());
 
         let connected_devices: Vec<_> = devices
             .iter()

@@ -99,10 +99,10 @@ impl SimpleComponent for SteppedSlider {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = SteppedSlider {
+        let model = Self {
             value: snap_to_nearest(init.value, &init.steps),
             steps: init.steps.clone(),
             sensitive: true,
@@ -175,51 +175,51 @@ mod tests {
     fn snaps_to_nearest_step() {
         let steps = vec![0.0, 25.0, 50.0, 75.0, 100.0];
 
-        assert_eq!(snap_to_nearest(0.0, &steps), 0.0);
-        assert_eq!(snap_to_nearest(12.0, &steps), 0.0);
-        assert_eq!(snap_to_nearest(13.0, &steps), 25.0);
-        assert_eq!(snap_to_nearest(37.0, &steps), 25.0);
-        assert_eq!(snap_to_nearest(38.0, &steps), 50.0);
-        assert_eq!(snap_to_nearest(100.0, &steps), 100.0);
+        assert!(snap_to_nearest(0.0, &steps).abs() < f64::EPSILON);
+        assert!(snap_to_nearest(12.0, &steps).abs() < f64::EPSILON);
+        assert!((snap_to_nearest(13.0, &steps) - 25.0).abs() < f64::EPSILON);
+        assert!((snap_to_nearest(37.0, &steps) - 25.0).abs() < f64::EPSILON);
+        assert!((snap_to_nearest(38.0, &steps) - 50.0).abs() < f64::EPSILON);
+        assert!((snap_to_nearest(100.0, &steps) - 100.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn snaps_equidistant_to_lower() {
         let steps = vec![0.0, 50.0, 100.0];
 
-        assert_eq!(snap_to_nearest(25.0, &steps), 0.0);
-        assert_eq!(snap_to_nearest(75.0, &steps), 50.0);
+        assert!(snap_to_nearest(25.0, &steps).abs() < f64::EPSILON);
+        assert!((snap_to_nearest(75.0, &steps) - 50.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn handles_single_step() {
         let steps = vec![50.0];
 
-        assert_eq!(snap_to_nearest(0.0, &steps), 50.0);
-        assert_eq!(snap_to_nearest(100.0, &steps), 50.0);
+        assert!((snap_to_nearest(0.0, &steps) - 50.0).abs() < f64::EPSILON);
+        assert!((snap_to_nearest(100.0, &steps) - 50.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn handles_empty_steps_returns_original() {
         let steps: Vec<f64> = vec![];
 
-        assert_eq!(snap_to_nearest(42.0, &steps), 42.0);
+        assert!((snap_to_nearest(42.0, &steps) - 42.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn handles_values_outside_range() {
         let steps = vec![25.0, 50.0, 75.0];
 
-        assert_eq!(snap_to_nearest(-100.0, &steps), 25.0);
-        assert_eq!(snap_to_nearest(200.0, &steps), 75.0);
+        assert!((snap_to_nearest(-100.0, &steps) - 25.0).abs() < f64::EPSILON);
+        assert!((snap_to_nearest(200.0, &steps) - 75.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn handles_unordered_steps() {
         let steps = vec![75.0, 25.0, 50.0, 0.0, 100.0];
 
-        assert_eq!(snap_to_nearest(30.0, &steps), 25.0);
-        assert_eq!(snap_to_nearest(60.0, &steps), 50.0);
+        assert!((snap_to_nearest(30.0, &steps) - 25.0).abs() < f64::EPSILON);
+        assert!((snap_to_nearest(60.0, &steps) - 50.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -227,7 +227,7 @@ mod tests {
         let init = SteppedSliderInit::default();
 
         assert_eq!(init.range, (0.0, 100.0));
-        assert_eq!(init.value, 50.0);
+        assert!((init.value - 50.0).abs() < f64::EPSILON);
         assert_eq!(init.steps, vec![0.0, 25.0, 50.0, 75.0, 100.0]);
         assert!(!init.show_labels);
         assert_eq!(init.emit_mode, EmitMode::Continuous);

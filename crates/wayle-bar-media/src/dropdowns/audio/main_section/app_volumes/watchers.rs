@@ -33,7 +33,7 @@ pub fn spawn_top_level(
 pub fn spawn_per_stream(
     sender: &ComponentSender<AppVolumes>,
     streams: &[Arc<wayle_audio::core::stream::AudioStream>],
-    token: CancellationToken,
+    token: &CancellationToken,
 ) {
     for stream in streams {
         let stream_index = stream.key.index;

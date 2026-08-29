@@ -152,7 +152,7 @@ impl ModuleInfoProvider for CpuConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("cpu"),
-            schema: || schema_for!(CpuConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("cpu")),
             array_entry: false,
         }

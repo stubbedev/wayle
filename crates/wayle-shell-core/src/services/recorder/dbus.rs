@@ -13,7 +13,7 @@ pub struct RecorderDaemon {
 }
 
 impl RecorderDaemon {
-    pub fn new(state: RecorderState) -> Self {
+    pub const fn new(state: RecorderState) -> Self {
         Self { state }
     }
 }
@@ -46,23 +46,27 @@ impl RecorderDaemon {
     }
 
     #[zbus(property)]
+    #[expect(clippy::unused_async, reason = "zbus interface signature")]
     pub async fn active(&self) -> bool {
         self.state.active.get()
     }
 
     #[zbus(property)]
+    #[expect(clippy::unused_async, reason = "zbus interface signature")]
     pub async fn paused(&self) -> bool {
         self.state.paused.get()
     }
 
     /// Elapsed recording time in seconds.
     #[zbus(property)]
+    #[expect(clippy::unused_async, reason = "zbus interface signature")]
     pub async fn elapsed(&self) -> u32 {
         self.state.elapsed_secs.get()
     }
 
     /// Path of the current/last output file.
     #[zbus(property)]
+    #[expect(clippy::unused_async, reason = "zbus interface signature")]
     pub async fn file(&self) -> String {
         self.state.file_path.get()
     }

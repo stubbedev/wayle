@@ -15,7 +15,7 @@ pub enum AppIconSource {
     /// Wayle's curated symbolic icons matched by app name.
     #[default]
     Mapped,
-    /// Native application icons reported by PulseAudio.
+    /// Native application icons reported by `PulseAudio`.
     Native,
 }
 
@@ -155,7 +155,7 @@ impl ModuleInfoProvider for VolumeConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("volume"),
-            schema: || schema_for!(VolumeConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("volume")),
             array_entry: false,
         }

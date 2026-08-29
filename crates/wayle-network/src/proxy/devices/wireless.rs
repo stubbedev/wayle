@@ -1,4 +1,4 @@
-//! NetworkManager Wireless Device interface.
+//! `NetworkManager` Wireless Device interface.
 
 use std::collections::HashMap;
 
@@ -49,7 +49,7 @@ pub(crate) trait DeviceWireless {
     #[zbus(property)]
     fn wireless_capabilities(&self) -> zbus::Result<u32>;
 
-    /// The timestamp (in CLOCK_BOOTTIME milliseconds) for the last finished network scan.
+    /// The timestamp (in `CLOCK_BOOTTIME` milliseconds) for the last finished network scan.
     #[zbus(property)]
     fn last_scan(&self) -> zbus::Result<i64>;
 

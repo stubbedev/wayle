@@ -58,6 +58,7 @@ impl BluetoothDropdown {
         });
     }
 
+    #[must_use]
     pub fn build_device_list(sender: &ComponentSender<Self>) -> FactoryVecDeque<DeviceItem> {
         FactoryVecDeque::builder()
             .launch(gtk::Box::default())
@@ -109,7 +110,7 @@ impl BluetoothDropdown {
         };
 
         sender.command(move |out, _shutdown| async move {
-            let Ok(device) = bluetooth.device(path.clone()).await else {
+            let Ok(device) = Box::pin(bluetooth.device(path.clone())).await else {
                 let _ = out.send(BluetoothDropdownCmd::DeviceActionFailed(path));
                 return;
             };
@@ -145,13 +146,15 @@ impl BluetoothDropdown {
         match request {
             Some(request) => {
                 let device_path = match &request {
-                    PairingRequest::RequestPinCode { device_path } => device_path,
-                    PairingRequest::DisplayPinCode { device_path, .. } => device_path,
-                    PairingRequest::RequestPasskey { device_path } => device_path,
-                    PairingRequest::DisplayPasskey { device_path, .. } => device_path,
-                    PairingRequest::RequestConfirmation { device_path, .. } => device_path,
-                    PairingRequest::RequestAuthorization { device_path } => device_path,
-                    PairingRequest::RequestServiceAuthorization { device_path, .. } => device_path,
+                    PairingRequest::RequestPinCode { device_path }
+                    | PairingRequest::RequestPasskey { device_path }
+                    | PairingRequest::RequestAuthorization { device_path }
+                    | PairingRequest::DisplayPinCode { device_path, .. }
+                    | PairingRequest::DisplayPasskey { device_path, .. }
+                    | PairingRequest::RequestConfirmation { device_path, .. }
+                    | PairingRequest::RequestServiceAuthorization { device_path, .. } => {
+                        device_path
+                    }
                 };
 
                 let Some(bluetooth) = &self.bluetooth else {
@@ -284,14 +287,14 @@ fn try_reconcile(
 
     let mut old_idx = 0;
     for (new_idx, snapshot) in new_snapshots.iter().enumerate() {
-        if old_idx < old_paths.len() && old_paths[old_idx] == snapshot.device.object_path {
+        if old_paths.get(old_idx) == Some(&snapshot.device.object_path) {
             let needs_update = guard
                 .get(new_idx)
                 .is_some_and(|item| item.differs_from(snapshot));
             if needs_update && let Some(item) = guard.get_mut(new_idx) {
                 item.update_from_snapshot(snapshot.clone());
             }
-            old_idx += 1;
+            old_idx = old_idx.saturating_add(1);
         } else {
             guard.insert(
                 new_idx,

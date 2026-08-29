@@ -215,7 +215,7 @@ impl AudioDaemon {
 
     /// Lists all output devices (sinks).
     ///
-    /// Returns a list of tuples: (device_index, name, description).
+    /// Returns a list of tuples: (`device_index`, name, description).
     #[instrument(skip(self))]
     pub async fn list_sinks(&self) -> Vec<(u32, String, String)> {
         self.service
@@ -234,7 +234,7 @@ impl AudioDaemon {
 
     /// Lists all input devices (sources).
     ///
-    /// Returns a list of tuples: (device_index, name, description).
+    /// Returns a list of tuples: (`device_index`, name, description).
     #[instrument(skip(self))]
     pub async fn list_sources(&self) -> Vec<(u32, String, String)> {
         self.service
@@ -311,47 +311,43 @@ impl AudioDaemon {
 
     /// Current volume of the default output as a percentage.
     #[zbus(property)]
-    pub async fn output_volume(&self) -> f64 {
+    pub fn output_volume(&self) -> f64 {
         self.service
             .default_output
             .get()
-            .map(|d| d.volume.get().average() * 100.0)
-            .unwrap_or(0.0)
+            .map_or(0.0, |d| d.volume.get().average() * 100.0)
     }
 
     /// Whether the default output is muted.
     #[zbus(property)]
-    pub async fn output_muted(&self) -> bool {
+    pub fn output_muted(&self) -> bool {
         self.service
             .default_output
             .get()
-            .map(|d| d.muted.get())
-            .unwrap_or(false)
+            .is_some_and(|d| d.muted.get())
     }
 
     /// Current volume of the default input as a percentage.
     #[zbus(property)]
-    pub async fn input_volume(&self) -> f64 {
+    pub fn input_volume(&self) -> f64 {
         self.service
             .default_input
             .get()
-            .map(|d| d.volume.get().average() * 100.0)
-            .unwrap_or(0.0)
+            .map_or(0.0, |d| d.volume.get().average() * 100.0)
     }
 
     /// Whether the default input is muted.
     #[zbus(property)]
-    pub async fn input_muted(&self) -> bool {
+    pub fn input_muted(&self) -> bool {
         self.service
             .default_input
             .get()
-            .map(|d| d.muted.get())
-            .unwrap_or(false)
+            .is_some_and(|d| d.muted.get())
     }
 
     /// Name of the default output device.
     #[zbus(property)]
-    pub async fn default_sink(&self) -> String {
+    pub fn default_sink(&self) -> String {
         self.service
             .default_output
             .get()
@@ -361,7 +357,7 @@ impl AudioDaemon {
 
     /// Name of the default input device.
     #[zbus(property)]
-    pub async fn default_source(&self) -> String {
+    pub fn default_source(&self) -> String {
         self.service
             .default_input
             .get()
@@ -371,13 +367,13 @@ impl AudioDaemon {
 
     /// Number of output devices.
     #[zbus(property)]
-    pub async fn sink_count(&self) -> u32 {
-        self.service.output_devices.get().len() as u32
+    pub fn sink_count(&self) -> u32 {
+        u32::try_from(self.service.output_devices.get().len()).unwrap_or(u32::MAX)
     }
 
     /// Number of input devices.
     #[zbus(property)]
-    pub async fn source_count(&self) -> u32 {
-        self.service.input_devices.get().len() as u32
+    pub fn source_count(&self) -> u32 {
+        u32::try_from(self.service.input_devices.get().len()).unwrap_or(u32::MAX)
     }
 }

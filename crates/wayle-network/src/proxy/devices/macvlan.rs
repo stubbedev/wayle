@@ -1,4 +1,4 @@
-//! NetworkManager MACVLAN Device interface.
+//! `NetworkManager` MACVLAN Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

@@ -43,6 +43,7 @@ impl Default for CavaServiceBuilder {
 
 impl CavaServiceBuilder {
     /// Creates a new builder with default audio visualization settings.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             bars: BarCount::DEFAULT,
@@ -63,6 +64,7 @@ impl CavaServiceBuilder {
     /// Sets the number of frequency bars to generate.
     ///
     /// Accepts [`BarCount`] (clamped to 1-256) or raw `usize`/`u16`.
+    #[must_use]
     pub fn bars(mut self, bars: impl Into<BarCount>) -> Self {
         self.bars = bars.into();
         self
@@ -71,7 +73,8 @@ impl CavaServiceBuilder {
     /// Enables or disables automatic sensitivity adjustment.
     ///
     /// When enabled, CAVA automatically adjusts sensitivity to keep values in 0-1 range.
-    pub fn autosens(mut self, autosens: bool) -> Self {
+    #[must_use]
+    pub const fn autosens(mut self, autosens: bool) -> Self {
         self.autosens = autosens;
         self
     }
@@ -79,7 +82,8 @@ impl CavaServiceBuilder {
     /// Enables or disables stereo channel visualization.
     ///
     /// When enabled, splits bars between left and right audio channels.
-    pub fn stereo(mut self, stereo: bool) -> Self {
+    #[must_use]
+    pub const fn stereo(mut self, stereo: bool) -> Self {
         self.stereo = stereo;
         self
     }
@@ -87,7 +91,8 @@ impl CavaServiceBuilder {
     /// Sets the noise reduction filter strength.
     ///
     /// Range: 0.0 (fast, noisy) to 1.0 (slow, smooth).
-    pub fn noise_reduction(mut self, noise_reduction: f64) -> Self {
+    #[must_use]
+    pub const fn noise_reduction(mut self, noise_reduction: f64) -> Self {
         self.noise_reduction = noise_reduction;
         self
     }
@@ -95,7 +100,8 @@ impl CavaServiceBuilder {
     /// Sets monstercat-style smoothing across adjacent bars.
     ///
     /// 0.0 disables monstercat smoothing. Higher values produce smoother falloff.
-    pub fn monstercat(mut self, monstercat: f64) -> Self {
+    #[must_use]
+    pub const fn monstercat(mut self, monstercat: f64) -> Self {
         self.monstercat = monstercat;
         self
     }
@@ -104,7 +110,8 @@ impl CavaServiceBuilder {
     ///
     /// 0 disables wave smoothing. Mutually exclusive with monstercat
     /// (monstercat takes priority if both non-zero).
-    pub fn waves(mut self, waves: u32) -> Self {
+    #[must_use]
+    pub const fn waves(mut self, waves: u32) -> Self {
         self.waves = waves;
         self
     }
@@ -112,6 +119,7 @@ impl CavaServiceBuilder {
     /// Sets the visualization update rate in frames per second.
     ///
     /// Accepts [`Framerate`] (clamped to 1-360) or raw `u32`.
+    #[must_use]
     pub fn framerate(mut self, framerate: impl Into<Framerate>) -> Self {
         self.framerate = framerate.into();
         self
@@ -119,8 +127,9 @@ impl CavaServiceBuilder {
 
     /// Sets the audio input method/backend.
     ///
-    /// Determines which audio system to use for capturing audio (PipeWire, PulseAudio, ALSA, etc.).
-    pub fn input(mut self, input: InputMethod) -> Self {
+    /// Determines which audio system to use for capturing audio (`PipeWire`, `PulseAudio`, ALSA, etc.).
+    #[must_use]
+    pub const fn input(mut self, input: InputMethod) -> Self {
         self.input = input;
         self
     }
@@ -128,6 +137,7 @@ impl CavaServiceBuilder {
     /// Sets the audio source identifier.
     ///
     /// Source string format depends on the input method. Use "auto" for automatic selection.
+    #[must_use]
     pub fn source(mut self, source: impl Into<String>) -> Self {
         self.source = source.into();
         self
@@ -136,16 +146,18 @@ impl CavaServiceBuilder {
     /// Sets the low frequency cutoff in Hz.
     ///
     /// Frequencies below this value are filtered out. Must be greater than 0.
-    pub fn low_cutoff(mut self, low_cutoff: u32) -> Self {
+    #[must_use]
+    pub const fn low_cutoff(mut self, low_cutoff: u32) -> Self {
         self.low_cutoff = low_cutoff;
         self
     }
 
     /// Sets the high frequency cutoff in Hz.
     ///
-    /// Frequencies above this value are filtered out. Must be greater than low_cutoff
+    /// Frequencies above this value are filtered out. Must be greater than `low_cutoff`
     /// and less than samplerate/2.
-    pub fn high_cutoff(mut self, high_cutoff: u32) -> Self {
+    #[must_use]
+    pub const fn high_cutoff(mut self, high_cutoff: u32) -> Self {
         self.high_cutoff = high_cutoff;
         self
     }
@@ -153,8 +165,9 @@ impl CavaServiceBuilder {
     /// Sets the audio sample rate in Hz.
     ///
     /// Should match the input audio sample rate. Must be greater than 0 and at least
-    /// 2*high_cutoff (Nyquist theorem).
-    pub fn samplerate(mut self, samplerate: u32) -> Self {
+    /// 2*`high_cutoff` (Nyquist theorem).
+    #[must_use]
+    pub const fn samplerate(mut self, samplerate: u32) -> Self {
         self.samplerate = samplerate;
         self
     }
@@ -162,7 +175,7 @@ impl CavaServiceBuilder {
     /// Builds and initializes the CAVA service with the configured parameters.
     ///
     /// `bars` and `framerate` are validated by their newtypes (clamped on construction).
-    /// Cross-field constraints (cutoffs, samplerate, noise_reduction) are validated here.
+    /// Cross-field constraints (cutoffs, samplerate, `noise_reduction`) are validated here.
     ///
     /// # Errors
     /// Returns error if:
@@ -225,7 +238,7 @@ impl CavaServiceBuilder {
                 "odd bar count rounded up for stereo output"
             );
         }
-        let bar_count = effective_bars.value() as usize;
+        let bar_count = usize::from(effective_bars.value());
 
         let service = CavaService {
             cancellation_token: Mutex::new(CancellationToken::new()),

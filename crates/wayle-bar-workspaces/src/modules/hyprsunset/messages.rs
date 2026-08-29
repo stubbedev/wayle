@@ -27,6 +27,6 @@ pub enum HyprsunsetCmd {
     StateChanged(Option<HyprsunsetState>),
     /// Re-evaluate the sunrise/sunset auto-schedule.
     TickSchedule,
-    /// GeoClue resolved a location for the auto-schedule (latitude, longitude).
+    /// `GeoClue` resolved a location for the auto-schedule (latitude, longitude).
     LocationResolved(f64, f64),
 }

@@ -4,7 +4,7 @@ pub(crate) type RawPixmap = (i32, i32, Vec<u8>);
 pub(crate) type RawPixmaps = Vec<RawPixmap>;
 pub(crate) type RawTooltip = (String, RawPixmaps, String, String);
 
-/// Describes the category of a StatusNotifierItem.
+/// Describes the category of a `StatusNotifierItem`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Category {
     /// The item describes the status of a generic application.
@@ -41,7 +41,7 @@ impl Display for Category {
     }
 }
 
-/// Describes the status of a StatusNotifierItem or its associated application.
+/// Describes the status of a `StatusNotifierItem` or its associated application.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Status {
     /// The item doesn't convey important information to the user.
@@ -74,7 +74,7 @@ impl Display for Status {
     }
 }
 
-/// Icon pixmap data for a StatusNotifierItem.
+/// Icon pixmap data for a `StatusNotifierItem`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IconPixmap {
     /// Width of the icon in pixels.
@@ -101,7 +101,7 @@ impl From<IconPixmap> for (i32, i32, Vec<u8>) {
     }
 }
 
-/// Tooltip information for a StatusNotifierItem.
+/// Tooltip information for a `StatusNotifierItem`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Tooltip {
     /// Freedesktop-compliant name for an icon.
@@ -125,7 +125,7 @@ impl From<(String, Vec<(i32, i32, Vec<u8>)>, String, String)> for Tooltip {
     }
 }
 
-/// Scroll orientation for StatusNotifierItem scroll events.
+/// Scroll orientation for `StatusNotifierItem` scroll events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrollOrientation {
     /// Horizontal scroll.

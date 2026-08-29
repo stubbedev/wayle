@@ -15,7 +15,7 @@ pub mod connection;
     default_path = "/org/freedesktop/NetworkManager/Settings"
 )]
 pub(crate) trait Settings {
-    /// List the saved network connections known to NetworkManager.
+    /// List the saved network connections known to `NetworkManager`.
     ///
     /// # Returns
     /// List of connections object paths
@@ -58,7 +58,7 @@ pub(crate) trait Settings {
     ///
     /// # Arguments
     /// * `settings` - New connection settings
-    /// * `flags` - NMSettingsAddConnection2Flags
+    /// * `flags` - `NMSettingsAddConnection2Flags`
     /// * `args` - Optional arguments
     ///
     /// # Returns
@@ -81,7 +81,7 @@ pub(crate) trait Settings {
     /// * Paths of connection objects that failed to load
     fn load_connections(&self, filenames: Vec<String>) -> zbus::Result<(bool, Vec<String>)>;
 
-    /// Tells NetworkManager to reload all connection files from disk.
+    /// Tells `NetworkManager` to reload all connection files from disk.
     ///
     /// # Returns
     /// Success status

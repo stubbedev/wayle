@@ -26,7 +26,7 @@ use crate::{
     volume::types::Volume,
 };
 
-/// PulseAudio stream (playback or recording) with reactive properties.
+/// `PulseAudio` stream (playback or recording) with reactive properties.
 ///
 /// Instances from [`AudioService`] fields are live (properties auto-update).
 /// Instances from [`AudioService::audio_stream`] are snapshots (frozen state).
@@ -101,7 +101,7 @@ pub struct AudioStream {
     /// Channel map
     pub channel_map: Property<ChannelMap>,
 
-    /// Stream properties from PulseAudio
+    /// Stream properties from `PulseAudio`
     pub properties: Property<HashMap<String, String>>,
 
     /// Media information

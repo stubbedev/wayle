@@ -6,15 +6,15 @@ use super::ActiveConnections;
 use crate::{i18n::t, shell::bar::dropdowns::network::helpers};
 
 impl ActiveConnections {
-    pub fn has_wifi_error(&self) -> bool {
+    pub const fn has_wifi_error(&self) -> bool {
         self.connection.error.is_some() && !self.wifi.connected
     }
 
-    pub fn is_wifi_connecting(&self) -> bool {
+    pub const fn is_wifi_connecting(&self) -> bool {
         self.connection.ssid.is_some() || self.wifi.connecting
     }
 
-    pub fn update_has_connections(&mut self) {
+    pub const fn update_has_connections(&mut self) {
         self.has_connections = self.wifi.connected || self.wifi.connecting || self.wired.connected;
     }
 
@@ -62,7 +62,7 @@ impl ActiveConnections {
         }
     }
 
-    pub fn wifi_detail_visible(&self) -> bool {
+    pub const fn wifi_detail_visible(&self) -> bool {
         self.connection.error.is_some()
             || self.connection.step.is_some()
             || self.wifi.frequency.is_some()
@@ -109,7 +109,7 @@ impl ActiveConnections {
         classes
     }
 
-    pub fn effective_wifi_icon(&self) -> &'static str {
+    pub const fn effective_wifi_icon(&self) -> &'static str {
         if self.has_wifi_error() {
             return "cm-wireless-disabled-symbolic";
         }

@@ -135,7 +135,7 @@ pub enum BarItem {
 
 /// Named group of modules. The name becomes a CSS ID selector.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BarGroup {
     /// Unique name for CSS targeting (becomes `#name` selector).
     pub name: String,
@@ -155,7 +155,7 @@ pub struct BarGroup {
 /// left = [{ module = "clock", class = "primary-clock" }]
 /// ```
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ModuleRef {
     /// Module with a custom CSS class.
@@ -166,7 +166,8 @@ pub enum ModuleRef {
 
 impl ModuleRef {
     /// Returns the underlying module type.
-    pub fn module(&self) -> &BarModule {
+    #[must_use]
+    pub const fn module(&self) -> &BarModule {
         match self {
             Self::Plain(m) => m,
             Self::Classed(c) => &c.module,
@@ -174,6 +175,7 @@ impl ModuleRef {
     }
 
     /// Returns the custom CSS class, if any.
+    #[must_use]
     pub fn class(&self) -> Option<&str> {
         match self {
             Self::Plain(_) => None,
@@ -184,7 +186,7 @@ impl ModuleRef {
 
 /// A module with an associated CSS class for custom styling.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClassedModule {
     /// The module type.
     pub module: BarModule,
@@ -235,7 +237,7 @@ pub enum BarModule {
     Netstat,
     /// Niri workspace switcher.
     NiriWorkspaces,
-    /// MangoWM tag switcher.
+    /// `MangoWM` tag switcher.
     MangoWorkspaces,
     /// sway workspace switcher.
     SwayWorkspaces,
@@ -298,7 +300,8 @@ impl BarModule {
     const CUSTOM_PREFIX: &str = "custom-";
 
     /// All built-in module names in kebab-case.
-    pub fn builtin_names() -> &'static [&'static str] {
+    #[must_use]
+    pub const fn builtin_names() -> &'static [&'static str] {
         BUILTIN_MODULES
     }
 
@@ -386,6 +389,7 @@ impl BarModule {
     }
 
     /// Returns the custom module ID if this is a custom module.
+    #[must_use]
     pub fn custom_id(&self) -> Option<&str> {
         match self {
             Self::Custom(id) => Some(id),
@@ -490,7 +494,8 @@ pub enum Location {
 
 impl Location {
     /// CSS class name for this location.
-    pub fn css_class(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::Top => "top",
             Self::Bottom => "bottom",
@@ -500,7 +505,8 @@ impl Location {
     }
 
     /// Whether this location results in a vertical bar layout.
-    pub fn is_vertical(self) -> bool {
+    #[must_use]
+    pub const fn is_vertical(self) -> bool {
         matches!(self, Self::Left | Self::Right)
     }
 }
@@ -526,7 +532,8 @@ pub enum BorderLocation {
 
 impl BorderLocation {
     /// CSS class suffix for this border location.
-    pub fn css_class(self) -> Option<&'static str> {
+    #[must_use]
+    pub const fn css_class(self) -> Option<&'static str> {
         match self {
             Self::None => None,
             Self::Top => Some("border-top"),
@@ -553,7 +560,8 @@ pub enum BarButtonVariant {
 
 impl BarButtonVariant {
     /// CSS class name for this variant.
-    pub fn css_class(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::Basic => "basic",
             Self::BlockPrefix => "block-prefix",
@@ -575,7 +583,8 @@ pub enum IconPosition {
 
 impl IconPosition {
     /// CSS class for this position, if any.
-    pub fn css_class(self) -> Option<&'static str> {
+    #[must_use]
+    pub const fn css_class(self) -> Option<&'static str> {
         match self {
             Self::Start => None,
             Self::End => Some("icon-end"),

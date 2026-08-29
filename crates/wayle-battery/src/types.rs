@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-/// Type of power source as defined by UPower
+/// Type of power source as defined by `UPower`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceType {
     /// Unknown device type
@@ -135,7 +135,7 @@ impl Display for DeviceType {
     }
 }
 
-/// The battery power state as defined by UPower
+/// The battery power state as defined by `UPower`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceState {
     /// Unknown state

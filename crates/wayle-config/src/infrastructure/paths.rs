@@ -5,6 +5,7 @@ use std::path::PathBuf;
 pub use wayle_core::paths::ConfigPaths;
 
 /// Path to `themes/schema.json` for theme file validation.
+#[must_use]
 pub fn theme_schema_json() -> PathBuf {
     ConfigPaths::themes_dir().join("schema.json")
 }
@@ -16,6 +17,7 @@ pub fn theme_schema_json() -> PathBuf {
 /// then creates with default contents), keeping TOML the default for fresh
 /// installs while letting users opt into YAML by simply naming their file
 /// `config.yaml`.
+#[must_use]
 pub fn discover_main_config() -> PathBuf {
     if let Ok(dir) = ConfigPaths::config_dir() {
         for name in ["config.yaml", "config.yml"] {

@@ -21,6 +21,7 @@ pub struct LiveDeviceParams<'a> {
     pub(crate) cancellation_token: &'a CancellationToken,
 }
 
+#[expect(clippy::struct_excessive_bools, reason = "config/state struct")]
 pub(crate) struct DeviceProperties {
     pub udi: String,
     pub udev_path: String,
@@ -64,8 +65,8 @@ pub struct AppliedConnection {
     /// Connection settings organized by group (e.g., "ipv4", "connection", "802-11-wireless").
     ///
     /// Each group contains its configuration parameters as key-value pairs.
-    /// This is kept as raw data due to the complexity and variety of NetworkManager
-    /// connection types (Ethernet, WiFi, VPN, Bridge, etc.), each with different settings.
+    /// This is kept as raw data due to the complexity and variety of `NetworkManager`
+    /// connection types (Ethernet, `WiFi`, VPN, Bridge, etc.), each with different settings.
     pub settings: HashMap<String, HashMap<String, OwnedValue>>,
 
     /// Version identifier for this applied connection.

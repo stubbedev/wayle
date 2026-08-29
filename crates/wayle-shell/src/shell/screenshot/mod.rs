@@ -105,7 +105,7 @@ impl Component for Screenshot {
         root: Self::Root,
         _sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = Screenshot {
+        let model = Self {
             config: init.config,
             hyprland: init.hyprland,
             niri: init.niri,
@@ -453,9 +453,7 @@ fn resolve_dir(configured: &str) -> PathBuf {
     if let Some(dir) = std::env::var_os("XDG_PICTURES_DIR") {
         return PathBuf::from(dir);
     }
-    std::env::var_os("HOME")
-        .map(|home| PathBuf::from(home).join("Pictures"))
-        .unwrap_or_else(|| PathBuf::from("."))
+    std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), |home| PathBuf::from(home).join("Pictures"))
 }
 
 /// Builds a timestamped file name from a `chrono` format string.

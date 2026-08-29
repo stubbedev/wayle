@@ -11,7 +11,7 @@ use relm4::gtk::{self, prelude::*};
 use wayle_config::{ConfigService, schemas::animations::AnimSurface};
 use wayle_widgets::prelude::WayleRevealer;
 
-/// Resolved (transition, duration_ms) for a surface and direction.
+/// Resolved (transition, `duration_ms`) for a surface and direction.
 fn animation(
     config: &Arc<ConfigService>,
     surface: AnimSurface,

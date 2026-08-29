@@ -101,13 +101,13 @@ pub trait Notifications {
     ///                      notification server's settings, and may vary for the type of
     ///                      notification. If 0, never expire.
     ///
-    /// If replaces_id is 0, the return value is a UINT32 that represent the notification.
+    /// If `replaces_id` is 0, the return value is a UINT32 that represent the notification.
     /// It is unique, and will not be reused unless a MAXINT number of notifications have
     /// been generated. An acceptable implementation may just use an incrementing counter for
     /// the ID. The returned ID is always greater than zero. Servers must make sure not to
     /// return zero as an ID.
     ///
-    /// If replaces_id is not 0, the returned value is the same value as replaces_id.
+    /// If `replaces_id` is not 0, the returned value is the same value as `replaces_id`.
     fn notify(
         &self,
         app_name: &str,
@@ -124,7 +124,7 @@ pub trait Notifications {
     /// It can be used, for example, in the event that what the notification pertains to
     /// is no longer relevant, or to cancel a notification with no expiration time.
     ///
-    /// The NotificationClosed signal is emitted by this method.
+    /// The `NotificationClosed` signal is emitted by this method.
     ///
     /// If the notification no longer exists, an empty D-BUS Error message is sent back.
     fn close_notification(&self, id: u32) -> zbus::Result<()>;
@@ -148,7 +148,7 @@ pub trait Notifications {
     /// * `reason` - The reason the notification was closed.
     ///              1 - The notification expired.
     ///              2 - The notification was dismissed by the user.
-    ///              3 - The notification was closed by a call to CloseNotification.
+    ///              3 - The notification was closed by a call to `CloseNotification`.
     ///              4 - Undefined/reserved reasons.
     ///
     /// The ID specified in the signal is invalidated before the signal is sent and is
@@ -165,18 +165,18 @@ pub trait Notifications {
     ///
     /// # Arguments
     ///
-    /// * `id`         - The ID of the notification emitting the ActionInvoked signal.
+    /// * `id`         - The ID of the notification emitting the `ActionInvoked` signal.
     /// * `action_key` - The key of the action invoked. These match the keys sent over
     ///                  in the list of actions.
     #[zbus(signal)]
     fn action_invoked(&self, id: u32, action_key: String) -> zbus::Result<()>;
 
-    /// This signal can be emitted before the ActionInvoked signal. It carries
+    /// This signal can be emitted before the `ActionInvoked` signal. It carries
     /// an activation token that can be used to activate a toplevel.
     ///
     /// # Arguments
     ///
-    /// * `id`               - The ID of the notification emitting the ActivationToken signal.
+    /// * `id`               - The ID of the notification emitting the `ActivationToken` signal.
     /// * `activation_token` - The activation token.
     #[zbus(signal)]
     fn activation_token(&self, id: u32, activation_token: String) -> zbus::Result<()>;

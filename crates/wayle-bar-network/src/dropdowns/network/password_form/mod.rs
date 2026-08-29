@@ -135,8 +135,8 @@ impl SimpleComponent for PasswordForm {
 
     fn init(
         _init: Self::Init,
-        _root: Self::Root,
-        _sender: ComponentSender<Self>,
+        root: Self::Root,
+        sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let password_entry = Self::build_password_entry();
 

@@ -51,6 +51,7 @@ impl SwayCommandClient {
             // The command socket should never carry events, but a stray event
             // would desync the reply stream; skip any that slip through.
             if message.event_kind().is_none() {
+                drop(guard);
                 return Ok(message.payload);
             }
         }

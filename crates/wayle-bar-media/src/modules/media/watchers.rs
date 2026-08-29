@@ -27,7 +27,7 @@ pub fn spawn_watchers(
     let icon_type = config.icon_type.clone();
     watch!(sender, [icon_name.watch()], |out| {
         if icon_type.get() == MediaIconType::Default {
-            let _ = out.send(MediaCmd::UpdateIcon(icon_name.get().clone()));
+            let _ = out.send(MediaCmd::UpdateIcon(icon_name.get()));
         }
     });
 
@@ -35,7 +35,7 @@ pub fn spawn_watchers(
     let icon_type_for_disc = config.icon_type.clone();
     watch!(sender, [spinning_disc_icon.watch()], |out| {
         if icon_type_for_disc.get() == MediaIconType::SpinningDisc {
-            let _ = out.send(MediaCmd::UpdateIcon(spinning_disc_icon.get().clone()));
+            let _ = out.send(MediaCmd::UpdateIcon(spinning_disc_icon.get()));
         }
     });
 

@@ -42,8 +42,8 @@ pub enum AuthPrompt {
 impl AuthPrompt {
     /// Whether this prompt expects the user to type a response.
     #[must_use]
-    pub fn wants_input(&self) -> bool {
-        matches!(self, AuthPrompt::Secret(_) | AuthPrompt::Visible(_))
+    pub const fn wants_input(&self) -> bool {
+        matches!(self, Self::Secret(_) | Self::Visible(_))
     }
 }
 

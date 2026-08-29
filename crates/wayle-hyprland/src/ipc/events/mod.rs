@@ -61,7 +61,7 @@ pub(crate) async fn subscribe(
                                 continue;
                             };
 
-                            if let Err(e) = dispatcher::dispatch(event, data, event_tx.clone()).await {
+                            if let Err(e) = dispatcher::dispatch(event, data, &event_tx) {
                                 warn!(error = %e, event, "cannot handle event");
                             }
                         }

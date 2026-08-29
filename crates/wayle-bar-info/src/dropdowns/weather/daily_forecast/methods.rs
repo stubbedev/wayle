@@ -28,6 +28,12 @@ impl DailyForecast {
 
         let scale = self.config.config().styling.scale.get().value();
         let bar_width_px = (BAR_WIDTH_REM * scale * REM_BASE).round();
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "rounded pixel value fits i32"
+        )]
+        let bar_width = bar_width_px as i32;
 
         let mut guard = self.items.guard();
         guard.clear();
@@ -48,7 +54,17 @@ impl DailyForecast {
                 range_max,
             );
 
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_possible_truncation,
+                reason = "clamped percentage-to-pixel math fits i32"
+            )]
             let bar_margin_start = (bar_offsets.left_pct / 100.0 * bar_width_px) as i32;
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_possible_truncation,
+                reason = "clamped percentage-to-pixel math fits i32"
+            )]
             let bar_fill_width = (bar_offsets.width_pct / 100.0 * bar_width_px).max(3.0) as i32;
 
             guard.push_back(DailyItem {
@@ -58,7 +74,7 @@ impl DailyForecast {
                 condition: weather_helpers::condition_label(day.condition),
                 high: weather_helpers::format_temp_value(day.temp_high, units),
                 low: weather_helpers::format_temp_value(day.temp_low, units),
-                bar_width: bar_width_px as i32,
+                bar_width,
                 bar_margin_start,
                 bar_fill_width,
                 is_today,

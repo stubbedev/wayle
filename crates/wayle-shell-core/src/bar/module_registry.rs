@@ -41,6 +41,7 @@ where
     }
 }
 
+#[must_use]
 pub fn dynamic_controller<C>(controller: Controller<C>) -> Box<dyn ModuleController>
 where
     C: Component<Root = gtk::Box> + 'static,
@@ -53,18 +54,15 @@ pub fn require_service<T>(
     service: &'static str,
     value: Option<T>,
 ) -> Option<T> {
-    match value {
-        Some(v) => Some(v),
-        None => {
-            warn!(
-                module,
-                service,
-                "module configured in bar layout but `{service}` service is unavailable on this system - \
-                 module will not appear; remove `{module}` from your layout or enable the service"
-            );
-            None
-        }
+    if value.is_none() {
+        warn!(
+            module,
+            service,
+            "module configured in bar layout but `{service}` service is unavailable on this system - \
+             module will not appear; remove `{module}` from your layout or enable the service"
+        );
     }
+    value
 }
 
 pub fn require_hyprland(module: &'static str) -> bool {

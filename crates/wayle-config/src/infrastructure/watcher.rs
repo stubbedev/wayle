@@ -37,6 +37,7 @@ impl FileWatcher {
     /// Subscribes to secrets reload events.
     ///
     /// The receiver fires whenever `.env` files are reloaded.
+    #[must_use]
     pub fn subscribe_secrets_reload(&self) -> watch::Receiver<()> {
         self.secrets_tx.subscribe()
     }
@@ -118,7 +119,7 @@ impl FileWatcher {
         dir == store
     }
 
-    fn should_reload(event: &Event) -> bool {
+    const fn should_reload(event: &Event) -> bool {
         matches!(
             event.kind,
             EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)

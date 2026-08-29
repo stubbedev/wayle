@@ -1,4 +1,4 @@
-//! NetworkManager IP Tunnel Device interface.
+//! `NetworkManager` IP Tunnel Device interface.
 
 use zbus::{proxy, zvariant::OwnedObjectPath};
 

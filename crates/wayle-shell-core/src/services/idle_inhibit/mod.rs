@@ -52,6 +52,7 @@ impl IdleInhibitService {
     }
 
     /// Returns a clone of the shared state for modules to watch.
+    #[must_use]
     pub fn state(&self) -> IdleInhibitState {
         self.state.clone()
     }

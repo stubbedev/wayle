@@ -81,7 +81,8 @@ async fn fetch_with_retry(
         WeatherErrorKind::from(&err)
     })?;
 
-    for attempt in 1..=MAX_RETRIES {
+    let mut attempt = 1;
+    loop {
         match provider.fetch(&config.location, &resolved).await {
             Ok(data) => {
                 on_fetch_success(weather, data);
@@ -91,6 +92,7 @@ async fn fetch_with_retry(
                 if wait_before_retry(token, &err, attempt).await.is_err() {
                     return Err(WeatherErrorKind::from(&err));
                 }
+                attempt = attempt.saturating_add(1);
             }
             Err(err) => {
                 warn!(error = %error_chain(&err), "cannot fetch weather data");
@@ -98,8 +100,6 @@ async fn fetch_with_retry(
             }
         }
     }
-
-    unreachable!("retry loop always returns")
 }
 
 fn on_fetch_success(weather: &Property<Option<Arc<Weather>>>, data: Weather) {
@@ -130,5 +130,5 @@ fn retry_delay(err: &Error, attempt: u32) -> Duration {
     if matches!(err, Error::RateLimited { .. }) {
         return RATE_LIMIT_DELAY;
     }
-    INITIAL_RETRY_DELAY * 2u32.saturating_pow(attempt - 1)
+    INITIAL_RETRY_DELAY.saturating_mul(2u32.saturating_pow(attempt.saturating_sub(1)))
 }

@@ -39,12 +39,12 @@ pub fn build_current(data: &ApiResponse) -> Result<CurrentWeather> {
 
 pub fn build_hourly(hourly: &HourlyData, count: usize) -> Result<Vec<HourlyForecast>> {
     let start = find_current_hour_index(&hourly.time);
-    let end = (start + count).min(hourly.time.len());
+    let end = start.saturating_add(count).min(hourly.time.len());
 
     let mut forecasts = Vec::with_capacity(count);
     for hour_idx in start..end {
         forecasts.push(HourlyForecast {
-            time: parse_iso_datetime(&hourly.time[hour_idx])?,
+            time: parse_iso_datetime(raw_str(&hourly.time, hour_idx)?)?,
             temperature: temperature(&hourly.temperature_2m, hour_idx)?,
             feels_like: temperature(&hourly.apparent_temperature, hour_idx)?,
             condition: WeatherCondition::from_wmo_code(raw_u8(&hourly.weather_code, hour_idx)?),
@@ -71,13 +71,13 @@ pub fn build_daily(data: &ApiResponse, count: usize) -> Result<Vec<DailyForecast
 
     let mut forecasts = Vec::with_capacity(count);
     for day_idx in 0..end {
-        let date = parse_date(&daily.time[day_idx])?;
-        let sunrise = parse_time_from_iso(&daily.sunrise[day_idx])?;
-        let sunset = parse_time_from_iso(&daily.sunset[day_idx])?;
+        let date = parse_date(raw_str(&daily.time, day_idx)?)?;
+        let sunrise = parse_time_from_iso(raw_str(&daily.sunrise, day_idx)?)?;
+        let sunset = parse_time_from_iso(raw_str(&daily.sunset, day_idx)?)?;
 
         let temp_high = temperature(&daily.temperature_2m_max, day_idx)?;
         let temp_low = temperature(&daily.temperature_2m_min, day_idx)?;
-        let avg = (temp_high.celsius() + temp_low.celsius()) / 2.0;
+        let avg = f32::midpoint(temp_high.celsius(), temp_low.celsius());
 
         forecasts.push(DailyForecast {
             date,
@@ -132,46 +132,102 @@ fn raw_f64(arr: &[f64], idx: usize) -> Result<f64> {
         .ok_or_else(|| Error::parse(PROVIDER, "missing data"))
 }
 
+fn raw_str(arr: &[String], idx: usize) -> Result<&str> {
+    arr.get(idx)
+        .map(String::as_str)
+        .ok_or_else(|| Error::parse(PROVIDER, "missing data"))
+}
+
 fn raw_u8(arr: &[f64], idx: usize) -> Result<u8> {
-    raw_f64(arr, idx).map(|raw| raw.clamp(0.0, 255.0) as u8)
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "clamped to 0..=255 before cast"
+    )]
+    let byte = raw_f64(arr, idx)?.clamp(0.0, 255.0) as u8;
+    Ok(byte)
 }
 
 fn temperature(arr: &[f64], idx: usize) -> Result<Temperature> {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for temperature"
+    )]
     let celsius = raw_f64(arr, idx)? as f32;
     Temperature::new(celsius).ok_or_else(|| Error::parse(PROVIDER, "invalid temperature"))
 }
 
 fn percentage(arr: &[f64], idx: usize) -> Result<Percentage> {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "clamped to 0..=100 before cast"
+    )]
     let percent = raw_f64(arr, idx)?.clamp(0.0, 100.0) as u8;
     Ok(Percentage::saturating(percent))
 }
 
 fn speed(arr: &[f64], idx: usize) -> Result<Speed> {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for wind speed"
+    )]
     let kmh = raw_f64(arr, idx)?.max(0.0) as f32;
     Speed::new(kmh).ok_or_else(|| Error::parse(PROVIDER, "invalid speed"))
 }
 
 fn wind_dir(arr: &[f64], idx: usize) -> Result<WindDirection> {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "clamped to non-negative, wind direction fits u16"
+    )]
     let degrees = raw_f64(arr, idx)?.max(0.0) as u16;
     Ok(WindDirection::saturating(degrees))
 }
 
 fn uv(arr: &[f64], idx: usize) -> Result<UvIndex> {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "clamped to 0..=15 before cast"
+    )]
     let index = raw_f64(arr, idx)?.clamp(0.0, 15.0) as u8;
     Ok(UvIndex::saturating(index))
 }
 
 fn pressure(arr: &[f64], idx: usize) -> Result<Pressure> {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for pressure"
+    )]
     let hpa = raw_f64(arr, idx)?.max(0.0) as f32;
     Pressure::new(hpa).ok_or_else(|| Error::parse(PROVIDER, "invalid pressure"))
 }
 
 fn visibility_from_meters(arr: &[f64], idx: usize) -> Result<Distance> {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for visibility"
+    )]
     let meters = raw_f64(arr, idx)?.max(0.0) as f32;
     Distance::from_meters(meters).ok_or_else(|| Error::parse(PROVIDER, "invalid visibility"))
 }
 
 fn precip(arr: &[f64], idx: usize) -> Result<Precipitation> {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "f64 to f32 precision loss acceptable for precipitation"
+    )]
     let mm = raw_f64(arr, idx)?.max(0.0) as f32;
     Precipitation::new(mm).ok_or_else(|| Error::parse(PROVIDER, "invalid precipitation"))
 }

@@ -90,7 +90,7 @@ async fn monitor(
             return;
         };
         tokio::select! {
-            _ = cancellation_token.cancelled() => {
+            () = cancellation_token.cancelled() => {
                 debug!("Device monitoring cancelled for {}", device.object_path);
                 return;
             }

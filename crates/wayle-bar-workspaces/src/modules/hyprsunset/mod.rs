@@ -34,7 +34,7 @@ pub struct HyprsunsetModule {
     auto_phase: Option<Phase>,
     /// A manual toggle is overriding the auto-schedule until the next boundary.
     manual_override: bool,
-    /// Location resolved via GeoClue; preferred over configured lat/long.
+    /// Location resolved via `GeoClue`; preferred over configured lat/long.
     geo_location: Option<(f64, f64)>,
 }
 
@@ -56,7 +56,7 @@ impl Component for HyprsunsetModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config_service = init.config;
@@ -64,7 +64,7 @@ impl Component for HyprsunsetModule {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: config.icon_off.get().clone(),
+                icon: config.icon_off.get(),
                 label: String::new(),
                 tooltip: None,
                 colors: BarButtonColors {
@@ -155,9 +155,10 @@ impl Component for HyprsunsetModule {
             }
             HyprsunsetCmd::StateChanged(state) => {
                 let enabled = state.is_some();
-                let (temp, gamma) = state
-                    .map(|s| (s.temp, s.gamma))
-                    .unwrap_or((config.temperature.get(), config.gamma.get()));
+                let (temp, gamma) = state.map_or_else(
+                    || (config.temperature.get(), config.gamma.get()),
+                    |s| (s.temp, s.gamma),
+                );
 
                 if self.enabled != enabled
                     || self.current_temp != temp

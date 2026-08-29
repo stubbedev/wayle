@@ -78,9 +78,9 @@ mod tests {
         let back: Srgb<f32> = hsl.into_color();
         let back_u8: Srgb<u8> = back.into_format();
         let orig_u8: Srgb<u8> = rgb.into_format();
-        assert!((orig_u8.red as i16 - back_u8.red as i16).unsigned_abs() <= 1);
-        assert!((orig_u8.green as i16 - back_u8.green as i16).unsigned_abs() <= 1);
-        assert!((orig_u8.blue as i16 - back_u8.blue as i16).unsigned_abs() <= 1);
+        assert!((i16::from(orig_u8.red) - i16::from(back_u8.red)).unsigned_abs() <= 1);
+        assert!((i16::from(orig_u8.green) - i16::from(back_u8.green)).unsigned_abs() <= 1);
+        assert!((i16::from(orig_u8.blue) - i16::from(back_u8.blue)).unsigned_abs() <= 1);
     }
 
     #[test]

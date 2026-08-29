@@ -137,7 +137,7 @@ pub struct Location {
 }
 
 /// Astronomical data for the location.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Astronomy {
     /// Sunrise time (local).
     pub sunrise: NaiveTime,
@@ -189,26 +189,21 @@ pub enum WeatherCondition {
 impl WeatherCondition {
     /// Converts a WMO weather code to a condition category.
     #[must_use]
-    pub fn from_wmo_code(code: u8) -> Self {
+    pub const fn from_wmo_code(code: u8) -> Self {
         match code {
             0 => Self::Clear,
             1..=2 => Self::PartlyCloudy,
             3 => Self::Overcast,
             45 | 48 => Self::Fog,
             51 | 53 | 55 => Self::Drizzle,
-            56 | 57 => Self::Sleet,
+            56 | 57 | 66 | 67 => Self::Sleet,
             61 => Self::LightRain,
-            63 => Self::Rain,
+            63 | 80..=82 => Self::Rain,
             65 => Self::HeavyRain,
-            66 | 67 => Self::Sleet,
             71 => Self::LightSnow,
-            73 => Self::Snow,
+            73 | 77 | 85 | 86 => Self::Snow,
             75 => Self::HeavySnow,
-            77 => Self::Snow,
-            80..=82 => Self::Rain,
-            85 | 86 => Self::Snow,
-            95 => Self::Thunderstorm,
-            96 | 99 => Self::Thunderstorm,
+            95 | 96 | 99 => Self::Thunderstorm,
             _ => Self::Unknown,
         }
     }
@@ -236,7 +231,7 @@ pub enum LocationQuery {
 impl LocationQuery {
     /// Creates a coordinate-based query.
     #[must_use]
-    pub fn coords(lat: f64, lon: f64) -> Self {
+    pub const fn coords(lat: f64, lon: f64) -> Self {
         Self::Coordinates { lat, lon }
     }
 

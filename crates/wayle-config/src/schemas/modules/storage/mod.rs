@@ -25,6 +25,7 @@ pub enum StorageMountPoint {
 
 impl StorageMountPoint {
     /// Returns normalized mount paths as a vector.
+    #[must_use]
     pub fn paths(&self) -> Vec<String> {
         match self {
             Self::Single(path) => vec![path.clone()],
@@ -179,7 +180,7 @@ impl ModuleInfoProvider for StorageConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("storage"),
-            schema: || schema_for!(StorageConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("storage")),
             array_entry: false,
         }

@@ -1,4 +1,4 @@
-//! NetworkManager Device Statistics interface.
+//! `NetworkManager` Device Statistics interface.
 
 use zbus::proxy;
 

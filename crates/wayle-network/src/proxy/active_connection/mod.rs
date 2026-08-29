@@ -9,13 +9,13 @@ pub mod vpn;
     interface = "org.freedesktop.NetworkManager.Connection.Active"
 )]
 pub(crate) trait ConnectionActive {
-    /// The path of the connection object that this ActiveConnection is using.
+    /// The path of the connection object that this `ActiveConnection` is using.
     #[zbus(property)]
     fn connection(&self) -> zbus::Result<OwnedObjectPath>;
 
     /// A specific object associated with the active connection.
     /// This property reflects the specific object used during connection activation,
-    /// and will not change over the lifetime of the ActiveConnection once set.
+    /// and will not change over the lifetime of the `ActiveConnection` once set.
     #[zbus(property)]
     fn specific_object(&self) -> zbus::Result<OwnedObjectPath>;
 
@@ -47,11 +47,11 @@ pub(crate) trait ConnectionActive {
     #[zbus(property)]
     fn default(&self) -> zbus::Result<bool>;
 
-    /// Object path of the Ip4Config object describing the configuration of the connection.
+    /// Object path of the `Ip4Config` object describing the configuration of the connection.
     #[zbus(property)]
     fn ip4_config(&self) -> zbus::Result<OwnedObjectPath>;
 
-    /// Object path of the Dhcp4Config object describing the DHCP options.
+    /// Object path of the `Dhcp4Config` object describing the DHCP options.
     #[zbus(property)]
     fn dhcp4_config(&self) -> zbus::Result<OwnedObjectPath>;
 
@@ -59,11 +59,11 @@ pub(crate) trait ConnectionActive {
     #[zbus(property)]
     fn default6(&self) -> zbus::Result<bool>;
 
-    /// Object path of the Ip6Config object describing the configuration of the connection.
+    /// Object path of the `Ip6Config` object describing the configuration of the connection.
     #[zbus(property)]
     fn ip6_config(&self) -> zbus::Result<OwnedObjectPath>;
 
-    /// Object path of the Dhcp6Config object describing the DHCP options.
+    /// Object path of the `Dhcp6Config` object describing the DHCP options.
     #[zbus(property)]
     fn dhcp6_config(&self) -> zbus::Result<OwnedObjectPath>;
 

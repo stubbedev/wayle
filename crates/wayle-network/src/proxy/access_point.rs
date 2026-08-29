@@ -47,7 +47,7 @@ pub(crate) trait AccessPoint {
     #[zbus(property)]
     fn strength(&self) -> zbus::Result<u8>;
 
-    /// The timestamp (in CLOCK_BOOTTIME seconds) for the last time the access point was found in scan results.
+    /// The timestamp (in `CLOCK_BOOTTIME` seconds) for the last time the access point was found in scan results.
     #[zbus(property)]
     fn last_seen(&self) -> zbus::Result<i32>;
 }

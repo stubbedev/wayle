@@ -24,12 +24,12 @@ use super::{
     types::states::NetworkStatus,
 };
 
-/// WiFi device with connection control. See [crate-level docs](crate) for usage.
+/// `WiFi` device with connection control. See [crate-level docs](crate) for usage.
 #[derive(Clone, Debug)]
 pub struct Wifi {
     /// Underlying device properties.
     pub device: DeviceWifi,
-    /// System-wide WiFi enabled state.
+    /// System-wide `WiFi` enabled state.
     pub enabled: Property<bool>,
     /// Current connectivity status.
     pub connectivity: Property<NetworkStatus>,
@@ -92,10 +92,10 @@ impl Reactive for Wifi {
 }
 
 impl Wifi {
-    /// Watch for any WiFi property changes.
+    /// Watch for any `WiFi` property changes.
     ///
-    /// Emits whenever any WiFi property changes (enabled, connectivity, ssid, strength, or access points).
-    pub fn watch(&self) -> impl Stream<Item = Wifi> + Send {
+    /// Emits whenever any `WiFi` property changes (enabled, connectivity, ssid, strength, or access points).
+    pub fn watch(&self) -> impl Stream<Item = Self> + Send {
         watch_all!(
             self,
             enabled,
@@ -108,10 +108,10 @@ impl Wifi {
         )
     }
 
-    /// Enable or disable WiFi on the system.
+    /// Enable or disable `WiFi` on the system.
     ///
-    /// Controls the system-wide WiFi state through NetworkManager. When disabled,
-    /// all WiFi connections are terminated.
+    /// Controls the system-wide `WiFi` state through `NetworkManager`. When disabled,
+    /// all `WiFi` connections are terminated.
     ///
     /// # Errors
     ///
@@ -120,7 +120,7 @@ impl Wifi {
         WifiControls::set_enabled(&self.device.core.connection, enabled).await
     }
 
-    /// Connect to a WiFi access point.
+    /// Connect to a `WiFi` access point.
     ///
     /// Checks for existing saved connection profiles matching this network's
     /// SSID. If found, reuses the profile (updating the password if provided).
@@ -144,9 +144,9 @@ impl Wifi {
         .await
     }
 
-    /// Disconnect from the current WiFi network.
+    /// Disconnect from the current `WiFi` network.
     ///
-    /// Deactivates the current WiFi connection if there is one active.
+    /// Deactivates the current `WiFi` connection if there is one active.
     /// If no connection is active, this is a no-op.
     ///
     /// # Errors

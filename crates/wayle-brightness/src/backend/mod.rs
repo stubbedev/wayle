@@ -65,7 +65,7 @@ pub(crate) fn start(
 
         loop {
             tokio::select! {
-                _ = token.cancelled() => {
+                () = token.cancelled() => {
                     info!("brightness backend stopping");
                     return Ok(());
                 }
@@ -75,7 +75,7 @@ pub(crate) fn start(
                         Command::SetBrightness { name, value, responder } => {
                             let result = set_brightness(
                                 &ddc_manager,
-                                &logind_connection,
+                                logind_connection.as_ref(),
                                 &event_tx,
                                 &name,
                                 value,
@@ -136,7 +136,7 @@ fn scan_ddc(ddc_manager: &Arc<DdcManager>, event_tx: &EventSender, settle: Durat
 /// which have no kernel poll source to pick the change up on their own.
 async fn set_brightness(
     ddc_manager: &Arc<DdcManager>,
-    logind_connection: &Option<zbus::Connection>,
+    logind_connection: Option<&zbus::Connection>,
     event_tx: &EventSender,
     name: &str,
     value: u32,

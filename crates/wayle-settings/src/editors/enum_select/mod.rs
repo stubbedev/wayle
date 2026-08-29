@@ -114,7 +114,9 @@ where
             EnumSelectMsg::Selected(index) => {
                 self.selected = index;
 
-                if let Some(variant) = E::variants().get(index as usize)
+                if let Some(variant) = usize::try_from(index)
+                    .ok()
+                    .and_then(|index| E::variants().get(index))
                     && let Some(value) = enum_from_serde_value(variant.value)
                 {
                     self.property.set(value);
@@ -140,7 +142,8 @@ where
     variants
         .iter()
         .position(|variant| enum_from_serde_value::<E>(variant.value).as_ref() == Some(current))
-        .unwrap_or(0) as u32
+        .and_then(|index| u32::try_from(index).ok())
+        .unwrap_or(0)
 }
 
 fn enum_from_serde_value<E: for<'de> Deserialize<'de>>(value: &str) -> Option<E> {

@@ -35,7 +35,7 @@ pub struct ConnectionSettings {
     /// D-Bus object path for this settings connection.
     pub object_path: OwnedObjectPath,
 
-    /// Human-readable connection name (e.g. "Home WiFi", "Wired connection 1").
+    /// Human-readable connection name (e.g. "Home `WiFi`", "Wired connection 1").
     pub id: Property<String>,
 
     /// Stable unique identifier for this connection profile.
@@ -44,7 +44,7 @@ pub struct ConnectionSettings {
     /// Network connection type.
     pub connection_type: Property<ConnectionType>,
 
-    /// WiFi SSID, if this is a wireless connection.
+    /// `WiFi` SSID, if this is a wireless connection.
     pub wifi_ssid: Property<Option<Ssid>>,
 
     /// Whether the in-memory state differs from the on-disk state.
@@ -113,7 +113,7 @@ impl ConnectionSettings {
     /// with each secret. Use the 'Save' method to save these changes to disk.
     /// Note that unsaved changes will be lost if the connection is reloaded
     /// from disk (either automatically on file change or due to an explicit
-    /// ReloadConnections call).
+    /// `ReloadConnections` call).
     ///
     /// # Errors
     ///
@@ -139,7 +139,7 @@ impl ConnectionSettings {
     ///
     /// This will never include any secrets required for connection to the
     /// network, as those are often protected. Secrets must be requested
-    /// separately using the GetSecrets() call.
+    /// separately using the `GetSecrets()` call.
     ///
     /// # Errors
     ///
@@ -183,7 +183,7 @@ impl ConnectionSettings {
 
     /// Saves a "dirty" connection to persistent storage.
     ///
-    /// Saves a connection (that had previously been updated with UpdateUnsaved)
+    /// Saves a connection (that had previously been updated with `UpdateUnsaved`)
     /// to persistent storage.
     ///
     /// # Errors
@@ -195,13 +195,13 @@ impl ConnectionSettings {
 
     /// Update the connection with new settings and properties.
     ///
-    /// Update2 is an alternative to Update, UpdateUnsaved and Save extensible
+    /// Update2 is an alternative to Update, `UpdateUnsaved` and Save extensible
     /// with extra flags and args arguments.
     ///
     /// # Arguments
     ///
     /// * `settings` - New connection settings, properties, and (optionally) secrets.
-    ///   Provide an empty HashMap to use the current settings.
+    ///   Provide an empty `HashMap` to use the current settings.
     /// * `flags` - Optional flags. Unknown flags cause the call to fail.
     ///   - 0x1 (to-disk): The connection is persisted to disk.
     ///   - 0x2 (in-memory): The change is only made in memory.
@@ -362,8 +362,7 @@ fn extract_identity(
     let connection_type = connection_group
         .and_then(|conn| conn.get("type"))
         .and_then(|val| String::try_from(val.clone()).ok())
-        .map(|type_str| ConnectionType::from_nm_type(&type_str))
-        .unwrap_or(ConnectionType::None);
+        .map_or(ConnectionType::None, |type_str| ConnectionType::from_nm_type(&type_str));
 
     let wifi_ssid = settings_map
         .get("802-11-wireless")

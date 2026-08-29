@@ -31,7 +31,7 @@ pub fn spawn(
     });
 }
 
-/// Watches for changes to saved network profiles and extracts known WiFi SSIDs.
+/// Watches for changes to saved network profiles and extracts known `WiFi` SSIDs.
 pub fn spawn_settings_watcher(
     sender: &ComponentSender<AvailableNetworks>,
     settings: &Arc<Settings>,
@@ -168,7 +168,7 @@ fn translate_connection_step(state: NMDeviceState) -> Option<String> {
     }
 }
 
-fn is_transient_disconnect(reason: NMDeviceStateReason) -> bool {
+const fn is_transient_disconnect(reason: NMDeviceStateReason) -> bool {
     matches!(
         reason,
         NMDeviceStateReason::None

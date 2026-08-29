@@ -120,7 +120,7 @@ impl ModuleInfoProvider for MicrophoneConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("microphone"),
-            schema: || schema_for!(MicrophoneConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("microphone")),
             array_entry: false,
         }

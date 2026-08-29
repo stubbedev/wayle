@@ -27,13 +27,13 @@ enum MatchTarget {
 }
 
 fn parse_pattern(pattern: &str) -> MatchTarget {
-    if let Some(suffix) = pattern.strip_prefix("title:") {
-        MatchTarget::Title(suffix.to_lowercase())
-    } else if let Some(suffix) = pattern.strip_prefix("class:") {
-        MatchTarget::Class(suffix.to_lowercase())
-    } else {
-        MatchTarget::Class(pattern.to_lowercase())
-    }
+    pattern.strip_prefix("title:").map_or_else(
+        || {
+            let class = pattern.strip_prefix("class:").unwrap_or(pattern);
+            MatchTarget::Class(class.to_lowercase())
+        },
+        |suffix| MatchTarget::Title(suffix.to_lowercase()),
+    )
 }
 
 fn workspace_class_key(class: &str) -> String {
@@ -41,7 +41,7 @@ fn workspace_class_key(class: &str) -> String {
 }
 
 pub fn resolve_app_icon(window: &WindowInfo<'_>, ctx: &IconContext<'_>) -> String {
-    for (pattern, icon) in ctx.user_map.iter() {
+    for (pattern, icon) in ctx.user_map {
         let matches = match parse_pattern(pattern) {
             MatchTarget::Class(p) => matches_glob(window.class, &p),
             MatchTarget::Title(p) => matches_glob(window.title, &p),
@@ -85,7 +85,9 @@ pub fn resolve_workspace_icons(
 
         if dedupe {
             if let Some(&idx) = seen.get(&key) {
-                icons[idx].addresses.push(address);
+                if let Some(icon) = icons.get_mut(idx) {
+                    icon.addresses.push(address);
+                }
                 continue;
             }
             seen.insert(key, icons.len());
@@ -135,7 +137,7 @@ pub enum WorkspaceState {
 }
 
 impl WorkspaceState {
-    pub fn css_class(self) -> &'static str {
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::Active => "active",
             Self::ActiveOtherMonitor => "active-other-monitor",
@@ -169,7 +171,7 @@ pub fn matches_ignore_patterns(id: WorkspaceId, patterns: &[String]) -> bool {
     false
 }
 
-pub fn determine_workspace_state(
+pub const fn determine_workspace_state(
     is_active: bool,
     is_active_on_any_monitor: bool,
     windows: u16,
@@ -245,10 +247,7 @@ pub fn should_update_for_monitor(
         return true;
     }
 
-    match bar_monitor {
-        Some(bar_mon) => bar_mon == event_monitor,
-        None => true,
-    }
+    bar_monitor.is_none_or(|bar_mon| bar_mon == event_monitor)
 }
 
 pub fn workspace_contains_urgent_address<A: Eq + Hash>(

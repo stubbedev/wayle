@@ -21,7 +21,7 @@ impl Plan {
     /// Takes ownership of a `cava_plan` pointer allocated by `cava_init`.
     ///
     /// `cava_destroy` is called on drop.
-    pub(crate) fn from_raw(ptr: NonNull<cava_plan>) -> Self {
+    pub(crate) const fn from_raw(ptr: NonNull<cava_plan>) -> Self {
         Self { ptr }
     }
 

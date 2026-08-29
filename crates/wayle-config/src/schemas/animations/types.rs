@@ -44,7 +44,7 @@ pub enum AnimationType {
 /// Per-surface enter/exit animation override. Any field left unset falls back
 /// to the global `[animations]` enter/exit, then to `transition`/`duration`.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", default)]
 pub struct SurfaceAnimation {
     /// Enter transition for this surface. Unset → global `enter`, then `transition`.

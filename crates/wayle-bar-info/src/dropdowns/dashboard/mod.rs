@@ -312,12 +312,9 @@ impl Component for DashboardDropdown {
         if let Some(battery_ctrl) = &model.battery {
             info_row.append(battery_ctrl.widget());
             battery_ctrl.widget().set_hexpand(true);
-            info_row.append(model.network.widget());
-            model.network.widget().set_hexpand(true);
-        } else {
-            info_row.append(model.network.widget());
-            model.network.widget().set_hexpand(true);
         }
+        info_row.append(model.network.widget());
+        model.network.widget().set_hexpand(true);
         let info_row_widget = &info_row;
 
         let widgets = view_output!();

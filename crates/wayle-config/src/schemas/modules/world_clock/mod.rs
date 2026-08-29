@@ -108,7 +108,7 @@ impl ModuleInfoProvider for WorldClockConfig {
     fn module_info() -> ModuleInfo {
         ModuleInfo {
             name: String::from("world-clock"),
-            schema: || schema_for!(WorldClockConfig),
+            schema: || schema_for!(Self),
             layout_id: Some(String::from("world-clock")),
             array_entry: false,
         }

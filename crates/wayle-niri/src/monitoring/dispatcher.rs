@@ -22,7 +22,7 @@ async fn event_loop(mut inputs: DispatcherInputs) {
 
     loop {
         tokio::select! {
-            _ = inputs.cancellation_token.cancelled() => return,
+            () = inputs.cancellation_token.cancelled() => return,
             received = inputs.inbound_event_rx.recv() => match received {
                 Ok(event) => apply_event(&inputs, &mut state, event),
                 Err(RecvError::Lagged(dropped_events)) => {

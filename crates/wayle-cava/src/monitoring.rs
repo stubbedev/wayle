@@ -12,6 +12,7 @@ use crate::{
 impl ServiceMonitoring for CavaService {
     type Error = Error;
 
+    #[expect(clippy::unused_async, reason = "trait signature")]
     async fn start_monitoring(&self) -> Result<(), Self::Error> {
         let bars_raw = self.bars.get();
         let stereo = self.stereo.get();
@@ -23,7 +24,7 @@ impl ServiceMonitoring for CavaService {
                 "odd bar count rounded up for stereo output"
             );
         }
-        let bars = bars_adjusted.value() as usize;
+        let bars = usize::from(bars_adjusted.value());
         let autosens = self.autosens.get();
         let noise_reduction = self.noise_reduction.get();
         let monstercat = self.monstercat.get();
@@ -72,12 +73,13 @@ impl ServiceMonitoring for CavaService {
         };
 
         tokio::spawn(async move {
-            let interval_duration = Duration::from_millis(1000 / framerate as u64);
+            let interval_duration =
+                Duration::from_millis(1000_u64.checked_div(u64::from(framerate)).unwrap_or(1000));
             let mut interval = tokio::time::interval(interval_duration);
 
             loop {
                 tokio::select! {
-                    _ = cancellation.cancelled() => {
+                    () = cancellation.cancelled() => {
                         debug!("Cava visualization loop cancelled");
                         return;
                     }
@@ -108,7 +110,7 @@ impl ServiceMonitoring for CavaService {
     }
 }
 
-fn calculate_cava_buffer_size(sample_rate: u32, channels: u32) -> usize {
+const fn calculate_cava_buffer_size(sample_rate: u32, channels: u32) -> usize {
     const BASE_FFT_SIZE: usize = 512;
     const BASS_BUFFER_MULTIPLIER: usize = 2;
 
@@ -117,14 +119,19 @@ fn calculate_cava_buffer_size(sample_rate: u32, channels: u32) -> usize {
         8126..=16250 => 2,
         16251..=32500 => 4,
         32501..=75000 => 8,
-        75001..=150000 => 16,
-        150001..=300000 => 32,
+        75001..=150_000 => 16,
+        150_001..=300_000 => 32,
         _ => 64,
     };
 
-    let fft_size = BASE_FFT_SIZE * fft_multiplier;
-    let fft_bass_size = fft_size * BASS_BUFFER_MULTIPLIER;
-    fft_bass_size * channels as usize
+    let fft_size = BASE_FFT_SIZE.saturating_mul(fft_multiplier);
+    let fft_bass_size = fft_size.saturating_mul(BASS_BUFFER_MULTIPLIER);
+    #[expect(
+        clippy::as_conversions,
+        reason = "u32 to usize is lossless on supported targets"
+    )]
+    let channels = channels as usize;
+    fft_bass_size.saturating_mul(channels)
 }
 
 #[cfg(test)]
@@ -142,10 +149,10 @@ mod tests {
     const TIER_4_MIN: u32 = 32501;
     const TIER_4_MAX: u32 = 75000;
     const TIER_5_MIN: u32 = 75001;
-    const TIER_5_MAX: u32 = 150000;
-    const TIER_6_MIN: u32 = 150001;
-    const TIER_6_MAX: u32 = 300000;
-    const TIER_7_MIN: u32 = 300001;
+    const TIER_5_MAX: u32 = 150_000;
+    const TIER_6_MIN: u32 = 150_001;
+    const TIER_6_MAX: u32 = 300_000;
+    const TIER_7_MIN: u32 = 300_001;
 
     const MULTIPLIER_TIER_1: usize = 1;
     const MULTIPLIER_TIER_2: usize = 2;
@@ -166,7 +173,7 @@ mod tests {
         let result = calculate_cava_buffer_size(sample_rate, channels);
 
         let expected =
-            BASE_FFT_SIZE * MULTIPLIER_TIER_1 * BASS_BUFFER_MULTIPLIER * channels as usize;
+            BASE_FFT_SIZE * MULTIPLIER_TIER_1 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap();
         assert_eq!(result, expected);
     }
 
@@ -178,7 +185,7 @@ mod tests {
         let result = calculate_cava_buffer_size(sample_rate, channels);
 
         let expected =
-            BASE_FFT_SIZE * MULTIPLIER_TIER_2 * BASS_BUFFER_MULTIPLIER * channels as usize;
+            BASE_FFT_SIZE * MULTIPLIER_TIER_2 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap();
         assert_eq!(result, expected);
     }
 
@@ -190,7 +197,7 @@ mod tests {
         let result = calculate_cava_buffer_size(sample_rate, channels);
 
         let expected =
-            BASE_FFT_SIZE * MULTIPLIER_TIER_7 * BASS_BUFFER_MULTIPLIER * channels as usize;
+            BASE_FFT_SIZE * MULTIPLIER_TIER_7 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap();
         assert_eq!(result, expected);
     }
 
@@ -202,7 +209,7 @@ mod tests {
         let result = calculate_cava_buffer_size(sample_rate, channels);
 
         let expected =
-            BASE_FFT_SIZE * MULTIPLIER_TIER_4 * BASS_BUFFER_MULTIPLIER * channels as usize;
+            BASE_FFT_SIZE * MULTIPLIER_TIER_4 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap();
         assert_eq!(result, expected);
     }
 
@@ -212,56 +219,56 @@ mod tests {
 
         assert_eq!(
             calculate_cava_buffer_size(TIER_1_MAX, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_1 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_1 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
         assert_eq!(
             calculate_cava_buffer_size(TIER_2_MIN, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_2 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_2 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
 
         assert_eq!(
             calculate_cava_buffer_size(TIER_2_MAX, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_2 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_2 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
         assert_eq!(
             calculate_cava_buffer_size(TIER_3_MIN, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_3 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_3 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
 
         assert_eq!(
             calculate_cava_buffer_size(TIER_3_MAX, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_3 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_3 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
         assert_eq!(
             calculate_cava_buffer_size(TIER_4_MIN, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_4 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_4 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
 
         assert_eq!(
             calculate_cava_buffer_size(TIER_4_MAX, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_4 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_4 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
         assert_eq!(
             calculate_cava_buffer_size(TIER_5_MIN, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_5 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_5 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
 
         assert_eq!(
             calculate_cava_buffer_size(TIER_5_MAX, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_5 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_5 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
         assert_eq!(
             calculate_cava_buffer_size(TIER_6_MIN, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_6 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_6 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
 
         assert_eq!(
             calculate_cava_buffer_size(TIER_6_MAX, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_6 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_6 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
         assert_eq!(
             calculate_cava_buffer_size(TIER_7_MIN, channels),
-            BASE_FFT_SIZE * MULTIPLIER_TIER_7 * BASS_BUFFER_MULTIPLIER * channels as usize
+            BASE_FFT_SIZE * MULTIPLIER_TIER_7 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap()
         );
     }
 
@@ -273,7 +280,7 @@ mod tests {
         let result = calculate_cava_buffer_size(sample_rate, channels);
 
         let expected =
-            BASE_FFT_SIZE * MULTIPLIER_TIER_7 * BASS_BUFFER_MULTIPLIER * channels as usize;
+            BASE_FFT_SIZE * MULTIPLIER_TIER_7 * BASS_BUFFER_MULTIPLIER * usize::try_from(channels).unwrap();
         assert_eq!(result, expected);
     }
 }

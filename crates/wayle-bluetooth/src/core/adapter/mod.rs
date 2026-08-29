@@ -25,7 +25,7 @@ use crate::{
     },
 };
 
-/// Bluetooth adapter from BlueZ.
+/// Bluetooth adapter from `BlueZ`.
 ///
 /// Instances from service fields are **live** and auto-update.
 /// Instances from [`BluetoothService::adapter()`](crate::BluetoothService::adapter) are **snapshots**.
@@ -112,20 +112,20 @@ pub struct Adapter {
     /// The power state will show whether the adapter is turning off, or turning on, as
     /// well as being on or off.
     ///
-    /// (BlueZ experimental)
+    /// (`BlueZ` experimental)
     pub power_state: Property<PowerState>,
 
     /// Switch an adapter to discoverable or non-discoverable to either make it visible
     /// or hide it. This is a global setting and should only be used by the settings
     /// application.
     ///
-    /// If the DiscoverableTimeout is set to a non-zero value then the system will set
+    /// If the `DiscoverableTimeout` is set to a non-zero value then the system will set
     /// this value back to false after the timer expired.
     ///
     /// In case the adapter is switched off, setting this value will fail.
     ///
     /// When changing the Powered property the new state of this property will be
-    /// updated via a PropertiesChanged signal.
+    /// updated via a `PropertiesChanged` signal.
     ///
     /// Default: false
     pub discoverable: Property<bool>,
@@ -304,16 +304,16 @@ impl Adapter {
     /// discoverable which enables listening to non-connectable and non-discoverable
     /// devices.
     ///
-    /// When multiple clients call SetDiscoveryFilter, their filters are internally
+    /// When multiple clients call `SetDiscoveryFilter`, their filters are internally
     /// merged, and notifications about new devices are sent to all clients. Therefore,
     /// each client must check that device updates actually match its filter.
     ///
-    /// When SetDiscoveryFilter is called multiple times by the same client, last filter
+    /// When `SetDiscoveryFilter` is called multiple times by the same client, last filter
     /// passed will be active for given client.
     ///
-    /// SetDiscoveryFilter can be called before StartDiscovery.
+    /// `SetDiscoveryFilter` can be called before `StartDiscovery`.
     /// It is useful when client will create first discovery session, to ensure that
-    /// proper scan will be started right after call to StartDiscovery.
+    /// proper scan will be started right after call to `StartDiscovery`.
     ///
     /// # Errors
     ///
@@ -342,10 +342,10 @@ impl Adapter {
         AdapterControls::start_discovery(&self.zbus_connection, &self.object_path).await
     }
 
-    /// Stops device discovery session started by start_discovery.
+    /// Stops device discovery session started by `start_discovery`.
     ///
     /// Note that a discovery procedure is shared between all discovery sessions thus
-    /// calling stop_discovery will only release a single session and discovery will stop
+    /// calling `stop_discovery` will only release a single session and discovery will stop
     /// when all sessions from all clients have finished.
     ///
     /// # Errors
@@ -368,7 +368,7 @@ impl Adapter {
         AdapterControls::remove_device(&self.zbus_connection, &self.object_path, device_path).await
     }
 
-    /// Returns available filters that can be given to set_discovery_filter.
+    /// Returns available filters that can be given to `set_discovery_filter`.
     ///
     /// # Errors
     ///
@@ -386,7 +386,7 @@ impl Adapter {
     /// After this method returns, services discovery will continue and any supported
     /// profile will be connected. Returns object path to created device object or device that already exists.
     ///
-    /// (BlueZ experimental)
+    /// (`BlueZ` experimental)
     ///
     /// # Errors
     ///

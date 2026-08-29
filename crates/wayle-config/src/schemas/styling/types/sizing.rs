@@ -25,7 +25,8 @@ pub enum IconSizeClass {
 
 impl IconSizeClass {
     /// CSS class for GTK widget styling (e.g., `icon-md`).
-    pub fn css_class(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::Sm => "icon-sm",
             Self::Md => "icon-md",
@@ -35,7 +36,8 @@ impl IconSizeClass {
     }
 
     /// CSS variable name (e.g., `--icon-md`).
-    pub fn css_var(self) -> &'static str {
+    #[must_use]
+    pub const fn css_var(self) -> &'static str {
         match self {
             Self::Sm => "--icon-sm",
             Self::Md => "--icon-md",
@@ -68,7 +70,8 @@ pub enum PaddingClass {
 
 impl PaddingClass {
     /// Uniform padding class (e.g., `padding-md`).
-    pub fn css_class(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::Xs => "padding-xs",
             Self::Sm => "padding-sm",
@@ -79,7 +82,8 @@ impl PaddingClass {
     }
 
     /// Horizontal padding class (e.g., `padding-x-md`).
-    pub fn css_class_x(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class_x(self) -> &'static str {
         match self {
             Self::Xs => "padding-x-xs",
             Self::Sm => "padding-x-sm",
@@ -90,7 +94,8 @@ impl PaddingClass {
     }
 
     /// Vertical padding class (e.g., `padding-y-md`).
-    pub fn css_class_y(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class_y(self) -> &'static str {
         match self {
             Self::Xs => "padding-y-xs",
             Self::Sm => "padding-y-sm",
@@ -101,7 +106,8 @@ impl PaddingClass {
     }
 
     /// CSS variable name (e.g., `--space-md`).
-    pub fn css_var(self) -> &'static str {
+    #[must_use]
+    pub const fn css_var(self) -> &'static str {
         match self {
             Self::Xs => "--space-xs",
             Self::Sm => "--space-sm",
@@ -133,7 +139,8 @@ pub enum GapClass {
 
 impl GapClass {
     /// CSS class for spacing (e.g., `gap-sm`).
-    pub fn css_class(self) -> &'static str {
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
         match self {
             Self::Xs => "gap-xs",
             Self::Sm => "gap-sm",

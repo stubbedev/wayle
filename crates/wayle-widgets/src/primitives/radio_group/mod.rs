@@ -57,7 +57,7 @@ impl SimpleComponent for RadioGroup {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let mut buttons = Vec::with_capacity(init.options.len());
@@ -88,7 +88,7 @@ impl SimpleComponent for RadioGroup {
             buttons.push(button);
         }
 
-        let model = RadioGroup {
+        let model = Self {
             buttons,
             selected: init.selected,
             sensitive: true,
@@ -114,8 +114,10 @@ impl SimpleComponent for RadioGroup {
                 }
             }
             RadioGroupMsg::SetSelected(index) => {
-                if index < self.buttons.len() && index != self.selected {
-                    self.buttons[index].set_active(true);
+                if index != self.selected
+                    && let Some(button) = self.buttons.get(index)
+                {
+                    button.set_active(true);
                     self.selected = index;
                 }
             }

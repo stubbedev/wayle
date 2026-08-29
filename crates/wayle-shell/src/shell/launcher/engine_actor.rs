@@ -69,7 +69,7 @@ pub(crate) enum EngineEvent {
         /// Matched indices, ranked.
         matched: Vec<u32>,
     },
-    /// The mode asked the surface to act (Close / Exit / SetInput).
+    /// The mode asked the surface to act (Close / Exit / `SetInput`).
     Action(Action),
 }
 

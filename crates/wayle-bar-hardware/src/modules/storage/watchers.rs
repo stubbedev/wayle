@@ -32,7 +32,7 @@ pub fn spawn_watchers(
 
         if let Some(snapshot) = aggregate_storage(&disks, &mount_points) {
             let colors =
-                evaluate_thresholds(snapshot.usage_percent as f64, &thresholds_watch.get());
+                evaluate_thresholds(f64::from(snapshot.usage_percent), &thresholds_watch.get());
             let _ = out.send(StorageCmd::UpdateThresholdColors(colors));
         }
     });
@@ -45,7 +45,7 @@ pub fn spawn_watchers(
             let label = format_label(&format.get(), &snapshot);
             let _ = out.send(StorageCmd::UpdateLabel(label));
 
-            let colors = evaluate_thresholds(snapshot.usage_percent as f64, &thresholds.get());
+            let colors = evaluate_thresholds(f64::from(snapshot.usage_percent), &thresholds.get());
             let _ = out.send(StorageCmd::UpdateThresholdColors(colors));
         }
     });
@@ -64,6 +64,6 @@ pub fn spawn_watchers(
 
     let icon_name = config.icon_name.clone();
     watch!(sender, [icon_name.watch()], |out| {
-        let _ = out.send(StorageCmd::UpdateIcon(icon_name.get().clone()));
+        let _ = out.send(StorageCmd::UpdateIcon(icon_name.get()));
     });
 }

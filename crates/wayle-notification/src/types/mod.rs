@@ -25,11 +25,11 @@ pub(crate) enum Signal {
 }
 
 impl Signal {
-    pub(crate) fn as_str(&self) -> &'static str {
+    pub(crate) const fn as_str(&self) -> &'static str {
         match self {
-            Signal::NotificationClosed => "NotificationClosed",
-            Signal::ActionInvoked => "ActionInvoked",
-            Signal::ActivationToken => "ActivationToken",
+            Self::NotificationClosed => "NotificationClosed",
+            Self::ActionInvoked => "ActionInvoked",
+            Self::ActivationToken => "ActivationToken",
         }
     }
 }

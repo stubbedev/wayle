@@ -23,7 +23,7 @@ impl FileChooserDaemon {
         current_folder: &str,
     ) -> zbus::fdo::Result<Vec<String>> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.dispatch(FileChooserInput::Open {
+        dispatch(FileChooserInput::Open {
             title: title.to_owned(),
             multiple,
             directory,
@@ -44,7 +44,7 @@ impl FileChooserDaemon {
         current_folder: &str,
     ) -> zbus::fdo::Result<Vec<String>> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.dispatch(FileChooserInput::Save {
+        dispatch(FileChooserInput::Save {
             title: title.to_owned(),
             current_name: current_name.to_owned(),
             filters,
@@ -55,16 +55,14 @@ impl FileChooserDaemon {
     }
 }
 
-impl FileChooserDaemon {
-    /// Sends a request to the GTK-thread host.
-    fn dispatch(&self, input: FileChooserInput) -> zbus::fdo::Result<()> {
-        let Some(sender) = host_sender() else {
-            warn!("file chooser requested before the shell UI registered its sender");
-            return Err(zbus::fdo::Error::Failed("shell UI not ready".to_owned()));
-        };
-        sender.emit(input);
-        Ok(())
-    }
+/// Sends a request to the GTK-thread host.
+fn dispatch(input: FileChooserInput) -> zbus::fdo::Result<()> {
+    let Some(sender) = host_sender() else {
+        warn!("file chooser requested before the shell UI registered its sender");
+        return Err(zbus::fdo::Error::Failed("shell UI not ready".to_owned()));
+    };
+    sender.emit(input);
+    Ok(())
 }
 
 /// Error when the host drops the reply channel.

@@ -1,4 +1,4 @@
-//! Shared helpers for rehosting Rust doc comments as VitePress markdown.
+//! Shared helpers for rehosting Rust doc comments as `VitePress` markdown.
 //!
 //! A schema's rustdoc often includes its own headings, tables, and fenced code
 //! blocks. When the generator embeds that description under another heading,
@@ -10,7 +10,8 @@
 ///
 /// The caller is responsible for wrapping the returned content in `<div v-pre>`
 /// or `::: v-pre` so Jinja-style mustaches in prose (`{{ output }}`) and
-/// HTML-like prose tokens don't trip VitePress's Vue template compiler.
+/// HTML-like prose tokens don't trip `VitePress`'s Vue template compiler.
+#[must_use]
 pub fn rehost_rustdoc(description: &str, enclosing_depth: usize) -> String {
     const MAX_DEPTH: usize = 6;
     let shift = enclosing_depth.saturating_sub(1);
@@ -33,19 +34,16 @@ pub fn rehost_rustdoc(description: &str, enclosing_depth: usize) -> String {
             continue;
         }
 
-        match parse_atx_heading(line) {
-            Some((heading_depth, body)) => {
-                let new_depth = (heading_depth + shift).max(min_depth).min(MAX_DEPTH);
-                for _ in 0..new_depth {
-                    rehosted.push('#');
-                }
-                rehosted.push_str(body);
-                rehosted.push('\n');
+        if let Some((heading_depth, body)) = parse_atx_heading(line) {
+            let new_depth = (heading_depth + shift).max(min_depth).min(MAX_DEPTH);
+            for _ in 0..new_depth {
+                rehosted.push('#');
             }
-            None => {
-                rehosted.push_str(line);
-                rehosted.push('\n');
-            }
+            rehosted.push_str(body);
+            rehosted.push('\n');
+        } else {
+            rehosted.push_str(line);
+            rehosted.push('\n');
         }
     }
 
@@ -53,6 +51,7 @@ pub fn rehost_rustdoc(description: &str, enclosing_depth: usize) -> String {
 }
 
 /// `true` when `line` opens or closes a fenced code block (backtick or tilde).
+#[must_use]
 pub fn is_fence_line(line: &str) -> bool {
     let trimmed = line.trim_start();
     trimmed.starts_with("```") || trimmed.starts_with("~~~")
@@ -61,6 +60,7 @@ pub fn is_fence_line(line: &str) -> bool {
 /// Splits an ATX heading line into `(depth, body)` where `body` starts with
 /// the space that followed the hashes. Rejects bare hashes, 7+ hashes, and
 /// hashes not followed by a space.
+#[must_use]
 pub fn parse_atx_heading(line: &str) -> Option<(usize, &str)> {
     let trimmed_start = line.trim_start();
     let hash_count = trimmed_start

@@ -1,4 +1,4 @@
-//! NetworkManager Dummy Device interface.
+//! `NetworkManager` Dummy Device interface.
 
 use zbus::proxy;
 

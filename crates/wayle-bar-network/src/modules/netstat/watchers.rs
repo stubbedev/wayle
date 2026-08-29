@@ -54,6 +54,6 @@ pub fn spawn_watchers(
 
     let icon_name = config.icon_name.clone();
     watch!(sender, [icon_name.watch()], |out| {
-        let _ = out.send(NetstatCmd::UpdateIcon(icon_name.get().clone()));
+        let _ = out.send(NetstatCmd::UpdateIcon(icon_name.get()));
     });
 }

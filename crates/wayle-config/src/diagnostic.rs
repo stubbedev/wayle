@@ -66,6 +66,7 @@ impl Diagnostic {
     /// Returns plain text version suitable for log files.
     ///
     /// Same structure as `Display` but without ANSI color codes.
+    #[must_use]
     pub fn to_plain(&self) -> String {
         let mut out = String::new();
 
@@ -82,10 +83,7 @@ impl Diagnostic {
         for (label, value) in &self.fields {
             let _ = writeln!(
                 out,
-                "    {:>width$}: {}",
-                label,
-                value,
-                width = max_label_len
+                "    {label:>max_label_len$}: {value}"
             );
         }
 
@@ -111,12 +109,12 @@ impl Display for Diagnostic {
         };
 
         writeln!(f)?;
-        writeln!(f, "{} {}", label, title_styled)?;
+        writeln!(f, "{label} {title_styled}")?;
 
         let max_label_len = self.fields.iter().map(|(l, _)| l.len()).max().unwrap_or(0);
 
         for (label, value) in &self.fields {
-            let padded_label = format!("{:>width$}", label, width = max_label_len);
+            let padded_label = format!("{label:>max_label_len$}");
             writeln!(f, "    {}: {}", padded_label.cyan(), value.white())?;
         }
 

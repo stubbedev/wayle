@@ -5,6 +5,7 @@ const GRID_CELLS: u32 = 42;
 /// Single cell in the calendar grid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(missing_docs)]
+#[expect(clippy::struct_excessive_bools, reason = "config/state struct")]
 pub struct DayCell {
     pub date: NaiveDate,
     pub is_current_month: bool,
@@ -20,6 +21,7 @@ pub struct DayCell {
 /// when their dimensions change.
 ///
 /// `week_start` controls which day appears in column 0.
+#[must_use]
 pub fn build_month_grid(
     month: NaiveDate,
     today: NaiveDate,
@@ -33,13 +35,17 @@ pub fn build_month_grid(
     // to first_of_month's weekday, counting forward (mod 7).
     let start_offset = week_start.num_days_from_monday();
     let dow_offset = first_of_month.weekday().num_days_from_monday();
-    let leading_days = (dow_offset + 7 - start_offset) % 7;
-    let grid_start = first_of_month - Duration::days(i64::from(leading_days));
+    let leading_days = dow_offset.saturating_add(7).saturating_sub(start_offset) % 7;
+    let grid_start = first_of_month
+        .checked_sub_signed(Duration::days(i64::from(leading_days)))
+        .unwrap_or(first_of_month);
 
     (0..GRID_CELLS)
         .map(|day_index| {
             let days_from_grid_start = Duration::days(i64::from(day_index));
-            let date = grid_start + days_from_grid_start;
+            let date = grid_start
+                .checked_add_signed(days_from_grid_start)
+                .unwrap_or(grid_start);
             DayCell {
                 date,
                 is_current_month: date.month() == target_month,
@@ -54,10 +60,12 @@ pub fn build_month_grid(
 /// Formats the month navigation label using a locale-provided pattern.
 ///
 /// Replaces `{month}` and `{year}` placeholders in `pattern`.
+#[must_use]
 pub fn format_month_label(date: NaiveDate, months: &[String; 12], pattern: &str) -> String {
-    let month_idx = date.month0() as usize;
+    let month_idx = usize::try_from(date.month0()).unwrap_or(0);
+    let month_name = months.get(month_idx).map_or("", String::as_str);
     pattern
-        .replace("{month}", &months[month_idx])
+        .replace("{month}", month_name)
         .replace("{year}", &date.year().to_string())
 }
 
@@ -139,8 +147,8 @@ mod tests {
     fn february_2026_has_28_current_month_days() {
         let grid = build_month_grid(date(2026, 2, 1), date(2026, 3, 5), None, Weekday::Sun);
         assert_eq!(grid[0].date, date(2026, 2, 1));
-        let feb_cells: Vec<_> = grid.iter().filter(|cell| cell.is_current_month).collect();
-        assert_eq!(feb_cells.len(), 28);
+        let feb_cells = grid.iter().filter(|cell| cell.is_current_month).count();
+        assert_eq!(feb_cells, 28);
     }
 
     #[test]
@@ -159,15 +167,15 @@ mod tests {
     #[test]
     fn leap_year_february_has_29_days() {
         let grid = build_month_grid(date(2028, 2, 1), date(2028, 2, 15), None, Weekday::Sun);
-        let feb_cells: Vec<_> = grid.iter().filter(|cell| cell.is_current_month).collect();
-        assert_eq!(feb_cells.len(), 29);
+        let feb_cells = grid.iter().filter(|cell| cell.is_current_month).count();
+        assert_eq!(feb_cells, 29);
     }
 
     #[test]
     fn december_year_boundary() {
         let grid = build_month_grid(date(2026, 12, 1), date(2026, 12, 25), None, Weekday::Sun);
-        let dec_cells: Vec<_> = grid.iter().filter(|cell| cell.is_current_month).collect();
-        assert_eq!(dec_cells.len(), 31);
+        let dec_cells = grid.iter().filter(|cell| cell.is_current_month).count();
+        assert_eq!(dec_cells, 31);
 
         let last_dec = grid.iter().rfind(|cell| cell.is_current_month).unwrap();
         assert_eq!(last_dec.date, date(2026, 12, 31));
@@ -182,8 +190,8 @@ mod tests {
     #[test]
     fn january_year_boundary() {
         let grid = build_month_grid(date(2027, 1, 1), date(2027, 1, 10), None, Weekday::Sun);
-        let jan_cells: Vec<_> = grid.iter().filter(|cell| cell.is_current_month).collect();
-        assert_eq!(jan_cells.len(), 31);
+        let jan_cells = grid.iter().filter(|cell| cell.is_current_month).count();
+        assert_eq!(jan_cells, 31);
     }
 
     #[test]

@@ -7,7 +7,7 @@ pub async fn execute() -> CliAction {
     proxy
         .pause()
         .await
-        .map_err(|e| format_error("pause recording", e))?;
+        .map_err(|e| format_error("pause recording", &e))?;
 
     println!("Paused");
 

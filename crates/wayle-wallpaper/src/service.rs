@@ -1,4 +1,9 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use derive_more::Debug;
 use futures::stream::{Stream, StreamExt};
@@ -54,6 +59,7 @@ impl WallpaperService {
     }
 
     /// Creates a builder for configuring the wallpaper service.
+    #[must_use]
     pub fn builder() -> WallpaperServiceBuilder {
         WallpaperServiceBuilder::new()
     }
@@ -61,6 +67,7 @@ impl WallpaperService {
     /// Returns the wallpaper for a monitor.
     ///
     /// Returns `None` if the monitor isn't registered or has no wallpaper.
+    #[must_use]
     pub fn wallpaper(&self, monitor: &str) -> Option<PathBuf> {
         self.monitors
             .get()
@@ -69,6 +76,7 @@ impl WallpaperService {
     }
 
     /// Returns the cycling configuration, if cycling is active.
+    #[must_use]
     pub fn cycling_config(&self) -> Option<CyclingConfig> {
         self.cycling.get()
     }
@@ -91,7 +99,7 @@ impl WallpaperService {
         // shell renders wallpapers natively by watching this property.
         match monitor {
             Some(name) => self.store_wallpaper(name, path),
-            None => self.store_wallpaper_all(path),
+            None => self.store_wallpaper_all(&path),
         }
 
         Ok(())
@@ -100,6 +108,7 @@ impl WallpaperService {
     /// Returns the fit mode for a monitor.
     ///
     /// Returns `None` if the monitor isn't registered.
+    #[must_use]
     pub fn fit_mode(&self, monitor: &str) -> Option<FitMode> {
         self.monitors.get().get(monitor).map(|s| s.fit_mode)
     }
@@ -182,6 +191,7 @@ impl WallpaperService {
     /// # Errors
     ///
     /// Infallible today; returns `Result` for API stability.
+    #[expect(clippy::unused_async, reason = "async is part of the public API")]
     #[instrument(skip(self))]
     pub async fn advance_cycle(&self) -> Result<(), Error> {
         let Some(config) = self.cycling.get() else {
@@ -199,7 +209,7 @@ impl WallpaperService {
         }
         self.monitors.set(monitors);
 
-        self.render_cycle().await
+        self.render_cycle()
     }
 
     /// Rewinds all monitors to their previous wallpaper in the cycle.
@@ -209,6 +219,7 @@ impl WallpaperService {
     /// # Errors
     ///
     /// Infallible today; returns `Result` for API stability.
+    #[expect(clippy::unused_async, reason = "async is part of the public API")]
     #[instrument(skip(self))]
     pub async fn rewind_cycle(&self) -> Result<(), Error> {
         let Some(config) = self.cycling.get() else {
@@ -226,7 +237,7 @@ impl WallpaperService {
         }
         self.monitors.set(monitors);
 
-        self.render_cycle().await
+        self.render_cycle()
     }
 
     /// Extracts colors from the theming monitor's wallpaper.
@@ -251,7 +262,7 @@ impl WallpaperService {
         if self.last_extracted_wallpaper.get() == path {
             let _ = self.extraction_complete.send(());
             return Ok(());
-        };
+        }
 
         self.last_extracted_wallpaper.set(path.clone());
 
@@ -277,6 +288,7 @@ impl WallpaperService {
     }
 
     /// Returns all known monitor names.
+    #[must_use]
     pub fn monitor_names(&self) -> Vec<String> {
         self.monitors.get().keys().cloned().collect()
     }
@@ -322,7 +334,7 @@ impl WallpaperService {
     ///
     /// Mutating the reactive `monitors` state is enough — the shell renders the
     /// new image by watching the property.
-    async fn render_cycle(&self) -> Result<(), Error> {
+    fn render_cycle(&self) -> Result<(), Error> {
         let Some(config) = self.cycling.get() else {
             return Ok(());
         };
@@ -346,10 +358,10 @@ impl WallpaperService {
         }
     }
 
-    fn store_wallpaper_all(&self, path: PathBuf) {
+    fn store_wallpaper_all(&self, path: &Path) {
         let mut monitors = self.monitors.get();
         for state in monitors.values_mut() {
-            state.wallpaper = Some(path.clone());
+            state.wallpaper = Some(path.to_path_buf());
         }
         self.monitors.set(monitors);
     }
@@ -391,8 +403,7 @@ impl WallpaperService {
                 .get()
                 .values()
                 .next()
-                .map(|s| s.cycle_index)
-                .unwrap_or(0),
+                .map_or(0, |s| s.cycle_index),
             CyclingMode::Shuffle => rand::random_range(0..image_count),
         }
     }

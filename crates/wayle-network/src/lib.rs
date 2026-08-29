@@ -1,4 +1,4 @@
-//! Network management via NetworkManager D-Bus.
+//! Network management via `NetworkManager` D-Bus.
 //!
 //! # Quick Start
 //!
@@ -42,7 +42,7 @@
 //! # }
 //! ```
 //!
-//! # WiFi Control
+//! # `WiFi` Control
 //!
 //! ```rust,no_run
 //! # use wayle_network::NetworkService;
@@ -89,7 +89,7 @@ mod proxy;
 mod service;
 /// Network type definitions
 pub mod types;
-/// WiFi device functionality
+/// `WiFi` device functionality
 pub mod wifi;
 /// Wired device functionality
 pub mod wired;

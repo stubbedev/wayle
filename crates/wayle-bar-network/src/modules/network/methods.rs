@@ -8,6 +8,7 @@ use super::{
 use crate::i18n::t;
 
 impl NetworkModule {
+    #[must_use]
     pub fn compute_display(config: &NetworkConfig, network: &NetworkService) -> (String, String) {
         let primary = network.primary.get();
 
@@ -24,7 +25,7 @@ impl NetworkModule {
                     (wifi_icon(config, &ctx), wifi_label(&ctx))
                 } else {
                     (
-                        config.wifi_offline_icon.get().clone(),
+                        config.wifi_offline_icon.get(),
                         t!("bar-network-no-wifi"),
                     )
                 }
@@ -37,13 +38,13 @@ impl NetworkModule {
                     (wired_icon(config, &ctx), wired_label(&ctx))
                 } else {
                     (
-                        config.wired_disconnected_icon.get().clone(),
+                        config.wired_disconnected_icon.get(),
                         t!("bar-network-no-ethernet"),
                     )
                 }
             }
             ConnectionType::None => (
-                config.wifi_offline_icon.get().clone(),
+                config.wifi_offline_icon.get(),
                 t!("bar-network-offline"),
             ),
 
@@ -64,7 +65,7 @@ impl NetworkModule {
                     (wired_icon(config, &ctx), wired_label(&ctx))
                 } else {
                     (
-                        config.wifi_offline_icon.get().clone(),
+                        config.wifi_offline_icon.get(),
                         t!("bar-network-offline"),
                     )
                 }

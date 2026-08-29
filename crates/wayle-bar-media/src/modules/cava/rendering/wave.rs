@@ -63,7 +63,7 @@ fn trace_wave_curve(
     for point_idx in 1..values.len() {
         let point_x = point_idx as f64 * point_spacing;
         let prev_point_x = (point_idx - 1) as f64 * point_spacing;
-        let bezier_control_x = (prev_point_x + point_x) / 2.0;
+        let bezier_control_x = f64::midpoint(prev_point_x, point_x);
 
         cr.curve_to(
             bezier_control_x,
@@ -121,7 +121,7 @@ fn trace_mirror_bottom(
         }
 
         let next_point_x = (point_idx + 1) as f64 * point_spacing;
-        let bezier_control_x = (point_x + next_point_x) / 2.0;
+        let bezier_control_x = f64::midpoint(point_x, next_point_x);
         let next_clamped_amplitude = values[point_idx + 1].max(min_amplitude);
         let next_mirror_y = center + next_clamped_amplitude * canvas_height / 2.0;
 

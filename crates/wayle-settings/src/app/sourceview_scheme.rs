@@ -37,7 +37,7 @@ pub(crate) fn update_wayle_scheme(palette: &PaletteConfig) {
 
     let mut registered = SCHEME_DIR_REGISTERED
         .lock()
-        .unwrap_or_else(|err| err.into_inner());
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
 
     if !*registered {
         let Some(dir_str) = dir.to_str() else {
@@ -47,6 +47,7 @@ pub(crate) fn update_wayle_scheme(palette: &PaletteConfig) {
         manager.append_search_path(dir_str);
         *registered = true;
     }
+    drop(registered);
 
     manager.force_rescan();
 }

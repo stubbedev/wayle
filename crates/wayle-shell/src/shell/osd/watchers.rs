@@ -165,7 +165,7 @@ fn spawn_toggle_watchers(sender: &ComponentSender<Osd>) {
 
             loop {
                 tokio::select! {
-                    _ = &mut shutdown_fut => return,
+                    () = &mut shutdown_fut => return,
 
                     event = stream.next() => {
                         let Some(result) = event else { return };

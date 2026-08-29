@@ -33,7 +33,7 @@ pub struct Notification {
     pub id: u32,
     /// The optional name of the application sending the notification. This should be the
     /// application's formal name, rather than some sort of ID. An example would be
-    /// "FredApp E-Mail Client," rather than "fredapp-email-client."
+    /// "`FredApp` E-Mail Client," rather than "fredapp-email-client."
     pub app_name: Property<Option<String>>,
     /// An optional ID of an existing notification that this notification is intended to replace.
     pub replaces_id: Property<Option<u32>>,
@@ -114,7 +114,7 @@ impl Notification {
     }
 
     /// Dismisses the notification, removing it from history and emitting
-    /// the D-Bus NotificationClosed signal.
+    /// the D-Bus `NotificationClosed` signal.
     #[instrument(skip(self), fields(notification_id = %self.id))]
     pub fn dismiss(&self) {
         let _ = self.notif_tx.send(NotificationEvent::Remove(
@@ -145,17 +145,17 @@ impl Notification {
         props: NotificationProps,
         connection: Connection,
         notif_tx: broadcast::Sender<NotificationEvent>,
-    ) -> Notification {
-        let app_name = if !props.app_name.is_empty() {
-            Some(props.app_name)
-        } else {
+    ) -> Self {
+        let app_name = if props.app_name.is_empty() {
             None
+        } else {
+            Some(props.app_name)
         };
 
-        let app_icon = if !props.app_icon.is_empty() {
-            Some(props.app_icon)
-        } else {
+        let app_icon = if props.app_icon.is_empty() {
             None
+        } else {
+            Some(props.app_icon)
         };
 
         let replaces_id = if props.replaces_id > 0 {
@@ -164,10 +164,10 @@ impl Notification {
             None
         };
 
-        let body = if !props.body.is_empty() {
-            Some(props.body)
-        } else {
+        let body = if props.body.is_empty() {
             None
+        } else {
+            Some(props.body)
         };
 
         let urgency = &props
@@ -242,14 +242,14 @@ impl Notification {
             .find(|action| action.id == Action::DEFAULT_ID)
             .cloned();
 
-        let hints = if !props.hints.is_empty() {
-            Some(props.hints)
-        } else {
+        let hints = if props.hints.is_empty() {
             None
+        } else {
+            Some(props.hints)
         };
 
         let expire_timeout = match props.expire_timeout {
-            t if t > 0 => Some(t as u32),
+            t if t > 0 => u32::try_from(t).ok(),
             0 => Some(0),
             _ => None,
         };
@@ -257,7 +257,7 @@ impl Notification {
         let id = props.id;
 
         Self {
-            zbus_connection: connection.clone(),
+            zbus_connection: connection,
             notif_tx,
             id,
             app_name: Property::new(app_name),

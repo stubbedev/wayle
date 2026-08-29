@@ -10,8 +10,11 @@ use super::{
 };
 
 impl ColorValueControl {
-    pub(super) fn handle_dropdown_selected(&mut self, index: u32) {
-        let Some(item) = self.items.get(index as usize) else {
+    pub(super) fn handle_dropdown_selected(&self, index: u32) {
+        let Some(item) = usize::try_from(index)
+            .ok()
+            .and_then(|index| self.items.get(index))
+        else {
             return;
         };
 
@@ -28,7 +31,7 @@ impl ColorValueControl {
         self.property.set(item.value.clone());
     }
 
-    fn select_custom(&mut self) {
+    fn select_custom(&self) {
         let current_hex = match self.property.get() {
             ColorValue::Custom(hex) => hex,
             _ => HexColor::new("#ffffff").unwrap_or_default(),
@@ -44,7 +47,7 @@ impl ColorValueControl {
         self.color_button.unblock_signal(&self.color_button_handler);
     }
 
-    pub(super) fn handle_color_button_changed(&mut self) {
+    pub(super) fn handle_color_button_changed(&self) {
         let rgba = self.color_button.rgba();
         let hex_str = rgba_to_hex(&rgba);
 
@@ -55,7 +58,7 @@ impl ColorValueControl {
         self.property.set(ColorValue::Custom(hex));
     }
 
-    pub(super) fn refresh_from_property(&mut self) {
+    pub(super) fn refresh_from_property(&self) {
         let current = self.property.get();
         let index = find_index(&self.items, &current);
 

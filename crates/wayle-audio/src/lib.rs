@@ -1,10 +1,10 @@
-//! PulseAudio integration for managing audio devices and streams.
+//! `PulseAudio` integration for managing audio devices and streams.
 //!
 //! # Overview
 //!
-//! Provides reactive access to PulseAudio through [`AudioService`].
+//! Provides reactive access to `PulseAudio` through [`AudioService`].
 //! All state is exposed via [`Property`] fields that automatically update when
-//! PulseAudio state changes.
+//! `PulseAudio` state changes.
 //!
 //! # Reactive Properties
 //!
@@ -43,7 +43,7 @@
 //! # Live vs Snapshot Instances
 //!
 //! Devices from [`AudioService`] fields (`output_devices`, `default_output`, etc.)
-//! are **live**: their properties update when PulseAudio state changes.
+//! are **live**: their properties update when `PulseAudio` state changes.
 //!
 //! The explicit lookup methods differ:
 //!

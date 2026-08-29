@@ -23,7 +23,7 @@ impl BarCount {
 
     /// Returns the inner u16 value.
     #[must_use]
-    pub fn value(self) -> u16 {
+    pub const fn value(self) -> u16 {
         self.0
     }
 
@@ -62,14 +62,14 @@ impl From<u16> for BarCount {
 
 impl From<i32> for BarCount {
     fn from(value: i32) -> Self {
-        Self::new(value.clamp(BAR_COUNT_MIN as i32, BAR_COUNT_MAX as i32) as u16)
+        let clamped = value.clamp(i32::from(BAR_COUNT_MIN), i32::from(BAR_COUNT_MAX));
+        Self::new(u16::try_from(clamped).unwrap_or(BAR_COUNT_MIN))
     }
 }
 
 impl From<usize> for BarCount {
     fn from(value: usize) -> Self {
-        let clamped = value.min(BAR_COUNT_MAX as usize) as u16;
-        Self::new(clamped)
+        Self::new(u16::try_from(value).unwrap_or(BAR_COUNT_MAX))
     }
 }
 
@@ -89,7 +89,7 @@ impl Framerate {
 
     /// Returns the inner u32 value.
     #[must_use]
-    pub fn value(self) -> u32 {
+    pub const fn value(self) -> u32 {
         self.0
     }
 }
@@ -114,7 +114,7 @@ impl From<u32> for Framerate {
 
 impl From<i32> for Framerate {
     fn from(value: i32) -> Self {
-        Self::new(value.clamp(FRAMERATE_MIN as i32, FRAMERATE_MAX as i32) as u32)
+        Self::new(u32::try_from(value).unwrap_or(FRAMERATE_MIN))
     }
 }
 
@@ -126,16 +126,16 @@ pub enum InputMethod {
     /// Read audio from a named pipe (FIFO).
     Fifo,
 
-    /// PortAudio cross-platform audio I/O library.
+    /// `PortAudio` cross-platform audio I/O library.
     PortAudio,
 
-    /// PipeWire multimedia server (default).
+    /// `PipeWire` multimedia server (default).
     PipeWire,
 
     /// Advanced Linux Sound Architecture (ALSA).
     Alsa,
 
-    /// PulseAudio sound server.
+    /// `PulseAudio` sound server.
     Pulse,
 
     /// sndio audio subsystem.
@@ -157,16 +157,16 @@ pub enum InputMethod {
 impl From<InputMethod> for ffi::InputMethod {
     fn from(method: InputMethod) -> Self {
         match method {
-            InputMethod::Fifo => ffi::InputMethod::Fifo,
-            InputMethod::PortAudio => ffi::InputMethod::PortAudio,
-            InputMethod::PipeWire => ffi::InputMethod::PipeWire,
-            InputMethod::Alsa => ffi::InputMethod::Alsa,
-            InputMethod::Pulse => ffi::InputMethod::Pulse,
-            InputMethod::Sndio => ffi::InputMethod::Sndio,
-            InputMethod::Oss => ffi::InputMethod::Oss,
-            InputMethod::Jack => ffi::InputMethod::Jack,
-            InputMethod::Shmem => ffi::InputMethod::Shmem,
-            InputMethod::Winscap => ffi::InputMethod::Winscap,
+            InputMethod::Fifo => Self::Fifo,
+            InputMethod::PortAudio => Self::PortAudio,
+            InputMethod::PipeWire => Self::PipeWire,
+            InputMethod::Alsa => Self::Alsa,
+            InputMethod::Pulse => Self::Pulse,
+            InputMethod::Sndio => Self::Sndio,
+            InputMethod::Oss => Self::Oss,
+            InputMethod::Jack => Self::Jack,
+            InputMethod::Shmem => Self::Shmem,
+            InputMethod::Winscap => Self::Winscap,
         }
     }
 }

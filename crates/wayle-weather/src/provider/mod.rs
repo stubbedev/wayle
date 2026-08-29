@@ -34,6 +34,7 @@ pub trait WeatherProvider: Send + Sync {
 }
 
 /// Configuration for creating a weather provider.
+#[derive(Clone, Copy)]
 pub struct ProviderConfig<'a> {
     /// Which provider to instantiate.
     pub kind: WeatherProviderKind,

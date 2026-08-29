@@ -4,7 +4,8 @@ use super::SeparatorModule;
 
 impl SeparatorModule {
     /// Returns the separator orientation based on bar orientation.
-    pub fn orientation_for_vertical(is_vertical: bool) -> gtk::Orientation {
+    #[must_use]
+    pub const fn orientation_for_vertical(is_vertical: bool) -> gtk::Orientation {
         if is_vertical {
             gtk::Orientation::Horizontal
         } else {

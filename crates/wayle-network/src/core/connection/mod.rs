@@ -25,7 +25,7 @@ use crate::{
     },
 };
 
-/// Active network connection in NetworkManager.
+/// Active network connection in `NetworkManager`.
 ///
 /// Tracks state and configuration of currently active connections,
 /// including devices, IP configuration, and connection properties.
@@ -42,12 +42,12 @@ pub struct ActiveConnection {
     /// Object path for this connection
     pub object_path: OwnedObjectPath,
 
-    /// The path of the connection object that this ActiveConnection is using.
+    /// The path of the connection object that this `ActiveConnection` is using.
     pub connection_path: Property<OwnedObjectPath>,
 
     /// Specific object associated with the active connection. Reflects the
     /// object used during connection activation, and will not change over the
-    /// lifetime of the ActiveConnection once set.
+    /// lifetime of the `ActiveConnection` once set.
     pub specific_object: Property<OwnedObjectPath>,
 
     /// The ID of the connection, provided for convenience.
@@ -66,35 +66,35 @@ pub struct ActiveConnection {
     /// The state of this active connection.
     pub state: Property<NMActiveConnectionState>,
 
-    /// The state flags of this active connection. See NMActivationStateFlags.
+    /// The state flags of this active connection. See `NMActivationStateFlags`.
     pub state_flags: Property<NMActivationStateFlags>,
 
     /// Whether this active connection is the default IPv4 connection, i.e. whether it
     /// currently owns the default IPv4 route.
     pub default: Property<bool>,
 
-    /// Object path of the Ip4Config object describing the configuration of the
+    /// Object path of the `Ip4Config` object describing the configuration of the
     /// connection. Only valid when the connection is in the
-    /// NM_ACTIVE_CONNECTION_STATE_ACTIVATED state.
+    /// `NM_ACTIVE_CONNECTION_STATE_ACTIVATED` state.
     pub ip4_config: Property<OwnedObjectPath>,
 
-    /// Object path of the Dhcp4Config object describing the DHCP options returned by the
+    /// Object path of the `Dhcp4Config` object describing the DHCP options returned by the
     /// DHCP server (assuming the connection used DHCP). Only valid when the connection is
-    /// in the NM_ACTIVE_CONNECTION_STATE_ACTIVATED state.
+    /// in the `NM_ACTIVE_CONNECTION_STATE_ACTIVATED` state.
     pub dhcp4_config: Property<OwnedObjectPath>,
 
     /// Whether this active connection is the default IPv6 connection, i.e. whether it
     /// currently owns the default IPv6 route.
     pub default6: Property<bool>,
 
-    /// Object path of the Ip6Config object describing the configuration of the
+    /// Object path of the `Ip6Config` object describing the configuration of the
     /// connection. Only valid when the connection is in the
-    /// NM_ACTIVE_CONNECTION_STATE_ACTIVATED state.
+    /// `NM_ACTIVE_CONNECTION_STATE_ACTIVATED` state.
     pub ip6_config: Property<OwnedObjectPath>,
 
-    /// Object path of the Dhcp6Config object describing the DHCP options returned by the
+    /// Object path of the `Dhcp6Config` object describing the DHCP options returned by the
     /// DHCP server (assuming the connection used DHCP). Only valid when the connection is
-    /// in the NM_ACTIVE_CONNECTION_STATE_ACTIVATED state.
+    /// in the `NM_ACTIVE_CONNECTION_STATE_ACTIVATED` state.
     pub dhcp6_config: Property<OwnedObjectPath>,
 
     /// Whether this active connection is also a VPN connection.
@@ -110,15 +110,15 @@ impl Reactive for ActiveConnection {
     type Error = Error;
 
     async fn get(params: Self::Context<'_>) -> Result<Self, Self::Error> {
-        Self::from_path(params.connection, params.path, None).await
+        Box::pin(Self::from_path(params.connection, params.path, None)).await
     }
 
     async fn get_live(params: Self::LiveContext<'_>) -> Result<Arc<Self>, Self::Error> {
-        let active_connection = Self::from_path(
+        let active_connection = Box::pin(Self::from_path(
             params.connection,
             params.path.clone(),
             Some(params.cancellation_token.child_token()),
-        )
+        ))
         .await?;
         let active_connection = Arc::new(active_connection);
 

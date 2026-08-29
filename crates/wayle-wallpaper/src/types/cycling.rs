@@ -35,7 +35,8 @@ impl Display for CyclingMode {
 
 impl CyclingMode {
     /// Returns the mode name as a string slice.
-    pub fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Sequential => "sequential",
             Self::Shuffle => "shuffle",
@@ -59,7 +60,7 @@ impl FromStr for CyclingMode {
 ///
 /// Contains the image pool and timing settings. Per-monitor cycle
 /// positions are tracked separately in `MonitorState`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CyclingConfig {
     /// Directory containing wallpaper images.
     pub directory: PathBuf,
@@ -105,15 +106,14 @@ impl CyclingConfig {
     }
 
     /// Returns the image at the given index (wraps around).
+    #[must_use]
     pub fn image_at(&self, index: usize) -> Option<&PathBuf> {
-        if self.images.is_empty() {
-            return None;
-        }
-        self.images.get(index % self.images.len())
+        self.images.get(index.checked_rem(self.images.len())?)
     }
 
     /// Returns the number of images in the cycle.
-    pub fn image_count(&self) -> usize {
+    #[must_use]
+    pub const fn image_count(&self) -> usize {
         self.images.len()
     }
 

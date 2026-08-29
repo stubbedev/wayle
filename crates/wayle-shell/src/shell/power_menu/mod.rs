@@ -116,7 +116,7 @@ impl Component for PowerMenu {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = PowerMenu { config: init };
+        let model = Self { config: init };
         let widgets = view_output!();
 
         root.init_layer_shell();

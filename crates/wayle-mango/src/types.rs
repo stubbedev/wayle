@@ -16,11 +16,13 @@ pub struct TagId(u32);
 
 impl TagId {
     /// Wraps a raw one-based tag index.
+    #[must_use]
     pub const fn new(index: u32) -> Self {
         Self(index)
     }
 
     /// Returns the raw one-based tag index.
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
@@ -48,11 +50,13 @@ pub struct ClientId(u32);
 
 impl ClientId {
     /// Wraps a raw client id.
+    #[must_use]
     pub const fn new(id: u32) -> Self {
         Self(id)
     }
 
     /// Returns the raw client id.
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }

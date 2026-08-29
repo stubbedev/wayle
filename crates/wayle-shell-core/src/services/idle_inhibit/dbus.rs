@@ -13,7 +13,7 @@ pub struct IdleInhibitDaemon {
 }
 
 impl IdleInhibitDaemon {
-    pub fn new(state: IdleInhibitState) -> Self {
+    pub const fn new(state: IdleInhibitState) -> Self {
         Self { state }
     }
 }
@@ -75,23 +75,27 @@ impl IdleInhibitDaemon {
     }
 
     #[zbus(property)]
+    #[expect(clippy::unused_async, reason = "zbus interface signature")]
     pub async fn active(&self) -> bool {
         self.state.active.get()
     }
 
     /// Duration in minutes (0 = indefinite).
     #[zbus(property)]
+    #[expect(clippy::unused_async, reason = "zbus interface signature")]
     pub async fn duration(&self) -> u32 {
         self.state.duration_mins.get()
     }
 
     /// Remaining seconds (0 when inactive or indefinite).
     #[zbus(property)]
+    #[expect(clippy::unused_async, reason = "zbus interface signature")]
     pub async fn remaining(&self) -> u32 {
         self.state.remaining_secs.get().unwrap_or(0)
     }
 
     #[zbus(property)]
+    #[expect(clippy::unused_async, reason = "zbus interface signature")]
     pub async fn indefinite(&self) -> bool {
         self.state.indefinite()
     }

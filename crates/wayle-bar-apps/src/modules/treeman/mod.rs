@@ -57,7 +57,7 @@ impl Component for TreemanModule {
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: treeman_config.icon_name.get().clone(),
+                icon: treeman_config.icon_name.get(),
                 label: String::from("--"),
                 tooltip: None,
                 colors: BarButtonColors {

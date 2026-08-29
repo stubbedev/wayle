@@ -4,6 +4,7 @@ use super::WeatherDropdown;
 use crate::i18n::t;
 
 impl WeatherDropdown {
+    #[must_use]
     pub fn error_description(&self) -> String {
         match &self.error_kind {
             Some(WeatherErrorKind::ApiKeyMissing { provider }) => {

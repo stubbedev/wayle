@@ -78,7 +78,7 @@ impl<'a> IncomingHints<'a> {
 }
 
 /// Represents a notification action with an ID and label.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Action {
     /// Action identifier sent via D-Bus `ActionInvoked` signal.
     pub id: String,
@@ -89,13 +89,13 @@ pub struct Action {
 impl Action {
     /// The spec-defined identifier for the body-click action.
     pub const DEFAULT_ID: &str = "default";
-    pub(crate) fn parse_dbus_actions(raw_actions: &[String]) -> Vec<Action> {
+    pub(crate) fn parse_dbus_actions(raw_actions: &[String]) -> Vec<Self> {
         let mut actions = Vec::new();
         let mut iter = raw_actions.iter();
 
         while let Some(id) = iter.next() {
             let label = iter.next().unwrap_or(id);
-            actions.push(Action {
+            actions.push(Self {
                 id: id.clone(),
                 label: label.clone(),
             });
@@ -104,8 +104,8 @@ impl Action {
         actions
     }
 
-    pub(crate) fn to_dbus_format(actions: &[Action]) -> Vec<String> {
-        let mut raw = Vec::with_capacity(actions.len() * 2);
+    pub(crate) fn to_dbus_format(actions: &[Self]) -> Vec<String> {
+        let mut raw = Vec::with_capacity(actions.len().saturating_mul(2));
 
         for action in actions {
             raw.push(action.id.clone());

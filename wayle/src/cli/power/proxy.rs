@@ -7,7 +7,7 @@ use crate::cli::dbus;
 
 const SERVICE_NAME: &str = "Power profiles";
 
-/// Creates a PowerProfilesWayleProxy connection.
+/// Creates a `PowerProfilesWayleProxy` connection.
 ///
 /// # Errors
 /// Returns error if D-Bus connection or proxy creation fails.
@@ -22,6 +22,6 @@ pub async fn connect() -> Result<(Connection, PowerProfilesWayleProxy<'static>),
 }
 
 /// Transforms zbus errors into user-friendly messages.
-pub fn format_error(operation: &str, error: ZbusError) -> String {
+pub fn format_error(operation: &str, error: &ZbusError) -> String {
     dbus::format_error(SERVICE_NAME, operation, error)
 }

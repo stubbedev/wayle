@@ -34,7 +34,7 @@ impl Percentage {
 
     /// The raw `u8`.
     #[must_use]
-    pub fn value(self) -> u8 {
+    pub const fn value(self) -> u8 {
         self.0
     }
 }
@@ -65,11 +65,11 @@ impl<'de> Deserialize<'de> for Percentage {
         D: Deserializer<'de>,
     {
         let raw = u8::deserialize(deserializer)?;
-        if raw > Percentage::MAX {
+        if raw > Self::MAX {
             warn!(
                 "percentage {} exceeds maximum, clamped to {}",
                 raw,
-                Percentage::MAX
+                Self::MAX
             );
         }
         Ok(Self::new(raw))

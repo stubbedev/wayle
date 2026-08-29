@@ -71,22 +71,26 @@ impl Session {
     }
 
     /// Names of all loaded modes (sidebar tabs, kb-mode-next order).
+    #[must_use]
     pub fn mode_names(&self) -> Vec<&str> {
         self.modes.iter().map(|mode| mode.name()).collect()
     }
 
     /// Display names of all loaded modes.
+    #[must_use]
     pub fn mode_display_names(&self) -> Vec<&str> {
         self.modes.iter().map(|mode| mode.display_name()).collect()
     }
 
     /// Index of the active mode.
-    pub fn active_index(&self) -> usize {
+    #[must_use]
+    pub const fn active_index(&self) -> usize {
         self.active
     }
 
     /// State of the active mode (prompt, message, flags).
-    pub fn state(&self) -> &ModeState {
+    #[must_use]
+    pub const fn state(&self) -> &ModeState {
         &self.state
     }
 

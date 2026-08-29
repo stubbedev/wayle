@@ -150,8 +150,9 @@ pub fn palette_by_name(name: &str) -> Option<Palette> {
 }
 
 /// Default palette
+#[must_use]
 pub fn wayle() -> Palette {
-    use wayle_theme::*;
+    use wayle_theme::{BG, SURFACE, ELEVATED, FG, FG_MUTED, PRIMARY, RED, YELLOW, GREEN, BLUE};
     Palette {
         bg: BG.to_owned(),
         surface: SURFACE.to_owned(),

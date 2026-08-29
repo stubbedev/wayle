@@ -41,7 +41,7 @@ impl Component for NetstatModule {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let config = init.config.config();
@@ -50,13 +50,11 @@ impl Component for NetstatModule {
         let networks = init.sysinfo.network.get();
         let interface_config = netstat_config.interface.get();
 
-        let initial_label = helpers::select_interface(&networks, &interface_config)
-            .map(|n| helpers::format_label(&netstat_config.format.get(), n))
-            .unwrap_or_else(|| String::from("--"));
+        let initial_label = helpers::select_interface(&networks, &interface_config).map_or_else(|| String::from("--"), |n| helpers::format_label(&netstat_config.format.get(), n));
 
         let bar_button = BarButton::builder()
             .launch(BarButtonInit {
-                icon: netstat_config.icon_name.get().clone(),
+                icon: netstat_config.icon_name.get(),
                 label: initial_label,
                 tooltip: None,
                 colors: BarButtonColors {

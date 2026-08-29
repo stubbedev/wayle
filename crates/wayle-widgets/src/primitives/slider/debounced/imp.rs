@@ -134,7 +134,7 @@ impl DebouncedSliderImp {
         {
             return fmt(value);
         }
-        format!("{:.0}%", value)
+        format!("{value:.0}%")
     }
 
     fn update_label(&self, value: f64) {

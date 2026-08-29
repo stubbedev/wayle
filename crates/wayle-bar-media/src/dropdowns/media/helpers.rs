@@ -19,9 +19,7 @@ pub fn resolve_source_icon(player: &Player) -> String {
         return String::from("ld-music-symbolic");
     };
 
-    icons::lookup_app_icon(&desktop_entry)
-        .map(|icon| icon.to_string())
-        .unwrap_or_else(|| format!("{desktop_entry}-symbolic"))
+    icons::lookup_app_icon(&desktop_entry).map_or_else(|| format!("{desktop_entry}-symbolic"), std::string::ToString::to_string)
 }
 
 pub struct DurationParts {
@@ -30,7 +28,7 @@ pub struct DurationParts {
     pub seconds: u64,
 }
 
-pub fn duration_parts(duration: Duration) -> DurationParts {
+pub const fn duration_parts(duration: Duration) -> DurationParts {
     let total_secs = duration.as_secs();
     DurationParts {
         hours: total_secs / 3600,
@@ -100,10 +98,7 @@ mod tests {
 
     #[test]
     fn progress_fraction_zero_length() {
-        assert_eq!(
-            progress_fraction(Duration::from_secs(10), Duration::ZERO),
-            0.0
-        );
+        assert!(progress_fraction(Duration::from_secs(10), Duration::ZERO).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -115,6 +110,6 @@ mod tests {
     #[test]
     fn progress_fraction_clamped() {
         let frac = progress_fraction(Duration::from_secs(200), Duration::from_secs(100));
-        assert_eq!(frac, 1.0);
+        assert!((frac - 1.0).abs() < f64::EPSILON);
     }
 }

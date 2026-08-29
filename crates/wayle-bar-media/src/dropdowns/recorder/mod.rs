@@ -358,7 +358,7 @@ impl Component for RecorderDropdown {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let scale = init.config.config().styling.scale.get().value();
@@ -425,26 +425,52 @@ impl Component for RecorderDropdown {
             });
         }
         {
-            let (cam, frame, grab) = (cam.clone(), frame.clone(), grab.clone());
+            let (cam, frame, grab) = (cam.clone(), frame.clone(), grab);
             drag.connect_drag_update(move |gesture, offset_x, offset_y| {
                 let (start_x, start_y) = gesture.start_point().unwrap_or((0.0, 0.0));
                 let (grab_x, grab_y) = grab.get();
                 let margin = webcam_margin(frame.width_request(), frame.height_request());
-                let travel_w = (frame.width_request() - cam.width_request() - 2 * margin).max(0);
-                let travel_h = (frame.height_request() - cam.height_request() - 2 * margin).max(0);
+                let travel_w = frame
+                    .width_request()
+                    .saturating_sub(cam.width_request())
+                    .saturating_sub(margin.saturating_mul(2))
+                    .max(0);
+                let travel_h = frame
+                    .height_request()
+                    .saturating_sub(cam.height_request())
+                    .saturating_sub(margin.saturating_mul(2))
+                    .max(0);
+                #[expect(
+                    clippy::as_conversions,
+                    clippy::cast_possible_truncation,
+                    reason = "rounded pixel offset fits i32"
+                )]
                 let nx = (start_x + offset_x - grab_x).round() as i32;
+                #[expect(
+                    clippy::as_conversions,
+                    clippy::cast_possible_truncation,
+                    reason = "rounded pixel offset fits i32"
+                )]
                 let ny = (start_y + offset_y - grab_y).round() as i32;
-                cam.set_margin_start(nx.clamp(margin, margin + travel_w));
-                cam.set_margin_top(ny.clamp(margin, margin + travel_h));
+                cam.set_margin_start(nx.clamp(margin, margin.saturating_add(travel_w)));
+                cam.set_margin_top(ny.clamp(margin, margin.saturating_add(travel_h)));
             });
         }
         {
-            let (cam, frame, sender) = (cam.clone(), frame.clone(), sender.clone());
+            let (cam, frame, sender) = (cam, frame, sender);
             drag.connect_drag_end(move |_, _, _| {
                 cam.set_cursor_from_name(Some("grab"));
                 let margin = webcam_margin(frame.width_request(), frame.height_request());
-                let travel_w = (frame.width_request() - cam.width_request() - 2 * margin).max(0);
-                let travel_h = (frame.height_request() - cam.height_request() - 2 * margin).max(0);
+                let travel_w = frame
+                    .width_request()
+                    .saturating_sub(cam.width_request())
+                    .saturating_sub(margin.saturating_mul(2))
+                    .max(0);
+                let travel_h = frame
+                    .height_request()
+                    .saturating_sub(cam.height_request())
+                    .saturating_sub(margin.saturating_mul(2))
+                    .max(0);
                 let x_percent = pct_from_px(cam.margin_start(), margin, travel_w);
                 let y_percent = pct_from_px(cam.margin_top(), margin, travel_h);
                 sender.input(RecorderDropdownMsg::WebcamMoved {
@@ -474,7 +500,10 @@ impl Component for RecorderDropdown {
                 self.config.config().modules.recorder.microphone.set(active);
             }
             RecorderDropdownMsg::MicrophoneDeviceSelected(index) => {
-                if let Some(choice) = self.mic_sources.get(index as usize) {
+                if let Some(choice) = usize::try_from(index)
+                    .ok()
+                    .and_then(|index| self.mic_sources.get(index))
+                {
                     self.config
                         .config()
                         .modules
@@ -500,7 +529,10 @@ impl Component for RecorderDropdown {
                     .set(active);
             }
             RecorderDropdownMsg::WebcamDeviceSelected(index) => {
-                if let Some(choice) = self.cameras.get(index as usize) {
+                if let Some(choice) = usize::try_from(index)
+                    .ok()
+                    .and_then(|index| self.cameras.get(index))
+                {
                     self.config
                         .config()
                         .modules
@@ -527,7 +559,7 @@ impl Component for RecorderDropdown {
         &mut self,
         widgets: &mut Self::Widgets,
         msg: Self::CommandOutput,
-        _sender: ComponentSender<Self>,
+        sender: ComponentSender<Self>,
         _root: &Self::Root,
     ) {
         match msg {
@@ -563,7 +595,7 @@ impl Component for RecorderDropdown {
                 widgets.mic_device_dropdown.set_selected(selected);
             }
         }
-        self.update_view(widgets, _sender);
+        self.update_view(widgets, sender);
     }
 }
 
@@ -573,10 +605,20 @@ impl RecorderDropdown {
     /// edge inset as the recording pipeline.
     fn reposition_cam(&mut self) {
         let margin = webcam_margin(self.preview_w, self.preview_h);
-        let travel_w = (self.preview_w - self.cam_w - 2 * margin).max(0);
-        let travel_h = (self.preview_h - self.cam_h - 2 * margin).max(0);
-        self.cam_x_px = margin + travel_w * i32::from(self.webcam_x.min(100)) / 100;
-        self.cam_y_px = margin + travel_h * i32::from(self.webcam_y.min(100)) / 100;
+        let travel_w = self
+            .preview_w
+            .saturating_sub(self.cam_w)
+            .saturating_sub(margin.saturating_mul(2))
+            .max(0);
+        let travel_h = self
+            .preview_h
+            .saturating_sub(self.cam_h)
+            .saturating_sub(margin.saturating_mul(2))
+            .max(0);
+        self.cam_x_px = margin
+            .saturating_add(travel_w.saturating_mul(i32::from(self.webcam_x.min(100))) / 100);
+        self.cam_y_px = margin
+            .saturating_add(travel_h.saturating_mul(i32::from(self.webcam_y.min(100))) / 100);
     }
 }
 
@@ -602,10 +644,10 @@ fn format_elapsed(secs: u32) -> String {
 /// Pixel geometry of the position preview: the screen frame (16:9, fit to the
 /// popover width) and the webcam frame (the configured size percentage of it).
 fn preview_geometry(scaled_width: i32, size_percent: u8) -> (i32, i32, i32, i32) {
-    let preview_w = (scaled_width - 48).max(160);
-    let preview_h = preview_w * 9 / 16;
-    let cam_w = (preview_w * i32::from(size_percent) / 100).max(24);
-    let cam_h = (cam_w * 9 / 16).max(14);
+    let preview_w = scaled_width.saturating_sub(48).max(160);
+    let preview_h = preview_w.saturating_mul(9) / 16;
+    let cam_w = (preview_w.saturating_mul(i32::from(size_percent)) / 100).max(24);
+    let cam_h = (cam_w.saturating_mul(9) / 16).max(14);
     (preview_w, preview_h, cam_w, cam_h)
 }
 
@@ -618,15 +660,18 @@ const EDGE_MARGIN_PERCENT: i32 = 5;
 /// Uniform edge inset in pixels for the preview: [`EDGE_MARGIN_PERCENT`] of the
 /// shorter preview dimension.
 fn webcam_margin(preview_w: i32, preview_h: i32) -> i32 {
-    preview_w.min(preview_h) * EDGE_MARGIN_PERCENT / 100
+    preview_w.min(preview_h).saturating_mul(EDGE_MARGIN_PERCENT) / 100
 }
 
 /// Converts a frame offset into a 0-100 percentage of the inset travel span,
 /// defaulting to 0 when there is no room to move.
 fn pct_from_px(px: i32, margin: i32, travel: i32) -> u8 {
     if travel <= 0 {
-        0
-    } else {
-        ((px - margin).clamp(0, travel) * 100 / travel) as u8
+        return 0;
     }
+    let scaled = px.saturating_sub(margin).clamp(0, travel).saturating_mul(100);
+    scaled
+        .checked_div(travel)
+        .and_then(|pct| u8::try_from(pct).ok())
+        .unwrap_or(0)
 }

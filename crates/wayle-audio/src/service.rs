@@ -40,10 +40,10 @@ pub struct AudioService {
     #[debug(skip)]
     pub(crate) _connection: Option<Connection>,
 
-    /// All PulseAudio sinks: speakers, headphones, Bluetooth outputs, virtual sinks.
+    /// All `PulseAudio` sinks: speakers, headphones, Bluetooth outputs, virtual sinks.
     pub output_devices: Property<Vec<Arc<OutputDevice>>>,
 
-    /// All PulseAudio sources: microphones, monitor sources, virtual inputs.
+    /// All `PulseAudio` sources: microphones, monitor sources, virtual inputs.
     pub input_devices: Property<Vec<Arc<InputDevice>>>,
 
     /// Current default sink, or `None` if unset.
@@ -62,16 +62,17 @@ pub struct AudioService {
 impl AudioService {
     /// Creates a new audio service instance with default configuration.
     ///
-    /// Initializes PulseAudio connection and discovers available devices and streams.
+    /// Initializes `PulseAudio` connection and discovers available devices and streams.
     ///
     /// # Errors
-    /// Returns error if PulseAudio connection fails or service initialization fails.
+    /// Returns error if `PulseAudio` connection fails or service initialization fails.
     #[instrument]
     pub async fn new() -> Result<Arc<Self>, Error> {
         Self::builder().build().await
     }
 
-    /// Creates a builder for configuring an AudioService.
+    /// Creates a builder for configuring an `AudioService`.
+    #[must_use]
     pub fn builder() -> AudioServiceBuilder {
         AudioServiceBuilder::new()
     }
@@ -96,7 +97,7 @@ impl AudioService {
     /// Returns a live-updating output device instance.
     ///
     /// The returned [`OutputDevice`] properties update automatically when
-    /// PulseAudio state changes. Monitoring stops when the `Arc` is dropped.
+    /// `PulseAudio` state changes. Monitoring stops when the `Arc` is dropped.
     ///
     /// # Errors
     ///

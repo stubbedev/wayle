@@ -13,7 +13,7 @@ pub(crate) fn to_pulse(volume: &Volume) -> ChannelVolumes {
 
     for (channel_idx, &level) in volume.as_slice().iter().enumerate() {
         pulse_volume.get_mut()[channel_idx] =
-            PulseVolume((level * PulseVolume::NORMAL.0 as f64) as u32);
+            PulseVolume((level * f64::from(PulseVolume::NORMAL.0)) as u32);
     }
 
     pulse_volume
@@ -22,8 +22,8 @@ pub(crate) fn to_pulse(volume: &Volume) -> ChannelVolumes {
 pub(crate) fn from_pulse(pulse_volume: &ChannelVolumes) -> Volume {
     let volumes: Vec<f64> = (0..pulse_volume.len())
         .map(|channel_idx| {
-            let raw = pulse_volume.get()[channel_idx as usize].0 as f64;
-            raw / PulseVolume::NORMAL.0 as f64
+            let raw = f64::from(pulse_volume.get()[channel_idx as usize].0);
+            raw / f64::from(PulseVolume::NORMAL.0)
         })
         .collect();
 
@@ -31,7 +31,7 @@ pub(crate) fn from_pulse(pulse_volume: &ChannelVolumes) -> Volume {
 }
 
 pub(super) fn from_pulse_single(pulse_volume: PulseVolume) -> Volume {
-    Volume::new(vec![pulse_volume.0 as f64 / PulseVolume::NORMAL.0 as f64])
+    Volume::new(vec![f64::from(pulse_volume.0) / f64::from(PulseVolume::NORMAL.0)])
 }
 
 #[cfg(test)]
@@ -54,8 +54,8 @@ mod tests {
         let result = to_pulse(&volume);
 
         assert_eq!(result.len(), 2);
-        let left = result.get()[0].0 as f64 / PulseVolume::NORMAL.0 as f64;
-        let right = result.get()[1].0 as f64 / PulseVolume::NORMAL.0 as f64;
+        let left = f64::from(result.get()[0].0) / f64::from(PulseVolume::NORMAL.0);
+        let right = f64::from(result.get()[1].0) / f64::from(PulseVolume::NORMAL.0);
         assert!((left - 0.3).abs() < 0.001);
         assert!((right - 0.8).abs() < 0.001);
     }
@@ -86,7 +86,7 @@ mod tests {
 
         let result = to_pulse(&volume);
 
-        let expected = PulseVolume((4.0 * PulseVolume::NORMAL.0 as f64) as u32);
+        let expected = PulseVolume((4.0 * f64::from(PulseVolume::NORMAL.0)) as u32);
         assert_eq!(result.avg(), expected);
     }
 
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn from_pulse_max_volume() {
         let mut pulse_volume = ChannelVolumes::default();
-        let max = PulseVolume((4.0 * PulseVolume::NORMAL.0 as f64) as u32);
+        let max = PulseVolume((4.0 * f64::from(PulseVolume::NORMAL.0)) as u32);
         pulse_volume.set(1, max);
 
         let result = from_pulse(&pulse_volume);
