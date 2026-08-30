@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use gtk::prelude::WidgetExt as _;
 use relm4::{factory::FactoryVecDequeGuard, gtk, prelude::*};
 use tracing::warn;
-use wayle_bluetooth::types::agent::PairingRequest;
+use wayle_bluetooth::{BluetoothService, types::agent::PairingRequest};
 use zbus::zvariant::OwnedObjectPath;
 
 use super::{
@@ -10,7 +12,10 @@ use super::{
         DeviceItem,
         messages::{DeviceItemInit, DeviceItemOutput},
     },
-    helpers::{DeviceSnapshot, build_split_device_lists, format_passkey, resolve_device_display},
+    helpers::{
+        DeviceDisplayInfo, DeviceSnapshot, build_split_device_lists, format_passkey,
+        resolve_device_display,
+    },
     messages::{BluetoothDropdownCmd, BluetoothDropdownMsg, DeviceActionMsg, PairingCardOutput},
     pairing_card::messages::PairingCardMsg,
     watchers,
@@ -125,13 +130,8 @@ impl BluetoothDropdown {
                         // device. Connecting is explicit user consent, so persist
                         // it as trust — this also covers devices paired elsewhere,
                         // since BlueZ auto-pairs unpaired devices during connect.
-                        if result.is_ok()
-                            && let Ok(fresh) = bluetooth.device(path.clone()).await
-                            && fresh.paired.get()
-                            && !fresh.trusted.get()
-                            && let Err(err) = fresh.set_trusted(true).await
-                        {
-                            warn!(error = %err, "bluetooth device trust failed");
+                        if result.is_ok() {
+                            trust_paired_device(&bluetooth, path.clone()).await;
                         }
                         result
                     }
@@ -162,7 +162,7 @@ impl BluetoothDropdown {
     pub fn handle_pairing_request(&mut self, request: Option<PairingRequest>) {
         match request {
             Some(request) => {
-                let device_path = pairing_request_device_path(&request);
+                let device_path = pairing_request_device_path(&request).clone();
 
                 let Some(bluetooth) = &self.bluetooth else {
                     return;
@@ -171,7 +171,7 @@ impl BluetoothDropdown {
                 let devices = bluetooth.devices.get();
                 let matching_device = devices
                     .iter()
-                    .find(|device| &device.object_path == device_path);
+                    .find(|device| device.object_path == device_path);
 
                 let display = matching_device
                     .map(|device| resolve_device_display(device))
@@ -181,31 +181,7 @@ impl BluetoothDropdown {
                 // arrives while the dropdown is closed is otherwise invisible —
                 // the agent waits, times out and the connection silently fails.
                 if !self.popover_visible() {
-                    let device_name = if display.name.is_empty() {
-                        t!("dropdown-bluetooth-new-device")
-                    } else {
-                        display.name.clone()
-                    };
-
-                    let body = match &request {
-                        PairingRequest::RequestConfirmation { passkey, .. } => {
-                            t!(
-                                "dropdown-bluetooth-notify-passkey",
-                                device = device_name,
-                                passkey = format_passkey(*passkey)
-                            )
-                        }
-                        _ => {
-                            t!("dropdown-bluetooth-notify-body", device = device_name)
-                        }
-                    };
-
-                    wayle_shell_core::notify::notify(
-                        "Wayle",
-                        &t!("dropdown-bluetooth-notify-title"),
-                        &body,
-                        "ld-bluetooth-symbolic",
-                    );
+                    notify_closed_popover_request(bluetooth, &request, &device_path, &display);
                 }
 
                 self.pairing_card.emit(PairingCardMsg::SetRequest {
@@ -291,15 +267,119 @@ impl BluetoothDropdown {
             // Accepting a service authorization ("allow calls/audio") is
             // explicit consent for this device — persist it as trust so BlueZ
             // stops re-prompting on every reconnect.
-            if let Some(path) = service_auth_path
-                && let Ok(device) = bluetooth.device(path).await
-                && device.paired.get()
-                && !device.trusted.get()
-                && let Err(err) = device.set_trusted(true).await
-            {
-                warn!(error = %err, "bluetooth device trust failed");
+            if let Some(path) = service_auth_path {
+                trust_paired_device(&bluetooth, path).await;
             }
         });
+    }
+}
+
+enum NotifyResponder {
+    Confirmation,
+    Authorization,
+    ServiceAuthorization,
+}
+
+/// Pushes a desktop notification for a pairing request that arrived while the
+/// dropdown is closed. Yes/no prompts (confirmation, authorization, service
+/// authorization) get Allow/Deny buttons that answer the agent directly; pin
+/// and passkey prompts need the dropdown's input fields, so they only link.
+fn notify_closed_popover_request(
+    bluetooth: &Arc<BluetoothService>,
+    request: &PairingRequest,
+    device_path: &OwnedObjectPath,
+    display: &DeviceDisplayInfo,
+) {
+    let device_name = if display.name.is_empty() || display.name == "-" {
+        t!("dropdown-bluetooth-new-device")
+    } else {
+        display.name.clone()
+    };
+
+    let body = match request {
+        PairingRequest::RequestConfirmation { passkey, .. } => {
+            t!(
+                "dropdown-bluetooth-notify-passkey",
+                device = device_name,
+                passkey = format_passkey(*passkey)
+            )
+        }
+        _ => {
+            t!("dropdown-bluetooth-notify-body", device = device_name)
+        }
+    };
+
+    // Only the yes/no prompts can be answered from a notification; pin and
+    // passkey prompts need the dropdown's input fields.
+    let responder = match request {
+        PairingRequest::RequestConfirmation { .. } => Some(NotifyResponder::Confirmation),
+        PairingRequest::RequestAuthorization { .. } => Some(NotifyResponder::Authorization),
+        PairingRequest::RequestServiceAuthorization { .. } => {
+            Some(NotifyResponder::ServiceAuthorization)
+        }
+        _ => None,
+    };
+
+    let Some(responder) = responder else {
+        wayle_shell_core::notify::notify(
+            "Wayle",
+            &t!("dropdown-bluetooth-notify-title"),
+            &body,
+            "ld-bluetooth-symbolic",
+        );
+        return;
+    };
+
+    let deny_label = t!("dropdown-bluetooth-deny");
+    let allow_label = t!("dropdown-bluetooth-allow");
+    let mut receipt = wayle_shell_core::notify::notify_with_actions(
+        "Wayle",
+        &t!("dropdown-bluetooth-notify-title"),
+        &body,
+        "ld-bluetooth-symbolic",
+        &[
+            ("deny", deny_label.as_str()),
+            ("allow", allow_label.as_str()),
+        ],
+        // BlueZ gives up on the agent request after 60s — buttons past
+        // that are dead.
+        60_000,
+    );
+
+    let bluetooth = bluetooth.clone();
+    let notify_path = device_path.clone();
+    relm4::spawn_local(async move {
+        let Some(action) = receipt.action().await else {
+            return;
+        };
+        let accepted = action == "allow";
+        let result = match responder {
+            NotifyResponder::Confirmation => bluetooth.provide_confirmation(accepted).await,
+            NotifyResponder::Authorization => bluetooth.provide_authorization(accepted).await,
+            NotifyResponder::ServiceAuthorization => {
+                bluetooth.provide_service_authorization(accepted).await
+            }
+        };
+        if let Err(err) = result {
+            warn!(error = %err, "pairing response failed");
+            return;
+        }
+        if accepted {
+            trust_paired_device(&bluetooth, notify_path).await;
+        }
+    });
+}
+
+/// Marks a paired device as trusted, so BlueZ stops asking the agent to
+/// authorize its services (HFP calls/voice, A2DP, …) on every reconnect.
+/// No-op for devices that aren't paired — a stray trust would linger.
+async fn trust_paired_device(bluetooth: &BluetoothService, path: OwnedObjectPath) {
+    if let Ok(device) = bluetooth.device(path).await
+        && device.paired.get()
+        && !device.trusted.get()
+        && let Err(err) = device.set_trusted(true).await
+    {
+        warn!(error = %err, "bluetooth device trust failed");
     }
 }
 
