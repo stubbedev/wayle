@@ -288,6 +288,11 @@ dropdown-bluetooth-no-devices-title = Aucun appareil trouvé
 dropdown-bluetooth-no-devices-description = Assurez-vous que votre appareil est en mode de jumelage
 dropdown-bluetooth-off-title = Bluetooth désactivé
 dropdown-bluetooth-off-description = Activez le Bluetooth pour connecter des appareils
+
+## Notifications (envoyées quand une demande de jumelage arrive pendant que le menu est fermé)
+dropdown-bluetooth-notify-title = Demande de jumelage Bluetooth
+dropdown-bluetooth-notify-body = { $device } souhaite se connecter — ouvrez le menu Bluetooth pour répondre
+dropdown-bluetooth-notify-passkey = { $device } souhaite se jumeler avec la clé d'accès { $passkey } — ouvrez le menu Bluetooth pour répondre
 dropdown-bluetooth-no-adapter-title = Aucun adaptateur Bluetooth
 dropdown-bluetooth-no-adapter-description = Aucun adaptateur Bluetooth n'a été détecté
 dropdown-bluetooth-no-nearby = Aucun autre appareil à proximité

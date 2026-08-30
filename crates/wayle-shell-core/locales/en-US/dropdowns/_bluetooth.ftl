@@ -128,6 +128,11 @@ dropdown-bluetooth-no-devices-title = No Devices Found
 dropdown-bluetooth-no-devices-description = Make sure your device is in pairing mode
 dropdown-bluetooth-off-title = Bluetooth is Off
 dropdown-bluetooth-off-description = Turn on Bluetooth to connect devices
+
+## Notifications (sent when a pairing prompt arrives while the dropdown is closed)
+dropdown-bluetooth-notify-title = Bluetooth pairing request
+dropdown-bluetooth-notify-body = { $device } wants to connect — open the Bluetooth menu to respond
+dropdown-bluetooth-notify-passkey = { $device } wants to pair with passkey { $passkey } — open the Bluetooth menu to respond
 dropdown-bluetooth-no-adapter-title = No Bluetooth Adapter
 dropdown-bluetooth-no-adapter-description = No Bluetooth adapter was detected
 dropdown-bluetooth-no-nearby = No other devices nearby

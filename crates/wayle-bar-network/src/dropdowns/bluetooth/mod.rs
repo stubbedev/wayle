@@ -29,6 +29,7 @@ const ACTION_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct BluetoothDropdown {
     bluetooth: Option<Arc<BluetoothService>>,
+    root: gtk::glib::WeakRef<gtk::Popover>,
     scaled_width: i32,
     scaled_height: i32,
     width_override: Option<Size>,
@@ -332,7 +333,7 @@ impl Component for BluetoothDropdown {
 
     fn init(
         init: Self::Init,
-        _root: Self::Root,
+        root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let my_devices = Self::build_device_list(&sender);
@@ -348,8 +349,12 @@ impl Component for BluetoothDropdown {
         watchers::spawn_config_watcher(&sender, &init.config);
         watchers::spawn_service_watcher(&sender, &init.bluetooth);
 
+        let root_ref = gtk::glib::WeakRef::new();
+        root_ref.set(Some(&root));
+
         let model = Self {
             bluetooth: None,
+            root: root_ref,
             scaled_width: resolve_dimension(size.width, BASE_WIDTH, scale),
             scaled_height: resolve_dimension(size.height, BASE_HEIGHT, scale),
             width_override: size.width,

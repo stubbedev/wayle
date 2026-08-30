@@ -1,3 +1,4 @@
+use gtk::prelude::WidgetExt as _;
 use relm4::{factory::FactoryVecDequeGuard, gtk, prelude::*};
 use tracing::warn;
 use wayle_bluetooth::types::agent::PairingRequest;
@@ -9,11 +10,12 @@ use super::{
         DeviceItem,
         messages::{DeviceItemInit, DeviceItemOutput},
     },
-    helpers::{DeviceSnapshot, build_split_device_lists, resolve_device_display},
+    helpers::{DeviceSnapshot, build_split_device_lists, format_passkey, resolve_device_display},
     messages::{BluetoothDropdownCmd, BluetoothDropdownMsg, DeviceActionMsg, PairingCardOutput},
     pairing_card::messages::PairingCardMsg,
     watchers,
 };
+use crate::i18n::t;
 
 impl BluetoothDropdown {
     pub fn handle_bluetooth_toggled(&mut self, active: bool, sender: &ComponentSender<Self>) {
@@ -116,7 +118,23 @@ impl BluetoothDropdown {
 
             let action_fut = async {
                 match action {
-                    DeviceActionMsg::Connect(_) => device.connect().await,
+                    DeviceActionMsg::Connect(_) => {
+                        let result = device.connect().await;
+                        // BlueZ re-asks the agent to authorize every service (HFP
+                        // calls/voice, A2DP) on each reconnect of an untrusted
+                        // device. Connecting is explicit user consent, so persist
+                        // it as trust — this also covers devices paired elsewhere,
+                        // since BlueZ auto-pairs unpaired devices during connect.
+                        if result.is_ok()
+                            && let Ok(fresh) = bluetooth.device(path.clone()).await
+                            && fresh.paired.get()
+                            && !fresh.trusted.get()
+                            && let Err(err) = fresh.set_trusted(true).await
+                        {
+                            warn!(error = %err, "bluetooth device trust failed");
+                        }
+                        result
+                    }
                     DeviceActionMsg::Disconnect(_) => device.disconnect().await,
                     DeviceActionMsg::Forget(_) => device.forget().await,
                 }
@@ -144,15 +162,7 @@ impl BluetoothDropdown {
     pub fn handle_pairing_request(&mut self, request: Option<PairingRequest>) {
         match request {
             Some(request) => {
-                let device_path = match &request {
-                    PairingRequest::RequestPinCode { device_path } => device_path,
-                    PairingRequest::DisplayPinCode { device_path, .. } => device_path,
-                    PairingRequest::RequestPasskey { device_path } => device_path,
-                    PairingRequest::DisplayPasskey { device_path, .. } => device_path,
-                    PairingRequest::RequestConfirmation { device_path, .. } => device_path,
-                    PairingRequest::RequestAuthorization { device_path } => device_path,
-                    PairingRequest::RequestServiceAuthorization { device_path, .. } => device_path,
-                };
+                let device_path = pairing_request_device_path(&request);
 
                 let Some(bluetooth) = &self.bluetooth else {
                     return;
@@ -167,6 +177,37 @@ impl BluetoothDropdown {
                     .map(|device| resolve_device_display(device))
                     .unwrap_or_default();
 
+                // The pairing card lives inside the popover, so a request that
+                // arrives while the dropdown is closed is otherwise invisible —
+                // the agent waits, times out and the connection silently fails.
+                if !self.popover_visible() {
+                    let device_name = if display.name.is_empty() {
+                        t!("dropdown-bluetooth-new-device")
+                    } else {
+                        display.name.clone()
+                    };
+
+                    let body = match &request {
+                        PairingRequest::RequestConfirmation { passkey, .. } => {
+                            t!(
+                                "dropdown-bluetooth-notify-passkey",
+                                device = device_name,
+                                passkey = format_passkey(*passkey)
+                            )
+                        }
+                        _ => {
+                            t!("dropdown-bluetooth-notify-body", device = device_name)
+                        }
+                    };
+
+                    wayle_shell_core::notify::notify(
+                        "Wayle",
+                        &t!("dropdown-bluetooth-notify-title"),
+                        &body,
+                        "ld-bluetooth-symbolic",
+                    );
+                }
+
                 self.pairing_card.emit(PairingCardMsg::SetRequest {
                     request,
                     device_name: display.name,
@@ -178,6 +219,12 @@ impl BluetoothDropdown {
                 self.pairing_card.emit(PairingCardMsg::Clear);
             }
         }
+    }
+
+    fn popover_visible(&self) -> bool {
+        self.root
+            .upgrade()
+            .is_some_and(|popover| popover.is_visible())
     }
 
     pub fn handle_pairing_output(
@@ -202,6 +249,18 @@ impl BluetoothDropdown {
         };
 
         sender.command(move |_out, _shutdown| async move {
+            // Captured before responding: providing the answer clears the
+            // service's pending pairing_request.
+            let service_auth_path = match &output {
+                PairingCardOutput::ServiceAuthorizationAccepted => bluetooth
+                    .pairing_request
+                    .get()
+                    .as_ref()
+                    .map(pairing_request_device_path)
+                    .cloned(),
+                _ => None,
+            };
+
             let result = match output {
                 PairingCardOutput::PinSubmitted(pin)
                 | PairingCardOutput::LegacyPinSubmitted(pin) => bluetooth.provide_pin(pin).await,
@@ -226,8 +285,33 @@ impl BluetoothDropdown {
                     error = %err,
                     "pairing response failed"
                 );
+                return;
+            }
+
+            // Accepting a service authorization ("allow calls/audio") is
+            // explicit consent for this device — persist it as trust so BlueZ
+            // stops re-prompting on every reconnect.
+            if let Some(path) = service_auth_path
+                && let Ok(device) = bluetooth.device(path).await
+                && device.paired.get()
+                && !device.trusted.get()
+                && let Err(err) = device.set_trusted(true).await
+            {
+                warn!(error = %err, "bluetooth device trust failed");
             }
         });
+    }
+}
+
+fn pairing_request_device_path(request: &PairingRequest) -> &OwnedObjectPath {
+    match request {
+        PairingRequest::RequestPinCode { device_path }
+        | PairingRequest::DisplayPinCode { device_path, .. }
+        | PairingRequest::RequestPasskey { device_path }
+        | PairingRequest::DisplayPasskey { device_path, .. }
+        | PairingRequest::RequestConfirmation { device_path, .. }
+        | PairingRequest::RequestAuthorization { device_path }
+        | PairingRequest::RequestServiceAuthorization { device_path, .. } => device_path,
     }
 }
 
