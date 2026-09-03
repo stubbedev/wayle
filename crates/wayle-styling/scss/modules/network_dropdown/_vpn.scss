@@ -59,6 +59,15 @@
     margin-top: var(--space-sm);
 }
 
+button.network-vpn-import image {
+    -gtk-icon-size: var(--icon-sm);
+    color: var(--fg-subtle);
+}
+
+button.network-vpn-import:hover image {
+    color: var(--fg-default);
+}
+
 button.network-vpn-delete label {
     color: var(--status-error);
 }

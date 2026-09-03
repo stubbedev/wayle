@@ -11,7 +11,10 @@ use std::collections::HashMap;
 
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
-use wayle_network::vpn::kinds::{self, VpnChoice, VpnField, VpnFormat, VpnKind};
+use wayle_network::vpn::{
+    kinds::{self, VpnChoice, VpnField, VpnFormat, VpnKind},
+    wg_quick,
+};
 use wayle_widgets::prelude::*;
 
 pub use self::messages::{VpnFormInput, VpnFormOutput};
@@ -187,6 +190,19 @@ impl SimpleComponent for VpnForm {
                         set_halign: gtk::Align::Start,
                         set_label: &t!("dropdown-network-vpn-new"),
                     },
+                },
+
+                // WireGuard tunnels arrive as a file; without this its nine
+                // fields, two of them 44-character keys, get retyped by hand.
+                #[template]
+                GhostIconButton {
+                    add_css_class: "network-vpn-import",
+                    set_icon_name: "ld-folder-open-symbolic",
+                    set_valign: gtk::Align::Start,
+                    set_tooltip_text: Some(&t!("dropdown-network-vpn-import")),
+                    #[watch]
+                    set_visible: model.kind().is_some_and(|kind| kind.id == kinds::WIREGUARD),
+                    connect_clicked => VpnFormInput::ImportClicked,
                 },
 
                 #[template]
@@ -406,6 +422,17 @@ impl SimpleComponent for VpnForm {
                 }
             }
             VpnFormInput::DeleteDismissed => self.confirming_delete = false,
+            VpnFormInput::ImportClicked => self.pick_config(&sender),
+            VpnFormInput::Imported { name, values } => {
+                self.error = None;
+                if self.name_entry.text().trim().is_empty() {
+                    self.name_entry.set_text(&name);
+                }
+                self.rebuild(&values);
+            }
+            VpnFormInput::ImportFailed => {
+                self.error = Some(t!("dropdown-network-vpn-import-failed"));
+            }
             VpnFormInput::CancelClicked => {
                 let _ = sender.output(VpnFormOutput::Cancel);
                 self.visible = false;
@@ -512,6 +539,54 @@ impl VpnForm {
         self.pickers
             .push((field.key.clone(), picker.clone(), values));
         picker
+    }
+
+    /// Opens a `wg-quick` file and fills the form from it.
+    fn pick_config(&self, sender: &ComponentSender<Self>) {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&t!("dropdown-network-vpn-import-filter")));
+        filter.add_pattern("*.conf");
+
+        let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+
+        let dialog = gtk::FileDialog::builder()
+            .title(t!("dropdown-network-vpn-import"))
+            .filters(&filters)
+            .modal(true)
+            .build();
+
+        let window = self.name_entry.root().and_downcast::<gtk::Window>();
+        let sender = sender.clone();
+        dialog.open(
+            window.as_ref(),
+            gtk::gio::Cancellable::NONE,
+            move |result| {
+                let Ok(file) = result else {
+                    // Cancelling is not a failure, and saying so would be noise.
+                    return;
+                };
+                let name = file
+                    .basename()
+                    .map(|path| path.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                // Read here rather than off the main loop: a wg-quick file is a
+                // few hundred bytes on local disk, and a task to fetch them would
+                // cost more than the read.
+                let parsed = file
+                    .path()
+                    .and_then(|path| std::fs::read_to_string(path).ok())
+                    .and_then(|text| wg_quick::parse(&text, &name));
+
+                sender.input(match parsed {
+                    Some(values) => VpnFormInput::Imported {
+                        name: values.get("interface").cloned().unwrap_or_default(),
+                        values,
+                    },
+                    None => VpnFormInput::ImportFailed,
+                });
+            },
+        );
     }
 
     /// Puts the error mark on every field save refused, and takes it off the

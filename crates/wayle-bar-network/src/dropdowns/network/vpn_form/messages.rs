@@ -14,6 +14,13 @@ pub enum VpnFormInput {
     /// A different VPN type was picked; the fields change with it.
     KindSelected(u32),
     SaveClicked,
+    /// Fill the form from a `wg-quick` file.
+    ImportClicked,
+    Imported {
+        name: String,
+        values: HashMap<String, String>,
+    },
+    ImportFailed,
     /// Delete was pressed; the profile is not gone until it is confirmed.
     DeleteClicked,
     DeleteConfirmed,

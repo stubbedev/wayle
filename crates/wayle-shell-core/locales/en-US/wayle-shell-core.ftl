@@ -539,6 +539,9 @@ dropdown-network-vpn-delete = Delete
 dropdown-network-vpn-delete-confirm = Delete { $name }?
 dropdown-network-vpn-delete-confirm-detail = This cannot be undone. A private key stored here is not saved anywhere else.
 dropdown-network-vpn-no-native-sign-in = signs in through the plugin
+dropdown-network-vpn-import = Import a wg-quick file
+dropdown-network-vpn-import-filter = WireGuard configuration
+dropdown-network-vpn-import-failed = That file is not a wg-quick configuration
 dropdown-network-vpn-raw-hint = One key = value per line
 dropdown-network-vpn-name-required = A name is required
 dropdown-network-vpn-field-required = { $field } is required
