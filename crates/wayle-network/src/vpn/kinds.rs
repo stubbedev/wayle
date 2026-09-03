@@ -23,6 +23,21 @@ const PLUGIN_DIRECTORIES: &[&str] = &[
 /// a connection *type*, not a VPN plugin.
 pub const WIREGUARD: &str = "wireguard";
 
+/// One choice of a field that is a picker rather than a text box.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VpnChoice {
+    /// What is stored in the profile.
+    pub value: String,
+    /// What to call it in the picker.
+    pub label: String,
+    /// Whether wayle signs into this choice itself.
+    ///
+    /// The form says so while the choice is being made. The alternative is
+    /// what used to happen: the profile saves happily and the first connect
+    /// fails with "no native sign-in for openconnect protocol fortinet".
+    pub native_sign_in: bool,
+}
+
 /// One field on the add/edit form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VpnField {
@@ -36,6 +51,8 @@ pub struct VpnField {
     pub required: bool,
     /// Example value, shown as placeholder text.
     pub placeholder: String,
+    /// The values this field accepts. Empty means free text.
+    pub choices: Vec<VpnChoice>,
 }
 
 impl VpnField {
@@ -46,7 +63,13 @@ impl VpnField {
             secret: false,
             required: false,
             placeholder: String::from(placeholder),
+            choices: Vec::new(),
         }
+    }
+
+    fn choices(mut self, choices: Vec<VpnChoice>) -> Self {
+        self.choices = choices;
+        self
     }
 
     const fn required(mut self) -> Self {
@@ -85,10 +108,10 @@ impl VpnKind {
 #[must_use]
 pub fn available() -> Vec<VpnKind> {
     let mut kinds = vec![wireguard()];
-    for (service, label) in installed_plugins() {
+    for (service, plugin_name) in installed_plugins() {
         kinds.push(VpnKind {
             fields: fields_for(&service),
-            label,
+            label: display_label(&service, &plugin_name),
             id: service,
         });
     }
@@ -120,7 +143,9 @@ fn fields_for(service: &str) -> Vec<VpnField> {
     match service {
         "org.freedesktop.NetworkManager.openconnect" => vec![
             VpnField::new("gateway", "Gateway", "vpn.example.com").required(),
-            VpnField::new("protocol", "Protocol", "gp").required(),
+            VpnField::new("protocol", "Protocol", "gp")
+                .required()
+                .choices(openconnect_protocols()),
             VpnField::new("wayle-username", "Username", "alice"),
         ],
         "org.freedesktop.NetworkManager.openvpn" => vec![
@@ -131,6 +156,48 @@ fn fields_for(service: &str) -> Vec<VpnField> {
         ],
         _ => Vec::new(),
     }
+}
+
+/// The openconnect protocols, as picker choices.
+///
+/// A free-text box here meant typing a protocol name from memory and finding
+/// out at connect time whether it was one openconnect knows and one wayle can
+/// sign into.
+fn openconnect_protocols() -> Vec<VpnChoice> {
+    crate::vpn::openconnect::PROTOCOLS
+        .iter()
+        .map(|(value, label)| VpnChoice {
+            value: String::from(*value),
+            label: String::from(*label),
+            native_sign_in: crate::vpn::openconnect::signs_in_natively(value),
+        })
+        .collect()
+}
+
+/// What to call a plugin in the type picker.
+///
+/// A plugin's `.name` file says what the packager called it, which on a normal
+/// machine is literally `openconnect`, `openvpn`, `pptp`. Nobody setting up
+/// GlobalProtect knows to pick "openconnect", so the ones wayle recognises get
+/// named after what they connect to, and anything else keeps the plugin's own
+/// wording — there is no list of every VPN plugin that exists.
+fn display_label(service: &str, plugin_name: &str) -> String {
+    let known = match service {
+        "org.freedesktop.NetworkManager.openconnect" => {
+            "OpenConnect (GlobalProtect, AnyConnect, Fortinet, Pulse)"
+        }
+        "org.freedesktop.NetworkManager.openvpn" => "OpenVPN",
+        "org.freedesktop.NetworkManager.vpnc" => "Cisco (vpnc)",
+        "org.freedesktop.NetworkManager.strongswan" => "IPsec/IKEv2 (strongSwan)",
+        "org.freedesktop.NetworkManager.libreswan" => "IPsec/IKEv2 (libreswan)",
+        "org.freedesktop.NetworkManager.l2tp" => "L2TP/IPsec",
+        "org.freedesktop.NetworkManager.pptp" => "PPTP",
+        "org.freedesktop.NetworkManager.sstp" => "SSTP",
+        "org.freedesktop.NetworkManager.fortisslvpn" => "Fortinet SSL VPN",
+        "org.freedesktop.NetworkManager.iodine" => "Iodine (DNS tunnel)",
+        _ => return String::from(plugin_name),
+    };
+    String::from(known)
 }
 
 /// Reads every installed plugin's `.name` file as `(service, display name)`.
@@ -256,6 +323,73 @@ mod tests {
         let kinds = available();
         assert_eq!(kinds.first().map(|kind| kind.id.as_str()), Some(WIREGUARD));
         assert!(kinds[0].is_typed());
+    }
+
+    #[test]
+    fn the_protocol_field_is_a_picker_over_what_openconnect_speaks() {
+        let fields = fields_for("org.freedesktop.NetworkManager.openconnect");
+        let protocol = fields
+            .iter()
+            .find(|field| field.key == "protocol")
+            .expect("openconnect asks for a protocol");
+
+        let values: Vec<&str> = protocol
+            .choices
+            .iter()
+            .map(|choice| choice.value.as_str())
+            .collect();
+        assert_eq!(
+            values,
+            ["gp", "anyconnect", "nc", "pulse", "f5", "fortinet", "array"]
+        );
+    }
+
+    #[test]
+    fn a_protocol_wayle_cannot_sign_into_says_so_before_it_is_saved() {
+        let choices = openconnect_protocols();
+        let native = |value: &str| {
+            choices
+                .iter()
+                .find(|choice| choice.value == value)
+                .map(|choice| choice.native_sign_in)
+        };
+
+        assert_eq!(native("gp"), Some(true));
+        assert_eq!(native("anyconnect"), Some(true));
+        assert_eq!(native("fortinet"), Some(false));
+        assert_eq!(native("pulse"), Some(false));
+    }
+
+    #[test]
+    fn a_free_text_field_offers_no_choices() {
+        let fields = fields_for("org.freedesktop.NetworkManager.openconnect");
+        let gateway = fields
+            .iter()
+            .find(|field| field.key == "gateway")
+            .expect("openconnect asks for a gateway");
+
+        assert!(gateway.choices.is_empty());
+    }
+
+    #[test]
+    fn a_recognised_plugin_is_named_after_what_it_connects_to() {
+        assert_eq!(
+            display_label("org.freedesktop.NetworkManager.openconnect", "openconnect"),
+            "OpenConnect (GlobalProtect, AnyConnect, Fortinet, Pulse)"
+        );
+        assert_eq!(
+            display_label("org.freedesktop.NetworkManager.openvpn", "openvpn"),
+            "OpenVPN"
+        );
+    }
+
+    #[test]
+    fn an_unrecognised_plugin_keeps_its_own_wording() {
+        assert_eq!(
+            display_label("org.example.SomeVpn", "Some VPN"),
+            "Some VPN",
+            "there is no list of every VPN plugin that exists"
+        );
     }
 
     #[test]

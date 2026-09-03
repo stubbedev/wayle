@@ -161,9 +161,34 @@ fn data_dict(value: &OwnedValue) -> Option<HashMap<String, String>> {
 /// auth dialog, if it is installed) have a go rather than failing outright.
 const NATIVE_PROTOCOLS: &[&str] = &["gp", "anyconnect"];
 
+/// Every protocol the openconnect plugin speaks, as `(value, display name)`.
+///
+/// This is what the plugin's own `--protocol` takes; the order is the one the
+/// picker offers, natively supported first so the two that work end to end are
+/// not buried under five that hand off to the plugin's auth dialog.
+pub(crate) const PROTOCOLS: &[(&str, &str)] = &[
+    ("gp", "Palo Alto GlobalProtect"),
+    ("anyconnect", "Cisco AnyConnect"),
+    ("nc", "Juniper Network Connect"),
+    ("pulse", "Pulse Connect Secure"),
+    ("f5", "F5 BIG-IP"),
+    ("fortinet", "Fortinet"),
+    ("array", "Array Networks"),
+];
+
+/// Whether wayle signs into this protocol itself, rather than leaving it to
+/// the plugin's own auth dialog.
+///
+/// The form asks this at configuration time so the answer arrives while the
+/// protocol is being picked, rather than as a failure the first time connect
+/// is pressed.
+pub(crate) fn signs_in_natively(protocol: &str) -> bool {
+    NATIVE_PROTOCOLS.contains(&protocol)
+}
+
 /// Whether wayle can produce this profile's secrets natively.
 pub(crate) fn is_supported(profile: &Profile) -> bool {
-    NATIVE_PROTOCOLS.contains(&profile.protocol.as_str()) && !profile.gateway.is_empty()
+    signs_in_natively(&profile.protocol) && !profile.gateway.is_empty()
 }
 
 /// Authenticates and returns the secrets the openconnect plugin asked for.

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
-use wayle_network::vpn::kinds::{self, VpnField, VpnKind};
+use wayle_network::vpn::kinds::{self, VpnChoice, VpnField, VpnKind};
 use wayle_widgets::prelude::*;
 
 pub use self::messages::{VpnFormInput, VpnFormOutput};
@@ -39,6 +39,8 @@ pub struct VpnForm {
     /// Holds the generated field rows, rebuilt whenever the kind changes.
     container: gtk::Box,
     entries: Vec<(String, gtk::Entry)>,
+    /// Fields the kind restricts to a fixed set, and the values behind them.
+    pickers: Vec<(String, gtk::DropDown, Vec<String>)>,
     /// The escape hatch for a kind with no typed form.
     raw: gtk::TextView,
     raw_visible: bool,
@@ -70,6 +72,20 @@ fn field_label(field: &VpnField) -> String {
         format!("{} *", label_for(field))
     } else {
         label_for(field)
+    }
+}
+
+/// A choice as shown, saying up front when picking it means the plugin's own
+/// auth dialog rather than wayle's sign-in.
+fn choice_label(choice: &VpnChoice) -> String {
+    if choice.native_sign_in {
+        choice.label.clone()
+    } else {
+        format!(
+            "{} — {}",
+            choice.label,
+            t!("dropdown-network-vpn-no-native-sign-in")
+        )
     }
 }
 
@@ -297,6 +313,7 @@ impl SimpleComponent for VpnForm {
                 .build(),
             container: gtk::Box::default(),
             entries: Vec::new(),
+            pickers: Vec::new(),
             raw: gtk::TextView::builder().monospace(true).build(),
             raw_visible: false,
             confirming_delete: false,
@@ -384,9 +401,16 @@ impl VpnForm {
                 .to_string();
             return parse_raw(&text);
         }
-        self.entries
+        let typed = self
+            .entries
             .iter()
-            .map(|(key, entry)| (key.clone(), entry.text().to_string()))
+            .map(|(key, entry)| (key.clone(), entry.text().to_string()));
+        let picked = self.pickers.iter().filter_map(|(key, picker, values)| {
+            let value = values.get(picker.selected() as usize)?;
+            Some((key.clone(), value.clone()))
+        });
+        typed
+            .chain(picked)
             .filter(|(_, value)| !value.is_empty())
             .collect()
     }
@@ -420,6 +444,35 @@ impl VpnForm {
             values,
         });
         self.visible = false;
+    }
+
+    /// Draws a fixed-choice field, preselected on what is stored.
+    fn build_picker(&mut self, field: &VpnField, current: Option<&String>) -> gtk::DropDown {
+        let labels: Vec<String> = field.choices.iter().map(choice_label).collect();
+        let values: Vec<String> = field
+            .choices
+            .iter()
+            .map(|choice| choice.value.clone())
+            .collect();
+
+        let picker = gtk::DropDown::builder()
+            .css_classes(["network-vpn-kind"])
+            .model(&gtk::StringList::new(
+                &labels.iter().map(String::as_str).collect::<Vec<_>>(),
+            ))
+            .build();
+
+        // A profile saved with a value this build does not offer — a protocol
+        // from a newer openconnect, say — keeps the first choice rather than
+        // silently rewriting itself on the next save.
+        let selected = current
+            .and_then(|value| values.iter().position(|candidate| candidate == value))
+            .unwrap_or(0);
+        picker.set_selected(selected as u32);
+
+        self.pickers
+            .push((field.key.clone(), picker.clone(), values));
+        picker
     }
 
     /// Puts the error mark on every required field left empty, and takes it
@@ -476,6 +529,7 @@ impl VpnForm {
     /// Redraws the field rows for the current kind, prefilled from `values`.
     fn rebuild(&mut self, values: &HashMap<String, String>) {
         self.entries.clear();
+        self.pickers.clear();
         while let Some(child) = self.container.first_child() {
             self.container.remove(&child);
         }
@@ -502,6 +556,13 @@ impl VpnForm {
                     ["network-secret-label"].as_slice()
                 })
                 .build();
+
+            if !field.choices.is_empty() {
+                self.container.append(&label);
+                let picker = self.build_picker(field, values.get(&field.key));
+                self.container.append(&picker);
+                continue;
+            }
 
             let entry = gtk::Entry::builder()
                 .css_classes(["network-password-input"])
@@ -549,6 +610,7 @@ mod tests {
             secret: false,
             required: true,
             placeholder: String::new(),
+            choices: Vec::new(),
         }
     }
 
@@ -612,6 +674,7 @@ mod tests {
                 secret: false,
                 required: false,
                 placeholder: String::new(),
+                choices: Vec::new(),
             },
             required("private-key"),
         ]);
@@ -635,6 +698,28 @@ mod tests {
     }
 
     #[test]
+    fn a_choice_wayle_cannot_sign_into_is_labelled_before_it_is_picked() {
+        let native = VpnChoice {
+            value: String::from("gp"),
+            label: String::from("Palo Alto GlobalProtect"),
+            native_sign_in: true,
+        };
+        let handed_off = VpnChoice {
+            value: String::from("fortinet"),
+            label: String::from("Fortinet"),
+            native_sign_in: false,
+        };
+
+        assert_eq!(choice_label(&native), "Palo Alto GlobalProtect");
+        assert!(
+            choice_label(&handed_off).starts_with("Fortinet — "),
+            "a protocol with no native sign-in says so in the picker, not at \
+             connect time: {}",
+            choice_label(&handed_off)
+        );
+    }
+
+    #[test]
     fn a_required_field_is_marked_and_an_optional_one_is_not() {
         assert_eq!(field_label(&required("gateway")), "Gateway *");
         assert_eq!(
@@ -644,6 +729,7 @@ mod tests {
                 secret: false,
                 required: false,
                 placeholder: String::new(),
+                choices: Vec::new(),
             }),
             "Protocol"
         );
@@ -657,6 +743,7 @@ mod tests {
             secret: false,
             required: false,
             placeholder: String::new(),
+            choices: Vec::new(),
         };
         assert_eq!(label_for(&field), "Plugin's own wording");
     }
