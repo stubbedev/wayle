@@ -48,6 +48,8 @@ pub struct NetworkDropdown {
     vpn_connections: Controller<VpnConnections>,
     vpn_form: Controller<VpnForm>,
     available_networks: Controller<AvailableNetworks>,
+    /// Whether the VPN editor is up, and with it owns the dropdown body.
+    vpn_form_open: bool,
     wifi_watcher: WatcherToken,
 }
 
@@ -140,14 +142,25 @@ impl Component for NetworkDropdown {
                     // Above the scan list: a VPN is a property of the
                     // connection you already have, not another network to join.
                     #[local_ref]
-                    vpn_form_widget -> gtk::Box {},
+                    vpn_form_widget -> gtk::Box {
+                        set_vexpand: true,
+                    },
 
+                    // The form is an editor, not another row: while it is open
+                    // it owns the body, so it gets the height it needs instead
+                    // of shoving the lists around inside a popover that cannot
+                    // grow.
                     #[local_ref]
-                    vpn_connections_widget -> gtk::Box {},
+                    vpn_connections_widget -> gtk::Box {
+                        #[watch]
+                        set_visible: !model.vpn_form_open,
+                    },
 
                     #[local_ref]
                     available_networks_widget -> gtk::Box {
                         set_vexpand: true,
+                        #[watch]
+                        set_visible: !model.vpn_form_open,
                     },
                 },
             },
@@ -208,6 +221,7 @@ impl Component for NetworkDropdown {
             vpn_connections,
             vpn_form,
             available_networks,
+            vpn_form_open: false,
             wifi_watcher: WatcherToken::new(),
         };
 
@@ -243,10 +257,18 @@ impl Component for NetworkDropdown {
                 });
             }
             NetworkDropdownMsg::VpnConnections(output) => match output {
-                VpnConnectionsOutput::Add => self.vpn_form.emit(VpnFormInput::ShowNew),
+                VpnConnectionsOutput::Add => {
+                    self.vpn_form_open = true;
+                    self.vpn_form.emit(VpnFormInput::ShowNew);
+                }
                 VpnConnectionsOutput::Edit(uuid) => self.load_vpn_settings(uuid, &sender),
             },
-            NetworkDropdownMsg::VpnForm(output) => self.apply_vpn_form(output, &sender),
+            NetworkDropdownMsg::VpnForm(output) => {
+                // Every output the form produces closes it. A write that NM
+                // then refuses reopens it, from VpnWriteFailed.
+                self.vpn_form_open = false;
+                self.apply_vpn_form(output, &sender);
+            }
             NetworkDropdownMsg::AvailableNetworks(output) => match output {
                 AvailableNetworksOutput::ScanStarted => {
                     self.scanning = true;
@@ -322,6 +344,7 @@ impl Component for NetworkDropdown {
                 kind,
                 values,
             } => {
+                self.vpn_form_open = true;
                 self.vpn_form.emit(VpnFormInput::ShowEdit {
                     uuid,
                     name,
@@ -331,6 +354,9 @@ impl Component for NetworkDropdown {
             }
 
             NetworkDropdownCmd::VpnWriteFailed(reason) => {
+                // The form reopens on what was typed so it can be corrected,
+                // so the body is its again.
+                self.vpn_form_open = true;
                 self.vpn_form.emit(VpnFormInput::Failed(reason));
             }
 

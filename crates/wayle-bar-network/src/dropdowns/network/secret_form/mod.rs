@@ -15,7 +15,7 @@ use wayle_network::types::agent::SecretField;
 use wayle_widgets::prelude::*;
 
 pub use self::messages::{SecretFormInput, SecretFormOutput};
-use crate::i18n::t;
+use crate::{dropdowns::network::helpers::attach_reveal_toggle, i18n::t};
 
 pub struct SecretForm {
     name: String,
@@ -235,6 +235,7 @@ impl SecretForm {
                 .build();
             if field.secret {
                 entry.set_input_purpose(gtk::InputPurpose::Password);
+                attach_reveal_toggle(&entry);
             }
             // Enter in any box submits the whole form: a 2FA code is a single
             // short field and reaching for the mouse to confirm it is friction

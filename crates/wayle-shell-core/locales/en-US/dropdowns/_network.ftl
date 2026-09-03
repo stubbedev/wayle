@@ -76,6 +76,8 @@ dropdown-network-vpn-name = Name
 dropdown-network-vpn-type = Type
 dropdown-network-vpn-save = Save
 dropdown-network-vpn-delete = Delete
+dropdown-network-vpn-delete-confirm = Delete { $name }?
+dropdown-network-vpn-delete-confirm-detail = This cannot be undone. A private key stored here is not saved anywhere else.
 dropdown-network-vpn-raw-hint = One key = value per line
 dropdown-network-vpn-name-required = A name is required
 dropdown-network-vpn-field-required = { $field } is required

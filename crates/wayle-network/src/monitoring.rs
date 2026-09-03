@@ -297,22 +297,32 @@ async fn sync_wifi(
             wifi.set(None);
         }
         DeviceSync::Rebind(path) => {
-            match Wifi::get_live(LiveWifiParams {
-                connection,
-                device_path: path.clone(),
-                cancellation_token,
-                settings: settings.clone(),
-            })
-            .await
-            {
-                Ok(new_wifi) => {
-                    debug!(path = %path, "WiFi device initialized");
-                    wifi.set(Some(new_wifi));
-                }
-                Err(err) => {
-                    warn!(error = %err, path = %path, "Failed to initialize WiFi device");
-                }
-            }
+            bind_wifi(connection, wifi, settings, cancellation_token, path).await;
+        }
+    }
+}
+
+async fn bind_wifi(
+    connection: &Connection,
+    wifi: &Property<Option<Arc<Wifi>>>,
+    settings: &Arc<Settings>,
+    cancellation_token: &CancellationToken,
+    path: OwnedObjectPath,
+) {
+    match Wifi::get_live(LiveWifiParams {
+        connection,
+        device_path: path.clone(),
+        cancellation_token,
+        settings: settings.clone(),
+    })
+    .await
+    {
+        Ok(new_wifi) => {
+            debug!(path = %path, "WiFi device initialized");
+            wifi.set(Some(new_wifi));
+        }
+        Err(err) => {
+            warn!(error = %err, path = %path, "Failed to initialize WiFi device");
         }
     }
 }
@@ -342,21 +352,30 @@ async fn sync_wired(
             wired.set(None);
         }
         DeviceSync::Rebind(path) => {
-            match Wired::get_live(LiveWiredParams {
-                connection,
-                device_path: path.clone(),
-                cancellation_token,
-            })
-            .await
-            {
-                Ok(new_wired) => {
-                    debug!(path = %path, "Wired device initialized");
-                    wired.set(Some(new_wired));
-                }
-                Err(err) => {
-                    warn!(error = %err, path = %path, "Failed to initialize wired device");
-                }
-            }
+            bind_wired(connection, wired, cancellation_token, path).await;
+        }
+    }
+}
+
+async fn bind_wired(
+    connection: &Connection,
+    wired: &Property<Option<Arc<Wired>>>,
+    cancellation_token: &CancellationToken,
+    path: OwnedObjectPath,
+) {
+    match Wired::get_live(LiveWiredParams {
+        connection,
+        device_path: path.clone(),
+        cancellation_token,
+    })
+    .await
+    {
+        Ok(new_wired) => {
+            debug!(path = %path, "Wired device initialized");
+            wired.set(Some(new_wired));
+        }
+        Err(err) => {
+            warn!(error = %err, path = %path, "Failed to initialize wired device");
         }
     }
 }

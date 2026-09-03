@@ -8,9 +8,6 @@ use wayle_widgets::prelude::*;
 pub use self::messages::*;
 use crate::i18n::t;
 
-const ICON_EYE: &str = "ld-eye-symbolic";
-const ICON_EYE_OFF: &str = "ld-eye-off-symbolic";
-
 pub struct PasswordForm {
     ssid: String,
     security_label: String,

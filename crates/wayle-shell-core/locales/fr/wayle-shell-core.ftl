@@ -518,6 +518,8 @@ dropdown-network-vpn-name = Nom
 dropdown-network-vpn-type = Type
 dropdown-network-vpn-save = Enregistrer
 dropdown-network-vpn-delete = Supprimer
+dropdown-network-vpn-delete-confirm = Supprimer { $name } ?
+dropdown-network-vpn-delete-confirm-detail = Cette action est irréversible. Une clé privée enregistrée ici n'est stockée nulle part ailleurs.
 dropdown-network-vpn-raw-hint = Une paire clé = valeur par ligne
 dropdown-network-vpn-name-required = Un nom est requis
 dropdown-network-vpn-field-required = { $field } est requis

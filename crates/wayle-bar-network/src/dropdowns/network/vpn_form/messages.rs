@@ -14,7 +14,10 @@ pub enum VpnFormInput {
     /// A different VPN type was picked; the fields change with it.
     KindSelected(u32),
     SaveClicked,
+    /// Delete was pressed; the profile is not gone until it is confirmed.
     DeleteClicked,
+    DeleteConfirmed,
+    DeleteDismissed,
     CancelClicked,
     /// NetworkManager refused the profile.
     Failed(String),

@@ -20,6 +20,31 @@
     margin-top: calc(-1 * var(--space-xs));
 }
 
+// The kind decides how many fields there are, so the form has to bound
+// itself: a popover cannot scroll and cannot be resized once it is mapped.
+.network-vpn-form-scroll {
+    // Undo the scrolled window's own frame; the card around it is the frame.
+    background: transparent;
+
+    > viewport {
+        background: transparent;
+    }
+}
+
+// Required fields are marked before the save button has to name them.
+.network-secret-label.required {
+    color: var(--fg-default);
+}
+
+// A required field left empty, once save has said so.
+.network-vpn-form entry.network-password-input.error {
+    border-color: var(--status-error);
+
+    &:focus-within {
+        border-color: var(--status-error);
+    }
+}
+
 .network-vpn-raw {
     background: var(--bg-surface);
     border-radius: var(--rounding-element);

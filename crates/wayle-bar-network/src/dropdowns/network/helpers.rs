@@ -1,11 +1,18 @@
 use std::{
+    cell::Cell,
     cmp::Reverse,
     collections::{HashMap, HashSet},
+    rc::Rc,
     sync::Arc,
 };
 
+use relm4::gtk;
 use wayle_network::core::access_point::{AccessPoint, SecurityType};
 use zbus::zvariant::OwnedObjectPath;
+
+/// The reveal toggle's two states.
+pub const ICON_EYE: &str = "ld-eye-symbolic";
+pub const ICON_EYE_OFF: &str = "ld-eye-off-symbolic";
 
 /// Snapshot of an access point for display in the network list.
 #[derive(Debug, Clone)]
@@ -102,6 +109,44 @@ pub fn sorted_unique_access_points(
     let mut snapshots: Vec<AccessPointSnapshot> = best_by_ssid.into_values().collect();
     snapshots.sort_by_key(|snapshot| Reverse(snapshot.strength));
     snapshots
+}
+
+/// Turns a masked entry into one the user can peek at, via an eye icon in the
+/// entry itself.
+///
+/// A mistyped WireGuard private key or VPN password is otherwise unrecoverable
+/// except by clearing the box and retyping it, and every form in this dropdown
+/// that asks for a secret gets the same affordance — the wifi password box
+/// three rows up already had it.
+pub fn attach_reveal_toggle(entry: &gtk::Entry) {
+    use gtk::prelude::*;
+
+    entry.set_icon_from_icon_name(gtk::EntryIconPosition::Secondary, Some(ICON_EYE_OFF));
+    entry.set_icon_activatable(gtk::EntryIconPosition::Secondary, true);
+    entry.set_icon_sensitive(gtk::EntryIconPosition::Secondary, true);
+
+    let revealed = Rc::new(Cell::new(false));
+    let target = entry.clone();
+    entry.connect_icon_press(move |_entry, position| {
+        if position != gtk::EntryIconPosition::Secondary {
+            return;
+        }
+        let now_revealed = !revealed.get();
+        revealed.set(now_revealed);
+        target.set_visibility(now_revealed);
+        target.set_icon_from_icon_name(
+            gtk::EntryIconPosition::Secondary,
+            Some(if now_revealed { ICON_EYE } else { ICON_EYE_OFF }),
+        );
+    });
+}
+
+/// Re-masks an entry and puts its reveal toggle back to hidden.
+pub fn reset_reveal_toggle(entry: &gtk::Entry) {
+    use gtk::prelude::*;
+
+    entry.set_visibility(false);
+    entry.set_icon_from_icon_name(gtk::EntryIconPosition::Secondary, Some(ICON_EYE_OFF));
 }
 
 #[cfg(test)]
