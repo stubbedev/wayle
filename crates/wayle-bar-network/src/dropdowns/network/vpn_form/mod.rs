@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
-use wayle_network::vpn::kinds::{self, VpnChoice, VpnField, VpnKind};
+use wayle_network::vpn::kinds::{self, VpnChoice, VpnField, VpnFormat, VpnKind};
 use wayle_widgets::prelude::*;
 
 pub use self::messages::{VpnFormInput, VpnFormOutput};
@@ -108,6 +108,39 @@ fn render_raw(values: &HashMap<String, String>) -> String {
         .collect();
     lines.sort();
     lines.join("\n")
+}
+
+/// What to say about a value NetworkManager should not be handed.
+///
+/// One message per format rather than a single "that is wrong": the useful
+/// half is what the box wanted, not that it did not get it.
+fn malformed_message(field: &VpnField) -> String {
+    let name = label_for(field);
+    match field.format {
+        VpnFormat::Text => t!("dropdown-network-vpn-invalid-text", field = name),
+        VpnFormat::Host => t!("dropdown-network-vpn-invalid-host", field = name),
+        VpnFormat::HostPort => t!("dropdown-network-vpn-invalid-host-port", field = name),
+        VpnFormat::IpList => t!("dropdown-network-vpn-invalid-ip-list", field = name),
+        VpnFormat::CidrList => t!("dropdown-network-vpn-invalid-cidr-list", field = name),
+        VpnFormat::Key => t!("dropdown-network-vpn-invalid-key", field = name),
+        VpnFormat::Number => t!("dropdown-network-vpn-invalid-number", field = name),
+    }
+}
+
+/// Every field whose value is not in the shape the kind asks for.
+///
+/// Separate from the required check because they are different complaints: one
+/// box is empty, the other holds something NetworkManager would take badly —
+/// or, worse, take quietly and drop.
+fn malformed<'a>(kind: &'a VpnKind, values: &HashMap<String, String>) -> Vec<&'a VpnField> {
+    kind.fields
+        .iter()
+        .filter(|field| {
+            values
+                .get(&field.key)
+                .is_some_and(|value| !field.format.accepts(value))
+        })
+        .collect()
 }
 
 /// Every required field left empty, in the order they are drawn.
@@ -427,12 +460,18 @@ impl VpnForm {
 
         let values = self.values();
         let missing = missing_required(&kind, &values);
-        self.mark_missing(&missing);
+        let malformed = malformed(&kind, &values);
+        self.mark_bad(&missing, &malformed);
+
         if let Some(first) = missing.first() {
             self.error = Some(t!(
                 "dropdown-network-vpn-field-required",
                 field = label_for(first)
             ));
+            return;
+        }
+        if let Some(first) = malformed.first() {
+            self.error = Some(malformed_message(first));
             return;
         }
 
@@ -475,11 +514,18 @@ impl VpnForm {
         picker
     }
 
-    /// Puts the error mark on every required field left empty, and takes it
-    /// off the ones that are now filled.
-    fn mark_missing(&self, missing: &[&VpnField]) {
+    /// Puts the error mark on every field save refused, and takes it off the
+    /// ones that are now fine.
+    fn mark_bad(&self, missing: &[&VpnField], malformed: &[&VpnField]) {
+        let bad = |key: &String| {
+            missing
+                .iter()
+                .chain(malformed)
+                .any(|field| &field.key == key)
+        };
+
         for (key, entry) in &self.entries {
-            if missing.iter().any(|field| &field.key == key) {
+            if bad(key) {
                 entry.add_css_class("error");
             } else {
                 entry.remove_css_class("error");
@@ -611,6 +657,7 @@ mod tests {
             required: true,
             placeholder: String::new(),
             choices: Vec::new(),
+            format: VpnFormat::Text,
         }
     }
 
@@ -675,6 +722,7 @@ mod tests {
                 required: false,
                 placeholder: String::new(),
                 choices: Vec::new(),
+                format: VpnFormat::Text,
             },
             required("private-key"),
         ]);
@@ -695,6 +743,77 @@ mod tests {
         assert!(missing_required(&kind, &values).is_empty());
         // Optional fields never block a save.
         assert!(missing_required(&a_kind(Vec::new()), &HashMap::new()).is_empty());
+    }
+
+    fn wireguard() -> VpnKind {
+        kinds::available()
+            .into_iter()
+            .find(|kind| kind.id == kinds::WIREGUARD)
+            .expect("WireGuard is always available")
+    }
+
+    #[test]
+    fn a_value_networkmanager_would_drop_is_caught_before_it_gets_there() {
+        let kind = wireguard();
+        let values = HashMap::from([
+            (String::from("address"), String::from("10.0.0.256/24")),
+            (
+                String::from("peer-endpoint"),
+                String::from("vpn.example.com"),
+            ),
+        ]);
+
+        let bad = keys(&malformed(&kind, &values));
+
+        assert!(
+            bad.contains(&String::from("address")),
+            "not an address: {bad:?}"
+        );
+        assert!(
+            bad.contains(&String::from("peer-endpoint")),
+            "an endpoint with no port: {bad:?}"
+        );
+    }
+
+    #[test]
+    fn a_well_formed_profile_has_nothing_to_complain_about() {
+        let kind = wireguard();
+        let values = HashMap::from([
+            (String::from("interface"), String::from("wg0")),
+            (
+                String::from("private-key"),
+                String::from("6HeTLQTdIcJHFmwCNBjMFR/nGiEBDSQMCsBcgWJZ7Fk="),
+            ),
+            (String::from("address"), String::from("10.0.0.2/24")),
+            (String::from("dns"), String::from("10.0.0.1")),
+            (
+                String::from("peer-public-key"),
+                String::from("Kx3AZBHm3vDJXPGRAJfvTvUEHY1c2Jw4qYE9nR6qEXY="),
+            ),
+            (
+                String::from("peer-endpoint"),
+                String::from("vpn.example.com:51820"),
+            ),
+            (
+                String::from("peer-allowed-ips"),
+                String::from("0.0.0.0/0, ::/0"),
+            ),
+            (String::from("peer-keepalive"), String::from("25")),
+        ]);
+
+        assert!(malformed(&kind, &values).is_empty());
+        assert!(missing_required(&kind, &values).is_empty());
+    }
+
+    #[test]
+    fn an_empty_field_is_missing_rather_than_malformed() {
+        // Both checks run on every save; a blank required box must not also be
+        // reported as the wrong shape, or one mistake names the field twice.
+        let kind = wireguard();
+        let values = HashMap::from([(String::from("address"), String::new())]);
+
+        assert!(malformed(&kind, &values).is_empty());
+        assert!(keys(&missing_required(&kind, &values)).contains(&String::from("address")));
     }
 
     #[test]
@@ -730,6 +849,7 @@ mod tests {
                 required: false,
                 placeholder: String::new(),
                 choices: Vec::new(),
+                format: VpnFormat::Text,
             }),
             "Protocol"
         );
@@ -744,6 +864,7 @@ mod tests {
             required: false,
             placeholder: String::new(),
             choices: Vec::new(),
+            format: VpnFormat::Text,
         };
         assert_eq!(label_for(&field), "Plugin's own wording");
     }

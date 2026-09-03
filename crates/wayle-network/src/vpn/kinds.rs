@@ -8,7 +8,12 @@
 //! exactly what can work here, rather than a fixed list where two thirds of
 //! the entries fail at connect time.
 
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    net::{IpAddr, Ipv6Addr},
+    path::Path,
+};
 
 /// Where NM looks for VPN plugin descriptors. Both are read; a file in the
 /// second shadows the same name in the first, which is how a distribution
@@ -22,6 +27,123 @@ const PLUGIN_DIRECTORIES: &[&str] = &[
 /// The `id` of the built-in WireGuard kind. Not a service name: WireGuard is
 /// a connection *type*, not a VPN plugin.
 pub const WIREGUARD: &str = "wireguard";
+
+/// What a field's value has to look like to be worth sending to
+/// NetworkManager.
+///
+/// NM validates too, and refuses with a raw D-Bus error string that the form
+/// then shows verbatim; the address builder is worse still and silently drops
+/// what it cannot parse, so a typo in a CIDR became a tunnel with no route and
+/// nothing said. Checking here means the complaint names the field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VpnFormat {
+    /// Anything non-empty.
+    #[default]
+    Text,
+    /// A hostname or address, with no scheme and no path.
+    Host,
+    /// A hostname or address with a port: `vpn.example.com:51820`.
+    HostPort,
+    /// One or more IP addresses, comma separated.
+    IpList,
+    /// One or more addresses, each optionally with a prefix length.
+    CidrList,
+    /// A base64 X25519 key, as WireGuard writes them.
+    Key,
+    /// A non-negative whole number.
+    Number,
+}
+
+impl VpnFormat {
+    /// Whether `value` is in this format. An empty value is not this check's
+    /// business — that is what `required` is for.
+    #[must_use]
+    pub fn accepts(self, value: &str) -> bool {
+        let value = value.trim();
+        if value.is_empty() {
+            return true;
+        }
+        match self {
+            Self::Text => true,
+            Self::Host => is_host(value),
+            Self::HostPort => is_host_port(value),
+            Self::IpList => every_item(value, |item| item.parse::<IpAddr>().is_ok()),
+            Self::CidrList => every_item(value, is_cidr),
+            Self::Key => is_wireguard_key(value),
+            Self::Number => value.parse::<u64>().is_ok(),
+        }
+    }
+}
+
+/// Whether every comma-separated item passes `check`. An empty list does not.
+fn every_item(raw: &str, check: impl Fn(&str) -> bool) -> bool {
+    let mut items = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .peekable();
+    items.peek().is_some() && items.all(check)
+}
+
+/// An address, or a name that could resolve to one. Deliberately loose: the
+/// point is to catch `https://vpn.example.com/portal`, not to re-implement
+/// DNS.
+fn is_host(value: &str) -> bool {
+    if value.parse::<IpAddr>().is_ok() {
+        return true;
+    }
+    !value.is_empty()
+        && !value.contains(['/', ' ', ':', '@'])
+        && value.split('.').all(|part| {
+            !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        })
+}
+
+fn is_host_port(value: &str) -> bool {
+    // An IPv6 endpoint is bracketed, which is also how the port stays
+    // unambiguous: `[fd00::1]:51820`.
+    if let Some(rest) = value.strip_prefix('[') {
+        let Some((address, port)) = rest.split_once("]:") else {
+            return false;
+        };
+        return address.parse::<Ipv6Addr>().is_ok() && is_port(port);
+    }
+    let Some((host, port)) = value.rsplit_once(':') else {
+        return false;
+    };
+    // A leftover colon means an unbracketed IPv6 address, where the last colon
+    // is part of the address rather than the separator — `fd00::1:51820` is a
+    // whole address with no port at all.
+    !host.contains(':') && is_host(host) && is_port(port)
+}
+
+fn is_port(value: &str) -> bool {
+    value.parse::<u16>().is_ok_and(|port| port != 0)
+}
+
+fn is_cidr(value: &str) -> bool {
+    let (address, prefix) = match value.split_once('/') {
+        Some((address, prefix)) => (address, Some(prefix)),
+        None => (value, None),
+    };
+    let Ok(address) = address.parse::<IpAddr>() else {
+        return false;
+    };
+    let Some(prefix) = prefix else {
+        return true;
+    };
+    let limit = if address.is_ipv4() { 32 } else { 128 };
+    prefix.parse::<u32>().is_ok_and(|prefix| prefix <= limit)
+}
+
+/// A WireGuard key is 32 bytes of base64: 43 characters and an `=`.
+fn is_wireguard_key(value: &str) -> bool {
+    value.len() == 44
+        && value.ends_with('=')
+        && value[..43]
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/')
+}
 
 /// One choice of a field that is a picker rather than a text box.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,6 +175,8 @@ pub struct VpnField {
     pub placeholder: String,
     /// The values this field accepts. Empty means free text.
     pub choices: Vec<VpnChoice>,
+    /// What a value has to look like to be worth sending to NM.
+    pub format: VpnFormat,
 }
 
 impl VpnField {
@@ -64,7 +188,13 @@ impl VpnField {
             required: false,
             placeholder: String::from(placeholder),
             choices: Vec::new(),
+            format: VpnFormat::Text,
         }
+    }
+
+    const fn format(mut self, format: VpnFormat) -> Self {
+        self.format = format;
+        self
     }
 
     fn choices(mut self, choices: Vec<VpnChoice>) -> Self {
@@ -126,14 +256,25 @@ fn wireguard() -> VpnKind {
             VpnField::new("interface", "Interface", "wg0").required(),
             VpnField::new("private-key", "Private key", "")
                 .required()
-                .secret(),
-            VpnField::new("address", "Addresses", "10.0.0.2/24").required(),
-            VpnField::new("dns", "DNS", "10.0.0.1"),
-            VpnField::new("peer-public-key", "Peer public key", "").required(),
-            VpnField::new("peer-endpoint", "Peer endpoint", "vpn.example.com:51820").required(),
-            VpnField::new("peer-allowed-ips", "Allowed IPs", "0.0.0.0/0, ::/0").required(),
-            VpnField::new("peer-preshared-key", "Preshared key", "").secret(),
-            VpnField::new("peer-keepalive", "Keepalive (seconds)", "25"),
+                .secret()
+                .format(VpnFormat::Key),
+            VpnField::new("address", "Addresses", "10.0.0.2/24")
+                .required()
+                .format(VpnFormat::CidrList),
+            VpnField::new("dns", "DNS", "10.0.0.1").format(VpnFormat::IpList),
+            VpnField::new("peer-public-key", "Peer public key", "")
+                .required()
+                .format(VpnFormat::Key),
+            VpnField::new("peer-endpoint", "Peer endpoint", "vpn.example.com:51820")
+                .required()
+                .format(VpnFormat::HostPort),
+            VpnField::new("peer-allowed-ips", "Allowed IPs", "0.0.0.0/0, ::/0")
+                .required()
+                .format(VpnFormat::CidrList),
+            VpnField::new("peer-preshared-key", "Preshared key", "")
+                .secret()
+                .format(VpnFormat::Key),
+            VpnField::new("peer-keepalive", "Keepalive (seconds)", "25").format(VpnFormat::Number),
         ],
     }
 }
@@ -142,14 +283,18 @@ fn wireguard() -> VpnKind {
 fn fields_for(service: &str) -> Vec<VpnField> {
     match service {
         "org.freedesktop.NetworkManager.openconnect" => vec![
-            VpnField::new("gateway", "Gateway", "vpn.example.com").required(),
+            VpnField::new("gateway", "Gateway", "vpn.example.com")
+                .required()
+                .format(VpnFormat::Host),
             VpnField::new("protocol", "Protocol", "gp")
                 .required()
                 .choices(openconnect_protocols()),
             VpnField::new("wayle-username", "Username", "alice"),
         ],
         "org.freedesktop.NetworkManager.openvpn" => vec![
-            VpnField::new("remote", "Server", "vpn.example.com:1194").required(),
+            VpnField::new("remote", "Server", "vpn.example.com:1194")
+                .required()
+                .format(VpnFormat::HostPort),
             VpnField::new("username", "Username", "alice"),
             VpnField::new("password", "Password", "").secret(),
             VpnField::new("ca", "CA certificate", "/path/to/ca.crt"),
@@ -323,6 +468,151 @@ mod tests {
         let kinds = available();
         assert_eq!(kinds.first().map(|kind| kind.id.as_str()), Some(WIREGUARD));
         assert!(kinds[0].is_typed());
+    }
+
+    #[test]
+    fn an_empty_value_is_never_a_format_error() {
+        // Emptiness is `required`'s business, not the format's; reporting both
+        // for the same box would name it twice.
+        for format in [
+            VpnFormat::Host,
+            VpnFormat::HostPort,
+            VpnFormat::IpList,
+            VpnFormat::CidrList,
+            VpnFormat::Key,
+            VpnFormat::Number,
+        ] {
+            assert!(format.accepts(""), "{format:?} rejected an empty value");
+            assert!(format.accepts("   "), "{format:?} rejected blank space");
+        }
+    }
+
+    #[test]
+    fn an_address_list_takes_addresses_with_or_without_a_prefix() {
+        assert!(VpnFormat::CidrList.accepts("10.0.0.2/24"));
+        assert!(VpnFormat::CidrList.accepts("10.0.0.2"));
+        assert!(VpnFormat::CidrList.accepts("0.0.0.0/0, ::/0"));
+        assert!(VpnFormat::CidrList.accepts("fd00::2/64"));
+    }
+
+    #[test]
+    fn an_address_list_refuses_what_would_be_silently_dropped() {
+        // Each of these used to reach the profile builder, which kept the
+        // entries it could parse and threw the rest away without a word.
+        assert!(
+            !VpnFormat::CidrList.accepts("10.0.0.256/24"),
+            "not an address"
+        );
+        assert!(
+            !VpnFormat::CidrList.accepts("10.0.0.2/33"),
+            "prefix past /32"
+        );
+        assert!(
+            !VpnFormat::CidrList.accepts("fd00::2/129"),
+            "prefix past /128"
+        );
+        assert!(
+            !VpnFormat::CidrList.accepts("10.0.0.2, nonsense"),
+            "one bad entry"
+        );
+        assert!(!VpnFormat::CidrList.accepts(","), "no entries at all");
+    }
+
+    #[test]
+    fn a_dns_list_takes_only_bare_addresses() {
+        assert!(VpnFormat::IpList.accepts("10.0.0.1, fd00::1"));
+        assert!(
+            !VpnFormat::IpList.accepts("10.0.0.1/24"),
+            "a prefix is not a server"
+        );
+        assert!(
+            !VpnFormat::IpList.accepts("dns.example.com"),
+            "a name is not an address"
+        );
+    }
+
+    #[test]
+    fn an_endpoint_needs_a_port() {
+        assert!(VpnFormat::HostPort.accepts("vpn.example.com:51820"));
+        assert!(VpnFormat::HostPort.accepts("10.0.0.1:51820"));
+        assert!(VpnFormat::HostPort.accepts("[fd00::1]:51820"));
+
+        assert!(!VpnFormat::HostPort.accepts("vpn.example.com"), "no port");
+        assert!(
+            !VpnFormat::HostPort.accepts("vpn.example.com:0"),
+            "port zero"
+        );
+        assert!(
+            !VpnFormat::HostPort.accepts("vpn.example.com:99999"),
+            "past a u16"
+        );
+        assert!(
+            !VpnFormat::HostPort.accepts("fd00::1:51820"),
+            "unbracketed v6 is ambiguous"
+        );
+    }
+
+    #[test]
+    fn a_gateway_is_a_host_and_not_a_url() {
+        assert!(VpnFormat::Host.accepts("vpn.example.com"));
+        assert!(VpnFormat::Host.accepts("10.0.0.1"));
+        assert!(VpnFormat::Host.accepts("fd00::1"));
+
+        assert!(
+            !VpnFormat::Host.accepts("https://vpn.example.com"),
+            "a scheme is not a host"
+        );
+        assert!(
+            !VpnFormat::Host.accepts("vpn.example.com/portal"),
+            "a path is not a host"
+        );
+        assert!(!VpnFormat::Host.accepts("vpn example com"), "spaces");
+    }
+
+    #[test]
+    fn a_wireguard_key_is_thirty_two_bytes_of_base64() {
+        assert!(VpnFormat::Key.accepts("6HeTLQTdIcJHFmwCNBjMFR/nGiEBDSQMCsBcgWJZ7Fk="));
+
+        assert!(
+            !VpnFormat::Key.accepts("6HeTLQTdIcJHFmwCNBjMFR/nGiEBDSQMCsBcgWJZ7Fk"),
+            "no padding"
+        );
+        assert!(!VpnFormat::Key.accepts("not-a-key"), "too short");
+        assert!(
+            !VpnFormat::Key.accepts("6HeTLQTdIcJHFmwCNBjMFR nGiEBDSQMCsBcgWJZ7Fk="),
+            "not base64"
+        );
+    }
+
+    #[test]
+    fn a_keepalive_is_a_number() {
+        assert!(VpnFormat::Number.accepts("25"));
+        assert!(!VpnFormat::Number.accepts("25s"));
+        assert!(!VpnFormat::Number.accepts("-1"));
+    }
+
+    #[test]
+    fn plain_text_fields_take_anything_that_is_there() {
+        assert!(VpnFormat::Text.accepts("wg0"));
+        assert!(VpnFormat::Text.accepts("anything at all / really"));
+    }
+
+    #[test]
+    fn wireguards_fields_carry_the_formats_that_catch_a_typo() {
+        let fields = wireguard().fields;
+        let format = |key: &str| {
+            fields
+                .iter()
+                .find(|field| field.key == key)
+                .map(|field| field.format)
+        };
+
+        assert_eq!(format("private-key"), Some(VpnFormat::Key));
+        assert_eq!(format("address"), Some(VpnFormat::CidrList));
+        assert_eq!(format("dns"), Some(VpnFormat::IpList));
+        assert_eq!(format("peer-endpoint"), Some(VpnFormat::HostPort));
+        assert_eq!(format("peer-keepalive"), Some(VpnFormat::Number));
+        assert_eq!(format("interface"), Some(VpnFormat::Text));
     }
 
     #[test]

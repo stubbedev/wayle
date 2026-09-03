@@ -524,6 +524,13 @@ dropdown-network-vpn-no-native-sign-in = connexion via le greffon
 dropdown-network-vpn-raw-hint = Une paire clé = valeur par ligne
 dropdown-network-vpn-name-required = Un nom est requis
 dropdown-network-vpn-field-required = { $field } est requis
+dropdown-network-vpn-invalid-text = { $field } n'est pas valide
+dropdown-network-vpn-invalid-host = { $field } doit être un nom d'hôte ou une adresse, sans https:// ni chemin
+dropdown-network-vpn-invalid-host-port = { $field } doit être un hôte et un port, comme vpn.example.com:51820
+dropdown-network-vpn-invalid-ip-list = { $field } doit être des adresses IP, séparées par des virgules
+dropdown-network-vpn-invalid-cidr-list = { $field } doit être des adresses comme 10.0.0.2/24, séparées par des virgules
+dropdown-network-vpn-invalid-key = { $field } doit être une clé WireGuard : 44 caractères en base64
+dropdown-network-vpn-invalid-number = { $field } doit être un nombre entier
 dropdown-network-vpn-field-interface = Interface
 dropdown-network-vpn-field-private-key = Clé privée
 dropdown-network-vpn-field-address = Adresses

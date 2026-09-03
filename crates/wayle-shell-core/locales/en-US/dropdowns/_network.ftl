@@ -82,6 +82,13 @@ dropdown-network-vpn-no-native-sign-in = signs in through the plugin
 dropdown-network-vpn-raw-hint = One key = value per line
 dropdown-network-vpn-name-required = A name is required
 dropdown-network-vpn-field-required = { $field } is required
+dropdown-network-vpn-invalid-text = { $field } is not valid
+dropdown-network-vpn-invalid-host = { $field } should be a hostname or an address, with no https:// and no path
+dropdown-network-vpn-invalid-host-port = { $field } should be a host and a port, like vpn.example.com:51820
+dropdown-network-vpn-invalid-ip-list = { $field } should be IP addresses, separated by commas
+dropdown-network-vpn-invalid-cidr-list = { $field } should be addresses like 10.0.0.2/24, separated by commas
+dropdown-network-vpn-invalid-key = { $field } should be a WireGuard key: 44 characters of base64
+dropdown-network-vpn-invalid-number = { $field } should be a whole number
 dropdown-network-vpn-field-interface = Interface
 dropdown-network-vpn-field-private-key = Private key
 dropdown-network-vpn-field-address = Addresses
