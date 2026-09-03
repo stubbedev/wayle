@@ -14,6 +14,16 @@
     margin: var(--space-sm) var(--space-xs) 0;
 }
 
+// The heading over a group of fields: the kind decides the groups, this is
+// what tells them apart from the field labels below them.
+.network-vpn-section {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    margin: var(--space-md) var(--space-xs) var(--space-2xs);
+}
+
 .network-secret-fields {
     // The entries bring their own top margin; without this the first label
     // sits twice as far from the header as the rest.

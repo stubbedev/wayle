@@ -78,6 +78,26 @@ fn field_label(field: &VpnField) -> String {
     }
 }
 
+/// The heading a kind's group of fields sits under.
+///
+/// A slug rather than a string, so the vocabulary stays with the kind and the
+/// wording stays with the locale. An unknown slug is shown as itself, the same
+/// bargain `label_for` makes for a plugin wayle has never seen.
+fn section_heading(section: &str) -> gtk::Label {
+    let id = format!("dropdown-network-vpn-section-{section}");
+    let label = if crate::i18n::loader().has(&id) {
+        td!(&id)
+    } else {
+        String::from(section)
+    };
+
+    gtk::Label::builder()
+        .label(label)
+        .halign(gtk::Align::Start)
+        .css_classes(["network-vpn-section"])
+        .build()
+}
+
 /// A choice as shown, saying up front when picking it means the plugin's own
 /// auth dialog rather than wayle's sign-in.
 fn choice_label(choice: &VpnChoice) -> String {
@@ -667,7 +687,13 @@ impl VpnForm {
             return;
         }
 
+        let mut drawn_section = String::new();
         for field in &kind.fields {
+            if !field.section.is_empty() && field.section != drawn_section {
+                self.container.append(&section_heading(&field.section));
+                drawn_section.clone_from(&field.section);
+            }
+
             let label = gtk::Label::builder()
                 .label(field_label(field))
                 .halign(gtk::Align::Start)
@@ -733,6 +759,7 @@ mod tests {
             placeholder: String::new(),
             choices: Vec::new(),
             format: VpnFormat::Text,
+            section: String::new(),
         }
     }
 
@@ -798,6 +825,7 @@ mod tests {
                 placeholder: String::new(),
                 choices: Vec::new(),
                 format: VpnFormat::Text,
+                section: String::new(),
             },
             required("private-key"),
         ]);
@@ -925,6 +953,7 @@ mod tests {
                 placeholder: String::new(),
                 choices: Vec::new(),
                 format: VpnFormat::Text,
+                section: String::new(),
             }),
             "Protocol"
         );
@@ -940,6 +969,7 @@ mod tests {
             placeholder: String::new(),
             choices: Vec::new(),
             format: VpnFormat::Text,
+            section: String::new(),
         };
         assert_eq!(label_for(&field), "Plugin's own wording");
     }

@@ -177,6 +177,13 @@ pub struct VpnField {
     pub choices: Vec<VpnChoice>,
     /// What a value has to look like to be worth sending to NM.
     pub format: VpnFormat,
+    /// Which group of the form this field belongs to, as a slug the UI turns
+    /// into a heading. Empty means it stands on its own.
+    ///
+    /// WireGuard's nine fields are really three things — the local end, its
+    /// addressing, and the peer — and drawn as one flat list none of that is
+    /// visible.
+    pub section: String,
 }
 
 impl VpnField {
@@ -189,11 +196,17 @@ impl VpnField {
             placeholder: String::from(placeholder),
             choices: Vec::new(),
             format: VpnFormat::Text,
+            section: String::new(),
         }
     }
 
     const fn format(mut self, format: VpnFormat) -> Self {
         self.format = format;
+        self
+    }
+
+    fn section(mut self, section: &str) -> Self {
+        self.section = String::from(section);
         self
     }
 
@@ -253,28 +266,40 @@ fn wireguard() -> VpnKind {
         id: String::from(WIREGUARD),
         label: String::from("WireGuard"),
         fields: vec![
-            VpnField::new("interface", "Interface", "wg0").required(),
+            VpnField::new("interface", "Interface", "wg0")
+                .required()
+                .section("interface"),
             VpnField::new("private-key", "Private key", "")
                 .required()
                 .secret()
-                .format(VpnFormat::Key),
+                .format(VpnFormat::Key)
+                .section("interface"),
             VpnField::new("address", "Addresses", "10.0.0.2/24")
                 .required()
-                .format(VpnFormat::CidrList),
-            VpnField::new("dns", "DNS", "10.0.0.1").format(VpnFormat::IpList),
+                .format(VpnFormat::CidrList)
+                .section("addressing"),
+            VpnField::new("dns", "DNS", "10.0.0.1")
+                .format(VpnFormat::IpList)
+                .section("addressing"),
             VpnField::new("peer-public-key", "Peer public key", "")
                 .required()
-                .format(VpnFormat::Key),
+                .format(VpnFormat::Key)
+                .section("peer"),
             VpnField::new("peer-endpoint", "Peer endpoint", "vpn.example.com:51820")
                 .required()
-                .format(VpnFormat::HostPort),
+                .format(VpnFormat::HostPort)
+                .section("peer"),
             VpnField::new("peer-allowed-ips", "Allowed IPs", "0.0.0.0/0, ::/0")
                 .required()
-                .format(VpnFormat::CidrList),
+                .format(VpnFormat::CidrList)
+                .section("peer"),
             VpnField::new("peer-preshared-key", "Preshared key", "")
                 .secret()
-                .format(VpnFormat::Key),
-            VpnField::new("peer-keepalive", "Keepalive (seconds)", "25").format(VpnFormat::Number),
+                .format(VpnFormat::Key)
+                .section("peer"),
+            VpnField::new("peer-keepalive", "Keepalive (seconds)", "25")
+                .format(VpnFormat::Number)
+                .section("peer"),
         ],
     }
 }
@@ -468,6 +493,39 @@ mod tests {
         let kinds = available();
         assert_eq!(kinds.first().map(|kind| kind.id.as_str()), Some(WIREGUARD));
         assert!(kinds[0].is_typed());
+    }
+
+    #[test]
+    fn wireguards_fields_are_grouped_into_the_three_things_they_are() {
+        let wireguard = wireguard();
+        let sections: Vec<&str> = wireguard
+            .fields
+            .iter()
+            .map(|field| field.section.as_str())
+            .collect();
+
+        assert_eq!(
+            sections,
+            [
+                "interface",
+                "interface",
+                "addressing",
+                "addressing",
+                "peer",
+                "peer",
+                "peer",
+                "peer",
+                "peer",
+            ],
+            "each group is contiguous, or the headings would repeat"
+        );
+    }
+
+    #[test]
+    fn a_kind_with_nothing_to_group_says_so_with_no_section() {
+        let fields = fields_for("org.freedesktop.NetworkManager.openconnect");
+
+        assert!(fields.iter().all(|field| field.section.is_empty()));
     }
 
     #[test]
