@@ -102,6 +102,14 @@ async fn pump_rows(mut writer: FrameWriter, input_file: Option<String>, separato
         }
     }
     let _ = writer.finish_rows().await;
+
+    // Park the writer for the rest of the session instead of returning and
+    // dropping it. Dropping half-closes the socket, and the daemon reads
+    // that FIN as the client dying — so a `-dmenu` menu vanished the instant
+    // its rows finished streaming, with the CLI exiting 1 in silence. `run`
+    // aborts this task when the session ends, which is when the write half
+    // should close.
+    std::future::pending::<()>().await;
 }
 
 async fn read_input(input_file: Option<String>) -> std::io::Result<String> {

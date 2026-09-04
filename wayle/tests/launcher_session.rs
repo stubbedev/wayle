@@ -171,3 +171,54 @@ fn dmenu_session_streams_rows_then_signals_eof() -> TestResult {
     reap(&mut child);
     Ok(())
 }
+
+/// Negative: finishing the rows must not look like the client dying.
+///
+/// The row pump owns the write half, so returning from it dropped the half
+/// and half-closed the socket — the daemon read that FIN as a dead client and
+/// tore the menu down the instant the rows arrived. `-dmenu` menus vanished
+/// immediately and the CLI exited 1 without a word.
+#[test]
+fn dmenu_session_stays_open_after_its_rows_are_done() -> TestResult {
+    let daemon = Daemon::bind("dmenu-live")?;
+    let mut child = daemon.spawn(&["launcher", "-dmenu"], Stdio::piped())?;
+    child
+        .stdin
+        .take()
+        .ok_or("stdin was not piped")?
+        .write_all(b"alpha\nbravo\n")?;
+    let (mut reader, _writer) = daemon.accept_session()?;
+
+    let _rows = read_frame(&mut reader)?;
+    let done = read_frame(&mut reader)?;
+    assert!(
+        done.contains("\"type\":\"rows-done\""),
+        "expected rows-done first, got: {done}"
+    );
+
+    let mut byte = [0u8; 1];
+    match reader.read(&mut byte) {
+        Ok(0) => {
+            reap(&mut child);
+            return Err(
+                "daemon saw EOF once the rows were done: the dmenu pump half-closed the socket"
+                    .into(),
+            );
+        }
+        Ok(_) => {
+            reap(&mut child);
+            return Err("unexpected client frame after rows-done".into());
+        }
+        Err(error) => assert!(
+            matches!(error.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut),
+            "unexpected socket error: {error}"
+        ),
+    }
+    assert!(
+        child.try_wait()?.is_none(),
+        "CLI exited while the dmenu session was still open"
+    );
+
+    reap(&mut child);
+    Ok(())
+}
