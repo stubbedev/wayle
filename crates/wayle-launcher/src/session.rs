@@ -23,6 +23,11 @@ pub struct Session {
     pub engine: MatchEngine,
     /// Multi-select accumulation (matched-item indices).
     pub selected: BTreeSet<u32>,
+    /// `-completer-mode`: the mode `kb-mode-complete` opens to *complete*
+    /// the query rather than to launch something.
+    completer: Option<String>,
+    /// While the completer is open, the mode index to return to.
+    completing_from: Option<usize>,
 }
 
 impl Session {
@@ -45,6 +50,73 @@ impl Session {
             subset: None,
             engine: MatchEngine::new(options, notify),
             selected: BTreeSet::new(),
+            completer: None,
+            completing_from: None,
+        }
+    }
+
+    /// Names the mode `kb-mode-complete` opens (rofi `-completer-mode`).
+    ///
+    /// It has to be one of the session's own modes; the surface adds it to
+    /// the list when the flag names one that is not already there.
+    pub fn set_completer(&mut self, mode: Option<String>) {
+        self.completer = mode.filter(|name| !name.is_empty());
+    }
+
+    /// Whether the completer is currently open.
+    #[must_use]
+    pub fn completing(&self) -> bool {
+        self.completing_from.is_some()
+    }
+
+    /// Opens the completer, remembering where to come back to.
+    ///
+    /// Returns false when no completer is configured or it is not a mode this
+    /// session loaded — pressing the key then does nothing rather than
+    /// switching to some arbitrary mode.
+    pub async fn open_completer(&mut self) -> bool {
+        if self.completing_from.is_some() {
+            return false;
+        }
+        let Some(name) = self.completer.clone() else {
+            return false;
+        };
+        let Some(index) = self.modes.iter().position(|mode| mode.name() == name) else {
+            return false;
+        };
+        if index == self.active {
+            return false;
+        }
+        let from = self.active;
+        self.switch_to(index).await;
+        self.completing_from = Some(from);
+        true
+    }
+
+    /// Closes the completer without taking anything from it.
+    pub async fn cancel_completer(&mut self) {
+        if let Some(from) = self.completing_from.take() {
+            self.switch_to(from).await;
+        }
+    }
+
+    /// Takes the completer's row as the query and returns to the mode that
+    /// asked for it.
+    ///
+    /// The point of a completer is that accepting a row *fills the box*
+    /// rather than launching it, so the caller gets [`Action::SetInput`]
+    /// instead of whatever the completer mode would have done.
+    pub async fn complete_with(&mut self, index: Option<u32>) -> Action {
+        let Some(from) = self.completing_from.take() else {
+            return Action::Nothing;
+        };
+        let text = index
+            .and_then(|index| self.engine.items().get(index as usize))
+            .map(|item| item.display.clone());
+        self.switch_to(from).await;
+        match text {
+            Some(text) => Action::SetInput(text),
+            None => Action::Nothing,
         }
     }
 
@@ -137,6 +209,11 @@ impl Session {
     /// Forward an accept to the active mode and apply the resulting action.
     /// Returns the action for the surface to interpret (Close/Exit/...).
     pub async fn activate(&mut self, index: Option<u32>, kind: ActivateKind) -> Action {
+        // While the completer is open, accepting fills the query instead of
+        // launching: that is what makes it a completer and not a mode switch.
+        if self.completing() {
+            return self.complete_with(index).await;
+        }
         if matches!(kind, ActivateKind::Custom(_))
             && (!self.modes[self.active].allows_custom() || self.state.no_custom)
         {
@@ -297,5 +374,81 @@ mod tests {
         session.load().await;
         let action = session.activate(Some(0), ActivateKind::Default).await;
         assert!(matches!(action, Action::Close));
+    }
+
+    #[tokio::test]
+    async fn a_completer_fills_the_query_instead_of_launching() {
+        let mut session = session();
+        session.set_completer(Some(String::from("beta")));
+        session.load().await;
+        assert_eq!(session.active_index(), 0);
+
+        assert!(session.open_completer().await, "the completer opens");
+        assert!(session.completing());
+        assert_eq!(session.active_index(), 1, "it is showing the completer");
+
+        // Accepting takes the row's text and returns to where we came from —
+        // a completer that launched the row would be a mode switch.
+        let action = session.activate(Some(0), ActivateKind::Default).await;
+        match action {
+            Action::SetInput(text) => assert_eq!(text, "b1"),
+            other => panic!("expected the row's text back, got {other:?}"),
+        }
+        assert!(!session.completing());
+        assert_eq!(session.active_index(), 0, "back to the original mode");
+    }
+
+    #[tokio::test]
+    async fn cancelling_the_completer_takes_nothing_from_it() {
+        let mut session = session();
+        session.set_completer(Some(String::from("beta")));
+        session.load().await;
+        assert!(session.open_completer().await);
+
+        session.cancel_completer().await;
+        assert!(!session.completing());
+        assert_eq!(session.active_index(), 0);
+        // And a later accept behaves normally again.
+        let action = session.activate(Some(0), ActivateKind::Default).await;
+        assert!(matches!(action, Action::Close), "got {action:?}");
+    }
+
+    #[tokio::test]
+    async fn a_completer_that_is_not_loaded_does_nothing() {
+        let mut session = session();
+        // Naming a mode this session never loaded must not switch to some
+        // arbitrary one.
+        session.set_completer(Some(String::from("nope")));
+        session.load().await;
+        assert!(!session.open_completer().await);
+        assert!(!session.completing());
+        assert_eq!(session.active_index(), 0);
+
+        // Nor may the completer be the mode already showing: there would be
+        // nothing to come back to.
+        session.set_completer(Some(String::from("alpha")));
+        assert!(!session.open_completer().await);
+        assert!(!session.completing());
+    }
+
+    #[tokio::test]
+    async fn no_completer_configured_means_the_key_is_inert() {
+        let mut session = session();
+        session.load().await;
+        assert!(!session.open_completer().await);
+        session.set_completer(Some(String::new()));
+        assert!(!session.open_completer().await);
+    }
+
+    #[tokio::test]
+    async fn the_completer_cannot_be_opened_twice() {
+        // Otherwise the second open would overwrite the mode to return to,
+        // and the completer would never close.
+        let mut session = session();
+        session.set_completer(Some(String::from("beta")));
+        session.load().await;
+        assert!(session.open_completer().await);
+        assert!(!session.open_completer().await);
+        assert_eq!(session.completing_from, Some(0));
     }
 }

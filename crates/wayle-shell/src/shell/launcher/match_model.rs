@@ -116,6 +116,29 @@ impl MatchModel {
             .and_then(|position| u32::try_from(position).ok())
     }
 
+    /// The display text at a matched-list position, as *text* — a hook's
+    /// `{entry}`.
+    ///
+    /// Markup rows are flattened: `drun`'s default display format wraps the
+    /// generic name in a `<span>`, and a preview script handed
+    /// `Alacritty <span weight='light'>(Terminal)</span>` cannot do anything
+    /// useful with it.
+    pub fn text_at(&self, position: u32) -> Option<String> {
+        let item_index = self.item_index(position)?;
+        let items = self.imp().items.borrow();
+        let item = items.get(item_index as usize)?;
+        if !item.flags.contains(wayle_launcher::ItemFlags::MARKUP) {
+            return Some(item.display.clone());
+        }
+        Some(
+            relm4::gtk::pango::parse_markup(&item.display, '\0')
+                .map(|(_, text, _)| text.to_string())
+                // Markup that does not parse is what it is; the row shows it
+                // verbatim too.
+                .unwrap_or_else(|_| item.display.clone()),
+        )
+    }
+
     /// All row texts in display order (`-dump`).
     pub fn texts(&self) -> Vec<String> {
         let items = self.imp().items.borrow();

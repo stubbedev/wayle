@@ -225,8 +225,34 @@ pub struct SessionOptions {
 
     /// `-kb-*` overrides: action name (without `kb-`) → key list.
     pub kb_overrides: BTreeMap<String, String>,
+    /// `-me-*`/`-ml-*` overrides: action name (with the `me-`/`ml-` prefix
+    /// kept, since the two namespaces have their own action names) → the
+    /// rofi mouse binding list.
+    pub mouse_overrides: BTreeMap<String, String>,
     /// `-display-<mode>` overrides: mode name → display name.
     pub display_names: BTreeMap<String, String>,
+
+    /// `-on-selection-changed`.
+    pub on_selection_changed: Option<String>,
+    /// `-on-entry-accepted`.
+    pub on_entry_accepted: Option<String>,
+    /// `-on-mode-changed`.
+    pub on_mode_changed: Option<String>,
+    /// `-on-menu-canceled`.
+    pub on_menu_canceled: Option<String>,
+    /// `-on-menu-error`.
+    pub on_menu_error: Option<String>,
+
+    /// `-font`: per-invocation font, as a Pango font description.
+    pub font: Option<String>,
+    /// `-style`: a named `[launcher.styles]` preset to apply.
+    pub style: Option<String>,
+    /// `-preview-cmd`: the command that turns a `thumbnail://` row icon into
+    /// an image file.
+    pub preview_cmd: Option<String>,
+    /// `-completer-mode`: the mode `kb-mode-complete` opens to complete the
+    /// query rather than to launch something.
+    pub completer_mode: Option<String>,
 }
 
 /// Frames sent CLI → daemon.

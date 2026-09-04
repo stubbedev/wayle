@@ -3216,6 +3216,11 @@
           "default": true,
           "description": "Keep the list height fixed at `lines` rows."
         },
+        "font": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Launcher font, as a Pango description (`\"Inter 12\"`). Empty keeps the\nshell's font. rofi's `-font` overrides it per invocation."
+        },
         "history": {
           "$ref": "#/$defs/LauncherHistoryConfig",
           "default": {
@@ -3268,6 +3273,11 @@
           "default": "",
           "description": "Output connector to show on (\"\" = focused output)."
         },
+        "mouse-bindings": {
+          "$ref": "#/$defs/Map_of_string",
+          "default": {},
+          "description": "Mouse binding overrides: action (rofi's `me-`/`ml-` name, prefix\nincluded, e.g. `me-accept-entry`, `ml-row-down`) → comma-separated\nbutton list (e.g. `\"MouseDPrimary\"`, `\"ScrollDown\"`). Unset actions\nkeep their defaults."
+        },
         "negate-char": {
           "$ref": "#/$defs/string",
           "default": "-",
@@ -3277,6 +3287,11 @@
           "$ref": "#/$defs/boolean",
           "default": true,
           "description": "Strip accents/normalize Unicode while matching."
+        },
+        "preview-cmd": {
+          "$ref": "#/$defs/string",
+          "default": "",
+          "description": "Command that turns a `thumbnail://` row icon into an image file:\n`{input}` the icon's path, `{output}` where to write the thumbnail,\n`{size}` the requested pixel size. Empty uses the system's XDG\nthumbnailers. rofi's `-preview-cmd`."
         },
         "run": {
           "$ref": "#/$defs/LauncherRunConfig",
@@ -3321,6 +3336,11 @@
             "parse-known-hosts": true
           },
           "description": "ssh mode."
+        },
+        "styles": {
+          "$ref": "#/$defs/Map_of_string",
+          "default": {},
+          "description": "Named looks selectable per invocation with `-style <name>`: name →\nthe CSS applied for that session, on top of `[styling]`.\n\nCSS rather than a second copy of the display keys: a preset exists to\nsay \"this invocation looks different\", and there is no list of the\nways someone might want that. `-style compact` then costs one config\nentry instead of a schema change."
         },
         "terminal": {
           "$ref": "#/$defs/string",
@@ -9154,6 +9174,7 @@
           "sorting-method": "name"
         },
         "fixed-num-lines": true,
+        "font": "",
         "history": {
           "enable": true,
           "max-size": 25
@@ -9170,8 +9191,10 @@
           "window"
         ],
         "monitor": "",
+        "mouse-bindings": {},
         "negate-char": "-",
         "normalize-match": true,
+        "preview-cmd": "",
         "run": {
           "list-command": "",
           "run-command": "{cmd}",
@@ -9188,6 +9211,7 @@
           "parse-hosts": false,
           "parse-known-hosts": true
         },
+        "styles": {},
         "terminal": "",
         "tokenize": true,
         "width": 1.0,

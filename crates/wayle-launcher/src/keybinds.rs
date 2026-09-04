@@ -64,6 +64,41 @@ pub const DEFAULTS: &[(&str, &str)] = &[
     ("custom-19", "Alt+parenleft"),
 ];
 
+/// Default mouse bindings (`rofi-keys(5)`), with one deliberate deviation.
+///
+/// rofi accepts a row on `MouseDPrimary` — a double click — and only selects
+/// it on a single one. wayle has always accepted on a single click, so
+/// `me-accept-entry` keeps both: rofi's exact behaviour is one
+/// `-me-accept-entry MouseDPrimary` away, and nobody's muscle memory breaks
+/// on an upgrade.
+pub const MOUSE_DEFAULTS: &[(&str, &str)] = &[
+    ("me-select-entry", "MousePrimary"),
+    ("me-accept-entry", "MousePrimary,MouseDPrimary"),
+    ("me-accept-custom", "Control+MouseDPrimary"),
+    ("ml-row-up", "ScrollUp"),
+    ("ml-row-down", "ScrollDown"),
+    ("ml-row-left", "ScrollLeft"),
+    ("ml-row-right", "ScrollRight"),
+];
+
+/// Effective mouse bindings: [`MOUSE_DEFAULTS`] with per-action `overrides`
+/// applied (config `[launcher.mouse-bindings]`, then per-session `-me-*` /
+/// `-ml-*`).
+pub fn effective_mouse(
+    overrides: &std::collections::BTreeMap<String, String>,
+) -> Vec<(String, String)> {
+    MOUSE_DEFAULTS
+        .iter()
+        .map(|(action, buttons)| {
+            let buttons = overrides
+                .get(*action)
+                .cloned()
+                .unwrap_or_else(|| (*buttons).to_owned());
+            ((*action).to_owned(), buttons)
+        })
+        .collect()
+}
+
 /// Effective bindings: rofi defaults with per-action `overrides` applied
 /// (config `[launcher.keybindings]`, then per-session `-kb-*`).
 pub fn effective(overrides: &std::collections::BTreeMap<String, String>) -> Vec<(String, String)> {
@@ -82,6 +117,19 @@ pub fn effective(overrides: &std::collections::BTreeMap<String, String>) -> Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mouse_overrides_replace_defaults() {
+        let mut overrides = std::collections::BTreeMap::new();
+        overrides.insert("me-accept-entry".to_owned(), "MouseDPrimary".to_owned());
+        let bindings = effective_mouse(&overrides);
+        let accept = bindings
+            .iter()
+            .find(|(action, _)| action == "me-accept-entry");
+        assert_eq!(accept.map(|(_, b)| b.as_str()), Some("MouseDPrimary"));
+        let scroll = bindings.iter().find(|(action, _)| action == "ml-row-down");
+        assert_eq!(scroll.map(|(_, b)| b.as_str()), Some("ScrollDown"));
+    }
 
     #[test]
     fn overrides_replace_defaults() {

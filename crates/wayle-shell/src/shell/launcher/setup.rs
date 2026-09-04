@@ -13,10 +13,10 @@ use wayle_config::{
 };
 use wayle_ipc::launcher_socket::{LauncherWidth, SessionOptions};
 use wayle_launcher::{
-    CaseMode, MatchMethod, MatcherOptions, Mode, SortMethod,
+    CaseMode, Hooks, MatchMethod, MatcherOptions, Mode, SortMethod,
     history::HistoryStore,
     modes::{
-        CalcMode, CombiMode, DmenuConfig, DmenuMode, DrunConfig, DrunField, DrunMode,
+        CalcMode, CombiMode, DmenuConfig, DmenuMode, DrunConfig, DrunField, DrunMode, EmojiMode,
         FileBrowserConfig, FileBrowserMode, FileSort, KeysMode, RunConfig, RunMode, ScriptMode,
         SshConfig, SshMode, WindowConfig, WindowField, WindowMode,
     },
@@ -56,6 +56,17 @@ pub(super) struct UiSettings {
     pub display_names: BTreeMap<String, String>,
     /// Effective keybindings (defaults ← config ← `-kb-*`).
     pub keybindings: Vec<(String, String)>,
+    /// Effective mouse bindings (defaults ← config ← `-me-*`/`-ml-*`).
+    pub mouse_bindings: Vec<(String, String)>,
+    /// `-on-*` commands for this session.
+    pub hooks: Hooks,
+    /// The CSS this session adds on top of `[styling]`: the `-font`/config
+    /// font and the `-style` preset, already rendered.
+    pub css: Option<String>,
+    /// `-preview-cmd`: how a `thumbnail://` icon becomes an image file.
+    pub preview_cmd: Option<String>,
+    /// `-completer-mode`: the mode `kb-mode-complete` opens.
+    pub completer: Option<String>,
     /// Wrap selection at list edges.
     pub cycle: bool,
     /// Accept automatically when exactly one result remains.
@@ -174,6 +185,14 @@ pub(super) fn build(
                 .unwrap_or_else(|| launcher.sidebar_mode.get()),
             display_names,
             keybindings: effective_bindings,
+            mouse_bindings: mouse_bindings(options, launcher),
+            hooks: hooks(options),
+            css: session_css(options, launcher),
+            preview_cmd: preview_cmd(options, launcher),
+            completer: options
+                .completer_mode
+                .clone()
+                .filter(|name| !name.is_empty()),
             cycle: options.cycle.unwrap_or_else(|| launcher.cycle.get()),
             auto_select: options
                 .auto_select
@@ -185,15 +204,20 @@ pub(super) fn build(
                 .display_column_separator
                 .clone()
                 .unwrap_or_else(|| "\t".to_owned()),
-            ellipsize: if options.keep_right {
-                "start".to_owned()
-            } else {
-                options
-                    .ellipsize_mode
-                    .clone()
-                    .unwrap_or_else(|| "end".to_owned())
-            },
+            ellipsize: ellipsize(options),
         },
+    }
+}
+
+/// Row truncation: `-keep-right` is `-ellipsize-mode start` by another name.
+fn ellipsize(options: &SessionOptions) -> String {
+    if options.keep_right {
+        "start".to_owned()
+    } else {
+        options
+            .ellipsize_mode
+            .clone()
+            .unwrap_or_else(|| "end".to_owned())
     }
 }
 
@@ -211,6 +235,16 @@ fn requested_modes(
         && !names.contains(mode)
     {
         names.insert(0, mode.clone());
+    }
+    // The completer has to be one of the session's own modes for the key to
+    // reach it, and `-completer-mode` naming one is the whole request — so
+    // it is loaded even when `-modes` did not list it. It is appended, so it
+    // is never the mode the session opens on.
+    if let Some(completer) = &options.completer_mode
+        && !completer.is_empty()
+        && !names.contains(completer)
+    {
+        names.push(completer.clone());
     }
     names
 }
@@ -250,6 +284,7 @@ fn build_mode(
         )))),
         "keys" => Some(Box::new(KeysMode::new(bindings.to_vec()))),
         "calc" => Some(Box::new(CalcMode::new())),
+        "emoji" => Some(Box::new(EmojiMode::new())),
         "combi" => {
             let combi = &config.launcher.combi;
             let children: Vec<Box<dyn Mode>> = combi
@@ -579,4 +614,255 @@ fn location_from_rofi(location: u8) -> Option<LauncherLocation> {
         8 => LauncherLocation::West,
         _ => return None,
     })
+}
+
+/// A Pango font description as GTK CSS properties.
+///
+/// The two syntaxes are not interchangeable and it is easy to assume they
+/// are: Pango puts the size last (`"Monospace 20"`), CSS's `font:` shorthand
+/// puts it first (`font: 20pt Monospace`), so handing CSS a Pango string
+/// yields a declaration GTK silently drops — `-font` looked like it did
+/// nothing at all. Parsing it and emitting the individual properties is what
+/// makes rofi's spelling work.
+fn font_properties(description: &str) -> String {
+    let description = relm4::gtk::pango::FontDescription::from_string(description);
+    let mut properties = Vec::new();
+
+    let family = description.family().unwrap_or_default();
+    if !family.is_empty() {
+        properties.push(format!("font-family: \"{family}\";"));
+    }
+
+    // Pango sizes are in points scaled by `pango::SCALE`, unless the
+    // description says they are absolute pixels.
+    let size = description.size();
+    if size > 0 {
+        let points = f64::from(size) / f64::from(relm4::gtk::pango::SCALE);
+        let unit = if description.is_size_absolute() {
+            "px"
+        } else {
+            "pt"
+        };
+        properties.push(format!("font-size: {points}{unit};"));
+    }
+
+    if description.style() == relm4::gtk::pango::Style::Italic {
+        properties.push(String::from("font-style: italic;"));
+    }
+    // CSS takes the numeric weight, which is the value pango's enum wraps.
+    let weight = relm4::gtk::glib::translate::IntoGlib::into_glib(description.weight());
+    if weight > 0 && description.weight() != relm4::gtk::pango::Weight::Normal {
+        properties.push(format!("font-weight: {weight};"));
+    }
+
+    properties.join(" ")
+}
+
+/// The `-on-*` commands this session asked for.
+fn hooks(options: &SessionOptions) -> Hooks {
+    Hooks {
+        selection_changed: options.on_selection_changed.clone(),
+        entry_accepted: options.on_entry_accepted.clone(),
+        mode_changed: options.on_mode_changed.clone(),
+        menu_canceled: options.on_menu_canceled.clone(),
+        menu_error: options.on_menu_error.clone(),
+    }
+}
+
+/// `-preview-cmd`, else the configured one, else the system thumbnailers.
+fn preview_cmd(
+    options: &SessionOptions,
+    launcher: &wayle_config::schemas::launcher::LauncherConfig,
+) -> Option<String> {
+    options
+        .preview_cmd
+        .clone()
+        .or_else(|| Some(launcher.preview_cmd.get()))
+        .filter(|command| !command.trim().is_empty())
+}
+
+/// Effective mouse bindings: defaults, then config, then `-me-*`/`-ml-*`.
+fn mouse_bindings(
+    options: &SessionOptions,
+    launcher: &wayle_config::schemas::launcher::LauncherConfig,
+) -> Vec<(String, String)> {
+    let mut mouse = launcher.mouse_bindings.get();
+    for (action, buttons) in &options.mouse_overrides {
+        mouse.insert(action.clone(), buttons.clone());
+    }
+    wayle_launcher::keybinds::effective_mouse(&mouse)
+}
+
+/// The CSS one session adds on top of `[styling]`, from the font and the
+/// `-style` preset — or `None` when it asked for neither.
+///
+/// One provider for both because they want the same lifecycle: GTK4 has no
+/// per-widget style provider, so anything per-session has to be a provider
+/// added to the display for the session's lifetime and removed after.
+///
+/// Scoped to `.launcher-surface` so a preset cannot reach the bar.
+fn session_css(
+    options: &SessionOptions,
+    launcher: &wayle_config::schemas::launcher::LauncherConfig,
+) -> Option<String> {
+    let mut css = String::new();
+
+    let font = options
+        .font
+        .clone()
+        .unwrap_or_else(|| launcher.font.get())
+        .trim()
+        .to_owned();
+    if !font.is_empty() {
+        // `.launcher-surface`, not `.launcher-window`: the surface declares
+        // its own `font-family` (`_launcher.scss`), so a rule on the window
+        // above it is inherited and then immediately overridden. Same
+        // specificity here means the provider priority decides, which is
+        // what makes the override actually win.
+        css.push_str(&format!(
+            ".launcher-surface {{ {} }}\n",
+            font_properties(&font)
+        ));
+    }
+
+    if let Some(name) = &options.style {
+        match launcher.styles.get().get(name) {
+            Some(preset) => css.push_str(preset),
+            // Naming a preset that does not exist is a typo in a bind, and
+            // silently rendering the default look is how it stays unnoticed.
+            None => warn!(style = %name, "launcher: no such [launcher.styles] preset"),
+        }
+    }
+
+    (!css.trim().is_empty()).then_some(css)
+}
+
+#[cfg(test)]
+mod tests {
+    use wayle_config::Config;
+
+    use super::*;
+
+    fn launcher_config() -> Config {
+        Config::default()
+    }
+
+    #[test]
+    fn a_session_asking_for_neither_font_nor_style_adds_no_css() {
+        let config = launcher_config();
+        assert!(session_css(&SessionOptions::default(), &config.launcher).is_none());
+    }
+
+    #[test]
+    fn the_font_flag_becomes_css_scoped_to_the_launcher() {
+        let config = launcher_config();
+        let options = SessionOptions {
+            font: Some(String::from("Inter 12")),
+            ..SessionOptions::default()
+        };
+        let css = session_css(&options, &config.launcher).expect("font produces css");
+        assert!(css.contains("font-family: \"Inter\""), "{css}");
+        assert!(css.contains("font-size: 12pt"), "{css}");
+        assert!(
+            css.contains(".launcher-surface"),
+            "a preset must not reach the rest of the shell: {css}"
+        );
+    }
+
+    #[test]
+    fn a_style_preset_is_looked_up_by_name_and_a_missing_one_adds_nothing() {
+        let config = launcher_config();
+        config
+            .launcher
+            .styles
+            .set(std::collections::BTreeMap::from([(
+                String::from("compact"),
+                String::from(".launcher-row { padding: 0; }"),
+            )]));
+
+        let found = session_css(
+            &SessionOptions {
+                style: Some(String::from("compact")),
+                ..SessionOptions::default()
+            },
+            &config.launcher,
+        );
+        assert_eq!(found.as_deref(), Some(".launcher-row { padding: 0; }"));
+
+        let missing = session_css(
+            &SessionOptions {
+                style: Some(String::from("nope")),
+                ..SessionOptions::default()
+            },
+            &config.launcher,
+        );
+        assert!(
+            missing.is_none(),
+            "an unknown preset contributes nothing rather than something arbitrary"
+        );
+    }
+
+    #[test]
+    fn the_font_and_a_preset_share_one_provider() {
+        let config = launcher_config();
+        config
+            .launcher
+            .styles
+            .set(std::collections::BTreeMap::from([(
+                String::from("compact"),
+                String::from(".launcher-row { padding: 0; }"),
+            )]));
+        let css = session_css(
+            &SessionOptions {
+                font: Some(String::from("Inter 12")),
+                style: Some(String::from("compact")),
+                ..SessionOptions::default()
+            },
+            &config.launcher,
+        )
+        .expect("both produce css");
+        assert!(css.contains("font-family: \"Inter\""), "{css}");
+        assert!(css.contains(".launcher-row"), "{css}");
+    }
+
+    #[test]
+    fn a_pango_font_description_becomes_css_properties_not_the_css_shorthand() {
+        // The bug this exists to catch: `font: Monospace 20` is not valid CSS
+        // — CSS wants the size first — so GTK dropped the whole declaration
+        // and `-font` did nothing visible.
+        let properties = font_properties("Monospace 20");
+        assert!(
+            properties.contains("font-family: \"Monospace\""),
+            "{properties}"
+        );
+        assert!(properties.contains("font-size: 20pt"), "{properties}");
+        assert!(
+            !properties.contains("font:"),
+            "the shorthand is what silently failed: {properties}"
+        );
+    }
+
+    #[test]
+    fn a_font_description_carries_its_style_and_weight_across() {
+        let properties = font_properties("Inter Bold Italic 11");
+        assert!(
+            properties.contains("font-family: \"Inter\""),
+            "{properties}"
+        );
+        assert!(properties.contains("font-style: italic"), "{properties}");
+        assert!(properties.contains("font-weight: 700"), "{properties}");
+        // A plain description says nothing about style or weight, so the CSS
+        // must not either — otherwise it overrides the theme with defaults.
+        let plain = font_properties("Inter 11");
+        assert!(!plain.contains("font-style"), "{plain}");
+        assert!(!plain.contains("font-weight"), "{plain}");
+    }
+
+    #[test]
+    fn a_sizeless_font_description_sets_only_the_family() {
+        // rofi accepts a bare family; a `font-size: 0pt` would make the
+        // launcher unreadable.
+        let properties = font_properties("Inter");
+        assert_eq!(properties, "font-family: \"Inter\";");
+    }
 }

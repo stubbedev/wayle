@@ -129,6 +129,37 @@ pub struct LauncherConfig {
     #[default(BTreeMap::new())]
     pub keybindings: ConfigProperty<BTreeMap<String, String>>,
 
+    /// Mouse binding overrides: action (rofi's `me-`/`ml-` name, prefix
+    /// included, e.g. `me-accept-entry`, `ml-row-down`) → comma-separated
+    /// button list (e.g. `"MouseDPrimary"`, `"ScrollDown"`). Unset actions
+    /// keep their defaults.
+    #[serde(rename = "mouse-bindings")]
+    #[default(BTreeMap::new())]
+    pub mouse_bindings: ConfigProperty<BTreeMap<String, String>>,
+
+    /// Launcher font, as a Pango description (`"Inter 12"`). Empty keeps the
+    /// shell's font. rofi's `-font` overrides it per invocation.
+    #[default(String::new())]
+    pub font: ConfigProperty<String>,
+
+    /// Named looks selectable per invocation with `-style <name>`: name →
+    /// the CSS applied for that session, on top of `[styling]`.
+    ///
+    /// CSS rather than a second copy of the display keys: a preset exists to
+    /// say "this invocation looks different", and there is no list of the
+    /// ways someone might want that. `-style compact` then costs one config
+    /// entry instead of a schema change.
+    #[default(BTreeMap::new())]
+    pub styles: ConfigProperty<BTreeMap<String, String>>,
+
+    /// Command that turns a `thumbnail://` row icon into an image file:
+    /// `{input}` the icon's path, `{output}` where to write the thumbnail,
+    /// `{size}` the requested pixel size. Empty uses the system's XDG
+    /// thumbnailers. rofi's `-preview-cmd`.
+    #[serde(rename = "preview-cmd")]
+    #[default(String::new())]
+    pub preview_cmd: ConfigProperty<String>,
+
     /// Launch history / frecency.
     pub history: LauncherHistoryConfig,
 

@@ -28,6 +28,18 @@ pub enum IconSource {
     Name(String),
     /// Image file on disk.
     File(PathBuf),
+    /// A thumbnail of this file, generated on demand (rofi
+    /// `thumbnail://<path>` and `-preview-cmd`).
+    ///
+    /// Carries its own fallback because a file nothing can thumbnail still
+    /// has to show something, and the row is drawn before any thumbnail
+    /// exists.
+    Thumbnail {
+        /// The file to picture.
+        path: PathBuf,
+        /// Icon-theme name to show until (or instead of) the thumbnail.
+        fallback: String,
+    },
 }
 
 /// One list entry. Its index in the mode's item vec is its identity —

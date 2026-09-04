@@ -77,9 +77,16 @@ async fn run_local(local: LocalCmd) -> CliAction {
             let service = ConfigService::load()
                 .await
                 .map_err(|error| format!("failed to load config: {error}"))?;
-            let overrides = service.config().launcher.keybindings.get();
-            for (action, keys) in wayle_launcher::keybinds::effective(&overrides) {
+            let launcher = &service.config().launcher;
+            for (action, keys) in wayle_launcher::keybinds::effective(&launcher.keybindings.get()) {
                 println!("kb-{action}: {keys}");
+            }
+            // The mouse bindings share this listing: they are the same kind
+            // of thing, and `-list-keybindings` is where someone looks to
+            // find out what is bound.
+            let mouse = launcher.mouse_bindings.get();
+            for (action, buttons) in wayle_launcher::keybinds::effective_mouse(&mouse) {
+                println!("{action}: {buttons}");
             }
             Ok(())
         }
@@ -105,5 +112,29 @@ GEOMETRY (per invocation, overriding [launcher] in config.toml):
     -lines N         visible result lines (alias of -l)
     -xoffset N       pixel offset from the anchored edge (needs -location 1-8)
     -yoffset N       pixel offset from the anchored edge (needs -location 1-8)
+
+APPEARANCE (per invocation):
+    -font 'Inter 12'   font, as a Pango description
+    -style <name>      a named look from [launcher.styles] in config.toml
+
+EVENT HOOKS (a command, run detached; {input} {entry} {mode} {error} are
+substituted, one placeholder per argument, and no shell is involved):
+    -on-selection-changed <cmd>   the highlighted row changed
+    -on-entry-accepted <cmd>      a row (or custom input) was accepted
+    -on-mode-changed <cmd>        the active mode changed
+    -on-menu-canceled <cmd>       the menu was dismissed
+    -on-menu-error <cmd>          the menu could not be built
+
+THUMBNAILS:
+    -preview-cmd '<cmd> {input} {output} {size}'
+                     makes a row's picture instead of the system's XDG
+                     thumbnailers. A row asks for one by prefixing its icon
+                     with thumbnail://, e.g.
+                     printf 'Name\\0icon\\x1fthumbnail:///path/to/file'
+                     filebrowser and recursivebrowser ask for one per file.
+
+MOUSE BINDINGS (-me-* buttons, -ml-* scroll; see -list-keybindings):
+    -me-accept-entry MouseDPrimary     accept on a double click only
+    -ml-row-down ScrollDown            wheel moves the selection
 
 Local commands: -help, -version, -dump-config, -dump-theme, -list-keybindings";

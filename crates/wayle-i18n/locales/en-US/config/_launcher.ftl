@@ -69,6 +69,18 @@ settings-launcher-scripts = Script Modes
 settings-launcher-keybindings = Keybindings
     .description = Keybinding overrides: action → comma-separated keys (unset actions keep rofi defaults)
 
+settings-launcher-mouse-bindings = Mouse Bindings
+    .description = Mouse binding overrides: action (me-* buttons, ml-* scroll) → comma-separated buttons (e.g. "MouseDPrimary", "ScrollDown")
+
+settings-launcher-font = Font
+    .description = Launcher font as a Pango description (e.g. "Inter 12"); empty keeps the shell font
+
+settings-launcher-styles = Style Presets
+    .description = Named looks selectable per invocation with -style <name>: name → the CSS applied for that session
+
+settings-launcher-preview-cmd = Preview Command
+    .description = Command making a row thumbnail: {"{"}input{"}"} the file, {"{"}output{"}"} the image to write, {"{"}size{"}"} the pixel size; empty uses the system thumbnailers
+
 settings-launcher-history = History
     .description = Launch history and frecency ranking
 

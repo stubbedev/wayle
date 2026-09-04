@@ -307,28 +307,25 @@ fn entry_item(path: &Path, is_dir: bool, base: &Path, recursive: bool) -> Item {
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| path.display().to_string())
     };
+    // A file gets its picture where one can be made, which is what rofi's
+    // thumbnail system does for this mode; a directory has nothing to
+    // picture. Generation is lazy — only the rows the list realizes ask for
+    // one — so a directory of ten thousand files costs ten thumbnails.
     let icon = if is_dir {
-        "folder-symbolic".to_owned()
+        IconSource::Name("folder-symbolic".to_owned())
     } else {
-        file_icon(path)
+        IconSource::Thumbnail {
+            fallback: crate::thumbnail::mime_icon(path),
+            path: path.to_path_buf(),
+        }
     };
     Item {
         match_text: name.clone(),
         display: name,
-        icon: Some(IconSource::Name(icon)),
+        icon: Some(icon),
         info: None,
         flags: crate::item::ItemFlags::empty(),
     }
-}
-
-/// Icon name from the file's guessed content type.
-fn file_icon(path: &Path) -> String {
-    let (content_type, _uncertain) = gio::functions::content_type_guess(Some(path), None);
-    let icon = gio::functions::content_type_get_generic_icon_name(&content_type);
-    icon.map_or_else(
-        || "text-x-generic-symbolic".to_owned(),
-        |name| name.to_string(),
-    )
 }
 
 #[cfg(test)]

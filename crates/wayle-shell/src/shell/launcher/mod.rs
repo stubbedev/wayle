@@ -30,7 +30,7 @@ use wayle_config::{
     },
 };
 use wayle_ipc::launcher_socket::{LauncherWidth, Selected, ServerFrame, SessionOptions};
-use wayle_launcher::{Action, ActivateKind};
+use wayle_launcher::{Action, ActivateKind, hooks};
 use wayle_widgets::prelude::WayleRevealer;
 
 /// Messages driving the launcher surface.
@@ -57,10 +57,18 @@ pub(crate) enum LauncherInput {
     Engine(EngineEvent),
     /// Search entry text changed.
     QueryChanged(String),
-    /// A list row was activated (position in the matched list).
-    RowActivated(u32),
     /// A bound key fired.
     Key(KeyAction),
+    /// A bound pointer binding fired. `row` is the list position it landed
+    /// on, for the bindings that are about a row rather than the selection.
+    Mouse {
+        /// What the binding does.
+        action: views::MouseAction,
+        /// The row the pointer was over, when it was over one.
+        row: Option<u32>,
+    },
+    /// The highlighted row changed (fires `-on-selection-changed`).
+    SelectionChanged,
     /// A sidebar mode tab was clicked.
     TabClicked(usize),
     /// `-dump` debounce fired: matches settled, reply and close.
@@ -78,8 +86,9 @@ impl std::fmt::Debug for LauncherInput {
             Self::ClientGone { id } => f.debug_struct("ClientGone").field("id", id).finish(),
             Self::Engine(event) => f.debug_tuple("Engine").field(event).finish(),
             Self::QueryChanged(_) => f.write_str("QueryChanged"),
-            Self::RowActivated(pos) => f.debug_tuple("RowActivated").field(pos).finish(),
             Self::Key(action) => f.debug_tuple("Key").field(action).finish(),
+            Self::Mouse { action, .. } => f.debug_tuple("Mouse").field(action).finish(),
+            Self::SelectionChanged => f.write_str("SelectionChanged"),
             Self::TabClicked(index) => f.debug_tuple("TabClicked").field(index).finish(),
             Self::DumpReady => f.write_str("DumpReady"),
         }
@@ -97,6 +106,9 @@ pub(crate) struct Launcher {
     bindings: Rc<RefCell<Vec<KeyBinding>>>,
     /// Multi-select display state, shared with the row factory.
     multi: Rc<RefCell<views::MultiSelect>>,
+    /// Compiled mouse bindings, shared with the row gestures and the scroll
+    /// controller.
+    mouse: views::MouseTable,
 }
 
 struct ActiveSession {
@@ -106,6 +118,18 @@ struct ActiveSession {
     ui: UiSettings,
     /// Prompt supplied by the active mode (overridden by `-p`).
     mode_prompt: String,
+    /// Name of the active mode: the `{mode}` a hook sees, and what tells a
+    /// real mode change from a state refresh.
+    mode_name: String,
+    /// The provider carrying this session's `-font`/`-style` CSS, so it can
+    /// be taken back off the display when the session ends.
+    css: Option<gtk::CssProvider>,
+    /// Whether the user has accepted or cancelled.
+    ///
+    /// Tearing the list down moves the selection, and reporting that as
+    /// `-on-selection-changed` would hand a preview script one last row to
+    /// render just as the menu closes.
+    decided: bool,
     /// `-e` dialog: message only, any accept/cancel closes with code 0.
     dialog: bool,
     /// `-dump`: reply with the filtered list, never show the surface.
@@ -209,6 +233,7 @@ impl Component for Launcher {
             selection,
             bindings: Rc::new(RefCell::new(Vec::new())),
             multi: Rc::new(RefCell::new(views::MultiSelect::default())),
+            mouse: Rc::new(RefCell::new(Vec::new())),
         };
         let widgets = view_output!();
 
@@ -220,14 +245,18 @@ impl Component for Launcher {
 
         let list = gtk::ListView::new(Some(model.selection.clone()), None::<gtk::ListItemFactory>);
         list.add_css_class("launcher-listview");
-        list.set_single_click_activate(true);
+        // Accepting a row is a binding now (`me-accept-entry`), so the list's
+        // own click-to-activate would fire a second time alongside it.
+        list.set_single_click_activate(false);
+        views::add_scroll_controller(&list, sender.input_sender().clone(), model.mouse.clone());
+        widgets.scrolled.set_child(Some(&list));
+
         {
             let sender = sender.input_sender().clone();
-            list.connect_activate(move |_, position| {
-                sender.emit(LauncherInput::RowActivated(position));
+            model.selection.connect_selected_notify(move |_| {
+                sender.emit(LauncherInput::SelectionChanged);
             });
         }
-        widgets.scrolled.set_child(Some(&list));
 
         {
             let sender = sender.input_sender().clone();
@@ -281,9 +310,11 @@ impl Component for Launcher {
                 }
             }
 
-            LauncherInput::RowActivated(position) => self.activate_position(Some(position)),
-
             LauncherInput::Key(action) => self.on_key(action, widgets, root),
+
+            LauncherInput::Mouse { action, row } => self.on_mouse(action, row, widgets, root),
+
+            LauncherInput::SelectionChanged => self.fire_selection_hook(widgets),
 
             LauncherInput::TabClicked(index) => {
                 if let Some(engine) = self.engine() {
@@ -330,11 +361,21 @@ impl Launcher {
         let dialog = setup.ui.error_message.is_some();
         if setup.modes.is_empty() && !dialog {
             warn!("launcher: no usable modes in session request");
+            // The one thing wayle's launcher calls a menu error: it was asked
+            // for a menu it cannot build. `-on-menu-error` exists to be told.
+            hooks::fire(
+                setup.ui.hooks.menu_error.as_ref(),
+                &hooks::Context {
+                    error: String::from("no usable modes"),
+                    ..hooks::Context::default()
+                },
+            );
             let _ = reply.send(ServerFrame::Cancelled { code: 1 });
             return;
         }
 
         *self.bindings.borrow_mut() = views::compile_bindings(&setup.ui.keybindings);
+        *self.mouse.borrow_mut() = views::compile_mouse(&setup.ui.mouse_bindings);
         {
             let mut multi = self.multi.borrow_mut();
             multi.enabled = false;
@@ -354,18 +395,23 @@ impl Launcher {
                 setup.modes,
                 setup.initial_mode,
                 setup.matcher,
+                setup.ui.completer.clone(),
                 sender.input_sender().clone(),
             )
         });
 
         let dump = options.dump;
-        self.apply_ui(&setup.ui, dialog, widgets, root);
+        let css = install_css(setup.ui.css.as_deref());
+        self.apply_ui(&setup.ui, dialog, widgets, root, sender.input_sender());
         self.session = Some(ActiveSession {
             id,
             engine,
             reply: Some(reply),
             ui: setup.ui,
             mode_prompt: String::new(),
+            mode_name: String::new(),
+            css,
+            decided: false,
             dialog,
             dump,
             dump_timer: None,
@@ -392,6 +438,7 @@ impl Launcher {
         dialog: bool,
         widgets: &LauncherWidgets,
         root: &gtk::Window,
+        sender: &relm4::Sender<LauncherInput>,
     ) {
         widgets
             .surface
@@ -443,6 +490,9 @@ impl Launcher {
                 ui.show_icons,
                 display,
                 self.multi.clone(),
+                sender.clone(),
+                self.mouse.clone(),
+                Rc::new(wayle_launcher::Thumbnailer::new(ui.preview_cmd.clone())),
             )));
         }
 
@@ -574,6 +624,22 @@ impl Launcher {
             None => PendingSelection::First,
         };
         session.mode_prompt.clone_from(&prompt);
+        // A State event also arrives on every reload, so the hook has to fire
+        // on a *change* of mode rather than on being told the mode again.
+        let name = mode_names.get(active_mode).cloned().unwrap_or_default();
+        let changed = !name.is_empty() && name != session.mode_name;
+        session.mode_name.clone_from(&name);
+        if changed {
+            let command = session.ui.hooks.mode_changed.clone();
+            hooks::fire(
+                command.as_ref(),
+                &hooks::Context {
+                    input: widgets.entry.text().to_string(),
+                    mode: name,
+                    ..hooks::Context::default()
+                },
+            );
+        }
         let shown = session
             .ui
             .prompt
@@ -609,6 +675,120 @@ impl Launcher {
         }
     }
 
+    /// Runs a bound pointer action.
+    fn on_mouse(
+        &mut self,
+        action: views::MouseAction,
+        row: Option<u32>,
+        widgets: &LauncherWidgets,
+        root: &gtk::Window,
+    ) {
+        match action {
+            views::MouseAction::Select => {
+                if let Some(row) = row {
+                    self.selection.set_selected(row);
+                }
+            }
+            // A click on a row accepts *that* row, not whatever happened to
+            // be selected when the press landed.
+            views::MouseAction::Accept => match row {
+                Some(row) => {
+                    self.selection.set_selected(row);
+                    self.on_key(KeyAction::Accept, widgets, root);
+                }
+                None => self.on_key(KeyAction::Accept, widgets, root),
+            },
+            views::MouseAction::AcceptCustom => {
+                self.on_key(KeyAction::AcceptCustom, widgets, root);
+            }
+            views::MouseAction::RowUp => self.move_selection(-1),
+            views::MouseAction::RowDown => self.move_selection(1),
+        }
+    }
+
+    /// The `{input}`/`{entry}`/`{mode}` a hook fired right now would see.
+    fn hook_context(&self, widgets: &LauncherWidgets, entry: String) -> hooks::Context {
+        hooks::Context {
+            input: widgets.entry.text().to_string(),
+            entry,
+            mode: self
+                .session
+                .as_ref()
+                .map(|session| session.mode_name.clone())
+                .unwrap_or_default(),
+            error: String::new(),
+        }
+    }
+
+    /// `-on-selection-changed`.
+    fn fire_selection_hook(&self, widgets: &LauncherWidgets) {
+        let Some(session) = &self.session else {
+            return;
+        };
+        if session.decided {
+            return;
+        }
+        let Some(command) = session.ui.hooks.selection_changed.clone() else {
+            return;
+        };
+        let entry = self
+            .model
+            .text_at(self.selection.selected())
+            .unwrap_or_default();
+        hooks::fire(Some(&command), &self.hook_context(widgets, entry));
+    }
+
+    /// `-on-entry-accepted` and `-on-menu-canceled`: the hooks that describe
+    /// a decision the user just made, fired before it is acted on because
+    /// acting on it tears the session down.
+    fn fire_decision_hook(&mut self, action: KeyAction, widgets: &LauncherWidgets) {
+        let multi_select = self.multi.borrow().enabled;
+        let empty_list = self.model.len() == 0;
+        let selected_text = self
+            .model
+            .text_at(self.selection.selected())
+            .unwrap_or_default();
+        let typed = widgets.entry.text().to_string();
+        let mode = self
+            .session
+            .as_ref()
+            .map(|session| session.mode_name.clone())
+            .unwrap_or_default();
+
+        let Some(session) = &mut self.session else {
+            return;
+        };
+        if !session.ui.hooks.any() {
+            return;
+        }
+        let (command, entry, decided) = match action {
+            KeyAction::Cancel => (session.ui.hooks.menu_canceled.clone(), selected_text, true),
+            // With no rows there is nothing to accept but the typed text,
+            // which is the same thing accept-custom does.
+            KeyAction::Accept if empty_list => {
+                (session.ui.hooks.entry_accepted.clone(), typed, true)
+            }
+            KeyAction::Accept => (session.ui.hooks.entry_accepted.clone(), selected_text, true),
+            // In multi-select, the alternate accept toggles a row and moves
+            // on; nothing has been accepted yet.
+            KeyAction::AcceptAlt if !multi_select => {
+                (session.ui.hooks.entry_accepted.clone(), selected_text, true)
+            }
+            KeyAction::AcceptCustom => (session.ui.hooks.entry_accepted.clone(), typed, true),
+            _ => (None, String::new(), false),
+        };
+        session.decided |= decided;
+        hooks::fire(
+            command.as_ref(),
+            &hooks::Context {
+                input: widgets.entry.text().to_string(),
+                entry,
+                mode,
+                error: String::new(),
+            },
+        );
+    }
+
     fn on_key(&mut self, action: KeyAction, widgets: &LauncherWidgets, root: &gtk::Window) {
         if self.session.as_ref().is_some_and(|s| s.dialog) {
             // `-e` dialog: any bound action dismisses with success.
@@ -623,6 +803,7 @@ impl Launcher {
             );
             return;
         }
+        self.fire_decision_hook(action, widgets);
         match action {
             KeyAction::Cancel => {
                 self.end_session(Some(ServerFrame::Cancelled { code: 1 }), widgets, root);
@@ -670,6 +851,11 @@ impl Launcher {
             KeyAction::ModePrevious => {
                 if let Some(engine) = self.engine() {
                     let _ = engine.send(EngineCmd::ModePrevious);
+                }
+            }
+            KeyAction::ModeComplete => {
+                if let Some(engine) = self.engine() {
+                    let _ = engine.send(EngineCmd::ModeComplete);
                 }
             }
             KeyAction::RowUp => self.move_selection(-1),
@@ -811,6 +997,9 @@ impl Launcher {
             }
             if let (Some(reply), Some(frame)) = (session.reply.take(), frame) {
                 let _ = reply.send(frame);
+            }
+            if let Some(provider) = session.css.take() {
+                remove_css(&provider);
             }
         }
         self.multi.borrow_mut().picked.clear();
@@ -955,6 +1144,37 @@ fn rebuild_tabs(
             sender.emit(LauncherInput::TabClicked(index));
         });
         widgets.tabs.append(&button);
+    }
+}
+
+/// Adds a session's `-font`/`-style` CSS to the display.
+///
+/// A display-wide provider is the only per-session mechanism GTK4 offers —
+/// there are no per-widget style providers — so the CSS is scoped by
+/// `.launcher-surface` when it is built, and the provider is removed again
+/// when the session ends.
+///
+/// The priority has to clear the shell's *own* stylesheet, which
+/// `shell/helpers/bootstrap.rs` installs at `PRIORITY_USER + 100`. At
+/// anything below that a `-font` or `-style` simply lost to `[styling]` and
+/// looked like it did nothing.
+fn install_css(css: Option<&str>) -> Option<gtk::CssProvider> {
+    let css = css?;
+    let display = gtk::gdk::Display::default()?;
+    let provider = gtk::CssProvider::new();
+    provider.load_from_string(css);
+    gtk::style_context_add_provider_for_display(
+        &display,
+        &provider,
+        gtk::STYLE_PROVIDER_PRIORITY_USER + 200,
+    );
+    Some(provider)
+}
+
+/// Takes a session's CSS provider back off the display.
+fn remove_css(provider: &gtk::CssProvider) {
+    if let Some(display) = gtk::gdk::Display::default() {
+        gtk::style_context_remove_provider_for_display(&display, provider);
     }
 }
 

@@ -235,10 +235,39 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
                 opts.combi_display_format = Some(value("combi-display-format")?);
             }
 
+            // ---- session: event hooks ----
+            // Every one of these runs a command; the value is the command.
+            "on-selection-changed" => {
+                opts.on_selection_changed = Some(value("on-selection-changed")?);
+            }
+            "on-entry-accepted" => opts.on_entry_accepted = Some(value("on-entry-accepted")?),
+            "on-mode-changed" => opts.on_mode_changed = Some(value("on-mode-changed")?),
+            "on-menu-canceled" | "on-menu-cancelled" => {
+                opts.on_menu_canceled = Some(value(flag)?);
+            }
+            "on-menu-error" => opts.on_menu_error = Some(value("on-menu-error")?),
+            // The launcher takes no screenshots, so there is no event to
+            // hang this on. Say that rather than accepting it silently.
+            "on-screenshot-taken" => {
+                let _ = value(flag);
+                eprintln!("wayle launcher: -{flag} is ignored — the launcher takes no screenshots");
+            }
+
+            // ---- session: appearance ----
+            "font" => opts.font = Some(value("font")?),
+            "style" => opts.style = Some(value("style")?),
+            "preview-cmd" => opts.preview_cmd = Some(value("preview-cmd")?),
+            "completer-mode" => opts.completer_mode = Some(value("completer-mode")?),
+
             // ---- prefixed families ----
             _ if flag.starts_with("kb-") => {
                 let action = flag.trim_start_matches("kb-").to_owned();
                 opts.kb_overrides.insert(action, value(flag)?);
+            }
+            // `me-` (button) and `ml-` (scroll) keep their prefix: the two
+            // namespaces have their own action names and nothing shared.
+            _ if flag.starts_with("me-") || flag.starts_with("ml-") => {
+                opts.mouse_overrides.insert(flag.to_owned(), value(flag)?);
             }
             _ if flag.starts_with("display-") => {
                 let mode = flag.trim_start_matches("display-").to_owned();
@@ -480,6 +509,108 @@ mod tests {
         let plain = parse_ok(&["-show", "drun"]);
         assert_eq!(plain.options.ignored_prefixes, None);
         assert_eq!(plain.options.application_fallback_icon, None);
+    }
+
+    #[test]
+    fn event_hooks_reach_the_session() {
+        let inv = parse_ok(&[
+            "-show",
+            "drun",
+            "-on-selection-changed",
+            "preview {entry}",
+            "-on-entry-accepted",
+            "log {input}",
+            "-on-mode-changed",
+            "mode {mode}",
+            "-on-menu-canceled",
+            "cleanup",
+            "-on-menu-error",
+            "report {error}",
+        ]);
+        assert_eq!(
+            inv.options.on_selection_changed.as_deref(),
+            Some("preview {entry}")
+        );
+        assert_eq!(
+            inv.options.on_entry_accepted.as_deref(),
+            Some("log {input}")
+        );
+        assert_eq!(inv.options.on_mode_changed.as_deref(), Some("mode {mode}"));
+        assert_eq!(inv.options.on_menu_canceled.as_deref(), Some("cleanup"));
+        assert_eq!(inv.options.on_menu_error.as_deref(), Some("report {error}"));
+        // Unset unless asked: an absent hook must not become an empty command.
+        let plain = parse_ok(&["-show", "drun"]);
+        assert!(plain.options.on_selection_changed.is_none());
+        assert!(plain.options.on_menu_error.is_none());
+    }
+
+    #[test]
+    fn completer_mode_names_the_mode_that_completes_the_query() {
+        let inv = parse_ok(&["-completer-mode", "run", "-show", "drun"]);
+        assert_eq!(inv.options.completer_mode.as_deref(), Some("run"));
+        // And its value is consumed, so the flag after it still parses.
+        assert_eq!(inv.options.mode.as_deref(), Some("drun"));
+        assert!(
+            parse_ok(&["-show", "drun"])
+                .options
+                .completer_mode
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn the_screenshot_hook_is_ignored_with_its_value() {
+        // There is no screenshot to hang it on, so it is refused rather than
+        // stored — but its value must still be consumed, or the command would
+        // be read as the next flag.
+        let inv = parse_ok(&["-on-screenshot-taken", "upload {file}", "-show", "run"]);
+        assert_eq!(inv.options.mode.as_deref(), Some("run"));
+    }
+
+    #[test]
+    fn mouse_bindings_keep_their_namespace_prefix() {
+        let inv = parse_ok(&[
+            "-me-accept-entry",
+            "MousePrimary",
+            "-ml-row-down",
+            "ScrollDown",
+        ]);
+        assert_eq!(
+            inv.options
+                .mouse_overrides
+                .get("me-accept-entry")
+                .map(String::as_str),
+            Some("MousePrimary")
+        );
+        assert_eq!(
+            inv.options
+                .mouse_overrides
+                .get("ml-row-down")
+                .map(String::as_str),
+            Some("ScrollDown")
+        );
+        // `-mesg` is not a mouse binding, prefix similarity notwithstanding.
+        let inv = parse_ok(&["-mesg", "hello"]);
+        assert!(inv.options.mouse_overrides.is_empty());
+        assert_eq!(inv.options.mesg.as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn appearance_flags_reach_the_session() {
+        let inv = parse_ok(&[
+            "-font",
+            "Inter 12",
+            "-style",
+            "compact",
+            "-preview-cmd",
+            "thumb {input} {output} {size}",
+        ]);
+        assert_eq!(inv.options.font.as_deref(), Some("Inter 12"));
+        assert_eq!(inv.options.style.as_deref(), Some("compact"));
+        assert_eq!(
+            inv.options.preview_cmd.as_deref(),
+            Some("thumb {input} {output} {size}")
+        );
     }
 
     #[test]

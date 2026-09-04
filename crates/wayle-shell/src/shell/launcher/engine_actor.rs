@@ -32,6 +32,9 @@ pub(crate) enum EngineCmd {
     ModePrevious,
     /// Switch to the mode at this tab index.
     ModeTo(usize),
+    /// Open the `-completer-mode` to complete the query (kb-mode-complete),
+    /// or close it again when it is already open.
+    ModeComplete,
     /// Session over; drop the actor.
     Stop,
 }
@@ -78,6 +81,7 @@ pub(super) fn spawn(
     modes: Vec<Box<dyn Mode>>,
     initial_mode: usize,
     options: MatcherOptions,
+    completer: Option<String>,
     ui: Sender<LauncherInput>,
 ) -> mpsc::UnboundedSender<EngineCmd> {
     let (tx, rx) = mpsc::unbounded_channel();
@@ -85,7 +89,8 @@ pub(super) fn spawn(
     let notify: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
         let _ = notify_tx.send(EngineCmd::Tick);
     });
-    let session = Session::new(modes, options, notify);
+    let mut session = Session::new(modes, options, notify);
+    session.set_completer(completer);
     relm4::spawn(run(session, initial_mode, rx, tx.clone(), ui));
     tx
 }
@@ -147,6 +152,17 @@ async fn run(
             }
             EngineCmd::ModeTo(index) => {
                 session.switch_to(index).await;
+                send_state(&session, &ui, false);
+                push_matches(&mut session, &ui);
+            }
+            EngineCmd::ModeComplete => {
+                // The same key opens and closes it, so a completer opened by
+                // accident is not a trap.
+                if session.completing() {
+                    session.cancel_completer().await;
+                } else if !session.open_completer().await {
+                    continue;
+                }
                 send_state(&session, &ui, false);
                 push_matches(&mut session, &ui);
             }

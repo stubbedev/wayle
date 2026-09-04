@@ -301,17 +301,28 @@ pub(crate) fn parse_row(entry: &str) -> ParsedRow {
     }
 }
 
+/// One `icon` value: a `thumbnail://` request, a path, or a theme name.
+pub(crate) fn parse_icon(value: &str) -> IconSource {
+    if let Some(file) = value.strip_prefix(crate::thumbnail::THUMBNAIL_SCHEME) {
+        let path = PathBuf::from(file);
+        return IconSource::Thumbnail {
+            fallback: crate::thumbnail::mime_icon(&path),
+            path,
+        };
+    }
+    if value.starts_with('/') {
+        return IconSource::File(PathBuf::from(value));
+    }
+    IconSource::Name(value.to_owned())
+}
+
 fn apply_row_option(item: &mut Item, text: &str, key: &str, value: &str) {
     let truthy = value == "true";
     match key {
         // Comma-separated icon values are fallbacks; take the first.
         "icon" => {
             let first = value.split(',').next().unwrap_or(value);
-            item.icon = Some(if first.starts_with('/') {
-                IconSource::File(PathBuf::from(first))
-            } else {
-                IconSource::Name(first.to_owned())
-            });
+            item.icon = Some(parse_icon(first));
         }
         "display" => item.display = value.to_owned(),
         "meta" => item.match_text = format!("{text} {value}"),
