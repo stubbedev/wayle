@@ -2,6 +2,7 @@
 
 pub mod compositor;
 pub mod dropdown_registry;
+pub mod dropdown_resize;
 pub mod icons;
 pub mod module_registry;
 

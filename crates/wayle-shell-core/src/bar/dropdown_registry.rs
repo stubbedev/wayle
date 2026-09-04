@@ -22,7 +22,7 @@ use wayle_config::{
 };
 use wayle_widgets::prelude::{BarButton, BarButtonInput, GenieEdge, WayleRevealer};
 
-use crate::{process, shell_services::ShellServices};
+use crate::{bar::dropdown_resize, process, shell_services::ShellServices};
 
 /// Returns `value` unchanged, logging at debug if it is `None`.
 ///
@@ -54,9 +54,21 @@ pub struct DropdownInstance {
     /// popover keeps its own size request, so the revealer animates content
     /// within stable geometry rather than resizing the popover surface.
     revealer: WayleRevealer,
+    /// Drives the popover's measurement so the card never does.
+    ///
+    /// The card is an *overlay* child, which does not contribute to
+    /// measurement, so it can shrink without dragging the surface down with
+    /// it — see [`dropdown_resize`] for why the surface must not move.
+    spacer: gtk::Box,
     _controller: Box<dyn Any>,
     thaw_target: Rc<Cell<Option<relm4::Sender<BarButtonInput>>>>,
     original_height: Cell<Option<i32>>,
+    /// How long a page-to-page size change takes, refreshed at each popup
+    /// from the animation config so the page watcher does not need it.
+    resize_duration: Rc<Cell<u32>>,
+    /// The exit animation to play for a dismissal this instance owns,
+    /// refreshed at each popup. See [`Self::dismiss_on_spacer_click`].
+    exit_style: Rc<RefCell<Option<(u32, AnimationType, GenieEdge)>>>,
 }
 
 impl DropdownInstance {
@@ -72,7 +84,25 @@ impl DropdownInstance {
             popover.set_child(None::<&gtk::Widget>);
             revealer.set_child(Some(&child));
         }
-        popover.set_child(Some(&revealer));
+
+        // The revealer goes in as an *overlay* child over a spacer, so the
+        // popover measures the spacer and the card is free to be any size up
+        // to it. `set_measure_overlay` defaults to false, which is the whole
+        // point; it is set explicitly because the behaviour is load-bearing.
+        // Overflow::Hidden keeps a card that measures taller than the spacer
+        // from painting outside the surface.
+        let spacer = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let overlay = gtk::Overlay::new();
+        overlay.set_child(Some(&spacer));
+        overlay.add_overlay(&revealer);
+        overlay.set_measure_overlay(&revealer, false);
+        overlay.set_overflow(gtk::Overflow::Hidden);
+        // The card sits against the bar-facing edge, so a page shorter than
+        // the surface leaves its gap on the far side rather than floating in
+        // the middle.
+        revealer.set_valign(gtk::Align::Start);
+        revealer.set_halign(gtk::Align::Fill);
+        popover.set_child(Some(&overlay));
 
         popover.connect_map(|popover| {
             debug!(
@@ -145,13 +175,84 @@ impl DropdownInstance {
             }
         });
 
-        Self {
+        let resize_duration = Rc::new(Cell::new(0u32));
+        let exit_style = Rc::new(RefCell::new(None));
+        let instance = Self {
             popover,
             revealer,
+            spacer,
             _controller: controller,
             thaw_target,
             original_height,
-        }
+            resize_duration,
+            exit_style,
+        };
+        instance.watch_page_changes();
+        instance.dismiss_on_spacer_click();
+        instance
+    }
+
+    /// Dismisses — with the exit animation — on a click in the surface's
+    /// empty region.
+    ///
+    /// The surface is sized to the tallest page, so a shorter page leaves
+    /// transparent surface below the card. That area belongs to wayle, which
+    /// makes it the *one* place an "outside" click is reachable at all: a
+    /// click on another application's surface is never delivered to this
+    /// process. Verified on a nested compositor — with
+    /// `bar.dropdown_autohide = false` a click on another window produces no
+    /// event here whatsoever, and with autohide on the compositor's
+    /// `popup_done` has already torn the surface down before
+    /// `GtkPopover::closed` runs.
+    ///
+    /// Without this the region would silently swallow clicks, which is worse
+    /// than either dismissing or passing them on.
+    fn dismiss_on_spacer_click(&self) {
+        let gesture = gtk::GestureClick::new();
+        let popover = self.popover.clone();
+        let revealer = self.revealer.clone();
+        let style = self.exit_style.clone();
+        gesture.connect_released(move |_, _, _, _| {
+            let exit = style
+                .borrow()
+                .unwrap_or((0, AnimationType::None, GenieEdge::Top));
+            let (duration, transition, genie_edge) = exit;
+            if duration == 0 {
+                popover.popdown();
+                return;
+            }
+            revealer.set_transition(transition);
+            revealer.set_genie_edge(genie_edge);
+            revealer.set_transition_duration(duration);
+            revealer.set_reveal_child(false);
+            let popover = popover.clone();
+            gtk::glib::timeout_add_local_once(
+                Duration::from_millis(u64::from(duration)),
+                move || popover.popdown(),
+            );
+        });
+        self.spacer.add_controller(gesture);
+    }
+
+    /// Animates the card whenever the content switches page.
+    ///
+    /// Wired once, at construction: the stacks belong to the content, which
+    /// outlives any single popup.
+    fn watch_page_changes(&self) {
+        let Some(card) = self.revealer.child() else {
+            return;
+        };
+        let duration = self.resize_duration.clone();
+        let spacer = self.spacer.clone();
+        let watched = {
+            let card = card.clone();
+            dropdown_resize::watch_pages(&card.clone(), move || {
+                let width = spacer.width_request().max(1);
+                let (_, target, _, _) = card.measure(gtk::Orientation::Vertical, width);
+                dropdown_resize::animate_height(&card, target, duration.get());
+            })
+        };
+        debug!(stacks = watched, "watching dropdown pages for size changes");
     }
 
     /// Plays the enter animation: collapse instantly, then reveal on the next
@@ -379,7 +480,29 @@ impl DropdownInstance {
             } else {
                 self.popover.set_height_request(-1);
             }
+
+            self.size_surface(max_allowed_height);
         }
+    }
+
+    /// Fixes the surface geometry for the popup that is about to happen.
+    ///
+    /// Sized to the tallest page the content could show rather than the
+    /// visible one, because the surface cannot change once mapped — a page
+    /// switch would otherwise clip, or destroy the popup by trying to grow.
+    /// Called before every `popup()`, so re-opening picks up content that has
+    /// changed in the meantime.
+    fn size_surface(&self, max_allowed_height: i32) {
+        let Some(card) = self.revealer.child() else {
+            return;
+        };
+        let (width, height) = dropdown_resize::measure(&card);
+        // A dropdown that asked for a height of its own still gets it as a
+        // floor; the measurement only ever adds room.
+        let floor = self.original_height.get().unwrap_or(0);
+        let height = height.max(floor).min(max_allowed_height);
+        self.spacer.set_size_request(width, height);
+        debug!(width, height, "sized dropdown surface for its tallest page");
     }
 
     fn find_and_clamp_scrolled_windows(widget: &gtk::Widget, max_allowed_height: i32) {
@@ -401,6 +524,8 @@ impl DropdownInstance {
     }
 
     fn apply_style(&self, style: &DropdownStyle) {
+        self.resize_duration.set(style.resize);
+        *self.exit_style.borrow_mut() = Some((style.exit.0, style.exit.1, style.genie_edge));
         self.popover.set_autohide(style.autohide);
         if style.shadow_enabled {
             self.popover.add_css_class("shadow");
@@ -487,6 +612,11 @@ struct DropdownStyle {
     exit: (u32, AnimationType),
     /// Edge a genie transition collapses toward (the bar's edge).
     genie_edge: GenieEdge,
+    /// How long a page-to-page size change takes.
+    ///
+    /// An interaction rather than a surface transition: the popover is
+    /// already open and only its contents changed size.
+    resize: u32,
 }
 
 const REM_PX: f32 = 16.0;
@@ -1007,5 +1137,6 @@ fn dropdown_style(registry: &DropdownRegistry) -> DropdownStyle {
             Location::Left => GenieEdge::Left,
             Location::Right => GenieEdge::Right,
         },
+        resize: animations.interaction_duration_ms(),
     }
 }
