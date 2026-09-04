@@ -46,7 +46,10 @@ pub struct VpnForm {
     pickers: Vec<(String, gtk::DropDown, Vec<String>)>,
     /// The escape hatch for a kind with no typed form.
     raw: gtk::TextView,
+    /// True when the kind has no typed form, so the raw editor is the form.
     raw_visible: bool,
+    /// Whether the advanced (raw) section is open.
+    raw_expanded: bool,
     /// The profile the delete button is asking about, while the dialog is up.
     confirming_delete: bool,
 }
@@ -57,12 +60,30 @@ pub struct VpnForm {
 /// The fallback is what keeps an unknown plugin's vocabulary usable — there is
 /// no list of every key every VPN plugin might want.
 fn label_for(field: &VpnField) -> String {
-    let id = format!("dropdown-network-vpn-field-{}", field.key);
+    let id = format!("dropdown-network-vpn-field-{}", slug(&field.key));
     if crate::i18n::loader().has(&id) {
         td!(&id)
     } else {
         field.label.clone()
     }
+}
+
+/// A plugin key as a Fluent message-id fragment.
+///
+/// Plugin keys are not identifiers: vpnc's are `IPSec gateway` and
+/// `Xauth password`, spaces and capitals included. Used verbatim they build a
+/// message id no Fluent file can declare, so those fields could never be
+/// translated at all — they fell through to the plugin's English every time.
+fn slug(key: &str) -> String {
+    let mut slug = String::with_capacity(key.len());
+    for character in key.chars() {
+        if character.is_ascii_alphanumeric() {
+            slug.extend(character.to_lowercase());
+        } else if !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    slug.trim_matches('-').to_owned()
 }
 
 /// The label as shown, with required fields marked.
@@ -120,6 +141,42 @@ fn parse_raw(text: &str) -> HashMap<String, String> {
         .filter_map(|line| line.split_once('='))
         .map(|(key, value)| (key.trim().to_owned(), value.trim().to_owned()))
         .filter(|(key, _)| !key.is_empty())
+        .collect()
+}
+
+/// What the profile ends up with: the raw editor's keys, with the typed
+/// fields laid over the top.
+///
+/// A typed field wins over the same key in the raw editor — it is the one the
+/// user can see — and an emptied box *clears* the key rather than letting the
+/// raw editor's version of it come back.
+fn merge(
+    raw: HashMap<String, String>,
+    typed: impl Iterator<Item = (String, String)>,
+) -> HashMap<String, String> {
+    let mut values = raw;
+    for (key, value) in typed {
+        if value.is_empty() {
+            values.remove(&key);
+        } else {
+            values.insert(key, value);
+        }
+    }
+    values.retain(|_, value| !value.trim().is_empty());
+    values
+}
+
+/// The saved values a typed form has no box for.
+///
+/// These go into the raw editor so that editing a profile does not silently
+/// drop the keys the form cannot show — a plugin accepts far more keys than
+/// any form should ask for, and a profile made elsewhere (or in the raw
+/// editor before a typed form existed) carries them.
+fn leftovers(values: &HashMap<String, String>, typed_keys: &[&str]) -> HashMap<String, String> {
+    values
+        .iter()
+        .filter(|(key, _)| !typed_keys.contains(&key.as_str()))
+        .map(|(key, value)| (key.clone(), value.clone()))
         .collect()
 }
 
@@ -191,12 +248,26 @@ impl SimpleComponent for VpnForm {
             add_css_class: "network-password-card",
             add_css_class: "network-vpn-form",
             set_orientation: gtk::Orientation::Vertical,
-            #[watch]
-            set_visible: model.visible,
+            // Deliberately *not* hiding itself: the stack it lives in decides
+            // which page is shown. Hiding the widget made it measure as zero
+            // high, so the dropdown sized its surface for the list alone and
+            // then clipped the form when it opened.
 
             #[name = "header"]
             gtk::Box {
                 add_css_class: "network-password-header",
+
+                // The form is a page now, so leaving it is "back" rather
+                // than "close" — the same action, named the way the rest of
+                // the shell names it.
+                #[template]
+                GhostIconButton {
+                    add_css_class: "network-vpn-back",
+                    set_icon_name: "ld-arrow-left-symbolic",
+                    set_valign: gtk::Align::Start,
+                    set_tooltip_text: Some(&t!("dropdown-network-vpn-back")),
+                    connect_clicked => VpnFormInput::CancelClicked,
+                },
 
                 #[name = "header_info"]
                 gtk::Box {
@@ -225,13 +296,6 @@ impl SimpleComponent for VpnForm {
                     connect_clicked => VpnFormInput::ImportClicked,
                 },
 
-                #[template]
-                GhostIconButton {
-                    add_css_class: "network-password-close",
-                    set_icon_name: "ld-x-symbolic",
-                    set_valign: gtk::Align::Start,
-                    connect_clicked => VpnFormInput::CancelClicked,
-                },
             },
 
             // Everything the kind decides lives in here, because how much of
@@ -287,21 +351,42 @@ impl SimpleComponent for VpnForm {
                         set_orientation: gtk::Orientation::Vertical,
                     },
 
+                    // A typed form covers the keys worth asking for, never
+                    // all of them, so the raw editor stays reachable behind
+                    // a disclosure rather than being replaced by the form.
+                    #[template]
+                    GhostButton {
+                        add_css_class: "network-vpn-advanced",
+                        #[watch]
+                        set_visible: !model.raw_visible,
+                        connect_clicked => VpnFormInput::ToggleAdvanced,
+                        #[template_child]
+                        label {
+                            #[watch]
+                            set_label: &if model.raw_expanded {
+                                t!("dropdown-network-vpn-advanced-hide")
+                            } else {
+                                t!("dropdown-network-vpn-advanced-show")
+                            },
+                        },
+                    },
+
                     #[name = "raw_hint"]
                     gtk::Label {
                         add_css_class: "network-secret-label",
                         set_halign: gtk::Align::Start,
                         set_wrap: true,
                         #[watch]
-                        set_visible: model.raw_visible,
-                        set_label: &t!("dropdown-network-vpn-raw-hint"),
+                        set_visible: model.raw_expanded,
+                        #[watch]
+                        set_label: &model.raw_hint(),
                     },
 
                     model.raw.clone() -> gtk::TextView {
                         add_css_class: "network-vpn-raw",
                         set_monospace: true,
                         #[watch]
-                        set_visible: model.raw_visible,
+                        set_visible: model.raw_expanded,
                     },
                 },
             },
@@ -385,6 +470,7 @@ impl SimpleComponent for VpnForm {
             pickers: Vec::new(),
             raw: gtk::TextView::builder().monospace(true).build(),
             raw_visible: false,
+            raw_expanded: false,
             confirming_delete: false,
         };
 
@@ -432,6 +518,7 @@ impl SimpleComponent for VpnForm {
                     self.rebuild(&HashMap::new());
                 }
             }
+            VpnFormInput::ToggleAdvanced => self.raw_expanded = !self.raw_expanded,
             VpnFormInput::SaveClicked => self.save(&sender),
             VpnFormInput::DeleteClicked => self.confirm_delete(&sender),
             VpnFormInput::DeleteConfirmed => {
@@ -472,27 +559,62 @@ impl VpnForm {
         self.kinds.get(self.selected)
     }
 
-    /// Collects what the user typed, from whichever editor is in use.
-    fn values(&self) -> HashMap<String, String> {
-        if self.raw_visible {
-            let buffer = self.raw.buffer();
-            let text = buffer
-                .text(&buffer.start_iter(), &buffer.end_iter(), false)
-                .to_string();
-            return parse_raw(&text);
+    /// What to say above the raw editor.
+    ///
+    /// For a kind with a typed form, the keys it already covers — so it is
+    /// clear what the editor is *for* rather than leaving the user to guess
+    /// whether re-stating `gateway` here would help. For a plugin wayle has
+    /// no form for there is no such list to give, so the hint names the
+    /// plugin's own service instead, which is what its documentation is
+    /// indexed by.
+    fn raw_hint(&self) -> String {
+        let Some(kind) = self.kind() else {
+            return t!("dropdown-network-vpn-raw-hint");
+        };
+        if !kind.is_typed() {
+            return t!(
+                "dropdown-network-vpn-raw-hint-unknown",
+                service = kind.id.clone()
+            );
         }
+        let covered = kind
+            .fields
+            .iter()
+            .map(|field| field.key.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        t!("dropdown-network-vpn-raw-hint-typed", covered = covered)
+    }
+
+    /// Everything the raw editor currently holds.
+    fn raw_values(&self) -> HashMap<String, String> {
+        let buffer = self.raw.buffer();
+        let text = buffer
+            .text(&buffer.start_iter(), &buffer.end_iter(), false)
+            .to_string();
+        parse_raw(&text)
+    }
+
+    /// Collects what the user typed, from both editors.
+    ///
+    /// A typed form covers the keys worth asking for, never all of them —
+    /// openvpn alone accepts over seventy. The raw editor stays available
+    /// next to the typed fields so the rest are reachable, and holds the
+    /// keys of a saved profile that the form has no box for, so editing a
+    /// profile does not quietly drop them.
+    ///
+    /// A typed field wins over the same key in the raw editor: it is the one
+    /// the user can see.
+    fn values(&self) -> HashMap<String, String> {
         let typed = self
             .entries
             .iter()
             .map(|(key, entry)| (key.clone(), entry.text().to_string()));
-        let picked = self.pickers.iter().filter_map(|(key, picker, values)| {
-            let value = values.get(picker.selected() as usize)?;
+        let picked = self.pickers.iter().filter_map(|(key, picker, choices)| {
+            let value = choices.get(picker.selected() as usize)?;
             Some((key.clone(), value.clone()))
         });
-        typed
-            .chain(picked)
-            .filter(|(_, value)| !value.is_empty())
-            .collect()
+        merge(self.raw_values(), typed.chain(picked))
     }
 
     fn save(&mut self, sender: &ComponentSender<Self>) {
@@ -679,13 +801,22 @@ impl VpnForm {
             return;
         };
 
-        // A kind with no typed form falls back to the raw editor rather than
-        // to nothing, so no installed plugin is unreachable.
+        // A kind with no typed form *is* the raw editor, so it is open from
+        // the start; a typed one keeps it as an advanced section, holding
+        // whatever the form has no box for.
         self.raw_visible = !kind.is_typed();
+        self.raw_expanded = self.raw_visible;
         if self.raw_visible {
             self.raw.buffer().set_text(&render_raw(values));
             return;
         }
+
+        let typed_keys: Vec<&str> = kind.fields.iter().map(|field| field.key.as_str()).collect();
+        let extra = leftovers(values, &typed_keys);
+        // Anything already in the profile beyond the form is worth showing
+        // rather than hiding behind a disclosure nobody opens.
+        self.raw_expanded = !extra.is_empty();
+        self.raw.buffer().set_text(&render_raw(&extra));
 
         let mut drawn_section = String::new();
         for field in &kind.fields {
@@ -972,5 +1103,100 @@ mod tests {
             section: String::new(),
         };
         assert_eq!(label_for(&field), "Plugin's own wording");
+    }
+
+    #[test]
+    fn a_plugin_key_with_spaces_still_reaches_a_translatable_id() {
+        // vpnc's keys are the reason this exists: used verbatim they build a
+        // message id Fluent cannot declare, so the field was never
+        // translatable and always fell through to English.
+        assert_eq!(slug("IPSec gateway"), "ipsec-gateway");
+        assert_eq!(slug("Xauth password"), "xauth-password");
+        assert_eq!(slug("Perfect Forward Secrecy"), "perfect-forward-secrecy");
+        // A key that is already an identifier is left as it is.
+        assert_eq!(slug("peer-allowed-ips"), "peer-allowed-ips");
+        assert_eq!(slug("gateway"), "gateway");
+        // Runs of punctuation collapse rather than producing `--`.
+        assert_eq!(slug("NAT  //  Traversal"), "nat-traversal");
+        assert_eq!(slug("--x--"), "x");
+        assert_eq!(slug(""), "");
+    }
+
+    fn typed(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+        pairs
+            .iter()
+            .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+            .collect()
+    }
+
+    #[test]
+    fn a_typed_field_wins_over_the_same_key_in_the_raw_editor() {
+        let raw = HashMap::from([
+            (String::from("gateway"), String::from("old.example.com")),
+            (String::from("cipher"), String::from("AES-256-GCM")),
+        ]);
+        let merged = merge(raw, typed(&[("gateway", "new.example.com")]).into_iter());
+
+        assert_eq!(
+            merged.get("gateway").map(String::as_str),
+            Some("new.example.com"),
+            "the box the user can see wins"
+        );
+        assert_eq!(
+            merged.get("cipher").map(String::as_str),
+            Some("AES-256-GCM"),
+            "a key the form has no box for must survive the save"
+        );
+    }
+
+    #[test]
+    fn an_emptied_box_clears_the_key_rather_than_reviving_the_raw_value() {
+        // Otherwise clearing a field would appear to do nothing: the raw
+        // editor's older value would come straight back.
+        let raw = HashMap::from([(String::from("user"), String::from("alice"))]);
+        let merged = merge(raw, typed(&[("user", "")]).into_iter());
+        assert!(!merged.contains_key("user"));
+    }
+
+    #[test]
+    fn blank_values_never_reach_networkmanager() {
+        let raw = HashMap::from([(String::from("realm"), String::from("   "))]);
+        let merged = merge(raw, typed(&[("otp", "")]).into_iter());
+        assert!(merged.is_empty(), "{merged:?}");
+    }
+
+    #[test]
+    fn editing_a_profile_keeps_the_keys_the_form_cannot_show() {
+        // The data-loss path a typed form introduces: before it existed this
+        // plugin was configured entirely in the raw editor, so a saved
+        // profile carries keys no box covers.
+        let saved = HashMap::from([
+            (String::from("gateway"), String::from("vpn.example.com")),
+            (String::from("user"), String::from("alice")),
+            (String::from("cipher"), String::from("AES-256-GCM")),
+            (String::from("reneg-seconds"), String::from("0")),
+        ]);
+        let extra = leftovers(&saved, &["gateway", "user"]);
+
+        assert_eq!(extra.len(), 2, "{extra:?}");
+        assert!(extra.contains_key("cipher"));
+        assert!(extra.contains_key("reneg-seconds"));
+        assert!(
+            !extra.contains_key("gateway"),
+            "a key the form shows must not also be in the raw editor"
+        );
+
+        // And the round trip loses nothing.
+        let merged = merge(
+            extra,
+            typed(&[("gateway", "vpn.example.com"), ("user", "alice")]).into_iter(),
+        );
+        assert_eq!(merged, saved);
+    }
+
+    #[test]
+    fn a_profile_that_fits_its_form_leaves_the_raw_editor_empty() {
+        let saved = HashMap::from([(String::from("gateway"), String::from("vpn.example.com"))]);
+        assert!(leftovers(&saved, &["gateway", "user"]).is_empty());
     }
 }

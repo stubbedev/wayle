@@ -14,10 +14,16 @@ MODE picks which gateway this is:
                 redirect, which wayle must refuse *before* posting any
                 credentials at it.
   anyconnect  — Cisco: an XML form, a challenge, then a `webvpn` cookie.
+  fortinet    — FortiGate: an HTML login form posted to
+                `/remote/logincheck`, a `tokeninfo` second factor, then an
+                `SVPNCOOKIE`. Not XML at all.
+  array       — Array Networks: one form POST, then an `ANsession…` cookie.
+                No challenge round at all.
 
 Nothing here is a fixture of a real gateway's traffic; the response shapes come
-from openconnect's `auth-globalprotect.c` and `auth.c`, which is also where
-gp.rs and anyconnect.rs got them.
+from openconnect's `auth-globalprotect.c`, `auth.c`, `fortinet.c` and
+`array.c`, which is also where gp.rs, anyconnect.rs, fortinet.rs and array.rs
+got them.
 """
 
 import os
@@ -33,6 +39,15 @@ PASSWORD = "hunter2"
 CHALLENGE_TOKEN = "CHALLENGE-1"
 CHALLENGE_ANSWER = "123456"
 COOKIE = "AUTHCOOKIEVALUE"
+
+# Fortinet's bookkeeping, echoed back by the challenge round.
+FORTI_REQID = "17"
+FORTI_MAGIC = "deadbeef"
+FORTI_COOKIE = "SVPNSESSIONVALUE"
+
+# Array's session cookie. The name carries a varying suffix, which is why
+# the client matches it by prefix.
+ARRAY_COOKIE = "ARRAYSESSION"
 
 PRELOGIN_FORM = """<?xml version="1.0" encoding="UTF-8" ?>
 <prelogin-response><status>Success</status><ccusername></ccusername>
@@ -184,10 +199,82 @@ class Gateway(BaseHTTPRequestHandler):
             return
         self._reply(AC_REJECTED)
 
+    def _fortinet(self, body: str) -> None:
+        """One round of FortiGate's form authentication."""
+        form = parse_qs(body, keep_blank_values=True)
+        field = lambda key: form.get(key, [""])[0]  # noqa: E731
+
+        if field("username") != USER:
+            self._reply("ret=0,err=Permission denied")
+            return
+
+        # A challenge round sends `code` and echoes the values from the
+        # previous reply. The real thing recognises the conversation by them,
+        # so refusing without them is what makes the echo load-bearing.
+        if "code" in form:
+            if field("reqid") != FORTI_REQID or field("magic") != FORTI_MAGIC:
+                self._reply("ret=0,err=Session not recognised")
+                return
+            if field("code") == CHALLENGE_ANSWER:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header(
+                    "Set-Cookie", f"SVPNCOOKIE={FORTI_COOKIE}; path=/; secure; HttpOnly"
+                )
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self._reply("ret=0,err=Wrong code")
+            return
+
+        # First round: the password buys a `tokeninfo` challenge.
+        if field("credential") == PASSWORD:
+            self._reply(
+                f"ret=2,tokeninfo=,grp=Employees,reqid={FORTI_REQID},polid=3,"
+                f"portal=web,peer=1,magic={FORTI_MAGIC},"
+                "chal_msg=Enter your token code"
+            )
+            return
+        self._reply("ret=0,err=Permission denied")
+
+    def _array(self, body: str) -> None:
+        """Array's one-shot login: no challenge, just a cookie or a refusal."""
+        form = parse_qs(body, keep_blank_values=True)
+        field = lambda key: form.get(key, [""])[0]  # noqa: E731
+
+        # Array's own field names. Answering to `username`/`password` would
+        # let a client using the wrong names pass, which is the mistake most
+        # worth catching here.
+        if field("uname") == USER and field("pwd") == PASSWORD:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header(
+                "Set-Cookie", f"ANsession1234={ARRAY_COOKIE}; path=/; secure; HttpOnly"
+            )
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self._reply("<html>Login failed</html>")
+
     def do_POST(self) -> None:
-        if os.environ.get("MODE") == "anyconnect":
+        mode = os.environ.get("MODE")
+        if mode == "array":
+            if not self.path.startswith("/prx/000/http/localhost/login"):
+                self._reply("<html>not a gateway</html>", 404)
+                return
+            length = int(self.headers.get("Content-Length", "0"))
+            self._array(self.rfile.read(length).decode())
+            return
+        if mode == "anyconnect":
             length = int(self.headers.get("Content-Length", "0"))
             self._anyconnect(self.rfile.read(length).decode())
+            return
+        if mode == "fortinet":
+            if not self.path.startswith("/remote/logincheck"):
+                self._reply("<html>not a gateway</html>", 404)
+                return
+            length = int(self.headers.get("Content-Length", "0"))
+            self._fortinet(self.rfile.read(length).decode())
             return
         if not self.path.startswith("/ssl-vpn/login.esp"):
             self._reply("<html>not a gateway</html>", 404)

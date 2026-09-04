@@ -19,10 +19,13 @@
 //! thing that moves packets.
 
 mod anyconnect;
+mod array;
 mod cache;
 mod cert;
 mod form;
+mod fortinet;
 mod gp;
+mod sso;
 mod xml;
 
 use std::{
@@ -48,6 +51,12 @@ const SERVICE_TYPE: &str = "org.freedesktop.NetworkManager.openconnect";
 /// where it is a setting the user can see and edit rather than hidden state.
 const USERNAME_KEY: &str = "wayle-username";
 
+/// Where wayle records that this profile wants the browser sign-in.
+///
+/// Also wayle's own key rather than the plugin's: openconnect's own switch
+/// for this is a command-line flag, not a profile setting.
+const SSO_KEY: &str = "wayle-sso";
+
 /// How many challenge rounds to follow before giving up. A gateway that keeps
 /// asking is misconfigured or hostile; either way an unbounded loop would keep
 /// the prompt on screen forever.
@@ -70,6 +79,12 @@ const PRELOGIN_TIMEOUT: Duration = Duration::from_secs(20);
 /// the user has approved it on their phone, so the timeout that fits every
 /// other request would fail exactly the person who is slow to find it.
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(180);
+
+/// How long to wait for the browser sign-in to come back.
+///
+/// Longer than a login request: the user has to find the browser, sign in
+/// to their identity provider and very likely approve a second factor.
+const SSO_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// How long a cookie stays "just handed over" for. NM re-asks within
 /// milliseconds when the plugin rejects a secret set, so anything on this
@@ -117,6 +132,11 @@ pub(crate) struct Profile {
     pub gateway: String,
     pub protocol: String,
     pub username: Option<String>,
+    /// Whether this profile asked for the browser (SAML) sign-in.
+    ///
+    /// Opt-in because advertising the capability is a one-way door per
+    /// gateway: see [`sso`].
+    pub sso: bool,
 }
 
 /// Reads an openconnect profile out of NM's connection dictionary, or `None`
@@ -144,6 +164,11 @@ pub(crate) fn profile(
             .cloned()
             .unwrap_or_else(|| String::from("anyconnect")),
         username: data.get(USERNAME_KEY).cloned().filter(|u| !u.is_empty()),
+        // Wayle's own key, like the username: the plugin has no notion of it.
+        // Absent means off, which is what every existing profile says.
+        sso: data
+            .get(SSO_KEY)
+            .is_some_and(|value| value == "yes" || value == "true"),
     })
 }
 
@@ -155,25 +180,29 @@ fn data_dict(value: &OwnedValue) -> Option<HashMap<String, String>> {
     HashMap::<String, String>::try_from(value.clone()).ok()
 }
 
-/// The protocols wayle signs into itself. Everything else in the openconnect
-/// family — `nc`, `pulse`, `f5`, `fortinet`, `array` — falls through to the
-/// normal no-secrets answer, which lets another agent (or the plugin's own
-/// auth dialog, if it is installed) have a go rather than failing outright.
-const NATIVE_PROTOCOLS: &[&str] = &["gp", "anyconnect"];
+/// The protocols wayle signs into itself.
+///
+/// `nc`, `pulse` and `f5` fall through to the normal no-secrets answer, which
+/// lets another agent (or the plugin's own auth dialog, if it is installed)
+/// have a go rather than failing outright. They are left out on purpose: all
+/// three authenticate by scraping the gateway's own HTML login form, so the
+/// variability that matters lives in markup no mock written from
+/// openconnect's source could represent faithfully.
+const NATIVE_PROTOCOLS: &[&str] = &["gp", "anyconnect", "fortinet", "array"];
 
 /// Every protocol the openconnect plugin speaks, as `(value, display name)`.
 ///
 /// This is what the plugin's own `--protocol` takes; the order is the one the
-/// picker offers, natively supported first so the two that work end to end are
-/// not buried under five that hand off to the plugin's auth dialog.
+/// picker offers, natively supported first so the four that work end to end
+/// are not buried under the three that hand off to the plugin's auth dialog.
 pub(crate) const PROTOCOLS: &[(&str, &str)] = &[
     ("gp", "Palo Alto GlobalProtect"),
     ("anyconnect", "Cisco AnyConnect"),
+    ("fortinet", "Fortinet"),
+    ("array", "Array Networks"),
     ("nc", "Juniper Network Connect"),
     ("pulse", "Pulse Connect Secure"),
     ("f5", "F5 BIG-IP"),
-    ("fortinet", "Fortinet"),
-    ("array", "Array Networks"),
 ];
 
 /// Whether wayle signs into this protocol itself, rather than leaving it to
@@ -216,6 +245,8 @@ pub(crate) async fn authenticate(
     // way with no way for the user to correct it.
     let signed_in = match profile.protocol.as_str() {
         "anyconnect" => anyconnect::sign_in(profile, &client, state).await,
+        "fortinet" => fortinet::sign_in(profile, &client, state).await,
+        "array" => array::sign_in(profile, &client, state).await,
         _ => globalprotect(profile, &client, state).await,
     }
     .inspect_err(|_| cache::forget_password(&profile.uuid))?;
@@ -582,7 +613,11 @@ mod tests {
         // Same plugin, a different sign-in each. Claiming one without
         // implementing it would break a VPN that works today through the
         // plugin's own auth dialog.
-        for protocol in ["nc", "pulse", "f5", "fortinet", "array"] {
+        //
+        // These three are left out on purpose rather than pending: all
+        // authenticate by scraping the gateway's own HTML login form, so
+        // what varies lives in markup no mock could represent faithfully.
+        for protocol in ["nc", "pulse", "f5"] {
             let profile = profile(
                 &connection(
                     SERVICE_TYPE,
@@ -593,6 +628,24 @@ mod tests {
             )
             .expect("still an openconnect profile");
             assert!(!is_supported(&profile), "{protocol} has no native sign-in");
+        }
+    }
+
+    #[test]
+    fn the_four_protocols_wayle_signs_into_are_claimed() {
+        // The other half of the contract above: a protocol wayle *does*
+        // implement must be claimed, or the sign-in it has would never run.
+        for protocol in ["gp", "anyconnect", "fortinet", "array"] {
+            let profile = profile(
+                &connection(
+                    SERVICE_TYPE,
+                    &[("gateway", "vpn.example.com"), ("protocol", protocol)],
+                ),
+                "uuid-1",
+                "Work",
+            )
+            .expect("still an openconnect profile");
+            assert!(is_supported(&profile), "{protocol} should sign in natively");
         }
     }
 
@@ -674,5 +727,47 @@ mod tests {
         // Nor a cookie that is not the one that was handed out.
         let fresh = (String::from("authcookie=old"), Instant::now());
         assert!(!is_spent(Some(&fresh), "authcookie=new", Instant::now()));
+    }
+
+    #[test]
+    fn the_browser_sign_in_is_off_unless_the_profile_turns_it_on() {
+        // Every profile made before this existed has no such key, and must
+        // keep behaving exactly as it did.
+        let plain = profile(
+            &connection(SERVICE_TYPE, &[("gateway", "vpn.example.com")]),
+            "uuid-1",
+            "Work",
+        )
+        .expect("a profile");
+        assert!(!plain.sso);
+
+        for value in ["no", "false", "", "off"] {
+            let off = profile(
+                &connection(
+                    SERVICE_TYPE,
+                    &[("gateway", "vpn.example.com"), (SSO_KEY, value)],
+                ),
+                "uuid-1",
+                "Work",
+            )
+            .expect("a profile");
+            assert!(!off.sso, "{value:?} must not enable the browser sign-in");
+        }
+    }
+
+    #[test]
+    fn a_profile_that_asks_for_the_browser_sign_in_gets_it() {
+        for value in ["yes", "true"] {
+            let on = profile(
+                &connection(
+                    SERVICE_TYPE,
+                    &[("gateway", "vpn.example.com"), (SSO_KEY, value)],
+                ),
+                "uuid-1",
+                "Work",
+            )
+            .expect("a profile");
+            assert!(on.sso, "{value:?} should enable the browser sign-in");
+        }
     }
 }

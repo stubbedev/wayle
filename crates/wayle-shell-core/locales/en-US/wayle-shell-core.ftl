@@ -543,6 +543,10 @@ dropdown-network-vpn-import = Import a wg-quick file
 dropdown-network-vpn-import-filter = WireGuard configuration
 dropdown-network-vpn-import-failed = That file is not a wg-quick configuration
 dropdown-network-vpn-raw-hint = One key = value per line
+dropdown-network-vpn-raw-hint-typed = One key = value per line, for keys this form has no box for. Already covered: { $covered }
+dropdown-network-vpn-raw-hint-unknown = One key = value per line. These go to { $service } exactly as written — see that plugin's own documentation for the keys it accepts.
+dropdown-network-vpn-advanced-show = Advanced keys
+dropdown-network-vpn-advanced-hide = Hide advanced keys
 dropdown-network-vpn-name-required = A name is required
 dropdown-network-vpn-field-required = { $field } is required
 dropdown-network-vpn-invalid-text = { $field } is not valid
@@ -571,6 +575,53 @@ dropdown-network-vpn-field-remote = Server
 dropdown-network-vpn-field-username = Username
 dropdown-network-vpn-field-password = Password
 dropdown-network-vpn-field-ca = CA certificate
+
+# Sections shared by the plugin forms
+dropdown-network-vpn-section-gateway = Gateway
+dropdown-network-vpn-section-credentials = Sign-in
+dropdown-network-vpn-section-certificates = Certificates
+dropdown-network-vpn-section-cipher = Encryption
+dropdown-network-vpn-section-ipsec = IPsec
+
+# Plugin fields. The id is the plugin's own key, slugified — vpnc's keys have
+# spaces and capitals in them, so `IPSec gateway` becomes `ipsec-gateway`.
+dropdown-network-vpn-field-cert = User certificate
+dropdown-network-vpn-field-key = Private key
+dropdown-network-vpn-field-cert-pass = Private key password
+dropdown-network-vpn-field-connection-type = Authentication
+dropdown-network-vpn-field-ipsec-gateway = Gateway
+dropdown-network-vpn-field-ipsec-id = Group name
+dropdown-network-vpn-field-ipsec-secret = Group password
+dropdown-network-vpn-field-xauth-username = Username
+dropdown-network-vpn-field-xauth-password = Password
+dropdown-network-vpn-field-domain = Domain
+dropdown-network-vpn-field-nat-traversal-mode = NAT traversal
+dropdown-network-vpn-field-ike-dh-group = IKE DH group
+dropdown-network-vpn-field-perfect-forward-secrecy = Forward secrecy
+dropdown-network-vpn-field-certificate = Gateway certificate
+dropdown-network-vpn-field-method = Authentication
+dropdown-network-vpn-field-user = Username
+dropdown-network-vpn-field-usercert = User certificate
+dropdown-network-vpn-field-userkey = Private key
+dropdown-network-vpn-field-right = Gateway
+dropdown-network-vpn-field-leftid = Local identity
+dropdown-network-vpn-field-ikev2 = IKE version
+dropdown-network-vpn-field-leftxauthusername = Username
+dropdown-network-vpn-field-xauthpassword = Password
+dropdown-network-vpn-field-pskvalue = Pre-shared key
+dropdown-network-vpn-field-ipsec-enabled = IPsec
+dropdown-network-vpn-field-ipsec-psk = Pre-shared key
+dropdown-network-vpn-field-ipsec-gateway-id = Gateway ID
+dropdown-network-vpn-field-require-mppe = Require encryption
+dropdown-network-vpn-field-ca-cert = CA certificate
+dropdown-network-vpn-field-trusted-cert = Trusted certificate
+dropdown-network-vpn-field-otp = One-time code
+dropdown-network-vpn-field-realm = Realm
+dropdown-network-vpn-field-topdomain = Top domain
+dropdown-network-vpn-field-nameserver = Nameserver
+dropdown-network-vpn-field-fragsize = Fragment size
+dropdown-network-vpn-field-wayle-sso = Browser sign-in (SAML)
+dropdown-network-vpn-back = Back
 
 ### Recorder Dropdown
 

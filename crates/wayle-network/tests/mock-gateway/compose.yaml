@@ -37,3 +37,25 @@ services:
       - "127.0.0.1:8445:8445"
     volumes:
       - .:/mock:ro
+
+  fortinet-gateway:
+    image: python:3.13-alpine
+    command: python /mock/gateway.py
+    environment:
+      MODE: fortinet
+      PORT: "8446"
+    ports:
+      - "127.0.0.1:8446:8446"
+    volumes:
+      - .:/mock:ro
+
+  array-gateway:
+    image: python:3.13-alpine
+    command: python /mock/gateway.py
+    environment:
+      MODE: array
+      PORT: "8447"
+    ports:
+      - "127.0.0.1:8447:8447"
+    volumes:
+      - .:/mock:ro

@@ -146,15 +146,13 @@ fn plugin(
 }
 
 /// Whether a key is a secret for this plugin, rather than plain configuration.
+///
+/// Delegates to [`kinds::secret_keys`], which is derived from each plugin's
+/// own source. Keeping the answer in one place is what stops the form and the
+/// profile builder from disagreeing — a disagreement writes a password into
+/// `vpn.data`, where it sits in the profile in the clear.
 fn is_plugin_secret(service_type: &str, key: &str) -> bool {
-    match service_type {
-        "org.freedesktop.NetworkManager.openvpn" => {
-            matches!(key, "password" | "cert-pass" | "proxy-password")
-        }
-        // openconnect's secrets are all minted by a sign-in; nothing typed on
-        // the form is one.
-        _ => false,
-    }
+    super::kinds::is_secret(service_type, key)
 }
 
 /// A native WireGuard profile: no plugin, the kernel carries it.

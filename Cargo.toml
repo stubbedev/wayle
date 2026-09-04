@@ -57,6 +57,7 @@ repository = "https://github.com/stubbedev/wayle"
 license = "MIT"
 
 [workspace.dependencies]
+aes-gcm = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
 async-stream = "0.3.6"
 async-trait = "0.1.89"
 base64 = "0.22"
@@ -126,6 +127,10 @@ reqwest = { version = "0.13", default-features = false, features = [
 	"query",
 	"rustls",
 ] }
+# Already in the tree as rustls's crypto backend; taken as a direct
+# dependency for the AnyConnect SSO token's ECDH + HKDF + AES-GCM, so that
+# needs no new crate.
+ring = "0.17"
 rusqlite = { version = "0.38.0", features = ["bundled"] }
 rust-embed = "8"
 schemars = { version = "1.0.4", features = ["derive"] }

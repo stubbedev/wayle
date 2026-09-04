@@ -304,9 +304,62 @@ fn wireguard() -> VpnKind {
     }
 }
 
-/// The typed form for a known plugin, or none for one wayle has no form for.
-fn fields_for(service: &str) -> Vec<VpnField> {
+/// Keys a plugin stores as a *secret* rather than as plain connection data.
+///
+/// Taken from each plugin's own source — the `NM_*_KEY_*` defines its
+/// `need_secrets` looks for — rather than from the key's name. Getting this
+/// wrong writes a password into `vpn.data`, where it sits in the profile in
+/// the clear instead of going through the secret agent.
+///
+/// This list is the single source of truth: [`fields_for`] marks a field
+/// secret by consulting it, and the profile builder decides which section a
+/// value lands in the same way.
+#[must_use]
+pub fn secret_keys(service: &str) -> &'static [&'static str] {
     match service {
+        // openconnect's secrets are all minted by a sign-in; nothing typed
+        // on the form is one.
+        "org.freedesktop.NetworkManager.openconnect" => &[],
+        "org.freedesktop.NetworkManager.openvpn" => {
+            &["password", "cert-pass", "http-proxy-password"]
+        }
+        "org.freedesktop.NetworkManager.vpnc" => &["IPSec secret", "Xauth password"],
+        "org.freedesktop.NetworkManager.strongswan" => &["password"],
+        "org.freedesktop.NetworkManager.libreswan" => &["xauthpassword", "pskvalue"],
+        "org.freedesktop.NetworkManager.l2tp" => {
+            &["password", "ipsec-psk", "user-certpass", "machine-certpass"]
+        }
+        "org.freedesktop.NetworkManager.pptp" => &["password"],
+        "org.freedesktop.NetworkManager.sstp" => {
+            &["password", "proxy-password", "tls-user-key-secret"]
+        }
+        "org.freedesktop.NetworkManager.fortisslvpn" => &["password", "otp"],
+        "org.freedesktop.NetworkManager.iodine" => &["password"],
+        _ => &[],
+    }
+}
+
+/// Whether `key` is one of `service`'s secrets.
+#[must_use]
+pub fn is_secret(service: &str, key: &str) -> bool {
+    secret_keys(service).contains(&key)
+}
+
+/// The typed form for a known plugin, or none for one wayle has no form for.
+///
+/// Every key here is the plugin's own, read out of its source rather than
+/// remembered: a key the plugin does not know is silently ignored by it, so a
+/// typed form built on guesses would save happily and fail to connect with
+/// nothing to point at. The keys are deliberately a *useful subset* — the
+/// tuning knobs each plugin also accepts stay reachable through the raw
+/// editor, which the form offers alongside the typed fields.
+// One arm per plugin, each a flat list of its own keys. Splitting it into a
+// function per plugin buys nothing but indirection: the value of having them
+// side by side is being able to read what wayle asks for across the whole
+// family at once.
+#[allow(clippy::too_many_lines)]
+fn fields_for(service: &str) -> Vec<VpnField> {
+    let fields = match service {
         "org.freedesktop.NetworkManager.openconnect" => vec![
             VpnField::new("gateway", "Gateway", "vpn.example.com")
                 .required()
@@ -315,17 +368,210 @@ fn fields_for(service: &str) -> Vec<VpnField> {
                 .required()
                 .choices(openconnect_protocols()),
             VpnField::new("wayle-username", "Username", "alice"),
+            // Opt-in, and it has to stay that way: openconnect's manual
+            // warns that a gateway seeing the capability may insist on a
+            // browser where it would otherwise serve a form, so turning
+            // this on for everyone could break a working VPN.
+            VpnField::new("wayle-sso", "Browser sign-in (SAML)", "").choices(choices(&[
+                ("no", "Off"),
+                ("yes", "Sign in through the browser"),
+            ])),
         ],
         "org.freedesktop.NetworkManager.openvpn" => vec![
             VpnField::new("remote", "Server", "vpn.example.com:1194")
                 .required()
-                .format(VpnFormat::HostPort),
-            VpnField::new("username", "Username", "alice"),
-            VpnField::new("password", "Password", "").secret(),
-            VpnField::new("ca", "CA certificate", "/path/to/ca.crt"),
+                .format(VpnFormat::HostPort)
+                .section("gateway"),
+            VpnField::new("connection-type", "Authentication", "")
+                .choices(choices(&[
+                    ("password", "Username and password"),
+                    ("password-tls", "Username, password and certificate"),
+                    ("tls", "Certificate"),
+                    ("static-key", "Static key"),
+                ]))
+                .section("gateway"),
+            VpnField::new("username", "Username", "alice").section("credentials"),
+            VpnField::new("password", "Password", "").section("credentials"),
+            VpnField::new("ca", "CA certificate", "/path/to/ca.crt").section("certificates"),
+            VpnField::new("cert", "User certificate", "/path/to/client.crt")
+                .section("certificates"),
+            VpnField::new("key", "Private key", "/path/to/client.key").section("certificates"),
+            VpnField::new("cert-pass", "Private key password", "").section("certificates"),
+        ],
+        // Cisco's legacy IPsec. Its keys really do have spaces in them.
+        "org.freedesktop.NetworkManager.vpnc" => vec![
+            VpnField::new("IPSec gateway", "Gateway", "vpn.example.com")
+                .required()
+                .format(VpnFormat::Host)
+                .section("gateway"),
+            VpnField::new("IPSec ID", "Group name", "employees")
+                .required()
+                .section("gateway"),
+            VpnField::new("IPSec secret", "Group password", "").section("gateway"),
+            VpnField::new("Xauth username", "Username", "alice").section("credentials"),
+            VpnField::new("Xauth password", "Password", "").section("credentials"),
+            VpnField::new("Domain", "Domain", "example.com").section("credentials"),
+            VpnField::new("NAT Traversal Mode", "NAT traversal", "")
+                .choices(choices(&[
+                    ("natt", "NAT-T when detected"),
+                    ("cisco-udp", "Cisco UDP"),
+                    ("none", "Disabled"),
+                ]))
+                .section("cipher"),
+            VpnField::new("IKE DH Group", "IKE DH group", "")
+                .choices(dh_groups(false))
+                .section("cipher"),
+            VpnField::new("Perfect Forward Secrecy", "Forward secrecy", "")
+                .choices(dh_groups(true))
+                .section("cipher"),
+        ],
+        "org.freedesktop.NetworkManager.strongswan" => vec![
+            VpnField::new("address", "Gateway", "vpn.example.com")
+                .required()
+                .format(VpnFormat::Host)
+                .section("gateway"),
+            VpnField::new("certificate", "Gateway certificate", "/path/to/gateway.crt")
+                .section("gateway"),
+            VpnField::new("method", "Authentication", "")
+                .choices(choices(&[
+                    ("eap", "Username and password (EAP)"),
+                    ("key", "Certificate and private key"),
+                    ("agent", "Certificate from the SSH agent"),
+                    ("smartcard", "Smartcard"),
+                    ("psk", "Pre-shared key"),
+                ]))
+                .section("gateway"),
+            VpnField::new("user", "Identity", "alice@example.com").section("credentials"),
+            VpnField::new("password", "Password", "").section("credentials"),
+            VpnField::new("usercert", "User certificate", "/path/to/client.crt")
+                .section("certificates"),
+            VpnField::new("userkey", "Private key", "/path/to/client.key").section("certificates"),
+        ],
+        "org.freedesktop.NetworkManager.libreswan" => vec![
+            VpnField::new("right", "Gateway", "vpn.example.com")
+                .required()
+                .format(VpnFormat::Host)
+                .section("gateway"),
+            VpnField::new("leftid", "Local identity", "alice@example.com").section("gateway"),
+            VpnField::new("ikev2", "IKE version", "")
+                .choices(choices(&[
+                    ("insist", "IKEv2 only"),
+                    ("propose", "IKEv2 if offered"),
+                    ("no", "IKEv1 only"),
+                ]))
+                .section("gateway"),
+            VpnField::new("leftxauthusername", "Username", "alice").section("credentials"),
+            VpnField::new("xauthpassword", "Password", "").section("credentials"),
+            VpnField::new("pskvalue", "Pre-shared key", "").section("credentials"),
+            VpnField::new("Domain", "Domain", "example.com").section("credentials"),
+        ],
+        "org.freedesktop.NetworkManager.l2tp" => vec![
+            VpnField::new("gateway", "Gateway", "vpn.example.com")
+                .required()
+                .format(VpnFormat::Host)
+                .section("gateway"),
+            VpnField::new("user", "Username", "alice").section("credentials"),
+            VpnField::new("password", "Password", "").section("credentials"),
+            VpnField::new("domain", "Domain", "example.com").section("credentials"),
+            VpnField::new("ipsec-enabled", "IPsec", "")
+                .choices(yes_no())
+                .section("ipsec"),
+            VpnField::new("ipsec-psk", "Pre-shared key", "").section("ipsec"),
+            VpnField::new("ipsec-gateway-id", "Gateway ID", "@vpn.example.com").section("ipsec"),
+        ],
+        "org.freedesktop.NetworkManager.pptp" => vec![
+            VpnField::new("gateway", "Gateway", "vpn.example.com")
+                .required()
+                .format(VpnFormat::Host)
+                .section("gateway"),
+            VpnField::new("user", "Username", "alice").section("credentials"),
+            VpnField::new("password", "Password", "").section("credentials"),
+            VpnField::new("domain", "Domain", "example.com").section("credentials"),
+            VpnField::new("require-mppe", "Require encryption", "")
+                .choices(yes_no())
+                .section("cipher"),
+        ],
+        "org.freedesktop.NetworkManager.sstp" => vec![
+            VpnField::new("gateway", "Gateway", "vpn.example.com")
+                .required()
+                .format(VpnFormat::Host)
+                .section("gateway"),
+            VpnField::new("ca-cert", "CA certificate", "/path/to/ca.crt").section("gateway"),
+            VpnField::new("user", "Username", "alice").section("credentials"),
+            VpnField::new("password", "Password", "").section("credentials"),
+            VpnField::new("domain", "Domain", "example.com").section("credentials"),
+        ],
+        "org.freedesktop.NetworkManager.fortisslvpn" => vec![
+            VpnField::new("gateway", "Gateway", "vpn.example.com:443")
+                .required()
+                .format(VpnFormat::HostPort)
+                .section("gateway"),
+            VpnField::new("trusted-cert", "Trusted certificate", "").section("gateway"),
+            VpnField::new("user", "Username", "alice").section("credentials"),
+            VpnField::new("password", "Password", "").section("credentials"),
+            VpnField::new("otp", "One-time code", "").section("credentials"),
+            VpnField::new("realm", "Realm", "").section("credentials"),
+        ],
+        "org.freedesktop.NetworkManager.iodine" => vec![
+            VpnField::new("topdomain", "Top domain", "tunnel.example.com").required(),
+            VpnField::new("nameserver", "Nameserver", "ns.example.com").format(VpnFormat::Host),
+            VpnField::new("password", "Password", ""),
+            VpnField::new("fragsize", "Fragment size", "").format(VpnFormat::Number),
         ],
         _ => Vec::new(),
-    }
+    };
+
+    // Secrecy comes from one list rather than from remembering to write
+    // `.secret()` on the right rows.
+    fields
+        .into_iter()
+        .map(|field| {
+            if is_secret(service, &field.key) {
+                field.secret()
+            } else {
+                field
+            }
+        })
+        .collect()
+}
+
+/// `(value, label)` pairs as picker choices. Everything here is configuration
+/// rather than a sign-in method, so none of it claims native sign-in.
+fn choices(pairs: &[(&str, &str)]) -> Vec<VpnChoice> {
+    pairs
+        .iter()
+        .map(|(value, label)| VpnChoice {
+            value: String::from(*value),
+            label: String::from(*label),
+            native_sign_in: true,
+        })
+        .collect()
+}
+
+/// A yes/no plugin flag. Both plugins that take these spell them out.
+fn yes_no() -> Vec<VpnChoice> {
+    choices(&[("yes", "Enabled"), ("no", "Disabled")])
+}
+
+/// vpnc's Diffie-Hellman groups, shared by its IKE group and forward-secrecy
+/// fields — the latter also takes "leave it to the server" and "off".
+fn dh_groups(forward_secrecy: bool) -> Vec<VpnChoice> {
+    let mut groups = if forward_secrecy {
+        choices(&[("server", "Server decides"), ("nopfs", "Disabled")])
+    } else {
+        Vec::new()
+    };
+    groups.extend(choices(&[
+        ("dh1", "Group 1"),
+        ("dh2", "Group 2"),
+        ("dh5", "Group 5"),
+        ("dh14", "Group 14"),
+        ("dh15", "Group 15"),
+        ("dh16", "Group 16"),
+        ("dh17", "Group 17"),
+        ("dh18", "Group 18"),
+    ]));
+    groups
 }
 
 /// The openconnect protocols, as picker choices.
@@ -686,9 +932,11 @@ mod tests {
             .iter()
             .map(|choice| choice.value.as_str())
             .collect();
+        // Native sign-in first, so the four that work end to end are not
+        // buried under the three that hand off.
         assert_eq!(
             values,
-            ["gp", "anyconnect", "nc", "pulse", "f5", "fortinet", "array"]
+            ["gp", "anyconnect", "fortinet", "array", "nc", "pulse", "f5"]
         );
     }
 
@@ -702,10 +950,16 @@ mod tests {
                 .map(|choice| choice.native_sign_in)
         };
 
+        // The four wayle signs into itself.
         assert_eq!(native("gp"), Some(true));
         assert_eq!(native("anyconnect"), Some(true));
-        assert_eq!(native("fortinet"), Some(false));
+        assert_eq!(native("fortinet"), Some(true));
+        assert_eq!(native("array"), Some(true));
+        // The three that hand off: all authenticate by scraping the
+        // gateway's own HTML login form.
         assert_eq!(native("pulse"), Some(false));
+        assert_eq!(native("nc"), Some(false));
+        assert_eq!(native("f5"), Some(false));
     }
 
     #[test]
@@ -749,5 +1003,145 @@ mod tests {
             fields: Vec::new(),
         };
         assert!(!kind.is_typed());
+    }
+
+    /// Every plugin wayle ships a typed form for.
+    const TYPED_PLUGINS: &[&str] = &[
+        "org.freedesktop.NetworkManager.openconnect",
+        "org.freedesktop.NetworkManager.openvpn",
+        "org.freedesktop.NetworkManager.vpnc",
+        "org.freedesktop.NetworkManager.strongswan",
+        "org.freedesktop.NetworkManager.libreswan",
+        "org.freedesktop.NetworkManager.l2tp",
+        "org.freedesktop.NetworkManager.pptp",
+        "org.freedesktop.NetworkManager.sstp",
+        "org.freedesktop.NetworkManager.fortisslvpn",
+        "org.freedesktop.NetworkManager.iodine",
+    ];
+
+    #[test]
+    fn every_typed_plugin_asks_for_a_gateway_and_asks_for_it_first() {
+        // A VPN with no address to dial cannot connect, so the field is
+        // required in every form and is the first thing the form asks for.
+        for service in TYPED_PLUGINS {
+            let fields = fields_for(service);
+            assert!(!fields.is_empty(), "{service} has no typed form");
+            let first = &fields[0];
+            assert!(
+                first.required,
+                "{service}'s first field {} is not required",
+                first.key
+            );
+        }
+    }
+
+    #[test]
+    fn a_plugin_wayle_has_never_seen_gets_no_typed_form() {
+        // The raw editor is the escape hatch; inventing fields for an unknown
+        // plugin would produce keys it ignores.
+        assert!(fields_for("org.example.SomeVpnPlugin").is_empty());
+        assert!(secret_keys("org.example.SomeVpnPlugin").is_empty());
+    }
+
+    #[test]
+    fn a_password_field_is_marked_secret_from_the_one_list() {
+        // The bug this guards: a field the form shows in the clear but the
+        // profile builder stores as data, or the reverse. Both read the same
+        // list, so the two cannot drift.
+        for service in TYPED_PLUGINS {
+            for field in fields_for(service) {
+                assert_eq!(
+                    field.secret,
+                    is_secret(service, &field.key),
+                    "{service}: {} disagrees with the secret list",
+                    field.key
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_secret_key_a_plugin_declares_is_a_real_key_of_that_plugin() {
+        // Verified against each plugin's own `NM_*_KEY_*` defines. A typo
+        // here would flag nothing as a secret and store a password as data.
+        let expected: &[(&str, &[&str])] = &[
+            (
+                "org.freedesktop.NetworkManager.vpnc",
+                &["IPSec secret", "Xauth password"],
+            ),
+            (
+                "org.freedesktop.NetworkManager.libreswan",
+                &["xauthpassword", "pskvalue"],
+            ),
+            (
+                "org.freedesktop.NetworkManager.fortisslvpn",
+                &["password", "otp"],
+            ),
+        ];
+        for (service, keys) in expected {
+            assert_eq!(secret_keys(service), *keys, "{service}");
+        }
+        // vpnc's keys really do contain spaces; a "tidied" key is a
+        // different key and the plugin ignores it.
+        assert!(is_secret(
+            "org.freedesktop.NetworkManager.vpnc",
+            "IPSec secret"
+        ));
+        assert!(!is_secret(
+            "org.freedesktop.NetworkManager.vpnc",
+            "ipsec-secret"
+        ));
+    }
+
+    #[test]
+    fn openconnect_keeps_nothing_typed_as_a_secret() {
+        // Its secrets are minted by a sign-in and flagged not-saved; marking
+        // a typed field secret here would store one.
+        let service = "org.freedesktop.NetworkManager.openconnect";
+        assert!(secret_keys(service).is_empty());
+        assert!(fields_for(service).iter().all(|field| !field.secret));
+    }
+
+    #[test]
+    fn a_picker_offers_only_values_its_plugin_accepts() {
+        let vpnc = fields_for("org.freedesktop.NetworkManager.vpnc");
+        let natt = vpnc
+            .iter()
+            .find(|field| field.key == "NAT Traversal Mode")
+            .expect("vpnc offers NAT traversal");
+        let values: Vec<&str> = natt
+            .choices
+            .iter()
+            .map(|choice| choice.value.as_str())
+            .collect();
+        assert_eq!(values, ["natt", "cisco-udp", "none"]);
+
+        // Forward secrecy takes the DH groups plus two answers the plain IKE
+        // group field does not have.
+        let pfs = vpnc
+            .iter()
+            .find(|field| field.key == "Perfect Forward Secrecy")
+            .expect("vpnc offers forward secrecy");
+        let ike = vpnc
+            .iter()
+            .find(|field| field.key == "IKE DH Group")
+            .expect("vpnc offers an IKE group");
+        assert_eq!(pfs.choices.len(), ike.choices.len() + 2);
+        assert_eq!(pfs.choices[0].value, "server");
+        assert_eq!(ike.choices[0].value, "dh1");
+    }
+
+    #[test]
+    fn a_typed_form_stays_short_enough_to_fill_in() {
+        // The tuning knobs stay in the raw editor on purpose: openvpn alone
+        // accepts over seventy keys, and a form of seventy boxes is not a
+        // form anyone completes.
+        for service in TYPED_PLUGINS {
+            let count = fields_for(service).len();
+            assert!(
+                count <= 12,
+                "{service} asks for {count} fields; that belongs in the raw editor"
+            );
+        }
     }
 }

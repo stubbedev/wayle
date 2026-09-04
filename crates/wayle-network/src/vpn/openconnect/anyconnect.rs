@@ -13,7 +13,7 @@
 //! gateway this does not understand is no worse off than before wayle claimed
 //! the protocol.
 
-use super::{LOGIN_TIMEOUT, MAX_CHALLENGES, Session, SignIn, peer_pin, xml};
+use super::{LOGIN_TIMEOUT, MAX_CHALLENGES, SSO_TIMEOUT, Session, SignIn, peer_pin, sso, xml};
 use crate::{
     Error,
     agent::SecretAgentState,
@@ -40,6 +40,9 @@ struct Field {
     label: String,
     /// Whether the answer must be hidden as it is typed.
     secret: bool,
+    /// `<input type="sso">`: the value comes from the browser sign-in
+    /// rather than from the user, so this field is never prompted for.
+    sso: bool,
 }
 
 /// The form a gateway is asking to have filled in.
@@ -53,6 +56,9 @@ struct Form {
     opaque: Option<String>,
     /// The tunnel group to select, when the gateway offered a choice.
     group: Option<String>,
+    /// `sso-v2-login`: the URL to open in the browser, when the gateway
+    /// answered with the external-browser flow.
+    sso_login: Option<String>,
 }
 
 /// What one exchange with the gateway produced.
@@ -77,11 +83,18 @@ pub(super) async fn sign_in(
     client: &reqwest::Client,
     state: &SecretAgentState,
 ) -> Result<SignIn, Error> {
-    let mut body = init_request(&profile.gateway);
+    // The browser sign-in needs a key pair from the very first request: the
+    // gateway encrypts the token to it. Generated only when the profile asked
+    // for the flow, so an ordinary sign-in costs nothing.
+    let mut keys = profile.sso.then(sso::Keys::generate).transpose()?;
+    // Kept alongside: the header goes on every request of the conversation,
+    // while the key itself is consumed the moment a token arrives.
+    let pubkey = keys.as_ref().map(|keys| keys.public_base64.clone());
+    let mut body = init_request(&profile.gateway, keys.is_some());
     let mut remember_password = None;
 
     for _ in 0..=MAX_CHALLENGES {
-        let exchange = post(client, &profile.gateway, &body).await?;
+        let exchange = post(client, &profile.gateway, &body, pubkey.as_deref()).await?;
         let form = match exchange.step {
             Step::Authenticated => {
                 let cookie = exchange.cookie.ok_or_else(|| {
@@ -99,7 +112,7 @@ pub(super) async fn sign_in(
             Step::Form(form) => *form,
         };
 
-        let answers = answer(profile, &form, state).await?;
+        let answers = answer(profile, &form, &mut keys, state).await?;
         // Only the first password is worth remembering: a second factor is a
         // second factor precisely because it is different every time.
         if remember_password.is_none() {
@@ -122,8 +135,13 @@ struct Exchange {
 }
 
 /// Posts one exchange and reads the gateway's answer.
-async fn post(client: &reqwest::Client, gateway: &str, body: &str) -> Result<Exchange, Error> {
-    let response = client
+async fn post(
+    client: &reqwest::Client,
+    gateway: &str,
+    body: &str,
+    dh_pubkey: Option<&str>,
+) -> Result<Exchange, Error> {
+    let mut request = client
         .post(format!("https://{gateway}/"))
         // The content type openconnect sends for this XML, which some
         // gateways check even though the body is plainly not a form.
@@ -132,12 +150,20 @@ async fn post(client: &reqwest::Client, gateway: &str, body: &str) -> Result<Exc
             "application/x-www-form-urlencoded",
         )
         .timeout(LOGIN_TIMEOUT)
-        .body(String::from(body))
-        .send()
-        .await
-        .map_err(|error| {
-            Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
-        })?;
+        .body(String::from(body));
+
+    // The key the gateway encrypts the SSO token to. Sent on every request of
+    // the conversation, as openconnect does — the gateway may answer any of
+    // them with the browser flow.
+    if let Some(pubkey) = dh_pubkey {
+        request = request
+            .header("X-AnyConnect-STRAP-Pubkey", pubkey)
+            .header("X-AnyConnect-STRAP-DH-Pubkey", pubkey);
+    }
+
+    let response = request.send().await.map_err(|error| {
+        Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
+    })?;
 
     let gwcert = peer_pin(&response).ok_or_else(|| {
         auth_error("cannot read the gateway's certificate, which the VPN plugin requires")
@@ -161,13 +187,25 @@ async fn post(client: &reqwest::Client, gateway: &str, body: &str) -> Result<Exc
 }
 
 /// The opening request: "who are you, and what do you want from me".
-fn init_request(gateway: &str) -> String {
+fn init_request(gateway: &str, sso: bool) -> String {
+    // Advertised only when the profile asked for it. openconnect ships
+    // `--no-external-auth` because a gateway that sees this capability can
+    // *insist* on a browser where it would otherwise have served a form, so
+    // offering it unasked could break a VPN that works today.
+    let capabilities = if sso {
+        "<capabilities>\
+         <auth-method>single-sign-on-external-browser</auth-method>\
+         </capabilities>"
+    } else {
+        ""
+    };
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
          <config-auth client=\"vpn\" type=\"init\" aggregate-auth-version=\"2\">\
          <version who=\"vpn\">{VERSION}</version>\
          <device-id>{DEVICE_ID}</device-id>\
          <group-access>https://{gateway}</group-access>\
+         {capabilities}\
          </config-auth>"
     )
 }
@@ -240,6 +278,7 @@ fn parse(body: &str) -> Result<Step, Error> {
         fields,
         opaque: xml::raw_element(body, "opaque").map(String::from),
         group: group(form),
+        sso_login: xml::value(body, "sso-v2-login").filter(|url| !url.is_empty()),
     })))
 }
 
@@ -256,6 +295,7 @@ fn field(input: &str) -> Option<Field> {
         .unwrap_or_else(|| name.clone());
     Some(Field {
         secret: kind == "password",
+        sso: kind == "sso",
         // Gateways label their fields "Username:", which reads badly next to
         // an entry box that already looks like one.
         label: String::from(label.trim_end_matches(':').trim()),
@@ -283,13 +323,26 @@ fn group(form: &str) -> Option<String> {
 async fn answer(
     profile: &Profile,
     form: &Form,
+    keys: &mut Option<sso::Keys>,
     state: &SecretAgentState,
 ) -> Result<Vec<(String, String)>, Error> {
     let stored_password = super::cache::password(&profile.uuid);
     let mut known: Vec<(String, String)> = Vec::new();
     let mut ask: Vec<SecretField> = Vec::new();
 
+    // An `<input type="sso">` is answered by the browser, not by the user, so
+    // it is resolved before anything is prompted for — otherwise the prompt
+    // would sit there asking for a token nobody can type.
+    let sso_token = match form.fields.iter().find(|field| field.sso) {
+        Some(_) => Some(browser_token(form, keys).await?),
+        None => None,
+    };
+
     for field in &form.fields {
+        if field.sso {
+            known.push((field.name.clone(), sso_token.clone().unwrap_or_default()));
+            continue;
+        }
         let known_value = match field.name.as_str() {
             "username" => profile.username.clone(),
             "password" => stored_password.clone(),
@@ -339,6 +392,33 @@ async fn answer(
             .unwrap_or(usize::MAX)
     });
     Ok(answers)
+}
+
+/// Runs the browser sign-in and opens the token it comes back with.
+///
+/// # Errors
+///
+/// Returns an error when the gateway asked for a browser sign-in without
+/// saying where to go, when the profile did not enable the flow (so there is
+/// no key to decrypt with), or when the sign-in does not complete.
+async fn browser_token(form: &Form, keys: &mut Option<sso::Keys>) -> Result<String, Error> {
+    let Some(url) = form.sso_login.as_deref() else {
+        return Err(unsupported(
+            "the gateway wants a browser sign-in but did not say where to go",
+        ));
+    };
+    // Taken, not borrowed: the shared secret is ephemeral and protects
+    // exactly one token, so the key cannot outlive this use. A gateway that
+    // asks twice therefore gets an error rather than a reused secret.
+    let keys = keys.take().ok_or_else(|| {
+        unsupported("this gateway requires a browser sign-in; enable it on the VPN profile")
+    })?;
+
+    let blob = sso::await_token(url, SSO_TIMEOUT).await?;
+    let bytes = sso::base64_decode(&blob)
+        .ok_or_else(|| auth_error("the browser returned a token that is not base64"))?;
+    let parsed = sso::parse_blob(&bytes)?;
+    sso::decrypt(keys, &parsed)
 }
 
 /// The password out of a set of answers, when the form asked for one.
@@ -445,11 +525,13 @@ mod tests {
                     name: String::from("username"),
                     label: String::from("Username"),
                     secret: false,
+                    sso: false,
                 },
                 Field {
                     name: String::from("password"),
                     label: String::from("Password"),
                     secret: true,
+                    sso: false,
                 },
             ]
         );
@@ -550,6 +632,7 @@ mod tests {
                 name: String::from("password"),
                 label: String::from("Password"),
                 secret: true,
+                sso: false,
             }],
             ..Form::default()
         };
@@ -600,7 +683,7 @@ mod tests {
 
     #[test]
     fn the_opening_request_names_the_gateway_it_is_asking() {
-        let request = init_request("vpn.example.com");
+        let request = init_request("vpn.example.com", false);
         assert!(request.contains("type=\"init\""), "got: {request}");
         assert!(
             request.contains("<group-access>https://vpn.example.com</group-access>"),
@@ -627,6 +710,7 @@ mod tests {
                 name: String::from("secondary_password"),
                 label: String::from("Code"),
                 secret: true,
+                sso: false,
             }],
             ..Form::default()
         };
@@ -672,6 +756,7 @@ mod mock {
             gateway: String::from(GATEWAY),
             protocol: String::from("anyconnect"),
             username: None,
+            sso: false,
         }
     }
 
@@ -762,5 +847,121 @@ mod mock {
             matches!(error, Error::VpnProtocolUnsupported(_)),
             "got: {error}"
         );
+    }
+}
+
+/// The browser sign-in's own tests: the capability is off unless asked for,
+/// and an `sso` input is recognised as one the user cannot answer.
+#[cfg(test)]
+mod sso_tests {
+    use super::*;
+
+    #[test]
+    fn the_browser_capability_is_not_advertised_unless_the_profile_asks() {
+        // The reason this matters: openconnect's manual warns that a gateway
+        // seeing this capability may *insist* on a browser where it would
+        // otherwise have served a form. Advertising it unasked could break a
+        // VPN that works today.
+        let quiet = init_request("vpn.example.com", false);
+        assert!(
+            !quiet.contains("single-sign-on"),
+            "the capability leaked into an ordinary sign-in: {quiet}"
+        );
+        assert!(!quiet.contains("<capabilities>"), "got: {quiet}");
+
+        let asked = init_request("vpn.example.com", true);
+        assert!(
+            asked.contains("<auth-method>single-sign-on-external-browser</auth-method>"),
+            "got: {asked}"
+        );
+    }
+
+    #[test]
+    fn an_sso_input_is_a_field_the_user_cannot_answer() {
+        let form = parse(
+            "<config-auth><opaque is-for=\"sg\"><x>1</x></opaque>\
+             <auth id=\"main\"><form>\
+             <input type=\"sso\" name=\"sso-token\" label=\"Single sign-on\"/>\
+             </form></auth>\
+             <sso-v2-login>https://idp.example.com/saml</sso-v2-login>\
+             </config-auth>",
+        )
+        .expect("a form");
+        let Step::Form(form) = form else {
+            panic!("expected a form");
+        };
+
+        assert_eq!(form.fields.len(), 1);
+        assert!(form.fields[0].sso, "an sso input must be flagged as one");
+        assert_eq!(
+            form.sso_login.as_deref(),
+            Some("https://idp.example.com/saml"),
+            "the URL to open has to come out of the same reply"
+        );
+    }
+
+    #[test]
+    fn an_ordinary_form_carries_no_sso_login_and_no_sso_field() {
+        let form = parse(
+            "<config-auth><auth id=\"main\"><form>\
+             <input type=\"text\" name=\"username\" label=\"Username:\"/>\
+             </form></auth></config-auth>",
+        )
+        .expect("a form");
+        let Step::Form(form) = form else {
+            panic!("expected a form");
+        };
+        assert!(!form.fields[0].sso);
+        assert!(form.sso_login.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_gateway_asking_for_a_browser_when_the_profile_did_not_is_unsupported() {
+        // Reaches NM as "someone else should try" rather than as a failed
+        // sign-in: the plugin's own auth dialog can do a webview, and this
+        // cannot.
+        let form = Form {
+            fields: vec![Field {
+                name: String::from("sso-token"),
+                label: String::from("Single sign-on"),
+                secret: false,
+                sso: true,
+            }],
+            sso_login: Some(String::from("https://idp.example.com/saml")),
+            ..Form::default()
+        };
+        let error = browser_token(&form, &mut None)
+            .await
+            .expect_err("with no key there is nothing to decrypt with");
+        assert!(
+            matches!(error, Error::VpnProtocolUnsupported(_)),
+            "got {error:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_browser_sign_in_with_nowhere_to_go_is_refused_before_a_browser_opens() {
+        let form = Form {
+            fields: vec![Field {
+                name: String::from("sso-token"),
+                label: String::from("Single sign-on"),
+                secret: false,
+                sso: true,
+            }],
+            // The gateway asked for SSO but sent no `sso-v2-login`.
+            sso_login: None,
+            ..Form::default()
+        };
+        let mut keys = Some(sso::Keys::generate().expect("keys"));
+        let error = browser_token(&form, &mut keys)
+            .await
+            .expect_err("nowhere to send the user");
+        assert!(
+            matches!(error, Error::VpnProtocolUnsupported(_)),
+            "got {error:?}"
+        );
+        // And the key is still there: nothing was consumed by a flow that
+        // never started.
+        assert!(keys.is_some());
     }
 }

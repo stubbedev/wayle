@@ -11,6 +11,8 @@ pub enum VpnFormInput {
         kind: String,
         values: HashMap<String, String>,
     },
+    /// Show or hide the raw `key = value` editor next to the typed fields.
+    ToggleAdvanced,
     /// A different VPN type was picked; the fields change with it.
     KindSelected(u32),
     SaveClicked,

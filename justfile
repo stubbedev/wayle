@@ -210,7 +210,7 @@ test-gateway:
     docker compose -f "$mock/compose.yaml" up -d
     trap 'docker compose -f "$mock/compose.yaml" down' EXIT
     for _ in $(seq 30); do
-        (exec 3<>/dev/tcp/127.0.0.1/8443) 2>/dev/null && break
+        (exec 3<>/dev/tcp/127.0.0.1/8447) 2>/dev/null && break
         sleep 0.5
     done
     {{cargo}} nextest run -p wayle-network --run-ignored all -E 'test(mock::)'

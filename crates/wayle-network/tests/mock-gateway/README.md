@@ -1,6 +1,6 @@
 # Mock VPN gateways
 
-Three throwaway gateways for the VPN sign-in tests, so nothing has to be
+Four throwaway gateways for the VPN sign-in tests, so nothing has to be
 pointed at a real VPN to prove the sign-in works:
 
 - `127.0.0.1:8443` — GlobalProtect: username/password, one challenge round,
@@ -10,14 +10,18 @@ pointed at a real VPN to prove the sign-in works:
 - `127.0.0.1:8445` — AnyConnect: an XML form, a challenge, then a `webvpn`
   cookie. It refuses any reply that does not echo its `<opaque>` blob, which is
   what the real ones do.
+- `127.0.0.1:8446` — Fortinet: a form POST to `/remote/logincheck`, a
+  `tokeninfo` second factor, then an `SVPNCOOKIE`. It refuses a challenge reply
+  that does not echo `reqid` and `magic` back, which is how the real ones
+  recognise the conversation.
 
 ```sh
 just test-gateway     # up, run the `mock::` tests, down again
 ```
 
 The tests are `#[ignore]`d in the normal suite (`mod mock` in
-`crates/wayle-network/src/vpn/openconnect/gp.rs` and `anyconnect.rs`) because
-they need these containers running.
+`crates/wayle-network/src/vpn/openconnect/gp.rs`, `anyconnect.rs` and
+`fortinet.rs`) because they need these containers running.
 
 ## The certificates
 

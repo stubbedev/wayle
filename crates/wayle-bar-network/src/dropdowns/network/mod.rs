@@ -139,28 +139,45 @@ impl Component for NetworkDropdown {
                     #[local_ref]
                     secret_form_widget -> gtk::Box {},
 
-                    // Above the scan list: a VPN is a property of the
-                    // connection you already have, not another network to join.
-                    #[local_ref]
-                    vpn_form_widget -> gtk::Box {
+                    // Two pages rather than a form that hides the lists in
+                    // place: the editor is somewhere you *go*, and coming
+                    // back is one button.
+                    //
+                    // `vhomogeneous: false` lets each page be its own
+                    // height, which used to be impossible — a stack that
+                    // re-measures resized the popover, and a mapped popover
+                    // cannot resize, so it was destroyed instead. The
+                    // dropdown layer now sizes the surface to the tallest
+                    // page up front and animates the card between them; see
+                    // `wayle_shell_core::bar::dropdown_resize`.
+                    #[name = "body"]
+                    gtk::Stack {
                         set_vexpand: true,
-                    },
-
-                    // The form is an editor, not another row: while it is open
-                    // it owns the body, so it gets the height it needs instead
-                    // of shoving the lists around inside a popover that cannot
-                    // grow.
-                    #[local_ref]
-                    vpn_connections_widget -> gtk::Box {
+                        set_vhomogeneous: false,
+                        set_transition_type: gtk::StackTransitionType::SlideLeftRight,
                         #[watch]
-                        set_visible: !model.vpn_form_open,
-                    },
+                        set_visible_child_name: if model.vpn_form_open {
+                            "edit"
+                        } else {
+                            "browse"
+                        },
 
-                    #[local_ref]
-                    available_networks_widget -> gtk::Box {
-                        set_vexpand: true,
-                        #[watch]
-                        set_visible: !model.vpn_form_open,
+                        add_named[Some("browse")] = &gtk::Box {
+                            set_orientation: gtk::Orientation::Vertical,
+
+                            #[local_ref]
+                            vpn_connections_widget -> gtk::Box {},
+
+                            #[local_ref]
+                            available_networks_widget -> gtk::Box {
+                                set_vexpand: true,
+                            },
+                        },
+
+                        #[local_ref]
+                        add_named[Some("edit")] = vpn_form_widget -> gtk::Box {
+                            set_vexpand: true,
+                        },
                     },
                 },
             },
