@@ -8,7 +8,9 @@
 //!
 //! Doc comments are skipped on purpose: the config schemas document example
 //! icon names (`ld-gpu-symbolic`, `ld-youtube-symbolic`) that are meant to
-//! come from the user's own icon theme, not from wayle's bundled set.
+//! come from the user's own icon theme, not from wayle's bundled set. So is
+//! `tests/`: the fixtures below spell out icon names that exist to be scanned,
+//! not to be looked up in the bundle.
 
 use std::{
     collections::BTreeSet,
@@ -19,8 +21,19 @@ use std::{
 /// Where the bundled symbolic icons live.
 const ICON_DIR: &str = "../resources/icons/hicolor/scalable/actions";
 
-/// The trees whose Rust sources are scanned.
+/// The trees whose Rust sources are scanned. `tests` is left out on purpose;
+/// see the module docs.
 const SOURCE_DIRS: [&str; 2] = ["src", "../crates"];
+
+/// The icon-set prefixes wayle bundles.
+const PREFIXES: [&str; 6] = ["ld", "tb", "tbf", "md", "cm", "si"];
+
+/// Names the code asks for that are deliberately not bundled.
+const IGNORED: [&str; 1] = [
+    // The dashboard's distro logo falls back to this behind `icon_exists`, so
+    // a distro with no bundled logo draws nothing instead of a broken image.
+    "cm-wayle-symbolic",
+];
 
 /// The icon-name literals on one line of Rust, or nothing for a comment.
 ///
@@ -54,10 +67,13 @@ fn is_icon_name(literal: &str) -> bool {
     let Some(prefix) = literal.split('-').next() else {
         return false;
     };
-    ["ld", "tb", "si"].contains(&prefix)
+    PREFIXES.contains(&prefix)
         && literal.ends_with("-symbolic")
         && literal.chars().all(|character| {
-            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-'
+            character.is_ascii_lowercase()
+                || character.is_ascii_digit()
+                || character == '-'
+                || character == '_'
         })
 }
 
@@ -132,7 +148,7 @@ fn every_referenced_icon_is_bundled() -> Result<(), String> {
 
     let mut missing: Vec<String> = referenced
         .iter()
-        .filter(|(name, _)| !bundled.contains(name))
+        .filter(|(name, _)| !bundled.contains(name) && !IGNORED.contains(&name.as_str()))
         .map(|(name, path)| {
             let shown = path
                 .strip_prefix(manifest_dir())
@@ -154,8 +170,25 @@ fn every_referenced_icon_is_bundled() -> Result<(), String> {
     ))
 }
 
+/// The fixtures in this file name icons on purpose; scanning them would report
+/// every one of them as missing.
+#[test]
+fn test_sources_are_not_scanned() {
+    let referenced = referenced();
+    assert!(!referenced.is_empty(), "the scan found nothing at all");
+
+    let from_tests: Vec<_> = referenced
+        .iter()
+        .filter(|(_, path)| path.components().any(|part| part.as_os_str() == "tests"))
+        .collect();
+    assert!(
+        from_tests.is_empty(),
+        "icon names picked up from test sources: {from_tests:#?}"
+    );
+}
+
 mod scanning {
-    use super::{icon_names_in, is_icon_name};
+    use super::{IGNORED, icon_names_in, is_icon_name};
 
     #[test]
     fn finds_icon_literals_in_real_code() {
@@ -185,11 +218,26 @@ mod scanning {
     fn only_the_bundled_prefixes_and_shapes_count() {
         assert!(is_icon_name("ld-image-symbolic"));
         assert!(is_icon_name("ld-grid-2x2-symbolic"));
+        // Every set wayle bundles, including the Material names, which are the
+        // only ones with underscores.
+        assert!(is_icon_name("tbf-circle-symbolic"));
+        assert!(is_icon_name("cm-wireless-symbolic"));
+        assert!(is_icon_name("si-dropbox-symbolic"));
+        assert!(is_icon_name("md-battery_android_frame_1-symbolic"));
         // Wrong prefix, wrong suffix, and a format string are all not names
         // this test can check against the bundle.
         assert!(!is_icon_name("gtk-image-symbolic"));
         assert!(!is_icon_name("ld-image"));
         assert!(!is_icon_name("ld-{kind}-symbolic"));
         assert!(!is_icon_name(""));
+    }
+
+    /// An ignored name still scans as an icon name; it is excused at the
+    /// bundle check, not at the scan, so a typo in it is not silently ignored.
+    #[test]
+    fn ignored_names_are_still_icon_names() {
+        for name in IGNORED {
+            assert!(is_icon_name(name), "{name} does not scan as an icon name");
+        }
     }
 }

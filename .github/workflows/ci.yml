@@ -87,9 +87,6 @@ jobs:
             - name: Clippy
               run: cargo clippy --workspace --all-targets -- -D warnings
 
-            - name: Check icons exist
-              run: ./scripts/ci/check-icons.sh
-
             # Baked into the ci-arch image; this covers the window where the
             # running image predates that, since it only rebuilds on a push to
             # master -- the same push that would need nextest here.
