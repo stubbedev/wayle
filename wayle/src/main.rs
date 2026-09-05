@@ -61,6 +61,9 @@ fn main() {
             Commands::Idle { command } => cli::idle::execute(command).await,
             Commands::Launcher { args } => cli::launcher::execute(args).await,
             Commands::Lock => cli::lock::execute().await,
+            Commands::Vpn { command } => match command {
+                cli::vpn::VpnCommands::SsoCallback { uri } => cli::vpn::sso_callback(&uri).await,
+            },
             Commands::Recorder { command } => cli::recorder::execute(command).await,
             Commands::Screenshot { command } => cli::screenshot::execute(command).await,
             Commands::Widget { command } => cli::widget::execute(command).await,

@@ -25,6 +25,10 @@ pub trait ShellIpc {
     /// Locks the session via Wayle's lock screen.
     async fn lock(&self) -> Result<()>;
 
+    /// Hands a `globalprotectcallback:` URI from the browser to a waiting
+    /// GlobalProtect SAML sign-in.
+    async fn vpn_sso_callback(&self, uri: &str) -> Result<()>;
+
     #[zbus(property)]
     fn bar_hidden(&self) -> Result<Vec<String>>;
 

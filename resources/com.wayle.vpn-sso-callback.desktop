@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Wayle VPN Sign-in
+Comment=Completes a GlobalProtect browser sign-in started by Wayle
+Exec=wayle vpn sso-callback %u
+Icon=wayle-settings
+Terminal=false
+# Not a launchable application: it exists so the browser has somewhere to send
+# the globalprotectcallback: URI the portal redirects to at the end of a SAML
+# sign-in. Showing it in a menu would only offer the user a no-op.
+NoDisplay=true
+StartupNotify=false
+MimeType=x-scheme-handler/globalprotectcallback;
+Categories=Network;

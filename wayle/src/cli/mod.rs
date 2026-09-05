@@ -13,6 +13,7 @@ pub mod idle;
 pub mod launcher;
 /// Lock screen command
 pub mod lock;
+
 /// Media control commands
 pub mod media;
 /// Notification control commands
@@ -33,6 +34,8 @@ pub mod style;
 pub mod systray;
 /// Custom toast command
 pub mod toast;
+/// VPN browser sign-in callback command
+pub mod vpn;
 /// Wallpaper control commands
 pub mod wallpaper;
 /// Widget control commands

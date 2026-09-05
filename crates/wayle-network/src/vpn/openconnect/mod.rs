@@ -25,6 +25,7 @@ mod cert;
 mod form;
 mod fortinet;
 mod gp;
+mod gp_sso;
 mod sso;
 mod xml;
 
@@ -216,6 +217,11 @@ pub(crate) fn signs_in_natively(protocol: &str) -> bool {
 }
 
 /// Whether wayle can produce this profile's secrets natively.
+/// Hands a browser callback to a waiting GlobalProtect SAML sign-in.
+pub(crate) fn deliver_sso_callback(uri: &str) -> bool {
+    gp_sso::deliver_callback(uri)
+}
+
 pub(crate) fn is_supported(profile: &Profile) -> bool {
     signs_in_natively(&profile.protocol) && !profile.gateway.is_empty()
 }
@@ -409,6 +415,46 @@ async fn credentials(
     }
 
     let prelogin = gp::prelogin(client, &profile.gateway).await?;
+
+    // A SAML gateway wants a browser, not a form. With the profile's consent
+    // wayle hands the sign-in to the real browser and takes the answer back
+    // through the `globalprotectcallback:` scheme; without it, the refusal is
+    // the one this has always given, so nothing changes for a profile that
+    // never asked.
+    if let Some(request) = &prelogin.saml {
+        if !profile.sso {
+            return Err(Error::VpnAuthenticationFailed(String::from(
+                "this gateway requires SAML sign-in; turn on \"Browser sign-in (SAML)\" \
+                 for this profile to sign in through your browser",
+            )));
+        }
+        let callback = gp_sso::sign_in(request, SSO_TIMEOUT).await?;
+        let cookie = callback
+            .cookie()
+            .ok_or_else(|| {
+                Error::VpnAuthenticationFailed(String::from(
+                    "the browser sign-in did not return a gateway cookie",
+                ))
+            })?
+            .to_owned();
+        // openconnect posts the SAML result as an ordinary login, with the
+        // identity provider's username and the pre-login cookie standing in
+        // for the password. The challenge loop after this is unchanged: a
+        // gateway may still want a second factor on top.
+        let username = callback
+            .username
+            .clone()
+            .or(stored_user)
+            .filter(|user| !user.is_empty())
+            .ok_or_else(|| {
+                Error::VpnAuthenticationFailed(String::from(
+                    "the browser sign-in did not say who signed in",
+                ))
+            })?;
+        // Never cached: a pre-login cookie is single-use, and remembering it
+        // would make the next connect fail with a stale one.
+        return Ok((username, cookie, false));
+    }
 
     let mut fields = Vec::new();
     if stored_user.is_none() {

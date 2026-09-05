@@ -47,6 +47,23 @@ impl ShellIpcDaemon {
         }
     }
 
+    /// Hands a `globalprotectcallback:` URI from the browser to a waiting
+    /// GlobalProtect SAML sign-in.
+    ///
+    /// The desktop entry wayle installs for that URI scheme runs
+    /// `wayle vpn sso-callback`, which calls this.
+    pub async fn vpn_sso_callback(&self, uri: &str) -> fdo::Result<()> {
+        if wayle_network::vpn::deliver_sso_callback(uri) {
+            Ok(())
+        } else {
+            // Not an error the browser can act on, but the CLI reports it so a
+            // stale callback does not look like a sign-in that worked.
+            Err(fdo::Error::Failed(
+                "no VPN browser sign-in is waiting for a callback".to_string(),
+            ))
+        }
+    }
+
     /// Currently hidden monitor connectors.
     #[zbus(property)]
     pub async fn bar_hidden(&self) -> Vec<String> {

@@ -12,7 +12,7 @@ use crate::cli::{
     notify::commands::NotifyCommands, panel::commands::PanelCommands,
     portal::commands::PortalCommands, power::commands::PowerCommands,
     recorder::commands::RecorderCommands, screenshot::commands::ScreenshotCommands,
-    systray::commands::SystrayCommands, wallpaper::commands::WallpaperCommands,
+    systray::commands::SystrayCommands, vpn::VpnCommands, wallpaper::commands::WallpaperCommands,
     widget::commands::WidgetCommands,
 };
 
@@ -109,6 +109,12 @@ pub enum Commands {
     },
     /// Lock the session via Wayle's lock screen
     Lock,
+    /// VPN commands
+    Vpn {
+        /// VPN subcommand to execute.
+        #[command(subcommand)]
+        command: VpnCommands,
+    },
     /// Screen recorder control commands
     Recorder {
         /// Recorder subcommand to execute.

@@ -416,7 +416,7 @@ const SUCCESS: &str = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: tex
      <html><title>Signed in</title><body>You can close this tab.</body></html>\r\n";
 
 /// Hands the URL to the desktop's browser.
-fn open_in_browser(url: &str) -> Result<(), Error> {
+pub(super) fn open_in_browser(url: &str) -> Result<(), Error> {
     // `xdg-open` rather than a configured browser: the sign-in has to land
     // in the browser the user is already signed into their IdP with.
     std::process::Command::new("xdg-open")

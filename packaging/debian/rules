@@ -24,6 +24,8 @@ override_dh_auto_install:
 	install -d debian/wayle/usr/share/applications
 	install -m 0644 com.wayle.settings.desktop debian/wayle/usr/share/applications/com.wayle.settings.desktop
 	desktop-file-validate debian/wayle/usr/share/applications/com.wayle.settings.desktop
+	install -m 0644 com.wayle.vpn-sso-callback.desktop debian/wayle/usr/share/applications/com.wayle.vpn-sso-callback.desktop
+	desktop-file-validate debian/wayle/usr/share/applications/com.wayle.vpn-sso-callback.desktop
 
 	install -d debian/wayle/usr/share/icons/hicolor/scalable/apps
 	install -m 0644 wayle-settings.svg debian/wayle/usr/share/icons/hicolor/scalable/apps/wayle-settings.svg

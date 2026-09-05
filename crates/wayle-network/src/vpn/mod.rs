@@ -587,6 +587,20 @@ fn fold(states: impl IntoIterator<Item = VpnState>) -> VpnState {
     result
 }
 
+/// Hands a `globalprotectcallback:` URI to a GlobalProtect browser sign-in
+/// that is waiting for one.
+///
+/// The browser reaches this through the desktop entry wayle installs for the
+/// scheme, which runs `wayle vpn sso-callback`, which calls the shell's
+/// `VpnSsoCallback` D-Bus method.
+///
+/// Returns whether a sign-in was waiting. A callback with nothing waiting is
+/// stale — a re-opened tab, a second click — and is dropped.
+#[must_use]
+pub fn deliver_sso_callback(uri: &str) -> bool {
+    openconnect::deliver_sso_callback(uri)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

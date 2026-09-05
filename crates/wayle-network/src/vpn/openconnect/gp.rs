@@ -84,6 +84,9 @@ pub(super) enum Step {
 pub(super) struct Prelogin {
     /// The gateway's instruction to the user, when it sent one.
     pub message: Option<String>,
+    /// The browser sign-in this gateway wants, when it wants one instead of a
+    /// username and a password.
+    pub saml: Option<super::gp_sso::SamlRequest>,
     /// What it calls the username field.
     pub username_label: String,
     /// What it calls the password field.
@@ -94,6 +97,7 @@ impl Default for Prelogin {
     fn default() -> Self {
         Self {
             message: None,
+            saml: None,
             username_label: String::from("Username"),
             password_label: String::from("Password"),
         }
@@ -226,15 +230,11 @@ fn auth_error(message: &str) -> Error {
 ///
 /// Returns an error when the gateway reports one, or when it wants SAML.
 fn parse_prelogin(body: &str) -> Result<Prelogin, Error> {
-    // Checked before the status, because a SAML gateway answers `Success`:
-    // from its point of view nothing is wrong, it just wants a browser.
-    if xml::value(body, "saml-auth-method").is_some_and(|method| !method.is_empty())
-        || xml::value(body, "saml-request").is_some_and(|request| !request.is_empty())
-    {
-        return Err(auth_error(
-            "this gateway requires SAML sign-in, which wayle cannot do yet",
-        ));
-    }
+    // Read before the status, because a SAML gateway answers `Success`: from
+    // its point of view nothing is wrong, it just wants a browser. Whether
+    // wayle can act on that is the caller's decision — the profile has to have
+    // asked for the browser sign-in.
+    let saml = super::gp_sso::parse_request(body);
 
     if xml::value(body, "status").is_some_and(|status| !status.eq_ignore_ascii_case("success")) {
         let message = xml::value(body, "msg")
@@ -246,6 +246,7 @@ fn parse_prelogin(body: &str) -> Result<Prelogin, Error> {
     let default = Prelogin::default();
     Ok(Prelogin {
         message: xml::value(body, "authentication-message").filter(|m| !m.is_empty()),
+        saml,
         username_label: xml::value(body, "username-label")
             .filter(|label| !label.is_empty())
             .unwrap_or(default.username_label),
@@ -513,12 +514,33 @@ mod tests {
     }
 
     #[test]
-    fn a_saml_gateway_is_refused_before_any_credentials_are_posted_at_it() {
+    fn a_saml_gateway_is_recognised_before_any_credentials_are_posted_at_it() {
         let saml = "<prelogin-response><status>Success</status>\
             <saml-auth-method>REDIRECT</saml-auth-method>\
             <saml-request>aHR0cHM6Ly9pZHA=</saml-request></prelogin-response>";
-        let error = parse_prelogin(saml).expect_err("saml is refused");
-        assert!(error.to_string().contains("SAML"), "got: {error}");
+
+        let prelogin = parse_prelogin(saml).expect("a SAML gateway parses");
+
+        // The request is carried out of parsing rather than refused here:
+        // whether wayle signs in through the browser is the profile's choice,
+        // and `credentials` is where that is known. What must not happen is
+        // this reading as an ordinary username/password gateway.
+        let request = prelogin.saml.expect("the SAML request");
+        assert_eq!(request.payload, "https://idp");
+        assert_eq!(request.method, super::super::gp_sso::Method::Redirect);
+    }
+
+    #[test]
+    fn an_ordinary_gateway_carries_no_saml_request() {
+        // The form gateway advertises `saml-default-browser` and is still a
+        // form gateway; treating that as SAML would send it to the browser.
+        assert!(PRELOGIN_FORM.contains("saml-default-browser"));
+        assert!(
+            parse_prelogin(PRELOGIN_FORM)
+                .expect("a form gateway parses")
+                .saml
+                .is_none()
+        );
     }
 
     #[test]

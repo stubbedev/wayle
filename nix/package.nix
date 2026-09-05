@@ -179,6 +179,9 @@ craneLib.buildPackage (
 
     postInstall = ''
       install -Dm0644 resources/com.wayle.settings.desktop -t $out/share/applications
+      # Handler for the globalprotectcallback: URI scheme, which is how a
+      # GlobalProtect SAML sign-in in the browser gets its answer back.
+      install -Dm0644 resources/com.wayle.vpn-sso-callback.desktop -t $out/share/applications
       # Polkit action so wayle-settings can push greeter (login-screen) changes
       # to the system config via `pkexec wayle-greeter apply-config`.
       install -Dm0644 resources/dev.stubbe.wayle.greeter.policy \

@@ -31,6 +31,34 @@ pub(super) fn encode(pairs: &[(&str, &str)]) -> String {
         .join("&")
 }
 
+/// Resolves `%XX` escapes back to bytes.
+///
+/// The inverse of [`escape`] for one component. A `%` that does not begin a
+/// valid escape is kept as written rather than dropped: it is a literal
+/// percent sign in someone's cookie or filename, and losing it silently
+/// corrupts the value.
+pub(super) fn decode_component(value: &str) -> String {
+    let mut out: Vec<u8> = Vec::with_capacity(value.len());
+    let bytes = value.as_bytes();
+    let mut index = 0;
+
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if byte == b'%'
+            && let Some(hex) = value.get(index + 1..index + 3)
+            && let Ok(decoded) = u8::from_str_radix(hex, 16)
+        {
+            out.push(decoded);
+            index += 3;
+            continue;
+        }
+        out.push(byte);
+        index += 1;
+    }
+
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -62,5 +90,28 @@ mod tests {
     fn pairs_join_with_ampersands() {
         assert_eq!(encode(&[("a", "1"), ("b", "")]), "a=1&b=");
         assert_eq!(encode(&[]), "");
+    }
+}
+
+#[cfg(test)]
+mod decoding {
+    use super::{decode_component, escape};
+
+    #[test]
+    fn escapes_resolve_back_to_the_original() {
+        for original in ["p@ss&word=x", "EXAMPLE\\alice", "a b", "é", "aZ0-_.~"] {
+            assert_eq!(decode_component(&escape(original)), original);
+        }
+    }
+
+    #[test]
+    fn a_percent_that_is_not_an_escape_survives() {
+        // A literal percent in a value, and a truncated escape at the end:
+        // dropping either silently corrupts somebody's cookie.
+        assert_eq!(decode_component("100%"), "100%");
+        assert_eq!(decode_component("50%off"), "50%off");
+        assert_eq!(decode_component("%zz"), "%zz");
+        assert_eq!(decode_component("%2"), "%2");
+        assert_eq!(decode_component(""), "");
     }
 }
