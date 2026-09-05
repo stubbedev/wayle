@@ -128,3 +128,11 @@ button.network-vpn-edit {
     color: var(--fg-muted);
     margin: var(--space-2xs) var(--space-xs) 0;
 }
+
+// The form is the stack's other page, and it starts where the browse page's
+// first section label starts. That label carries `--space-lg` above it
+// (`.dropdown-content .section-label`); the card carries nothing, so swapping
+// pages dropped the form flush against the active-connections list above it.
+.network-password-card.network-vpn-form {
+    margin-top: var(--space-lg);
+}
