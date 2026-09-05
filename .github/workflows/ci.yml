@@ -90,8 +90,23 @@ jobs:
             - name: Check icons exist
               run: ./scripts/ci/check-icons.sh
 
+            # Baked into the ci-arch image; this covers the window where the
+            # running image predates that, since it only rebuilds on a push to
+            # master -- the same push that would need nextest here.
+            - name: Ensure cargo-nextest
+              run: |
+                  if ! command -v cargo-nextest >/dev/null; then
+                    curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C "$CARGO_HOME/bin"
+                  fi
+
+            # nextest runs each test in its own process, in parallel, and
+            # reports failures without swallowing output. It cannot run
+            # doctests, so those get their own step.
             - name: Run tests
-              run: cargo test --workspace --no-fail-fast
+              run: cargo nextest run --workspace --no-fail-fast
+
+            - name: Run doctests
+              run: cargo test --doc --workspace
 
             - name: Check config schema is up to date
               run: |

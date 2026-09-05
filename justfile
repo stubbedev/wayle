@@ -93,11 +93,17 @@ lint-check:
     {{cargo}} clippy --workspace --all-targets -- -D warnings
 
 # Run the test suite (nextest — parallel, per-test process, readable output).
+# nextest does not run doctests; `just test-doc` covers those.
 test *args:
     {{cargo}} nextest run --workspace --no-fail-fast {{args}}
 
+# Run the doctests. Separate because nextest cannot run them, and they are not
+# worth recompiling on every filtered `just test`.
+test-doc:
+    {{cargo}} test --doc --workspace
+
 # Format, lint and test. Run before every release.
-check: lint test
+check: lint test test-doc
 
 # Regenerate the committed config JSON schema from the Rust types. The schema's
 # $id embeds the workspace version, so this must be re-run after a version bump

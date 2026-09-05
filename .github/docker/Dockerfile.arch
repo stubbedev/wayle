@@ -4,6 +4,7 @@
 FROM archlinux:base-devel
 
 # jq: config-schema diff. github-cli: release uploads. mold: fast linker.
+# cargo-nextest: test runner (`just test`, CI).
 RUN pacman --noconfirm --needed -Syu \
         git \
         github-cli \
@@ -18,6 +19,7 @@ RUN pacman --noconfirm --needed -Syu \
         pam \
         libpipewire \
         mold \
+        cargo-nextest \
         systemd-libs \
         gstreamer \
         jq \
