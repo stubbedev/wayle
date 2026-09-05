@@ -8,10 +8,20 @@ use super::{
     HyprsunsetModule,
     helpers::{self, LabelContext},
     messages::HyprsunsetCmd,
+    persist,
     solar::{self, Phase},
 };
 
 impl HyprsunsetModule {
+    /// The solar phase here and now: GeoClue's location when it has resolved
+    /// one, otherwise the configured coordinates.
+    pub fn current_phase(&self, config: &HyprsunsetConfig) -> Phase {
+        let (lat, lng) = self
+            .geo_location
+            .unwrap_or((config.latitude.get(), config.longitude.get()));
+        solar::phase_at(Utc::now(), lat, lng)
+    }
+
     pub fn toggle_filter(&self, sender: &ComponentSender<Self>, config: &HyprsunsetConfig) {
         let enabled = self.enabled;
         let temp = config.temperature.get();
@@ -45,17 +55,14 @@ impl HyprsunsetModule {
             return;
         }
 
-        // GeoClue location wins when available; otherwise the configured coords.
-        let (lat, lng) = self
-            .geo_location
-            .unwrap_or((config.latitude.get(), config.longitude.get()));
-        let phase = solar::phase_at(Utc::now(), lat, lng);
+        let phase = self.current_phase(config);
         let phase_changed = self.auto_phase != Some(phase);
         self.auto_phase = Some(phase);
 
         if phase_changed {
             // Crossing sunrise/sunset hands control back to the schedule.
             self.manual_override = false;
+            persist::clear();
         }
 
         if self.manual_override {

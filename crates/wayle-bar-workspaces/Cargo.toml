@@ -23,6 +23,7 @@ tokio-stream.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
 wayle-config.workspace = true
+wayle-core.workspace = true
 wayle-hyprland.workspace = true
 wayle-mango.workspace = true
 wayle-niri.workspace = true

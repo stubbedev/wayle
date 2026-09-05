@@ -6040,6 +6040,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "wayle-config",
+ "wayle-core",
  "wayle-hyprland",
  "wayle-mango",
  "wayle-niri",

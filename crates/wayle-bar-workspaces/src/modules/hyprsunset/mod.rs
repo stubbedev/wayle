@@ -3,6 +3,7 @@ mod geoclue;
 mod helpers;
 mod messages;
 mod methods;
+mod persist;
 mod solar;
 mod watchers;
 
@@ -92,6 +93,18 @@ impl Component for HyprsunsetModule {
                 BarButtonOutput::ScrollDown => HyprsunsetMsg::ScrollDown,
             });
 
+        // The filter lives in a process that dies with the shell, so a manual
+        // toggle is replayed here rather than lost to the auto-schedule.
+        let restored = persist::load();
+        if let Some(persist::Override { enabled: true, .. }) = restored {
+            let temp = config.temperature.get();
+            let gamma = config.gamma.get();
+            sender.oneshot_command(async move {
+                let _ = helpers::start(temp, gamma).await;
+                HyprsunsetCmd::StateChanged(Some(helpers::HyprsunsetState { temp, gamma }))
+            });
+        }
+
         watchers::spawn_config_watchers(&sender, &config);
         watchers::spawn_state_watcher(&sender);
         watchers::spawn_schedule_watcher(&sender);
@@ -105,8 +118,8 @@ impl Component for HyprsunsetModule {
             current_temp: config.temperature.get(),
             current_gamma: config.gamma.get(),
             dropdowns: init.dropdowns,
-            auto_phase: None,
-            manual_override: false,
+            auto_phase: restored.and_then(|o| o.phase),
+            manual_override: restored.is_some(),
             geo_location: None,
         };
         let bar_button = model.bar_button.widget();
@@ -126,7 +139,11 @@ impl Component for HyprsunsetModule {
                     // until the next sunrise/sunset boundary.
                     if config.auto_schedule.get() {
                         self.manual_override = true;
+                        if self.auto_phase.is_none() {
+                            self.auto_phase = Some(self.current_phase(config));
+                        }
                     }
+                    persist::save(self.auto_phase, !self.enabled);
                     self.toggle_filter(&sender, config);
                     return;
                 }
