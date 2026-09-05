@@ -932,8 +932,8 @@ mod tests {
             .iter()
             .map(|choice| choice.value.as_str())
             .collect();
-        // Native sign-in first, so the four that work end to end are not
-        // buried under the three that hand off.
+        // The order the picker offers, unchanged now that all seven sign in
+        // natively: the four older ones still come first.
         assert_eq!(
             values,
             ["gp", "anyconnect", "fortinet", "array", "nc", "pulse", "f5"]
@@ -941,7 +941,7 @@ mod tests {
     }
 
     #[test]
-    fn a_protocol_wayle_cannot_sign_into_says_so_before_it_is_saved() {
+    fn every_offered_protocol_signs_in_natively() {
         let choices = openconnect_protocols();
         let native = |value: &str| {
             choices
@@ -950,16 +950,22 @@ mod tests {
                 .map(|choice| choice.native_sign_in)
         };
 
-        // The four wayle signs into itself.
+        // All seven, since the web-login three landed. The four that were
+        // always native:
         assert_eq!(native("gp"), Some(true));
         assert_eq!(native("anyconnect"), Some(true));
         assert_eq!(native("fortinet"), Some(true));
         assert_eq!(native("array"), Some(true));
-        // The three that hand off: all authenticate by scraping the
-        // gateway's own HTML login form.
-        assert_eq!(native("pulse"), Some(false));
-        assert_eq!(native("nc"), Some(false));
-        assert_eq!(native("f5"), Some(false));
+        // And the three that authenticate through the gateway's own HTML
+        // login form, which `form_login` now drives.
+        assert_eq!(native("pulse"), Some(true));
+        assert_eq!(native("nc"), Some(true));
+        assert_eq!(native("f5"), Some(true));
+
+        // The annotation itself still has to work: it is what a protocol
+        // added later, before its sign-in exists, would be marked with.
+        assert!(!choices.is_empty());
+        assert!(choices.iter().all(|choice| choice.native_sign_in));
     }
 
     #[test]

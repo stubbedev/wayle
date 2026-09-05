@@ -241,6 +241,7 @@ mod mock {
             protocol: String::from("array"),
             username: None,
             sso: false,
+            plugin_signin: false,
         }
     }
 

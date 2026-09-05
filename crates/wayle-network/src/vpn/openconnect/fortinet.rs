@@ -621,6 +621,7 @@ mod mock {
             protocol: String::from("fortinet"),
             username: None,
             sso: false,
+            plugin_signin: false,
         }
     }
 

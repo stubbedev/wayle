@@ -757,6 +757,7 @@ mod mock {
             protocol: String::from("anyconnect"),
             username: None,
             sso: false,
+            plugin_signin: false,
         }
     }
 

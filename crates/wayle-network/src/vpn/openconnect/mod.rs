@@ -23,10 +23,12 @@ mod array;
 mod cache;
 mod cert;
 mod form;
+mod form_login;
 mod fortinet;
 mod gp;
 mod gp_sso;
 mod sso;
+mod web_login;
 mod xml;
 
 use std::{
@@ -57,6 +59,14 @@ const USERNAME_KEY: &str = "wayle-username";
 /// Also wayle's own key rather than the plugin's: openconnect's own switch
 /// for this is a command-line flag, not a profile setting.
 const SSO_KEY: &str = "wayle-sso";
+
+/// Where a profile can say it wants the plugin's own auth dialog instead of
+/// wayle's sign-in. `wayle-signin=plugin` opts out; anything else is the
+/// default, which is wayle.
+///
+/// The escape hatch for a gateway wayle reads wrong — above all one of the
+/// web-login protocols, whose pages are per-deployment markup.
+const SIGNIN_KEY: &str = "wayle-signin";
 
 /// How many challenge rounds to follow before giving up. A gateway that keeps
 /// asking is misconfigured or hostile; either way an unbounded loop would keep
@@ -138,6 +148,14 @@ pub(crate) struct Profile {
     /// Opt-in because advertising the capability is a one-way door per
     /// gateway: see [`sso`].
     pub sso: bool,
+    /// Whether this profile asked to be signed in by the plugin's own auth
+    /// dialog rather than by wayle.
+    ///
+    /// The escape hatch for a gateway wayle's sign-in gets wrong. It matters
+    /// most for the web-login protocols (`nc`, `pulse`, `f5`), whose login
+    /// pages are per-deployment markup: if wayle reads one wrong, this hands
+    /// the profile back to the thing that worked before.
+    pub plugin_signin: bool,
 }
 
 /// Reads an openconnect profile out of NM's connection dictionary, or `None`
@@ -170,6 +188,7 @@ pub(crate) fn profile(
         sso: data
             .get(SSO_KEY)
             .is_some_and(|value| value == "yes" || value == "true"),
+        plugin_signin: data.get(SIGNIN_KEY).is_some_and(|value| value == "plugin"),
     })
 }
 
@@ -189,7 +208,7 @@ fn data_dict(value: &OwnedValue) -> Option<HashMap<String, String>> {
 /// three authenticate by scraping the gateway's own HTML login form, so the
 /// variability that matters lives in markup no mock written from
 /// openconnect's source could represent faithfully.
-const NATIVE_PROTOCOLS: &[&str] = &["gp", "anyconnect", "fortinet", "array"];
+const NATIVE_PROTOCOLS: &[&str] = &["gp", "anyconnect", "fortinet", "array", "nc", "pulse", "f5"];
 
 /// Every protocol the openconnect plugin speaks, as `(value, display name)`.
 ///
@@ -223,7 +242,7 @@ pub(crate) fn deliver_sso_callback(uri: &str) -> bool {
 }
 
 pub(crate) fn is_supported(profile: &Profile) -> bool {
-    signs_in_natively(&profile.protocol) && !profile.gateway.is_empty()
+    signs_in_natively(&profile.protocol) && !profile.gateway.is_empty() && !profile.plugin_signin
 }
 
 /// Authenticates and returns the secrets the openconnect plugin asked for.
@@ -253,6 +272,11 @@ pub(crate) async fn authenticate(
         "anyconnect" => anyconnect::sign_in(profile, &client, state).await,
         "fortinet" => fortinet::sign_in(profile, &client, state).await,
         "array" => array::sign_in(profile, &client, state).await,
+        // Juniper, Pulse and F5 all sign in through the gateway's own web
+        // login; see `form_login`.
+        protocol if form_login::dialect(protocol).is_some() => {
+            form_login::sign_in(profile, &client, state).await
+        }
         _ => globalprotect(profile, &client, state).await,
     }
     .inspect_err(|_| cache::forget_password(&profile.uuid))?;
@@ -655,14 +679,10 @@ mod tests {
     }
 
     #[test]
-    fn the_rest_of_the_protocol_family_is_left_to_someone_else() {
-        // Same plugin, a different sign-in each. Claiming one without
-        // implementing it would break a VPN that works today through the
-        // plugin's own auth dialog.
-        //
-        // These three are left out on purpose rather than pending: all
-        // authenticate by scraping the gateway's own HTML login form, so
-        // what varies lives in markup no mock could represent faithfully.
+    fn the_web_login_protocols_sign_in_natively_too() {
+        // `nc`, `pulse` and `f5` authenticate through the gateway's own HTML
+        // login page, which `form_login` now drives by reading the form
+        // rather than knowing it.
         for protocol in ["nc", "pulse", "f5"] {
             let profile = profile(
                 &connection(
@@ -673,7 +693,48 @@ mod tests {
                 "Work",
             )
             .expect("still an openconnect profile");
-            assert!(!is_supported(&profile), "{protocol} has no native sign-in");
+            assert!(is_supported(&profile), "{protocol} has no native sign-in");
+        }
+    }
+
+    #[test]
+    fn a_profile_can_hand_itself_back_to_the_plugins_auth_dialog() {
+        // The escape hatch for a gateway wayle reads wrong. These login pages
+        // are per-deployment markup, so "it works through the plugin today"
+        // has to stay reachable without editing the profile's protocol.
+        let opted_out = profile(
+            &connection(
+                SERVICE_TYPE,
+                &[
+                    ("gateway", "vpn.example.com"),
+                    ("protocol", "f5"),
+                    (SIGNIN_KEY, "plugin"),
+                ],
+            ),
+            "uuid-1",
+            "Work",
+        )
+        .expect("still an openconnect profile");
+        assert!(opted_out.plugin_signin);
+        assert!(!is_supported(&opted_out));
+
+        // Any other value, and the absent key, mean the default: wayle.
+        for value in ["wayle", "", "yes"] {
+            let normal = profile(
+                &connection(
+                    SERVICE_TYPE,
+                    &[
+                        ("gateway", "vpn.example.com"),
+                        ("protocol", "f5"),
+                        (SIGNIN_KEY, value),
+                    ],
+                ),
+                "uuid-1",
+                "Work",
+            )
+            .expect("still an openconnect profile");
+            assert!(!normal.plugin_signin, "{value:?} opted out");
+            assert!(is_supported(&normal));
         }
     }
 
