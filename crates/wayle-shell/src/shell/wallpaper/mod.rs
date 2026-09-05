@@ -70,6 +70,7 @@ impl Wallpaper {
         // completes the pair.
         if let Some(display) = gdk::Display::default() {
             display.monitors().connect_items_changed(move |_, _, _, _| {
+                sync_service_monitors(&service);
                 let monitors = state.borrow();
                 reconcile(&surfaces, &monitors, &config);
             });
@@ -157,6 +158,47 @@ fn reconcile(
             surface.render(path, fit, transition, duration_ms);
         }
     }
+}
+
+/// Mirrors GDK's monitor list into the service's registration.
+///
+/// The service discovers outputs over a Wayland connection of its own, on a
+/// thread that stops dispatching for good if that connection ever errors — and
+/// its map is what [`reconcile`] iterates, so past that point nothing would ever
+/// paint a newly connected monitor. GDK is watching the same outputs anyway.
+/// Both service calls are idempotent, so whichever side notices first wins and
+/// the other no-ops.
+fn sync_service_monitors(service: &WallpaperService) {
+    let gdk_monitors: Vec<String> = current_monitors()
+        .into_iter()
+        .map(|(connector, _)| connector)
+        .collect();
+
+    let (added, removed) = monitor_diff(&gdk_monitors, &service.monitor_names());
+
+    for connector in added {
+        service.register_monitor(&connector);
+    }
+    for connector in removed {
+        service.unregister_monitor(&connector);
+    }
+}
+
+/// Connectors to register and to unregister to bring `registered` in line with
+/// what GDK reports.
+fn monitor_diff(gdk_monitors: &[String], registered: &[String]) -> (Vec<String>, Vec<String>) {
+    let added = gdk_monitors
+        .iter()
+        .filter(|c| !registered.contains(c))
+        .cloned()
+        .collect();
+    let removed = registered
+        .iter()
+        .filter(|c| !gdk_monitors.contains(c))
+        .cloned()
+        .collect();
+
+    (added, removed)
 }
 
 /// Whether a live surface should be kept for `connector`.
@@ -318,10 +360,48 @@ fn stack_transition(anim: AnimationType) -> gtk::StackTransitionType {
 mod tests {
     use std::collections::HashMap;
 
-    use super::keeps_surface;
+    use super::{keeps_surface, monitor_diff};
 
     fn map(names: &[&str]) -> HashMap<String, ()> {
         names.iter().map(|n| ((*n).to_string(), ())).collect()
+    }
+
+    fn names(names: &[&str]) -> Vec<String> {
+        names.iter().map(|n| (*n).to_string()).collect()
+    }
+
+    #[test]
+    fn diff_registers_a_monitor_gdk_gained() {
+        let (added, removed) = monitor_diff(&names(&["DP-1", "DP-2"]), &names(&["DP-1"]));
+
+        assert_eq!(added, names(&["DP-2"]));
+        assert!(removed.is_empty());
+    }
+
+    #[test]
+    fn diff_unregisters_a_monitor_gdk_lost() {
+        let (added, removed) = monitor_diff(&names(&["DP-1"]), &names(&["DP-1", "DP-2"]));
+
+        assert!(added.is_empty());
+        assert_eq!(removed, names(&["DP-2"]));
+    }
+
+    #[test]
+    fn diff_is_empty_when_the_service_already_agrees() {
+        // The service's own Wayland watcher normally gets there first; this must
+        // then be a no-op rather than churning the registration.
+        let (added, removed) = monitor_diff(&names(&["DP-1", "DP-2"]), &names(&["DP-2", "DP-1"]));
+
+        assert!(added.is_empty(), "re-registered {added:?}");
+        assert!(removed.is_empty(), "unregistered {removed:?}");
+    }
+
+    #[test]
+    fn diff_replaces_the_whole_set_on_a_dock_swap() {
+        let (added, removed) = monitor_diff(&names(&["HDMI-1"]), &names(&["DP-1", "DP-2"]));
+
+        assert_eq!(added, names(&["HDMI-1"]));
+        assert_eq!(removed, names(&["DP-1", "DP-2"]));
     }
 
     #[test]
