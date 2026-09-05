@@ -155,14 +155,16 @@ release-preview:
     echo "  release-minor: v${MAJOR}.$((MINOR + 1)).0"
     echo "  release-patch: v${MAJOR}.${MINOR}.$((PATCH + 1))"
 
-# Gate the release on CI having already gone green for HEAD, instead of
-# recompiling the workspace here. CI's `check` job runs the exact same fmt +
-# clippy + nextest + doctests + schema check on every master push, so the local
-# `just check` was a second pass over work already done — three compiles of the
-# workspace (clippy, the test build, the doctest build) for zero new
-# information. Waits if the run is still in flight. WAYLE_RELEASE_NO_CI=1 falls
-# back to checking locally (offline, or CI is down).
-_require-ci-green:
+# Refuse to release a commit CI has already judged broken, without waiting on
+# anything. CI's `check` job runs the same fmt + clippy + nextest + doctests +
+# schema check on every master push, so a local `just check` here would be a
+# second pass over work already done — three compiles of the workspace for zero
+# new information. But this recipe does not block either: one status read, no
+# polling, no `gh run watch`. A run that is still in flight (or has not started,
+# or never will because HEAD is unpushed) is not an error — the tag pushed below
+# gets its own CI run, which is the real verification. WAYLE_RELEASE_NO_CI=1
+# checks locally instead (offline, or CI is down).
+_reject-red-ci:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -n "${WAYLE_RELEASE_NO_CI:-}" ]; then
@@ -171,26 +173,17 @@ _require-ci-green:
         exit 0
     fi
     SHA=$(git rev-parse HEAD)
-    git fetch -q origin
-    if [ -z "$(git branch -r --contains "$SHA" 2>/dev/null)" ]; then
-        echo "Error: HEAD ($SHA) is not pushed, so CI never saw it. Push first." >&2
-        exit 1
-    fi
-    ID=$(gh run list --workflow CI --commit "$SHA" --limit 1 --json databaseId -q '.[0].databaseId // empty')
-    if [ -z "$ID" ]; then
-        echo "Error: no CI run for $SHA. Wait for it to start, or set WAYLE_RELEASE_NO_CI=1." >&2
-        exit 1
-    fi
-    if [ "$(gh run view "$ID" --json status -q .status)" != "completed" ]; then
-        echo "CI still running for $SHA — waiting on it instead of recompiling locally."
-        gh run watch "$ID" --exit-status
-    fi
-    CONCLUSION=$(gh run view "$ID" --json conclusion -q .conclusion)
-    if [ "$CONCLUSION" != "success" ]; then
-        echo "Error: CI concluded '$CONCLUSION' for $SHA — not releasing." >&2
-        exit 1
-    fi
-    echo "CI green for $SHA."
+    read -r STATUS CONCLUSION <<<"$(gh run list --workflow CI --commit "$SHA" --limit 1 \
+        --json status,conclusion -q '.[0] | "\(.status) \(.conclusion)"' 2>/dev/null || true)"
+    case "${STATUS:-}${CONCLUSION:-}" in
+        completedsuccess) echo "CI green for ${SHA:0:7}." ;;
+        completed*)
+            echo "Error: CI concluded '$CONCLUSION' for ${SHA:0:7} — not releasing." >&2
+            echo "Fix it, or set WAYLE_RELEASE_NO_CI=1 to check locally instead." >&2
+            exit 1
+            ;;
+        *) echo "No finished CI run for ${SHA:0:7} yet — releasing anyway; the tag's run verifies it." ;;
+    esac
 
 _release-checks:
     #!/usr/bin/env bash
@@ -205,10 +198,10 @@ _release-checks:
         exit 1
     fi
     if [ -n "$(git status --porcelain)" ]; then
-        echo "Error: working tree is dirty. Commit (or stash) and push, so CI verifies exactly what gets tagged." >&2
+        echo "Error: working tree is dirty. Commit (or stash) it, so what gets tagged is what CI builds." >&2
         exit 1
     fi
-    just _require-ci-green
+    just _reject-red-ci
 
 _release bump:
     #!/usr/bin/env bash
@@ -259,8 +252,9 @@ _release bump:
     git push origin HEAD
     git push origin "v${NEW}"
     echo
-    echo "Tagged v${NEW}."
-    echo "Watch the release build: gh run watch || open https://github.com/stubbedev/wayle/actions"
+    echo "Tagged and pushed v${NEW}. The build, archives and cache push run on CI."
+    echo "  status:  gh run list --workflow Release --limit 1"
+    echo "  actions: https://github.com/stubbedev/wayle/actions"
 
 release-patch: (_release "patch")
 release-minor: (_release "minor")
