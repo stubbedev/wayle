@@ -1,0 +1,17 @@
+[package]
+name = "wayle-clipboard"
+description = "Wayland clipboard access and session clipboard history"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+tracing.workspace = true
+wayland-client.workspace = true
+wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
+
+[lints]
+workspace = true

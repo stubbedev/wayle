@@ -6155,6 +6155,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "wayle-clipboard"
+version = "0.8.41"
+dependencies = [
+ "tokio",
+ "tracing",
+ "wayland-client",
+ "wayland-protocols-wlr",
+]
+
+[[package]]
 name = "wayle-config"
 version = "0.8.41"
 dependencies = [
@@ -6315,6 +6325,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "wayle-clipboard",
  "wayle-core",
 ]
 
@@ -6443,6 +6454,7 @@ dependencies = [
  "wayland-protocols-misc",
  "wayland-protocols-wlr",
  "wayland-scanner",
+ "wayle-clipboard",
  "wayle-config",
  "wayle-ipc",
  "wayle-share-preview",
@@ -6575,6 +6587,7 @@ dependencies = [
  "wayle-bluetooth",
  "wayle-brightness",
  "wayle-cava",
+ "wayle-clipboard",
  "wayle-config",
  "wayle-core",
  "wayle-hyprland",

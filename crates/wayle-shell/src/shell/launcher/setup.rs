@@ -16,9 +16,9 @@ use wayle_launcher::{
     CaseMode, Hooks, MatchMethod, MatcherOptions, Mode, SortMethod,
     history::HistoryStore,
     modes::{
-        CalcMode, CombiMode, DmenuConfig, DmenuMode, DrunConfig, DrunField, DrunMode, EmojiMode,
-        FileBrowserConfig, FileBrowserMode, FileSort, KeysMode, RunConfig, RunMode, ScriptMode,
-        SshConfig, SshMode, WindowConfig, WindowField, WindowMode,
+        CalcMode, ClipboardMode, CombiMode, DmenuConfig, DmenuMode, DrunConfig, DrunField,
+        DrunMode, EmojiMode, FileBrowserConfig, FileBrowserMode, FileSort, KeysMode, RunConfig,
+        RunMode, ScriptMode, SshConfig, SshMode, WindowConfig, WindowField, WindowMode,
     },
 };
 
@@ -284,6 +284,7 @@ fn build_mode(
         )))),
         "keys" => Some(Box::new(KeysMode::new(bindings.to_vec()))),
         "calc" => Some(Box::new(CalcMode::new())),
+        "clipboard" => Some(Box::new(ClipboardMode::new())),
         "emoji" => Some(Box::new(EmojiMode::new())),
         "combi" => {
             let combi = &config.launcher.combi;

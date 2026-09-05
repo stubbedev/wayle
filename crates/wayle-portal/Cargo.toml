@@ -33,6 +33,7 @@ wayland-protocols-wlr = { version = "0.3.12", features = ["client"] }
 wayland-protocols-misc = { version = "0.3.12", features = ["client"] }
 reis = { version = "0.7", features = ["calloop"] }
 calloop = "0.14"
+wayle-clipboard.workspace = true
 wayle-config.workspace = true
 wayle-ipc.workspace = true
 wayle-share-preview.workspace = true

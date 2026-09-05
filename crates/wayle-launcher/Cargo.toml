@@ -22,6 +22,7 @@ shlex.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+wayle-clipboard.workspace = true
 wayle-core.workspace = true
 
 [lints]

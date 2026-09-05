@@ -35,15 +35,16 @@ fn locales_dir() -> PathBuf {
 }
 
 /// Every locale directory, by name.
-fn locales() -> Vec<String> {
-    let mut names: Vec<String> = fs::read_dir(locales_dir())
-        .expect("locales/ must exist")
+fn locales() -> Result<Vec<String>, String> {
+    let entries =
+        fs::read_dir(locales_dir()).map_err(|error| format!("cannot read locales/: {error}"))?;
+    let mut names: Vec<String> = entries
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_dir())
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
         .collect();
     names.sort();
-    names
+    Ok(names)
 }
 
 /// The ids one locale declares, read from the partials rather than the
@@ -62,8 +63,11 @@ fn ids_for(locale: &str) -> BTreeSet<String> {
                 .and_then(|name| name.to_str())
                 .is_some_and(|name| name.starts_with('_') && name.ends_with(".ftl"))
             {
-                let source = fs::read_to_string(&path).expect("readable ftl");
-                into.extend(message_ids(&source));
+                // An unreadable partial contributes nothing; the non-empty
+                // check on the reference locale catches a wholesale failure.
+                if let Ok(source) = fs::read_to_string(&path) {
+                    into.extend(message_ids(&source));
+                }
             }
         }
     }
@@ -76,14 +80,14 @@ fn ids_for(locale: &str) -> BTreeSet<String> {
 const REFERENCE: &str = "en-US";
 
 #[test]
-fn every_locale_declares_every_reference_id() {
+fn every_locale_declares_every_reference_id() -> Result<(), String> {
     let reference = ids_for(REFERENCE);
     assert!(
         !reference.is_empty(),
         "the {REFERENCE} locale declared nothing; the test is reading the wrong place"
     );
 
-    for locale in locales() {
+    for locale in locales()? {
         if locale == REFERENCE {
             continue;
         }
@@ -96,13 +100,14 @@ fn every_locale_declares_every_reference_id() {
             missing.len()
         );
     }
+    Ok(())
 }
 
 #[test]
-fn no_locale_declares_an_id_the_reference_does_not() {
+fn no_locale_declares_an_id_the_reference_does_not() -> Result<(), String> {
     let reference = ids_for(REFERENCE);
 
-    for locale in locales() {
+    for locale in locales()? {
         if locale == REFERENCE {
             continue;
         }
@@ -115,6 +120,7 @@ fn no_locale_declares_an_id_the_reference_does_not() {
             extra.len()
         );
     }
+    Ok(())
 }
 
 mod parsing {

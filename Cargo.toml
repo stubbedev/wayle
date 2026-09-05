@@ -8,6 +8,7 @@ members = [
 	"crates/wayle-bar-info",
 	"crates/wayle-bar-apps",
 	"crates/wayle-auth",
+	"crates/wayle-clipboard",
 	"crates/wayle-config",
 	"crates/wayle-derive",
 	"crates/wayle-greeter",
@@ -197,6 +198,7 @@ wayle-bar-media = { path = "crates/wayle-bar-media" }
 wayle-bar-info = { path = "crates/wayle-bar-info" }
 wayle-bar-apps = { path = "crates/wayle-bar-apps" }
 wayle-auth = { path = "crates/wayle-auth" }
+wayle-clipboard = { path = "crates/wayle-clipboard" }
 wayle-config = { path = "crates/wayle-config" }
 wayle-derive = { path = "crates/wayle-derive" }
 wayle-i18n = { path = "crates/wayle-i18n" }

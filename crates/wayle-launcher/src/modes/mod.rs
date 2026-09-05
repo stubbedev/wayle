@@ -1,6 +1,7 @@
 //! Launch mode implementations.
 
 pub mod calc;
+pub mod clipboard;
 pub mod combi;
 pub mod dmenu;
 pub mod drun;
@@ -13,6 +14,7 @@ pub mod ssh;
 pub mod window;
 
 pub use calc::CalcMode;
+pub use clipboard::ClipboardMode;
 pub use combi::CombiMode;
 pub use dmenu::{DmenuConfig, DmenuMode};
 pub use drun::{DrunConfig, DrunField, DrunMode};

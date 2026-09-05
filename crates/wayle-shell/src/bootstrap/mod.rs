@@ -180,6 +180,15 @@ pub async fn init_services() -> Result<(StartupTimer, ShellServices), Box<dyn Er
 
     let treeman = timer.time_sync("Treeman", || Arc::new(TreemanService::builder().build()));
 
+    // Started here rather than when the launcher first opens, so the history
+    // covers the session. A compositor without `zwlr_data_control` simply has
+    // no clipboard history; nothing else in the shell depends on it.
+    timer.time_sync("Clipboard", || {
+        if let Err(error) = wayle_clipboard::start_global(wayle_clipboard::History::default()) {
+            debug!(%error, "no clipboard history for this session");
+        }
+    });
+
     timer.mark_services_done();
 
     let services = ShellServices {

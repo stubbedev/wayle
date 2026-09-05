@@ -5,21 +5,19 @@
 //! selection owner, and serve their data on demand. The Wayland work lives in
 //! [`manager`]; this is the D-Bus surface + signal fan-out.
 
-mod manager;
-
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
 };
 
 use tracing::{debug, warn};
+use wayle_clipboard::{ClipEvent, ClipboardHandle};
 use zbus::{
     Connection, interface,
     object_server::SignalEmitter,
     zvariant::{OwnedFd, OwnedObjectPath, OwnedValue},
 };
 
-use self::manager::{ClipEvent, ClipboardHandle};
 use crate::{dbus_util::opt_string, settings::PORTAL_PATH};
 
 /// Clipboard portal interface.
@@ -46,7 +44,7 @@ impl Clipboard {
         if self.handle.lock().map(|g| g.is_some()).unwrap_or(false) {
             return true;
         }
-        match tokio::task::spawn_blocking(manager::spawn).await {
+        match tokio::task::spawn_blocking(wayle_clipboard::spawn).await {
             Ok(Ok((handle, events))) => {
                 self.spawn_event_task(events);
                 if let Ok(mut guard) = self.handle.lock() {

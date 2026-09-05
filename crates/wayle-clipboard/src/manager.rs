@@ -1,5 +1,5 @@
-//! Wayland side of the Clipboard portal: bridges `zwlr_data_control` to the
-//! D-Bus interface.
+//! The `zwlr_data_control` client: watching, reading and owning the Wayland
+//! selection.
 //!
 //! A dedicated thread reads selection/transfer events; the manager/device/queue
 //! handle are `Send`, so the async interface issues requests (receive, set
@@ -19,7 +19,9 @@ use std::{
 use tokio::sync::mpsc as tokio_mpsc;
 use tracing::warn;
 use wayland_client::{
-    Connection, Dispatch, QueueHandle, delegate_noop, event_created_child,
+    Connection, Dispatch, Proxy, QueueHandle,
+    backend::ObjectId,
+    delegate_noop, event_created_child,
     protocol::{wl_registry, wl_seat::WlSeat},
 };
 use wayland_protocols_wlr::data_control::v1::client::{
@@ -29,19 +31,32 @@ use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_source_v1::{self, ZwlrDataControlSourceV1},
 };
 
-/// An event from the compositor for the async side to turn into a D-Bus signal.
+/// An event from the compositor for the async side to act on.
 pub enum ClipEvent {
     /// The selection owner changed (new clipboard content available).
     OwnerChanged,
-    /// The compositor requests our owned selection's data for `mime`; the app
-    /// must write it to the fd returned by `SelectionWrite(serial)`.
-    Transfer { mime: String, serial: u32 },
+    /// The compositor wants our owned selection's data. Take the fd with
+    /// [`ClipboardHandle::take_transfer_fd`] and write the bytes into it.
+    Transfer {
+        /// The mime type the requester asked for.
+        mime: String,
+        /// Identifies the pending fd for [`ClipboardHandle::take_transfer_fd`].
+        serial: u32,
+    },
 }
 
 /// State shared between the Wayland thread and the async interface.
 #[derive(Clone, Default)]
 struct Shared {
     current_offer: Arc<Mutex<Option<ZwlrDataControlOfferV1>>>,
+    /// The mime types the current selection is offered under, in the order
+    /// the owner advertised them.
+    current_mimes: Arc<Mutex<Vec<String>>>,
+    /// Mimes seen per offer object before the `selection` event says which
+    /// offer is the clipboard. The compositor sends `offer` events on the new
+    /// offer first, and several offers can be in flight, so they cannot just
+    /// be accumulated into one list.
+    offer_mimes: Arc<Mutex<HashMap<ObjectId, Vec<String>>>>,
     transfer_fds: Arc<Mutex<HashMap<u32, OwnedFd>>>,
     serial: Arc<AtomicU32>,
 }
@@ -58,6 +73,20 @@ pub struct ClipboardHandle {
 }
 
 impl ClipboardHandle {
+    /// The mime types the current selection is offered under, in the order the
+    /// owner advertised them. Empty when there is no selection.
+    ///
+    /// This is what makes the difference between remembering text and
+    /// remembering a copied file: a file manager offers `text/uri-list`, an
+    /// image editor `image/png`, and only the list says which.
+    pub fn mimes(&self) -> Vec<String> {
+        self.shared
+            .current_mimes
+            .lock()
+            .map(|mimes| mimes.clone())
+            .unwrap_or_default()
+    }
+
     /// Reads the current selection's `mime` content, returning a readable fd the
     /// data streams into. `None` if there is no selection.
     pub fn read(&self, mime: &str) -> Option<OwnedFd> {
@@ -243,6 +272,23 @@ impl Dispatch<ZwlrDataControlDeviceV1, ()> for ClipState {
     ) {
         match event {
             zwlr_data_control_device_v1::Event::Selection { id } => {
+                // Take this offer's mimes and drop every other offer's: an
+                // offer that never became the selection is gone, and its
+                // entry would otherwise sit in the map for the session.
+                let mimes = match state.shared.offer_mimes.lock() {
+                    Ok(mut collected) => {
+                        let mimes = id
+                            .as_ref()
+                            .and_then(|offer| collected.remove(&offer.id()))
+                            .unwrap_or_default();
+                        collected.clear();
+                        mimes
+                    }
+                    Err(_) => Vec::new(),
+                };
+                if let Ok(mut current) = state.shared.current_mimes.lock() {
+                    *current = mimes;
+                }
                 if let Ok(mut current) = state.shared.current_offer.lock() {
                     *current = id;
                 }
@@ -252,7 +298,11 @@ impl Dispatch<ZwlrDataControlDeviceV1, ()> for ClipState {
                 if let Ok(mut current) = state.shared.current_offer.lock() {
                     *current = None;
                 }
+                if let Ok(mut current) = state.shared.current_mimes.lock() {
+                    current.clear();
+                }
             }
+
             _ => {}
         }
     }
@@ -264,14 +314,22 @@ impl Dispatch<ZwlrDataControlDeviceV1, ()> for ClipState {
 
 impl Dispatch<ZwlrDataControlOfferV1, ()> for ClipState {
     fn event(
-        _state: &mut Self,
-        _offer: &ZwlrDataControlOfferV1,
-        _event: zwlr_data_control_offer_v1::Event,
+        state: &mut Self,
+        offer: &ZwlrDataControlOfferV1,
+        event: zwlr_data_control_offer_v1::Event,
         _data: &(),
         _conn: &Connection,
         _handle: &QueueHandle<Self>,
     ) {
-        // We don't need the per-offer mime list for read/owner-change handling.
+        // One `offer` event per mime the owner advertises, all before the
+        // `selection` event that says which offer is the clipboard. Kept per
+        // offer object so an unrelated offer in flight cannot contribute its
+        // mimes to the selection's list.
+        if let zwlr_data_control_offer_v1::Event::Offer { mime_type } = event
+            && let Ok(mut mimes) = state.shared.offer_mimes.lock()
+        {
+            mimes.entry(offer.id()).or_default().push(mime_type);
+        }
     }
 }
 
@@ -310,13 +368,8 @@ delegate_noop!(ClipState: ignore ZwlrDataControlManagerV1);
 
 /// Creates a unix pipe, returning `(read, write)`.
 fn make_pipe() -> Option<(OwnedFd, OwnedFd)> {
-    use std::os::fd::FromRawFd;
-    let mut fds = [0i32; 2];
-    // SAFETY: fds is a valid 2-element buffer; we own the returned descriptors.
-    let ret = unsafe { libc::pipe(fds.as_mut_ptr()) };
-    if ret != 0 {
-        return None;
-    }
-    // SAFETY: pipe() succeeded, so both fds are valid and owned by us.
-    Some(unsafe { (OwnedFd::from_raw_fd(fds[0]), OwnedFd::from_raw_fd(fds[1])) })
+    // `std::io::pipe` rather than `libc::pipe`: same syscall, no `unsafe`, and
+    // the workspace denies `unsafe_code`.
+    let (reader, writer) = std::io::pipe().ok()?;
+    Some((OwnedFd::from(reader), OwnedFd::from(writer)))
 }
