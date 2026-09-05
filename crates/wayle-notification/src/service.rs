@@ -81,6 +81,7 @@ impl NotificationService {
     /// When enabled, new notifications will not appear as popups but will
     /// still be added to the notification list.
     pub fn set_dnd(&self, dnd: bool) {
+        crate::dnd_state::save(dnd);
         self.dnd.set(dnd)
     }
 

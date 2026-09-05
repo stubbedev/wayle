@@ -72,6 +72,7 @@
 //! See [`dbus.md`](https://github.com/stubbedev/wayle-services/blob/master/wayle-notification/dbus.md) for the full interface specification.
 
 mod builder;
+pub(crate) mod dnd_state;
 /// Notification data structures and operations.
 pub mod core;
 pub(crate) mod daemon;

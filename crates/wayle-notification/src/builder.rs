@@ -42,7 +42,7 @@ impl Default for NotificationServiceBuilder {
     fn default() -> Self {
         Self {
             popup_duration: Property::new(5000),
-            dnd: Property::new(false),
+            dnd: Property::new(crate::dnd_state::load()),
             remove_expired: Property::new(true),
             blocklist: Property::new(vec![]),
             register_wayle_daemon: false,
