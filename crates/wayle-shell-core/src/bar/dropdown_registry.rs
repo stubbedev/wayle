@@ -290,6 +290,31 @@ impl DropdownInstance {
     /// Only programmatic closes (toggling the bar button, re-anchoring) run
     /// through here; native autohide outside-clicks close the popover instantly
     /// because they rely on the Wayland popup grab, which has no exit hook.
+    ///
+    /// # Why the outside click still cannot animate
+    ///
+    /// Two routes have been ruled out, and it is worth having them written
+    /// down before a third attempt:
+    ///
+    /// - **Turn autohide off and handle the click here.** Already possible
+    ///   (`bar.dropdown_autohide = false`) and already verified useless for
+    ///   this: with no grab, a click on another application's surface is never
+    ///   delivered to this process at all. See
+    ///   [`Self::dismiss_on_spacer_click`], which is why only the surface's own
+    ///   empty region can dismiss in that mode.
+    /// - **Add a fullscreen layer-shell surface to catch those clicks.** The
+    ///   catcher has to sit above ordinary windows, so `Layer::Top` or higher;
+    ///   the dropdown is an `xdg_popup` belonging to the *bar's* layer surface,
+    ///   and a catcher mapped after the bar stacks above it. The catcher would
+    ///   then swallow the clicks meant for the dropdown's own content. Giving
+    ///   it `set_exclusive_zone(0)` keeps it off the bar, but not off the
+    ///   popup, which extends into the work area by definition.
+    ///
+    /// What is left is the large one: stop making the dropdown an `xdg_popup`
+    /// of the bar and give it its own `Layer::Overlay` surface, which can be
+    /// stacked above a catcher and closed on wayle's own terms. That is a
+    /// rewrite of anchoring, sizing and keyboard routing for every dropdown,
+    /// not an addition to this method.
     fn animate_out(&self, style: &DropdownStyle) {
         let (duration, transition) = style.exit;
         if duration == 0 {
