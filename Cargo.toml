@@ -139,6 +139,7 @@ serde_json = { version = "1.0.145", features = ["preserve_order"] }
 serde_json_path = "0.7"
 serde_yaml = "0.9"
 sha2 = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
 smithay-client-toolkit = "0.20"
 sourceview5 = "0.11"
 sysinfo = { version = "0.33", default-features = false, features = [

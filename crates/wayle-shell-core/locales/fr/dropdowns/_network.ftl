@@ -82,6 +82,9 @@ dropdown-network-vpn-no-native-sign-in = connexion via le greffon
 dropdown-network-vpn-import = Importer un fichier wg-quick
 dropdown-network-vpn-import-filter = Configuration WireGuard
 dropdown-network-vpn-import-failed = Ce fichier n'est pas une configuration wg-quick
+dropdown-network-vpn-generate-key = Générer une nouvelle paire de clés
+dropdown-network-vpn-public-key = Clé publique : { $key }
+dropdown-network-vpn-public-key-empty = La clé publique apparaît ici une fois la clé privée définie. Transmettez-la à la personne qui gère l'autre extrémité.
 dropdown-network-vpn-raw-hint = Une paire clé = valeur par ligne
 dropdown-network-vpn-name-required = Un nom est requis
 dropdown-network-vpn-field-required = { $field } est requis

@@ -82,6 +82,9 @@ dropdown-network-vpn-no-native-sign-in = signs in through the plugin
 dropdown-network-vpn-import = Import a wg-quick file
 dropdown-network-vpn-import-filter = WireGuard configuration
 dropdown-network-vpn-import-failed = That file is not a wg-quick configuration
+dropdown-network-vpn-generate-key = Generate a new key pair
+dropdown-network-vpn-public-key = Public key: { $key }
+dropdown-network-vpn-public-key-empty = The public key appears here once a private key is set. Hand it to whoever runs the other end.
 dropdown-network-vpn-raw-hint = One key = value per line
 dropdown-network-vpn-raw-hint-typed = One key = value per line, for keys this form has no box for. Already covered: { $covered }
 dropdown-network-vpn-raw-hint-unknown = One key = value per line. These go to { $service } exactly as written — see that plugin's own documentation for the keys it accepts.

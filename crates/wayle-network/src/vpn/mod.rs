@@ -21,6 +21,7 @@ pub mod kinds;
 mod nm;
 pub(crate) mod openconnect;
 pub mod profile;
+pub mod wg_keys;
 pub mod wg_quick;
 
 use std::sync::Arc;

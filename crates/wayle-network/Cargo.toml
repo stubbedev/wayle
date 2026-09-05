@@ -28,6 +28,7 @@ tracing.workspace = true
 wayle-config.workspace = true
 wayle-core.workspace = true
 wayle-traits.workspace = true
+x25519-dalek.workspace = true
 zbus.workspace = true
 
 [dev-dependencies]

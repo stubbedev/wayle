@@ -13,7 +13,7 @@ use gtk::prelude::*;
 use relm4::{gtk, prelude::*};
 use wayle_network::vpn::{
     kinds::{self, VpnChoice, VpnField, VpnFormat, VpnKind},
-    wg_quick,
+    wg_keys, wg_quick,
 };
 use wayle_widgets::prelude::*;
 
@@ -97,6 +97,69 @@ fn field_label(field: &VpnField) -> String {
     } else {
         label_for(field)
     }
+}
+
+/// The WireGuard field holding this end's private key.
+const WIREGUARD_PRIVATE_KEY: &str = "private-key";
+
+/// Icon that generates a fresh key pair into the entry it sits in.
+const ICON_GENERATE: &str = "ld-refresh-cw-symbolic";
+
+/// Gives a WireGuard private-key entry a generate button and a live readout of
+/// the public key derived from whatever it holds.
+///
+/// The private key was previously expected to arrive from `wg genkey` run
+/// somewhere else, and the public key — which WireGuard derives rather than
+/// stores, so it is readable nowhere in the profile — had to be derived
+/// somewhere else too, even though it is the half the other end needs.
+///
+/// Returns the label to place under the entry.
+fn attach_key_generation(entry: &gtk::Entry) -> gtk::Label {
+    let readout = gtk::Label::builder()
+        .css_classes(["network-secret-label", "network-vpn-public-key"])
+        .halign(gtk::Align::Start)
+        .wrap(true)
+        // A base64 key has no spaces to wrap at, and an unbounded natural
+        // width would widen the popover surface and destroy the popup.
+        .wrap_mode(gtk::pango::WrapMode::WordChar)
+        .natural_wrap_mode(gtk::NaturalWrapMode::None)
+        .selectable(true)
+        .build();
+
+    let refresh = {
+        let readout = readout.clone();
+        move |entry: &gtk::Entry| {
+            let text = entry.text();
+            readout.set_label(&match wg_keys::public_for(&text) {
+                Some(public) => t!("dropdown-network-vpn-public-key", key = public),
+                // Includes the half-typed and mistyped cases: showing the last
+                // good public key while the private key no longer matches it
+                // would hand the other end a key that opens nothing.
+                None => t!("dropdown-network-vpn-public-key-empty"),
+            });
+        }
+    };
+
+    refresh(entry);
+    entry.connect_changed(refresh);
+
+    // The reveal toggle already owns the secondary icon.
+    entry.set_icon_from_icon_name(gtk::EntryIconPosition::Primary, Some(ICON_GENERATE));
+    entry.set_icon_activatable(gtk::EntryIconPosition::Primary, true);
+    entry.set_icon_sensitive(gtk::EntryIconPosition::Primary, true);
+    entry.set_icon_tooltip_text(
+        gtk::EntryIconPosition::Primary,
+        Some(&t!("dropdown-network-vpn-generate-key")),
+    );
+    entry.connect_icon_press(move |entry, position| {
+        if position != gtk::EntryIconPosition::Primary {
+            return;
+        }
+        // `connect_changed` carries this into the readout.
+        entry.set_text(&wg_keys::generate().private);
+    });
+
+    readout
 }
 
 /// The heading a kind's group of fields sits under.
@@ -860,6 +923,15 @@ impl VpnForm {
 
             self.container.append(&label);
             self.container.append(&entry);
+
+            // WireGuard is the one kind whose private key the user is expected
+            // to have made elsewhere with `wg genkey`, and whose *public* key —
+            // derived, stored nowhere — the other end needs. Both live on the
+            // field itself rather than in a separate flow.
+            if kind.id == kinds::WIREGUARD && field.key == WIREGUARD_PRIVATE_KEY {
+                self.container.append(&attach_key_generation(&entry));
+            }
+
             self.entries.push((field.key.clone(), entry));
         }
     }
