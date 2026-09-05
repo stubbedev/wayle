@@ -161,6 +161,12 @@ craneLib.buildPackage (
   // {
     inherit cargoArtifacts;
 
+    # Exposed so CI can `nix build` and push the deps layer to the binary cache
+    # explicitly. It is a build-time input, not part of the final binary's
+    # runtime closure, so pushing the wayle output alone never carries it — and
+    # an unpushed deps layer is a ~30 min recompile for every consumer.
+    passthru.cargoArtifacts = cargoArtifacts;
+
     # GTK app wrapping is only needed for the final binary, not the deps layer.
     nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ wrapGAppsHook4 ];
 

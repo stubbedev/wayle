@@ -31,6 +31,13 @@
       packages = forAllSystems (pkgs: rec {
         wayle = pkgs.callPackage ./nix/package.nix { craneLib = crane.mkLib pkgs; };
         default = wayle;
+
+        # The cached 591-crate dependency layer. Not useful to install — it
+        # exists so CI can build and push it to the xilo cache as its own store
+        # path, which is what lets a fresh machine (or a fresh CI runner) skip
+        # the ~30 min deps compile instead of relying on a GitHub Actions
+        # /nix/store snapshot.
+        wayle-deps = wayle.cargoArtifacts;
       });
 
       # Adds `wayle` to a nixpkgs instance: `nixpkgs.overlays = [ wayle.overlays.default ];`

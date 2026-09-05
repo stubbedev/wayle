@@ -241,36 +241,39 @@ jobs:
                       extra-substituters = https://nix.stubbe.dev/c/default/default
                       extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
 
-            # Restore /nix/store from the GitHub Actions cache so the big
-            # `wayle-deps` derivation (591 crates, ~30 min) is reused instead of
-            # recompiled. Keyed on the lockfiles + nix expr — the only inputs to
-            # wayle-deps. Runs on every event; PRs restore master's cache.
+            # No GitHub Actions /nix/store cache here any more. It existed to
+            # keep the `wayle-deps` layer (591 crates, ~30 min) off the critical
+            # path, because pushing the wayle output alone never carried it —
+            # deps are a build-time input, absent from the binary's runtime
+            # closure. `#wayle-deps` (see flake.nix) now builds that layer as its
+            # own output and the push step below sends it to xilo, so the
+            # substituter covers it for every consumer, not just CI runners.
             #
-            # SAVE is split out below and gated to master pushes. Previously the
-            # combined action also saved on PRs, and each PR's branch-scoped
-            # ~3.2 GiB /nix/store cache counted against GitHub's hard 10 GiB
-            # per-repo cache budget. With the four Swatinem rust caches also in
-            # that budget, every save evicted the master nix cache by LRU — so
-            # the next nix run restored nothing and recompiled wayle-deps from
-            # scratch (~30 min) on *every* push, lockfile change or not.
-            - name: Restore Nix store cache
-              uses: nix-community/cache-nix-action/restore@v7
-              with:
-                  primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', 'nix/package.nix') }}
-                  restore-prefixes-first-match: nix-${{ runner.os }}-
-
-            - name: Build package
+            # Dropping it also returns ~3.2 GiB to GitHub's hard 10 GiB
+            # per-repo cache budget — that snapshot plus the Swatinem rust caches
+            # was over budget, and the LRU eviction it caused is what made
+            # wayle-deps recompile on runs that should have been cache hits.
+            - name: Build package + deps layer
               # --accept-flake-config: honor the flake's nixConfig substituter
               # (the system extra_nix_config above sets it too, but this trusts
               # the flake's own setting and silences the untrusted-config warning).
-              run: nix build '.?submodules=1#wayle' -L --accept-flake-config --print-out-paths | tee /tmp/wayle-outpaths
+              run: |
+                  nix build -L --accept-flake-config --print-out-paths \
+                    '.?submodules=1#wayle' \
+                    '.?submodules=1#wayle-deps' | tee /tmp/wayle-outpaths
 
             # Push the build closure to the xilo cache. Runs on master pushes
             # and same-repo PRs (both have the token) so PR-built deps are in
             # xilo before merge. Fork PRs lack the secret and just pull via the
-            # substituter above. Best-effort: large-path 504s don't fail the
-            # job. The master-only
-            # GH /nix/store cache above is the primary cross-run reuse path.
+            # substituter above.
+            #
+            # Spelled `<ns>/<cache>` to match the substituter URL above
+            # (/c/default/default) and `just cache-push`. A bare `default`
+            # resolves to the same cache (the server answers a bare-`default`
+            # push with "pushed N paths to default/default"), so the ref was
+            # never the problem: the 401 was the `ci` token, minted with scope
+            # `default/default/default`, which matched no cache. Rotated
+            # 2026-09-05; spelling it out here is just consistency.
             - name: setup xilo
               if: >-
                   github.event_name == 'push' ||
@@ -278,33 +281,22 @@ jobs:
               uses: stubbedev/xilo@v1
               with:
                   url: https://nix.stubbe.dev
-                  cache: default
+                  cache: default/default
                   token: ${{ secrets.XILO_TOKEN }}
 
+            # NOT continue-on-error. Populating the cache is the entire point of
+            # this job — a silent failure here means every consumer (local `nix
+            # build`, the next CI run, a release) recompiles wayle from source
+            # while the job still reports green. That is exactly how the 401
+            # above stayed hidden: every run from at least 2026-08-30 (as far
+            # back as the logs are kept) to the token rotation pushed nothing
+            # and reported success.
             - name: Push to cache (xilo)
               if: >-
                   github.event_name == 'push' ||
                   github.event.pull_request.head.repo.full_name == github.repository
-              continue-on-error: true
               run: |
-                  xilo push default $(cat /tmp/wayle-outpaths)
-
-            # Save /nix/store ONLY on master pushes — never on PRs. One master
-            # nix cache fits comfortably under the 10 GiB budget; per-PR copies
-            # do not, and evicting the master cache is what forced the deps
-            # rebuild. purge drops stale nix-${os}-* keys (e.g. from an old
-            # Cargo.lock) so the budget keeps shrinking instead of growing. Saves
-            # only when the exact key is absent, so a no-op restore-hit run skips
-            # re-uploading 3.2 GiB.
-            - name: Save Nix store cache
-              if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-              uses: nix-community/cache-nix-action/save@v7
-              with:
-                  primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', 'nix/package.nix') }}
-                  purge: true
-                  purge-prefixes: nix-${{ runner.os }}-
-                  purge-created: 0
-                  purge-primary-key: never
+                  xilo push default/default $(cat /tmp/wayle-outpaths)
 
     ci-status:
         name: CI Status

@@ -51,88 +51,20 @@ jobs:
                   draft: true
                   token: ${{ secrets.GITHUB_TOKEN }}
 
-    build:
-        name: Build (${{ matrix.arch }})
-        needs: changelog
-        runs-on: ubuntu-latest
-        container:
-            image: ghcr.io/stubbedev/wayle/ci-arch:latest
-        strategy:
-            matrix:
-                arch: [x86_64]
-        env:
-            RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
-        steps:
-            - uses: actions/checkout@v7
-              with:
-                  submodules: recursive
-
-            - name: Fix git ownership
-              run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-            - uses: Swatinem/rust-cache@v2
-
-            - name: Build release binaries
-              run: cargo build --release --locked
-
-            - name: Build archive
-              run: ./scripts/ci/build-archive.sh target/release "${GITHUB_REF_NAME#v}" "${{ matrix.arch }}"
-
-            - name: Upload to release
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  VERSION="${GITHUB_REF_NAME#v}"
-                  ARCH="${{ matrix.arch }}"
-                  gh release upload "${{ github.ref_name }}" \
-                    "wayle-${VERSION}-${ARCH}-linux.tar.gz" \
-                    --clobber
-
-    nix:
-        name: Nix build + cache
-        needs: changelog
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v7
-              with:
-                  submodules: recursive
-
-            - uses: cachix/install-nix-action@v31
-              with:
-                  extra_nix_config: |
-                      experimental-features = nix-command flakes
-                      # Pull from the self-hosted xilo cache (same as CI).
-                      extra-substituters = https://nix.stubbe.dev/c/default/default
-                      extra-trusted-public-keys = default:6uWvXutL9cXjV3lii+Ur5ff+ArQoG4kMBKNXWrIxhHg=
-
-            # Restore /nix/store from the GitHub Actions cache (shared with the
-            # CI nix job via the lockfile key) so a tag build reuses the cached
-            # wayle-deps instead of recompiling. See ci.yml for rationale.
-            - uses: nix-community/cache-nix-action@v7
-              with:
-                  primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', 'nix/package.nix') }}
-                  restore-prefixes-first-match: nix-${{ runner.os }}-
-
-            - name: Build release package
-              # --accept-flake-config: trust the flake's nixConfig substituter
-              # (also set via extra_nix_config above); silences the
-              # untrusted-config warning.
-              run: nix build '.?submodules=1#wayle' -L --accept-flake-config --print-out-paths | tee /tmp/wayle-outpaths
-
-            # Push the release build closure to the xilo cache — the single
-            # source of truth for both CI and releases. Best-effort: a cache
-            # push failure must not redden the release.
-            - name: setup xilo
-              uses: stubbedev/xilo@v1
-              with:
-                  url: https://nix.stubbe.dev
-                  cache: default
-                  token: ${{ secrets.XILO_TOKEN }}
-
-            - name: Push to cache (xilo)
-              continue-on-error: true
-              run: |
-                  xilo push default $(cat /tmp/wayle-outpaths)
+    # There is no `build` job and no `nix` job here on purpose.
+    #
+    # `build` used to compile the release binaries a fourth time, in the Arch
+    # container, purely to produce the generic tar.gz. The Ubuntu job below
+    # already compiles the same binaries and builds the same archive on its way
+    # to the .deb — and links against an *older* glibc than Arch does, so its
+    # tarball runs on strictly more systems. It uploads the archive now.
+    #
+    # `nix` used to `nix build` + `xilo push` the tag. The tag always points at
+    # the `chore: release` commit on master (`just _release-checks` refuses
+    # anything else), and the push of that commit runs ci.yml's `nix` job, which
+    # builds the identical derivation and pushes the identical closure to xilo.
+    # Two ~15 min builds of the same store path, racing each other. The cache
+    # push lives in ci.yml; releasing does not repeat it.
 
     ubuntu:
         name: Package (Ubuntu ${{ matrix.arch }})
@@ -154,7 +86,13 @@ jobs:
             - name: Fix Git ownership
               run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+            # Restore master's cargo cache, never save. A tag run's cache is
+            # scoped to the tag ref, so nothing can ever read it back — it is
+            # write-only, and it still counts against the repo's hard 10 GiB
+            # budget, evicting caches that runs on master can still use.
             - uses: Swatinem/rust-cache@v2
+              with:
+                  save-if: false
 
             - name: Build release binaries
               run: cargo build --release --locked
@@ -167,11 +105,15 @@ jobs:
                   VERSION="${GITHUB_REF_NAME#v}"
                   ./scripts/ci/build-packages.sh "wayle-${VERSION}-${{ matrix.arch }}-linux.tar.gz" "${VERSION}" deb
 
+            # The generic tarball ships from here, not from a separate Arch
+            # build: same binaries, older glibc, one less full compile per tag.
             - name: Upload to release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
+                  VERSION="${GITHUB_REF_NAME#v}"
                   gh release upload "${{ github.ref_name }}" \
+                    "wayle-${VERSION}-${{ matrix.arch }}-linux.tar.gz" \
                     debbuild/DEBS/*/*.deb \
                     --clobber
 
@@ -205,7 +147,10 @@ jobs:
                     packaging/rpm/wayle.spec.in >/tmp/wayle.spec
                   dnf -y --setopt=install_weak_deps=False builddep /tmp/wayle.spec
 
+            # Restore only — see the Ubuntu job for why a tag must not save.
             - uses: Swatinem/rust-cache@v2
+              with:
+                  save-if: false
 
             - name: Build release binaries
               run: cargo build --release --locked
@@ -229,7 +174,7 @@ jobs:
 
     checksums:
         name: Checksums
-        needs: [changelog, build, ubuntu, fedora]
+        needs: [changelog, ubuntu, fedora]
         runs-on: ubuntu-latest
         steps:
             - name: Download assets

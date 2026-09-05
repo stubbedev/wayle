@@ -120,13 +120,26 @@ update:
 # ─────────────────────────── Nix cache ───────────────────────────
 
 # Build the flake package and push its closure to the self-hosted xilo
-# cache (https://nix.stubbe.dev, cache `default/default`) — the same cache
-# CI/releases push to (`xilo push default`). Requires the xilo client logged
-# in (`xilo login https://nix.stubbe.dev --token <tok>`). Pull access is
-# public via the flake's substituter.
+# cache (https://nix.stubbe.dev, cache `default/default`) — the same cache CI
+# pushes to. Pull access is public via the flake's substituter; pushing needs
+# a token, from either XILO_TOKEN or a `xilo login` profile.
+#
+# --url is passed explicitly because the cache is a property of this project,
+# not of the machine: with no profile and no XILO_URL, xilo falls back to
+# localhost:8080 and the push dies with "no server configured" — after the
+# 10-minute build. Credentials stay the machine's business; the check below
+# only refuses to start that build when there are none to be found.
 cache-push:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${XILO_TOKEN:-}" ] && \
+       [ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/xilo/config.yaml" ]; then
+        echo "Error: no push credentials — set XILO_TOKEN, or run:" >&2
+        echo "  xilo login https://nix.stubbe.dev --token <tok> --cache default/default" >&2
+        exit 1
+    fi
     nix build '.?submodules=1#wayle' -L --accept-flake-config
-    xilo push default/default ./result
+    xilo push default/default ./result --url https://nix.stubbe.dev
 
 release-preview:
     #!/usr/bin/env bash
@@ -142,6 +155,43 @@ release-preview:
     echo "  release-minor: v${MAJOR}.$((MINOR + 1)).0"
     echo "  release-patch: v${MAJOR}.${MINOR}.$((PATCH + 1))"
 
+# Gate the release on CI having already gone green for HEAD, instead of
+# recompiling the workspace here. CI's `check` job runs the exact same fmt +
+# clippy + nextest + doctests + schema check on every master push, so the local
+# `just check` was a second pass over work already done — three compiles of the
+# workspace (clippy, the test build, the doctest build) for zero new
+# information. Waits if the run is still in flight. WAYLE_RELEASE_NO_CI=1 falls
+# back to checking locally (offline, or CI is down).
+_require-ci-green:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -n "${WAYLE_RELEASE_NO_CI:-}" ]; then
+        echo "WAYLE_RELEASE_NO_CI set — running the local check instead."
+        just check
+        exit 0
+    fi
+    SHA=$(git rev-parse HEAD)
+    git fetch -q origin
+    if [ -z "$(git branch -r --contains "$SHA" 2>/dev/null)" ]; then
+        echo "Error: HEAD ($SHA) is not pushed, so CI never saw it. Push first." >&2
+        exit 1
+    fi
+    ID=$(gh run list --workflow CI --commit "$SHA" --limit 1 --json databaseId -q '.[0].databaseId // empty')
+    if [ -z "$ID" ]; then
+        echo "Error: no CI run for $SHA. Wait for it to start, or set WAYLE_RELEASE_NO_CI=1." >&2
+        exit 1
+    fi
+    if [ "$(gh run view "$ID" --json status -q .status)" != "completed" ]; then
+        echo "CI still running for $SHA — waiting on it instead of recompiling locally."
+        gh run watch "$ID" --exit-status
+    fi
+    CONCLUSION=$(gh run view "$ID" --json conclusion -q .conclusion)
+    if [ "$CONCLUSION" != "success" ]; then
+        echo "Error: CI concluded '$CONCLUSION' for $SHA — not releasing." >&2
+        exit 1
+    fi
+    echo "CI green for $SHA."
+
 _release-checks:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -154,12 +204,11 @@ _release-checks:
         echo "Error: not on default branch '$DEFAULT_BRANCH' (currently '$BRANCH')." >&2
         exit 1
     fi
-    just check
     if [ -n "$(git status --porcelain)" ]; then
-        echo "Formatting/lint produced changes — staging + committing."
-        git add -A
-        git commit -m "chore: format code for release"
+        echo "Error: working tree is dirty. Commit (or stash) and push, so CI verifies exactly what gets tagged." >&2
+        exit 1
     fi
+    just _require-ci-green
 
 _release bump:
     #!/usr/bin/env bash
@@ -183,9 +232,25 @@ _release bump:
     sed -i -E '/\[workspace\.package\]/,/^\[/{s|^(version = )"[^"]*"|\1"'"$NEW"'"|}' Cargo.toml
     # Refresh Cargo.lock so `cargo build --locked` in CI sees the new version.
     cargo update --workspace
-    # The schema $id embeds the version — regenerate so it doesn't drift and
-    # fail the CI schema check (which is exactly what happened for v0.7.3).
-    just schema
+    # The schema $id embeds the version, and a version bump changes nothing
+    # else in the schema — CI's schema check already proved the committed file
+    # matches what the binary generates at HEAD. So rewrite that one line
+    # instead of compiling the whole workspace to print it (`just schema`
+    # builds the wayle bin). If the $id doesn't carry the version we expect,
+    # regenerate for real rather than guess — a stale $id here is what broke
+    # the CI schema check on v0.7.3.
+    if grep -q "\"\$id\": \"wayle-config-${CURRENT_VERSION}\"" schema/wayle-config.schema.json; then
+        sed -i "s|\"\$id\": \"wayle-config-${CURRENT_VERSION}\"|\"\$id\": \"wayle-config-${NEW}\"|" schema/wayle-config.schema.json
+    else
+        just schema
+    fi
+    # Both branches must land the new version in the $id. A silent sed miss here
+    # is exactly the v0.7.3 failure: the tag builds, then CI's schema check
+    # rejects it.
+    grep -q "\"\$id\": \"wayle-config-${NEW}\"" schema/wayle-config.schema.json || {
+        echo "Error: schema \$id is not wayle-config-${NEW} after the bump." >&2
+        exit 1
+    }
     if [ -n "$(git status --porcelain Cargo.toml Cargo.lock schema/wayle-config.schema.json)" ]; then
         git add Cargo.toml Cargo.lock schema/wayle-config.schema.json
         git commit -m "chore: release v${NEW}"
