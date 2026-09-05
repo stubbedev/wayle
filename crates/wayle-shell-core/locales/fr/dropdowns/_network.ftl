@@ -114,3 +114,55 @@ dropdown-network-vpn-field-remote = Serveur
 dropdown-network-vpn-field-username = Nom d'utilisateur
 dropdown-network-vpn-field-password = Mot de passe
 dropdown-network-vpn-field-ca = Certificat CA
+
+## Sections de formulaire VPN
+dropdown-network-vpn-section-gateway = Passerelle
+dropdown-network-vpn-section-credentials = Connexion
+dropdown-network-vpn-section-certificates = Certificats
+dropdown-network-vpn-section-cipher = Chiffrement
+dropdown-network-vpn-section-ipsec = IPsec
+
+## Éditeur de clés brut
+dropdown-network-vpn-advanced-show = Clés avancées
+dropdown-network-vpn-advanced-hide = Masquer les clés avancées
+dropdown-network-vpn-back = Retour
+dropdown-network-vpn-raw-hint-typed = Une paire clé = valeur par ligne, pour les clés que ce formulaire ne propose pas. Déjà couvertes : { $covered }
+dropdown-network-vpn-raw-hint-unknown = Une paire clé = valeur par ligne. Elles sont transmises à { $service } telles quelles — consultez la documentation de ce greffon pour les clés qu'il accepte.
+
+## Champs des greffons VPN
+dropdown-network-vpn-field-ca-cert = Certificat CA
+dropdown-network-vpn-field-cert = Certificat utilisateur
+dropdown-network-vpn-field-certificate = Certificat de la passerelle
+dropdown-network-vpn-field-cert-pass = Mot de passe de la clé privée
+dropdown-network-vpn-field-connection-type = Authentification
+dropdown-network-vpn-field-domain = Domaine
+dropdown-network-vpn-field-fragsize = Taille de fragment
+dropdown-network-vpn-field-ike-dh-group = Groupe DH IKE
+dropdown-network-vpn-field-ikev2 = Version IKE
+dropdown-network-vpn-field-ipsec-enabled = IPsec
+dropdown-network-vpn-field-ipsec-gateway = Passerelle
+dropdown-network-vpn-field-ipsec-gateway-id = Identifiant de la passerelle
+dropdown-network-vpn-field-ipsec-id = Nom du groupe
+dropdown-network-vpn-field-ipsec-psk = Clé partagée
+dropdown-network-vpn-field-ipsec-secret = Mot de passe du groupe
+dropdown-network-vpn-field-key = Clé privée
+dropdown-network-vpn-field-leftid = Identité locale
+dropdown-network-vpn-field-leftxauthusername = Nom d'utilisateur
+dropdown-network-vpn-field-method = Authentification
+dropdown-network-vpn-field-nameserver = Serveur de noms
+dropdown-network-vpn-field-nat-traversal-mode = Traversée de NAT
+dropdown-network-vpn-field-otp = Code à usage unique
+dropdown-network-vpn-field-perfect-forward-secrecy = Confidentialité persistante
+dropdown-network-vpn-field-pskvalue = Clé partagée
+dropdown-network-vpn-field-realm = Domaine d'authentification
+dropdown-network-vpn-field-require-mppe = Exiger le chiffrement
+dropdown-network-vpn-field-right = Passerelle
+dropdown-network-vpn-field-topdomain = Domaine racine
+dropdown-network-vpn-field-trusted-cert = Certificat de confiance
+dropdown-network-vpn-field-user = Nom d'utilisateur
+dropdown-network-vpn-field-usercert = Certificat utilisateur
+dropdown-network-vpn-field-userkey = Clé privée
+dropdown-network-vpn-field-wayle-sso = Connexion par navigateur (SAML)
+dropdown-network-vpn-field-xauth-password = Mot de passe
+dropdown-network-vpn-field-xauthpassword = Mot de passe
+dropdown-network-vpn-field-xauth-username = Nom d'utilisateur

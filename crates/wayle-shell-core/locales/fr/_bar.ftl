@@ -27,6 +27,11 @@ bar-window-title-empty = Bureau
 bar-idle-inhibit-on = Activé
 bar-idle-inhibit-off = Désactivé
 
+## Enregistreur
+bar-recorder-idle = Inactif
+bar-recorder-recording = Enregistrement
+bar-recorder-paused = Suspendu
+
 ## Mode de raccourcis
 bar-keybind-mode-default = par défaut
 

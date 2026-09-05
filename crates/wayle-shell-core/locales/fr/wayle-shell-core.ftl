@@ -27,6 +27,11 @@ bar-window-title-empty = Bureau
 bar-idle-inhibit-on = Activé
 bar-idle-inhibit-off = Désactivé
 
+## Enregistreur
+bar-recorder-idle = Inactif
+bar-recorder-recording = Enregistrement
+bar-recorder-paused = Suspendu
+
 ## Mode de raccourcis
 bar-keybind-mode-default = par défaut
 
@@ -321,6 +326,19 @@ dropdown-bluetooth-pairing-common-pins = NIP courants : 0000, 1234, 1111
 # Échec du jumelage
 dropdown-bluetooth-pairing-failed = Échec du jumelage. Le NIP est peut-être incorrect ou la demande a expiré.
 
+### Brightness Dropdown
+
+dropdown-brightness-title = Luminosité
+
+## Empty State
+dropdown-brightness-empty-title = Aucun rétroéclairage détecté
+dropdown-brightness-empty-description = Le réglage de la luminosité n'est disponible que pour les écrans intégrés.
+
+## Friendly device names
+dropdown-brightness-device-internal = Écran intégré
+dropdown-brightness-device-external = Écran externe
+dropdown-brightness-device-keyboard = Rétroéclairage du clavier
+
 ### Menu déroulant du calendrier
 
 dropdown-calendar-title = Calendrier
@@ -556,6 +574,89 @@ dropdown-network-vpn-field-remote = Serveur
 dropdown-network-vpn-field-username = Nom d'utilisateur
 dropdown-network-vpn-field-password = Mot de passe
 dropdown-network-vpn-field-ca = Certificat CA
+
+## Sections de formulaire VPN
+dropdown-network-vpn-section-gateway = Passerelle
+dropdown-network-vpn-section-credentials = Connexion
+dropdown-network-vpn-section-certificates = Certificats
+dropdown-network-vpn-section-cipher = Chiffrement
+dropdown-network-vpn-section-ipsec = IPsec
+
+## Éditeur de clés brut
+dropdown-network-vpn-advanced-show = Clés avancées
+dropdown-network-vpn-advanced-hide = Masquer les clés avancées
+dropdown-network-vpn-back = Retour
+dropdown-network-vpn-raw-hint-typed = Une paire clé = valeur par ligne, pour les clés que ce formulaire ne propose pas. Déjà couvertes : { $covered }
+dropdown-network-vpn-raw-hint-unknown = Une paire clé = valeur par ligne. Elles sont transmises à { $service } telles quelles — consultez la documentation de ce greffon pour les clés qu'il accepte.
+
+## Champs des greffons VPN
+dropdown-network-vpn-field-ca-cert = Certificat CA
+dropdown-network-vpn-field-cert = Certificat utilisateur
+dropdown-network-vpn-field-certificate = Certificat de la passerelle
+dropdown-network-vpn-field-cert-pass = Mot de passe de la clé privée
+dropdown-network-vpn-field-connection-type = Authentification
+dropdown-network-vpn-field-domain = Domaine
+dropdown-network-vpn-field-fragsize = Taille de fragment
+dropdown-network-vpn-field-ike-dh-group = Groupe DH IKE
+dropdown-network-vpn-field-ikev2 = Version IKE
+dropdown-network-vpn-field-ipsec-enabled = IPsec
+dropdown-network-vpn-field-ipsec-gateway = Passerelle
+dropdown-network-vpn-field-ipsec-gateway-id = Identifiant de la passerelle
+dropdown-network-vpn-field-ipsec-id = Nom du groupe
+dropdown-network-vpn-field-ipsec-psk = Clé partagée
+dropdown-network-vpn-field-ipsec-secret = Mot de passe du groupe
+dropdown-network-vpn-field-key = Clé privée
+dropdown-network-vpn-field-leftid = Identité locale
+dropdown-network-vpn-field-leftxauthusername = Nom d'utilisateur
+dropdown-network-vpn-field-method = Authentification
+dropdown-network-vpn-field-nameserver = Serveur de noms
+dropdown-network-vpn-field-nat-traversal-mode = Traversée de NAT
+dropdown-network-vpn-field-otp = Code à usage unique
+dropdown-network-vpn-field-perfect-forward-secrecy = Confidentialité persistante
+dropdown-network-vpn-field-pskvalue = Clé partagée
+dropdown-network-vpn-field-realm = Domaine d'authentification
+dropdown-network-vpn-field-require-mppe = Exiger le chiffrement
+dropdown-network-vpn-field-right = Passerelle
+dropdown-network-vpn-field-topdomain = Domaine racine
+dropdown-network-vpn-field-trusted-cert = Certificat de confiance
+dropdown-network-vpn-field-user = Nom d'utilisateur
+dropdown-network-vpn-field-usercert = Certificat utilisateur
+dropdown-network-vpn-field-userkey = Clé privée
+dropdown-network-vpn-field-wayle-sso = Connexion par navigateur (SAML)
+dropdown-network-vpn-field-xauth-password = Mot de passe
+dropdown-network-vpn-field-xauthpassword = Mot de passe
+dropdown-network-vpn-field-xauth-username = Nom d'utilisateur
+
+### Recorder Dropdown
+
+dropdown-recorder-title = Enregistreur d'écran
+
+dropdown-recorder-record = Enregistrer
+dropdown-recorder-stop = Arrêter
+dropdown-recorder-pause = Suspendre
+dropdown-recorder-resume = Reprendre
+
+# Live status row (shown while recording)
+dropdown-recorder-recording = Enregistrement en cours
+dropdown-recorder-paused = Suspendu
+
+# Section headings
+dropdown-recorder-section-audio = Audio
+dropdown-recorder-section-webcam = Webcam
+
+dropdown-recorder-microphone = Microphone
+dropdown-recorder-microphone-device = Source
+dropdown-recorder-system-audio = Son du système
+dropdown-recorder-webcam = Vignette webcam
+dropdown-recorder-webcam-device = Caméra
+dropdown-recorder-position = Position
+
+# Toasts + notifications
+recorder-toast-starting = Démarrage de l'enregistrement…
+recorder-toast-stopped = Enregistrement arrêté
+recorder-toast-failed = Échec de l'enregistrement
+recorder-notification-saved = Enregistrement enregistré
+recorder-notification-failed = Échec de l'enregistrement
 
 ### Menu Treeman
 
