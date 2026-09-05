@@ -5845,7 +5845,7 @@ dependencies = [
 
 [[package]]
 name = "wayle"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "chrono",
  "clap",
@@ -5896,7 +5896,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-audio"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -5915,7 +5915,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-auth"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "pam",
  "serde",
@@ -5926,7 +5926,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-bar-apps"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "futures",
  "gdk-pixbuf",
@@ -5948,7 +5948,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-bar-hardware"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "bytesize",
  "futures",
@@ -5973,7 +5973,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-bar-info"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "chrono",
  "futures",
@@ -6005,7 +6005,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-bar-media"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "futures",
  "gdk4",
@@ -6031,7 +6031,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-bar-network"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "bytesize",
  "futures",
@@ -6055,7 +6055,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-bar-workspaces"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "chrono",
  "futures",
@@ -6084,7 +6084,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-battery"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -6102,7 +6102,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-bluetooth"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -6119,7 +6119,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-brightness"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "ddc",
  "ddc-i2c",
@@ -6138,7 +6138,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-cava"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "bindgen",
  "cc",
@@ -6156,7 +6156,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-clipboard"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "tokio",
  "tracing",
@@ -6166,7 +6166,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-config"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "dotenvy",
  "futures",
@@ -6191,7 +6191,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-core"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "futures",
  "schemars",
@@ -6206,7 +6206,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-derive"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6219,7 +6219,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-greeter"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "chrono",
  "gdk4",
@@ -6242,7 +6242,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-hyprland"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -6260,7 +6260,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-i18n"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "i18n-embed",
  "i18n-embed-fl",
@@ -6273,7 +6273,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-icons"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "futures",
  "gtk4",
@@ -6288,7 +6288,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-idle-inhibit"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "gdk4",
  "glib",
@@ -6298,7 +6298,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-ipc"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "serde",
  "serde_json",
@@ -6309,7 +6309,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-launcher"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-trait",
  "bitflags 2.10.0",
@@ -6331,7 +6331,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-mango"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "derive_more",
  "futures",
@@ -6348,7 +6348,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-media"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6370,7 +6370,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-network"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -6397,7 +6397,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-niri"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "derive_more",
  "futures",
@@ -6414,7 +6414,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-notification"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6437,7 +6437,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-portal"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "calloop",
  "futures",
@@ -6464,7 +6464,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-power-profiles"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -6482,7 +6482,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-recorder"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "ashpd",
  "futures",
@@ -6495,7 +6495,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-settings"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "futures",
  "gtk4",
@@ -6520,7 +6520,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-share-preview"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "bitflags 2.10.0",
  "drm-fourcc",
@@ -6540,7 +6540,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-shell"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "bytesize",
  "chrono",
@@ -6618,7 +6618,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-shell-core"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "chrono",
  "futures",
@@ -6671,7 +6671,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-styling"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "grass",
  "gtk4",
@@ -6688,7 +6688,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-sway"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "derive_more",
  "futures",
@@ -6705,7 +6705,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-sysinfo"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "derive_more",
  "futures",
@@ -6719,7 +6719,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-systray"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6742,11 +6742,11 @@ dependencies = [
 
 [[package]]
 name = "wayle-traits"
-version = "0.8.41"
+version = "0.8.42"
 
 [[package]]
 name = "wayle-treeman"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "serde",
  "serde_json",
@@ -6759,7 +6759,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-wallpaper"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "derive_more",
  "futures",
@@ -6779,7 +6779,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-weather"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6797,7 +6797,7 @@ dependencies = [
 
 [[package]]
 name = "wayle-widgets"
-version = "0.8.41"
+version = "0.8.42"
 dependencies = [
  "chrono",
  "futures",
