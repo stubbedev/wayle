@@ -231,8 +231,9 @@ impl WallpaperService {
 
     /// Extracts colors from the theming monitor's wallpaper.
     ///
-    /// Uses wallpaper from `theming_monitor` if configured. Falls back to
-    /// first monitor otherwise.
+    /// Uses the wallpaper of `theming_monitor` if configured, and keeps the
+    /// current palette while that monitor is disconnected. Falls back to the
+    /// lowest-named monitor when none is configured.
     ///
     /// # Errors
     ///
@@ -241,12 +242,20 @@ impl WallpaperService {
     pub(crate) async fn extract_colors(&self) -> Result<(), Error> {
         let monitors = self.monitors.get();
 
-        let path = self
-            .theming_monitor
-            .get()
-            .and_then(|monitor| monitors.get(&monitor))
-            .or_else(|| monitors.values().next())
-            .and_then(|state| state.wallpaper.clone());
+        let path = match self.theming_monitor.get() {
+            Some(monitor) => {
+                // A configured theming monitor that is currently unplugged must
+                // not hand theming to whichever other monitor happens to be
+                // around: one dock cycle would otherwise repaint the whole
+                // desktop from the wrong wallpaper and back again.
+                let Some(state) = monitors.get(&monitor) else {
+                    let _ = self.extraction_complete.send(());
+                    return Ok(());
+                };
+                state.wallpaper.clone()
+            }
+            None => theming_fallback(&monitors),
+        };
 
         if self.last_extracted_wallpaper.get() == path {
             let _ = self.extraction_complete.send(());
@@ -291,8 +300,9 @@ impl WallpaperService {
 
     /// Registers a monitor.
     ///
-    /// New monitors start with no wallpaper and a unique cycle index
-    /// (distributed evenly across the image pool if cycling is active).
+    /// New monitors get a unique cycle index (distributed evenly across the
+    /// image pool if cycling is active) and, while cycling, the image at that
+    /// index. Without cycling they start with no wallpaper.
     pub fn register_monitor(&self, monitor: &str) {
         let mut monitors = self.monitors.get();
         if monitors.contains_key(monitor) {
@@ -300,10 +310,11 @@ impl WallpaperService {
         }
 
         let cycle_index = self.new_monitor_starting_index();
-        monitors.insert(
-            monitor.to_string(),
-            MonitorState::with_cycle_index(cycle_index),
-        );
+        let mut state = MonitorState::with_cycle_index(cycle_index);
+
+        state.wallpaper = initial_wallpaper(self.cycling.get().as_ref(), cycle_index);
+
+        monitors.insert(monitor.to_string(), state);
         self.monitors.set(monitors);
 
         info!(monitor, cycle_index, "Monitor registered");
@@ -401,5 +412,113 @@ impl WallpaperService {
 impl Drop for WallpaperService {
     fn drop(&mut self) {
         self.cancellation_token.cancel();
+    }
+}
+
+/// The wallpaper a freshly registered monitor starts with.
+///
+/// A monitor plugged in after startup owns no wallpaper yet. With cycling active
+/// it is seeded from the current cycle, so it isn't left blank until the next
+/// tick — which can be minutes away. Without cycling there is nothing to seed
+/// from; the shell falls back to the configured image.
+fn initial_wallpaper(cycling: Option<&CyclingConfig>, cycle_index: usize) -> Option<PathBuf> {
+    cycling.and_then(|config| config.image_at(cycle_index).cloned())
+}
+
+/// The wallpaper theming falls back to when no theming monitor is configured.
+///
+/// Picks the lowest connector name rather than `HashMap` iteration order: the
+/// map is rebuilt whenever an output comes or goes, so an arbitrary pick makes a
+/// dock replug re-extract the palette from a different monitor's wallpaper at
+/// random — the desktop's colors change for no reason the user can see.
+fn theming_fallback(monitors: &HashMap<String, MonitorState>) -> Option<PathBuf> {
+    monitors
+        .iter()
+        .min_by(|(a, _), (b, _)| a.cmp(b))
+        .and_then(|(_, state)| state.wallpaper.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_config(image_count: usize) -> CyclingConfig {
+        CyclingConfig {
+            directory: PathBuf::from("/test"),
+            images: (0..image_count)
+                .map(|i| PathBuf::from(format!("image_{i}.png")))
+                .collect(),
+            mode: CyclingMode::Sequential,
+            interval: Duration::from_secs(10),
+        }
+    }
+
+    fn monitors(entries: &[(&str, Option<&str>)]) -> HashMap<String, MonitorState> {
+        entries
+            .iter()
+            .map(|(name, wallpaper)| {
+                let mut state = MonitorState::new();
+                state.wallpaper = wallpaper.map(PathBuf::from);
+                ((*name).to_string(), state)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn theming_falls_back_to_the_lowest_connector_name() {
+        let map = monitors(&[
+            ("DP-3", Some("third.png")),
+            ("DP-1", Some("first.png")),
+            ("eDP-1", Some("laptop.png")),
+        ]);
+
+        assert_eq!(theming_fallback(&map), Some(PathBuf::from("first.png")));
+    }
+
+    #[test]
+    fn theming_fallback_is_stable_across_a_rebuilt_monitor_map() {
+        // A dock replug tears the map down and rebuilds it in another order.
+        // The palette must not follow that order.
+        let before = monitors(&[("DP-1", Some("first.png")), ("DP-3", Some("third.png"))]);
+        let after = monitors(&[("DP-3", Some("third.png")), ("DP-1", Some("first.png"))]);
+
+        assert_eq!(theming_fallback(&before), theming_fallback(&after));
+        assert_eq!(theming_fallback(&after), Some(PathBuf::from("first.png")));
+    }
+
+    #[test]
+    fn theming_fallback_is_none_without_monitors() {
+        assert_eq!(theming_fallback(&monitors(&[])), None);
+    }
+
+    #[test]
+    fn theming_fallback_does_not_skip_to_another_monitor() {
+        // Lowest name wins even when it has nothing to show — falling through to
+        // the next one is exactly the arbitrary pick this replaces.
+        let map = monitors(&[("DP-1", None), ("DP-3", Some("third.png"))]);
+
+        assert_eq!(theming_fallback(&map), None);
+    }
+
+    #[test]
+    fn hotplugged_monitor_is_seeded_from_the_active_cycle() {
+        let config = make_config(4);
+
+        assert_eq!(
+            initial_wallpaper(Some(&config), 2),
+            Some(PathBuf::from("image_2.png"))
+        );
+    }
+
+    #[test]
+    fn hotplugged_monitor_gets_nothing_without_cycling() {
+        assert_eq!(initial_wallpaper(None, 2), None);
+    }
+
+    #[test]
+    fn hotplugged_monitor_gets_nothing_from_an_empty_cycle() {
+        let config = make_config(0);
+
+        assert_eq!(initial_wallpaper(Some(&config), 0), None);
     }
 }

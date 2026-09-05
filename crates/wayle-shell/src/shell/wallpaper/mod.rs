@@ -43,14 +43,37 @@ impl Wallpaper {
     /// native `Layer::Background` surfaces.
     pub(crate) fn spawn(service: Arc<WallpaperService>, config: Arc<ConfigService>) -> Self {
         let surfaces = Rc::new(RefCell::new(HashMap::<String, Surface>::new()));
+        // Last state seen from the service, so a GDK-driven reconcile has
+        // something to render even though it carries no state of its own.
+        let state = Rc::new(RefCell::new(service.monitors.get()));
         let mut stream = service.monitors.watch();
 
-        let task = glib::spawn_future_local(async move {
-            use futures::StreamExt;
-            while let Some(monitors) = stream.next().await {
+        let task = {
+            let (surfaces, state, config) = (surfaces.clone(), state.clone(), config.clone());
+            glib::spawn_future_local(async move {
+                use futures::StreamExt;
+                while let Some(monitors) = stream.next().await {
+                    *state.borrow_mut() = monitors;
+                    let monitors = state.borrow();
+                    reconcile(&surfaces, &monitors, &config);
+                }
+            })
+        };
+
+        // The wallpaper service and GDK watch Wayland over separate connections,
+        // so a hotplugged output (dock unplug/replug) reaches them at different
+        // times. Reconciling only on the service's side loses the race whenever
+        // it registers first: `reconcile` finds no GDK monitor to anchor a
+        // surface to, skips the monitor, and nothing pokes it again — that
+        // output stays wallpaper-less until the next config change or cycle
+        // tick. Reconcile on GDK's list too, so whichever side arrives last
+        // completes the pair.
+        if let Some(display) = gdk::Display::default() {
+            display.monitors().connect_items_changed(move |_, _, _, _| {
+                let monitors = state.borrow();
                 reconcile(&surfaces, &monitors, &config);
-            }
-        });
+            });
+        }
 
         Self { _task: task }
     }
@@ -87,19 +110,30 @@ fn reconcile(
 
     // Scaling: global `fit-mode`, overridden per monitor by `[[wallpaper.monitors]]`.
     let global_fit = cfg.wallpaper.fit_mode.get();
-    let fit_overrides: HashMap<String, FitMode> = cfg
+    let monitor_cfgs: Vec<_> = cfg
         .wallpaper
         .monitors
         .get()
         .into_iter()
         .filter(|m| !m.name.is_empty())
+        .collect();
+    let fit_overrides: HashMap<String, FitMode> = monitor_cfgs
+        .iter()
         .map(|m| (m.name.clone(), m.fit_mode))
+        .collect();
+    // Same idea for the image itself: a monitor hotplugged after startup has no
+    // wallpaper in the service state, so its `[[wallpaper.monitors]]` entry must
+    // be consulted before falling back to the global one.
+    let wallpaper_overrides: HashMap<String, PathBuf> = monitor_cfgs
+        .iter()
+        .filter(|m| !m.wallpaper.is_empty())
+        .map(|m| (m.name.clone(), PathBuf::from(&m.wallpaper)))
         .collect();
 
     let mut map = surfaces.borrow_mut();
 
     // Drop surfaces for monitors that no longer exist.
-    map.retain(|connector, _| monitors.contains_key(connector));
+    map.retain(|connector, _| keeps_surface(connector, monitors, &gdk_monitors));
 
     for (connector, state) in monitors {
         // Create a surface on first sighting (needs the GDK monitor).
@@ -112,11 +146,31 @@ fn reconcile(
         let Some(surface) = map.get(connector) else {
             continue;
         };
-        if let Some(path) = state.wallpaper.as_ref().or(fallback.as_ref()) {
+        let wallpaper_override = wallpaper_overrides.get(connector);
+        if let Some(path) = state
+            .wallpaper
+            .as_ref()
+            .or(wallpaper_override)
+            .or(fallback.as_ref())
+        {
             let fit = fit_overrides.get(connector).copied().unwrap_or(global_fit);
             surface.render(path, fit, transition, duration_ms);
         }
     }
+}
+
+/// Whether a live surface should be kept for `connector`.
+///
+/// Both sides have to still know it. Keying only on the service leaves a
+/// surface bound to a `gdk::Monitor` GDK has already dropped: it renders
+/// nowhere, and because the map still holds the connector, the replugged
+/// monitor never gets a fresh surface built for it.
+fn keeps_surface<S, G>(
+    connector: &str,
+    monitors: &HashMap<String, S>,
+    gdk_monitors: &HashMap<String, G>,
+) -> bool {
+    monitors.contains_key(connector) && gdk_monitors.contains_key(connector)
 }
 
 impl Surface {
@@ -257,5 +311,42 @@ fn stack_transition(anim: AnimationType) -> gtk::StackTransitionType {
         | AnimationType::Zoom
         | AnimationType::Rotate
         | AnimationType::Flip => gtk::StackTransitionType::Crossfade,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::keeps_surface;
+
+    fn map(names: &[&str]) -> HashMap<String, ()> {
+        names.iter().map(|n| ((*n).to_string(), ())).collect()
+    }
+
+    #[test]
+    fn keeps_surface_while_both_sides_know_the_monitor() {
+        assert!(keeps_surface(
+            "DP-1",
+            &map(&["DP-1", "DP-2"]),
+            &map(&["DP-1"])
+        ));
+    }
+
+    #[test]
+    fn drops_surface_when_gdk_dropped_the_monitor() {
+        // Service hasn't unregistered it yet, but the `gdk::Monitor` the surface
+        // is anchored to is gone. Keeping it would block the replug rebuild.
+        assert!(!keeps_surface("DP-1", &map(&["DP-1"]), &map(&["DP-2"])));
+    }
+
+    #[test]
+    fn drops_surface_when_service_unregistered_the_monitor() {
+        assert!(!keeps_surface("DP-1", &map(&["DP-2"]), &map(&["DP-1"])));
+    }
+
+    #[test]
+    fn drops_surface_when_neither_side_knows_the_monitor() {
+        assert!(!keeps_surface("DP-1", &map(&[]), &map(&[])));
     }
 }
