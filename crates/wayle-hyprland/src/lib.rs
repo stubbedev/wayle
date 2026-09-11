@@ -89,8 +89,8 @@ pub use ipc::events::types::HyprlandEvent;
 pub use service::HyprlandService;
 pub(crate) use types::*;
 pub use types::{
-    Address, BindData, CursorPosition, DeviceInfo, FocusHistoryId, MonitorId, ProcessId,
-    ScreencastOwner, WorkspaceId, WorkspaceInfo, WorkspaceRule,
+    Address, BindData, CursorPosition, DeviceInfo, FocusHistoryId, KeyboardDevice, MonitorId,
+    ProcessId, ScreencastOwner, WorkspaceId, WorkspaceInfo, WorkspaceRule,
 };
 
 #[doc = include_str!("../README.md")]

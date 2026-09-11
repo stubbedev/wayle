@@ -11,9 +11,16 @@ use futures::{StreamExt, stream::BoxStream};
 use tokio::{runtime::Handle, sync::mpsc};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::warn;
-use wayle_hyprland::{DeviceInfo, HyprlandEvent, HyprlandService};
+use wayle_hyprland::{DeviceInfo, HyprlandEvent, HyprlandService, KeyboardDevice};
 
 use super::{CurrentLayout, KeyboardLayoutSource};
+
+/// Hyprland names the throwaway keyboards that wtype and friends create for a
+/// single synthetic keystroke.
+const VIRTUAL_KEYBOARD_PREFIX: &str = "hl-virtual-keyboard-";
+
+/// Keymaps Hyprland reports while a keyboard has no usable xkb state.
+const PLACEHOLDER_KEYMAPS: [&str; 2] = ["none", "error"];
 
 pub struct HyprlandKeyboardLayoutSource {
     service: Arc<HyprlandService>,
@@ -53,9 +60,12 @@ impl KeyboardLayoutSource for HyprlandKeyboardLayoutSource {
                 // The payload is not trustworthy: Hyprland emits the event for
                 // *every* keyboard, including the throwaway
                 // `hl-virtual-keyboard-*` that wtype and friends create for a
-                // single synthetic keystroke — whose teardown reports the layout
-                // as `none`. Re-read the main keyboard so this agrees with
-                // `snapshot()` instead of latching onto a foreign device.
+                // single synthetic keystroke — whose xkb state is unusable, so
+                // it reports the layout as `none` or `error` (and transiently
+                // emits malformed `devices` JSON). Re-read the main keyboard so
+                // this agrees with `snapshot()` instead of latching onto a
+                // foreign device; on a read failure keep the last known layout
+                // rather than flashing an unknown one over a transient error.
                 let layout = match service.devices().await {
                     Ok(devices) => main_keyboard_layout(&devices).map(|label| CurrentLayout {
                         label: label.to_string(),
@@ -80,8 +90,21 @@ fn main_keyboard_layout(devices: &DeviceInfo) -> Option<&str> {
     devices
         .keyboards
         .iter()
-        .find(|keyboard| keyboard.main)
+        .find(|keyboard| keyboard.main && !is_virtual_keyboard(keyboard))
+        .or_else(|| {
+            devices.keyboards.iter().find(|keyboard| {
+                !is_virtual_keyboard(keyboard)
+                    && !PLACEHOLDER_KEYMAPS.contains(&keyboard.active_keymap.as_str())
+            })
+        })
         .map(|keyboard| keyboard.active_keymap.as_str())
+}
+
+/// While a synthetic-keystroke keyboard exists, Hyprland hands it the `main`
+/// flag (it became the active keyboard by sending a key), so the flag alone
+/// cannot identify the real keyboard.
+fn is_virtual_keyboard(keyboard: &KeyboardDevice) -> bool {
+    keyboard.name.starts_with(VIRTUAL_KEYBOARD_PREFIX)
 }
 
 #[cfg(test)]
@@ -136,10 +159,31 @@ mod tests {
         assert_eq!(main_keyboard_layout(&devices(false)), Some("Danish"));
     }
 
+    /// The transient keyboard becomes the *active* keyboard by sending the
+    /// synthetic keystroke, so Hyprland reports it with `main: true` and an
+    /// unusable keymap — exactly what a device re-read racing the keystroke
+    /// sees.
     #[test]
-    fn no_main_keyboard_yields_no_layout() {
+    fn virtual_keyboard_stealing_main_flag_is_ignored() {
         let mut devices = devices(true);
-        devices.keyboards.retain(|keyboard| !keyboard.main);
+        for keyboard in &mut devices.keyboards {
+            if is_virtual_keyboard(keyboard) {
+                keyboard.main = true;
+                keyboard.active_keymap = "error".to_string();
+            } else {
+                keyboard.main = false;
+            }
+        }
+
+        assert_eq!(main_keyboard_layout(&devices), Some("Danish"));
+    }
+
+    #[test]
+    fn no_real_keyboard_yields_no_layout() {
+        let mut devices = devices(true);
+        devices
+            .keyboards
+            .retain(|keyboard| is_virtual_keyboard(keyboard));
 
         assert_eq!(main_keyboard_layout(&devices), None);
     }
