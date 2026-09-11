@@ -181,9 +181,7 @@ mod tests {
     #[test]
     fn no_real_keyboard_yields_no_layout() {
         let mut devices = devices(true);
-        devices
-            .keyboards
-            .retain(|keyboard| is_virtual_keyboard(keyboard));
+        devices.keyboards.retain(is_virtual_keyboard);
 
         assert_eq!(main_keyboard_layout(&devices), None);
     }
