@@ -7,7 +7,7 @@
 
 use futures::StreamExt;
 use relm4::Sender;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 use zbus::{Connection, proxy};
 
 use super::LockInput;
@@ -22,6 +22,12 @@ use super::LockInput;
 trait Session {
     /// Hints to logind whether the session is currently locked.
     fn set_locked_hint(&self, locked: bool) -> zbus::Result<()>;
+
+    /// Whether the session is currently locked, as last hinted via
+    /// `SetLockedHint`. Unlike the method call, the property is kept by
+    /// logind and so outlives the process that set it.
+    #[zbus(property)]
+    fn locked_hint(&self) -> zbus::Result<bool>;
 
     /// Emitted when the session should lock (e.g. `loginctl lock-session`).
     #[zbus(signal)]
@@ -78,5 +84,64 @@ pub(crate) async fn set_locked_hint(locked: bool) {
 
     if let Err(err) = result {
         debug!(error = %err, locked, "lock: SetLockedHint failed (non-fatal)");
+    }
+}
+
+/// Reads the session's `LockedHint` property; `None` when logind or the
+/// session is unavailable.
+async fn locked_hint() -> Option<bool> {
+    let result = async {
+        let connection = Connection::system().await?;
+        let proxy = SessionProxy::new(&connection).await?;
+        proxy.locked_hint().await
+    }
+    .await;
+
+    match result {
+        Ok(locked) => Some(locked),
+        Err(err) => {
+            debug!(error = %err, "lock: LockedHint probe unavailable (non-fatal)");
+            None
+        }
+    }
+}
+
+/// Emits [`LockInput::Lock`] when the session was locked when this shell
+/// started, so a restart re-acquires the lock its dead predecessor held.
+/// Best-effort: without logind, or with the hint unset, startup proceeds
+/// unlocked.
+pub(crate) async fn relock_at_startup(input: Sender<LockInput>) {
+    if should_relock(locked_hint().await) {
+        info!("lock: session was locked at startup (logind LockedHint); re-acquiring");
+        input.emit(LockInput::Lock);
+    }
+}
+
+/// Whether a fresh shell should re-acquire the session lock from the
+/// `LockedHint` probe. Only a confirmed `true` relocks: `false` means the
+/// previous shell left the session unlocked, and `None` (probe unavailable)
+/// fails soft — an unknown state must not lock the user out.
+fn should_relock(hint: Option<bool>) -> bool {
+    hint == Some(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_relock;
+
+    #[test]
+    fn relocks_only_on_a_confirmed_locked_hint() {
+        assert!(
+            should_relock(Some(true)),
+            "LockedHint set: the previous shell died holding the lock, re-acquire"
+        );
+        assert!(
+            !should_relock(Some(false)),
+            "LockedHint clear: the session was unlocked, a restart must not lock it"
+        );
+        assert!(
+            !should_relock(None),
+            "probe unavailable: fail soft, an unknown state must not lock the user out"
+        );
     }
 }

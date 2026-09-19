@@ -171,6 +171,18 @@ impl Component for Lock {
             sender.input_sender().emit(LockInput::Lock);
         }
 
+        // Restart recovery: `ext-session-lock-v1` keeps the session locked when
+        // the lock client dies, so a restart while locked (home-manager switch
+        // bouncing wayle.service, an on-failure restart) leaves the compositor's
+        // crashed-lockscreen render with no client behind it. `claim_lock_on_start`
+        // skips restarts on purpose; logind's `LockedHint` — kept in sync by
+        // `acquire`/`release` — survives this process and says whether the last
+        // shell died holding the lock.
+        let input = sender.input_sender().clone();
+        relm4::spawn(async move {
+            logind::relock_at_startup(input).await;
+        });
+
         let model = Lock {
             config,
             instance: None,
@@ -265,7 +277,15 @@ impl Lock {
 
         let instance = self.instance.get_or_insert_with(Instance::new);
         if !instance.lock() {
-            warn!("lock: failed to acquire session lock");
+            // `lock()` returns false exactly when the compositor refused the
+            // lock (`finished`). Hyprland does this when the session is already
+            // locked — e.g. by a dead lock client after a shell restart —
+            // unless takeover is allowed.
+            warn!(
+                "lock: compositor denied the session lock (a previous lock client \
+                 may still hold the session); on Hyprland set \
+                 misc:allow_session_lock_restore = true to allow takeover"
+            );
             return;
         }
 

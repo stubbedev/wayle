@@ -10,6 +10,8 @@ Settings can be edited in `config.toml`, through the `wayle-settings` GUI, or wi
 
 Wayle requires a Wayland compositor that implements the `wlr-layer-shell` protocol. Compositor-specific modules currently target Hyprland, Niri and Mango; Sway support is in development.
 
+On Hyprland, the built-in lock screen needs one extra compositor setting: `misc:allow_session_lock_restore = true`. Wayle keeps its lock client inside the shell process, so a shell restart while the session is locked (for example a `home-manager switch` bouncing `wayle.service`) has to re-take the lock, and Hyprland refuses that takeover unless the flag is set — the session would stay stuck on Hyprland's crashed-lockscreen render.
+
 <a href="/wayle-preview.png" target="_blank" rel="noopener">
   <img src="/wayle-preview.png" alt="Wayle desktop shell" style="margin-bottom: 1.5rem;">
 </a>
