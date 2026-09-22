@@ -61,6 +61,9 @@ impl Component for VpnConnections {
             #[template]
             Card {
                 add_css_class: "network-list",
+                // A card is a horizontal box, and this one holds two
+                // children: the rows, then the "Add VPN" row under them.
+                set_orientation: gtk::Orientation::Vertical,
                 set_overflow: gtk::Overflow::Hidden,
 
                 #[local_ref]
