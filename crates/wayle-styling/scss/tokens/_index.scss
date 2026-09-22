@@ -6,12 +6,14 @@
 // Base values below are compile-time constants that get multiplied by
 // var(--global-scale) or var(--bar-scale) in calc() expressions.
 
+$base-space-2xs: 0.125rem;
 $base-space-xs: 0.25rem;
 $base-space-sm: 0.5rem;
 $base-space-md: 1rem;
 $base-space-lg: 1.5rem;
 $base-space-xl: 2rem;
 
+$base-text-2xs: 0.6875rem;
 $base-text-xs: 0.75rem;
 $base-text-sm: 0.8125rem;
 $base-text-base: 0.875rem;
@@ -93,6 +95,7 @@ $base-btn-gap: 0.5rem;
     --scrim: rgba(0, 0, 0, 0.6);
 
     // Spacing (global scale)
+    --space-2xs: calc(#{$base-space-2xs} * var(--global-scale));
     --space-xs: calc(#{$base-space-xs} * var(--global-scale));
     --space-sm: calc(#{$base-space-sm} * var(--global-scale));
     --space-md: calc(#{$base-space-md} * var(--global-scale));
@@ -100,6 +103,7 @@ $base-btn-gap: 0.5rem;
     --space-xl: calc(#{$base-space-xl} * var(--global-scale));
 
     // Typography (global scale)
+    --text-2xs: calc(#{$base-text-2xs} * var(--global-scale));
     --text-xs: calc(#{$base-text-xs} * var(--global-scale));
     --text-sm: calc(#{$base-text-sm} * var(--global-scale));
     --text-base: calc(#{$base-text-base} * var(--global-scale));

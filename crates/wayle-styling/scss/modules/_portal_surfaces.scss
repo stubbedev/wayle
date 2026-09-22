@@ -43,7 +43,7 @@
 // Header: a slim title bar. Nav button sits left, title centered.
 .file-chooser-header {
     padding: var(--space-sm) var(--space-md);
-    border-bottom: 1px solid var(--border-subtle, var(--border-default));
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 // Square so the symbolic icon sits dead-centre. Qualified with `button` to beat
@@ -75,7 +75,7 @@ button.file-chooser-nav {
 // Path bar: clickable breadcrumb trail on the left, filter dropdown on the right.
 .file-chooser-crumbbar {
     padding: var(--space-xs) var(--space-md);
-    border-bottom: 1px solid var(--border-subtle, var(--border-default));
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .file-chooser-crumb {
@@ -87,7 +87,7 @@ button.file-chooser-nav {
     border: none;
     box-shadow: none;
     color: var(--fg-muted);
-    font-weight: var(--weight-medium, var(--weight-semibold));
+    font-weight: var(--weight-medium);
 
     &:hover {
         background: var(--bg-hover);
@@ -101,7 +101,7 @@ button.file-chooser-nav {
 }
 
 .file-chooser-crumb-sep {
-    color: var(--fg-subtle, var(--fg-muted));
+    color: var(--fg-subtle);
     font-size: var(--text-sm);
 }
 
@@ -113,10 +113,10 @@ button.file-chooser-filter {
     min-height: 0;
     padding: var(--space-xs) var(--space-sm);
     border-radius: var(--rounding-element);
-    background: var(--bg-subtle, var(--bg-elevated));
-    border: 1px solid var(--border-subtle, var(--border-default));
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
     color: var(--fg-default);
-    font-weight: var(--weight-medium, var(--weight-semibold));
+    font-weight: var(--weight-medium);
 
     &:checked {
         background: var(--bg-hover);
@@ -124,9 +124,9 @@ button.file-chooser-filter {
 }
 
 .file-chooser-filter-popup {
-    padding: var(--space-xxs, var(--space-xs));
+    padding: var(--space-xs);
     background: var(--bg-elevated);
-    border: 1px solid var(--border-subtle, var(--border-default));
+    border: 1px solid var(--border-subtle);
     border-radius: var(--rounding-element);
     box-shadow: var(--shadow);
 }
@@ -149,8 +149,8 @@ button.file-chooser-filter {
     min-height: 0;
     padding: 0 var(--space-xs);
     border-radius: var(--rounding-element);
-    background: var(--bg-subtle, var(--bg-elevated));
-    border: 1px solid var(--border-subtle, var(--border-default));
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
     color: var(--fg-default);
     font-size: var(--text-sm);
 
@@ -172,8 +172,8 @@ button.file-chooser-filter {
 
 // Sidebar: a faintly tinted column of favorites, like Finder's source list.
 .file-chooser-sidebar-scroll {
-    background: var(--bg-subtle, var(--bg-elevated, var(--bg-base)));
-    border-right: 1px solid var(--border-subtle, var(--border-default));
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border-subtle);
 }
 
 .file-chooser-sidebar {
@@ -225,7 +225,7 @@ button.file-chooser-filter {
 
     // Zebra striping for readability — never over hover/selection.
     > row:nth-child(even):not(:selected):not(:hover) {
-        background: var(--bg-subtle, var(--bg-elevated));
+        background: var(--bg-elevated);
     }
 }
 
@@ -244,7 +244,7 @@ button.file-chooser-filter {
 // than blank and nothing reflows when the texture swaps in.
 .file-chooser-thumb {
     border-radius: 4px;
-    background: var(--bg-subtle, var(--bg-elevated));
+    background: var(--bg-elevated);
 }
 
 // Empty-folder / no-results overlay.
@@ -255,7 +255,7 @@ button.file-chooser-filter {
 
 // Quick Look (spacebar) preview card.
 .file-chooser-quicklook {
-    background: var(--bg-elevated, var(--bg-base));
+    background: var(--bg-elevated);
     border: 1px solid var(--border-default);
     border-radius: var(--rounding-container);
     box-shadow: var(--shadow);
@@ -276,13 +276,13 @@ button.file-chooser-filter {
 
 // Side preview pane (toggle) — selected item preview on the right.
 .file-chooser-preview {
-    background: var(--bg-subtle, var(--bg-base));
-    border-left: 1px solid var(--border-subtle, var(--border-default));
+    background: var(--bg-base);
+    border-left: 1px solid var(--border-subtle);
     padding: var(--space-lg);
 }
 
 .file-chooser-preview-name {
-    font-size: var(--text-md, var(--text-sm));
+    font-size: var(--text-md);
     font-weight: var(--weight-semibold);
     color: var(--fg-default);
 }
@@ -297,7 +297,7 @@ button.file-chooser-filter {
 // the box's vexpand off, not by stripping padding).
 .file-chooser-colheader {
     padding: var(--space-xs) var(--space-sm);
-    border-bottom: 1px solid var(--border-subtle, var(--border-default));
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .file-chooser-col {
@@ -308,7 +308,7 @@ button.file-chooser-filter {
     box-shadow: none;
     color: var(--fg-muted);
     font-size: var(--text-sm);
-    font-weight: var(--weight-medium, var(--weight-semibold));
+    font-weight: var(--weight-medium);
 
     &:hover {
         background: var(--bg-hover);
@@ -340,12 +340,12 @@ button.file-chooser-filter {
             135deg,
             transparent 0%,
             transparent 55%,
-            var(--fg-subtle, var(--fg-muted)) 55%,
-            var(--fg-subtle, var(--fg-muted)) 65%,
+            var(--fg-subtle) 55%,
+            var(--fg-subtle) 65%,
             transparent 65%,
             transparent 78%,
-            var(--fg-subtle, var(--fg-muted)) 78%,
-            var(--fg-subtle, var(--fg-muted)) 88%,
+            var(--fg-subtle) 78%,
+            var(--fg-subtle) 88%,
             transparent 88%
         );
     opacity: 0.4;
@@ -392,7 +392,7 @@ button.file-chooser-filter {
 // rounding — GTK has no `overflow: hidden` to clip them for us.
 .file-chooser-footer {
     padding: var(--space-sm) var(--space-md);
-    border-top: 1px solid var(--border-subtle, var(--border-default));
+    border-top: 1px solid var(--border-subtle);
     background: var(--bg-base);
     border-bottom-left-radius: var(--rounding-container);
     border-bottom-right-radius: var(--rounding-container);
@@ -404,7 +404,7 @@ button.file-chooser-filter {
         border-radius: var(--rounding-element);
         border: none;
         box-shadow: none;
-        font-weight: var(--weight-medium, var(--weight-semibold));
+        font-weight: var(--weight-medium);
     }
 }
 
@@ -413,7 +413,7 @@ button.file-chooser-filter {
     color: var(--fg-default);
 
     &:hover {
-        background: var(--bg-active, var(--bg-hover));
+        background: var(--bg-active);
     }
 }
 
@@ -423,7 +423,7 @@ button.file-chooser-filter {
     font-weight: var(--weight-semibold);
 
     &:hover {
-        background: var(--accent-hover, var(--accent));
+        background: var(--accent-hover);
     }
 }
 
@@ -439,7 +439,7 @@ button.file-chooser-filter {
     border-radius: var(--rounding-element);
     border: none;
     box-shadow: none;
-    font-weight: var(--weight-medium, var(--weight-semibold));
+    font-weight: var(--weight-medium);
 }
 
 .portal-dialog-cancel {
@@ -447,7 +447,7 @@ button.file-chooser-filter {
     color: var(--fg-default);
 
     &:hover {
-        background: var(--bg-active, var(--bg-hover));
+        background: var(--bg-active);
     }
 }
 
@@ -457,7 +457,7 @@ button.file-chooser-filter {
     font-weight: var(--weight-semibold);
 
     &:hover {
-        background: var(--accent-hover, var(--accent));
+        background: var(--accent-hover);
     }
 }
 
@@ -528,8 +528,8 @@ button.file-chooser-filter {
     min-height: 0;
     padding: 0 var(--space-xs);
     border-radius: var(--rounding-element);
-    background: var(--bg-subtle, var(--bg-elevated));
-    border: 1px solid var(--border-subtle, var(--border-default));
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
     color: var(--fg-default);
 
     text {
@@ -546,7 +546,7 @@ button.file-chooser-filter {
 // App rows: bold name over a muted one-line description. Both flip to the
 // on-accent foreground when the row is selected/hovered into the accent fill.
 .portal-dialog-app-name {
-    font-weight: var(--weight-medium, var(--weight-semibold));
+    font-weight: var(--weight-medium);
     color: var(--fg-default);
 }
 
@@ -572,13 +572,13 @@ button.file-chooser-filter {
 .print-form-label {
     color: var(--fg-muted);
     font-size: var(--text-sm);
-    font-weight: var(--weight-medium, var(--weight-semibold));
+    font-weight: var(--weight-medium);
 }
 
 // Printer rows carry a bold name over a muted "location · status" line; both
 // flip to the on-accent foreground when the row is selected.
 .print-printer-name {
-    font-weight: var(--weight-medium, var(--weight-semibold));
+    font-weight: var(--weight-medium);
     color: var(--fg-default);
 }
 

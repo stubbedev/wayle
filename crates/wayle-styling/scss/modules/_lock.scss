@@ -16,7 +16,7 @@
 
     .lock-center {
         padding: 2rem;
-        border-radius: var(--rounding-lg, 12px);
+        border-radius: 12px;
         background: rgba(0, 0, 0, 0.35);
     }
 
@@ -53,7 +53,7 @@
         .lock-user-button {
             background: transparent;
             padding: 0.5rem;
-            border-radius: var(--rounding-lg, 12px);
+            border-radius: 12px;
 
             &:hover {
                 background: rgba(0, 0, 0, 0.35);
@@ -105,7 +105,7 @@
             color: var(--palette-fg);
             border: none;
             box-shadow: none;
-            border-radius: var(--rounding-element, 8px);
+            border-radius: var(--rounding-element);
             padding: 0.4rem 1rem;
 
             &:hover,
@@ -128,7 +128,7 @@
         > popover {
             > contents {
                 padding: 0.375rem;
-                border-radius: var(--rounding-container, 10px);
+                border-radius: var(--rounding-container);
                 background: var(--bg-surface);
                 border: 1px solid var(--bg-hover);
                 box-shadow: var(--shadow);
@@ -139,7 +139,7 @@
 
                 > row {
                     padding: 0.5rem 0.75rem;
-                    border-radius: var(--rounding-element, 8px);
+                    border-radius: var(--rounding-element);
                     color: var(--fg-default);
 
                     &:hover {
@@ -168,7 +168,7 @@
             color: var(--palette-fg-muted);
             background: transparent;
             padding: 0.75rem;
-            border-radius: var(--rounding-lg, 12px);
+            border-radius: 12px;
 
             &:hover {
                 color: var(--palette-fg);

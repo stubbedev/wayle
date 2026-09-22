@@ -64,7 +64,7 @@
             &:selected .launcher-row,
             &:selected:hover .launcher-row {
                 background: var(--accent);
-                color: var(--on-accent);
+                color: var(--fg-on-accent);
             }
 
             &:hover .launcher-row {
@@ -80,7 +80,7 @@
     transition: background var(--duration-fast);
 
     &.urgent {
-        color: var(--error, #f38ba8);
+        color: #f38ba8;
     }
 
     &.active {
@@ -116,7 +116,7 @@
 
         &.active {
             background: var(--accent);
-            color: var(--on-accent);
+            color: var(--fg-on-accent);
         }
     }
 }

@@ -303,6 +303,141 @@ mod tests {
 
     use super::*;
 
+    /// Design-token names a stylesheet references with `var(--…)`, for the
+    /// families the token file owns. Runtime-injected variables (bar, workspace,
+    /// palette) are someone else's to declare, so they are not collected; nor
+    /// is a reference with a fallback, which GTK resolves rather than drops.
+    fn token_refs(scss: &str) -> Vec<String> {
+        const FAMILIES: [&str; 8] = [
+            "--space-",
+            "--text-",
+            "--rounding-",
+            "--radius-",
+            "--icon-",
+            "--fg-",
+            "--bg-",
+            "--on-",
+        ];
+        scss.split("var(")
+            .skip(1)
+            .filter_map(|rest| {
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+                    .collect();
+                let has_fallback = rest[name.len()..].trim_start().starts_with(',');
+                (!has_fallback && FAMILIES.iter().any(|family| name.starts_with(family)))
+                    .then_some(name)
+            })
+            .collect()
+    }
+
+    fn scss_files(dir: &Path, out: &mut Vec<PathBuf>) {
+        for entry in fs::read_dir(dir).expect("scss dir") {
+            let path = entry.expect("dir entry").path();
+            if path.is_dir() {
+                scss_files(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "scss") {
+                out.push(path);
+            }
+        }
+    }
+
+    fn undeclared<'a>(refs: &'a [String], css: &str) -> Vec<&'a str> {
+        refs.iter()
+            .map(String::as_str)
+            .filter(|name| !css.contains(&format!("{name}:")))
+            .collect()
+    }
+
+    /// GTK drops a whole declaration whose `var()` names nothing, so a typo'd
+    /// or never-added token silently zeroes every margin in the rule — the
+    /// network dropdown's section headings sat flush against their neighbours
+    /// for exactly this, with `--space-2xs` undeclared, and `--text-2xs`,
+    /// `--icon-base`, `--rounding-full` and `--on-accent` did the same to
+    /// font sizes, an icon size, a radius and a colour elsewhere.
+    #[test]
+    fn every_token_a_stylesheet_uses_is_declared() {
+        let mut files = Vec::new();
+        scss_files(&scss_dir(), &mut files);
+        assert!(!files.is_empty(), "no scss files found");
+
+        let mut offenders = Vec::new();
+        for path in &files {
+            let refs = token_refs(&fs::read_to_string(path).expect("scss file"));
+            for name in undeclared(&refs, STATIC_CSS) {
+                offenders.push(format!("{}: {name}", path.display()));
+            }
+        }
+        assert_eq!(offenders, Vec::<String>::new());
+    }
+
+    /// Variables Rust sets at runtime rather than the token file: the
+    /// animation switches (zeroed when animations are off), the per-workspace
+    /// colour, and the bar-button size overrides. Theirs are the only
+    /// fallbacks that ever apply.
+    const RUNTIME_VARS: [&str; 3] = ["--cfg-anim-", "--ws-override-color", "--bar-btn-"];
+
+    /// Every variable referenced with a fallback, `var(--name, …)`, including
+    /// one whose fallback starts on the next line.
+    fn fallback_refs(scss: &str) -> Vec<String> {
+        scss.split("var(")
+            .skip(1)
+            .filter_map(|rest| {
+                let rest = rest.trim_start();
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+                    .collect();
+                rest[name.len()..]
+                    .trim_start()
+                    .starts_with(',')
+                    .then_some(name)
+            })
+            .collect()
+    }
+
+    /// A fallback on a declared token never applies, and one on an undeclared
+    /// token is the only thing that does: either way the rule names a
+    /// variable that is not what it renders with.
+    #[test]
+    fn a_fallback_is_only_used_for_a_runtime_variable() {
+        let mut files = Vec::new();
+        scss_files(&scss_dir(), &mut files);
+
+        let mut offenders = Vec::new();
+        for path in &files {
+            for name in fallback_refs(&fs::read_to_string(path).expect("scss file")) {
+                if !RUNTIME_VARS.iter().any(|runtime| name.starts_with(runtime)) {
+                    offenders.push(format!("{}: {name}", path.display()));
+                }
+            }
+        }
+        assert_eq!(offenders, Vec::<String>::new());
+    }
+
+    #[test]
+    fn fallbacks_are_found_and_plain_references_are_not() {
+        let refs = fallback_refs(
+            "a { color: var(--fg-default); margin: var(--space-xxs, var(--space-xs)); \
+             width: var(\n  --bar-btn-gap-override,\n  1px); }",
+        );
+        // The nested `var(--space-xs)` has no fallback of its own.
+        assert_eq!(refs, ["--space-xxs", "--bar-btn-gap-override"]);
+    }
+
+    #[test]
+    fn an_undeclared_token_is_reported_and_a_declared_one_is_not() {
+        let refs = token_refs(
+            "a { margin: var(--space-sm) var(--space-9xl); color: var(--palette-fg); \
+             padding: var(--space-8xl, 4px); }",
+        );
+        // Palette variables are injected at runtime, and a fallback covers an
+        // undeclared name, so neither is collected.
+        assert_eq!(refs, ["--space-sm", "--space-9xl"]);
+        assert_eq!(undeclared(&refs, STATIC_CSS), ["--space-9xl"]);
+    }
+
     #[test]
     #[ignore = "requires display server"]
     fn css_loads_into_gtk4() -> Result<(), Box<dyn std::error::Error>> {

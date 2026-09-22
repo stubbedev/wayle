@@ -259,9 +259,9 @@
         margin: var(--space-xs);
         min-width: calc(1.75rem * var(--global-scale));
         min-height: calc(1.75rem * var(--global-scale));
-        border-radius: var(--rounding-full);
+        border-radius: var(--radius-full);
         background: var(--accent);
-        color: var(--on-accent, #fff);
+        color: var(--fg-on-accent);
         opacity: 0.9;
 
         &:hover {
