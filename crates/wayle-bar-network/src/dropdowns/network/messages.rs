@@ -15,6 +15,8 @@ pub struct NetworkDropdownInit {
 
 #[derive(Debug)]
 pub enum NetworkDropdownMsg {
+    /// The popover was mapped: the dropdown just opened.
+    Opened,
     WifiToggled(bool),
     ScanRequested,
     AvailableNetworks(AvailableNetworksOutput),

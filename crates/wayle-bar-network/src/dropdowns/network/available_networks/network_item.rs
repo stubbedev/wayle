@@ -21,6 +21,7 @@ pub struct NetworkItem {
 
     is_secured: bool,
     known: bool,
+    stale: bool,
     hovered: bool,
 }
 
@@ -48,6 +49,8 @@ impl FactoryComponent for NetworkItem {
         gtk::Box {
             add_css_class: "network-item",
             set_cursor_from_name: Some("pointer"),
+            #[watch]
+            set_class_active: ("stale", self.stale),
 
             #[name = "signal_icon"]
             gtk::Image {
@@ -137,7 +140,9 @@ impl FactoryComponent for NetworkItem {
         let known = snapshot.known;
         let base_label = methods::translate_security_type(snapshot.security);
 
-        let security_label = if known && is_secured {
+        let security_label = if snapshot.stale {
+            t!("dropdown-network-security-stale", security = base_label)
+        } else if known && is_secured {
             t!("dropdown-network-security-saved", security = base_label)
         } else {
             base_label
@@ -147,6 +152,7 @@ impl FactoryComponent for NetworkItem {
             icon: helpers::signal_strength_icon(snapshot.strength),
             is_secured,
             known,
+            stale: snapshot.stale,
             hovered: false,
             security_label,
             ssid: snapshot.ssid,

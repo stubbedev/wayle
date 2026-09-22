@@ -22,6 +22,10 @@ pub struct AccessPointSnapshot {
     pub security: SecurityType,
     pub object_path: OwnedObjectPath,
     pub known: bool,
+    /// Seen by an earlier scan but no longer reported by NetworkManager, which
+    /// prunes access points it has not heard from in a while. Its object path
+    /// is dead: connecting to it means scanning for it again first.
+    pub stale: bool,
 }
 
 pub fn signal_strength_icon(strength: u8) -> &'static str {
@@ -101,6 +105,7 @@ pub fn sorted_unique_access_points(
                     security,
                     object_path: ap.object_path().clone(),
                     known: known_ssids.contains(&ssid_str),
+                    stale: false,
                 },
             );
         }
@@ -109,6 +114,36 @@ pub fn sorted_unique_access_points(
     let mut snapshots: Vec<AccessPointSnapshot> = best_by_ssid.into_values().collect();
     snapshots.sort_by_key(|snapshot| Reverse(snapshot.strength));
     snapshots
+}
+
+/// Folds the live access points over the ones already listed, so a network
+/// NetworkManager has pruned stays in the list instead of disappearing.
+///
+/// Live entries always win and come first, strongest first; the remembered
+/// rest follow, marked stale and in their previous order. `connected_ssid`
+/// is dropped from both halves, the same as the live list does, and each
+/// entry's `known` is recomputed so a network forgotten or saved since it was
+/// last seen reads correctly.
+pub fn merge_with_cache(
+    live: Vec<AccessPointSnapshot>,
+    cached: &[AccessPointSnapshot],
+    connected_ssid: Option<&str>,
+    known_ssids: &HashSet<String>,
+) -> Vec<AccessPointSnapshot> {
+    let live_ssids: HashSet<&str> = live.iter().map(|ap| ap.ssid.as_str()).collect();
+
+    let remembered: Vec<AccessPointSnapshot> = cached
+        .iter()
+        .filter(|ap| !live_ssids.contains(ap.ssid.as_str()))
+        .filter(|ap| connected_ssid != Some(ap.ssid.as_str()))
+        .map(|ap| AccessPointSnapshot {
+            known: known_ssids.contains(&ap.ssid),
+            stale: true,
+            ..ap.clone()
+        })
+        .collect();
+
+    live.into_iter().chain(remembered).collect()
 }
 
 /// Turns a masked entry into one the user can peek at, via an eye icon in the
@@ -152,6 +187,71 @@ pub fn reset_reveal_toggle(entry: &gtk::Entry) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn snapshot(ssid: &str, strength: u8) -> AccessPointSnapshot {
+        AccessPointSnapshot {
+            ssid: String::from(ssid),
+            strength,
+            security: SecurityType::Wpa2,
+            object_path: OwnedObjectPath::try_from(format!(
+                "/org/freedesktop/NetworkManager/AccessPoint/{strength}"
+            ))
+            .expect("valid object path"),
+            known: false,
+            stale: false,
+        }
+    }
+
+    fn ssids(list: &[AccessPointSnapshot]) -> Vec<(&str, bool)> {
+        list.iter().map(|ap| (ap.ssid.as_str(), ap.stale)).collect()
+    }
+
+    #[test]
+    fn a_network_nm_pruned_stays_listed_as_stale() {
+        let cached = [snapshot("home", 80), snapshot("cafe", 40)];
+        let merged = merge_with_cache(vec![snapshot("home", 75)], &cached, None, &HashSet::new());
+        assert_eq!(ssids(&merged), [("home", false), ("cafe", true)]);
+    }
+
+    #[test]
+    fn a_live_network_is_never_marked_stale_or_duplicated() {
+        let cached = [snapshot("home", 80)];
+        let merged = merge_with_cache(vec![snapshot("home", 30)], &cached, None, &HashSet::new());
+        assert_eq!(ssids(&merged), [("home", false)]);
+        // The live reading wins over the remembered one.
+        assert_eq!(merged[0].strength, 30);
+    }
+
+    #[test]
+    fn live_networks_come_before_remembered_ones() {
+        let cached = [snapshot("strong-but-gone", 99)];
+        let merged = merge_with_cache(vec![snapshot("weak", 10)], &cached, None, &HashSet::new());
+        assert_eq!(ssids(&merged), [("weak", false), ("strong-but-gone", true)]);
+    }
+
+    #[test]
+    fn the_connected_network_is_not_resurrected_from_the_cache() {
+        let cached = [snapshot("home", 80), snapshot("cafe", 40)];
+        let merged = merge_with_cache(vec![], &cached, Some("home"), &HashSet::new());
+        assert_eq!(ssids(&merged), [("cafe", true)]);
+    }
+
+    #[test]
+    fn a_remembered_network_picks_up_saved_state_changes() {
+        let mut saved = snapshot("cafe", 40);
+        saved.known = true;
+        let known: HashSet<String> = HashSet::from([String::from("home")]);
+        let merged = merge_with_cache(vec![], &[saved, snapshot("home", 80)], None, &known);
+        // Forgotten since it was last seen, and saved since it was last seen.
+        assert!(!merged[0].known);
+        assert!(merged[1].known);
+    }
+
+    #[test]
+    fn an_empty_cache_leaves_the_live_list_untouched() {
+        let merged = merge_with_cache(vec![snapshot("home", 80)], &[], None, &HashSet::new());
+        assert_eq!(ssids(&merged), [("home", false)]);
+    }
 
     #[test]
     fn frequency_2ghz_band() {

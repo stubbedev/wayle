@@ -33,6 +33,16 @@
     }
 }
 
+// Seen by an earlier scan, since pruned by NetworkManager: still clickable
+// (a click rescans for it), but not claiming a signal it may no longer have.
+.network-item.stale {
+    image.network-item-signal,
+    .network-item-name,
+    .network-item-security {
+        opacity: 0.55;
+    }
+}
+
 .network-item-name {
     font-size: var(--text-md);
     font-weight: var(--weight-medium);

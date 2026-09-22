@@ -34,6 +34,9 @@ pub struct AvailableNetworks {
     known_ssids: HashSet<String>,
     state: ListState,
     selection: Option<SelectedNetwork>,
+    /// A stale network the user clicked: the scan started for it is still
+    /// looking, and the connect goes ahead when it turns up.
+    pending_ssid: Option<String>,
     password_form: Controller<PasswordForm>,
     ap_watcher: WatcherToken,
     connection_watcher: WatcherToken,
@@ -175,6 +178,7 @@ impl Component for AvailableNetworks {
             known_ssids: HashSet::new(),
             state: ListState::Normal,
             selection: None,
+            pending_ssid: None,
             password_form,
             ap_watcher: WatcherToken::new(),
             connection_watcher: WatcherToken::new(),
@@ -207,6 +211,9 @@ impl Component for AvailableNetworks {
             AvailableNetworksInput::ScanRequested => {
                 self.start_scan(&sender);
             }
+            AvailableNetworksInput::Opened => {
+                self.scan_if_empty(&sender);
+            }
             AvailableNetworksInput::NetworkSelected(index) => {
                 self.select_network(index, &sender);
             }
@@ -230,6 +237,11 @@ impl Component for AvailableNetworks {
                 let connected_ssid = self.network.wifi.get().and_then(|wifi| wifi.ssid.get());
 
                 self.rebuild_network_list(connected_ssid.as_deref());
+
+                if self.pending_ssid.is_some() {
+                    self.connect_pending_if_found(&sender);
+                    return;
+                }
 
                 if self.state == ListState::Scanning && !self.ap_cache.is_empty() {
                     self.state = ListState::Normal;
@@ -280,6 +292,11 @@ impl Component for AvailableNetworks {
             }
 
             AvailableNetworksCmd::ScanComplete => {
+                if self.pending_ssid.is_some() {
+                    self.finish_pending_search(&sender);
+                    return;
+                }
+
                 if self.state == ListState::Scanning {
                     self.state = ListState::Normal;
                 }

@@ -19,6 +19,8 @@ pub struct AvailableNetworksInit {
 #[derive(Debug)]
 pub enum AvailableNetworksInput {
     ScanRequested,
+    /// The dropdown was just opened.
+    Opened,
     WifiAvailabilityChanged(bool),
     WifiEnabledChanged(bool),
     NetworkSelected(usize),

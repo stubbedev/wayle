@@ -65,6 +65,7 @@ impl Component for NetworkDropdown {
         gtk::Popover {
             set_css_classes: &["dropdown", "network-dropdown"],
             set_has_arrow: false,
+            connect_map => NetworkDropdownMsg::Opened,
             #[watch]
             set_width_request: model.scaled_width,
             #[watch]
@@ -259,6 +260,9 @@ impl Component for NetworkDropdown {
         match msg {
             NetworkDropdownMsg::WifiToggled(active) => {
                 self.toggle_wifi(active, &sender);
+            }
+            NetworkDropdownMsg::Opened => {
+                self.available_networks.emit(AvailableNetworksInput::Opened);
             }
             NetworkDropdownMsg::ScanRequested => {
                 self.available_networks
