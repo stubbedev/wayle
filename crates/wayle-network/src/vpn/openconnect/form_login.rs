@@ -100,7 +100,9 @@ pub(super) async fn sign_in(
             }
             None => client.get(&url).timeout(LOGIN_TIMEOUT).send().await,
         }
-        .map_err(|error| auth_error(&format!("cannot reach the gateway: {error}")))?;
+        .map_err(|error| {
+            Error::VpnSignInIncomplete(format!("cannot reach the gateway: {error}"))
+        })?;
 
         // Read before the body: the session cookie is set on whichever
         // response finally accepts the sign-in, which is usually the one that
@@ -113,10 +115,9 @@ pub(super) async fn sign_in(
             cookie = Some(found);
         }
         let page_url = response.url().to_string();
-        let html = response
-            .text()
-            .await
-            .map_err(|error| auth_error(&format!("cannot read the gateway's reply: {error}")))?;
+        let html = response.text().await.map_err(|error| {
+            Error::VpnSignInIncomplete(format!("cannot read the gateway's reply: {error}"))
+        })?;
 
         match web_login::classify(&html) {
             Page::Done => {
@@ -213,7 +214,7 @@ async fn ask(
             fields,
         })
         .await
-        .ok_or_else(|| auth_error("sign-in dismissed"))?;
+        .ok_or_else(|| Error::VpnSignInIncomplete(String::from("sign-in dismissed")))?;
 
     let password = values.get("password").cloned().unwrap_or_default();
     Ok((

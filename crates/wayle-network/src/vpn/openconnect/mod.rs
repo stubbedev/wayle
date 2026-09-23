@@ -248,7 +248,10 @@ pub(crate) fn is_supported(profile: &Profile) -> bool {
 /// Authenticates and returns the secrets the openconnect plugin asked for.
 ///
 /// `request_new` is NM telling us the secrets it had were rejected: the cached
-/// cookie and the stored password are dropped and the user signs in afresh.
+/// cookie is dropped and the gateway is signed into afresh. The stored
+/// password is kept — NM's secrets are the cookie's derivatives, so their
+/// rejection says nothing about the password, and only the gateway refusing
+/// the password itself drops it (see [`discredits_password`]).
 ///
 /// # Errors
 ///
@@ -265,9 +268,10 @@ pub(crate) async fn authenticate(
         return Ok(hand_out(&profile.uuid, &session));
     }
 
-    // A failed sign-in drops the stored password: the likeliest thing that
+    // A refused sign-in drops the stored password: the likeliest thing that
     // went stale, and keeping it would make every later attempt fail the same
-    // way with no way for the user to correct it.
+    // way with no way for the user to correct it. A sign-in that merely did
+    // not finish keeps it.
     let signed_in = match profile.protocol.as_str() {
         "anyconnect" => anyconnect::sign_in(profile, &client, state).await,
         "fortinet" => fortinet::sign_in(profile, &client, state).await,
@@ -279,7 +283,11 @@ pub(crate) async fn authenticate(
         }
         _ => globalprotect(profile, &client, state).await,
     }
-    .inspect_err(|_| cache::forget_password(&profile.uuid))?;
+    .inspect_err(|error| {
+        if discredits_password(error) {
+            cache::forget_password(&profile.uuid);
+        }
+    })?;
 
     cache::store_session(&profile.uuid, &signed_in.session);
     if let Some(password) = &signed_in.remember_password {
@@ -287,6 +295,17 @@ pub(crate) async fn authenticate(
     }
     info!(name = %profile.name, "VPN sign-in complete");
     Ok(hand_out(&profile.uuid, &signed_in.session))
+}
+
+/// Whether a failed sign-in is evidence against the stored password.
+///
+/// Only a refusal is. A dismissed prompt, a gateway nobody could reach —
+/// routine for the first attempt after a resume, before the network has
+/// settled — or a rejected second factor all leave the password exactly as
+/// good as it was, and dropping it for them is what made a reconnect ask for
+/// the password again on top of the 2FA code.
+fn discredits_password(error: &Error) -> bool {
+    matches!(error, Error::VpnAuthenticationFailed(_))
 }
 
 /// The GlobalProtect sign-in: ask the gateway what it wants, ask the user for
@@ -335,9 +354,8 @@ async fn reusable_session(
     client: &reqwest::Client,
 ) -> Option<Session> {
     if request_new {
-        debug!(name = %profile.name, "previous VPN credentials rejected, discarding them");
+        debug!(name = %profile.name, "previous VPN session rejected, discarding it");
         cache::forget_session(&profile.uuid);
-        cache::forget_password(&profile.uuid);
         return None;
     }
 
@@ -421,7 +439,7 @@ async fn sign_in(
     let mut answer = String::from(password);
 
     for _ in 0..=MAX_CHALLENGES {
-        match gp::login(
+        let step = gp::login(
             client,
             &profile.gateway,
             username,
@@ -429,8 +447,16 @@ async fn sign_in(
             &computer,
             &input_str,
         )
-        .await?
-        {
+        .await;
+        // Past the first post the password has been accepted — a challenge
+        // is only ever issued to one that was — so a refusal now is of the
+        // code, not of the password.
+        let step = if input_str.is_empty() {
+            step?
+        } else {
+            step.map_err(past_the_password)?
+        };
+        match step {
             gp::Step::Authenticated(session) => return Ok(session),
             gp::Step::Challenge {
                 prompt,
@@ -592,7 +618,15 @@ async fn challenge(
 }
 
 fn cancelled() -> Error {
-    Error::VpnAuthenticationFailed(String::from("sign-in dismissed"))
+    Error::VpnSignInIncomplete(String::from("sign-in dismissed"))
+}
+
+/// Recasts a refusal that came after the password was accepted.
+fn past_the_password(error: Error) -> Error {
+    match error {
+        Error::VpnAuthenticationFailed(reason) => Error::VpnSignInIncomplete(reason),
+        other => other,
+    }
 }
 
 /// The HTTPS client the sign-in runs on.
@@ -925,6 +959,98 @@ mod tests {
         }
     }
 
+    #[test]
+    fn only_a_refusal_discredits_the_stored_password() {
+        assert!(discredits_password(&Error::VpnAuthenticationFailed(
+            String::from("Invalid username or password")
+        )));
+        // Dismissed, unreachable, or refused past the password: none of these
+        // say the password is wrong.
+        assert!(!discredits_password(&cancelled()));
+        assert!(!discredits_password(&Error::VpnSignInIncomplete(
+            String::from("cannot reach the gateway: timed out")
+        )));
+        assert!(!discredits_password(&Error::VpnProtocolUnsupported(
+            String::from("unrecognised reply")
+        )));
+    }
+
+    #[test]
+    fn a_refusal_after_the_password_is_recast_and_nothing_else_is() {
+        assert!(matches!(
+            past_the_password(Error::VpnAuthenticationFailed(String::from("wrong code"))),
+            Error::VpnSignInIncomplete(ref reason) if reason == "wrong code"
+        ));
+        assert!(matches!(
+            past_the_password(Error::VpnProtocolUnsupported(String::from("odd"))),
+            Error::VpnProtocolUnsupported(_)
+        ));
+    }
+
+    fn state_home(label: &str) -> std::path::PathBuf {
+        let base = std::env::temp_dir().join(format!("wayle-vpn-{label}-{}", std::process::id()));
+        // SAFETY: nextest runs every test in its own process, and nothing
+        // else in this crate reads `XDG_STATE_HOME`.
+        unsafe { std::env::set_var("XDG_STATE_HOME", &base) };
+        base
+    }
+
+    #[tokio::test]
+    async fn a_rejected_session_costs_the_cookie_but_not_the_password() {
+        // NM's REQUEST_NEW means the plugin refused the cookie it was handed:
+        // a statement about the session, not about the password that minted it.
+        let base = state_home("request-new");
+        cache::store_session("request-new", &session());
+        cache::store_password("request-new", "hunter2");
+        let client = client().expect("the client builds");
+
+        assert_eq!(
+            reusable_session(&gp_profile("request-new", "127.0.0.1:1"), true, &client).await,
+            None,
+            "a rejected session must not be handed out again"
+        );
+        assert_eq!(
+            cache::session("request-new"),
+            None,
+            "the rejected cookie survived"
+        );
+        assert_eq!(
+            cache::password("request-new").as_deref(),
+            Some("hunter2"),
+            "the password went with the cookie"
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_gateway_does_not_cost_the_stored_password() {
+        // The first attempt after a resume often runs before the network has
+        // settled. Failing to reach the gateway says nothing about the
+        // password, and must not turn the next connect into a password prompt.
+        let base = state_home("unreachable-password");
+        cache::store_password("unreachable-password", "hunter2");
+        let profile = Profile {
+            username: Some(String::from("alice")),
+            ..gp_profile("unreachable-password", "127.0.0.1:1")
+        };
+
+        let error = authenticate(&profile, false, &SecretAgentState::new())
+            .await
+            .expect_err("nobody signs in to a gateway that is not there");
+        assert!(
+            matches!(error, Error::VpnSignInIncomplete(_)),
+            "got {error:?}"
+        );
+        assert_eq!(
+            cache::password("unreachable-password").as_deref(),
+            Some("hunter2"),
+            "the stored password was dropped for an unreachable gateway"
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
     fn gp_profile(uuid: &str, gateway: &str) -> Profile {
         Profile {
             uuid: String::from(uuid),
@@ -1060,6 +1186,80 @@ mod tests {
                 Some(live.clone()),
                 "a cookie the gateway still accepts must not cost a sign-in"
             );
+        }
+
+        /// Answers every challenge prompt with `code`.
+        fn answer_challenges(state: &std::sync::Arc<SecretAgentState>, code: &'static str) {
+            use futures::StreamExt;
+            let state = std::sync::Arc::clone(state);
+            tokio::spawn(async move {
+                let mut changes = state.request.watch();
+                while let Some(change) = changes.next().await {
+                    if change.is_some() {
+                        state
+                            .submit(HashMap::from([(
+                                String::from("passwd"),
+                                String::from(code),
+                            )]))
+                            .await;
+                    }
+                }
+            });
+        }
+
+        fn alice(uuid: &str) -> Profile {
+            Profile {
+                username: Some(String::from("alice")),
+                ..gp_profile(uuid, GATEWAY)
+            }
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn a_refused_password_is_forgotten() {
+            let base = state_home("mock-bad-password");
+            let _client = client();
+            cache::store_password("mock-bad-password", "wrong");
+
+            let error = authenticate(&alice("mock-bad-password"), false, &SecretAgentState::new())
+                .await
+                .expect_err("a wrong password does not sign anyone in");
+            assert!(
+                matches!(error, Error::VpnAuthenticationFailed(_)),
+                "got {error:?}"
+            );
+            assert_eq!(
+                cache::password("mock-bad-password"),
+                None,
+                "a password the gateway refused is kept, and would fail every connect"
+            );
+
+            let _ = std::fs::remove_dir_all(&base);
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn a_refused_code_keeps_the_password_that_was_accepted() {
+            let base = state_home("mock-bad-code");
+            let _client = client();
+            cache::store_password("mock-bad-code", "hunter2");
+            let state = std::sync::Arc::new(SecretAgentState::new());
+            answer_challenges(&state, "000000");
+
+            let error = authenticate(&alice("mock-bad-code"), false, &state)
+                .await
+                .expect_err("a wrong code does not sign anyone in");
+            assert!(
+                matches!(error, Error::VpnSignInIncomplete(_)),
+                "got {error:?}"
+            );
+            assert_eq!(
+                cache::password("mock-bad-code").as_deref(),
+                Some("hunter2"),
+                "a wrong 2FA code cost the password the gateway had just accepted"
+            );
+
+            let _ = std::fs::remove_dir_all(&base);
         }
 
         #[tokio::test]

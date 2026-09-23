@@ -117,7 +117,7 @@ pub(super) fn store_password(uuid: &str, password: &str) {
     write_private(uuid, "password", password);
 }
 
-/// Drops a stored password NM has told us was rejected.
+/// Drops a stored password the gateway refused.
 pub(super) fn forget_password(uuid: &str) {
     remove(uuid, "password");
 }

@@ -272,7 +272,7 @@ pub(super) async fn prelogin(client: &reqwest::Client, gateway: &str) -> Result<
         .send()
         .await
         .map_err(|error| {
-            Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
+            Error::VpnSignInIncomplete(format!("cannot reach the gateway: {error}"))
         })?;
 
     if response.status() == reqwest::StatusCode::NOT_FOUND {
@@ -281,7 +281,7 @@ pub(super) async fn prelogin(client: &reqwest::Client, gateway: &str) -> Result<
         ));
     }
     let body = response.text().await.map_err(|error| {
-        Error::VpnAuthenticationFailed(format!("cannot read the gateway's reply: {error}"))
+        Error::VpnSignInIncomplete(format!("cannot read the gateway's reply: {error}"))
     })?;
 
     parse_prelogin(&body)
@@ -318,7 +318,7 @@ pub(super) async fn login(
         .send()
         .await
         .map_err(|error| {
-            Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
+            Error::VpnSignInIncomplete(format!("cannot reach the gateway: {error}"))
         })?;
 
     // Read off the response rather than a second connection: this is the
@@ -333,7 +333,7 @@ pub(super) async fn login(
     // usefully 404, which is what a portal-only host says to a gateway login.
     let status = response.status();
     let body = response.text().await.map_err(|error| {
-        Error::VpnAuthenticationFailed(format!("cannot read the gateway's reply: {error}"))
+        Error::VpnSignInIncomplete(format!("cannot read the gateway's reply: {error}"))
     })?;
 
     if status == reqwest::StatusCode::NOT_FOUND {
@@ -396,12 +396,12 @@ pub(super) async fn cookie_verdict(
         .send()
         .await
         .map_err(|error| {
-            Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
+            Error::VpnSignInIncomplete(format!("cannot reach the gateway: {error}"))
         })?;
 
     let status = response.status().as_u16();
     let body = response.text().await.map_err(|error| {
-        Error::VpnAuthenticationFailed(format!("cannot read the gateway's reply: {error}"))
+        Error::VpnSignInIncomplete(format!("cannot read the gateway's reply: {error}"))
     })?;
     Ok(verdict_from(status, &body))
 }

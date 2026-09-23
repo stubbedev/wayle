@@ -70,7 +70,7 @@ pub(super) async fn sign_in(
                     fields,
                 })
                 .await
-                .ok_or_else(|| auth_error("sign-in dismissed"))?;
+                .ok_or_else(|| Error::VpnSignInIncomplete(String::from("sign-in dismissed")))?;
             let password = values.get("password").cloned().unwrap_or_default();
             (
                 values.get("username").cloned().unwrap_or(username),
@@ -95,7 +95,7 @@ pub(super) async fn sign_in(
         .send()
         .await
         .map_err(|error| {
-            Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
+            Error::VpnSignInIncomplete(format!("cannot reach the gateway: {error}"))
         })?;
 
     let gwcert = peer_pin(&response).ok_or_else(|| {

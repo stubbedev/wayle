@@ -57,6 +57,17 @@ pub enum Error {
     #[error("{0}")]
     VpnAuthenticationFailed(String),
 
+    /// A VPN sign-in that ended without the gateway refusing the password:
+    /// the user dismissed the prompt, the gateway could not be reached or
+    /// read, or the password was accepted and a later factor was not.
+    ///
+    /// Shown to the user like a refusal, but kept apart from one because the
+    /// cached password survives it. Dropping the password on every failed
+    /// sign-in turned a dismissed 2FA prompt, or a gateway not yet reachable
+    /// after a resume, into a password prompt on the next connect.
+    #[error("{0}")]
+    VpnSignInIncomplete(String),
+
     /// A VPN gateway answered in a shape wayle's sign-in does not recognise.
     ///
     /// Distinct from a refused authentication on purpose: this one means

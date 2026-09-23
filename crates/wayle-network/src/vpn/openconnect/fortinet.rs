@@ -162,7 +162,7 @@ async fn ask(
                 }],
             })
             .await
-            .ok_or_else(|| auth_error("sign-in dismissed"))?;
+            .ok_or_else(|| Error::VpnSignInIncomplete(String::from("sign-in dismissed")))?;
         return Ok(Answers {
             username,
             credential: values.get("code").cloned().unwrap_or_default(),
@@ -205,7 +205,7 @@ async fn ask(
             fields,
         })
         .await
-        .ok_or_else(|| auth_error("sign-in dismissed"))?;
+        .ok_or_else(|| Error::VpnSignInIncomplete(String::from("sign-in dismissed")))?;
 
     let credential = values.get("password").cloned().unwrap_or_default();
     Ok(Answers {
@@ -269,7 +269,7 @@ async fn post(client: &reqwest::Client, gateway: &str, body: &str) -> Result<Exc
         .send()
         .await
         .map_err(|error| {
-            Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
+            Error::VpnSignInIncomplete(format!("cannot reach the gateway: {error}"))
         })?;
 
     let gwcert = peer_pin(&response).ok_or_else(|| {
@@ -278,7 +278,7 @@ async fn post(client: &reqwest::Client, gateway: &str, body: &str) -> Result<Exc
     let cookie = session_cookie(response.headers());
     let status = response.status();
     let body = response.text().await.map_err(|error| {
-        Error::VpnAuthenticationFailed(format!("cannot read the gateway's reply: {error}"))
+        Error::VpnSignInIncomplete(format!("cannot read the gateway's reply: {error}"))
     })?;
 
     Ok(Exchange {
