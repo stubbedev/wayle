@@ -260,11 +260,11 @@ pub(crate) async fn authenticate(
     request_new: bool,
     state: &SecretAgentState,
 ) -> Result<HashMap<String, String>, Error> {
-    if let Some(session) = reusable_session(profile, request_new) {
+    let client = client()?;
+    if let Some(session) = reusable_session(profile, request_new, &client).await {
         return Ok(hand_out(&profile.uuid, &session));
     }
 
-    let client = client()?;
     // A failed sign-in drops the stored password: the likeliest thing that
     // went stale, and keeping it would make every later attempt fail the same
     // way with no way for the user to correct it.
@@ -328,9 +328,12 @@ pub(crate) fn forget(uuid: &str) {
 }
 
 /// The cached session to reuse, or `None` when there is none to reuse — either
-/// because nothing is cached or because NM has just told us what was cached
-/// did not work.
-fn reusable_session(profile: &Profile, request_new: bool) -> Option<Session> {
+/// because nothing is cached, or because the cached one has stopped working.
+async fn reusable_session(
+    profile: &Profile,
+    request_new: bool,
+    client: &reqwest::Client,
+) -> Option<Session> {
     if request_new {
         debug!(name = %profile.name, "previous VPN credentials rejected, discarding them");
         cache::forget_session(&profile.uuid);
@@ -339,18 +342,58 @@ fn reusable_session(profile: &Profile, request_new: bool) -> Option<Session> {
     }
 
     let session = cache::session(&profile.uuid)?;
-    let spent = HANDED_OUT
-        .lock()
-        .ok()
-        .is_some_and(|handed| is_spent(handed.get(&profile.uuid), &session.cookie, Instant::now()));
-    if spent {
-        info!(name = %profile.name, "the cached VPN cookie was just refused; signing in again");
+    if nm_refused(profile, &session) {
+        cache::forget_session(&profile.uuid);
+        return None;
+    }
+    // GlobalProtect answers the plugin's own getconfig request with either
+    // tunnel configuration or a refusal, so the gateway is asked about the
+    // cookie before it is handed over. Without this, a cookie that expired
+    // overnight fails the first activation silently, NM tears it down without
+    // re-asking for secrets, and the user has to click a second time to reach
+    // the sign-in they always needed.
+    if profile.protocol == "gp" && gateway_refused(profile, &session, client).await {
         cache::forget_session(&profile.uuid);
         return None;
     }
 
     info!(name = %profile.name, "reusing cached VPN session; no sign-in needed");
     Some(session)
+}
+
+/// Whether NM itself has just told us the cached cookie does not work.
+fn nm_refused(profile: &Profile, session: &Session) -> bool {
+    let spent = HANDED_OUT
+        .lock()
+        .ok()
+        .is_some_and(|handed| is_spent(handed.get(&profile.uuid), &session.cookie, Instant::now()));
+    if spent {
+        info!(name = %profile.name, "the cached VPN cookie was just refused; signing in again");
+    }
+    spent
+}
+
+/// Asks the gateway whether it still opens a tunnel with the cached cookie.
+///
+/// A gateway that answers anything but a refusal cannot have said the cookie
+/// is dead, and one nobody could reach says nothing at all: both leave the
+/// decision to the plugin's own attempt.
+async fn gateway_refused(profile: &Profile, session: &Session, client: &reqwest::Client) -> bool {
+    match gp::cookie_verdict(client, &session.host, &session.cookie).await {
+        Ok(gp::Verdict::Refuses) => {
+            info!(name = %profile.name, "the gateway has expired the cached VPN cookie; signing in again");
+            true
+        }
+        Ok(_) => false,
+        Err(error) => {
+            debug!(
+                name = %profile.name,
+                %error,
+                "cannot ask the gateway about the cached cookie; trying it anyway"
+            );
+            false
+        }
+    }
 }
 
 /// Whether NM is asking again for a cookie it was given moments ago — which
@@ -596,6 +639,10 @@ fn hostname() -> String {
 }
 
 #[cfg(test)]
+// Several tests set `XDG_STATE_HOME` or `SSL_CERT_FILE`, so the state directory
+// and the mock gateway's certificate are read through the same paths the
+// running shell does.
+#[allow(unsafe_code)]
 mod tests {
     use std::collections::HashMap;
 
@@ -875,6 +922,182 @@ mod tests {
             )
             .expect("a profile");
             assert!(on.sso, "{value:?} should enable the browser sign-in");
+        }
+    }
+
+    fn gp_profile(uuid: &str, gateway: &str) -> Profile {
+        Profile {
+            uuid: String::from(uuid),
+            name: String::from("Work"),
+            gateway: String::from(gateway),
+            protocol: String::from("gp"),
+            username: None,
+            sso: false,
+            plugin_signin: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_gateway_does_not_cost_the_cached_cookie() {
+        // The probe exists to catch a cookie the gateway has expired. A
+        // gateway nobody could reach has said nothing at all, so the cookie
+        // stays and the plugin's own attempt decides.
+        let base = std::env::temp_dir().join(format!("wayle-vpn-probe-{}", std::process::id()));
+        // SAFETY: nextest runs every test in its own process, and nothing
+        // else in this crate reads `XDG_STATE_HOME`.
+        unsafe { std::env::set_var("XDG_STATE_HOME", &base) };
+
+        let unreachable = session_with_host("127.0.0.1:1");
+        cache::store_session("probe-unreachable", &unreachable);
+        let client = client().expect("the client builds");
+
+        assert_eq!(
+            reusable_session(
+                &gp_profile("probe-unreachable", "127.0.0.1:1"),
+                false,
+                &client
+            )
+            .await,
+            Some(unreachable.clone()),
+            "an unreachable gateway must not cost the cached cookie"
+        );
+        assert_eq!(
+            cache::session("probe-unreachable").as_ref(),
+            Some(&unreachable),
+            "the cached cookie survived"
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    fn session_with_host(host: &str) -> Session {
+        Session {
+            cookie: String::from("authcookie=abc&portal=vpn.example.com&user=alice&domain=example"),
+            host: String::from(host),
+            gwcert: String::from("pin-sha256:AAAA"),
+        }
+    }
+
+    /// Tests against the mock gateway in `tests/mock-gateway`, started by
+    /// `just test-gateway`.
+    mod mock {
+        use super::*;
+
+        const GATEWAY: &str = "127.0.0.1:8443";
+        const SAML_GATEWAY: &str = "127.0.0.1:8444";
+        const PIN: &str = "pin-sha256:eQO9gC6TVZtfFqt1YHSe7HUSxgHyRmhNo3UXeSAxvZI=";
+
+        /// A client that trusts the mock's committed certificate.
+        fn client() -> reqwest::Client {
+            // SAFETY: nextest runs every test in its own process.
+            unsafe {
+                std::env::set_var(
+                    "SSL_CERT_FILE",
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/mock-gateway/ca.crt"),
+                );
+            }
+            super::super::client().expect("the client builds")
+        }
+
+        /// Signs in the way [`globalprotect`] does: a password post, then the
+        /// answer to the challenge it comes back with.
+        async fn sign_in() -> Session {
+            let client = client();
+            let step = gp::login(&client, GATEWAY, "alice", "hunter2", "laptop", "").await;
+            let gp::Step::Challenge { input_str, .. } = step.expect("the mock signs in") else {
+                panic!("the mock gateway always challenges once");
+            };
+            match gp::login(&client, GATEWAY, "alice", "123456", "laptop", &input_str).await {
+                Ok(gp::Step::Authenticated(session)) => session,
+                _ => panic!("the second post completes the sign-in"),
+            }
+        }
+
+        /// Sets up a state directory and caches a session for `uuid`.
+        fn state_dir(uuid: &str, session: &Session) {
+            let base =
+                std::env::temp_dir().join(format!("wayle-vpn-mock-{uuid}-{}", std::process::id()));
+            // SAFETY: nextest runs every test in its own process, and nothing
+            // else in this crate reads `XDG_STATE_HOME`.
+            unsafe { std::env::set_var("XDG_STATE_HOME", &base) };
+            cache::store_session(uuid, session);
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn a_gateway_refused_cookie_is_dropped_instead_of_handed_out() {
+            let dead = Session {
+                cookie: String::from(
+                    "authcookie=EXPIRED&portal=127.0.0.1&user=alice&domain=example",
+                ),
+                host: String::from(GATEWAY),
+                gwcert: String::from(PIN),
+            };
+            state_dir("mock-refused", &dead);
+            let client = client();
+
+            assert_eq!(
+                reusable_session(&gp_profile("mock-refused", GATEWAY), false, &client).await,
+                None,
+                "a cookie the gateway refused must not be handed to NM"
+            );
+            assert_eq!(
+                cache::session("mock-refused"),
+                None,
+                "the refused cookie survived"
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn a_gateway_accepted_cookie_is_still_reused() {
+            let live = sign_in().await;
+            state_dir("mock-accepted", &live);
+            let client = client();
+
+            assert_eq!(
+                reusable_session(&gp_profile("mock-accepted", GATEWAY), false, &client).await,
+                Some(live.clone()),
+                "a cookie the gateway still accepts must not cost a sign-in"
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn a_saml_portal_is_refused_before_any_credentials_are_posted() {
+            // The mock SAML gateway answers its prelogin and nothing else: a
+            // posted login would 404, which this sign-in reports as "no
+            // GlobalProtect gateway at this address". Getting the SAML
+            // refusal instead proves nothing was posted.
+            let base = std::env::temp_dir().join(format!("wayle-vpn-saml-{}", std::process::id()));
+            // SAFETY: nextest runs every test in its own process, and nothing
+            // else in this crate reads these two variables.
+            unsafe {
+                std::env::set_var("XDG_STATE_HOME", &base);
+                std::env::set_var(
+                    "SSL_CERT_FILE",
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/mock-gateway/ca.crt"),
+                );
+            }
+
+            let error = authenticate(
+                &gp_profile("mock-saml", SAML_GATEWAY),
+                false,
+                &SecretAgentState::new(),
+            )
+            .await
+            .expect_err("a SAML portal is refused while the profile has no browser sign-in");
+            let message = error.to_string();
+            assert!(
+                message.contains("SAML sign-in"),
+                "the refusal should say how to sign in instead: {message}"
+            );
+            assert!(
+                !message.contains("no GlobalProtect gateway"),
+                "credentials were posted at the SAML portal: {message}"
+            );
+
+            let _ = std::fs::remove_dir_all(&base);
         }
     }
 }

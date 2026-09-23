@@ -2,7 +2,8 @@
 """A VPN gateway, in as much detail as wayle's sign-in can tell.
 
 Speaks the endpoints `crates/wayle-network/src/vpn/openconnect/` talks to —
-GlobalProtect's two `.esp` endpoints and AnyConnect's XML exchange — over TLS
+GlobalProtect's `prelogin`, `login` and `getconfig` endpoints and AnyConnect's
+XML exchange — over TLS
 with the certificate next to this file. The sign-in reads the peer certificate
 off that connection to produce the `gwcert` secret, so a plaintext mock would
 not exercise the thing most worth exercising.
@@ -69,6 +70,14 @@ CHALLENGE = f"""<?xml version="1.0" encoding="UTF-8" ?>
 
 REJECTED = """<?xml version="1.0" encoding="UTF-8" ?>
 <response status="error"><msg>Invalid username or password</msg></response>"""
+
+CONFIG_SUCCESS = """<?xml version="1.0" encoding="UTF-8" ?>
+<response status="success"><ip-address>192.168.241.222</ip-address>
+<netmask>255.255.255.255</netmask><mtu>0</mtu><lifetime>86400</lifetime>
+<access-routes><member>0.0.0.0/0</member></access-routes></response>"""
+
+COOKIE_REJECTED = """<?xml version="1.0" encoding="UTF-8" ?>
+<response status="error"><error>Invalid authentication cookie</error></response>"""
 
 OPAQUE = (
     '<opaque is-for="sg"><tunnel-group>DefaultWEBVPNGroup</tunnel-group>'
@@ -277,6 +286,16 @@ class Gateway(BaseHTTPRequestHandler):
             self._fortinet(self.rfile.read(length).decode())
             return
         if not self.path.startswith("/ssl-vpn/login.esp"):
+            # The cookie probe wayle hands a cached session to: the same
+            # getconfig request the plugin starts every tunnel with. The
+            # minted cookie buys tunnel configuration; anything else is the
+            # refusal a real gateway writes around a dead one.
+            if self.path.startswith("/ssl-vpn/getconfig.esp"):
+                length = int(self.headers.get("Content-Length", "0"))
+                form = parse_qs(self.rfile.read(length).decode(), keep_blank_values=True)
+                field = lambda key: form.get(key, [""])[0]  # noqa: E731
+                self._reply(CONFIG_SUCCESS if field("authcookie") == COOKIE else COOKIE_REJECTED)
+                return
             self._reply("<html>not a gateway</html>", 404)
             return
 

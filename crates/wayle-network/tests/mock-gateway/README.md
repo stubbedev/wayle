@@ -1,7 +1,8 @@
 # Mock VPN gateways
 
 Four throwaway gateways for the VPN sign-in tests, so nothing has to be
-pointed at a real VPN to prove the sign-in works:
+pointed at a real VPN to prove the sign-in works (five, counting the Array
+gateway below):
 
 - `127.0.0.1:8443` — GlobalProtect: username/password, one challenge round,
   then a cookie;
@@ -14,14 +15,20 @@ pointed at a real VPN to prove the sign-in works:
   `tokeninfo` second factor, then an `SVPNCOOKIE`. It refuses a challenge reply
   that does not echo `reqid` and `magic` back, which is how the real ones
   recognise the conversation.
+- `127.0.0.1:8447` — Array Networks: one form POST, then an `ANsession…`
+  cookie.
 
 ```sh
 just test-gateway     # up, run the `mock::` tests, down again
 ```
 
 The tests are `#[ignore]`d in the normal suite (`mod mock` in
-`crates/wayle-network/src/vpn/openconnect/gp.rs`, `anyconnect.rs` and
-`fortinet.rs`) because they need these containers running.
+`crates/wayle-network/src/vpn/openconnect/gp.rs`, `mod.rs`, `anyconnect.rs`
+and `fortinet.rs`) because they need these gateways running.
+
+CI runs the same tests without docker: the check job starts `gateway.py`
+directly, once per mode and port — the script only needs the interpreter
+and the stdlib. Docker is a local convenience, not a requirement.
 
 ## The certificates
 

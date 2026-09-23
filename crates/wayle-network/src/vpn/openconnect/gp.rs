@@ -345,6 +345,94 @@ pub(super) async fn login(
     parse_login(&body, gateway, computer, &gwcert)
 }
 
+/// What a gateway says when asked to use a cookie again.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Verdict {
+    /// It answered with tunnel configuration: the cookie is still good.
+    Accepts,
+    /// It refused the cookie outright.
+    Refuses,
+    /// The reply says nothing usable about the cookie. Keeping it and letting
+    /// the plugin's own attempt be the judge beats re-authenticating on the
+    /// strength of a reply nobody understands.
+    Unreadable,
+}
+
+/// Asks the gateway whether it still accepts a session cookie.
+///
+/// This is the request the plugin itself starts every tunnel with —
+/// openconnect's `gpst_get_config` posting the cookie string to
+/// `getconfig.esp` — so a gateway willing to bring the tunnel up with this
+/// cookie says so, and one that has expired the session says so before
+/// anything is handed to NM. A good cookie is answered with configuration; a
+/// dead one with `<response status="error">`, and sometimes HTTP 512 for
+/// good measure. openconnect's `gpst_xml_or_error` keys on exactly those.
+///
+/// # Errors
+///
+/// Only when the gateway cannot be reached at all. The caller treats that the
+/// same as [`Verdict::Unreadable`]: a gateway nobody can reach cannot tell
+/// anyone the cookie is bad.
+pub(super) async fn cookie_verdict(
+    client: &reqwest::Client,
+    gateway: &str,
+    cookie: &str,
+) -> Result<Verdict, Error> {
+    let url = format!("https://{gateway}/ssl-vpn/getconfig.esp");
+    // The fields before the cookie are openconnect's own, verbatim; the
+    // cookie string is appended whole, exactly as openconnect sends it.
+    let body = format!(
+        "client-type=1&protocol-version=p1&app-version=5.1.5-8&clientos=Linux&os-version=linux\
+         &hmac-algo=sha1,md5,sha256&enc-algo=aes-128-cbc,aes-256-cbc&{cookie}"
+    );
+    let response = client
+        .post(&url)
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
+        .timeout(PRELOGIN_TIMEOUT)
+        .body(body)
+        .send()
+        .await
+        .map_err(|error| {
+            Error::VpnAuthenticationFailed(format!("cannot reach the gateway: {error}"))
+        })?;
+
+    let status = response.status().as_u16();
+    let body = response.text().await.map_err(|error| {
+        Error::VpnAuthenticationFailed(format!("cannot read the gateway's reply: {error}"))
+    })?;
+    Ok(verdict_from(status, &body))
+}
+
+fn verdict_from(status: u16, body: &str) -> Verdict {
+    if refused(status, body) {
+        return Verdict::Refuses;
+    }
+    match xml::raw_element(body, "response") {
+        Some(_) => Verdict::Accepts,
+        None => Verdict::Unreadable,
+    }
+}
+
+fn refused(status: u16, body: &str) -> bool {
+    // The custom status a gateway answers a dead cookie with, next to the
+    // error document it writes around the same message.
+    if status == 512 {
+        return true;
+    }
+    if xml::values(body, "error")
+        .iter()
+        .any(|text| !text.is_empty())
+    {
+        return true;
+    }
+    xml::raw_element(body, "response").is_some_and(|response| {
+        xml::attribute(response, "status").is_some_and(|value| value.eq_ignore_ascii_case("error"))
+    })
+}
+
 #[cfg(test)]
 // One test sets `SSL_CERT_FILE` so the mock gateway's committed certificate
 // verifies through the same path a real one does.
@@ -354,6 +442,46 @@ mod tests {
 
     /// Stands in for the pin `login` reads off the TLS connection.
     const PIN: &str = "pin-sha256:AAAA";
+
+    mod verdict {
+        use super::super::{Verdict, verdict_from};
+
+        const CONFIG: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\
+            <response status=\"success\"><ip-address>192.168.241.222</ip-address>\
+            <netmask>255.255.255.255</netmask><mtu>0</mtu><lifetime>86400</lifetime>\
+            <access-routes><member>0.0.0.0/0</member></access-routes></response>";
+
+        const DEAD_COOKIE: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\
+            <response status=\"error\">\
+            <error>Invalid authentication cookie</error></response>";
+
+        #[test]
+        fn a_config_reply_means_the_cookie_still_opens_a_tunnel() {
+            assert_eq!(verdict_from(200, CONFIG), Verdict::Accepts);
+        }
+
+        #[test]
+        fn an_error_document_is_a_refused_cookie() {
+            assert_eq!(verdict_from(200, DEAD_COOKIE), Verdict::Refuses);
+        }
+
+        #[test]
+        fn the_gateways_custom_dead_cookie_status_refuses_without_xml() {
+            // Some gateways answer the same refusal as an HTTP 512 with a
+            // body that is not the error document at all.
+            assert_eq!(verdict_from(512, "nonsense"), Verdict::Refuses);
+        }
+
+        #[test]
+        fn a_reply_that_says_nothing_about_the_cookie_is_kept_anyway() {
+            // An HTML error page or any other reply the reader cannot place
+            // must not cost a cookie that might be fine.
+            assert_eq!(
+                verdict_from(200, "<html>something else</html>"),
+                Verdict::Unreadable
+            );
+        }
+    }
 
     /// A real gateway's reply, trimmed to the argument list.
     fn success_xml(connection_type: &str, client_version: &str) -> String {
@@ -682,6 +810,33 @@ mod tests {
 
         #[tokio::test]
         #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn the_gateway_accepts_the_cookie_it_minted() {
+            let session = sign_in().await.expect("the mock gateway signs us in");
+            assert_eq!(
+                cookie_verdict(&client(), &session.host, &session.cookie)
+                    .await
+                    .expect("the gateway answers"),
+                Verdict::Accepts,
+                "a cookie the gateway just minted must not cost a sign-in"
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn the_gateway_refuses_a_cookie_it_did_not_mint() {
+            let cookie =
+                String::from("authcookie=EXPIRED&portal=127.0.0.1&user=alice&domain=example");
+            assert_eq!(
+                cookie_verdict(&client(), GATEWAY, &cookie)
+                    .await
+                    .expect("the gateway answers"),
+                Verdict::Refuses,
+                "a dead cookie must be caught before it is handed to NM"
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
         async fn a_wrong_password_is_a_refusal_in_the_gateways_words() {
             let error = login(&client(), GATEWAY, "alice", "wrong", "laptop", "")
                 .await
@@ -694,11 +849,23 @@ mod tests {
 
         #[tokio::test]
         #[ignore = "needs the mock gateway: just test-gateway"]
-        async fn a_saml_portal_is_refused_before_any_credentials_are_posted() {
-            let error = prelogin(&client(), SAML_GATEWAY)
+        async fn a_saml_portal_is_reported_rather_than_signed_into() {
+            // `prelogin` only reports what the gateway wants; whether to
+            // refuse it is the caller's decision, because a profile may opt
+            // into the browser sign-in. The refusal itself is tested against
+            // `authenticate` in `mod.rs`, where the caller lives.
+            let prelogin = prelogin(&client(), SAML_GATEWAY)
                 .await
-                .expect_err("a SAML portal is not something this can sign into");
-            assert!(error.to_string().contains("SAML"), "got: {error}");
+                .expect("a SAML portal answers its prelogin");
+            let Some(request) = prelogin.saml else {
+                panic!("the mock SAML portal advertises a browser sign-in");
+            };
+            assert_eq!(
+                request.method,
+                super::super::super::gp_sso::Method::Redirect,
+                "the payload the callback scheme expects is a URL: {:?}",
+                request.method
+            );
         }
     }
 
