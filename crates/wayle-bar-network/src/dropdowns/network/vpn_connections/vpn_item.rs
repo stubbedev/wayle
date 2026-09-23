@@ -58,6 +58,18 @@ fn state_label(state: VpnState) -> String {
     }
 }
 
+/// A failure reason as the row shows it: capitalised, since it stands on its
+/// own line there. The reasons come lowercased from wayle's own errors, which
+/// are written to read mid-sentence in a log, and as the gateway wrote them
+/// otherwise; only the first letter is touched.
+fn sentence(reason: &str) -> String {
+    let reason = reason.trim();
+    let mut chars = reason.chars();
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(chars).collect()
+    })
+}
+
 #[relm4::factory(pub)]
 impl FactoryComponent for VpnItem {
     type Init = VpnItemInit;
@@ -108,10 +120,26 @@ impl FactoryComponent for VpnItem {
                 gtk::Label {
                     add_css_class: "network-item-security",
                     set_halign: gtk::Align::Start,
+                    set_xalign: 0.0,
                     set_ellipsize: pango::EllipsizeMode::End,
                     set_max_width_chars: 24,
+                    // A gateway's reason is a sentence, not a status word:
+                    // cut to one line it read as "Authentication failed: I…".
+                    // Wrapping keeps the width capped; three lines caps a
+                    // gateway that writes an essay, and the tooltip has the
+                    // rest.
+                    set_wrap: true,
+                    set_wrap_mode: pango::WrapMode::WordChar,
+                    set_lines: 3,
                     #[watch]
-                    set_label: &self.detail.clone().unwrap_or_else(|| state_label(self.state)),
+                    set_class_active: ("failed", self.detail.is_some()),
+                    #[watch]
+                    set_label: &self
+                        .detail
+                        .as_deref()
+                        .map_or_else(|| state_label(self.state), sentence),
+                    #[watch]
+                    set_tooltip_text: self.detail.as_deref(),
                 },
             },
 
@@ -187,5 +215,26 @@ mod tests {
             state_icon(VpnState::Failed),
             state_icon(VpnState::Disconnected)
         );
+    }
+
+    #[test]
+    fn a_failure_reason_reads_as_a_sentence_on_its_own_line() {
+        assert_eq!(
+            sentence("wrong username or password"),
+            "Wrong username or password"
+        );
+        assert_eq!(sentence("  ärger am gateway "), "Ärger am gateway");
+    }
+
+    #[test]
+    fn a_reason_is_otherwise_shown_as_the_gateway_wrote_it() {
+        // Only the first letter is touched: an administrator's casing, an
+        // acronym, or a message already capitalised passes through.
+        assert_eq!(
+            sentence("Authentication failed: Invalid username or password"),
+            "Authentication failed: Invalid username or password"
+        );
+        assert_eq!(sentence("HTTP 403 from gateway"), "HTTP 403 from gateway");
+        assert_eq!(sentence("   "), "");
     }
 }

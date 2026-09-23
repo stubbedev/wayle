@@ -68,8 +68,14 @@ CHALLENGE = f"""<?xml version="1.0" encoding="UTF-8" ?>
 <challenge><respmsg>Approve the push on your phone</respmsg>
 <inputstr>{CHALLENGE_TOKEN}</inputstr></challenge>"""
 
-REJECTED = """<?xml version="1.0" encoding="UTF-8" ?>
-<response status="error"><msg>Invalid username or password</msg></response>"""
+# How PAN-OS refuses a login: the custom 512 status, its reason header, and the
+# three lines of script openconnect's `parse_javascript` reads instead of XML.
+# The XML `<msg>` document this mock used to send is a shape no gateway writes,
+# which is how every real refusal came to read as "rejected the login".
+REJECTED = """var respStatus = "Error";
+var respMsg = "Authentication failed: Invalid username or password ";
+thisForm.inputStr.value = "";
+"""
 
 CONFIG_SUCCESS = """<?xml version="1.0" encoding="UTF-8" ?>
 <response status="success"><ip-address>192.168.241.222</ip-address>
@@ -157,6 +163,15 @@ class Gateway(BaseHTTPRequestHandler):
         encoded = body.encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/xml")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _refuse(self) -> None:
+        encoded = REJECTED.encode()
+        self.send_response(512)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("x-private-pan-globalprotect", "auth-failed")
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
@@ -304,19 +319,22 @@ class Gateway(BaseHTTPRequestHandler):
         field = lambda key: form.get(key, [""])[0]  # noqa: E731
 
         if field("user") != USER:
-            self._reply(REJECTED)
+            self._refuse()
             return
 
         # First post carries the password and no challenge token; the answer to
         # the challenge comes back in the same `passwd` field.
         if not field("inputStr"):
-            self._reply(CHALLENGE if field("passwd") == PASSWORD else REJECTED)
+            if field("passwd") == PASSWORD:
+                self._reply(CHALLENGE)
+            else:
+                self._refuse()
             return
 
         if field("inputStr") == CHALLENGE_TOKEN and field("passwd") == CHALLENGE_ANSWER:
             self._reply(success(field("computer")))
             return
-        self._reply(REJECTED)
+        self._refuse()
 
 
 def main() -> None:

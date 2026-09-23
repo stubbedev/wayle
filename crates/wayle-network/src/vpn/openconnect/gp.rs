@@ -138,6 +138,133 @@ fn login_body(
     ])
 }
 
+/// The custom status a GlobalProtect gateway answers a bad username or
+/// password with. openconnect's `do_https_request` maps it to `-EACCES`, the
+/// one refusal it treats as "ask for the password again".
+const STATUS_BAD_CREDENTIALS: u16 = 512;
+
+/// The header PAN-OS names its reason for a refusal in, next to whatever the
+/// body says.
+const REASON_HEADER: &str = "x-private-pan-globalprotect";
+
+/// A login reply as it came off the wire: the parts a refusal can hide its
+/// reason in, besides the body.
+#[derive(Debug, Clone, Copy)]
+struct Reply<'a> {
+    status: u16,
+    /// The [`REASON_HEADER`] value, when the gateway sent one.
+    reason: Option<&'a str>,
+    body: &'a str,
+}
+
+impl<'a> Reply<'a> {
+    /// A 200 reply with this body and no reason header, which is how a gateway
+    /// answers everything that is not a bad password.
+    #[cfg(test)]
+    fn ok(body: &'a str) -> Self {
+        Self {
+            status: 200,
+            reason: None,
+            body,
+        }
+    }
+}
+
+/// What the JavaScript-shaped reply some gateways write says.
+///
+/// openconnect's `parse_javascript`: GlobalProtect gateways send challenges,
+/// and refusals, as three lines of script instead of XML, sometimes wrapped in
+/// an HTML page, with no warning which shape is coming.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Script {
+    Challenge { prompt: String, input_str: String },
+    Error(String),
+}
+
+/// Reads `var respStatus = "…"; var respMsg = "…"; thisForm.inputStr.value =
+/// "…";` out of a reply, wherever in it the script sits.
+///
+/// An `Error` needs no `inputStr`: it has nothing to be echoed back, and a
+/// refusal is worth reading even from a gateway that leaves the line off. A
+/// `Challenge` without one cannot be answered, so it is not one.
+fn parse_script(body: &str) -> Option<Script> {
+    const STATUS: &str = "var respStatus = \"";
+    const MESSAGE: &str = "var respMsg = \"";
+    const INPUT_STR: &str = "thisForm.inputStr.value = \"";
+
+    let rest = &body[body.find(STATUS)? + STATUS.len()..];
+    let (status, rest) = rest.split_once('"')?;
+    let rest = &rest[rest.find(MESSAGE)? + MESSAGE.len()..];
+    let (message, rest) = script_string(rest)?;
+
+    if status.starts_with("Error") {
+        return Some(Script::Error(message));
+    }
+    if !status.starts_with("Challenge") {
+        return None;
+    }
+    let rest = &rest[rest.find(INPUT_STR)? + INPUT_STR.len()..];
+    let (input_str, _) = rest.split_once('"')?;
+    Some(Script::Challenge {
+        prompt: message,
+        input_str: String::from(input_str),
+    })
+}
+
+/// The contents of a double-quoted script string, unescaped, and what follows
+/// its closing quote.
+fn script_string(raw: &str) -> Option<(String, &str)> {
+    let mut out = String::new();
+    let mut chars = raw.char_indices();
+    while let Some((at, character)) = chars.next() {
+        match character {
+            '"' => return Some((out, &raw[at + 1..])),
+            '\\' => match chars.next()?.1 {
+                'n' => out.push('\n'),
+                't' => out.push('\t'),
+                other => out.push(other),
+            },
+            other => out.push(other),
+        }
+    }
+    None
+}
+
+/// Why the gateway refused, in the best words the reply has.
+///
+/// The body's own message first, in whichever of its shapes it came — the
+/// `<error>` of a `<response status="error">`, a prelogin-style `<msg>`, or
+/// the script's `respMsg` — because that is the administrator's wording. A
+/// bare 512 is openconnect's "invalid username or password" even with nothing
+/// written around it. Past that, PAN's reason header, and last the status, so
+/// a refusal nobody explained still says *something* a person can search for.
+fn refusal(reply: Reply<'_>) -> Error {
+    let from_body = match parse_script(reply.body) {
+        Some(Script::Error(message)) => Some(message),
+        _ => xml::values(reply.body, "error")
+            .into_iter()
+            .chain(xml::value(reply.body, "msg"))
+            .find(|message| !message.trim().is_empty()),
+    };
+    if let Some(message) = from_body {
+        return auth_error(message.trim());
+    }
+    if reply.status == STATUS_BAD_CREDENTIALS {
+        return auth_error("wrong username or password");
+    }
+    if let Some(reason) = reply
+        .reason
+        .map(str::trim)
+        .filter(|reason| !reason.is_empty())
+    {
+        return auth_error(&format!("the gateway refused the sign-in ({reason})"));
+    }
+    auth_error(&format!(
+        "the gateway refused the sign-in without saying why (HTTP {})",
+        reply.status
+    ))
+}
+
 /// Reads a gateway's answer to a login post.
 ///
 /// # Errors
@@ -145,7 +272,27 @@ fn login_body(
 /// Returns an error when the gateway reported one, when it demanded SAML —
 /// which needs a browser wayle deliberately does not embed — or when the reply
 /// is not a shape this code knows.
-fn parse_login(body: &str, gateway: &str, computer: &str, gwcert: &str) -> Result<Step, Error> {
+fn parse_login(
+    reply: Reply<'_>,
+    gateway: &str,
+    computer: &str,
+    gwcert: &str,
+) -> Result<Step, Error> {
+    let body = reply.body;
+    match parse_script(body) {
+        Some(Script::Challenge { prompt, input_str }) => {
+            return Ok(Step::Challenge { prompt, input_str });
+        }
+        Some(Script::Error(_)) => return Err(refusal(reply)),
+        None => {}
+    }
+
+    // A 512 is a refusal whatever its body looks like; nothing in it is a
+    // cookie or a challenge to be answered.
+    if reply.status == STATUS_BAD_CREDENTIALS {
+        return Err(refusal(reply));
+    }
+
     if let Some(input_str) = xml::value(body, "inputstr") {
         let prompt = xml::value(body, "respmsg").unwrap_or_default();
         return Ok(Step::Challenge { prompt, input_str });
@@ -160,10 +307,7 @@ fn parse_login(body: &str, gateway: &str, computer: &str, gwcert: &str) -> Resul
                 "this gateway requires SAML sign-in, which wayle cannot do yet",
             ));
         }
-        let message = xml::value(body, "msg")
-            .filter(|message| !message.is_empty())
-            .unwrap_or_else(|| String::from("the gateway rejected the login"));
-        return Err(auth_error(&message));
+        return Err(refusal(reply));
     }
 
     let named = name_arguments(&arguments);
@@ -332,6 +476,11 @@ pub(super) async fn login(
     // status is only interesting when it is a real transport failure — most
     // usefully 404, which is what a portal-only host says to a gateway login.
     let status = response.status();
+    let reason = response
+        .headers()
+        .get(REASON_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(String::from);
     let body = response.text().await.map_err(|error| {
         Error::VpnSignInIncomplete(format!("cannot read the gateway's reply: {error}"))
     })?;
@@ -342,7 +491,12 @@ pub(super) async fn login(
         ));
     }
 
-    parse_login(&body, gateway, computer, &gwcert)
+    let reply = Reply {
+        status: status.as_u16(),
+        reason: reason.as_deref(),
+        body: &body,
+    };
+    parse_login(reply, gateway, computer, &gwcert)
 }
 
 /// What a gateway says when asked to use a cookie again.
@@ -513,7 +667,7 @@ mod tests {
     #[test]
     fn a_successful_login_becomes_openconnects_cookie_string() {
         let step = parse_login(
-            &success_xml("tunnel", "4100"),
+            Reply::ok(&success_xml("tunnel", "4100")),
             "vpn.example.com",
             "laptop",
             PIN,
@@ -556,7 +710,7 @@ mod tests {
     #[test]
     fn a_reply_that_is_not_a_tunnel_is_refused_rather_than_used() {
         let error = parse_login(
-            &success_xml("not-a-tunnel", "4100"),
+            Reply::ok(&success_xml("not-a-tunnel", "4100")),
             "vpn.example.com",
             "laptop",
             PIN,
@@ -574,7 +728,7 @@ mod tests {
         // protocol; its argument list cannot be trusted to be this one.
         assert!(
             parse_login(
-                &success_xml("tunnel", "5000"),
+                Reply::ok(&success_xml("tunnel", "5000")),
                 "vpn.example.com",
                 "laptop",
                 PIN
@@ -587,7 +741,8 @@ mod tests {
     fn a_challenge_is_recognised_with_its_own_wording() {
         let xml = "<challenge><respmsg>Enter your token code</respmsg>\
                    <inputstr>CHALLENGE-1</inputstr></challenge>";
-        let step = parse_login(xml, "vpn.example.com", "laptop", PIN).expect("challenge");
+        let step =
+            parse_login(Reply::ok(xml), "vpn.example.com", "laptop", PIN).expect("challenge");
         assert_eq!(
             step,
             Step::Challenge {
@@ -601,7 +756,7 @@ mod tests {
     fn a_challenge_is_not_mistaken_for_a_success() {
         let xml = "<challenge><inputstr>C</inputstr></challenge>";
         assert!(!matches!(
-            parse_login(xml, "vpn.example.com", "laptop", PIN),
+            parse_login(Reply::ok(xml), "vpn.example.com", "laptop", PIN),
             Ok(Step::Authenticated(_))
         ));
     }
@@ -609,11 +764,147 @@ mod tests {
     #[test]
     fn a_rejection_surfaces_the_gateways_own_message() {
         let xml = "<response status=\"error\"><msg>Invalid username or password</msg></response>";
-        let error = parse_login(xml, "vpn.example.com", "laptop", PIN).expect_err("rejected");
+        let error =
+            parse_login(Reply::ok(xml), "vpn.example.com", "laptop", PIN).expect_err("rejected");
         assert!(
             error.to_string().contains("Invalid username or password"),
             "got: {error}"
         );
+    }
+
+    /// The reason a refused login is reported with.
+    fn refused(reply: Reply<'_>) -> String {
+        let error = parse_login(reply, "vpn.example.com", "laptop", PIN)
+            .expect_err("the gateway refused this login");
+        assert!(
+            matches!(error, Error::VpnAuthenticationFailed(_)),
+            "a refusal must discredit the password: {error:?}"
+        );
+        error.to_string()
+    }
+
+    #[test]
+    fn an_error_document_surfaces_its_error_element() {
+        // openconnect's `<response status="error"><error>…</error>` shape,
+        // which the old reader skipped for want of a `<msg>`.
+        let xml = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\
+            <response status=\"error\">\
+            <error>Authentication failed: Invalid username or password</error></response>";
+        assert_eq!(
+            refused(Reply::ok(xml)),
+            "Authentication failed: Invalid username or password"
+        );
+    }
+
+    const SCRIPT_ERROR: &str = "var respStatus = \"Error\";\n\
+        var respMsg = \"Authentication failed: Invalid username or password \";\n\
+        thisForm.inputStr.value = \"\";\n";
+
+    #[test]
+    fn a_script_shaped_refusal_surfaces_its_message() {
+        assert_eq!(
+            refused(Reply::ok(SCRIPT_ERROR)),
+            "Authentication failed: Invalid username or password"
+        );
+    }
+
+    #[test]
+    fn a_script_refusal_wrapped_in_html_is_still_read() {
+        let html = format!("<html><head></head><body>{SCRIPT_ERROR}</body></html>");
+        assert_eq!(
+            refused(Reply::ok(&html)),
+            "Authentication failed: Invalid username or password"
+        );
+    }
+
+    #[test]
+    fn a_script_shaped_challenge_is_answered_like_an_xml_one() {
+        let script = "var respStatus = \"Challenge\";\n\
+            var respMsg = \"Enter the \\\"code\\\" from your phone\";\n\
+            thisForm.inputStr.value = \"CHALLENGE-1\";\n";
+        assert_eq!(
+            parse_login(Reply::ok(script), "vpn.example.com", "laptop", PIN).expect("challenge"),
+            Step::Challenge {
+                prompt: String::from("Enter the \"code\" from your phone"),
+                input_str: String::from("CHALLENGE-1"),
+            }
+        );
+    }
+
+    #[test]
+    fn a_script_challenge_with_no_token_is_not_a_challenge() {
+        // Nothing to echo back means nothing to answer: prompting for a code
+        // the gateway could never match would waste the user's second factor.
+        let script = "var respStatus = \"Challenge\";\nvar respMsg = \"Enter code\";\n";
+        assert!(!matches!(
+            parse_login(Reply::ok(script), "vpn.example.com", "laptop", PIN),
+            Ok(Step::Challenge { .. })
+        ));
+    }
+
+    #[test]
+    fn a_bare_512_is_a_wrong_password() {
+        let reply = Reply {
+            status: STATUS_BAD_CREDENTIALS,
+            reason: None,
+            body: "",
+        };
+        assert_eq!(refused(reply), "wrong username or password");
+    }
+
+    #[test]
+    fn a_512_is_a_refusal_whatever_its_body_looks_like() {
+        let body = success_xml("tunnel", "4100");
+        let reply = Reply {
+            status: STATUS_BAD_CREDENTIALS,
+            reason: None,
+            body: &body,
+        };
+        assert_eq!(refused(reply), "wrong username or password");
+    }
+
+    #[test]
+    fn the_bodys_wording_wins_over_the_status_and_the_header() {
+        let reply = Reply {
+            status: STATUS_BAD_CREDENTIALS,
+            reason: Some("auth-failed"),
+            body: SCRIPT_ERROR,
+        };
+        assert_eq!(
+            refused(reply),
+            "Authentication failed: Invalid username or password"
+        );
+    }
+
+    #[test]
+    fn pans_reason_header_explains_a_refusal_with_an_empty_body() {
+        let reply = Reply {
+            status: 200,
+            reason: Some("auth-failed"),
+            body: "<response status=\"error\"></response>",
+        };
+        assert_eq!(
+            refused(reply),
+            "the gateway refused the sign-in (auth-failed)"
+        );
+    }
+
+    #[test]
+    fn an_unexplained_refusal_names_its_status_instead_of_saying_nothing() {
+        let reason = refused(Reply {
+            status: 403,
+            reason: None,
+            body: "<html>denied</html>",
+        });
+        assert!(reason.contains("HTTP 403"), "got: {reason}");
+        assert!(!reason.contains("rejected the login"), "got: {reason}");
+    }
+
+    #[test]
+    fn blank_messages_are_skipped_for_ones_that_say_something() {
+        let xml =
+            "<response status=\"error\"><error>  </error><msg>Account locked</msg></response>";
+        assert_eq!(refused(Reply::ok(xml)), "Account locked");
     }
 
     /// The real response from a form-authenticating gateway.
@@ -695,14 +986,15 @@ mod tests {
     fn a_saml_portal_says_so_instead_of_reading_as_malformed() {
         let xml = "<prelogin-response><saml-auth-method>REDIRECT</saml-auth-method>\
                    <saml-request>aHR0cHM6Ly9pZHA=</saml-request></prelogin-response>";
-        let error = parse_login(xml, "vpn.example.com", "laptop", PIN).expect_err("saml");
+        let error =
+            parse_login(Reply::ok(xml), "vpn.example.com", "laptop", PIN).expect_err("saml");
         assert!(error.to_string().contains("SAML"), "got: {error}");
     }
 
     #[test]
     fn a_login_without_a_cookie_is_a_failure_not_an_empty_success() {
         let xml = success_xml("tunnel", "4100").replace("AUTHCOOKIEVALUE", "");
-        assert!(parse_login(&xml, "vpn.example.com", "laptop", PIN).is_err());
+        assert!(parse_login(Reply::ok(&xml), "vpn.example.com", "laptop", PIN).is_err());
     }
 
     #[test]

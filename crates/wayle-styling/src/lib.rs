@@ -350,6 +350,45 @@ mod tests {
             .collect()
     }
 
+    /// The declarations of the compiled rule with exactly this selector.
+    fn rule<'a>(css: &'a str, selector: &str) -> Option<&'a str> {
+        let start = css.find(&format!("{selector} {{"))? + selector.len() + 2;
+        let end = start + css[start..].find('}')?;
+        Some(&css[start..end])
+    }
+
+    /// Sections in the network dropdown are spaced by their labels, and the
+    /// credential prompt has none: without its own top margin it sat flush
+    /// against the connection card above it while keeping the VPN label's gap
+    /// below. Only when something precedes it, though — as the dropdown's first
+    /// visible child it would push the whole content down.
+    #[test]
+    fn the_credential_prompt_is_spaced_like_a_section_below_whatever_precedes_it() {
+        let spaced = rule(
+            STATIC_CSS,
+            ".dropdown-content > .network-secret-card:not(:first-child)",
+        )
+        .expect("the credential prompt has a rule of its own");
+        assert!(
+            spaced.contains("margin-top: var(--space-lg)"),
+            "got: {spaced}"
+        );
+
+        assert!(
+            rule(STATIC_CSS, ".network-secret-card").is_none()
+                && rule(STATIC_CSS, ".network-password-card")
+                    .is_some_and(|card| !card.contains("margin-top")),
+            "an unconditional top margin would also push down a prompt that opens the dropdown"
+        );
+    }
+
+    #[test]
+    fn a_failed_vpn_rows_reason_is_coloured_as_an_error() {
+        let failed = rule(STATIC_CSS, ".vpn-item .network-item-security.failed")
+            .expect("the failed row has a rule");
+        assert!(failed.contains("var(--status-error)"), "got: {failed}");
+    }
+
     /// GTK drops a whole declaration whose `var()` names nothing, so a typo'd
     /// or never-added token silently zeroes every margin in the rule — the
     /// network dropdown's section headings sat flush against their neighbours

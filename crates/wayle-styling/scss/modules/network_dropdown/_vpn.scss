@@ -136,3 +136,19 @@ button.network-vpn-edit {
 .network-password-card.network-vpn-form {
     margin-top: var(--space-lg);
 }
+
+// The credential prompt sits between the active-connections list and the VPN
+// section, and sections are spaced by their labels' `--space-lg`. The card has
+// no label, so it got the VPN label's gap below it and nothing above: it sat
+// flush against the connection card. `:not(:first-child)` because with nothing
+// connected the prompt is the first thing in the dropdown, and GTK skips the
+// hidden active-connections box when it matches that.
+.dropdown-content > .network-secret-card:not(:first-child) {
+    margin-top: var(--space-lg);
+}
+
+// A failed VPN row's reason, in the gateway's words, where the state word
+// would be.
+.vpn-item .network-item-security.failed {
+    color: var(--status-error);
+}
