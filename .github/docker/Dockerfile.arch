@@ -5,10 +5,12 @@ FROM archlinux:base-devel
 
 # jq: config-schema diff. github-cli: release uploads. mold: fast linker.
 # cargo-nextest: test runner (`just test`, CI).
+# python: runs the VPN mock gateways for the #[ignore]d sign-in tests.
 RUN pacman --noconfirm --needed -Syu \
         git \
         github-cli \
         rustup \
+        python \
         clang \
         gtk4 \
         gtk4-layer-shell \

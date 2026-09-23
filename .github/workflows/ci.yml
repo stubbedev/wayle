@@ -102,6 +102,30 @@ jobs:
             - name: Run tests
               run: cargo nextest run --workspace --no-fail-fast
 
+            # The VPN sign-in tests need a gateway to talk to, so they are
+            # #[ignore]d in the normal suite and the gateways are started
+            # here directly with python — container jobs have no docker, and
+            # gateway.py needs nothing but the interpreter. Same gateways,
+            # same ports, as `just test-gateway` runs locally against the
+            # compose file; see crates/wayle-network/tests/mock-gateway.
+            - name: Run the VPN mock-gateway tests
+              run: |
+                  command -v python3 >/dev/null 2>&1 || pacman -Sy --noconfirm python
+                  gateways=()
+                  for spec in form:8443 saml:8444 anyconnect:8445 fortinet:8446 array:8447; do
+                      MODE=${spec%%:*} PORT=${spec##*:} \
+                          python3 crates/wayle-network/tests/mock-gateway/gateway.py &
+                      gateways+=("$!")
+                  done
+                  trap 'kill "${gateways[@]}" 2>/dev/null || true' EXIT
+                  # The last one to bind is the readiness signal, like
+                  # `just test-gateway` polls it.
+                  for _ in $(seq 30); do
+                      (exec 3<>/dev/tcp/127.0.0.1/8447) 2>/dev/null && break
+                      sleep 0.5
+                  done
+                  cargo nextest run -p wayle-network --run-ignored all --no-fail-fast -E 'test(mock::)'
+
             - name: Run doctests
               run: cargo test --doc --workspace
 
