@@ -209,6 +209,13 @@ craneLib.buildPackage (
         $out/share/wayle/xdg-desktop-portal-wayle.service \
         --replace-fail /usr/bin/wayle "$out/bin/wayle"
       install -Dm0644 resources/wayle-portals.conf -t $out/share/wayle
+
+      # NetworkManager vpn-pre-down hook that keeps an openconnect gateway
+      # session alive across a disconnect, so wayle's cached cookie survives
+      # a suspend. Installed where NetworkManager looks for packaged hooks;
+      # the NixOS module wires it up, other hosts link it into /etc.
+      install -Dm0755 resources/90-wayle-openconnect-detach \
+        -t $out/lib/NetworkManager/dispatcher.d/pre-down.d
     '';
 
     meta = {

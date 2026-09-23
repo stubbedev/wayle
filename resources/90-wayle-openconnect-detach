@@ -1,0 +1,38 @@
+#!/bin/sh
+# NetworkManager vpn-pre-down hook: detach openconnect instead of letting the
+# plugin log the session off.
+#
+# NetworkManager-openconnect stops openconnect with SIGINT, on which openconnect
+# posts the protocol's logout first. The gateway then kills the session, the
+# cookie wayle cached for it dies with it, and every reconnect — above all the
+# one after a suspend — costs a fresh second factor. SIGHUP is openconnect's
+# disconnect-without-logout: the tunnel goes down, the session stays valid until
+# the gateway's own idle timeout, and wayle's cached cookie brings it back.
+#
+# vpn-pre-down is dispatched, and waited for, before NetworkManager asks the
+# plugin to disconnect, so by the time the plugin's SIGINT lands there is
+# nothing left to log out. This needs root, which is why it is a dispatcher
+# hook rather than something wayle can do itself: openconnect runs as the
+# plugin's user, and the plugin has no option for how it stops it.
+#
+# $1 is the VPN's IP interface, $2 the action.
+
+[ "$2" = vpn-pre-down ] || exit 0
+iface=$1
+[ -n "$iface" ] || exit 0
+
+for pid in $(pgrep -x openconnect); do
+  # The plugin names the tunnel interface with --interface; matching on it
+  # is what keeps a second, unrelated openconnect out of this.
+  tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null |
+    awk -v iface="$iface" 'prev == "--interface" && $0 == iface { found = 1 } { prev = $0 } END { exit !found }' ||
+    continue
+  kill -HUP "$pid" 2>/dev/null || continue
+  # NetworkManager holds the disconnect until this returns: wait for the
+  # detach to finish rather than race the plugin's SIGINT, but not forever.
+  for _ in $(seq 50); do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+  done
+done
+exit 0

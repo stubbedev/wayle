@@ -320,6 +320,26 @@ in
           Slice = "session.slice";
         };
       };
+
+      # Keeps an openconnect gateway session alive across a disconnect or a
+      # suspend, so wayle's cached cookie reconnects without a second factor.
+      # NixOS's dispatcher only runs the scripts listed here, not the
+      # package's lib/NetworkManager copy, and runs them without a PATH.
+      networking.networkmanager.dispatcherScripts = lib.mkIf config.networking.networkmanager.enable [
+        {
+          type = "pre-down";
+          source = pkgs.writeShellScript "90-wayle-openconnect-detach" ''
+            export PATH=${
+              lib.makeBinPath [
+                pkgs.coreutils
+                pkgs.gawk
+                pkgs.procps
+              ]
+            }
+            exec ${cfg.package}/lib/NetworkManager/dispatcher.d/pre-down.d/90-wayle-openconnect-detach "$@"
+          '';
+        }
+      ];
     }
 
     (lib.mkIf cfg.portal.enable {

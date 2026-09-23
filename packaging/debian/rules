@@ -21,6 +21,9 @@ override_dh_auto_install:
 	install -d debian/wayle/usr/lib/systemd/user
 	install -m 0644 wayle.service debian/wayle/usr/lib/systemd/user/wayle.service
 
+	install -d debian/wayle/usr/lib/NetworkManager/dispatcher.d/pre-down.d
+	install -m 0755 90-wayle-openconnect-detach debian/wayle/usr/lib/NetworkManager/dispatcher.d/pre-down.d/90-wayle-openconnect-detach
+
 	install -d debian/wayle/usr/share/applications
 	install -m 0644 com.wayle.settings.desktop debian/wayle/usr/share/applications/com.wayle.settings.desktop
 	desktop-file-validate debian/wayle/usr/share/applications/com.wayle.settings.desktop

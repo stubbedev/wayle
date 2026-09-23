@@ -14,6 +14,9 @@
 //!   subscription per *currently active* VPN, because a tunnel going from
 //!   `activating` to `activated` never changes the list it is in.
 //!
+//! Tunnels that were up when the machine slept are brought back on wake; see
+//! [`resume`].
+//!
 //! Credentials — passwords, 2FA challenges, session cookies — are not handled
 //! here. NM asks a registered secret agent for those; see [`crate::agent`].
 
@@ -21,6 +24,7 @@ pub mod kinds;
 mod nm;
 pub(crate) mod openconnect;
 pub mod profile;
+mod resume;
 pub mod wg_keys;
 pub mod wg_quick;
 
@@ -199,6 +203,11 @@ impl VpnService {
             cancellation_token: token,
         };
         service.spawn_profile_watcher(settings, &connection);
+        resume::spawn(
+            connection.clone(),
+            service.entries.clone(),
+            service.cancellation_token.child_token(),
+        );
         service.spawn_active_watcher(connection);
         service.spawn_failure_watcher(agent);
         service
