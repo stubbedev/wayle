@@ -41,6 +41,8 @@ install -m 0644 wayle.service %{buildroot}%{_userunitdir}/wayle.service
 
 install -d %{buildroot}%{_prefix}/lib/NetworkManager/dispatcher.d/pre-down.d
 install -m 0755 90-wayle-openconnect-detach %{buildroot}%{_prefix}/lib/NetworkManager/dispatcher.d/pre-down.d/90-wayle-openconnect-detach
+install -d %{buildroot}%{_unitdir}/NetworkManager.service.d
+install -m 0644 90-wayle-openconnect-detach.conf %{buildroot}%{_unitdir}/NetworkManager.service.d/90-wayle-openconnect-detach.conf
 
 install -d %{buildroot}%{_datadir}/applications
 install -m 0644 com.wayle.settings.desktop %{buildroot}%{_datadir}/applications/com.wayle.settings.desktop
@@ -69,6 +71,7 @@ install -m 0644 completions/wayle.fish %{buildroot}%{_datadir}/fish/vendor_compl
 %{_bindir}/wayle-settings
 %{_userunitdir}/wayle.service
 %{_prefix}/lib/NetworkManager/dispatcher.d/pre-down.d/90-wayle-openconnect-detach
+%{_unitdir}/NetworkManager.service.d/90-wayle-openconnect-detach.conf
 %{_datadir}/applications/com.wayle.settings.desktop
 %{_datadir}/applications/com.wayle.vpn-sso-callback.desktop
 %{_datadir}/icons/hicolor/scalable/apps/wayle-settings.svg

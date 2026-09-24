@@ -297,3 +297,36 @@ fn a_suspend_with_no_tunnels_still_succeeds() -> TestResult {
     let _ = fs::remove_dir_all(&dir);
     Ok(())
 }
+
+#[test]
+fn networkmanager_stopping_detaches_every_tunnel_it_runs() -> TestResult {
+    // Run as NetworkManager.service's ExecStop=, while NM is still up and
+    // awake: a restart would otherwise stop the plugins, and openconnect log
+    // the session off.
+    let dir = scratch("nm-stop")?;
+    let mut tunnel = fake_openconnect(&dir, "wayletest8")?;
+    let reaper = thread::spawn(move || tunnel.wait());
+    let unlisted = fake_openconnect(&dir, "wayletest9")?;
+
+    run_hook_with_nm(&dir, "connected", &["wayletest8"], "", "nm-stop")?;
+
+    assert_eq!(signal_within(&dir, "wayletest8").as_deref(), Some("HUP"));
+    assert_eq!(
+        signal_seen(&dir, "wayletest9"),
+        None,
+        "the hook signalled an openconnect on an interface NM does not list"
+    );
+    let _ = reaper.join();
+    stop(unlisted);
+    let _ = fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn networkmanager_stopping_with_no_tunnels_still_succeeds() -> TestResult {
+    // A failing ExecStop= would be logged against every NetworkManager stop.
+    let dir = scratch("nm-stop-empty")?;
+    run_hook_with_nm(&dir, "connected", &[], "", "nm-stop")?;
+    let _ = fs::remove_dir_all(&dir);
+    Ok(())
+}

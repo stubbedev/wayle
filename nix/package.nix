@@ -216,6 +216,12 @@ craneLib.buildPackage (
       # the NixOS module wires it up, other hosts link it into /etc.
       install -Dm0755 resources/90-wayle-openconnect-detach \
         -t $out/lib/NetworkManager/dispatcher.d/pre-down.d
+      # The same hook as NetworkManager.service's ExecStop=, so a restart of
+      # NetworkManager detaches the tunnels instead of logging them off.
+      install -d $out/lib/systemd/system/NetworkManager.service.d
+      substitute resources/90-wayle-openconnect-detach.conf \
+        $out/lib/systemd/system/NetworkManager.service.d/90-wayle-openconnect-detach.conf \
+        --replace-fail /usr/lib/NetworkManager "$out/lib/NetworkManager"
     '';
 
     meta = {

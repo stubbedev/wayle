@@ -28,7 +28,7 @@ mod resume;
 pub mod wg_keys;
 pub mod wg_quick;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use futures::StreamExt;
 use tokio::sync::Mutex;
@@ -42,7 +42,10 @@ use crate::{
     agent::SecretAgentState,
     core::{settings::Settings, settings_connection::ConnectionSettings},
     proxy::{active_connection::ConnectionActiveProxy, manager::NetworkManagerProxy},
-    types::{connectivity::ConnectionType, states::NMActiveConnectionState},
+    types::{
+        connectivity::ConnectionType,
+        states::{NMActiveConnectionState, NMActiveConnectionStateReason},
+    },
 };
 
 /// The state of one VPN, as shown in the bar and the dropdown.
@@ -93,6 +96,14 @@ pub struct Vpn {
     pub state: Property<VpnState>,
     /// Why the last attempt failed, when it did.
     pub detail: Property<Option<String>>,
+    /// When the tunnel last stopped being up, if it has not come up since.
+    /// A restart of NetworkManager takes the tunnels down just before it goes
+    /// away; this is what finds those afterwards. See [`resume`].
+    went_down_at: Property<Option<Instant>>,
+    /// Whether the tunnel is down because someone turned it off — from the
+    /// dropdown, or any other NM client — rather than because something took
+    /// it down. Such a tunnel is never brought back on its own.
+    turned_off: Property<bool>,
     /// The profile's Settings object path, which is what activation takes.
     path: OwnedObjectPath,
     connection: Connection,
@@ -128,6 +139,7 @@ impl Vpn {
         if self.state.get().is_connected() {
             return Ok(());
         }
+        self.turned_off.set(false);
         self.detail.set(None);
 
         match nm::activate(&self.connection, &self.path).await {
@@ -151,6 +163,7 @@ impl Vpn {
     /// Returns an error when NM refuses the deactivation.
     pub async fn disconnect(&self) -> Result<(), Error> {
         let _guard = self.toggle_lock.lock().await;
+        self.turned_off.set(true);
         nm::deactivate(&self.connection, &self.uuid).await
     }
 
@@ -206,6 +219,12 @@ impl VpnService {
         resume::spawn(
             connection.clone(),
             service.entries.clone(),
+            service.cancellation_token.child_token(),
+        );
+        resume::spawn_nm_restart(
+            connection.clone(),
+            service.entries.clone(),
+            service.aggregate.clone(),
             service.cancellation_token.child_token(),
         );
         service.spawn_active_watcher(connection);
@@ -440,6 +459,10 @@ fn build_entries(
                     |vpn| vpn.state.clone(),
                 ),
                 detail: carried.map_or_else(|| Property::new(None), |vpn| vpn.detail.clone()),
+                went_down_at: carried
+                    .map_or_else(|| Property::new(None), |vpn| vpn.went_down_at.clone()),
+                turned_off: carried
+                    .map_or_else(|| Property::new(false), |vpn| vpn.turned_off.clone()),
                 uuid,
                 path: profile.object_path.clone(),
                 connection: connection.clone(),
@@ -483,6 +506,14 @@ async fn resync(
             // "disconnected" with no explanation is exactly what the user
             // needed the reason for.
             None if vpn.state.get() != VpnState::Failed => {
+                // This can land before the tunnel's own last state change,
+                // so it stamps the way down too.
+                vpn.went_down_at.set(next_went_down_at(
+                    vpn.state.get(),
+                    VpnState::Disconnected,
+                    vpn.went_down_at.get(),
+                    Instant::now(),
+                ));
                 vpn.state.set(VpnState::Disconnected);
                 vpn.detail.set(None);
             }
@@ -515,6 +546,14 @@ fn spawn_state_watcher(
                     let Some(signal) = next else { break };
                     let Ok(args) = signal.args() else { continue };
                     let (state, detail) = resolve_state(args.state, args.reason);
+                    vpn.went_down_at.set(next_went_down_at(
+                        vpn.state.get(),
+                        state,
+                        vpn.went_down_at.get(),
+                        Instant::now(),
+                    ));
+                    vpn.turned_off
+                        .set(next_turned_off(vpn.turned_off.get(), state, args.reason));
                     vpn.state.set(state);
                     vpn.detail.set(merge_detail(vpn.detail.get(), detail));
                     aggregate.set(fold_states(&entries.get()));
@@ -537,6 +576,44 @@ fn resolve_state(state: u32, reason: u32) -> (VpnState, Option<String>) {
         return (VpnState::Failed, Some(text));
     }
     (mapped, None)
+}
+
+/// When the tunnel last stopped being up, after a transition from `before` to
+/// `after`.
+///
+/// Stamped on the way out of up — connected, or on its way — whatever comes
+/// next: NM passes through deactivating before it settles on how the tunnel
+/// ended, so which way it went down is read off the state it ends in, not off
+/// this transition. Coming up again clears it.
+fn next_went_down_at(
+    before: VpnState,
+    after: VpnState,
+    previous: Option<Instant>,
+    now: Instant,
+) -> Option<Instant> {
+    let up = |state: VpnState| state.is_connected() || state.is_connecting();
+    match (up(before), up(after)) {
+        (_, true) => None,
+        (true, false) => Some(now),
+        (false, false) => previous,
+    }
+}
+
+/// Whether the tunnel counts as turned off, after a state change to `after`
+/// carrying NM's `reason`.
+///
+/// NM's user-disconnected reason covers a deactivation from any client, not
+/// only the dropdown. Coming up again clears it; any other way down leaves it
+/// as it was, since NM repeats the last reason on later transitions.
+fn next_turned_off(previous: bool, after: VpnState, reason: u32) -> bool {
+    if after.is_connected() || after.is_connecting() {
+        return false;
+    }
+    previous
+        || matches!(
+            NMActiveConnectionStateReason::from_u32(reason),
+            NMActiveConnectionStateReason::UserDisconnected
+        )
 }
 
 /// A random RFC 4122 version-4 UUID, in the form NM stores.
@@ -612,8 +689,84 @@ pub fn deliver_sso_callback(uri: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
     use crate::types::states::NMActiveConnectionStateReason as Reason;
+
+    #[test]
+    fn leaving_up_stamps_when_the_tunnel_went_down() {
+        let now = Instant::now();
+        for before in [VpnState::Connected, VpnState::Connecting] {
+            for after in [VpnState::Disconnected, VpnState::Failed] {
+                assert_eq!(
+                    next_went_down_at(before, after, None, now),
+                    Some(now),
+                    "{before:?} -> {after:?} did not stamp"
+                );
+            }
+        }
+        // Deactivating reads as disconnected before NM settles on failed:
+        // the stamp from leaving up survives the second step.
+        let earlier = now.checked_sub(Duration::from_secs(1));
+        assert_eq!(
+            next_went_down_at(VpnState::Disconnected, VpnState::Failed, earlier, now),
+            earlier
+        );
+    }
+
+    #[test]
+    fn a_deactivation_someone_asked_for_turns_the_tunnel_off() {
+        assert!(next_turned_off(
+            false,
+            VpnState::Disconnected,
+            Reason::UserDisconnected as u32
+        ));
+        // Stays off through the rest of the teardown, whatever it reports.
+        assert!(next_turned_off(
+            true,
+            VpnState::Failed,
+            Reason::ServiceStopped as u32
+        ));
+    }
+
+    #[test]
+    fn a_tunnel_taken_down_or_brought_up_is_not_turned_off() {
+        for reason in [
+            Reason::ServiceStopped,
+            Reason::DeviceDisconnected,
+            Reason::None,
+        ] {
+            assert!(
+                !next_turned_off(false, VpnState::Failed, reason as u32),
+                "{reason:?} counted as turned off"
+            );
+        }
+        assert!(
+            !next_turned_off(true, VpnState::Connecting, Reason::UserDisconnected as u32),
+            "coming up again stayed turned off"
+        );
+    }
+
+    #[test]
+    fn coming_up_or_staying_down_does_not_stamp() {
+        let now = Instant::now();
+        let earlier = now.checked_sub(Duration::from_secs(1));
+        assert_eq!(
+            next_went_down_at(VpnState::Failed, VpnState::Connecting, earlier, now),
+            None,
+            "coming up again kept a stale stamp"
+        );
+        assert_eq!(
+            next_went_down_at(VpnState::Connecting, VpnState::Connected, None, now),
+            None
+        );
+        assert_eq!(
+            next_went_down_at(VpnState::Disconnected, VpnState::Failed, None, now),
+            None,
+            "a sign-in that never came up was stamped as a drop"
+        );
+    }
 
     #[test]
     fn aggregate_prefers_connected_then_connecting() {

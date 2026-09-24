@@ -23,8 +23,19 @@
 # with NetworkManager already asleep: that is the cue to detach every tunnel
 # NetworkManager runs, since all of them are about to go.
 #
+# NetworkManager stopping — a package upgrade restarting it, a shutdown — is
+# the same story without even a device pre-down: it stops the plugins, and
+# openconnect logs off. So this also runs as NetworkManager.service's
+# ExecStop=, which systemd runs before signalling NetworkManager, with the
+# action nm-stop: every tunnel goes, and is detached first.
+#
 # $1 is the interface — the VPN's IP interface for vpn-pre-down, a device for
-# pre-down — and $2 the action.
+# pre-down, unused for nm-stop — and $2 the action.
+
+# Each tunnel the plugin brought up is a tun device NetworkManager lists.
+nm_tuns() {
+  timeout 5 nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2 == "tun" { print $1 }'
+}
 
 case $2 in
 vpn-pre-down)
@@ -35,8 +46,10 @@ pre-down)
   # here says which tunnel, if any, rides it, and detaching one that rides
   # another device would take down a tunnel nothing else was touching.
   [ "$(timeout 5 nmcli -t -f STATE general 2>/dev/null)" = asleep ] || exit 0
-  # Each tunnel the plugin brought up is a tun device NetworkManager lists.
-  ifaces=$(timeout 5 nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2 == "tun" { print $1 }')
+  ifaces=$(nm_tuns)
+  ;;
+nm-stop)
+  ifaces=$(nm_tuns)
   ;;
 *)
   exit 0

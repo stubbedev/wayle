@@ -7,11 +7,19 @@
 //! a click takes, so the secret agent hands NM the cached session and a
 //! reconnect costs no second factor.
 //!
+//! A restart of NetworkManager — a package upgrade — is the same story: it
+//! takes the tunnels down on its way out and brings none of them back. So
+//! the tunnels NM was running when it went away are brought back once it
+//! returns, by the same path.
+//!
 //! Only tunnels that were up are restored. One the user had turned off stays
 //! off, and nothing is recorded across a reboot: the record lives in memory,
 //! so this can never become a VPN that dials itself unattended.
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use futures::StreamExt;
 use tokio::task::JoinHandle;
@@ -20,7 +28,7 @@ use tracing::{debug, info, warn};
 use wayle_core::Property;
 use zbus::{Connection, proxy};
 
-use super::{Vpn, nm};
+use super::{Vpn, VpnState, fold_states, nm};
 use crate::{
     Error,
     proxy::{active_connection::ConnectionActiveProxy, manager::NetworkManagerProxy},
@@ -50,6 +58,18 @@ const ATTEMPTS: usize = 5;
 
 /// Pause between attempts.
 const RETRY_DELAY: Duration = Duration::from_secs(3);
+
+/// How long before NetworkManager goes away a tunnel may have dropped and
+/// still count as taken down by NM stopping. Its stop detaches the tunnels
+/// first — the detach hook waits up to five seconds for openconnect — and
+/// NM then takes a few more to exit.
+const NM_STOP_WINDOW: Duration = Duration::from_secs(20);
+
+/// How long to give the secret agent to re-register with a NetworkManager
+/// that has just come back. Both follow the same bus signal; a tunnel
+/// activated before the agent is back gets no cached session to sign in
+/// with, and NM fails it for want of secrets.
+const AGENT_SETTLE: Duration = Duration::from_secs(2);
 
 /// Watches logind's sleep signal for as long as `token` is live.
 pub(super) fn spawn(
@@ -104,6 +124,114 @@ pub(super) fn spawn(
             pending = Some((tunnels, handle));
         }
     });
+}
+
+/// Watches NetworkManager's bus name for as long as `token` is live, and
+/// brings back the tunnels it was running when it went away.
+pub(super) fn spawn_nm_restart(
+    connection: Connection,
+    entries: Property<Vec<Arc<Vpn>>>,
+    aggregate: Property<VpnState>,
+    token: CancellationToken,
+) {
+    tokio::spawn(async move {
+        let Ok(dbus) = zbus::fdo::DBusProxy::new(&connection).await else {
+            warn!("cannot reach the bus; VPNs will not be restored after NetworkManager restarts");
+            return;
+        };
+        let Ok(mut changes) = dbus.receive_name_owner_changed().await else {
+            warn!("cannot watch NetworkManager; VPNs will not be restored after it restarts");
+            return;
+        };
+
+        let mut owed = Vec::new();
+        let mut restoring = token.child_token();
+        loop {
+            let signal = tokio::select! {
+                () = token.cancelled() => break,
+                next = changes.next() => match next {
+                    Some(signal) => signal,
+                    None => break,
+                },
+            };
+            let Ok(args) = signal.args() else { continue };
+            if args.name() != "org.freedesktop.NetworkManager" {
+                continue;
+            }
+
+            if args.old_owner().is_some() {
+                restoring.cancel();
+                let rows: Vec<_> = entries
+                    .get()
+                    .iter()
+                    .map(|vpn| Row {
+                        uuid: vpn.uuid.clone(),
+                        state: vpn.state.get(),
+                        went_down_at: vpn.went_down_at.get(),
+                        turned_off: vpn.turned_off.get(),
+                    })
+                    .collect();
+                owed = owed_after_nm_stop(&rows, Instant::now());
+                // Nothing runs a tunnel without NM, and the objects whose
+                // signals would have said so went away with it.
+                for vpn in entries.get() {
+                    if matches!(vpn.state.get(), VpnState::Connected | VpnState::Connecting) {
+                        vpn.state.set(VpnState::Disconnected);
+                    }
+                }
+                aggregate.set(fold_states(&entries.get()));
+                debug!(
+                    ?owed,
+                    "NetworkManager went away; recorded the VPNs it was running"
+                );
+            }
+
+            if args.new_owner().is_some() {
+                let tunnels = std::mem::take(&mut owed);
+                if tunnels.is_empty() {
+                    continue;
+                }
+                restoring = token.child_token();
+                let (connection, entries, restoring) =
+                    (connection.clone(), entries.clone(), restoring.clone());
+                tokio::spawn(async move {
+                    tokio::select! {
+                        () = restoring.cancelled() => return,
+                        () = tokio::time::sleep(AGENT_SETTLE) => {}
+                    }
+                    restore(connection, entries, tunnels, restoring).await;
+                });
+            }
+        }
+        restoring.cancel();
+    });
+}
+
+/// One VPN as NetworkManager went away.
+#[derive(Debug)]
+struct Row {
+    uuid: String,
+    state: VpnState,
+    went_down_at: Option<Instant>,
+    turned_off: bool,
+}
+
+/// Which tunnels to bring back once NetworkManager returns.
+///
+/// One still up went away with NM. One that went down within
+/// [`NM_STOP_WINDOW`] was taken down by NM stopping — unless someone turned
+/// it off, however recently, which keeps it off.
+fn owed_after_nm_stop(rows: &[Row], now: Instant) -> Vec<String> {
+    rows.iter()
+        .filter(|row| {
+            let up = row.state.is_connected() || row.state.is_connecting();
+            let dropped_just_now = row
+                .went_down_at
+                .is_some_and(|at| now.saturating_duration_since(at) <= NM_STOP_WINDOW);
+            up || (dropped_just_now && !row.turned_off)
+        })
+        .map(|row| row.uuid.clone())
+        .collect()
 }
 
 /// The next `PrepareForSleep` value, or `None` once the watch should end.
@@ -354,6 +482,60 @@ mod tests {
         assert!(
             carried_over(Vec::new(), Vec::new()).is_empty(),
             "dialled a tunnel nothing recorded"
+        );
+    }
+
+    fn row(uuid: &str, state: VpnState, went_down_at: Option<Instant>, turned_off: bool) -> Row {
+        Row {
+            uuid: String::from(uuid),
+            state,
+            went_down_at,
+            turned_off,
+        }
+    }
+
+    fn ago(now: Instant, secs: u64) -> Option<Instant> {
+        now.checked_sub(Duration::from_secs(secs))
+    }
+
+    #[test]
+    fn tunnels_networkmanager_took_with_it_are_owed() {
+        let now = Instant::now();
+        let owed = owed_after_nm_stop(
+            &[
+                // Still up as far as anyone heard: NM went away under it.
+                row("work", VpnState::Connected, None, false),
+                row("home", VpnState::Connecting, None, false),
+                // Detached by NM's stop a few seconds before it exited.
+                row("lab", VpnState::Failed, ago(now, 4), false),
+                // Same, but the active-connection list said so before the
+                // tunnel's own failure did.
+                row("dc", VpnState::Disconnected, ago(now, 3), false),
+            ],
+            now,
+        );
+        assert_eq!(owed, ["work", "home", "lab", "dc"]);
+    }
+
+    #[test]
+    fn tunnels_down_for_another_reason_are_not_owed() {
+        let now = Instant::now();
+        let owed = owed_after_nm_stop(
+            &[
+                // Turned off by the user, just before the restart.
+                row("work", VpnState::Disconnected, ago(now, 1), true),
+                row("vpn2", VpnState::Failed, ago(now, 1), true),
+                // Failed long before NM stopped: not NM's doing.
+                row("home", VpnState::Failed, ago(now, 600), false),
+                // Failed without ever having been up: a refused sign-in.
+                row("lab", VpnState::Failed, None, false),
+                row("idle", VpnState::Disconnected, None, false),
+            ],
+            now,
+        );
+        assert!(
+            owed.is_empty(),
+            "owed a tunnel NM did not take down: {owed:?}"
         );
     }
 

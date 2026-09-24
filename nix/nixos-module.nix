@@ -13,6 +13,21 @@ let
   # writable by the greetd user (`greeter`); the tmpfiles rule below creates it.
   greeterStateDir = "/var/lib/wayle-greeter";
 
+  # The openconnect detach hook with the PATH it needs: NixOS's dispatcher runs
+  # scripts without one, and so does systemd's ExecStop=.
+  openconnectDetach = pkgs.writeShellScript "90-wayle-openconnect-detach" ''
+    export PATH=${
+      lib.makeBinPath [
+        pkgs.coreutils
+        pkgs.gawk
+        pkgs.procps
+        # It asks NM whether it is going to sleep, and which tunnels it runs.
+        config.networking.networkmanager.package
+      ]
+    }
+    exec ${cfg.package}/lib/NetworkManager/dispatcher.d/pre-down.d/90-wayle-openconnect-detach "$@"
+  '';
+
   # Forces both render layers onto their software paths: wlroots' pixman
   # renderer (DRM dumb buffers, no EGL/GBM) for cage, and GTK's cairo GSK
   # renderer (no GL context) for the greeter client. This needs no GPU vendor
@@ -324,24 +339,19 @@ in
       # Keeps an openconnect gateway session alive across a disconnect or a
       # suspend, so wayle's cached cookie reconnects without a second factor.
       # NixOS's dispatcher only runs the scripts listed here, not the
-      # package's lib/NetworkManager copy, and runs them without a PATH.
+      # package's lib/NetworkManager copy.
       networking.networkmanager.dispatcherScripts = lib.mkIf config.networking.networkmanager.enable [
         {
           type = "pre-down";
-          source = pkgs.writeShellScript "90-wayle-openconnect-detach" ''
-            export PATH=${
-              lib.makeBinPath [
-                pkgs.coreutils
-                pkgs.gawk
-                pkgs.procps
-                # A device's pre-down asks NM whether it is going to sleep.
-                config.networking.networkmanager.package
-              ]
-            }
-            exec ${cfg.package}/lib/NetworkManager/dispatcher.d/pre-down.d/90-wayle-openconnect-detach "$@"
-          '';
+          source = openconnectDetach;
         }
       ];
+
+      # And across NetworkManager itself stopping — a restart on a rebuild
+      # that updates it, a shutdown: ExecStop= runs before systemd signals it.
+      systemd.services.NetworkManager.serviceConfig.ExecStop =
+        lib.mkIf config.networking.networkmanager.enable
+          [ "${openconnectDetach} \"\" nm-stop" ];
     }
 
     (lib.mkIf cfg.portal.enable {

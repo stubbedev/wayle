@@ -23,6 +23,8 @@ override_dh_auto_install:
 
 	install -d debian/wayle/usr/lib/NetworkManager/dispatcher.d/pre-down.d
 	install -m 0755 90-wayle-openconnect-detach debian/wayle/usr/lib/NetworkManager/dispatcher.d/pre-down.d/90-wayle-openconnect-detach
+	install -d debian/wayle/usr/lib/systemd/system/NetworkManager.service.d
+	install -m 0644 90-wayle-openconnect-detach.conf debian/wayle/usr/lib/systemd/system/NetworkManager.service.d/90-wayle-openconnect-detach.conf
 
 	install -d debian/wayle/usr/share/applications
 	install -m 0644 com.wayle.settings.desktop debian/wayle/usr/share/applications/com.wayle.settings.desktop
