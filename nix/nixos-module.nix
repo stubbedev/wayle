@@ -334,6 +334,8 @@ in
                 pkgs.coreutils
                 pkgs.gawk
                 pkgs.procps
+                # A device's pre-down asks NM whether it is going to sleep.
+                config.networking.networkmanager.package
               ]
             }
             exec ${cfg.package}/lib/NetworkManager/dispatcher.d/pre-down.d/90-wayle-openconnect-detach "$@"

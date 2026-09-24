@@ -14,6 +14,7 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::StreamExt;
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 use wayle_core::Property;
@@ -71,10 +72,21 @@ pub(super) fn spawn(
         // again belongs to the previous wake: cancel it rather than let it
         // dial into the next one.
         let mut restoring = token.child_token();
+        let mut pending: Option<(Vec<String>, JoinHandle<()>)> = None;
         while let Some(sleeping) = next_sleep_signal(&mut signals, &token).await {
             if sleeping {
                 restoring.cancel();
-                was_up = up_now(&connection, &entries).await;
+                // The tunnels a cancelled restore never got to are still owed
+                // a restore: they were up before the first sleep, and NM
+                // tore them down then, so they are not among the ones up now.
+                // A lid bounced on wake sleeps again within the second, which
+                // is exactly when a restore is still waiting on the network.
+                let unfinished = pending
+                    .take()
+                    .filter(|(_, handle)| !handle.is_finished())
+                    .map(|(tunnels, _)| tunnels)
+                    .unwrap_or_default();
+                was_up = carried_over(unfinished, up_now(&connection, &entries).await);
                 debug!(?was_up, "going to sleep; recorded the VPNs that were up");
                 continue;
             }
@@ -83,12 +95,13 @@ pub(super) fn spawn(
                 continue;
             }
             restoring = token.child_token();
-            tokio::spawn(restore(
+            let handle = tokio::spawn(restore(
                 connection.clone(),
                 entries.clone(),
-                tunnels,
+                tunnels.clone(),
                 restoring.clone(),
             ));
+            pending = Some((tunnels, handle));
         }
     });
 }
@@ -153,6 +166,18 @@ fn to_restore(active: &[(String, NMActiveConnectionState)], known: &[String]) ->
         })
         .map(|(uuid, _)| uuid.clone())
         .collect()
+}
+
+/// What to restore on the next wake: the tunnels an interrupted restore still
+/// owed, then the ones up now, each once.
+fn carried_over(unfinished: Vec<String>, up: Vec<String>) -> Vec<String> {
+    let mut tunnels = unfinished;
+    for uuid in up {
+        if !tunnels.contains(&uuid) {
+            tunnels.push(uuid);
+        }
+    }
+    tunnels
 }
 
 /// Waits for the network, then brings each recorded tunnel back.
@@ -304,6 +329,32 @@ mod tests {
             &[String::from("work")],
         );
         assert_eq!(restored, ["work"]);
+    }
+
+    fn uuids(names: &[&str]) -> Vec<String> {
+        names.iter().map(|name| String::from(*name)).collect()
+    }
+
+    #[test]
+    fn a_restore_cut_short_by_another_sleep_is_carried_over() {
+        // Up before the first sleep, torn down by it, and not yet restored
+        // when the second sleep came: NM reports nothing up, and the tunnel
+        // must still come back on the second wake.
+        assert_eq!(carried_over(uuids(&["work"]), Vec::new()), ["work"]);
+        assert_eq!(
+            carried_over(uuids(&["work"]), uuids(&["home", "work"])),
+            ["work", "home"],
+            "a tunnel both owed and up is restored once"
+        );
+    }
+
+    #[test]
+    fn nothing_owed_records_only_what_is_up() {
+        assert_eq!(carried_over(Vec::new(), uuids(&["home"])), ["home"]);
+        assert!(
+            carried_over(Vec::new(), Vec::new()).is_empty(),
+            "dialled a tunnel nothing recorded"
+        );
     }
 
     #[test]

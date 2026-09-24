@@ -1,5 +1,5 @@
 #!/bin/sh
-# NetworkManager vpn-pre-down hook: detach openconnect instead of letting the
+# NetworkManager pre-down hook: detach openconnect instead of letting the
 # plugin log the session off.
 #
 # NetworkManager-openconnect stops openconnect with SIGINT, on which openconnect
@@ -15,17 +15,44 @@
 # hook rather than something wayle can do itself: openconnect runs as the
 # plugin's user, and the plugin has no option for how it stops it.
 #
-# $1 is the VPN's IP interface, $2 the action.
+# A suspend never dispatches vpn-pre-down. NetworkManager takes the devices
+# down, and a tunnel whose device is gone is disconnected outright, skipping
+# the deactivating state the dispatch hangs off — so the plugin's SIGINT was
+# the first thing openconnect heard, and every suspend logged the session off.
+# What a suspend does dispatch, and wait for, is the devices' own pre-down,
+# with NetworkManager already asleep: that is the cue to detach every tunnel
+# NetworkManager runs, since all of them are about to go.
+#
+# $1 is the interface — the VPN's IP interface for vpn-pre-down, a device for
+# pre-down — and $2 the action.
 
-[ "$2" = vpn-pre-down ] || exit 0
-iface=$1
-[ -n "$iface" ] || exit 0
+case $2 in
+vpn-pre-down)
+  ifaces=$1
+  ;;
+pre-down)
+  # A device taken down while NetworkManager is awake is left alone: nothing
+  # here says which tunnel, if any, rides it, and detaching one that rides
+  # another device would take down a tunnel nothing else was touching.
+  [ "$(timeout 5 nmcli -t -f STATE general 2>/dev/null)" = asleep ] || exit 0
+  # Each tunnel the plugin brought up is a tun device NetworkManager lists.
+  ifaces=$(timeout 5 nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2 == "tun" { print $1 }')
+  ;;
+*)
+  exit 0
+  ;;
+esac
+[ -n "$ifaces" ] || exit 0
 
 for pid in $(pgrep -x openconnect); do
   # The plugin names the tunnel interface with --interface; matching on it
   # is what keeps a second, unrelated openconnect out of this.
   tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null |
-    awk -v iface="$iface" 'prev == "--interface" && $0 == iface { found = 1 } { prev = $0 } END { exit !found }' ||
+    awk -v ifaces="$ifaces" '
+      BEGIN { n = split(ifaces, list); for (i = 1; i <= n; i++) wanted[list[i]] = 1 }
+      prev == "--interface" && ($0 in wanted) { found = 1 }
+      { prev = $0 }
+      END { exit !found }' ||
     continue
   kill -HUP "$pid" 2>/dev/null || continue
   # NetworkManager holds the disconnect until this returns: wait for the

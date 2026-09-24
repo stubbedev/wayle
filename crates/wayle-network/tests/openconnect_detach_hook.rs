@@ -63,10 +63,67 @@ fn fake_openconnect(dir: &Path, iface: &str) -> Result<Child, Box<dyn Error>> {
 
 fn run_hook(iface: &str, action: &str) -> TestResult {
     let status = Command::new("sh").args([HOOK, iface, action]).status()?;
+    check_status(status)
+}
+
+/// Runs the hook with a stand-in `nmcli` first on PATH, reporting `state` as
+/// NM's general state and `tuns` as its tun devices, next to a wired device
+/// that is not one.
+fn run_hook_with_nm(
+    dir: &Path,
+    state: &str,
+    tuns: &[&str],
+    iface: &str,
+    action: &str,
+) -> TestResult {
+    let bin = dir.join("bin");
+    fs::create_dir_all(&bin)?;
+    let devices: String = std::iter::once(String::from("enxfake:ethernet"))
+        .chain(tuns.iter().map(|tun| format!("{tun}:tun")))
+        .map(|line| format!(" '{line}'"))
+        .collect();
+    let nmcli = bin.join("nmcli");
+    fs::write(
+        &nmcli,
+        format!(
+            "#!/bin/sh\n\
+             case \"$*\" in\n\
+             *general*) echo '{state}' ;;\n\
+             *device*) printf '%s\\n'{devices} ;;\n\
+             *) exit 1 ;;\n\
+             esac\n"
+        ),
+    )?;
+    fs::set_permissions(&nmcli, fs::Permissions::from_mode(0o755))?;
+    let path = format!(
+        "{}:{}",
+        bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let status = Command::new("sh")
+        .args([HOOK, iface, action])
+        .env("PATH", path)
+        .status()?;
+    check_status(status)
+}
+
+fn check_status(status: std::process::ExitStatus) -> TestResult {
     if !status.success() {
         return Err(format!("the hook must never fail a disconnect; it exited {status}").into());
     }
     Ok(())
+}
+
+/// Waits up to a second for `iface`'s stand-in to record a signal.
+fn signal_within(dir: &Path, iface: &str) -> Option<String> {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    loop {
+        let seen = signal_seen(dir, iface);
+        if seen.is_some() || Instant::now() >= deadline {
+            return seen;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
 }
 
 fn signal_seen(dir: &Path, iface: &str) -> Option<String> {
@@ -146,15 +203,17 @@ fn any_other_dispatcher_action_is_a_no_op() -> TestResult {
     let dir = scratch("action")?;
     let tunnel = fake_openconnect(&dir, "wayletest3")?;
 
-    for action in ["vpn-down", "vpn-up", "pre-down", "down", ""] {
-        run_hook("wayletest3", action)?;
+    // NM asleep, and the tunnel listed: only the actions that tear a tunnel
+    // down may act on that, and these do not.
+    for action in ["vpn-down", "vpn-up", "down", "up", ""] {
+        run_hook_with_nm(&dir, "asleep", &["wayletest3"], "wayletest3", action)?;
     }
 
     thread::sleep(Duration::from_millis(200));
     assert_eq!(
         signal_seen(&dir, "wayletest3"),
         None,
-        "the hook acted on something other than vpn-pre-down"
+        "the hook acted on something other than a pre-down"
     );
     stop(tunnel);
     let _ = fs::remove_dir_all(&dir);
@@ -165,4 +224,76 @@ fn any_other_dispatcher_action_is_a_no_op() -> TestResult {
 fn nothing_to_detach_still_succeeds() -> TestResult {
     run_hook("wayletest-absent", "vpn-pre-down")?;
     run_hook("", "vpn-pre-down")
+}
+
+#[test]
+fn a_device_going_down_for_a_suspend_detaches_every_tunnel() -> TestResult {
+    // A suspend takes the tunnels down with their devices and never
+    // dispatches vpn-pre-down; the device's pre-down, with NM asleep, is the
+    // only warning openconnect gets before the plugin's SIGINT logs it off.
+    let dir = scratch("asleep")?;
+    // Reaped as they exit, as in the single-tunnel case, so the hook's wait
+    // loop sees each one go.
+    let reapers: Vec<_> = ["wayletest4", "wayletest5"]
+        .into_iter()
+        .map(|iface| {
+            fake_openconnect(&dir, iface).map(|mut child| thread::spawn(move || child.wait()))
+        })
+        .collect::<Result<_, _>>()?;
+    let unlisted = fake_openconnect(&dir, "wayletest6")?;
+
+    let started = Instant::now();
+    run_hook_with_nm(
+        &dir,
+        "asleep",
+        &["wayletest4", "wayletest5"],
+        "enxfake",
+        "pre-down",
+    )?;
+
+    assert_eq!(signal_within(&dir, "wayletest4").as_deref(), Some("HUP"));
+    assert_eq!(signal_within(&dir, "wayletest5").as_deref(), Some("HUP"));
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "the hook kept waiting after openconnect was gone"
+    );
+    assert_eq!(
+        signal_seen(&dir, "wayletest6"),
+        None,
+        "the hook signalled an openconnect on an interface NM does not list"
+    );
+    for reaper in reapers {
+        let _ = reaper.join();
+    }
+    stop(unlisted);
+    let _ = fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn a_device_going_down_while_awake_leaves_the_tunnels_alone() -> TestResult {
+    let dir = scratch("awake")?;
+    let tunnel = fake_openconnect(&dir, "wayletest7")?;
+
+    for state in ["connected", "disconnected", ""] {
+        run_hook_with_nm(&dir, state, &["wayletest7"], "enxfake", "pre-down")?;
+    }
+
+    thread::sleep(Duration::from_millis(200));
+    assert_eq!(
+        signal_seen(&dir, "wayletest7"),
+        None,
+        "the hook detached a tunnel for a device NM took down while awake"
+    );
+    stop(tunnel);
+    let _ = fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn a_suspend_with_no_tunnels_still_succeeds() -> TestResult {
+    let dir = scratch("asleep-empty")?;
+    run_hook_with_nm(&dir, "asleep", &[], "enxfake", "pre-down")?;
+    let _ = fs::remove_dir_all(&dir);
+    Ok(())
 }
