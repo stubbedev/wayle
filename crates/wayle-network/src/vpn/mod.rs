@@ -323,7 +323,9 @@ impl VpnService {
     /// it, the profile watcher rebuilds, and the dropdown redraws. Nothing
     /// here has to tell the UI anything.
     ///
-    /// It belongs to the user wayle runs as; see [`profile::owned_by`].
+    /// It belongs to the user wayle runs as when NM can run it that way —
+    /// see [`kinds::can_be_private`] and [`profile::owned_by`] — and is
+    /// system-wide otherwise.
     ///
     /// # Errors
     ///
@@ -337,7 +339,9 @@ impl VpnService {
     ) -> Result<(), Error> {
         let uuid = new_uuid();
         let mut settings = profile::build(kind, name, &uuid, values);
-        if let Some(owner) = &self.owner {
+        if let Some(owner) = &self.owner
+            && kinds::can_be_private(kind)
+        {
             profile::owned_by(&mut settings, owner);
         }
         self.settings.add_connection(settings).await?;
@@ -347,7 +351,8 @@ impl VpnService {
     /// Rewrites an existing profile in place, keeping its UUID so anything
     /// referring to it — including a cached session — still matches.
     ///
-    /// Saved from here it becomes the user's own, like a profile made here.
+    /// Saved from here it becomes the user's own when a profile made here
+    /// would be.
     /// That one write to a system-wide profile still needs
     /// `settings.modify.system`; every one after it, `settings.modify.own`.
     ///
@@ -364,7 +369,9 @@ impl VpnService {
     ) -> Result<(), Error> {
         let profile = self.profile_for(uuid)?;
         let mut settings = profile::build(kind, name, uuid, values);
-        if let Some(owner) = &self.owner {
+        if let Some(owner) = &self.owner
+            && kinds::can_be_private(kind)
+        {
             profile::owned_by(&mut settings, owner);
         }
         profile.update(settings).await

@@ -191,12 +191,10 @@ async fn an_openconnect_profile_round_trips_with_its_secret_flags() {
         .await
         .expect("the profile deletes");
 
-    assert_eq!(
-        owners(&stored),
-        Some(vec![
-            me().expect("the test runs as a user with a passwd entry")
-        ])
-    );
+    // System-wide: NetworkManager-openconnect does not declare
+    // supports-safe-private-file-access, and NM refuses to activate a
+    // private profile of a plugin that does not.
+    assert_eq!(owners(&stored).unwrap_or_default(), Vec::<String>::new());
     // And it asks NM to carry the tunnel across networks.
     assert_eq!(
         stored

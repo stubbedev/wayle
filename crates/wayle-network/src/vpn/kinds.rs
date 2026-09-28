@@ -652,6 +652,69 @@ fn read_directory(directory: &Path) -> Vec<(String, String)> {
     plugins
 }
 
+/// Whether NetworkManager will bring up a user-owned profile of this kind.
+///
+/// WireGuard needs no plugin and always can. A plugin VPN can only when its
+/// descriptor says `supports-safe-private-file-access=true`; NM refuses the
+/// activation otherwise ("The 'openconnect' plugin doesn't support private
+/// connections"), however the profile was saved. NetworkManager-openconnect
+/// does not say it, so its profiles stay system-wide.
+pub(crate) fn can_be_private(kind: &str) -> bool {
+    if kind == WIREGUARD {
+        return true;
+    }
+    let mut allowed = false;
+    for directory in PLUGIN_DIRECTORIES {
+        let Ok(entries) = fs::read_dir(directory) else {
+            continue;
+        };
+        for contents in entries
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "name"))
+            .filter_map(|entry| fs::read_to_string(entry.path()).ok())
+        {
+            // A later directory shadows an earlier one, as in NM.
+            if let Some(verdict) = private_access(&contents, kind) {
+                allowed = verdict;
+            }
+        }
+    }
+    allowed
+}
+
+/// What a descriptor says about private connections for `service`, or
+/// `None` when it describes some other plugin. Absent means no, as in NM.
+fn private_access(contents: &str, service: &str) -> Option<bool> {
+    let mut in_section = false;
+    let mut matches = false;
+    let mut private = false;
+
+    for line in contents.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_section = line.eq_ignore_ascii_case("[VPN Connection]");
+            continue;
+        }
+        if !in_section || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        match key.trim() {
+            "service" => matches = value.trim() == service,
+            "supports-safe-private-file-access" => {
+                private = matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "true" | "yes" | "1"
+                );
+            }
+            _ => {}
+        }
+    }
+    matches.then_some(private)
+}
+
 /// Pulls `service` and `name` out of a plugin descriptor's
 /// `[VPN Connection]` section.
 fn parse_name_file(contents: &str) -> Option<(String, String)> {
@@ -714,6 +777,36 @@ mod tests {
         // `service=` from another section and offer a plugin that is not one.
         let stray = "[GNOME]\nservice=org.example.NotAVpn\n";
         assert_eq!(parse_name_file(stray), None);
+    }
+
+    #[test]
+    fn openconnect_as_shipped_cannot_take_a_private_profile() {
+        // NM-openconnect 1.2.10's descriptor: no private-file-access key, so
+        // NM refuses to activate a profile only its user can see.
+        assert_eq!(
+            private_access(OPENCONNECT, "org.freedesktop.NetworkManager.openconnect"),
+            Some(false)
+        );
+        assert!(can_be_private(WIREGUARD), "WireGuard needs no plugin");
+    }
+
+    #[test]
+    fn a_plugin_that_says_so_can_take_a_private_profile() {
+        let declared = "[VPN Connection]\n\
+            service=org.freedesktop.NetworkManager.openvpn\n\
+            supports-safe-private-file-access=true\n";
+        assert_eq!(
+            private_access(declared, "org.freedesktop.NetworkManager.openvpn"),
+            Some(true)
+        );
+        // Another plugin's descriptor says nothing about this one.
+        assert_eq!(
+            private_access(declared, "org.freedesktop.NetworkManager.openconnect"),
+            None
+        );
+        let elsewhere = "[GNOME]\nsupports-safe-private-file-access=true\n\
+            [VPN Connection]\nservice=org.example.Vpn\n";
+        assert_eq!(private_access(elsewhere, "org.example.Vpn"), Some(false));
     }
 
     #[test]
