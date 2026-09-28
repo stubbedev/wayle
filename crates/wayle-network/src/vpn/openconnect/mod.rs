@@ -253,19 +253,32 @@ pub(crate) fn is_supported(profile: &Profile) -> bool {
 /// rejection says nothing about the password, and only the gateway refusing
 /// the password itself drops it (see [`discredits_password`]).
 ///
+/// `unattended` is an activation nobody is watching — a tunnel brought back
+/// after a suspend. It gets the cached session if that is still alive, and
+/// nothing else: no prompt, and no password posted, since a gateway doing
+/// push MFA answers that with a push to a phone nobody is looking at.
+///
 /// # Errors
 ///
 /// Returns an error when the gateway refuses the credentials, when it demands
-/// an authentication method wayle does not implement, or when the user
-/// dismisses the prompt.
+/// an authentication method wayle does not implement, when the user
+/// dismisses the prompt, or when an unattended activation has no live
+/// session to reuse.
 pub(crate) async fn authenticate(
     profile: &Profile,
     request_new: bool,
+    unattended: bool,
     state: &SecretAgentState,
 ) -> Result<HashMap<String, String>, Error> {
     let client = client()?;
     if let Some(session) = reusable_session(profile, request_new, &client).await {
         return Ok(hand_out(&profile.uuid, &session));
+    }
+    if unattended {
+        info!(name = %profile.name, "no live VPN session to restore; waiting for a connect");
+        return Err(Error::VpnSignInIncomplete(String::from(
+            "the VPN session has ended; connect again to sign in",
+        )));
     }
 
     // A refused sign-in drops the stored password: the likeliest thing that
@@ -672,6 +685,57 @@ fn hostname() -> String {
         })
 }
 
+/// What the agent's tests need to set up a profile that has signed in
+/// before, and to stand up a gateway that never finishes a sign-in.
+#[cfg(test)]
+pub(crate) mod testing {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    /// Stores a password the way a sign-in that worked does.
+    pub(crate) fn remember_password(uuid: &str, password: &str) {
+        super::cache::store_password(uuid, password);
+    }
+
+    /// The password stored for a profile.
+    pub(crate) fn remembered_password(uuid: &str) -> Option<String> {
+        super::cache::password(uuid)
+    }
+
+    /// A gateway that takes connections and never says a word — the far end
+    /// of a sign-in waiting on a push nobody approves — and how many
+    /// connections it has taken.
+    pub(crate) async fn silent_gateway() -> (String, Arc<AtomicUsize>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("a loopback port for the silent gateway");
+        let address = listener.local_addr().expect("the silent gateway's address");
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&accepted);
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((socket, _)) = listener.accept().await {
+                counter.fetch_add(1, Ordering::SeqCst);
+                held.push(socket);
+            }
+        });
+        (address.to_string(), accepted)
+    }
+
+    /// Waits until the gateway has been reached at least once.
+    pub(crate) async fn reached(accepted: &AtomicUsize) -> bool {
+        for _ in 0..100 {
+            if accepted.load(Ordering::SeqCst) > 0 {
+                return true;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        false
+    }
+}
+
 #[cfg(test)]
 // Several tests set `XDG_STATE_HOME` or `SSL_CERT_FILE`, so the state directory
 // and the mock gateway's certificate are read through the same paths the
@@ -1035,7 +1099,7 @@ mod tests {
             ..gp_profile("unreachable-password", "127.0.0.1:1")
         };
 
-        let error = authenticate(&profile, false, &SecretAgentState::new())
+        let error = authenticate(&profile, false, false, &SecretAgentState::new())
             .await
             .expect_err("nobody signs in to a gateway that is not there");
         assert!(
@@ -1102,6 +1166,92 @@ mod tests {
             host: String::from(host),
             gwcert: String::from("pin-sha256:AAAA"),
         }
+    }
+
+    #[tokio::test]
+    async fn an_unattended_restore_hands_back_the_cached_session() {
+        // A tunnel coming back after a short sleep: the session outlived it,
+        // and nobody needs to be asked for anything.
+        let base = state_home("unattended-cached");
+        let cached = session_with_host("127.0.0.1:1");
+        cache::store_session("unattended-cached", &cached);
+
+        let secrets = authenticate(
+            &gp_profile("unattended-cached", "127.0.0.1:1"),
+            false,
+            true,
+            &SecretAgentState::new(),
+        )
+        .await
+        .expect("a cached session comes back with nobody watching");
+        assert_eq!(secrets.get("cookie"), Some(&cached.cookie));
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[tokio::test]
+    async fn an_unattended_restore_with_no_session_signs_nobody_in() {
+        // A night's sleep outlasts the session. Signing in again from here
+        // posted the password, and the gateway pushed a second factor to a
+        // phone nobody was looking at while the row sat on "connecting".
+        use std::sync::atomic::Ordering;
+
+        let base = state_home("unattended-lapsed");
+        cache::store_password("unattended-lapsed", "hunter2");
+        let (gateway, accepted) = testing::silent_gateway().await;
+        let state = SecretAgentState::new();
+        let profile = Profile {
+            username: Some(String::from("alice")),
+            ..gp_profile("unattended-lapsed", &gateway)
+        };
+
+        let error = tokio::time::timeout(
+            Duration::from_secs(5),
+            authenticate(&profile, false, true, &state),
+        )
+        .await
+        .expect("an unattended restore stops at once rather than start a sign-in")
+        .expect_err("there is no session to restore");
+        assert!(
+            matches!(error, Error::VpnSignInIncomplete(_)),
+            "got {error:?}"
+        );
+        assert_eq!(
+            accepted.load(Ordering::SeqCst),
+            0,
+            "credentials were posted with nobody there to answer"
+        );
+        assert_eq!(state.request.get(), None, "a prompt went up for nobody");
+        assert_eq!(
+            cache::password("unattended-lapsed").as_deref(),
+            Some("hunter2"),
+            "the password went with a restore that never tried it"
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[tokio::test]
+    async fn a_connect_someone_asked_for_signs_in_when_the_session_is_gone() {
+        // The same profile, attended: its sign-in goes to the gateway.
+        let base = state_home("attended-lapsed");
+        cache::store_password("attended-lapsed", "hunter2");
+        let (gateway, accepted) = testing::silent_gateway().await;
+        let profile = Profile {
+            username: Some(String::from("alice")),
+            ..gp_profile("attended-lapsed", &gateway)
+        };
+
+        let signing_in = tokio::spawn(async move {
+            authenticate(&profile, false, false, &SecretAgentState::new()).await
+        });
+        assert!(
+            testing::reached(&accepted).await,
+            "a connect someone asked for never went to the gateway"
+        );
+        signing_in.abort();
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     /// Tests against the mock gateway in `tests/mock-gateway`, started by
@@ -1221,9 +1371,14 @@ mod tests {
             let _client = client();
             cache::store_password("mock-bad-password", "wrong");
 
-            let error = authenticate(&alice("mock-bad-password"), false, &SecretAgentState::new())
-                .await
-                .expect_err("a wrong password does not sign anyone in");
+            let error = authenticate(
+                &alice("mock-bad-password"),
+                false,
+                false,
+                &SecretAgentState::new(),
+            )
+            .await
+            .expect_err("a wrong password does not sign anyone in");
             assert!(
                 matches!(error, Error::VpnAuthenticationFailed(_)),
                 "got {error:?}"
@@ -1239,6 +1394,39 @@ mod tests {
 
         #[tokio::test]
         #[ignore = "needs the mock gateway: just test-gateway"]
+        async fn a_gateways_internal_error_keeps_the_password() {
+            // Answered with PAN's refusal status, reason header and all: only
+            // the words say it was the gateway, and the words decide.
+            let base = state_home("mock-internal-error");
+            let _client = client();
+            cache::store_password("mock-internal-error", "hunter2");
+            let profile = Profile {
+                username: Some(String::from("troubled")),
+                ..gp_profile("mock-internal-error", GATEWAY)
+            };
+
+            let error = authenticate(&profile, false, false, &SecretAgentState::new())
+                .await
+                .expect_err("nobody signs in past a gateway that fell over");
+            assert!(
+                matches!(error, Error::VpnSignInIncomplete(_)),
+                "got {error:?}"
+            );
+            assert!(
+                error.to_string().contains("Internal error"),
+                "the row should say what the gateway said: {error}"
+            );
+            assert_eq!(
+                cache::password("mock-internal-error").as_deref(),
+                Some("hunter2"),
+                "the gateway's own failure cost the password"
+            );
+
+            let _ = std::fs::remove_dir_all(&base);
+        }
+
+        #[tokio::test]
+        #[ignore = "needs the mock gateway: just test-gateway"]
         async fn a_refused_code_keeps_the_password_that_was_accepted() {
             let base = state_home("mock-bad-code");
             let _client = client();
@@ -1246,7 +1434,7 @@ mod tests {
             let state = std::sync::Arc::new(SecretAgentState::new());
             answer_challenges(&state, "000000");
 
-            let error = authenticate(&alice("mock-bad-code"), false, &state)
+            let error = authenticate(&alice("mock-bad-code"), false, false, &state)
                 .await
                 .expect_err("a wrong code does not sign anyone in");
             assert!(
@@ -1282,6 +1470,7 @@ mod tests {
 
             let error = authenticate(
                 &gp_profile("mock-saml", SAML_GATEWAY),
+                false,
                 false,
                 &SecretAgentState::new(),
             )

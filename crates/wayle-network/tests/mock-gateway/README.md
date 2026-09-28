@@ -5,7 +5,8 @@ pointed at a real VPN to prove the sign-in works (five, counting the Array
 gateway below):
 
 - `127.0.0.1:8443` — GlobalProtect: username/password, one challenge round,
-  then a cookie;
+  then a cookie. The user `troubled` gets PAN's refusal around an "Internal
+  error" instead, which must not cost the stored password;
 - `127.0.0.1:8444` — a GlobalProtect SAML portal, which wayle must refuse
   before posting any credentials at it;
 - `127.0.0.1:8445` — AnyConnect: an XML form, a challenge, then a `webvpn`

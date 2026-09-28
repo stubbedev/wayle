@@ -5,8 +5,9 @@
 //! to build — whether NM *accepts* it is a different question, and one that
 //! fails at connect time with an unhelpful message when the answer is no.
 //!
-//! Ignored by default: it needs a running NetworkManager and the polkit
-//! permission to modify system connections. Run it deliberately:
+//! Ignored by default: it needs a running NetworkManager, and permission to
+//! add connections of your own — which NM grants the active local user,
+//! since the profiles wayle makes are. Run it deliberately:
 //!
 //! ```sh
 //! cargo test -p wayle-network --test vpn_profiles -- --ignored
@@ -33,6 +34,20 @@ fn values(pairs: &[(&str, &str)]) -> HashMap<String, String> {
         .iter()
         .map(|(key, value)| (String::from(*key), String::from(*value)))
         .collect()
+}
+
+/// Whom a saved profile is restricted to, from its `connection.permissions`.
+fn owners(stored: &profile::ConnectionDict) -> Option<Vec<String>> {
+    stored
+        .get("connection")?
+        .get("permissions")
+        .and_then(|value| Vec::<String>::try_from(value.clone()).ok())
+}
+
+/// The permission entry NM keeps for the user running the test.
+fn me() -> Option<String> {
+    let user = nix::unistd::User::from_uid(nix::unistd::Uid::effective()).ok()??;
+    Some(format!("user:{}:", user.name))
 }
 
 #[tokio::test]
@@ -98,6 +113,15 @@ async fn a_wireguard_profile_round_trips_through_networkmanager() {
         .expect("the profile deletes");
 
     tokio::time::sleep(SETTLE).await;
+    // Made from someone's shell, it is theirs: NM checked modify.own, not
+    // modify.system, and no other account sees it. Asserted after the
+    // delete, so a failure here leaves nothing behind in NM.
+    assert_eq!(
+        owners(&stored),
+        Some(vec![
+            me().expect("the test runs as a user with a passwd entry")
+        ])
+    );
     assert!(
         !network
             .vpn
@@ -166,4 +190,19 @@ async fn an_openconnect_profile_round_trips_with_its_secret_flags() {
         .remove(&entry.uuid)
         .await
         .expect("the profile deletes");
+
+    assert_eq!(
+        owners(&stored),
+        Some(vec![
+            me().expect("the test runs as a user with a passwd entry")
+        ])
+    );
+    // And it asks NM to carry the tunnel across networks.
+    assert_eq!(
+        stored
+            .get("vpn")
+            .and_then(|vpn| vpn.get("persistent"))
+            .map(|value| bool::try_from(value.clone())),
+        Some(Ok(true))
+    );
 }

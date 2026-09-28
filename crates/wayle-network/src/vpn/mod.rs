@@ -107,6 +107,9 @@ pub struct Vpn {
     /// The profile's Settings object path, which is what activation takes.
     path: OwnedObjectPath,
     connection: Connection,
+    /// The secret agent, told before each activation whether anyone is there
+    /// to answer its sign-in.
+    agent: Arc<SecretAgentState>,
     /// Serializes toggles so a double-click can't start and stop at once.
     toggle_lock: Mutex<()>,
 }
@@ -135,13 +138,40 @@ impl Vpn {
     /// also published on [`Self::detail`], because the row is where the user is
     /// looking when it fails.
     pub async fn connect(&self) -> Result<(), Error> {
+        self.activate(false).await
+    }
+
+    /// Brings the tunnel back with nobody watching — after a suspend, or once
+    /// NetworkManager has restarted.
+    ///
+    /// Only a session that is still alive is reused. A sign-in that would need
+    /// someone — a password, or a second factor pushed to a phone — is not
+    /// started; the row says the session ended instead, and the next connect
+    /// signs in with the user there to answer it.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::connect`].
+    async fn restore(&self) -> Result<(), Error> {
+        self.activate(true).await
+    }
+
+    async fn activate(&self, unattended: bool) -> Result<(), Error> {
         let _guard = self.toggle_lock.lock().await;
+        // Whatever an earlier restore said about this profile's next sign-in,
+        // this activation decides it.
+        self.agent.expect_attended(&self.uuid);
         if self.state.get().is_connected() {
             return Ok(());
         }
         self.turned_off.set(false);
         self.detail.set(None);
 
+        // Said before NM is asked: it can want the secrets before the call
+        // that starts the activation has even returned.
+        if unattended {
+            self.agent.expect_unattended(&self.uuid);
+        }
         match nm::activate(&self.connection, &self.path).await {
             Ok(active) => {
                 self.state
@@ -149,6 +179,8 @@ impl Vpn {
                 Ok(())
             }
             Err(error) => {
+                // Refused outright, so no sign-in is coming to use the mark.
+                self.agent.expect_attended(&self.uuid);
                 self.state.set(VpnState::Failed);
                 self.detail.set(Some(error.to_string()));
                 Err(error)
@@ -158,12 +190,18 @@ impl Vpn {
 
     /// Tears the tunnel down. Already down is not an error.
     ///
+    /// An openconnect session ends with it: the plugin stops openconnect with
+    /// the signal that logs off, and nothing outside NM's own process can
+    /// send the one that does not. The next connect signs in afresh.
+    ///
     /// # Errors
     ///
     /// Returns an error when NM refuses the deactivation.
     pub async fn disconnect(&self) -> Result<(), Error> {
         let _guard = self.toggle_lock.lock().await;
         self.turned_off.set(true);
+        // A restore cut short here never reaches its sign-in to use the mark.
+        self.agent.expect_attended(&self.uuid);
         nm::deactivate(&self.connection, &self.uuid).await
     }
 
@@ -194,6 +232,10 @@ pub struct VpnService {
     /// connecting if any is connecting, else disconnected.
     pub aggregate: Property<VpnState>,
     settings: Arc<Settings>,
+    /// Whose the profiles made here are; see [`profile::owned_by`]. `None`
+    /// when the passwd database has no name for this process's user, and a
+    /// profile is then made system-wide.
+    owner: Option<String>,
     cancellation_token: CancellationToken,
 }
 
@@ -206,16 +248,17 @@ impl VpnService {
         agent: &Arc<SecretAgentState>,
     ) -> Self {
         let token = CancellationToken::new();
-        let entries = Property::new(build_entries(settings, &connection, &[]));
+        let entries = Property::new(build_entries(settings, &connection, agent, &[]));
         let aggregate = Property::new(fold_states(&entries.get()));
 
         let service = Self {
             entries,
             aggregate,
             settings: Arc::clone(settings),
+            owner: owner_name(),
             cancellation_token: token,
         };
-        service.spawn_profile_watcher(settings, &connection);
+        service.spawn_profile_watcher(settings, &connection, agent);
         resume::spawn(
             connection.clone(),
             service.entries.clone(),
@@ -280,6 +323,8 @@ impl VpnService {
     /// it, the profile watcher rebuilds, and the dropdown redraws. Nothing
     /// here has to tell the UI anything.
     ///
+    /// It belongs to the user wayle runs as; see [`profile::owned_by`].
+    ///
     /// # Errors
     ///
     /// Returns an error when NM rejects the profile — a missing plugin, a
@@ -291,13 +336,20 @@ impl VpnService {
         values: &std::collections::HashMap<String, String>,
     ) -> Result<(), Error> {
         let uuid = new_uuid();
-        let settings = profile::build(kind, name, &uuid, values);
+        let mut settings = profile::build(kind, name, &uuid, values);
+        if let Some(owner) = &self.owner {
+            profile::owned_by(&mut settings, owner);
+        }
         self.settings.add_connection(settings).await?;
         Ok(())
     }
 
     /// Rewrites an existing profile in place, keeping its UUID so anything
     /// referring to it — including a cached session — still matches.
+    ///
+    /// Saved from here it becomes the user's own, like a profile made here.
+    /// That one write to a system-wide profile still needs
+    /// `settings.modify.system`; every one after it, `settings.modify.own`.
     ///
     /// # Errors
     ///
@@ -311,9 +363,11 @@ impl VpnService {
         values: &std::collections::HashMap<String, String>,
     ) -> Result<(), Error> {
         let profile = self.profile_for(uuid)?;
-        profile
-            .update(profile::build(kind, name, uuid, values))
-            .await
+        let mut settings = profile::build(kind, name, uuid, values);
+        if let Some(owner) = &self.owner {
+            profile::owned_by(&mut settings, owner);
+        }
+        profile.update(settings).await
     }
 
     /// Deletes a profile, and whatever wayle cached for it.
@@ -356,9 +410,15 @@ impl VpnService {
     /// Rebuilds the entry list whenever NM's profile list changes, carrying
     /// each surviving profile's state across so an add or remove elsewhere in
     /// the list doesn't blank out a connected tunnel's row.
-    fn spawn_profile_watcher(&self, settings: &Arc<Settings>, connection: &Connection) {
+    fn spawn_profile_watcher(
+        &self,
+        settings: &Arc<Settings>,
+        connection: &Connection,
+        agent: &Arc<SecretAgentState>,
+    ) {
         let settings = settings.clone();
         let connection = connection.clone();
+        let agent = Arc::clone(agent);
         let entries = self.entries.clone();
         let aggregate = self.aggregate.clone();
         let token = self.cancellation_token.child_token();
@@ -372,7 +432,8 @@ impl VpnService {
                         if next.is_none() {
                             break;
                         }
-                        let rebuilt = build_entries(&settings, &connection, &entries.get());
+                        let rebuilt =
+                            build_entries(&settings, &connection, &agent, &entries.get());
                         entries.set(rebuilt);
                         aggregate.set(fold_states(&entries.get()));
                     }
@@ -439,6 +500,7 @@ impl Drop for VpnService {
 fn build_entries(
     settings: &Settings,
     connection: &Connection,
+    agent: &Arc<SecretAgentState>,
     previous: &[Arc<Vpn>],
 ) -> Vec<Arc<Vpn>> {
     settings
@@ -466,6 +528,7 @@ fn build_entries(
                 uuid,
                 path: profile.object_path.clone(),
                 connection: connection.clone(),
+                agent: Arc::clone(agent),
                 toggle_lock: Mutex::new(()),
             })
         })
@@ -614,6 +677,26 @@ fn next_turned_off(previous: bool, after: VpnState, reason: u32) -> bool {
             NMActiveConnectionStateReason::from_u32(reason),
             NMActiveConnectionStateReason::UserDisconnected
         )
+}
+
+/// This process's login name as NM will read it: the passwd name of the
+/// effective user, which is who the bus tells NM every call here comes from.
+///
+/// NM refuses a profile whose permissions leave its caller out, so a name
+/// that is only probably right — `$USER` — would fail the add outright
+/// whenever it was wrong.
+fn owner_name() -> Option<String> {
+    match nix::unistd::User::from_uid(nix::unistd::Uid::effective()) {
+        Ok(Some(user)) => Some(user.name),
+        Ok(None) => {
+            warn!("this user has no passwd entry; new VPN profiles will be system-wide");
+            None
+        }
+        Err(error) => {
+            warn!(%error, "cannot look up this user; new VPN profiles will be system-wide");
+            None
+        }
+    }
 }
 
 /// A random RFC 4122 version-4 UUID, in the form NM stores.

@@ -1,16 +1,19 @@
 //! Bringing tunnels back after a suspend.
 //!
-//! NetworkManager tears every VPN down when the machine sleeps and brings
-//! none of them back on wake: a VPN is never autoconnected on its own. So the
-//! tunnels that were up on the way down are recorded, and re-activated once
-//! the network they ride on is back — through [`Vpn::connect`], the same path
-//! a click takes, so the secret agent hands NM the cached session and a
-//! reconnect costs no second factor.
+//! NetworkManager tears a VPN down when the machine sleeps — unless its
+//! profile is persistent, as the openconnect profiles wayle makes are, and then
+//! the tunnel rides the suspend out on its own — and brings none of them back
+//! on wake: a VPN is never autoconnected on its own. So the tunnels that were up
+//! on the way down are recorded, and re-activated once the network they ride
+//! on is back, through [`Vpn::restore`]: the secret agent hands NM whatever it
+//! has cached, and a session that needs signing into again is left for the
+//! next connect, since nobody is there to approve a second factor at wake.
 //!
 //! A restart of NetworkManager — a package upgrade — is the same story: it
 //! takes the tunnels down on its way out and brings none of them back. So
 //! the tunnels NM was running when it went away are brought back once it
-//! returns, by the same path.
+//! returns, by the same path. An openconnect tunnel seldom makes it: its
+//! plugin logs the session off as NM goes, and that is left for a connect.
 //!
 //! Only tunnels that were up are restored. One the user had turned off stays
 //! off, and nothing is recorded across a reboot: the record lives in memory,
@@ -60,9 +63,9 @@ const ATTEMPTS: usize = 5;
 const RETRY_DELAY: Duration = Duration::from_secs(3);
 
 /// How long before NetworkManager goes away a tunnel may have dropped and
-/// still count as taken down by NM stopping. Its stop detaches the tunnels
-/// first — the detach hook waits up to five seconds for openconnect — and
-/// NM then takes a few more to exit.
+/// still count as taken down by NM stopping: a tunnel can report itself down
+/// while NM is on its way out, and NM takes a few seconds more to leave the
+/// bus.
 const NM_STOP_WINDOW: Duration = Duration::from_secs(20);
 
 /// How long to give the secret agent to re-register with a NetworkManager
@@ -341,10 +344,14 @@ fn report(vpn: &Vpn, outcome: &Result<(), Error>) {
 
 /// Brings one tunnel back, retrying while NM is still settling. A cancelled
 /// restore gives up quietly.
+///
+/// Unattended: the cached session comes back if it is still alive, and a
+/// session that has lapsed is left for the user to sign in again, rather than
+/// set off a second factor at wake that nobody sees.
 async fn restore_one(vpn: &Vpn, token: &CancellationToken) -> Result<(), Error> {
     let mut attempt = 1;
     loop {
-        match vpn.connect().await {
+        match vpn.restore().await {
             Err(_) if attempt < ATTEMPTS => attempt += 1,
             outcome => return outcome,
         }
@@ -506,7 +513,7 @@ mod tests {
                 // Still up as far as anyone heard: NM went away under it.
                 row("work", VpnState::Connected, None, false),
                 row("home", VpnState::Connecting, None, false),
-                // Detached by NM's stop a few seconds before it exited.
+                // Dropped as NM stopped, a few seconds before it exited.
                 row("lab", VpnState::Failed, ago(now, 4), false),
                 // Same, but the active-connection list said so before the
                 // tunnel's own failure did.

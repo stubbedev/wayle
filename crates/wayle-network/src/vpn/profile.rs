@@ -133,6 +133,19 @@ fn plugin(
     if !secrets.is_empty() {
         insert(&mut vpn, "secrets", dict(secrets));
     }
+    // openconnect can carry a tunnel across a change of network — it
+    // reconnects over whatever comes up next, on the session it already has,
+    // and its plugin tells NM so — but NM only lets it when the profile asks.
+    // Without this NM tears the tunnel down with the device it rode on, on a
+    // new wifi network and on every suspend alike, and the plugin stops
+    // openconnect with the SIGINT that logs the session off.
+    if service_type == "org.freedesktop.NetworkManager.openconnect" {
+        insert(
+            &mut vpn,
+            "persistent",
+            OwnedValue::try_from(Value::from(true)).ok(),
+        );
+    }
 
     HashMap::from([
         (
@@ -362,6 +375,27 @@ pub fn kind_of(settings: &ConnectionDict) -> Option<String> {
         .and_then(|value| String::try_from(value.clone()).ok())
 }
 
+/// Makes a profile its user's own: `connection.permissions` names them and
+/// nobody else.
+///
+/// A VPN made from someone's shell is theirs; no other account on the
+/// machine has a use for it. Owning it is also what spares the prompt: for a
+/// profile that names only its caller NM checks `settings.modify.own`, which
+/// it grants the active local user, where a system-wide profile needs
+/// `settings.modify.system` — an administrator's password on a stock
+/// install. NM takes a user's VPN down when they log out, and not before: a
+/// locked screen or a suspended laptop still has the session.
+pub(crate) fn owned_by(settings: &mut ConnectionDict, user: &str) {
+    // NM's own form, reserved field and all: `user:NAME:` is what it stores
+    // whatever it is sent, and what reads back.
+    if let Some(connection) = settings.get_mut("connection") {
+        insert(
+            connection,
+            "permissions",
+            OwnedValue::try_from(Value::from(vec![format!("user:{user}:")])).ok(),
+        );
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462,6 +496,98 @@ mod tests {
             .collect();
         flags.sort_unstable();
         assert_eq!(flags, ["cookie-flags", "gateway-flags", "gwcert-flags"]);
+    }
+
+    #[test]
+    fn an_openconnect_tunnel_rides_out_a_change_of_network() {
+        let profile = build(
+            "org.freedesktop.NetworkManager.openconnect",
+            "Work",
+            "uuid-1",
+            &values(&[("gateway", "vpn.example.com"), ("protocol", "gp")]),
+        );
+        let vpn = profile.get("vpn").expect("vpn section");
+        // Without it a new wifi network, or the old one dropping for a
+        // moment, took the tunnel down and logged its session off.
+        assert_eq!(
+            vpn.get("persistent")
+                .map(|value| bool::try_from(value.clone())),
+            Some(Ok(true))
+        );
+    }
+
+    #[test]
+    fn a_plugin_that_never_offered_to_persist_is_not_asked_to() {
+        // openconnect's plugin is the one known to tell NM it can carry a
+        // tunnel across networks; another plugin asked to would be asked for
+        // something it may not do.
+        let profile = build(
+            "org.freedesktop.NetworkManager.openvpn",
+            "Office",
+            "uuid-1",
+            &values(&[("remote", "vpn.example.com")]),
+        );
+        let vpn = profile.get("vpn").expect("vpn section");
+        assert!(!vpn.contains_key("persistent"));
+    }
+
+    fn permissions(profile: &ConnectionDict) -> Option<Vec<String>> {
+        profile
+            .get("connection")?
+            .get("permissions")
+            .and_then(|value| Vec::<String>::try_from(value.clone()).ok())
+    }
+
+    #[test]
+    fn a_profile_made_for_someone_is_theirs_alone() {
+        for (kind, pairs) in [
+            (
+                "org.freedesktop.NetworkManager.openconnect",
+                [("gateway", "vpn.example.com"), ("protocol", "gp")],
+            ),
+            (
+                WIREGUARD,
+                [("peer-public-key", "PUBLIC"), ("address", "10.0.0.2/24")],
+            ),
+        ] {
+            let mut profile = build(kind, "Work", "uuid-1", &values(&pairs));
+            owned_by(&mut profile, "alice");
+            assert_eq!(
+                permissions(&profile),
+                Some(vec![String::from("user:alice:")]),
+                "{kind}"
+            );
+        }
+    }
+
+    #[test]
+    fn ownership_replaces_the_list_and_nothing_else() {
+        let mut profile = build(
+            "org.freedesktop.NetworkManager.openconnect",
+            "Work",
+            "uuid-1",
+            &values(&[("gateway", "vpn.example.com"), ("protocol", "gp")]),
+        );
+        insert(
+            profile.get_mut("connection").expect("connection section"),
+            "permissions",
+            OwnedValue::try_from(Value::from(vec!["user:bob", "user:carol"])).ok(),
+        );
+        let before = profile.clone();
+
+        owned_by(&mut profile, "alice");
+        assert_eq!(
+            permissions(&profile),
+            Some(vec![String::from("user:alice:")])
+        );
+
+        let without_permissions = |mut profile: ConnectionDict| {
+            if let Some(connection) = profile.get_mut("connection") {
+                connection.remove("permissions");
+            }
+            profile
+        };
+        assert_eq!(without_permissions(profile), without_permissions(before));
     }
 
     #[test]

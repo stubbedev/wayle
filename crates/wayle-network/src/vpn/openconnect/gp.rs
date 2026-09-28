@@ -230,7 +230,21 @@ fn script_string(raw: &str) -> Option<(String, &str)> {
     None
 }
 
-/// Why the gateway refused, in the best words the reply has.
+/// Words a gateway uses for trouble on its own side of a sign-in — a backend
+/// that broke, or an authentication server that did not answer in time.
+const GATEWAY_TROUBLE: &[&str] = &[
+    "internal",
+    "timeout",
+    "timed out",
+    "unavailable",
+    "try again",
+];
+
+/// Words that put the credentials themselves in question.
+const ABOUT_CREDENTIALS: &[&str] = &["password", "credential"];
+
+/// Why the gateway refused, in the best words the reply has — and whether
+/// they are a verdict on the password.
 ///
 /// The body's own message first, in whichever of its shapes it came — the
 /// `<error>` of a `<response status="error">`, a prelogin-style `<msg>`, or
@@ -238,6 +252,11 @@ fn script_string(raw: &str) -> Option<(String, &str)> {
 /// bare 512 is openconnect's "invalid username or password" even with nothing
 /// written around it. Past that, PAN's reason header, and last the status, so
 /// a refusal nobody explained still says *something* a person can search for.
+///
+/// A refusal counts against the password unless the gateway says the trouble
+/// is its own; see [`blames_itself`]. Holding the gateway's own failure
+/// against the password is what made the connect after an "Internal error"
+/// ask for the password again.
 fn refusal(reply: Reply<'_>) -> Error {
     let from_body = match parse_script(reply.body) {
         Some(Script::Error(message)) => Some(message),
@@ -246,23 +265,46 @@ fn refusal(reply: Reply<'_>) -> Error {
             .chain(xml::value(reply.body, "msg"))
             .find(|message| !message.trim().is_empty()),
     };
-    if let Some(message) = from_body {
-        return auth_error(message.trim());
-    }
-    if reply.status == STATUS_BAD_CREDENTIALS {
-        return auth_error("wrong username or password");
-    }
-    if let Some(reason) = reply
+    let message = from_body.as_deref().map(str::trim);
+    let reason = if let Some(message) = message {
+        String::from(message)
+    } else if reply.status == STATUS_BAD_CREDENTIALS {
+        String::from("wrong username or password")
+    } else if let Some(reason) = reply
         .reason
         .map(str::trim)
         .filter(|reason| !reason.is_empty())
     {
-        return auth_error(&format!("the gateway refused the sign-in ({reason})"));
+        format!("the gateway refused the sign-in ({reason})")
+    } else {
+        format!(
+            "the gateway refused the sign-in without saying why (HTTP {})",
+            reply.status
+        )
+    };
+
+    if blames_itself(message, reply.status) {
+        Error::VpnSignInIncomplete(reason)
+    } else {
+        Error::VpnAuthenticationFailed(reason)
     }
-    auth_error(&format!(
-        "the gateway refused the sign-in without saying why (HTTP {})",
-        reply.status
-    ))
+}
+
+/// Whether a refusal is the gateway's own trouble rather than a verdict on
+/// the credentials: its message says so and does not also name the password,
+/// or it failed with a server error and said nothing at all.
+///
+/// Anything short of that is taken as a verdict, and costs the stored
+/// password. The lean is deliberate: a password is only asked for when none is
+/// stored, so a wrong one kept would fail every connect after it with no way
+/// to type the right one, where a right one dropped costs typing it again.
+fn blames_itself(message: Option<&str>, status: u16) -> bool {
+    let Some(message) = message else {
+        return status >= 500 && status != STATUS_BAD_CREDENTIALS;
+    };
+    let message = message.to_lowercase();
+    let mentions = |words: &[&str]| words.iter().any(|word| message.contains(word));
+    mentions(GATEWAY_TROUBLE) && !mentions(ABOUT_CREDENTIALS)
 }
 
 /// Reads a gateway's answer to a login post.
@@ -905,6 +947,99 @@ mod tests {
         let xml =
             "<response status=\"error\"><error>  </error><msg>Account locked</msg></response>";
         assert_eq!(refused(Reply::ok(xml)), "Account locked");
+    }
+
+    /// The reason a login the gateway itself fell over on is reported with.
+    fn gateway_trouble(reply: Reply<'_>) -> String {
+        let error = parse_login(reply, "vpn.example.com", "laptop", PIN)
+            .expect_err("the gateway failed this login");
+        assert!(
+            matches!(error, Error::VpnSignInIncomplete(_)),
+            "the gateway's own trouble must not discredit the password: {error:?}"
+        );
+        error.to_string()
+    }
+
+    const SCRIPT_INTERNAL_ERROR: &str = "var respStatus = \"Error\";\n\
+        var respMsg = \"Authentication failed: Internal error\";\n\
+        thisForm.inputStr.value = \"\";\n";
+
+    #[test]
+    fn an_internal_error_is_shown_without_costing_the_password() {
+        // What the row showed just before the next connect asked for the
+        // password again: the gateway's own failure, held against a password
+        // it had not got as far as judging.
+        assert_eq!(
+            gateway_trouble(Reply::ok(SCRIPT_INTERNAL_ERROR)),
+            "Authentication failed: Internal error"
+        );
+        assert_eq!(
+            gateway_trouble(Reply::ok(
+                "<response status=\"error\"><error>Internal error</error></response>"
+            )),
+            "Internal error"
+        );
+        // On PAN's refusal status too: the wording decides, as it does for
+        // the reason shown.
+        assert_eq!(
+            gateway_trouble(Reply {
+                status: STATUS_BAD_CREDENTIALS,
+                reason: Some("auth-failed"),
+                body: SCRIPT_INTERNAL_ERROR,
+            }),
+            "Authentication failed: Internal error"
+        );
+    }
+
+    #[test]
+    fn an_authentication_server_that_did_not_answer_keeps_the_password() {
+        let script = "var respStatus = \"Error\";\n\
+            var respMsg = \"Authentication server timed out\";\n\
+            thisForm.inputStr.value = \"\";\n";
+        assert_eq!(
+            gateway_trouble(Reply::ok(script)),
+            "Authentication server timed out"
+        );
+    }
+
+    #[test]
+    fn a_server_error_that_says_nothing_keeps_the_password() {
+        for status in [500, 502, 503] {
+            let reason = gateway_trouble(Reply {
+                status,
+                reason: None,
+                body: "<html>Service Unavailable</html>",
+            });
+            assert!(reason.contains(&format!("HTTP {status}")), "got: {reason}");
+        }
+    }
+
+    #[test]
+    fn a_refusal_that_is_not_plainly_the_gateways_trouble_costs_the_password() {
+        // The lean the other way. A wrong password kept fails every connect
+        // after it, with no prompt to type the right one.
+        assert_eq!(
+            refused(Reply::ok(
+                "<response status=\"error\"><error>Authentication failed</error></response>"
+            )),
+            "Authentication failed"
+        );
+        // Naming the password outweighs naming the gateway's trouble.
+        assert_eq!(
+            refused(Reply::ok(
+                "<response status=\"error\"><error>Internal error: password expired</error></response>"
+            )),
+            "Internal error: password expired"
+        );
+        // A silent 512 is PAN's wrong-password status, not a server error.
+        assert_eq!(
+            refused(Reply {
+                status: STATUS_BAD_CREDENTIALS,
+                reason: None,
+                body: "",
+            }),
+            "wrong username or password"
+        );
     }
 
     /// The real response from a form-authenticating gateway.

@@ -77,6 +77,16 @@ var respMsg = "Authentication failed: Invalid username or password ";
 thisForm.inputStr.value = "";
 """
 
+# A user the gateway's own backend falls over on, answered the same way: the
+# refusal status and reason header, around an error that is none of the
+# password's doing. The sign-in must show it and keep the password.
+TROUBLED_USER = "troubled"
+
+INTERNAL_ERROR = """var respStatus = "Error";
+var respMsg = "Authentication failed: Internal error";
+thisForm.inputStr.value = "";
+"""
+
 CONFIG_SUCCESS = """<?xml version="1.0" encoding="UTF-8" ?>
 <response status="success"><ip-address>192.168.241.222</ip-address>
 <netmask>255.255.255.255</netmask><mtu>0</mtu><lifetime>86400</lifetime>
@@ -167,8 +177,8 @@ class Gateway(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
-    def _refuse(self) -> None:
-        encoded = REJECTED.encode()
+    def _refuse(self, body: str = REJECTED) -> None:
+        encoded = body.encode()
         self.send_response(512)
         self.send_header("Content-Type", "text/html")
         self.send_header("x-private-pan-globalprotect", "auth-failed")
@@ -318,6 +328,9 @@ class Gateway(BaseHTTPRequestHandler):
         form = parse_qs(self.rfile.read(length).decode(), keep_blank_values=True)
         field = lambda key: form.get(key, [""])[0]  # noqa: E731
 
+        if field("user") == TROUBLED_USER:
+            self._refuse(INTERNAL_ERROR)
+            return
         if field("user") != USER:
             self._refuse()
             return
