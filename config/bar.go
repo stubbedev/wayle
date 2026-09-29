@@ -96,6 +96,7 @@ type Config struct {
 	Notification       NotificationConfig
 	Recorder           RecorderConfig
 	Systray            SystrayConfig
+	Osd                OsdConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -162,6 +163,7 @@ func Defaults() *Config {
 		Notification:       DefaultsNotification(),
 		Recorder:           DefaultsRecorder(),
 		Systray:            DefaultsSystray(),
+		Osd:                DefaultsOsd(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -186,6 +188,7 @@ func mustColor(s string) ColorValue {
 // ignored here exactly as serde ignores unknown fields in Rust.
 type fileDoc struct {
 	Bar     *toml.Primitive `toml:"bar"`
+	Osd     *toml.Primitive `toml:"osd"`
 	Modules *struct {
 		Clock              *toml.Primitive `toml:"clock"`
 		Cava               *toml.Primitive `toml:"cava"`
@@ -320,6 +323,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Osd != nil {
+		o, err := applyOsd(md, *doc.Osd)
+		if err != nil {
+			return err
+		}
+		c.Osd = o
 	}
 	if doc.Modules != nil && doc.Modules.Systray != nil {
 		st, err := applySystray(md, *doc.Modules.Systray)

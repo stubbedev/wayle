@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -24,6 +25,7 @@ import (
 	"github.com/stubbedev/wayle/service/sni"
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
+	"github.com/stubbedev/wayle/shell/osd"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -134,6 +136,7 @@ func RunWith(cfg *config.Config) error {
 	if len(outputs) == 0 {
 		return errors.New("bar: no output to draw on")
 	}
+	osdSrv := osd.New(application, cfg.Osd, font, palette)
 	for _, output := range outputs {
 		layout, ok := FindLayout(cfg.Bar.Layout, output.Name)
 		if !ok || !layout.Show {
@@ -154,8 +157,117 @@ func RunWith(cfg *config.Config) error {
 		for _, a := range *ctx.Attachers {
 			a.Attach(layer)
 		}
+		osdSrv.AttachOutput(output.Name, output)
+	}
+	if cfg.Osd.Enabled {
+		go watchOsd(cfg, baseCtx, osdSrv)
 	}
 	return application.Run()
+}
+
+// brightnessOsdIcon picks the brightness flash's glyph from the
+// percentage.
+func brightnessOsdIcon(percent float64) string {
+	switch {
+	case percent <= 0:
+		return "ld-sun-off-symbolic"
+	case percent < 50:
+		return "ld-sun-dim-symbolic"
+	}
+	return "ld-sun-symbolic"
+}
+
+// microphoneOsdIcon resolves the input flash's glyph.
+func microphoneOsdIcon(cfg config.MicrophoneConfig, dev pulse.Device) string {
+	if dev.Muted {
+		return cfg.IconMuted
+	}
+	return cfg.Icon.Name
+}
+
+// watchOsd follows the pulse and brightness subscriptions and flashes
+// the OSD on their changes, deduplicating repeats like osd/watchers.rs's
+// last_volume/last_brightness tracking.
+func watchOsd(cfg *config.Config, ctx ModuleContext, server *osd.Osd) {
+	bctx := context.Background()
+	var lastVolume, lastInput float64
+	var lastMuted, lastInputMuted bool
+	var lastBrightness float64
+	handlePulse := func() {
+		if ctx.Pulse == nil {
+			return
+		}
+		if sink, err := ctx.Pulse.DefaultSink(bctx); err == nil {
+			if sink.Volume != lastVolume || sink.Muted != lastMuted {
+				lastVolume, lastMuted = sink.Volume, sink.Muted
+				server.Show(osd.Event{
+					Kind:  "volume",
+					Icon:  volumeIconName(cfg.Volume, sink),
+					Label: "Output",
+					Value: sink.Volume,
+					Muted: sink.Muted,
+				})
+			}
+		}
+		if source, err := ctx.Pulse.DefaultSource(bctx); err == nil {
+			if source.Volume != lastInput || source.Muted != lastInputMuted {
+				lastInput, lastInputMuted = source.Volume, source.Muted
+				server.Show(osd.Event{
+					Kind:  "input-volume",
+					Icon:  microphoneOsdIcon(cfg.Microphone, source),
+					Label: "Input",
+					Value: source.Volume,
+					Muted: source.Muted,
+				})
+			}
+		}
+	}
+	handleBrightness := func() {
+		if ctx.Brightness == nil {
+			return
+		}
+		devices, err := ctx.Brightness.Devices(bctx)
+		if err != nil || len(devices) == 0 {
+			return
+		}
+		percent := devices[0].Percentage()
+		if percent != lastBrightness {
+			lastBrightness = percent
+			server.Show(osd.Event{
+				Kind:  "brightness",
+				Icon:  brightnessOsdIcon(percent),
+				Label: "Brightness",
+				Value: percent,
+			})
+		}
+	}
+	stops := make([]func(), 0, 2)
+	if ctx.Pulse != nil {
+		if ticks, stop, err := ctx.Pulse.Subscribe(bctx); err == nil {
+			stops = append(stops, stop)
+			go func() {
+				for range ticks {
+					handlePulse()
+				}
+			}()
+		}
+	}
+	if ctx.Brightness != nil {
+		if ticks, stop, err := ctx.Brightness.Subscribe(bctx); err == nil {
+			stops = append(stops, stop)
+			go func() {
+				for range ticks {
+					handleBrightness()
+				}
+			}()
+		}
+	}
+	defer func() {
+		for _, stop := range stops {
+			stop()
+		}
+	}()
+	select {}
 }
 
 // layerConfigFor measures the tree for one output and maps it onto a
