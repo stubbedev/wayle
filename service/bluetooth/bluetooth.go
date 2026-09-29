@@ -27,6 +27,8 @@ type Snapshot struct {
 	Available bool
 	// Enabled is the default adapter's Powered.
 	Enabled bool
+	// Discovering is the default adapter's Discovering.
+	Discovering bool
 	// Connected holds the aliases of connected devices.
 	Connected []string
 }
@@ -99,6 +101,10 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 	var powered bool
 	if err := adapterObj.CallWithContext(ctx, properties+".Get", 0, adapterIface, "Powered").Store(&powered); err == nil {
 		snap.Enabled = powered
+	}
+	var discovering bool
+	if err := adapterObj.CallWithContext(ctx, properties+".Get", 0, adapterIface, "Discovering").Store(&discovering); err == nil {
+		snap.Discovering = discovering
 	}
 
 	managed, err := s.managedObjects(ctx)

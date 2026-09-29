@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/bluetooth"
+	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -79,6 +80,79 @@ func TestBluetoothModuleDimsWhenIdle(t *testing.T) {
 	}
 	if m.label.Color() != mutedFg(style.palette) {
 		t.Errorf("idle color = %#08x, want fg-muted", m.label.Color())
+	}
+}
+
+func TestBluetoothStateIcon(t *testing.T) {
+	cfg := config.Defaults()
+	style := computeStyle(cfg, styling.Default())
+	source := &fakeBluetoothSource{
+		snap:  bluetooth.Snapshot{Available: true, Enabled: true, Connected: []string{"Headset"}},
+		ticks: make(chan struct{}, 2),
+	}
+	m := &bluetoothModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
+	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	m.icon = moduleIcon(m.ctx, cfg.Bluetooth.Icon)
+	if m.icon == nil {
+		t.Fatal("the bluetooth icon defaults on")
+	}
+	icon := m.icon.(*widget.Icon)
+
+	// The connected state first.
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := icon.Name(); got != cfg.Bluetooth.ConnectedIcon {
+		t.Errorf("connected icon = %q", got)
+	}
+	// Idle, searching, and disabled follow select_icon's order.
+	source.snap = bluetooth.Snapshot{Available: true, Enabled: true}
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := icon.Name(); got != cfg.Bluetooth.DisconnectedIcon {
+		t.Errorf("idle icon = %q", got)
+	}
+	source.snap.Discovering = true
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := icon.Name(); got != cfg.Bluetooth.SearchingIcon {
+		t.Errorf("searching icon = %q", got)
+	}
+	source.snap = bluetooth.Snapshot{Available: true}
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := icon.Name(); got != cfg.Bluetooth.DisabledIcon {
+		t.Errorf("disabled icon = %q", got)
+	}
+}
+
+func TestMicrophoneStateIcon(t *testing.T) {
+	cfg := config.Defaults()
+	style := computeStyle(cfg, styling.Default())
+	source := &fakePulseSource{dev: pulse.Device{Volume: 40}}
+	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
+	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	m.icon = moduleIcon(m.ctx, cfg.Microphone.Icon)
+	if m.icon == nil {
+		t.Fatal("the microphone icon defaults on")
+	}
+	icon := m.icon.(*widget.Icon)
+
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := icon.Name(); got != cfg.Microphone.Icon.Name {
+		t.Errorf("active icon = %q", got)
+	}
+	source.dev.Muted = true
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := icon.Name(); got != cfg.Microphone.IconMuted {
+		t.Errorf("muted icon = %q", got)
 	}
 }
 

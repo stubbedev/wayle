@@ -7,6 +7,7 @@ import (
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/bluetooth"
 )
 
@@ -27,11 +28,29 @@ func bluetoothLabel(snap bluetooth.Snapshot) string {
 	}
 }
 
+// bluetoothIconName is helpers.rs's select_icon: disabled when the
+// adapter is absent or off, searching while discovering, then the
+// connected states.
+func bluetoothIconName(cfg config.BluetoothConfig, snap bluetooth.Snapshot) string {
+	if !snap.Available || !snap.Enabled {
+		return cfg.DisabledIcon
+	}
+	if snap.Discovering {
+		return cfg.SearchingIcon
+	}
+	if len(snap.Connected) == 0 {
+		return cfg.DisconnectedIcon
+	}
+	return cfg.ConnectedIcon
+}
+
 // bluetooth is the module: the BlueZ status label.
 type bluetoothModule struct {
 	ctx    ModuleContext
 	source bluetooth.Source
 	label  *widget.Label
+	icon   widget.Widget
+	root   widget.Widget
 }
 
 func newBluetooth(ctx ModuleContext) (Module, error) {
@@ -43,6 +62,8 @@ func newBluetooth(ctx ModuleContext) (Module, error) {
 	}
 	m := &bluetoothModule{ctx: ctx, source: ctx.Bluetooth}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	m.icon = moduleIcon(ctx, ctx.Config.Bluetooth.Icon)
+	m.root = assembleModule(ctx, ctx.Config.Bluetooth.Icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -59,14 +80,15 @@ func newBluetooth(ctx ModuleContext) (Module, error) {
 	return m, nil
 }
 
-// refresh re-reads and restyles the label.
+// refresh re-reads and restyles the label and state icon.
 func (m *bluetoothModule) refresh() error {
 	snap, err := m.source.Read(context.Background())
 	if err != nil {
 		return err
 	}
+	cfg := m.ctx.Config.Bluetooth
 	label := ""
-	if m.ctx.Config.Bluetooth.LabelShow {
+	if cfg.LabelShow {
 		label = bluetoothLabel(snap)
 	}
 	color := m.ctx.Style.fg
@@ -75,7 +97,10 @@ func (m *bluetoothModule) refresh() error {
 	}
 	m.label.SetText(label)
 	m.label.SetColor(color)
+	if setter, ok := m.icon.(interface{ SetThemeName(name string) }); ok {
+		setter.SetThemeName(bluetoothIconName(cfg, snap))
+	}
 	return nil
 }
 
-func (m *bluetoothModule) Root() widget.Widget { return m.label }
+func (m *bluetoothModule) Root() widget.Widget { return m.root }
