@@ -2,7 +2,7 @@ package bar
 
 import (
 	"fmt"
-	"math"
+	"time"
 
 	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
@@ -11,13 +11,24 @@ import (
 	"github.com/stubbedev/wayle/config"
 )
 
-// ModuleContext carries what a module needs at construction time. It
-// grows as services (hyprland, audio, ...) are ported.
+// ModuleContext carries what a module needs at construction time: the
+// resolved bar style, the config, and the loop it schedules timers on.
+// App is nil only in headless construction (tests): the module then
+// builds its tree without scheduling updates.
 type ModuleContext struct {
 	Config *config.Config
 	App    *app.Application
 	Font   render.Font
-	Theme  *widget.Theme
+	Style  *barStyle
+}
+
+// Every schedules fn on the application loop; a no-op when the context
+// is headless.
+func (c ModuleContext) Every(d time.Duration, fn func()) {
+	if c.App == nil {
+		return
+	}
+	c.App.Every(d, fn)
 }
 
 // Module is one bar module: a live widget tree plus whatever timers
@@ -46,18 +57,22 @@ func Create(name string, ctx ModuleContext) (Module, error) {
 	return factory(ctx)
 }
 
-// CreateAll builds every item of one layout section into a row box.
-// Groups flatten into the section row for now: the shared visual
-// container lands with the styling port.
+// CreateAll builds every item of one layout section into a row.
+// Groups become bar-group containers: a styled box (background,
+// padding, and rounding through the .bar-group stylesheet rule)
+// holding the group's modules with the group gap.
 func CreateAll(items []config.BarItem, ctx ModuleContext) (*widget.Box, error) {
-	row := widget.NewBox(widget.Row, px(ctx.Config.Bar.ModuleGap), 0)
+	row := widget.NewBox(widget.Row, ctx.Style.moduleGap, 0)
 	for _, item := range items {
 		if item.IsGroup() {
+			group := widget.NewBox(widget.Row, ctx.Style.groupGap, 0)
+			group.AddClass("bar-group")
 			for _, inner := range item.Group.Modules {
-				if err := appendModule(row, inner, ctx); err != nil {
+				if err := appendModule(group, inner, ctx); err != nil {
 					return nil, err
 				}
 			}
+			row.Append(group, false)
 			continue
 		}
 		if err := appendModule(row, item, ctx); err != nil {
@@ -74,9 +89,4 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	}
 	row.Append(module.Root(), false)
 	return nil
-}
-
-// px resolves a config size against the bar's base font size.
-func px(s config.Size) int {
-	return int(math.Round(s.Px(labelPx)))
 }

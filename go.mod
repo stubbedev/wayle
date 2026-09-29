@@ -5,6 +5,7 @@ go 1.27.1
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/stubbedev/gelm v0.0.0-20260928211541-e058e0048ab1
+	golang.org/x/image v0.46.0
 )
 
 require (
@@ -16,7 +17,6 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/unxed/xkb-go v0.1.8 // indirect
 	github.com/yalue/native_endian v1.0.2 // indirect
-	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/net v0.45.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

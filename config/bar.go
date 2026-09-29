@@ -8,19 +8,38 @@ import (
 )
 
 // Bar is the bar chrome: per-monitor layout, spacing, and placement.
-// The fields carry the subset of BarConfig the Go shell consumes; the
-// styling keys follow with the wayle-styling port.
+// The fields carry the BarConfig keys the Go shell consumes; the button
+// styling keys follow with the bar button component.
 type Bar struct {
 	Location          Location
 	Layer             Layer
 	Exclusive         bool
-	ModuleGap         Size
-	Padding           Size
-	PaddingEnds       Size
-	Rounding          RoundingLevel
+	BG                ColorValue
 	BackgroundOpacity int
-	Scale             float64
-	Layout            []BarLayout
+	BorderColor       ColorValue
+	BorderLocation    BorderLocation
+	BorderWidth       int
+	// ButtonLabelSize is the module label font size: a multiplier of
+	// the 1.04rem button-label base, or absolute pixels.
+	ButtonLabelSize Size
+	ModuleGap       Size
+	Padding         Size
+	PaddingEnds     Size
+	InsetEdge       Size
+	InsetEnds       Size
+	Rounding        RoundingLevel
+	Scale           float64
+	Layout          []BarLayout
+
+	// Button group container styling.
+	ButtonGroupModuleGap      Size
+	ButtonGroupPadding        Size
+	ButtonGroupBackground     ColorValue
+	ButtonGroupOpacity        int
+	ButtonGroupBorderColor    ColorValue
+	ButtonGroupBorderLocation BorderLocation
+	ButtonGroupBorderWidth    int
+	ButtonGroupRounding       RoundingLevel
 }
 
 // BarLayout is the bar layout for one monitor. Monitor is a connector
@@ -58,15 +77,30 @@ type Config struct {
 func Defaults() *Config {
 	return &Config{
 		Bar: Bar{
-			Location:          LocationTop,
-			Layer:             LayerTop,
-			Exclusive:         true,
-			ModuleGap:         Size{Value: 0.5, Unit: SizeMultiplier},
-			Padding:           Size{Value: 0.35, Unit: SizeMultiplier},
-			PaddingEnds:       Size{Value: 0.5, Unit: SizeMultiplier},
-			Rounding:          RoundingNone,
-			BackgroundOpacity: 100,
-			Scale:             1.0,
+			Location:                  LocationTop,
+			Layer:                     LayerTop,
+			Exclusive:                 true,
+			BG:                        mustColor("bg-surface"),
+			BackgroundOpacity:         100,
+			BorderColor:               mustColor("border-accent"),
+			BorderLocation:            BorderNone,
+			BorderWidth:               1,
+			ButtonLabelSize:           Size{Value: 1.0, Unit: SizeMultiplier},
+			ModuleGap:                 Size{Value: 0.5, Unit: SizeMultiplier},
+			Padding:                   Size{Value: 0.35, Unit: SizeMultiplier},
+			PaddingEnds:               Size{Value: 0.5, Unit: SizeMultiplier},
+			InsetEdge:                 Size{Value: 0, Unit: SizeMultiplier},
+			InsetEnds:                 Size{Value: 0, Unit: SizeMultiplier},
+			Rounding:                  RoundingNone,
+			Scale:                     1.0,
+			ButtonGroupModuleGap:      Size{Value: 0.25, Unit: SizeMultiplier},
+			ButtonGroupPadding:        Size{Value: 0.0, Unit: SizeMultiplier},
+			ButtonGroupBackground:     mustColor("bg-elevated"),
+			ButtonGroupOpacity:        100,
+			ButtonGroupBorderColor:    mustColor("border-accent"),
+			ButtonGroupBorderLocation: BorderNone,
+			ButtonGroupBorderWidth:    1,
+			ButtonGroupRounding:       RoundingSm,
 		},
 		Clock: ClockConfig{
 			Format: "%a %b %d %I:%M %p",
@@ -76,6 +110,16 @@ func Defaults() *Config {
 			FontMono: "JetBrains Mono",
 		},
 	}
+}
+
+// mustColor panics only on a typo in these literal defaults; user
+// config never flows through it.
+func mustColor(s string) ColorValue {
+	cv, err := ParseColorValue(s)
+	if err != nil {
+		panic(err)
+	}
+	return cv
 }
 
 // fileDoc mirrors the top-level TOML document. Sections the Go shell
@@ -89,19 +133,35 @@ type fileDoc struct {
 	General *toml.Primitive `toml:"general"`
 }
 
-// barDoc mirrors the [bar] table; layout is handled by BarItem's
-// UnmarshalTOML through the slice element decode.
+// barDoc mirrors the [bar] table; the leaf values defer through
+// tomlValue where the schema allows number|string unions, and layout is
+// handled by BarItem's UnmarshalTOML through the slice element decode.
 type barDoc struct {
-	Location          string      `toml:"location"`
-	Layer             string      `toml:"layer"`
-	Exclusive         bool        `toml:"exclusive"`
-	ModuleGap         tomlValue   `toml:"module-gap"`
-	Padding           tomlValue   `toml:"padding"`
-	PaddingEnds       tomlValue   `toml:"padding-ends"`
-	Rounding          string      `toml:"rounding"`
-	BackgroundOpacity *int        `toml:"background-opacity"`
-	Scale             *float64    `toml:"scale"`
-	Layout            []BarLayout `toml:"layout"`
+	Location                  string      `toml:"location"`
+	Layer                     string      `toml:"layer"`
+	Exclusive                 bool        `toml:"exclusive"`
+	BG                        string      `toml:"bg"`
+	BackgroundOpacity         *int        `toml:"background-opacity"`
+	BorderColor               string      `toml:"border-color"`
+	BorderLocation            string      `toml:"border-location"`
+	BorderWidth               *int        `toml:"border-width"`
+	ButtonLabelSize           tomlValue   `toml:"button-label-size"`
+	ModuleGap                 tomlValue   `toml:"module-gap"`
+	ButtonGroupModuleGap      tomlValue   `toml:"button-group-module-gap"`
+	ButtonGroupPadding        tomlValue   `toml:"button-group-padding"`
+	ButtonGroupBackground     string      `toml:"button-group-background"`
+	ButtonGroupOpacity        *int        `toml:"button-group-opacity"`
+	ButtonGroupBorderColor    string      `toml:"button-group-border-color"`
+	ButtonGroupBorderLocation string      `toml:"button-group-border-location"`
+	ButtonGroupBorderWidth    *int        `toml:"button-group-border-width"`
+	ButtonGroupRounding       string      `toml:"button-group-rounding"`
+	Padding                   tomlValue   `toml:"padding"`
+	PaddingEnds               tomlValue   `toml:"padding-ends"`
+	InsetEdge                 tomlValue   `toml:"inset-edge"`
+	InsetEnds                 tomlValue   `toml:"inset-ends"`
+	Rounding                  string      `toml:"rounding"`
+	Scale                     *float64    `toml:"scale"`
+	Layout                    []BarLayout `toml:"layout"`
 }
 
 type generalDoc struct {
@@ -166,6 +226,34 @@ func (b barDoc) toBar() (Bar, error) {
 		bar.Layer = Layer(b.Layer)
 	}
 	bar.Exclusive = b.Exclusive
+	if b.BG != "" {
+		cv, err := ParseColorValue(b.BG)
+		if err != nil {
+			return Bar{}, fmt.Errorf("bar: bg: %w", err)
+		}
+		bar.BG = cv
+	}
+	if b.BorderColor != "" {
+		cv, err := ParseColorValue(b.BorderColor)
+		if err != nil {
+			return Bar{}, fmt.Errorf("bar: border-color: %w", err)
+		}
+		bar.BorderColor = cv
+	}
+	if b.BorderLocation != "" {
+		bar.BorderLocation = BorderLocation(b.BorderLocation)
+	}
+	if b.BorderWidth != nil {
+		if *b.BorderWidth < 0 || *b.BorderWidth > 255 {
+			return Bar{}, fmt.Errorf("bar: border-width %d outside 0-255", *b.BorderWidth)
+		}
+		bar.BorderWidth = *b.BorderWidth
+	}
+	if b.ButtonLabelSize.value != nil {
+		if err := bar.ButtonLabelSize.unmarshal(b.ButtonLabelSize.value, "button-label-size"); err != nil {
+			return Bar{}, err
+		}
+	}
 	if b.ModuleGap.value != nil {
 		if err := bar.ModuleGap.unmarshal(b.ModuleGap.value, "module-gap"); err != nil {
 			return Bar{}, err
@@ -180,6 +268,55 @@ func (b barDoc) toBar() (Bar, error) {
 		if err := bar.PaddingEnds.unmarshal(b.PaddingEnds.value, "padding-ends"); err != nil {
 			return Bar{}, err
 		}
+	}
+	if b.InsetEdge.value != nil {
+		if err := bar.InsetEdge.unmarshal(b.InsetEdge.value, "inset-edge"); err != nil {
+			return Bar{}, err
+		}
+	}
+	if b.InsetEnds.value != nil {
+		if err := bar.InsetEnds.unmarshal(b.InsetEnds.value, "inset-ends"); err != nil {
+			return Bar{}, err
+		}
+	}
+	if b.ButtonGroupModuleGap.value != nil {
+		if err := bar.ButtonGroupModuleGap.unmarshal(b.ButtonGroupModuleGap.value, "button-group-module-gap"); err != nil {
+			return Bar{}, err
+		}
+	}
+	if b.ButtonGroupPadding.value != nil {
+		if err := bar.ButtonGroupPadding.unmarshal(b.ButtonGroupPadding.value, "button-group-padding"); err != nil {
+			return Bar{}, err
+		}
+	}
+	if b.ButtonGroupBackground != "" {
+		cv, err := ParseColorValue(b.ButtonGroupBackground)
+		if err != nil {
+			return Bar{}, fmt.Errorf("bar: button-group-background: %w", err)
+		}
+		bar.ButtonGroupBackground = cv
+	}
+	if b.ButtonGroupOpacity != nil {
+		bar.ButtonGroupOpacity = *b.ButtonGroupOpacity
+	}
+	if b.ButtonGroupBorderColor != "" {
+		cv, err := ParseColorValue(b.ButtonGroupBorderColor)
+		if err != nil {
+			return Bar{}, fmt.Errorf("bar: button-group-border-color: %w", err)
+		}
+		bar.ButtonGroupBorderColor = cv
+	}
+	if b.ButtonGroupBorderLocation != "" {
+		bar.ButtonGroupBorderLocation = BorderLocation(b.ButtonGroupBorderLocation)
+	}
+	if b.ButtonGroupBorderWidth != nil {
+		if *b.ButtonGroupBorderWidth < 0 || *b.ButtonGroupBorderWidth > 255 {
+			return Bar{}, fmt.Errorf("bar: button-group-border-width %d outside 0-255", *b.ButtonGroupBorderWidth)
+		}
+		bar.ButtonGroupBorderWidth = *b.ButtonGroupBorderWidth
+	}
+	if b.ButtonGroupRounding != "" {
+		bar.ButtonGroupRounding = RoundingLevel(b.ButtonGroupRounding)
 	}
 	if b.Rounding != "" {
 		bar.Rounding = RoundingLevel(b.Rounding)
@@ -200,6 +337,18 @@ func (b barDoc) toBar() (Bar, error) {
 	}
 	if !validRounding[bar.Rounding] {
 		return Bar{}, fmt.Errorf("bar: invalid rounding %q (want none|sm|md|lg|full)", bar.Rounding)
+	}
+	if !validBorderLocations[bar.BorderLocation] {
+		return Bar{}, fmt.Errorf("bar: invalid border-location %q (want none|top|bottom|left|right|all)", bar.BorderLocation)
+	}
+	if !validBorderLocations[bar.ButtonGroupBorderLocation] {
+		return Bar{}, fmt.Errorf("bar: invalid button-group-border-location %q (want none|top|bottom|left|right|all)", bar.ButtonGroupBorderLocation)
+	}
+	if !validRounding[bar.ButtonGroupRounding] {
+		return Bar{}, fmt.Errorf("bar: invalid button-group-rounding %q (want none|sm|md|lg|full)", bar.ButtonGroupRounding)
+	}
+	if bar.ButtonGroupOpacity < 0 || bar.ButtonGroupOpacity > 100 {
+		return Bar{}, fmt.Errorf("bar: button-group-opacity %d outside 0-100", bar.ButtonGroupOpacity)
 	}
 	if bar.BackgroundOpacity < 0 || bar.BackgroundOpacity > 100 {
 		return Bar{}, fmt.Errorf("bar: background-opacity %d outside 0-100", bar.BackgroundOpacity)

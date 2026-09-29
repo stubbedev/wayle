@@ -39,7 +39,8 @@ var validLayers = map[Layer]bool{
 	LayerTop: true, LayerOverlay: true,
 }
 
-// RoundingLevel is the global corner-rounding preference.
+// RoundingLevel is the global corner-rounding preference. The radius
+// each level resolves to lives in styling.RoundingRadiusPx.
 type RoundingLevel string
 
 // Rounding levels.
@@ -56,31 +57,54 @@ var validRounding = map[RoundingLevel]bool{
 	RoundingLg: true, RoundingFull: true,
 }
 
+// BorderLocation is the placement of a border: one edge, all edges, or
+// none.
+type BorderLocation string
+
+// Border locations.
+const (
+	BorderNone   BorderLocation = "none"
+	BorderTop    BorderLocation = "top"
+	BorderBottom BorderLocation = "bottom"
+	BorderLeft   BorderLocation = "left"
+	BorderRight  BorderLocation = "right"
+	BorderAll    BorderLocation = "all"
+)
+
+var validBorderLocations = map[BorderLocation]bool{
+	BorderNone: true, BorderTop: true, BorderBottom: true,
+	BorderLeft: true, BorderRight: true, BorderAll: true,
+}
+
 // SizeUnit distinguishes a scale multiplier from absolute pixels.
 type SizeUnit int
 
-// Size units. A multiplier scales with the configured font size; a
-// pixel size is absolute.
+// Size units. A multiplier scales with the rem base and the surface's
+// scale factor; a pixel size is absolute.
 const (
 	SizeMultiplier SizeUnit = iota
 	SizePixels
 )
 
-// Size is a wayle config size: a bare number is a font-size multiplier,
-// a string like "4px" is absolute pixels.
+// Size is a wayle config size: a bare number is a multiplier, a string
+// like "4px" is absolute pixels.
 type Size struct {
 	Value float64
 	Unit  SizeUnit
 }
 
-// Px resolves the size to pixels against basePx, the font size the
-// multipliers scale with.
-func (s Size) Px(basePx float64) float64 {
+// ResolvePx converts the size to pixels: multipliers scale with
+// remBase and the surface scale factor, pixel values are taken
+// literally ignoring both. This is the Rust Size::resolve_px.
+func (s Size) ResolvePx(remBase, scale float64) float64 {
 	if s.Unit == SizePixels {
 		return s.Value
 	}
-	return s.Value * basePx
+	return s.Value * remBase * scale
 }
+
+// IsZero reports whether the size carries no value.
+func (s Size) IsZero() bool { return s.Value == 0 }
 
 func (s *Size) unmarshal(value any, key string) error {
 	switch v := value.(type) {
