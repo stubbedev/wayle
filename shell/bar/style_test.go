@@ -154,6 +154,12 @@ func TestBarStylesheetTargetsRootAndGroups(t *testing.T) {
 	}
 }
 
+// widgetConstraintsMax is the unconstrained-max helper shared by the
+// painter tests.
+func widgetConstraintsMax(w, h int) widget.Constraints {
+	return widget.Constraints{Max: widget.Size{W: w, H: h}}
+}
+
 func newTestContext(t *testing.T, cfg *config.Config) ModuleContext {
 	t.Helper()
 	style := computeStyle(cfg, styling.Default())

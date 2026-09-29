@@ -60,6 +60,7 @@ var factories = map[string]Factory{
 	"clock":               newClock,
 	"cava":                newCava,
 	"hyprland-workspaces": newHyprlandWorkspaces,
+	"separator":           newSeparator,
 }
 
 // Create builds the module named by a layout entry. Custom modules

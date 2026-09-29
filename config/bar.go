@@ -71,6 +71,7 @@ type Config struct {
 	Bar                Bar
 	Clock              ClockConfig
 	Cava               CavaConfig
+	Separator          SeparatorConfig
 	HyprlandWorkspaces HyprlandWorkspacesConfig
 	General            GeneralConfig
 }
@@ -108,6 +109,7 @@ func Defaults() *Config {
 			Format: "%a %b %d %I:%M %p",
 		},
 		Cava:               DefaultsCava(),
+		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
 			FontSans: "Inter",
@@ -134,6 +136,7 @@ type fileDoc struct {
 	Modules *struct {
 		Clock              *toml.Primitive `toml:"clock"`
 		Cava               *toml.Primitive `toml:"cava"`
+		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
 	} `toml:"modules"`
 	General *toml.Primitive `toml:"general"`
@@ -219,6 +222,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Cava = cava
+	}
+	if doc.Modules != nil && doc.Modules.Separator != nil {
+		sep, err := applySeparator(md, *doc.Modules.Separator)
+		if err != nil {
+			return err
+		}
+		c.Separator = sep
 	}
 	if doc.Modules != nil && doc.Modules.HyprlandWorkspaces != nil {
 		hw, err := applyHyprlandWorkspaces(md, *doc.Modules.HyprlandWorkspaces)
