@@ -93,6 +93,7 @@ type Config struct {
 	Hyprsunset         HyprsunsetConfig
 	IdleInhibit        IdleInhibitConfig
 	Treeman            TreemanConfig
+	Notification       NotificationConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -156,6 +157,7 @@ func Defaults() *Config {
 		Hyprsunset:         DefaultsHyprsunset(),
 		IdleInhibit:        DefaultsIdleInhibit(),
 		Treeman:            DefaultsTreeman(),
+		Notification:       DefaultsNotification(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -205,6 +207,7 @@ type fileDoc struct {
 		Hyprsunset         *toml.Primitive `toml:"hyprsunset"`
 		IdleInhibit        *toml.Primitive `toml:"idle-inhibit"`
 		Treeman            *toml.Primitive `toml:"treeman"`
+		Notifications      *toml.Primitive `toml:"notifications"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -311,6 +314,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Modules != nil && doc.Modules.Notifications != nil {
+		n, err := applyNotification(md, *doc.Modules.Notifications)
+		if err != nil {
+			return err
+		}
+		c.Notification = n
 	}
 	if doc.Modules != nil && doc.Modules.Treeman != nil {
 		tm, err := applyTreeman(md, *doc.Modules.Treeman)

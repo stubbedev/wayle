@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/network"
+	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/treeman"
@@ -88,6 +89,19 @@ func RunWith(cfg *config.Config) error {
 	inhibitState := idleinhibit.NewState(cfg.IdleInhibit.StartupDuration)
 	baseCtx.IdleInhibit = inhibitState
 	baseCtx.Treeman = treeman.New("treeman")
+	// The notification service owns the well-known name on the session
+	// bus; other senders deliver through it.
+	notifSvc := notifications.NewService()
+	baseCtx.Notifications = notifSvc
+	if conn, err := dbus.ConnectSessionBus(); err == nil {
+		defer func() { _ = conn.Close() }()
+		server, err := notifications.Serve(conn, notifSvc)
+		if err != nil {
+			log.Printf("notifications: daemon: %v", err)
+		} else {
+			defer func() { _ = server.Release() }()
+		}
+	}
 	baseCtx.Attachers = &[]interface{ Attach(app.Host) }{}
 	if conn, err := dbus.ConnectSessionBus(); err == nil {
 		defer func() { _ = conn.Close() }()
