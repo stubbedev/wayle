@@ -71,6 +71,7 @@ type Config struct {
 	Bar                Bar
 	Clock              ClockConfig
 	Battery            BatteryConfig
+	Brightness         BrightnessConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
 	HyprlandWorkspaces HyprlandWorkspacesConfig
@@ -111,6 +112,7 @@ func Defaults() *Config {
 		},
 		Cava:               DefaultsCava(),
 		Battery:            DefaultsBattery(),
+		Brightness:         DefaultsBrightness(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -139,6 +141,7 @@ type fileDoc struct {
 		Clock              *toml.Primitive `toml:"clock"`
 		Cava               *toml.Primitive `toml:"cava"`
 		Battery            *toml.Primitive `toml:"battery"`
+		Brightness         *toml.Primitive `toml:"brightness"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
 	} `toml:"modules"`
@@ -218,6 +221,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Clock.Format = clock.Format
+	}
+	if doc.Modules != nil && doc.Modules.Brightness != nil {
+		br, err := applyBrightness(md, *doc.Modules.Brightness)
+		if err != nil {
+			return err
+		}
+		c.Brightness = br
 	}
 	if doc.Modules != nil && doc.Modules.Cava != nil {
 		cava, err := applyCava(md, *doc.Modules.Cava)

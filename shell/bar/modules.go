@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/upower"
 )
@@ -19,12 +20,13 @@ import (
 // builds its tree without scheduling updates. Hyprland is nil when the
 // compositor is not Hyprland; Hyprland-only modules error in that case.
 type ModuleContext struct {
-	Config   *config.Config
-	App      *app.Application
-	Font     render.Font
-	Style    *barStyle
-	Hyprland *hyprland.Connection
-	Battery  upower.Source
+	Config     *config.Config
+	App        *app.Application
+	Font       render.Font
+	Style      *barStyle
+	Hyprland   *hyprland.Connection
+	Battery    upower.Source
+	Brightness brightness.Source
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
 	Connector string
@@ -60,6 +62,7 @@ type Factory func(ctx ModuleContext) (Module, error)
 
 var factories = map[string]Factory{
 	"battery":             newBattery,
+	"brightness":          newBrightness,
 	"clock":               newClock,
 	"cava":                newCava,
 	"hyprland-workspaces": newHyprlandWorkspaces,

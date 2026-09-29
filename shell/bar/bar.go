@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
@@ -56,6 +57,7 @@ func RunWith(cfg *config.Config) error {
 		defer func() { _ = battery.Close() }()
 		baseCtx.Battery = battery
 	}
+	baseCtx.Brightness = brightness.NewSysfs()
 
 	outputs := sess.Outputs()
 	if len(outputs) == 0 {
