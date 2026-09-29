@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/stubbedev/wayle/service/idleinhibit"
+	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/shell/bar"
 )
 
@@ -19,6 +20,7 @@ const usage = `wayle (Go rewrite)
 Usage:
   wayle shell        run the shell (bar only for now)
   wayle idle <cmd>   idle inhibition: on|off|toggle|duration|remaining|status
+  wayle notify <cmd> notifications: list|dismiss|dismiss-all|dnd|status
 
 Not ported yet: audio, config, icons, launch, lock, media, notify,
 panel, power, recorder, screenshot, systray, toast, wallpaper, widget.
@@ -35,6 +37,8 @@ func main() {
 		err = bar.Run()
 	case "idle":
 		err = runIdle(os.Args[2:])
+	case "notify":
+		err = runNotify(os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return
@@ -47,8 +51,75 @@ func main() {
 	}
 }
 
-// runIdle drives the shell's idle-inhibit daemon the way wayle/src/cli/idle
-// does: on|off|toggle [--indefinite], duration <m>, remaining <±m>, status.
+// runNotify drives the shell's notification daemon the way
+// wayle/src/cli/notify does: list|dismiss <id>|dismiss-all|dnd|status.
+func runNotify(args []string) error {
+	if len(args) == 0 {
+		return errors.New("notify needs a command: list|dismiss|dismiss-all|dnd|status")
+	}
+	client, err := notifications.Connect()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+	ctx := context.Background()
+	switch args[0] {
+	case "list":
+		rows, err := client.List(ctx)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			fmt.Println("No notifications")
+			return nil
+		}
+		for _, r := range rows {
+			fmt.Printf("%d %s: %s\n", r.ID, r.App, r.Summary)
+			if r.Body != "" {
+				fmt.Printf("    %s\n", r.Body)
+			}
+		}
+		return nil
+	case "dismiss":
+		if len(args) < 2 {
+			return errors.New("dismiss needs a notification id")
+		}
+		id, err := strconv.ParseUint(args[1], 10, 32)
+		if err != nil {
+			return fmt.Errorf("dismiss: %w", err)
+		}
+		return client.Dismiss(ctx, uint32(id))
+	case "dismiss-all":
+		return client.DismissAll(ctx)
+	case "dnd":
+		on, err := client.ToggleDND(ctx)
+		if err != nil {
+			return err
+		}
+		state := "disabled"
+		if on {
+			state = "enabled"
+		}
+		fmt.Printf("Do Not Disturb: %s\n", state)
+		return nil
+	case "status":
+		count, popups, dnd, err := client.Status(ctx)
+		if err != nil {
+			return err
+		}
+		dndState := "off"
+		if dnd {
+			dndState = "on"
+		}
+		fmt.Printf("Notifications: %d\n", count)
+		fmt.Printf("Active popups: %d\n", popups)
+		fmt.Printf("Do Not Disturb: %s\n", dndState)
+		return nil
+	default:
+		return fmt.Errorf("unknown notify command %q", args[0])
+	}
+}
+
 func runIdle(args []string) error {
 	indefinite := false
 	var positional []string
