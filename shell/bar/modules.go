@@ -125,6 +125,37 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	if err != nil {
 		return err
 	}
-	row.Append(module.Root(), false)
+	binding := moduleBinding(item.Module, ctx.Config)
+	row.Append(wrapActions(module.Root(), binding, func(action config.ClickAction) {
+		runClickAction(ctx, action)
+	}), false)
 	return nil
+}
+
+// moduleBinding looks up the [modules.<name>] bindings a layout item's
+// module carries; unknown modules have none.
+func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
+	switch name {
+	case "battery":
+		return cfg.Battery.Click
+	case "brightness":
+		return cfg.Brightness.Click
+	case "volume":
+		return cfg.Volume.Click
+	case "media":
+		return cfg.Media.Click
+	case "network":
+		return cfg.Network.Click
+	case "bluetooth":
+		return cfg.Bluetooth.Click
+	case "microphone":
+		return cfg.Microphone.Click
+	case "keyboard-layout":
+		return cfg.KeyboardInput.Click
+	case "clock":
+		return cfg.Clock.Click
+	case "cava":
+		return cfg.Cava.Click
+	}
+	return config.ClickConfig{}
 }

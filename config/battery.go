@@ -29,6 +29,7 @@ func (t ThresholdEntry) Matches(value float64) bool {
 
 // BatteryConfig is the battery module config.
 type BatteryConfig struct {
+	Click      ClickConfig
 	Format     string
 	LabelShow  bool
 	Thresholds []ThresholdEntry
@@ -37,6 +38,7 @@ type BatteryConfig struct {
 // DefaultsBattery returns the schema defaults.
 func DefaultsBattery() BatteryConfig {
 	return BatteryConfig{
+		Click:     DefaultsClick(map[string]string{"left-click": "dropdown:battery"}),
 		Format:    "{{ percent }}%",
 		LabelShow: true,
 	}
@@ -77,5 +79,10 @@ func applyBattery(md toml.MetaData, prim toml.Primitive) (BatteryConfig, error) 
 		}
 		cfg.Thresholds = append(cfg.Thresholds, t)
 	}
+	clicks, err := applyClicks(md, prim, cfg.Click)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Click = clicks
 	return cfg, nil
 }

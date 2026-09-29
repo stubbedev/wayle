@@ -36,6 +36,7 @@ var validCavaDirections = map[CavaDirection]bool{
 
 // CavaConfig is the cava module configuration.
 type CavaConfig struct {
+	Click          ClickConfig
 	Bars           int
 	BarWidth       int
 	BarGap         int
@@ -54,6 +55,7 @@ type CavaConfig struct {
 // DefaultsCava returns the schema defaults for the cava module.
 func DefaultsCava() CavaConfig {
 	return CavaConfig{
+		Click:          DefaultsClick(nil),
 		Bars:           20,
 		BarWidth:       6,
 		BarGap:         1,
@@ -153,5 +155,10 @@ func applyCava(md toml.MetaData, prim toml.Primitive) (CavaConfig, error) {
 	case !validCavaDirections[cfg.Direction]:
 		return cfg, fmt.Errorf("cava: invalid direction %q (want normal|reverse|mirror)", cfg.Direction)
 	}
+	clicks, err := applyClicks(md, prim, cfg.Click)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Click = clicks
 	return cfg, nil
 }

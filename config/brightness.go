@@ -9,6 +9,7 @@ import (
 
 // BrightnessConfig is the brightness module config.
 type BrightnessConfig struct {
+	Click      ClickConfig
 	Format     string
 	LabelShow  bool
 	MinBright  int
@@ -19,6 +20,7 @@ type BrightnessConfig struct {
 // DefaultsBrightness returns the schema defaults.
 func DefaultsBrightness() BrightnessConfig {
 	return BrightnessConfig{
+		Click:     DefaultsClick(map[string]string{"left-click": "dropdown:brightness", "scroll-up": "brightness:5", "scroll-down": "brightness:-5"}),
 		Format:    "{{ percent }}%",
 		LabelShow: true,
 		MinBright: 1,
@@ -72,5 +74,10 @@ func applyBrightness(md toml.MetaData, prim toml.Primitive) (BrightnessConfig, e
 		}
 		cfg.Thresholds = append(cfg.Thresholds, t)
 	}
+	clicks, err := applyClicks(md, prim, cfg.Click)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Click = clicks
 	return cfg, nil
 }

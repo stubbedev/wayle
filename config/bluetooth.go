@@ -7,6 +7,7 @@ import (
 // BluetoothConfig is the bluetooth module config (label subset; the
 // icon strings land with icon rendering).
 type BluetoothConfig struct {
+	Click     ClickConfig
 	LabelShow bool
 }
 
@@ -27,5 +28,10 @@ func applyBluetooth(md toml.MetaData, prim toml.Primitive) (BluetoothConfig, err
 	if doc.LabelShow != nil {
 		cfg.LabelShow = *doc.LabelShow
 	}
+	clicks, err := applyClicks(md, prim, cfg.Click)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Click = clicks
 	return cfg, nil
 }

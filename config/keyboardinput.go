@@ -11,6 +11,7 @@ import (
 
 // KeyboardInputConfig is the keyboard-layout module config.
 type KeyboardInputConfig struct {
+	Click          ClickConfig
 	Format         string
 	LabelShow      bool
 	LayoutAliasMap map[string]string
@@ -19,6 +20,7 @@ type KeyboardInputConfig struct {
 // DefaultsKeyboardInput returns the schema defaults.
 func DefaultsKeyboardInput() KeyboardInputConfig {
 	return KeyboardInputConfig{
+		Click:          DefaultsClick(map[string]string{}),
 		Format:         "{{ alias }}",
 		LabelShow:      true,
 		LayoutAliasMap: map[string]string{},
@@ -60,5 +62,10 @@ func applyKeyboardInput(md toml.MetaData, prim toml.Primitive) (KeyboardInputCon
 	if strings.TrimSpace(cfg.Format) == "" {
 		return cfg, errors.New("keyboard-layout: format is empty")
 	}
+	clicks, err := applyClicks(md, prim, cfg.Click)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Click = clicks
 	return cfg, nil
 }

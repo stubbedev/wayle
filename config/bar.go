@@ -57,6 +57,7 @@ type BarLayout struct {
 
 // ClockConfig is the clock module configuration; the format is strftime.
 type ClockConfig struct {
+	Click  ClickConfig
 	Format string
 }
 
@@ -114,6 +115,7 @@ func Defaults() *Config {
 			ButtonGroupRounding:       RoundingSm,
 		},
 		Clock: ClockConfig{
+			Click:  DefaultsClick(map[string]string{"left-click": "dropdown:calendar", "right-click": "dropdown:weather"}),
 			Format: "%a %b %d %I:%M %p",
 		},
 		Cava:               DefaultsCava(),
@@ -238,6 +240,11 @@ func (c *Config) applyTOML(data []byte) error {
 		if err := md.PrimitiveDecode(*doc.Modules.Clock, &clock); err != nil {
 			return err
 		}
+		clicks, err := applyClicks(md, *doc.Modules.Clock, c.Clock.Click)
+		if err != nil {
+			return err
+		}
+		c.Clock.Click = clicks
 		c.Clock.Format = clock.Format
 	}
 	if doc.Modules != nil && doc.Modules.KeyboardLayout != nil {

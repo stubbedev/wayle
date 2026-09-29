@@ -9,6 +9,7 @@ import (
 
 // VolumeConfig is the volume module config.
 type VolumeConfig struct {
+	Click      ClickConfig
 	Format     string
 	LabelShow  bool
 	MuteShows  bool
@@ -18,6 +19,7 @@ type VolumeConfig struct {
 // DefaultsVolume returns the schema defaults.
 func DefaultsVolume() VolumeConfig {
 	return VolumeConfig{
+		Click:     DefaultsClick(map[string]string{"left-click": "dropdown:audio", "middle-click": "wayle audio output-mute"}),
 		Format:    "{{ percent }}%",
 		LabelShow: true,
 		MuteShows: true,
@@ -63,5 +65,10 @@ func applyVolume(md toml.MetaData, prim toml.Primitive) (VolumeConfig, error) {
 		}
 		cfg.Thresholds = append(cfg.Thresholds, t)
 	}
+	clicks, err := applyClicks(md, prim, cfg.Click)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Click = clicks
 	return cfg, nil
 }

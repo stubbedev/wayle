@@ -9,6 +9,7 @@ import (
 
 // MediaConfig is the media module config.
 type MediaConfig struct {
+	Click     ClickConfig
 	Format    string
 	LabelShow bool
 	// LabelMaxLength truncates the label with an ellipsis; 0 disables.
@@ -19,6 +20,7 @@ type MediaConfig struct {
 // DefaultsMedia returns the schema defaults.
 func DefaultsMedia() MediaConfig {
 	return MediaConfig{
+		Click:          DefaultsClick(map[string]string{"left-click": "dropdown:media"}),
 		Format:         "{{ title }} - {{ artist }}",
 		LabelShow:      true,
 		LabelMaxLength: 35,
@@ -67,5 +69,10 @@ func applyMedia(md toml.MetaData, prim toml.Primitive) (MediaConfig, error) {
 		}
 		cfg.Thresholds = append(cfg.Thresholds, t)
 	}
+	clicks, err := applyClicks(md, prim, cfg.Click)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Click = clicks
 	return cfg, nil
 }

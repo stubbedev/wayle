@@ -8,6 +8,7 @@ import (
 
 // NetworkConfig is the network module config.
 type NetworkConfig struct {
+	Click     ClickConfig
 	LabelShow bool
 	// WifiFallback is the label when connected but the SSID is hidden.
 	WifiFallback string
@@ -20,6 +21,7 @@ type NetworkConfig struct {
 // the icon strings land with icon rendering).
 func DefaultsNetwork() NetworkConfig {
 	return NetworkConfig{
+		Click:        DefaultsClick(map[string]string{"left-click": "dropdown:network"}),
 		LabelShow:    true,
 		WifiFallback: "WiFi",
 		Connecting:   "Connecting...",
@@ -62,5 +64,10 @@ func applyNetwork(md toml.MetaData, prim toml.Primitive) (NetworkConfig, error) 
 		}
 		*set.label = *set.raw
 	}
+	clicks, err := applyClicks(md, prim, cfg.Click)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Click = clicks
 	return cfg, nil
 }
