@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
+	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
@@ -60,6 +61,10 @@ func RunWith(cfg *config.Config) error {
 	}
 	baseCtx.Brightness = brightness.NewSysfs()
 	baseCtx.Pulse = pulse.New()
+	if media, err := mpris.NewSession(); err == nil {
+		defer func() { _ = media.Close() }()
+		baseCtx.Media = media
+	}
 
 	outputs := sess.Outputs()
 	if len(outputs) == 0 {

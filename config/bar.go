@@ -73,6 +73,7 @@ type Config struct {
 	Battery            BatteryConfig
 	Brightness         BrightnessConfig
 	Volume             VolumeConfig
+	Media              MediaConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
 	HyprlandWorkspaces HyprlandWorkspacesConfig
@@ -115,6 +116,7 @@ func Defaults() *Config {
 		Battery:            DefaultsBattery(),
 		Brightness:         DefaultsBrightness(),
 		Volume:             DefaultsVolume(),
+		Media:              DefaultsMedia(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -145,6 +147,7 @@ type fileDoc struct {
 		Battery            *toml.Primitive `toml:"battery"`
 		Brightness         *toml.Primitive `toml:"brightness"`
 		Volume             *toml.Primitive `toml:"volume"`
+		Media              *toml.Primitive `toml:"media"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
 	} `toml:"modules"`
@@ -224,6 +227,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Clock.Format = clock.Format
+	}
+	if doc.Modules != nil && doc.Modules.Media != nil {
+		med, err := applyMedia(md, *doc.Modules.Media)
+		if err != nil {
+			return err
+		}
+		c.Media = med
 	}
 	if doc.Modules != nil && doc.Modules.Volume != nil {
 		vol, err := applyVolume(md, *doc.Modules.Volume)
