@@ -68,10 +68,11 @@ type GeneralConfig struct {
 
 // Config is the loaded user configuration.
 type Config struct {
-	Bar     Bar
-	Clock   ClockConfig
-	Cava    CavaConfig
-	General GeneralConfig
+	Bar                Bar
+	Clock              ClockConfig
+	Cava               CavaConfig
+	HyprlandWorkspaces HyprlandWorkspacesConfig
+	General            GeneralConfig
 }
 
 // Defaults returns the schema defaults for every modeled section.
@@ -106,7 +107,8 @@ func Defaults() *Config {
 		Clock: ClockConfig{
 			Format: "%a %b %d %I:%M %p",
 		},
-		Cava: DefaultsCava(),
+		Cava:               DefaultsCava(),
+		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
 			FontSans: "Inter",
 			FontMono: "JetBrains Mono",
@@ -130,8 +132,9 @@ func mustColor(s string) ColorValue {
 type fileDoc struct {
 	Bar     *toml.Primitive `toml:"bar"`
 	Modules *struct {
-		Clock *toml.Primitive `toml:"clock"`
-		Cava  *toml.Primitive `toml:"cava"`
+		Clock              *toml.Primitive `toml:"clock"`
+		Cava               *toml.Primitive `toml:"cava"`
+		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
 	} `toml:"modules"`
 	General *toml.Primitive `toml:"general"`
 }
@@ -216,6 +219,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Cava = cava
+	}
+	if doc.Modules != nil && doc.Modules.HyprlandWorkspaces != nil {
+		hw, err := applyHyprlandWorkspaces(md, *doc.Modules.HyprlandWorkspaces)
+		if err != nil {
+			return err
+		}
+		c.HyprlandWorkspaces = hw
 	}
 	if doc.General != nil {
 		general := generalDoc{}

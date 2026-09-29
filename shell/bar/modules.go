@@ -9,17 +9,32 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/service/hyprland"
 )
 
 // ModuleContext carries what a module needs at construction time: the
 // resolved bar style, the config, and the loop it schedules timers on.
 // App is nil only in headless construction (tests): the module then
-// builds its tree without scheduling updates.
+// builds its tree without scheduling updates. Hyprland is nil when the
+// compositor is not Hyprland; Hyprland-only modules error in that case.
 type ModuleContext struct {
-	Config *config.Config
-	App    *app.Application
-	Font   render.Font
-	Style  *barStyle
+	Config   *config.Config
+	App      *app.Application
+	Font     render.Font
+	Style    *barStyle
+	Hyprland *hyprland.Connection
+	// Connector is the output this bar instance sits on; per-output
+	// modules (workspaces) key their state on it.
+	Connector string
+}
+
+// Invoke marshals fn onto the loop goroutine; a no-op when the context
+// is headless.
+func (c ModuleContext) Invoke(fn func()) {
+	if c.App == nil {
+		return
+	}
+	c.App.Invoke(fn)
 }
 
 // Every schedules fn on the application loop; a no-op when the context
@@ -42,8 +57,9 @@ type Module interface {
 type Factory func(ctx ModuleContext) (Module, error)
 
 var factories = map[string]Factory{
-	"clock": newClock,
-	"cava":  newCava,
+	"clock":               newClock,
+	"cava":                newCava,
+	"hyprland-workspaces": newHyprlandWorkspaces,
 }
 
 // Create builds the module named by a layout entry. Custom modules

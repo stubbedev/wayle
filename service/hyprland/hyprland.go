@@ -18,6 +18,13 @@ import (
 // endOfTransmission terminates every command-socket reply.
 const endOfTransmission = '\x04'
 
+// IsRunning reports whether a Hyprland instance looks reachable: the
+// two environment variables the socket paths derive from are set.
+func IsRunning() bool {
+	_, _, err := Paths()
+	return err == nil
+}
+
 // Paths resolves the IPC socket paths for the running Hyprland
 // instance. Both HYPRLAND_INSTANCE_SIGNATURE and XDG_RUNTIME_DIR must
 // be set; without them Hyprland is not running as far as wayle is

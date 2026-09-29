@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -44,7 +45,12 @@ func RunWith(cfg *config.Config) error {
 		return fmt.Errorf("bar: font %q: %w", cfg.General.FontSans, err)
 	}
 	font := app.FontFallback(face)
-	ctx := ModuleContext{Config: cfg, App: application, Font: font, Style: &style}
+	baseCtx := ModuleContext{Config: cfg, App: application, Font: font, Style: &style}
+	if hyprland.IsRunning() {
+		if conn, err := hyprland.Connect(); err == nil {
+			baseCtx.Hyprland = conn
+		}
+	}
 
 	outputs := sess.Outputs()
 	if len(outputs) == 0 {
@@ -55,6 +61,8 @@ func RunWith(cfg *config.Config) error {
 		if !ok || !layout.Show {
 			continue
 		}
+		ctx := baseCtx
+		ctx.Connector = output.Name
 		lc, err := layerConfigFor(ctx, layout, output.Name, logicalWidth(output.ModeW, output.Scale))
 		if err != nil {
 			return err
