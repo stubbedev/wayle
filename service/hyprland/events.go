@@ -41,6 +41,7 @@ const (
 	EventUrgent         EventKind = "urgent"
 	EventActiveWindow   EventKind = "activewindow"
 	EventActiveWindowV2 EventKind = "activewindowv2"
+	EventSubmap         EventKind = "submap"
 )
 
 // Event is one parsed line from the event socket. Fields not named by
@@ -109,6 +110,9 @@ func ParseEvent(line string) (Event, bool) {
 			return ev, false
 		}
 		ev.Class, ev.Title = class, title
+	case EventSubmap:
+		// The submap name; empty means the default submap.
+		ev.Name = data
 	case EventActiveWindowV2:
 		// address only; event-driven modules re-read state on it.
 	}

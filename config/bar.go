@@ -88,6 +88,7 @@ type Config struct {
 	Netstat            NetstatConfig
 	Mail               MailConfig
 	Power              PowerConfig
+	KeybindMode        KeybindModeConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -146,6 +147,7 @@ func Defaults() *Config {
 		Netstat:            DefaultsNetstat(),
 		Mail:               DefaultsMail(),
 		Power:              DefaultsPower(),
+		KeybindMode:        DefaultsKeybindMode(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -190,6 +192,7 @@ type fileDoc struct {
 		Netstat            *toml.Primitive `toml:"netstat"`
 		Mail               *toml.Primitive `toml:"mail"`
 		Power              *toml.Primitive `toml:"power"`
+		KeybindMode        *toml.Primitive `toml:"keybind-mode"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -296,6 +299,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Modules != nil && doc.Modules.KeybindMode != nil {
+		km, err := applyKeybindMode(md, *doc.Modules.KeybindMode)
+		if err != nil {
+			return err
+		}
+		c.KeybindMode = km
 	}
 	if doc.Modules != nil && doc.Modules.Power != nil {
 		pw, err := applyPower(md, *doc.Modules.Power)
