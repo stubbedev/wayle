@@ -29,6 +29,8 @@ type Device struct {
 type Source interface {
 	// DefaultSink returns the default output's snapshot.
 	DefaultSink(ctx context.Context) (Device, error)
+	// DefaultSource returns the default input's snapshot.
+	DefaultSource(ctx context.Context) (Device, error)
 	// Subscribe ticks on PulseAudio state changes. The channel closes
 	// when ctx completes; stop terminates the listener.
 	Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
@@ -36,6 +38,8 @@ type Source interface {
 	SetVolume(ctx context.Context, percent float64) error
 	// SetMuted toggles or sets mute on the default sink.
 	SetMuted(ctx context.Context, muted bool) error
+	// SetSourceMuted sets mute on the default input.
+	SetSourceMuted(ctx context.Context, muted bool) error
 }
 
 // Pactl runs the real pactl.
@@ -152,6 +156,40 @@ func (p *Pactl) SetMuted(ctx context.Context, muted bool) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	_, err := p.run(ctx, "set-sink-mute", "@DEFAULT_SINK@", state)
+	return err
+}
+
+// DefaultSource queries the default input's volume and mute.
+func (p *Pactl) DefaultSource(ctx context.Context) (Device, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	name, err := p.run(ctx, "get-default-source")
+	if err != nil {
+		return Device{}, err
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return Device{}, errors.New("pulse: no default source")
+	}
+	dev := Device{Name: name}
+	if volOut, err := p.run(ctx, "get-source-volume", "@DEFAULT_SOURCE@"); err == nil {
+		dev.Volume = meanPercent(volOut)
+	}
+	if muteOut, err := p.run(ctx, "get-source-mute", "@DEFAULT_SOURCE@"); err == nil {
+		dev.Muted = strings.Contains(muteOut, "yes")
+	}
+	return dev, nil
+}
+
+// SetSourceMuted sets the default input's mute state.
+func (p *Pactl) SetSourceMuted(ctx context.Context, muted bool) error {
+	state := "0"
+	if muted {
+		state = "1"
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	_, err := p.run(ctx, "set-source-mute", "@DEFAULT_SOURCE@", state)
 	return err
 }
 

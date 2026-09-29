@@ -31,6 +31,12 @@ func (f *fakePulseSource) SetVolume(context.Context, float64) error { return nil
 
 func (f *fakePulseSource) SetMuted(context.Context, bool) error { return nil }
 
+func (f *fakePulseSource) DefaultSource(context.Context) (pulse.Device, error) {
+	return f.dev, nil
+}
+
+func (f *fakePulseSource) SetSourceMuted(context.Context, bool) error { return nil }
+
 func TestVolumeLabelRounds(t *testing.T) {
 	if got := volumeLabel("{{ percent }}%", 12.4); got != "12%" {
 		t.Errorf("= %q, want 12%%", got)

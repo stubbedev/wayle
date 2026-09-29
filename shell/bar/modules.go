@@ -71,6 +71,7 @@ var factories = map[string]Factory{
 	"brightness":          newBrightness,
 	"keyboard-layout":     newKeyboardLayout,
 	"media":               newMedia,
+	"microphone":          newMicrophone,
 	"network":             newNetwork,
 	"volume":              newVolume,
 	"clock":               newClock,

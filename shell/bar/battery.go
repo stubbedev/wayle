@@ -28,7 +28,7 @@ func batteryLabel(format string, percentage float64, present bool) string {
 }
 
 // replaceTemplateVar substitutes {{ name }} and {{name}} occurrences.
-func replaceTemplateVar(format, name, value string) string {
+func replaceTemplateVar(format, name, value string) string { //nolint:unparam // the shared level-template helper; more variables land with OSD clock strings
 	for _, pattern := range []string{"{{ " + name + " }}", "{{" + name + "}}"} {
 		format = strings.ReplaceAll(format, pattern, value)
 	}

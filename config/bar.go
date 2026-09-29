@@ -75,6 +75,7 @@ type Config struct {
 	Volume             VolumeConfig
 	Media              MediaConfig
 	Network            NetworkConfig
+	Microphone         MicrophoneConfig
 	KeyboardInput      KeyboardInputConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -120,6 +121,7 @@ func Defaults() *Config {
 		Volume:             DefaultsVolume(),
 		Media:              DefaultsMedia(),
 		Network:            DefaultsNetwork(),
+		Microphone:         DefaultsMicrophone(),
 		KeyboardInput:      DefaultsKeyboardInput(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
@@ -153,6 +155,7 @@ type fileDoc struct {
 		Volume             *toml.Primitive `toml:"volume"`
 		Media              *toml.Primitive `toml:"media"`
 		Network            *toml.Primitive `toml:"network"`
+		Microphone         *toml.Primitive `toml:"microphone"`
 		KeyboardLayout     *toml.Primitive `toml:"keyboard-layout"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -240,6 +243,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.KeyboardInput = ki
+	}
+	if doc.Modules != nil && doc.Modules.Microphone != nil {
+		mic, err := applyMicrophone(md, *doc.Modules.Microphone)
+		if err != nil {
+			return err
+		}
+		c.Microphone = mic
 	}
 	if doc.Modules != nil && doc.Modules.Network != nil {
 		net, err := applyNetwork(md, *doc.Modules.Network)

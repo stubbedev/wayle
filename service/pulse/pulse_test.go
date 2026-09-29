@@ -116,3 +116,36 @@ func TestSetMutedPassesState(t *testing.T) {
 		t.Errorf("mute calls = %q, want 1 then 0", data)
 	}
 }
+
+func TestDefaultSourceQueries(t *testing.T) {
+	fakePactlScript(t, `case "$1" in
+get-default-source) echo "alsa_input.pci-0000_00_1f.3.analog-stereo" ;;
+get-source-volume) echo "Volume: front-left: 32768 /  50% / -6.00 dB" ;;
+get-source-mute) echo "Mute: no" ;;
+*) exit 1 ;;
+esac`)
+	p := New()
+	dev, err := p.DefaultSource(context.Background())
+	if err != nil {
+		t.Fatalf("DefaultSource: %v", err)
+	}
+	if dev.Name != "alsa_input.pci-0000_00_1f.3.analog-stereo" || dev.Volume < 49.9 || dev.Volume > 50.1 {
+		t.Errorf("source = %+v", dev)
+	}
+}
+
+func TestSetSourceMutedPassesState(t *testing.T) {
+	calls := filepath.Join(t.TempDir(), "calls")
+	fakePactlScript(t, "case \"$1\" in\nset-source-mute) echo \"$3\" >> "+calls+" ;;\nesac")
+	p := New()
+	if err := p.SetSourceMuted(context.Background(), true); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "1\n" {
+		t.Errorf("mute calls = %q, want 1", data)
+	}
+}
