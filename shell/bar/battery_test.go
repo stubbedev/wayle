@@ -138,6 +138,45 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	}
 }
 
+func TestBatteryStateIcon(t *testing.T) {
+	cfg := config.Defaults()
+	source := newFakeBattery(upower.Device{Percentage: 75, State: upower.StateDischarging})
+	style := computeStyle(cfg, styling.Default())
+	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}
+	m := &battery{ctx: ctx, source: source}
+	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	m.icon = moduleIcon(ctx, cfg.Battery.Icon)
+	if m.icon == nil {
+		t.Fatal("the battery icon defaults on")
+	}
+	icon := m.icon.(*widget.Icon)
+
+	// Discharging: the level list bucketed over the percentage.
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := icon.Name(); got != "md-battery_android_frame_6-symbolic" {
+		t.Errorf("icon at 75%% = %q", got)
+	}
+	// Charging overrides the level list.
+	source.dev.State = upower.StateCharging
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := icon.Name(); got != cfg.Battery.ChargingIcon {
+		t.Errorf("charging icon = %q", got)
+	}
+	// Absent falls back to the alert icon.
+	source.dev.State = upower.StateUnknown
+	source.dev.Percentage = 0
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := icon.Name(); got != cfg.Battery.AlertIcon {
+		t.Errorf("absent icon = %q", got)
+	}
+}
+
 func TestBatteryAbsentBatteryShowsNA(t *testing.T) {
 	cfg := config.Defaults()
 	source := newFakeBattery(upower.Device{})

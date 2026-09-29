@@ -53,6 +53,8 @@ type battery struct {
 	ctx    ModuleContext
 	source upower.Source
 	label  *widget.Label
+	icon   widget.Widget
+	root   widget.Widget
 	cancel context.CancelFunc
 }
 
@@ -66,6 +68,8 @@ func newBattery(ctx ModuleContext) (Module, error) {
 	}
 	m := &battery{ctx: ctx, source: ctx.Battery}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	m.icon = moduleIcon(ctx, ctx.Config.Battery.Icon)
+	m.root = assembleModule(ctx, ctx.Config.Battery.Icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -75,7 +79,7 @@ func newBattery(ctx ModuleContext) (Module, error) {
 	return m, nil
 }
 
-// refresh reads the device and updates the label.
+// refresh reads the device and updates the label and state icon.
 func (m *battery) refresh() error {
 	dev, err := m.source.Read(context.Background())
 	if err != nil {
@@ -92,7 +96,30 @@ func (m *battery) refresh() error {
 	}
 	m.label.SetText(label)
 	m.label.SetColor(color)
+	m.setIcon(cfg, dev)
 	return nil
+}
+
+// setIcon follows battery helpers.rs's select_icon: alert when absent
+// or unknown, charging when charging or pending charge, else the
+// level list bucketed by percentage.
+func (m *battery) setIcon(cfg config.BatteryConfig, dev upower.Device) {
+	setter, ok := m.icon.(interface{ SetThemeName(name string) })
+	if !ok {
+		return
+	}
+	var name string
+	switch {
+	case !dev.Present() || dev.State == upower.StateUnknown:
+		name = cfg.AlertIcon
+	case dev.State == upower.StateCharging || dev.State == upower.StatePendingCharge:
+		name = cfg.ChargingIcon
+	case len(cfg.LevelIcons) == 0:
+		name = cfg.AlertIcon
+	default:
+		name = cfg.LevelIcons[levelIndexFloor(dev.Percentage, len(cfg.LevelIcons))]
+	}
+	setter.SetThemeName(name)
 }
 
 // subscribe re-reads on every PropertiesChanged tick.
@@ -115,4 +142,4 @@ func (m *battery) subscribe() error {
 	return nil
 }
 
-func (m *battery) Root() widget.Widget { return m.label }
+func (m *battery) Root() widget.Widget { return m.root }

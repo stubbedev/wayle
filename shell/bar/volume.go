@@ -40,6 +40,8 @@ type volumeModule struct {
 	ctx    ModuleContext
 	source pulse.Source
 	label  *widget.Label
+	icon   widget.Widget
+	root   widget.Widget
 }
 
 func newVolume(ctx ModuleContext) (Module, error) {
@@ -51,6 +53,8 @@ func newVolume(ctx ModuleContext) (Module, error) {
 	}
 	m := &volumeModule{ctx: ctx, source: ctx.Pulse}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	m.icon = moduleIcon(ctx, ctx.Config.Volume.Icon)
+	m.root = assembleModule(ctx, ctx.Config.Volume.Icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -67,7 +71,7 @@ func newVolume(ctx ModuleContext) (Module, error) {
 	return m, nil
 }
 
-// refresh re-reads and restyles the label.
+// refresh re-reads and restyles the label and state icon.
 func (m *volumeModule) refresh() error {
 	dev, err := m.source.DefaultSink(context.Background())
 	if err != nil {
@@ -80,7 +84,21 @@ func (m *volumeModule) refresh() error {
 	}
 	m.label.SetText(label)
 	m.label.SetColor(volumeColor(dev, cfg, m.ctx.Style.palette, m.ctx.Style.fg))
+	if setter, ok := m.icon.(interface{ SetThemeName(name string) }); ok {
+		setter.SetThemeName(volumeIconName(cfg, dev))
+	}
 	return nil
 }
 
-func (m *volumeModule) Root() widget.Widget { return m.label }
+// volumeIconName is volume helpers.rs's select_icon: the muted icon
+// wins, then the level list spans 1..100 across icons 0..n-1 (0%
+// takes the first). The percentage is the rounded average the Rust
+// module feeds in.
+func volumeIconName(cfg config.VolumeConfig, dev pulse.Device) string {
+	if dev.Muted || len(cfg.LevelIcons) == 0 {
+		return cfg.IconMuted
+	}
+	return cfg.LevelIcons[levelIndexSpan(int(math.Round(dev.Volume)), len(cfg.LevelIcons))]
+}
+
+func (m *volumeModule) Root() widget.Widget { return m.root }

@@ -114,16 +114,22 @@ func TestVolumeMutedDimsTheLabel(t *testing.T) {
 
 func TestLoadFileAppliesVolume(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.volume]\nformat = \"S {{ percent }}\"\nlabel-show = false\nicon-muted = false\n"
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+	content := "[modules.volume]\nformat = \"S {{ percent }}\"\nlabel-show = false\nicon-muted = \"ld-x-symbolic\"\nlevel-icons = [\"a\", \"b\"]\n"
+	if err := osWrite(path, content); err != nil {
 		t.Fatal(err)
 	}
 	c, err := config.LoadFile(path)
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if c.Volume.Format != "S {{ percent }}" || c.Volume.LabelShow || c.Volume.MuteShows {
+	if c.Volume.Format != "S {{ percent }}" || c.Volume.LabelShow {
 		t.Errorf("config = %+v", c.Volume)
+	}
+	if c.Volume.IconMuted != "ld-x-symbolic" {
+		t.Errorf("icon-muted = %q", c.Volume.IconMuted)
+	}
+	if len(c.Volume.LevelIcons) != 2 || c.Volume.LevelIcons[0] != "a" {
+		t.Errorf("level-icons = %v", c.Volume.LevelIcons)
 	}
 }
 

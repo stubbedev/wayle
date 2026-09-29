@@ -7,22 +7,37 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// Schema icon defaults (VolumeConfig's level-icons/icon-muted).
+const (
+	defaultVolumeMutedIcon = "ld-volume-x-symbolic"
+)
+
+// DefaultVolumeLevelIcons is the schema's level-icons list, low to
+// maximum.
+func DefaultVolumeLevelIcons() []string {
+	return []string{"ld-volume-symbolic", "ld-volume-1-symbolic", "ld-volume-2-symbolic"}
+}
+
 // VolumeConfig is the volume module config.
 type VolumeConfig struct {
 	Click      ClickConfig
 	Format     string
 	LabelShow  bool
-	MuteShows  bool
+	Icon       IconConfig
+	LevelIcons []string
+	IconMuted  string
 	Thresholds []ThresholdEntry
 }
 
 // DefaultsVolume returns the schema defaults.
 func DefaultsVolume() VolumeConfig {
 	return VolumeConfig{
-		Click:     DefaultsClick(map[string]string{"left-click": "dropdown:audio", "middle-click": "wayle audio output-mute"}),
-		Format:    "{{ percent }}%",
-		LabelShow: true,
-		MuteShows: true,
+		Click:      DefaultsClick(map[string]string{"left-click": "dropdown:audio", "middle-click": "wayle audio output-mute"}),
+		Format:     "{{ percent }}%",
+		LabelShow:  true,
+		Icon:       DefaultsIcon(true, "ld-volume-2-symbolic"),
+		LevelIcons: DefaultVolumeLevelIcons(),
+		IconMuted:  defaultVolumeMutedIcon,
 	}
 }
 
@@ -30,9 +45,13 @@ func DefaultsVolume() VolumeConfig {
 func applyVolume(md toml.MetaData, prim toml.Primitive) (VolumeConfig, error) {
 	cfg := DefaultsVolume()
 	var doc struct {
-		Format        *string `toml:"format"`
-		LabelShow     *bool   `toml:"label-show"`
-		MuteShows     *bool   `toml:"icon-muted"`
+		Format        *string     `toml:"format"`
+		LabelShow     *bool       `toml:"label-show"`
+		IconShow      *bool       `toml:"icon-show"`
+		IconName      *string     `toml:"icon-name"`
+		IconColor     *ColorValue `toml:"icon-color"`
+		LevelIcons    *[]string   `toml:"level-icons"`
+		IconMuted     *string     `toml:"icon-muted"`
 		ThresholdList []struct {
 			Above     *float64 `toml:"above"`
 			Below     *float64 `toml:"below"`
@@ -48,8 +67,20 @@ func applyVolume(md toml.MetaData, prim toml.Primitive) (VolumeConfig, error) {
 	if doc.LabelShow != nil {
 		cfg.LabelShow = *doc.LabelShow
 	}
-	if doc.MuteShows != nil {
-		cfg.MuteShows = *doc.MuteShows
+	if doc.IconShow != nil {
+		cfg.Icon.Show = *doc.IconShow
+	}
+	if doc.IconName != nil {
+		cfg.Icon.Name = *doc.IconName
+	}
+	if doc.IconColor != nil {
+		cfg.Icon.Color = *doc.IconColor
+	}
+	if doc.LevelIcons != nil {
+		cfg.LevelIcons = *doc.LevelIcons
+	}
+	if doc.IconMuted != nil {
+		cfg.IconMuted = *doc.IconMuted
 	}
 	for _, entry := range doc.ThresholdList {
 		if entry.Above == nil && entry.Below == nil {
