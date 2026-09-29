@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -60,7 +61,7 @@ func runIdle(args []string) error {
 		}
 	}
 	if len(positional) == 0 {
-		return fmt.Errorf("idle needs a command: on|off|toggle|duration|remaining|status")
+		return errors.New("idle needs a command: on|off|toggle|duration|remaining|status")
 	}
 	client, err := idleinhibit.Connect()
 	if err != nil {
@@ -124,7 +125,7 @@ func runIdleToggle(ctx context.Context, client *idleinhibit.DBus, indefinite boo
 
 func runIdleRemaining(ctx context.Context, client *idleinhibit.DBus, value string) error {
 	if value == "" {
-		return fmt.Errorf("idle remaining needs minutes (±m)")
+		return errors.New("idle remaining needs minutes (±m)")
 	}
 	if value[0] == '+' || value[0] == '-' {
 		delta, err := strconv.ParseInt(value, 10, 32)
