@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/pulse"
+	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -86,6 +87,7 @@ func RunWith(cfg *config.Config) error {
 	// session bus for the `wayle idle` CLI.
 	inhibitState := idleinhibit.NewState(cfg.IdleInhibit.StartupDuration)
 	baseCtx.IdleInhibit = inhibitState
+	baseCtx.Treeman = treeman.New("treeman")
 	baseCtx.Attachers = &[]interface{ Attach(app.Host) }{}
 	if conn, err := dbus.ConnectSessionBus(); err == nil {
 		defer func() { _ = conn.Close() }()

@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/pulse"
+	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 )
 
@@ -39,6 +40,7 @@ type ModuleContext struct {
 	Network       network.Source
 	PowerProfiles powerprofiles.Source
 	IdleInhibit   *idleinhibit.State
+	Treeman       treeman.Source
 	// Attachers collects modules that need the live layer surface
 	// (idle-inhibit binds its inhibitor to it); RunWith calls Attach
 	// on each once the layer exists.
@@ -97,6 +99,7 @@ var factories = map[string]Factory{
 	"power-profiles":      newPowerProfiles,
 	"hyprsunset":          newHyprsunset,
 	"idle-inhibit":        newIdleInhibit,
+	"treeman":             newTreeman,
 	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,
@@ -217,6 +220,8 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.Hyprsunset.Click
 	case "idle-inhibit":
 		return cfg.IdleInhibit.Click
+	case "treeman":
+		return cfg.Treeman.Click
 	case "clock":
 		return cfg.Clock.Click
 	case "cava":

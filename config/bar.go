@@ -92,6 +92,7 @@ type Config struct {
 	PowerProfiles      PowerProfilesConfig
 	Hyprsunset         HyprsunsetConfig
 	IdleInhibit        IdleInhibitConfig
+	Treeman            TreemanConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -154,6 +155,7 @@ func Defaults() *Config {
 		PowerProfiles:      DefaultsPowerProfiles(),
 		Hyprsunset:         DefaultsHyprsunset(),
 		IdleInhibit:        DefaultsIdleInhibit(),
+		Treeman:            DefaultsTreeman(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -202,6 +204,7 @@ type fileDoc struct {
 		PowerProfiles      *toml.Primitive `toml:"power-profiles"`
 		Hyprsunset         *toml.Primitive `toml:"hyprsunset"`
 		IdleInhibit        *toml.Primitive `toml:"idle-inhibit"`
+		Treeman            *toml.Primitive `toml:"treeman"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -308,6 +311,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Modules != nil && doc.Modules.Treeman != nil {
+		tm, err := applyTreeman(md, *doc.Modules.Treeman)
+		if err != nil {
+			return err
+		}
+		c.Treeman = tm
 	}
 	if doc.Modules != nil && doc.Modules.IdleInhibit != nil {
 		ii, err := applyIdleInhibit(md, *doc.Modules.IdleInhibit)
