@@ -2,7 +2,6 @@ package bar
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/stubbedev/gelm/widget"
 
@@ -21,7 +20,6 @@ type systrayModule struct {
 	ctx   ModuleContext
 	store *sni.Store
 
-	mu    sync.Mutex
 	boxes map[string]widget.Widget
 	root  *widget.Box
 }
