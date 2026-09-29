@@ -90,6 +90,7 @@ type Config struct {
 	Power              PowerConfig
 	KeybindMode        KeybindModeConfig
 	PowerProfiles      PowerProfilesConfig
+	Hyprsunset         HyprsunsetConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -150,6 +151,7 @@ func Defaults() *Config {
 		Power:              DefaultsPower(),
 		KeybindMode:        DefaultsKeybindMode(),
 		PowerProfiles:      DefaultsPowerProfiles(),
+		Hyprsunset:         DefaultsHyprsunset(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -196,6 +198,7 @@ type fileDoc struct {
 		Power              *toml.Primitive `toml:"power"`
 		KeybindMode        *toml.Primitive `toml:"keybind-mode"`
 		PowerProfiles      *toml.Primitive `toml:"power-profiles"`
+		Hyprsunset         *toml.Primitive `toml:"hyprsunset"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -302,6 +305,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Modules != nil && doc.Modules.Hyprsunset != nil {
+		hs, err := applyHyprsunset(md, *doc.Modules.Hyprsunset)
+		if err != nil {
+			return err
+		}
+		c.Hyprsunset = hs
 	}
 	if doc.Modules != nil && doc.Modules.PowerProfiles != nil {
 		pp, err := applyPowerProfiles(md, *doc.Modules.PowerProfiles)

@@ -89,6 +89,7 @@ var factories = map[string]Factory{
 	"power":               newPower,
 	"keybind-mode":        newKeybindMode,
 	"power-profiles":      newPowerProfiles,
+	"hyprsunset":          newHyprsunset,
 	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,
@@ -202,6 +203,8 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.KeybindMode.Click
 	case "power-profiles":
 		return cfg.PowerProfiles.Click
+	case "hyprsunset":
+		return cfg.Hyprsunset.Click
 	case "clock":
 		return cfg.Clock.Click
 	case "cava":
