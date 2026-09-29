@@ -84,10 +84,13 @@ var factories = map[string]Factory{
 }
 
 // Create builds the module named by a layout entry. Custom modules
-// (custom-*) and names outside the registry are errors: a layout
-// naming a module the Go shell cannot build fails loudly instead of
-// silently shortening the bar.
+// (custom-*) resolve through the [modules.custom] definitions; names
+// outside both are errors: a layout naming a module the Go shell
+// cannot build fails loudly instead of silently shortening the bar.
 func Create(name string, ctx ModuleContext) (Module, error) {
+	if def, ok := customDefinition(name, ctx.Config); ok {
+		return newCustomByID(ctx, def.ID)
+	}
 	factory, ok := factories[name]
 	if !ok {
 		return nil, fmt.Errorf("bar: module %q not ported to the Go shell yet", name)
@@ -156,6 +159,9 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.Clock.Click
 	case "cava":
 		return cfg.Cava.Click
+	}
+	if def, ok := customDefinition(name, cfg); ok {
+		return def.Click
 	}
 	return config.ClickConfig{}
 }

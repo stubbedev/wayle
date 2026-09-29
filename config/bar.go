@@ -79,6 +79,7 @@ type Config struct {
 	Microphone         MicrophoneConfig
 	Bluetooth          BluetoothConfig
 	KeyboardInput      KeyboardInputConfig
+	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
 	HyprlandWorkspaces HyprlandWorkspacesConfig
@@ -162,6 +163,7 @@ type fileDoc struct {
 		Microphone         *toml.Primitive `toml:"microphone"`
 		Bluetooth          *toml.Primitive `toml:"bluetooth"`
 		KeyboardLayout     *toml.Primitive `toml:"keyboard-layout"`
+		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
 	} `toml:"modules"`
@@ -253,6 +255,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.KeyboardInput = ki
+	}
+	if doc.Modules != nil && doc.Modules.Custom != nil {
+		defs, err := applyCustomDefinitions(*doc.Modules.Custom)
+		if err != nil {
+			return err
+		}
+		c.Custom = defs
 	}
 	if doc.Modules != nil && doc.Modules.Bluetooth != nil {
 		bt, err := applyBluetooth(md, *doc.Modules.Bluetooth)
