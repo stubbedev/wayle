@@ -79,6 +79,7 @@ type Config struct {
 	Microphone         MicrophoneConfig
 	Bluetooth          BluetoothConfig
 	KeyboardInput      KeyboardInputConfig
+	WindowTitle        WindowTitleConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -128,6 +129,7 @@ func Defaults() *Config {
 		Microphone:         DefaultsMicrophone(),
 		Bluetooth:          DefaultsBluetooth(),
 		KeyboardInput:      DefaultsKeyboardInput(),
+		WindowTitle:        DefaultsWindowTitle(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -163,6 +165,7 @@ type fileDoc struct {
 		Microphone         *toml.Primitive `toml:"microphone"`
 		Bluetooth          *toml.Primitive `toml:"bluetooth"`
 		KeyboardLayout     *toml.Primitive `toml:"keyboard-input"`
+		WindowTitle        *toml.Primitive `toml:"window-title"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -248,6 +251,13 @@ func (c *Config) applyTOML(data []byte) error {
 		}
 		c.Clock.Click = clicks
 		c.Clock.Format = clock.Format
+	}
+	if doc.Modules != nil && doc.Modules.WindowTitle != nil {
+		wt, err := applyWindowTitle(md, *doc.Modules.WindowTitle)
+		if err != nil {
+			return err
+		}
+		c.WindowTitle = wt
 	}
 	if doc.Modules != nil && doc.Modules.KeyboardLayout != nil {
 		ki, err := applyKeyboardInput(md, *doc.Modules.KeyboardLayout)

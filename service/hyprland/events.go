@@ -39,6 +39,8 @@ const (
 	EventMoveWindowV2   EventKind = "movewindowv2"
 	EventFullscreen     EventKind = "fullscreen"
 	EventUrgent         EventKind = "urgent"
+	EventActiveWindow   EventKind = "activewindow"
+	EventActiveWindowV2 EventKind = "activewindowv2"
 )
 
 // Event is one parsed line from the event socket. Fields not named by
@@ -50,6 +52,9 @@ type Event struct {
 	// ID is the numeric workspace/monitor id on v2 events (-1 when the
 	// event carries no id).
 	ID int
+	// Class and Title carry the activewindow event's window data.
+	Class string
+	Title string
 	// Payload is the raw data after the ">>" separator.
 	Payload string
 }
@@ -96,6 +101,16 @@ func ParseEvent(line string) (Event, bool) {
 		ev.Name = data
 	case EventFullscreen, EventUrgent:
 		// payload only
+	case EventActiveWindow:
+		// "class,title" - the title runs to the end of the line and may
+		// carry commas itself (the Rust split_once semantics).
+		class, title, found := strings.Cut(data, ",")
+		if !found {
+			return ev, false
+		}
+		ev.Class, ev.Title = class, title
+	case EventActiveWindowV2:
+		// address only; event-driven modules re-read state on it.
 	}
 	return ev, true
 }
