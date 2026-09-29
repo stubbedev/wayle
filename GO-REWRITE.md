@@ -44,10 +44,17 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] service/hyprland: command + event sockets, dispatch
 - [x] service/upower, service/brightness (sysfs+logind+inotify),
       service/pulse (pactl sink+source), service/mpris (MPRIS2),
-      service/network (NetworkManager), service/bluetooth (BlueZ)
+      service/network (NetworkManager), service/bluetooth (BlueZ),
+      service/sysinfo (proc/stat, meminfo, statfs)
+- [x] module click/scroll bindings: the full ClickAction grammar
+      (dropdown:, brightness:delta/toggle, shell), per-module config,
+      and the native brightness/audio executors
 - [ ] config: YAML configs, runtime layer, hot reload, the rest of the schema
-- [ ] bar: systray (SNI), custom modules, dashboard,
-      button component styling, module click/scroll actions
+- [ ] bar: systray (SNI), dashboard, weather, world-clock, updates,
+      mail, netstat, notifications, power, recorder, screenshot,
+      idle-inhibit, hyprsunset, keybind-mode, power-profiles,
+      treeman, sway/mango/niri workspaces; button component styling;
+      icon rendering (the icon-* config keys)
 - [ ] services: UPower, PipeWire, NetworkManager, ... (the zbus crates)
 - [ ] OSD, launcher, lock screen, settings (per #19 M5 order)
 
