@@ -1,0 +1,239 @@
+package bar
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/gelm/widget"
+	"golang.org/x/image/font/gofont/goregular"
+
+	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/service/upower"
+	"github.com/stubbedev/wayle/styling"
+)
+
+func TestBatteryLabelMatchesRustAssertions(t *testing.T) {
+	// The exact cases from helpers.rs's format_label tests.
+	if got := batteryLabel("{{ percent }}%", 75.0, true); got != "75%" {
+		t.Errorf("= %q, want 75%%", got)
+	}
+	if got := batteryLabel("{{ percent }}", 100.0, true); got != "100" {
+		t.Errorf("= %q, want 100", got)
+	}
+	if got := batteryLabel("Bat: {{ percent }}", 0.4, true); got != "Bat: 0" {
+		t.Errorf("= %q, want rounding down to 0", got)
+	}
+	if got := batteryLabel("{{ percent }}%", 50.0, false); got != "N/A" {
+		t.Errorf("absent battery = %q, want N/A", got)
+	}
+	if got := batteryLabel("{{percent}}%", 75.0, true); got != "75%" {
+		t.Errorf("no-space braces = %q, want 75%%", got)
+	}
+	if got := batteryLabel("{{ percent }} / {{percent}}", 42.6, true); got != "43 / 43" {
+		t.Errorf("repeated var = %q, want 43 twice", got)
+	}
+}
+
+func TestThresholdMatching(t *testing.T) {
+	above := config.ThresholdEntry{Above: ptrF(70), ColorSet: true}
+	if !above.Matches(80) || !above.Matches(70.5) {
+		t.Error("above=70: 80 and 70.5 should match")
+	}
+	if above.Matches(70) {
+		t.Error("above=70: 70 should not match (strictly above)")
+	}
+	both := config.ThresholdEntry{Above: ptrF(10), Below: ptrF(20), ColorSet: true}
+	if !both.Matches(15) {
+		t.Error("10<x<20: 15 should match")
+	}
+	if both.Matches(5) || both.Matches(25) {
+		t.Error("10<x<20: 5 and 25 should not match")
+	}
+	neither := config.ThresholdEntry{ColorSet: true}
+	if neither.Matches(50) {
+		t.Error("a threshold without bounds never matches")
+	}
+}
+
+func ptrF(v float64) *float64 {
+	p := new(float64)
+	*p = v
+	return p
+}
+
+// fakeBattery is a scriptable upower.Source.
+type fakeBattery struct {
+	dev   upower.Device
+	ticks chan struct{}
+	read  chan struct{}
+}
+
+func newFakeBattery(dev upower.Device) *fakeBattery {
+	return &fakeBattery{dev: dev, ticks: make(chan struct{}, 4), read: make(chan struct{}, 1)}
+}
+
+func (f *fakeBattery) Read(context.Context) (upower.Device, error) {
+	select {
+	case f.read <- struct{}{}:
+	default:
+	}
+	return f.dev, nil
+}
+
+func (f *fakeBattery) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
+	return f.ticks, func() {}, nil
+}
+
+func (f *fakeBattery) Push() { f.ticks <- struct{}{} }
+
+func TestBatteryModuleRendersAndRestyles(t *testing.T) {
+	cfg := config.Defaults()
+	threshold := config.ThresholdEntry{Below: ptrF(20), ColorSet: true}
+	cv, err := config.ParseColorValue("status-error")
+	if err != nil {
+		t.Fatal(err)
+	}
+	threshold.IconColor, threshold.ColorSet = cv, true
+	cfg.Battery.Thresholds = []config.ThresholdEntry{threshold}
+	cfg.Bar.Layout = []config.BarLayout{{Monitor: "*"}}
+
+	source := newFakeBattery(upower.Device{Percentage: 75, State: upower.StateDischarging})
+	style := computeStyle(cfg, styling.Default())
+	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}
+	// App is required by the module; Invoke is what the subscription
+	// pumps through. Build with a nil App is refused, so run the module
+	// lifecycle by hand here: construct, read, restyle.
+	if _, err := Create("battery", ctx); err == nil {
+		t.Fatal("nil App: want an error (no loop to subscribe on)")
+	}
+
+	// The refresh path itself is App-independent; drive it directly.
+	m := &battery{ctx: ctx, source: source}
+	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	if err := m.refresh(); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if got := m.label.Text(); got != "75%" {
+		t.Errorf("label = %q, want 75%%", got)
+	}
+	if m.label.Color() != style.fg {
+		t.Errorf("color at 75%% = %#08x, want the default fg", m.label.Color())
+	}
+
+	// Drop below the threshold: same template, error color.
+	source.dev.Percentage = 12
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.label.Text(); got != "12%" {
+		t.Errorf("label = %q, want 12%%", got)
+	}
+	errorColor, _ := styling.ResolveColor(cv, styling.Default())
+	if m.label.Color() != errorColor {
+		t.Errorf("color at 12%% = %#08x, want the status-error override", m.label.Color())
+	}
+}
+
+func TestBatteryAbsentBatteryShowsNA(t *testing.T) {
+	cfg := config.Defaults()
+	source := newFakeBattery(upower.Device{})
+	style := computeStyle(cfg, styling.Default())
+	m := &battery{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}, source: source}
+	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.label.Text(); got != "N/A" {
+		t.Errorf("label = %q, want N/A", got)
+	}
+}
+
+func TestLoadFileAppliesBattery(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	content := `
+[modules.battery]
+format = "Bat {{ percent }}"
+label-show = false
+
+[[modules.battery.thresholds]]
+below = 15
+icon-color = "status-error"
+
+[[modules.battery.thresholds]]
+above = 90
+icon-color = "status-success"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.LoadFile(path)
+	if err != nil {
+		t.Fatalf("LoadFile: %v", err)
+	}
+	if c.Battery.Format != "Bat {{ percent }}" || c.Battery.LabelShow {
+		t.Errorf("format/label-show = %q/%v", c.Battery.Format, c.Battery.LabelShow)
+	}
+	if len(c.Battery.Thresholds) != 2 {
+		t.Fatalf("thresholds = %+v, want 2", c.Battery.Thresholds)
+	}
+	if c.Battery.Thresholds[0].Below == nil || *c.Battery.Thresholds[0].Below != 15 {
+		t.Errorf("threshold[0] = %+v", c.Battery.Thresholds[0])
+	}
+	if !c.Battery.Thresholds[1].ColorSet || c.Battery.Thresholds[1].IconColor.Token != config.TokenStatusSuccess {
+		t.Errorf("threshold[1] = %+v", c.Battery.Thresholds[1])
+	}
+}
+
+func TestLoadFileRejectsBadBattery(t *testing.T) {
+	for _, content := range []string{
+		"[modules.battery]\n[[modules.battery.thresholds]]\nicon-color = \"accent\"\n",
+		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = 10\nicon-color = \"nope\"\n",
+	} {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := config.LoadFile(path); err == nil {
+			t.Errorf("%q: want a load error, got nil", content)
+		}
+	}
+}
+
+func TestStateFromUint32(t *testing.T) {
+	for _, tc := range []struct {
+		wire uint32
+		want upower.DeviceState
+	}{
+		{1, upower.StateCharging},
+		{2, upower.StateDischarging},
+		{4, upower.StateFullyCharged},
+		{7, upower.StateUnknown},
+	} {
+		if got := upower.StateFromUint32(tc.wire); got != tc.want {
+			t.Errorf("StateFromUint32(%d) = %v, want %v", tc.wire, got, tc.want)
+		}
+	}
+}
+
+func TestDevicePresent(t *testing.T) {
+	if (upower.Device{}).Present() {
+		t.Error("zero device: Present = true, want false")
+	}
+	if !(upower.Device{Percentage: 50, State: upower.StateDischarging}).Present() {
+		t.Error("discharging 50%: Present = false, want true")
+	}
+	_ = time.Second
+}
+
+func testFont(t *testing.T) render.Font {
+	t.Helper()
+	face, err := render.LoadFont(goregular.TTF)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return face
+}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/hyprland"
+	"github.com/stubbedev/wayle/service/upower"
 )
 
 // ModuleContext carries what a module needs at construction time: the
@@ -23,6 +24,7 @@ type ModuleContext struct {
 	Font     render.Font
 	Style    *barStyle
 	Hyprland *hyprland.Connection
+	Battery  upower.Source
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
 	Connector string
@@ -57,6 +59,7 @@ type Module interface {
 type Factory func(ctx ModuleContext) (Module, error)
 
 var factories = map[string]Factory{
+	"battery":             newBattery,
 	"clock":               newClock,
 	"cava":                newCava,
 	"hyprland-workspaces": newHyprlandWorkspaces,

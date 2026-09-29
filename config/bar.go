@@ -70,6 +70,7 @@ type GeneralConfig struct {
 type Config struct {
 	Bar                Bar
 	Clock              ClockConfig
+	Battery            BatteryConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
 	HyprlandWorkspaces HyprlandWorkspacesConfig
@@ -109,6 +110,7 @@ func Defaults() *Config {
 			Format: "%a %b %d %I:%M %p",
 		},
 		Cava:               DefaultsCava(),
+		Battery:            DefaultsBattery(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -136,6 +138,7 @@ type fileDoc struct {
 	Modules *struct {
 		Clock              *toml.Primitive `toml:"clock"`
 		Cava               *toml.Primitive `toml:"cava"`
+		Battery            *toml.Primitive `toml:"battery"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
 	} `toml:"modules"`
@@ -222,6 +225,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Cava = cava
+	}
+	if doc.Modules != nil && doc.Modules.Battery != nil {
+		b, err := applyBattery(md, *doc.Modules.Battery)
+		if err != nil {
+			return err
+		}
+		c.Battery = b
 	}
 	if doc.Modules != nil && doc.Modules.Separator != nil {
 		sep, err := applySeparator(md, *doc.Modules.Separator)

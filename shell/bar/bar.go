@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/hyprland"
+	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -50,6 +51,10 @@ func RunWith(cfg *config.Config) error {
 		if conn, err := hyprland.Connect(); err == nil {
 			baseCtx.Hyprland = conn
 		}
+	}
+	if battery, err := upower.NewSystem(); err == nil {
+		defer func() { _ = battery.Close() }()
+		baseCtx.Battery = battery
 	}
 
 	outputs := sess.Outputs()
