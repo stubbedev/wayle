@@ -67,6 +67,7 @@ type Factory func(ctx ModuleContext) (Module, error)
 var factories = map[string]Factory{
 	"battery":             newBattery,
 	"brightness":          newBrightness,
+	"keyboard-layout":     newKeyboardLayout,
 	"media":               newMedia,
 	"volume":              newVolume,
 	"clock":               newClock,
