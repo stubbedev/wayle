@@ -150,7 +150,7 @@ func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
 		s.stopped = true
 		close(stopped)
 	}
-	go s.run(ctx, ticks, stopped)
+	go s.run(ticks, stopped)
 	return ticks, s.stop, nil
 }
 
@@ -163,7 +163,7 @@ func notify(ticks chan struct{}) {
 }
 
 // run is the reconnect loop; the debounce mirrors the Rust service.
-func (s *System) run(ctx context.Context, ticks chan struct{}, stopped chan struct{}) {
+func (s *System) run(ticks chan struct{}, stopped chan struct{}) {
 	notify(ticks)
 	for {
 		select {

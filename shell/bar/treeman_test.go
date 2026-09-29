@@ -14,7 +14,6 @@ import (
 // fakeTreeman is a scripted treeman.Source.
 type fakeTreeman struct {
 	status *treeman.Status
-	ticks  chan struct{}
 }
 
 func (f *fakeTreeman) Read(context.Context) (*treeman.Status, error) { return f.status, nil }
