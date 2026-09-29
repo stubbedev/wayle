@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/recorder"
+	"github.com/stubbedev/wayle/service/sni"
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 )
@@ -45,6 +46,7 @@ type ModuleContext struct {
 	Treeman       treeman.Source
 	Notifications *notifications.Service
 	Recorder      *recorder.State
+	SNI           *sni.Store
 	// Attachers collects modules that need the live layer surface
 	// (idle-inhibit binds its inhibitor to it); RunWith calls Attach
 	// on each once the layer exists.
@@ -106,6 +108,7 @@ var factories = map[string]Factory{
 	"treeman":             newTreeman,
 	"notifications":       newNotification,
 	"recorder":            newRecorder,
+	"systray":             newSystray,
 	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,
@@ -232,6 +235,8 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.Notification.Click
 	case "recorder":
 		return cfg.Recorder.Click
+	case "systray":
+		return cfg.Systray.Click
 	case "clock":
 		return cfg.Clock.Click
 	case "cava":

@@ -21,6 +21,7 @@ import (
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/recorder"
+	"github.com/stubbedev/wayle/service/sni"
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
@@ -97,6 +98,8 @@ func RunWith(cfg *config.Config) error {
 	baseCtx.Notifications = notifSvc
 	recState := recorder.NewState(recorder.WfRecorder{}, time.Duration(cfg.Recorder.StartDelayMS)*time.Millisecond)
 	baseCtx.Recorder = recState
+	sniStore := sni.NewStore()
+	baseCtx.SNI = sniStore
 	if conn, err := dbus.ConnectSessionBus(); err == nil {
 		defer func() { _ = conn.Close() }()
 		server, err := notifications.Serve(conn, notifSvc)
@@ -110,6 +113,11 @@ func RunWith(cfg *config.Config) error {
 		} else {
 			log.Printf("recorder: daemon: %v", err)
 		}
+	}
+	if host, err := sni.NewHost(sniStore); err == nil {
+		defer func() { _ = host.Close() }()
+	} else {
+		log.Printf("systray: host: %v", err)
 	}
 	baseCtx.Attachers = &[]interface{ Attach(app.Host) }{}
 	if conn, err := dbus.ConnectSessionBus(); err == nil {

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/stubbedev/wayle/internal/glob"
 )
 
 // D-Bus identity and server information.
@@ -324,32 +326,9 @@ func (s *Service) startPopupTimerLocked(n *Notification) {
 	s.popups[n.ID] = timer
 }
 
-// globMatch is glob.rs: a case-insensitive `*` wildcard match.
+// globMatch delegates to the shared blocklist matcher.
 func globMatch(pattern, name string) bool {
-	pattern, name = strings.ToLower(pattern), strings.ToLower(name)
-	if pattern == "*" {
-		return true
-	}
-	parts := strings.Split(pattern, "*")
-	if !strings.HasPrefix(name, parts[0]) {
-		return false
-	}
-	pos := len(parts[0])
-	for _, part := range parts[1:] {
-		if part == "" {
-			continue
-		}
-		idx := strings.Index(name[pos:], part)
-		if idx < 0 {
-			return false
-		}
-		pos += idx + len(part)
-	}
-	// The last segment must reach the end unless the pattern ends in *.
-	if last := parts[len(parts)-1]; last != "" && !strings.HasSuffix(pattern, "*") {
-		return strings.HasSuffix(name, last)
-	}
-	return true
+	return glob.Match(pattern, name)
 }
 
 // StateDir is the DND flag's directory ($XDG_STATE_HOME/wayle).
