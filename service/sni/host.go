@@ -26,10 +26,8 @@ type Host struct {
 	conn  *dbus.Conn
 	store *Store
 
-	mu      sync.Mutex
 	owned   bool
 	watcher bool // true: we serve the watcher role ourselves
-	release func()
 	stop    chan struct{}
 }
 
