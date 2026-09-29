@@ -33,13 +33,16 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ## Status
 
-- [x] config: paths, discovery, bar/general/clock/cava subset, defaults, load errors
+- [x] config: paths, discovery, bar/general/clock/cava/separator/
+      hyprland-workspaces subsets, defaults, load errors
 - [x] styling: palette + full token table, ColorValue/Size/rounding resolution
 - [x] bar: layer surfaces per output, layout resolution, chrome (classes,
-      opacity mix, borders, insets, groups), clock and cava modules
+      opacity mix, borders, insets, groups), clock, cava, separator,
+      hyprland-workspaces modules
+- [x] service/hyprland: command + event sockets, dispatch
 - [ ] config: YAML configs, runtime layer, hot reload, the rest of the schema
-- [ ] bar: remaining modules (workspaces, battery, ...), button component styling
-- [ ] services: hyprland/niri/sway IPC, audio, network, ... (the zbus crates)
+- [ ] bar: remaining modules (battery, volume, network, ...), button component styling
+- [ ] services: UPower, PipeWire, NetworkManager, ... (the zbus crates)
 - [ ] OSD, launcher, lock screen, settings (per #19 M5 order)
 
 ## Decisions
