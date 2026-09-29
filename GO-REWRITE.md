@@ -54,11 +54,10 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       and the native brightness/audio executors
 - [ ] config: YAML configs, runtime layer, hot reload, the rest of the schema
 - [ ] bar: systray (SNI), dashboard, notifications, recorder,
-      screenshot, idle-inhibit, treeman, sway/mango/niri workspaces;
-      hyprsunset auto-schedule (geoclue + solar) and persistence;
-      button component styling; icon-map/icon-names state icons;
-      dropdown panels (calendar, weather detail, audio, network,
-      bluetooth, battery, media, power menu)
+      screenshot, treeman, sway/mango/niri workspaces; hyprsunset
+      auto-schedule (geoclue + solar) and persistence; button
+      component styling; dropdown panels (calendar, weather detail,
+      audio, network, bluetooth, battery, media, power menu)
 - [ ] services: UPower, PipeWire, NetworkManager, ... (the zbus crates)
 - [ ] OSD, launcher, lock screen, settings (per #19 M5 order)
 
