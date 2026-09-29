@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/mpris"
@@ -32,6 +33,7 @@ type ModuleContext struct {
 	Brightness brightness.Source
 	Pulse      pulse.Source
 	Media      mpris.Source
+	Bluetooth  bluetooth.Source
 	Network    network.Source
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
@@ -71,6 +73,7 @@ var factories = map[string]Factory{
 	"brightness":          newBrightness,
 	"keyboard-layout":     newKeyboardLayout,
 	"media":               newMedia,
+	"bluetooth":           newBluetooth,
 	"microphone":          newMicrophone,
 	"network":             newNetwork,
 	"volume":              newVolume,

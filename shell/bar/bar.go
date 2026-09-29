@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/mpris"
@@ -62,6 +63,10 @@ func RunWith(cfg *config.Config) error {
 	}
 	baseCtx.Brightness = brightness.NewSysfs()
 	baseCtx.Pulse = pulse.New()
+	if bt, err := bluetooth.NewSystem(); err == nil {
+		defer func() { _ = bt.Close() }()
+		baseCtx.Bluetooth = bt
+	}
 	if nm, err := network.NewSystem(); err == nil {
 		defer func() { _ = nm.Close() }()
 		baseCtx.Network = nm

@@ -7,9 +7,7 @@ import (
 
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/pulse"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // microphoneLabel is helpers.rs's format_label: bare percentage. A
@@ -63,9 +61,7 @@ func (m *microphoneModule) refresh() error {
 	}
 	color := m.ctx.Style.fg
 	if dev.Muted {
-		if muted, ok := styling.ResolveColor(config.ColorValue{Token: config.TokenFgMuted}, m.ctx.Style.palette); ok {
-			color = muted
-		}
+		color = mutedFg(m.ctx.Style.palette)
 	}
 	m.label.SetText(label)
 	m.label.SetColor(color)

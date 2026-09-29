@@ -44,9 +44,7 @@ func networkLabel(snap network.Snapshot, cfg config.NetworkConfig) string {
 func networkColor(snap network.Snapshot, palette *styling.Palette, fallback render.Color) render.Color {
 	connected := snap.WifiConnected || snap.WiredConnected
 	if !connected {
-		if color, ok := styling.ResolveColor(config.ColorValue{Token: config.TokenFgMuted}, palette); ok {
-			return color
-		}
+		return mutedFg(palette)
 	}
 	return fallback
 }

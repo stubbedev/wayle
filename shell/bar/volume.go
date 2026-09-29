@@ -26,9 +26,7 @@ func volumeLabel(format string, percent float64) string {
 // level, else the default fg.
 func volumeColor(dev pulse.Device, cfg config.VolumeConfig, palette *styling.Palette, fallback render.Color) render.Color {
 	if dev.Muted {
-		if color, ok := styling.ResolveColor(config.ColorValue{Token: config.TokenFgMuted}, palette); ok {
-			return color
-		}
+		return mutedFg(palette)
 	}
 	if override, ok := thresholdColor(dev.Volume, cfg.Thresholds, palette); ok {
 		return override
