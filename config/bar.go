@@ -89,6 +89,7 @@ type Config struct {
 	Mail               MailConfig
 	Power              PowerConfig
 	KeybindMode        KeybindModeConfig
+	PowerProfiles      PowerProfilesConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -148,6 +149,7 @@ func Defaults() *Config {
 		Mail:               DefaultsMail(),
 		Power:              DefaultsPower(),
 		KeybindMode:        DefaultsKeybindMode(),
+		PowerProfiles:      DefaultsPowerProfiles(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -193,6 +195,7 @@ type fileDoc struct {
 		Mail               *toml.Primitive `toml:"mail"`
 		Power              *toml.Primitive `toml:"power"`
 		KeybindMode        *toml.Primitive `toml:"keybind-mode"`
+		PowerProfiles      *toml.Primitive `toml:"power-profiles"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -299,6 +302,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Modules != nil && doc.Modules.PowerProfiles != nil {
+		pp, err := applyPowerProfiles(md, *doc.Modules.PowerProfiles)
+		if err != nil {
+			return err
+		}
+		c.PowerProfiles = pp
 	}
 	if doc.Modules != nil && doc.Modules.KeybindMode != nil {
 		km, err := applyKeybindMode(md, *doc.Modules.KeybindMode)

@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/network"
+	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
@@ -70,6 +71,10 @@ func RunWith(cfg *config.Config) error {
 	if nm, err := network.NewSystem(); err == nil {
 		defer func() { _ = nm.Close() }()
 		baseCtx.Network = nm
+	}
+	if pp, err := powerprofiles.NewSystem(); err == nil {
+		defer func() { _ = pp.Close() }()
+		baseCtx.PowerProfiles = pp
 	}
 	if media, err := mpris.NewSession(); err == nil {
 		defer func() { _ = media.Close() }()

@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/network"
+	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/upower"
 )
@@ -24,17 +25,18 @@ import (
 // builds its tree without scheduling updates. Hyprland is nil when the
 // compositor is not Hyprland; Hyprland-only modules error in that case.
 type ModuleContext struct {
-	Config     *config.Config
-	App        *app.Application
-	Font       render.Font
-	Style      *barStyle
-	Hyprland   *hyprland.Connection
-	Battery    upower.Source
-	Brightness brightness.Source
-	Pulse      pulse.Source
-	Media      mpris.Source
-	Bluetooth  bluetooth.Source
-	Network    network.Source
+	Config        *config.Config
+	App           *app.Application
+	Font          render.Font
+	Style         *barStyle
+	Hyprland      *hyprland.Connection
+	Battery       upower.Source
+	Brightness    brightness.Source
+	Pulse         pulse.Source
+	Media         mpris.Source
+	Bluetooth     bluetooth.Source
+	Network       network.Source
+	PowerProfiles powerprofiles.Source
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
 	Connector string
@@ -86,6 +88,7 @@ var factories = map[string]Factory{
 	"mail":                newMail,
 	"power":               newPower,
 	"keybind-mode":        newKeybindMode,
+	"power-profiles":      newPowerProfiles,
 	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,
@@ -139,7 +142,19 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 		return err
 	}
 	binding := moduleBinding(item.Module, ctx.Config)
+	var handler interface {
+		RunAction(config.ClickAction)
+	}
+	if h, ok := module.(interface {
+		RunAction(config.ClickAction)
+	}); ok {
+		handler = h
+	}
 	row.Append(wrapActions(module.Root(), binding, func(action config.ClickAction) {
+		if handler != nil {
+			handler.RunAction(action)
+			return
+		}
 		runClickAction(ctx, action)
 	}), false)
 	return nil
@@ -185,6 +200,8 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.Power.Click
 	case "keybind-mode":
 		return cfg.KeybindMode.Click
+	case "power-profiles":
+		return cfg.PowerProfiles.Click
 	case "clock":
 		return cfg.Clock.Click
 	case "cava":
