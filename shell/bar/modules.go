@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
+	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/upower"
 )
 
@@ -27,6 +28,7 @@ type ModuleContext struct {
 	Hyprland   *hyprland.Connection
 	Battery    upower.Source
 	Brightness brightness.Source
+	Pulse      pulse.Source
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
 	Connector string
@@ -63,6 +65,7 @@ type Factory func(ctx ModuleContext) (Module, error)
 var factories = map[string]Factory{
 	"battery":             newBattery,
 	"brightness":          newBrightness,
+	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,
 	"hyprland-workspaces": newHyprlandWorkspaces,

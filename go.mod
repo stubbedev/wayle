@@ -7,6 +7,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/stubbedev/gelm v0.0.0-20260928211541-e058e0048ab1
 	golang.org/x/image v0.46.0
+	golang.org/x/sys v0.48.0
 	gonum.org/v1/gonum v0.17.0
 )
 
@@ -19,7 +20,6 @@ require (
 	github.com/unxed/xkb-go v0.1.8 // indirect
 	github.com/yalue/native_endian v1.0.2 // indirect
 	golang.org/x/net v0.45.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 )
 
