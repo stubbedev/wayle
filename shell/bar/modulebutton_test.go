@@ -61,7 +61,7 @@ func TestModuleClickDefaultsMatchSchema(t *testing.T) {
 		t.Errorf("clock right-click = %q", got)
 	}
 	if cfg.KeyboardInput.Click.LeftClick.Kind != config.ClickNone {
-		t.Errorf("keyboard-layout left-click = %+v, want none", cfg.KeyboardInput.Click.LeftClick)
+		t.Errorf("keyboard-input left-click = %+v, want none", cfg.KeyboardInput.Click.LeftClick)
 	}
 }
 

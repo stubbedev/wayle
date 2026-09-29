@@ -71,7 +71,7 @@ type Factory func(ctx ModuleContext) (Module, error)
 var factories = map[string]Factory{
 	"battery":             newBattery,
 	"brightness":          newBrightness,
-	"keyboard-layout":     newKeyboardLayout,
+	"keyboard-input":     newKeyboardLayout,
 	"media":               newMedia,
 	"bluetooth":           newBluetooth,
 	"microphone":          newMicrophone,
@@ -153,7 +153,7 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.Bluetooth.Click
 	case "microphone":
 		return cfg.Microphone.Click
-	case "keyboard-layout":
+	case "keyboard-input":
 		return cfg.KeyboardInput.Click
 	case "clock":
 		return cfg.Clock.Click

@@ -9,7 +9,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// KeyboardInputConfig is the keyboard-layout module config.
+// KeyboardInputConfig is the keyboard-input module config.
 type KeyboardInputConfig struct {
 	Click          ClickConfig
 	Format         string
@@ -27,7 +27,7 @@ func DefaultsKeyboardInput() KeyboardInputConfig {
 	}
 }
 
-// applyKeyboardInput overlays [modules.keyboard-layout].
+// applyKeyboardInput overlays [modules.keyboard-input].
 func applyKeyboardInput(md toml.MetaData, prim toml.Primitive) (KeyboardInputConfig, error) {
 	cfg := DefaultsKeyboardInput()
 	var doc struct {
@@ -54,13 +54,13 @@ func applyKeyboardInput(md toml.MetaData, prim toml.Primitive) (KeyboardInputCon
 		for _, key := range keys {
 			alias, ok := doc.AliasMap[key].(string)
 			if !ok {
-				return cfg, fmt.Errorf("keyboard-layout: layout-alias-map[%q] is not a string", key)
+				return cfg, fmt.Errorf("keyboard-input: layout-alias-map[%q] is not a string", key)
 			}
 			cfg.LayoutAliasMap[key] = alias
 		}
 	}
 	if strings.TrimSpace(cfg.Format) == "" {
-		return cfg, errors.New("keyboard-layout: format is empty")
+		return cfg, errors.New("keyboard-input: format is empty")
 	}
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {

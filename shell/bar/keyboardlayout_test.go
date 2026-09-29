@@ -109,7 +109,7 @@ func TestKeyboardLayoutModuleRenders(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	ctx.Hyprland = newFakeDevicesConn(t, devicesJSON)
 
-	module, err := Create("keyboard-layout", ctx)
+	module, err := Create("keyboard-input", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -126,14 +126,14 @@ func TestNewKeyboardLayoutRequiresHyprland(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Hyprland = nil
-	if _, err := Create("keyboard-layout", ctx); err == nil {
+	if _, err := Create("keyboard-input", ctx); err == nil {
 		t.Fatal("no Hyprland: want an error, got a module")
 	}
 }
 
 func TestLoadFileAppliesKeyboardLayout(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.keyboard-layout]\nformat = \"KB {{ layout }}\"\nlabel-show = false\n\n[modules.keyboard-layout.layout-alias-map]\nus = \"EN\"\nde = \"DE\"\n"
+	content := "[modules.keyboard-input]\nformat = \"KB {{ layout }}\"\nlabel-show = false\n\n[modules.keyboard-input.layout-alias-map]\nus = \"EN\"\nde = \"DE\"\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -151,9 +151,9 @@ func TestLoadFileAppliesKeyboardLayout(t *testing.T) {
 
 func TestLoadFileRejectsBadKeyboardLayout(t *testing.T) {
 	for _, content := range []string{
-		"[modules.keyboard-layout]\nformat = \"\"\n",
-		"[modules.keyboard-layout]\nformat = \"   \"\n",
-		"[modules.keyboard-layout]\n[modules.keyboard-layout.layout-alias-map]\nus = 3\n",
+		"[modules.keyboard-input]\nformat = \"\"\n",
+		"[modules.keyboard-input]\nformat = \"   \"\n",
+		"[modules.keyboard-input]\n[modules.keyboard-input.layout-alias-map]\nus = 3\n",
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

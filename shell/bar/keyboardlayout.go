@@ -10,7 +10,7 @@ import (
 	"github.com/stubbedev/wayle/service/hyprland"
 )
 
-// The keyboard-layout source logic from keyboard_input/sources/hyprland.rs:
+// The keyboard-input source logic from keyboard_input/sources/hyprland.rs:
 // Hyprland names the throwaway keyboards that wtype and friends create
 // for a single synthetic keystroke, and reports placeholder keymaps
 // while a keyboard has no usable xkb state.
@@ -63,7 +63,7 @@ type keyboardLayout struct {
 
 func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 	if ctx.Hyprland == nil {
-		return nil, errors.New("keyboard-layout: the compositor is not Hyprland")
+		return nil, errors.New("keyboard-input: the compositor is not Hyprland")
 	}
 	m := &keyboardLayout{ctx: ctx, conn: ctx.Hyprland}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)

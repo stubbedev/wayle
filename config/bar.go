@@ -162,7 +162,7 @@ type fileDoc struct {
 		Network            *toml.Primitive `toml:"network"`
 		Microphone         *toml.Primitive `toml:"microphone"`
 		Bluetooth          *toml.Primitive `toml:"bluetooth"`
-		KeyboardLayout     *toml.Primitive `toml:"keyboard-layout"`
+		KeyboardLayout     *toml.Primitive `toml:"keyboard-input"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
