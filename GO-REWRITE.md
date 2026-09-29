@@ -33,12 +33,23 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ## Status
 
-- [x] config: paths, discovery, bar/general/clock subset, defaults, load errors
-- [x] bar: layer surfaces per output, layout resolution, clock module
+- [x] config: paths, discovery, bar/general/clock/cava subset, defaults, load errors
+- [x] styling: palette + full token table, ColorValue/Size/rounding resolution
+- [x] bar: layer surfaces per output, layout resolution, chrome (classes,
+      opacity mix, borders, insets, groups), clock and cava modules
 - [ ] config: YAML configs, runtime layer, hot reload, the rest of the schema
-- [ ] bar: styling tokens (wayle-styling port), per-side padding, groups as containers, remaining modules
+- [ ] bar: remaining modules (workspaces, battery, ...), button component styling
 - [ ] services: hyprland/niri/sway IPC, audio, network, ... (the zbus crates)
 - [ ] OSD, launcher, lock screen, settings (per #19 M5 order)
+
+## Decisions
+
+- **cava stays, capture via `pw-record`.** No maintained pure-Go
+  PipeWire/PulseAudio monitor client exists (purego-pipewire is dormant,
+  tubo is playback-only, go-audio-capture is hw: mic-only), so the
+  analyzer is a faithful cavacore.c translation on gonum's FFT and the
+  PCM comes from a `pw-record` subprocess. The wave style and stereo
+  split are not ported and error at module creation.
 
 ## Known deviations from the Rust shell
 
