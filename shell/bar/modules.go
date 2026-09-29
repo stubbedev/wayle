@@ -77,6 +77,9 @@ var factories = map[string]Factory{
 	"microphone":          newMicrophone,
 	"network":             newNetwork,
 	"window-title":        newWindowTitle,
+	"cpu":                 newCpu,
+	"ram":                 newRam,
+	"storage":             newStorage,
 	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,
@@ -158,6 +161,12 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.KeyboardInput.Click
 	case "window-title":
 		return cfg.WindowTitle.Click
+	case "cpu":
+		return cfg.CPU.Click
+	case "ram":
+		return cfg.RAM.Click
+	case "storage":
+		return cfg.Storage.Click
 	case "clock":
 		return cfg.Clock.Click
 	case "cava":

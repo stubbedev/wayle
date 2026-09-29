@@ -80,6 +80,9 @@ type Config struct {
 	Bluetooth          BluetoothConfig
 	KeyboardInput      KeyboardInputConfig
 	WindowTitle        WindowTitleConfig
+	CPU                CPUConfig
+	RAM                RAMConfig
+	Storage            StorageConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -130,6 +133,9 @@ func Defaults() *Config {
 		Bluetooth:          DefaultsBluetooth(),
 		KeyboardInput:      DefaultsKeyboardInput(),
 		WindowTitle:        DefaultsWindowTitle(),
+		CPU:                DefaultsSysinfoCpu(),
+		RAM:                DefaultsSysinfoRam(),
+		Storage:            DefaultsSysinfoStorage(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -166,6 +172,9 @@ type fileDoc struct {
 		Bluetooth          *toml.Primitive `toml:"bluetooth"`
 		KeyboardLayout     *toml.Primitive `toml:"keyboard-input"`
 		WindowTitle        *toml.Primitive `toml:"window-title"`
+		CPU                *toml.Primitive `toml:"cpu"`
+		RAM                *toml.Primitive `toml:"ram"`
+		Storage            *toml.Primitive `toml:"storage"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -251,6 +260,27 @@ func (c *Config) applyTOML(data []byte) error {
 		}
 		c.Clock.Click = clicks
 		c.Clock.Format = clock.Format
+	}
+	if doc.Modules != nil && doc.Modules.CPU != nil {
+		cpu, err := applyCpu(md, *doc.Modules.CPU)
+		if err != nil {
+			return err
+		}
+		c.CPU = cpu
+	}
+	if doc.Modules != nil && doc.Modules.RAM != nil {
+		ram, err := applyRam(md, *doc.Modules.RAM)
+		if err != nil {
+			return err
+		}
+		c.RAM = ram
+	}
+	if doc.Modules != nil && doc.Modules.Storage != nil {
+		st, err := applyStorage(md, *doc.Modules.Storage)
+		if err != nil {
+			return err
+		}
+		c.Storage = st
 	}
 	if doc.Modules != nil && doc.Modules.WindowTitle != nil {
 		wt, err := applyWindowTitle(md, *doc.Modules.WindowTitle)
