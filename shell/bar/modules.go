@@ -80,6 +80,8 @@ var factories = map[string]Factory{
 	"cpu":                 newCpu,
 	"ram":                 newRam,
 	"storage":             newStorage,
+	"weather":             newWeather,
+	"world-clock":         newWorldClock,
 	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,
@@ -167,6 +169,10 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.RAM.Click
 	case "storage":
 		return cfg.Storage.Click
+	case "weather":
+		return cfg.Weather.Click
+	case "world-clock":
+		return cfg.WorldClock.Click
 	case "clock":
 		return cfg.Clock.Click
 	case "cava":

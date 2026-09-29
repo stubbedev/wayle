@@ -105,6 +105,7 @@ var layouts = map[byte]string{
 // custom maps specifiers needing arithmetic beyond a Go layout.
 var custom = map[byte]func(time.Time) string{
 	'j': func(t time.Time) string { return fmt.Sprintf("%03d", t.YearDay()) },
+	'Z': func(t time.Time) string { return t.Format("MST") },
 	'u': func(t time.Time) string {
 		if wd := int(t.Weekday()); wd == 0 {
 			return "7"

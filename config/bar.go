@@ -83,6 +83,8 @@ type Config struct {
 	CPU                CPUConfig
 	RAM                RAMConfig
 	Storage            StorageConfig
+	Weather            WeatherConfig
+	WorldClock         WorldClockConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -136,6 +138,8 @@ func Defaults() *Config {
 		CPU:                DefaultsSysinfoCpu(),
 		RAM:                DefaultsSysinfoRam(),
 		Storage:            DefaultsSysinfoStorage(),
+		Weather:            DefaultsWeather(),
+		WorldClock:         DefaultsWorldClock(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -175,6 +179,8 @@ type fileDoc struct {
 		CPU                *toml.Primitive `toml:"cpu"`
 		RAM                *toml.Primitive `toml:"ram"`
 		Storage            *toml.Primitive `toml:"storage"`
+		Weather            *toml.Primitive `toml:"weather"`
+		WorldClock         *toml.Primitive `toml:"world-clock"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -274,6 +280,20 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.RAM = ram
+	}
+	if doc.Modules != nil && doc.Modules.Weather != nil {
+		w, err := applyWeather(md, *doc.Modules.Weather)
+		if err != nil {
+			return err
+		}
+		c.Weather = w
+	}
+	if doc.Modules != nil && doc.Modules.WorldClock != nil {
+		wc, err := applyWorldClock(md, *doc.Modules.WorldClock)
+		if err != nil {
+			return err
+		}
+		c.WorldClock = wc
 	}
 	if doc.Modules != nil && doc.Modules.Storage != nil {
 		st, err := applyStorage(md, *doc.Modules.Storage)
