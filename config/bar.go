@@ -94,6 +94,7 @@ type Config struct {
 	IdleInhibit        IdleInhibitConfig
 	Treeman            TreemanConfig
 	Notification       NotificationConfig
+	Recorder           RecorderConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -158,6 +159,7 @@ func Defaults() *Config {
 		IdleInhibit:        DefaultsIdleInhibit(),
 		Treeman:            DefaultsTreeman(),
 		Notification:       DefaultsNotification(),
+		Recorder:           DefaultsRecorder(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -208,6 +210,7 @@ type fileDoc struct {
 		IdleInhibit        *toml.Primitive `toml:"idle-inhibit"`
 		Treeman            *toml.Primitive `toml:"treeman"`
 		Notifications      *toml.Primitive `toml:"notifications"`
+		Recorder           *toml.Primitive `toml:"recorder"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -314,6 +317,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Modules != nil && doc.Modules.Recorder != nil {
+		r, err := applyRecorder(md, *doc.Modules.Recorder)
+		if err != nil {
+			return err
+		}
+		c.Recorder = r
 	}
 	if doc.Modules != nil && doc.Modules.Notifications != nil {
 		n, err := applyNotification(md, *doc.Modules.Notifications)

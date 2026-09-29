@@ -12,6 +12,7 @@ import (
 
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/notifications"
+	"github.com/stubbedev/wayle/service/recorder"
 	"github.com/stubbedev/wayle/shell/bar"
 )
 
@@ -21,6 +22,7 @@ Usage:
   wayle shell        run the shell (bar only for now)
   wayle idle <cmd>   idle inhibition: on|off|toggle|duration|remaining|status
   wayle notify <cmd> notifications: list|dismiss|dismiss-all|dnd|status
+  wayle recorder <cmd> recording: toggle|start|stop|pause|resume|status
 
 Not ported yet: audio, config, icons, launch, lock, media, notify,
 panel, power, recorder, screenshot, systray, toast, wallpaper, widget.
@@ -39,6 +41,8 @@ func main() {
 		err = runIdle(os.Args[2:])
 	case "notify":
 		err = runNotify(os.Args[2:])
+	case "recorder":
+		err = runRecorder(os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return
@@ -48,6 +52,59 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "wayle:", err)
 		os.Exit(1)
+	}
+}
+
+// runRecorder drives the shell's recorder daemon the way
+// wayle/src/cli/recorder does.
+func runRecorder(args []string) error {
+	if len(args) == 0 {
+		return errors.New("recorder needs a command: toggle|start|stop|pause|resume|status")
+	}
+	client, err := recorder.Connect()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+	ctx := context.Background()
+	switch args[0] {
+	case "toggle":
+		status, err := client.Toggle(ctx)
+		if err == nil {
+			fmt.Printf("Recording: %s\n", status)
+		}
+		return err
+	case "start":
+		status, err := client.Start(ctx)
+		if err == nil {
+			fmt.Printf("Recording: %s\n", status)
+		}
+		return err
+	case "stop":
+		status, err := client.Stop(ctx)
+		if err == nil {
+			fmt.Printf("Recording: %s\n", status)
+		}
+		return err
+	case "pause":
+		_, err := client.SetPaused(ctx, true)
+		return err
+	case "resume":
+		_, err := client.SetPaused(ctx, false)
+		return err
+	case "status":
+		snap, err := client.Status(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Recording: %s\n", snap.Status)
+		fmt.Printf("Elapsed: %s\n", recorder.FormatElapsed(snap.ElapsedSecs))
+		if snap.OutputPath != "" {
+			fmt.Printf("Output: %s\n", snap.OutputPath)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown recorder command %q", args[0])
 	}
 }
 

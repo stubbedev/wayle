@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/app"
@@ -19,6 +20,7 @@ import (
 	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/pulse"
+	"github.com/stubbedev/wayle/service/recorder"
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
@@ -93,6 +95,8 @@ func RunWith(cfg *config.Config) error {
 	// bus; other senders deliver through it.
 	notifSvc := notifications.NewService()
 	baseCtx.Notifications = notifSvc
+	recState := recorder.NewState(recorder.WfRecorder{}, time.Duration(cfg.Recorder.StartDelayMS)*time.Millisecond)
+	baseCtx.Recorder = recState
 	if conn, err := dbus.ConnectSessionBus(); err == nil {
 		defer func() { _ = conn.Close() }()
 		server, err := notifications.Serve(conn, notifSvc)
@@ -100,6 +104,11 @@ func RunWith(cfg *config.Config) error {
 			log.Printf("notifications: daemon: %v", err)
 		} else {
 			defer func() { _ = server.Release() }()
+		}
+		if release, err := recorder.NewDaemon(recState).Export(conn); err == nil {
+			defer release()
+		} else {
+			log.Printf("recorder: daemon: %v", err)
 		}
 	}
 	baseCtx.Attachers = &[]interface{ Attach(app.Host) }{}
