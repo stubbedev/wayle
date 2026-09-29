@@ -5,6 +5,7 @@ package sysinfo
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,11 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
+)
+
+var (
+	errCPUShortLine = errors.New("sysinfo: /proc/stat cpu line too short")
+	errNoCpuLine    = errors.New("sysinfo: /proc/stat has no cpu line")
 )
 
 // ProcRoot is the procfs mount; tests repoint it at a fake tree.
@@ -38,7 +44,7 @@ func ReadCpuSample() (CpuSample, error) {
 		}
 		fields := strings.Fields(line)[1:]
 		if len(fields) < 4 {
-			return CpuSample{}, fmt.Errorf("sysinfo: /proc/stat cpu line too short")
+			return CpuSample{}, errCPUShortLine
 		}
 		var total, idle uint64
 		for i, field := range fields {
@@ -56,7 +62,7 @@ func ReadCpuSample() (CpuSample, error) {
 	if err := scanner.Err(); err != nil {
 		return CpuSample{}, fmt.Errorf("sysinfo: read /proc/stat: %w", err)
 	}
-	return CpuSample{}, fmt.Errorf("sysinfo: /proc/stat has no cpu line")
+	return CpuSample{}, errNoCpuLine
 }
 
 // Usage returns the percent of non-idle time between two samples.
