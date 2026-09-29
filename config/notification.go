@@ -1,6 +1,9 @@
 package config
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/BurntSushi/toml"
 )
 
@@ -37,12 +40,17 @@ func DefaultsNotification() NotificationConfig {
 func applyNotification(md toml.MetaData, prim toml.Primitive) (NotificationConfig, error) {
 	cfg := DefaultsNotification()
 	var doc struct {
-		LabelShow  *bool       `toml:"label-show"`
-		IconShow   *bool       `toml:"icon-show"`
-		IconName   *string     `toml:"icon-name"`
-		IconColor  *ColorValue `toml:"icon-color"`
-		IconUnread *string     `toml:"icon-unread"`
-		IconDnd    *string     `toml:"icon-dnd"`
+		LabelShow     *bool       `toml:"label-show"`
+		IconShow      *bool       `toml:"icon-show"`
+		IconName      *string     `toml:"icon-name"`
+		IconColor     *ColorValue `toml:"icon-color"`
+		IconUnread    *string     `toml:"icon-unread"`
+		IconDnd       *string     `toml:"icon-dnd"`
+		ThresholdList []struct {
+			Above     *float64 `toml:"above"`
+			Below     *float64 `toml:"below"`
+			IconColor string   `toml:"icon-color"`
+		} `toml:"thresholds"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -64,6 +72,20 @@ func applyNotification(md toml.MetaData, prim toml.Primitive) (NotificationConfi
 	}
 	if doc.IconDnd != nil {
 		cfg.IconDnd = *doc.IconDnd
+	}
+	for _, entry := range doc.ThresholdList {
+		if entry.Above == nil && entry.Below == nil {
+			return cfg, errors.New("notifications: threshold needs above or below")
+		}
+		th := ThresholdEntry{Above: entry.Above, Below: entry.Below}
+		if entry.IconColor != "" {
+			cv, err := ParseColorValue(entry.IconColor)
+			if err != nil {
+				return cfg, fmt.Errorf("notifications: threshold icon-color: %w", err)
+			}
+			th.IconColor, th.ColorSet = cv, true
+		}
+		cfg.Thresholds = append(cfg.Thresholds, th)
 	}
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
