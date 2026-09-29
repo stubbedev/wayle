@@ -248,7 +248,9 @@ func (m *customModule) apply(out string) {
 	}
 }
 
-func (m *customModule) Root() widget.Widget { return m.label }
+func (m *customModule) Root() widget.Widget {
+	return assembleModule(m.ctx, m.def.Icon, m.label)
+}
 
 // Stop releases the poll/watch goroutine.
 func (m *customModule) Stop() {

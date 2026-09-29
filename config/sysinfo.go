@@ -14,6 +14,7 @@ type SysinfoConfig struct {
 	LabelShow  bool
 	PollMs     int
 	Thresholds []ThresholdEntry
+	Icon       IconConfig
 	// Path is the storage module's mount point (empty = /).
 	Path string
 }
@@ -45,6 +46,11 @@ func applySysinfo(md toml.MetaData, prim toml.Primitive, defaults SysinfoConfig,
 	if withPath && doc.Path != nil {
 		defaults.Path = *doc.Path
 	}
+	icon, err := applyIcon(md, prim, defaults.Icon)
+	if err != nil {
+		return defaults, err
+	}
+	defaults.Icon = icon
 	if defaults.PollMs < 0 {
 		return defaults, errors.New("poll interval is negative")
 	}
@@ -62,6 +68,7 @@ func DefaultsSysinfoCpu() SysinfoConfig {
 		Format:    "{{ percent }}%",
 		LabelShow: true,
 		PollMs:    2000,
+		Icon:      DefaultsIcon(true, "ld-cpu-symbolic"),
 	}
 }
 
@@ -71,6 +78,7 @@ func DefaultsSysinfoRam() SysinfoConfig {
 		Format:    "{{ percent }}%",
 		LabelShow: true,
 		PollMs:    5000,
+		Icon:      DefaultsIcon(true, "ld-memory-stick-symbolic"),
 	}
 }
 
@@ -80,6 +88,7 @@ func DefaultsSysinfoStorage() SysinfoConfig {
 		Format:    "{{ percent }}%",
 		LabelShow: true,
 		PollMs:    30000,
+		Icon:      DefaultsIcon(true, "ld-hard-drive-symbolic"),
 		Path:      "/",
 	}
 }

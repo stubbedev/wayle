@@ -21,6 +21,7 @@ type CustomModuleConfig struct {
 	LabelShow      bool
 	LabelMaxLength int
 	HideIfEmpty    bool
+	Icon           IconConfig
 	Click          ClickConfig
 }
 
@@ -35,19 +36,22 @@ func DefaultsCustomModule() CustomModuleConfig {
 }
 
 type customDoc struct {
-	ID             *string `toml:"id"`
-	Command        *string `toml:"command"`
-	Mode           *string `toml:"mode"`
-	IntervalMs     *int    `toml:"interval-ms"`
-	Format         *string `toml:"format"`
-	LabelShow      *bool   `toml:"label-show"`
-	LabelMaxLength *int    `toml:"label-max-length"`
-	HideIfEmpty    *bool   `toml:"hide-if-empty"`
-	LeftClick      *string `toml:"left-click"`
-	MiddleClick    *string `toml:"middle-click"`
-	RightClick     *string `toml:"right-click"`
-	ScrollUp       *string `toml:"scroll-up"`
-	ScrollDown     *string `toml:"scroll-down"`
+	ID             *string     `toml:"id"`
+	Command        *string     `toml:"command"`
+	Mode           *string     `toml:"mode"`
+	IntervalMs     *int        `toml:"interval-ms"`
+	Format         *string     `toml:"format"`
+	LabelShow      *bool       `toml:"label-show"`
+	LabelMaxLength *int        `toml:"label-max-length"`
+	HideIfEmpty    *bool       `toml:"hide-if-empty"`
+	IconShow       *bool       `toml:"icon-show"`
+	IconName       *string     `toml:"icon-name"`
+	IconColor      *ColorValue `toml:"icon-color"`
+	LeftClick      *string     `toml:"left-click"`
+	MiddleClick    *string     `toml:"middle-click"`
+	RightClick     *string     `toml:"right-click"`
+	ScrollUp       *string     `toml:"scroll-up"`
+	ScrollDown     *string     `toml:"scroll-down"`
 }
 
 // applyCustomDefinitions decodes the [[modules.custom]] array.
@@ -96,6 +100,17 @@ func applyCustomDefinitions(defs []customDoc) ([]CustomModuleConfig, error) {
 		if doc.HideIfEmpty != nil {
 			cfg.HideIfEmpty = *doc.HideIfEmpty
 		}
+		icon := DefaultsIcon(true, "")
+		if doc.IconShow != nil {
+			icon.Show = *doc.IconShow
+		}
+		if doc.IconName != nil {
+			icon.Name = *doc.IconName
+		}
+		if doc.IconColor != nil {
+			icon.Color = *doc.IconColor
+		}
+		cfg.Icon = icon
 		binding := DefaultsClick(nil)
 		for _, entry := range []struct {
 			raw   *string

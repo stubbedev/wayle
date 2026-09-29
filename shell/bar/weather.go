@@ -176,7 +176,9 @@ func (m *worldClockModule) apply(format string) {
 	m.label.SetText(text)
 }
 
-func (m *worldClockModule) Root() widget.Widget { return m.label }
+func (m *worldClockModule) Root() widget.Widget {
+	return assembleModule(m.ctx, m.ctx.Config.WorldClock.Icon, m.label)
+}
 
 // Stop ends the render ticker.
 func (m *worldClockModule) Stop() { m.stop() }
@@ -235,7 +237,9 @@ func (m *weatherModule) refresh(ctx context.Context) {
 	})
 }
 
-func (m *weatherModule) Root() widget.Widget { return m.label }
+func (m *weatherModule) Root() widget.Widget {
+	return assembleModule(m.ctx, m.ctx.Config.Weather.Icon, m.label)
+}
 
 // Stop ends the refresh loop.
 func (m *weatherModule) Stop() { m.cancel() }

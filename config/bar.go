@@ -87,6 +87,7 @@ type Config struct {
 	WorldClock         WorldClockConfig
 	Netstat            NetstatConfig
 	Mail               MailConfig
+	Power              PowerConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -144,6 +145,7 @@ func Defaults() *Config {
 		WorldClock:         DefaultsWorldClock(),
 		Netstat:            DefaultsNetstat(),
 		Mail:               DefaultsMail(),
+		Power:              DefaultsPower(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -187,6 +189,7 @@ type fileDoc struct {
 		WorldClock         *toml.Primitive `toml:"world-clock"`
 		Netstat            *toml.Primitive `toml:"netstat"`
 		Mail               *toml.Primitive `toml:"mail"`
+		Power              *toml.Primitive `toml:"power"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -293,6 +296,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Modules != nil && doc.Modules.Power != nil {
+		pw, err := applyPower(md, *doc.Modules.Power)
+		if err != nil {
+			return err
+		}
+		c.Power = pw
 	}
 	if doc.Modules != nil && doc.Modules.Mail != nil {
 		ml, err := applyMail(md, *doc.Modules.Mail)

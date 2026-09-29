@@ -20,6 +20,7 @@ type WeatherConfig struct {
 	Units     string
 	RefreshS  int
 	LabelShow bool
+	Icon      IconConfig
 }
 
 // DefaultsWeather returns the schema defaults.
@@ -31,6 +32,7 @@ func DefaultsWeather() WeatherConfig {
 		Units:     WeatherMetric,
 		RefreshS:  1800,
 		LabelShow: true,
+		Icon:      DefaultsIcon(true, "ld-sun-symbolic"),
 	}
 }
 
@@ -62,6 +64,11 @@ func applyWeather(md toml.MetaData, prim toml.Primitive) (WeatherConfig, error) 
 	if doc.LabelShow != nil {
 		cfg.LabelShow = *doc.LabelShow
 	}
+	icon, err := applyIcon(md, prim, cfg.Icon)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Icon = icon
 	if cfg.Units != WeatherMetric && cfg.Units != WeatherImperial {
 		return cfg, errors.New("weather: units must be metric or imperial")
 	}

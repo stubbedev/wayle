@@ -34,6 +34,7 @@ func sysinfoThreshold(percent float64, thresholds []config.ThresholdEntry, palet
 type pollModule struct {
 	ctx    ModuleContext
 	label  *widget.Label
+	icon   config.IconConfig
 	read   func() (float64, error)
 	render func(m ModuleContext, label *widget.Label, percent float64)
 	cancel context.CancelFunc
@@ -68,7 +69,8 @@ func newPollModule(ctx ModuleContext, pollMs int, read func() (float64, error), 
 	return m, nil
 }
 
-func (m *pollModule) Root() widget.Widget { return m.label }
+// Root assembles the icon beside the label when the module shows one.
+func (m *pollModule) Root() widget.Widget { return assembleModule(m.ctx, m.icon, m.label) }
 
 // Stop ends the poll loop.
 func (m *pollModule) Stop() {
@@ -110,9 +112,11 @@ func newCpu(ctx ModuleContext) (Module, error) {
 		prev = sample
 		return percent, nil
 	}
-	return newPollModule(ctx, ctx.Config.CPU.PollMs, read, func(ctx ModuleContext, label *widget.Label, percent float64) {
+	m, err := newPollModule(ctx, ctx.Config.CPU.PollMs, read, func(ctx ModuleContext, label *widget.Label, percent float64) {
 		renderSysinfo(ctx.Config.CPU, ctx, label, percent)
 	})
+	m.icon = ctx.Config.CPU.Icon
+	return m, err
 }
 
 // newRam builds the ram module: used/total from /proc/meminfo.
@@ -124,9 +128,11 @@ func newRam(ctx ModuleContext) (Module, error) {
 		}
 		return mem.UsagePercent(), nil
 	}
-	return newPollModule(ctx, ctx.Config.RAM.PollMs, read, func(ctx ModuleContext, label *widget.Label, percent float64) {
+	m, err := newPollModule(ctx, ctx.Config.RAM.PollMs, read, func(ctx ModuleContext, label *widget.Label, percent float64) {
 		renderSysinfo(ctx.Config.RAM, ctx, label, percent)
 	})
+	m.icon = ctx.Config.RAM.Icon
+	return m, err
 }
 
 // newStorage builds the storage module: used/total on one mount point.
@@ -135,7 +141,9 @@ func newStorage(ctx ModuleContext) (Module, error) {
 	read := func() (float64, error) {
 		return sysinfo.ReadStoragePercent(path)
 	}
-	return newPollModule(ctx, ctx.Config.Storage.PollMs, read, func(ctx ModuleContext, label *widget.Label, percent float64) {
+	m, err := newPollModule(ctx, ctx.Config.Storage.PollMs, read, func(ctx ModuleContext, label *widget.Label, percent float64) {
 		renderSysinfo(ctx.Config.Storage, ctx, label, percent)
 	})
+	m.icon = ctx.Config.Storage.Icon
+	return m, err
 }
