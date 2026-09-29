@@ -85,6 +85,7 @@ type Config struct {
 	Storage            StorageConfig
 	Weather            WeatherConfig
 	WorldClock         WorldClockConfig
+	Netstat            NetstatConfig
 	Custom             []CustomModuleConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -140,6 +141,7 @@ func Defaults() *Config {
 		Storage:            DefaultsSysinfoStorage(),
 		Weather:            DefaultsWeather(),
 		WorldClock:         DefaultsWorldClock(),
+		Netstat:            DefaultsNetstat(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		General: GeneralConfig{
@@ -181,6 +183,7 @@ type fileDoc struct {
 		Storage            *toml.Primitive `toml:"storage"`
 		Weather            *toml.Primitive `toml:"weather"`
 		WorldClock         *toml.Primitive `toml:"world-clock"`
+		Netstat            *toml.Primitive `toml:"netstat"`
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -287,6 +290,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Modules != nil && doc.Modules.Netstat != nil {
+		ns, err := applyNetstat(md, *doc.Modules.Netstat)
+		if err != nil {
+			return err
+		}
+		c.Netstat = ns
 	}
 	if doc.Modules != nil && doc.Modules.WorldClock != nil {
 		wc, err := applyWorldClock(md, *doc.Modules.WorldClock)

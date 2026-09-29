@@ -82,6 +82,7 @@ var factories = map[string]Factory{
 	"storage":             newStorage,
 	"weather":             newWeather,
 	"world-clock":         newWorldClock,
+	"netstat":             newNetstat,
 	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,
@@ -173,6 +174,8 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.Weather.Click
 	case "world-clock":
 		return cfg.WorldClock.Click
+	case "netstat":
+		return cfg.Netstat.Click
 	case "clock":
 		return cfg.Clock.Click
 	case "cava":
