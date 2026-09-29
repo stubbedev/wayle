@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/mpris"
+	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
@@ -61,6 +62,10 @@ func RunWith(cfg *config.Config) error {
 	}
 	baseCtx.Brightness = brightness.NewSysfs()
 	baseCtx.Pulse = pulse.New()
+	if nm, err := network.NewSystem(); err == nil {
+		defer func() { _ = nm.Close() }()
+		baseCtx.Network = nm
+	}
 	if media, err := mpris.NewSession(); err == nil {
 		defer func() { _ = media.Close() }()
 		baseCtx.Media = media

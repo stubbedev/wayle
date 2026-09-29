@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/mpris"
+	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/upower"
 )
@@ -31,6 +32,7 @@ type ModuleContext struct {
 	Brightness brightness.Source
 	Pulse      pulse.Source
 	Media      mpris.Source
+	Network    network.Source
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
 	Connector string
@@ -69,6 +71,7 @@ var factories = map[string]Factory{
 	"brightness":          newBrightness,
 	"keyboard-layout":     newKeyboardLayout,
 	"media":               newMedia,
+	"network":             newNetwork,
 	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,

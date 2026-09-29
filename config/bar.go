@@ -74,6 +74,7 @@ type Config struct {
 	Brightness         BrightnessConfig
 	Volume             VolumeConfig
 	Media              MediaConfig
+	Network            NetworkConfig
 	KeyboardInput      KeyboardInputConfig
 	Cava               CavaConfig
 	Separator          SeparatorConfig
@@ -118,6 +119,7 @@ func Defaults() *Config {
 		Brightness:         DefaultsBrightness(),
 		Volume:             DefaultsVolume(),
 		Media:              DefaultsMedia(),
+		Network:            DefaultsNetwork(),
 		KeyboardInput:      DefaultsKeyboardInput(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
@@ -150,6 +152,7 @@ type fileDoc struct {
 		Brightness         *toml.Primitive `toml:"brightness"`
 		Volume             *toml.Primitive `toml:"volume"`
 		Media              *toml.Primitive `toml:"media"`
+		Network            *toml.Primitive `toml:"network"`
 		KeyboardLayout     *toml.Primitive `toml:"keyboard-layout"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
@@ -237,6 +240,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.KeyboardInput = ki
+	}
+	if doc.Modules != nil && doc.Modules.Network != nil {
+		net, err := applyNetwork(md, *doc.Modules.Network)
+		if err != nil {
+			return err
+		}
+		c.Network = net
 	}
 	if doc.Modules != nil && doc.Modules.Media != nil {
 		med, err := applyMedia(md, *doc.Modules.Media)
