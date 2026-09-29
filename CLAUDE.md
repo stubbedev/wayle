@@ -11,6 +11,13 @@ just lint          # fmt + clippy -D warnings
 just check         # lint + test, run before every release
 ```
 
+The Go rewrite (`go-rewrite` branch) has its own shell with the pinned
+toolchain:
+
+```sh
+nix develop .#go -c just go-check   # gofmt/gofumpt + vet + golangci-lint + test
+```
+
 ## Tests define behavior
 
 Every feature and every bug fix lands with tests, and each behavior gets both

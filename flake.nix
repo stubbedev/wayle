@@ -133,9 +133,73 @@
             GST_PLUGIN_SYSTEM_PATH_1_0 =
               pkgs.lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins;
           };
+
+          # The Go toolchain for the rewrite shell (`nix develop .#go`).
+          # go.mod declares `go 1.27.1` and nixpkgs' default go is older,
+          # so the pin is load-bearing exactly as in gelm's flake: with
+          # the plain `go` package every command would try to download a
+          # toolchain; go_1_27 keeps dev and CI offline-identical.
+          goShell = pkgs.mkShell {
+            packages = with pkgs; [
+              go_1_27 # the pinned toolchain, see comment above
+              golangci-lint # `just go-lint`, config in .golangci.yml (gelm parity)
+              gofumpt # the formatter behind `golangci-lint fmt`
+              gopls # Go language server
+              delve # Go debugger
+              just # task runner (`just go-check`)
+
+              # Runtime deps of the pure-Go stack. gelm needs no native
+              # libraries: it speaks the Wayland protocol and rasterizes
+              # wl_shm itself, but its font scanner reads fontconfig, and
+              # a headless test session has no host fonts to fall back on.
+              fontconfig
+              sway # headless compositor for the wayle-go test gate (gelm parity)
+
+              inter # config default font-sans
+              jetbrains-mono # config default font-mono
+              nerd-fonts.jetbrains-mono # the user config's font-sans/font-mono
+            ];
+
+            shellHook =
+              let
+                # The config's defaults (Inter, JetBrains Mono) plus the
+                # common Nerd Font, layered over the host fontconfig when
+                # one exists: `wayle shell` finds fonts in a bare container
+                # or headless session, and sees the same set on a NixOS
+                # host as outside the shell.
+                extraFontDirs = pkgs.lib.concatMapStrings
+                  (font: "  <dir>${font}/share/fonts</dir>\n")
+                  [
+                    pkgs.inter
+                    pkgs.jetbrains-mono
+                    pkgs.nerd-fonts.jetbrains-mono
+                  ];
+              in
+              ''
+                # gelm is pure Go by design; keep accidental cgo out.
+                export CGO_ENABLED=0
+
+                fontconf="''${TMPDIR:-/tmp}/wayle-go-fonts.conf"
+                cat > "$fontconf" <<EOF
+                <?xml version="1.0"?>
+                <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+                <fontconfig>
+                  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+                ${extraFontDirs}  <cachedir>''${XDG_CACHE_HOME:-$HOME/.cache}/fontconfig</cachedir>
+                </fontconfig>
+                EOF
+                export FONTCONFIG_FILE="$fontconf"
+                echo "wayle Go shell: CGO off, $(go version | cut -d' ' -f3)"
+              '';
+          };
         in
         {
           inherit default;
+
+          # `nix develop .#go` — the Go rewrite shell: pinned toolchain,
+          # lint/format stack, fonts, and a headless-capable sway. See
+          # GO-REWRITE.md.
+          go = goShell;
 
           # `nix develop .#css` — same env as the default shell, but with
           # WAYLE_DEV=1 exported, so any `cargo run` (shell or wayle-settings)

@@ -1,0 +1,71 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - errorlint
+    - gosec
+    - intrange
+    - misspell
+    - modernize
+    - nolintlint
+    - perfsprint
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - whitespace
+  settings:
+    errcheck:
+      check-type-assertions: true
+      exclude-functions:
+        - (*os.File).Close
+        - (io.Closer).Close
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    gosec:
+      excludes:
+        # Wayland wire values are int32 by protocol definition. wayle-go keeps
+        # them as Go ints for math and converts back at the boundary, so
+        # int -> int32 conversions round-trip protocol values.
+        - G115 # integer overflow conversion
+    perfsprint:
+      strconcat: true
+      sprintf1: true
+    revive:
+      rules:
+        # Enforced since the API-consistency pass (#52): every
+        # exported symbol carries a doc comment starting with its
+        # name, so godoc and the wayle-facing API stay complete.
+        - name: exported
+  exclusions:
+    generated: lax
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+          - unparam
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+formatters:
+  enable:
+    - gofumpt
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/stubbedev/wayle)
+  exclusions:
+    generated: lax

@@ -9,6 +9,29 @@ cargo := "nix develop --command cargo"
 default:
     @just --list --unsorted
 
+# ─────────────────────────── Go rewrite ───────────────────────────
+
+# Go toolchain: the `.#go` flake devShell pins go_1_27 (`nix develop .#go -c
+# just go-check`); a plain PATH `go` at 1.27 works too, the flake only adds
+# the lint stack, fonts, and a headless sway.
+go := "go"
+
+# Go release gate: format, lint, test — the mirror of `just check`.
+go-check: go-fmt go-lint go-test
+
+# Lint every Go package; settings live in .golangci.yml (gelm parity).
+go-lint:
+    {{go}} vet ./...
+    golangci-lint run
+
+# Test every Go package.
+go-test:
+    {{go}} test ./...
+
+# Format every Go package in place (gofumpt via golangci-lint).
+go-fmt:
+    golangci-lint fmt
+
 # ─────────────────────────── Build & Run ───────────────────────────
 
 # Build the release binary.

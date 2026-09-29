@@ -1,0 +1,52 @@
+# Go rewrite
+
+The `go-rewrite` branch carries wayle's port from Rust/GTK4 to Go on top
+of [gelm](https://github.com/stubbedev/gelm), the pure-Go Wayland widget
+kit (issues #18, #19). Direction of travel: the toolkit already exists;
+this branch is the consumer side — port order bar → OSD/toasts →
+launcher → lock screen → settings.
+
+## Layout
+
+| Go package | Ports | Notes |
+| --- | --- | --- |
+| `config` | wayle-config (bar/general/clock subset) | Same files, discovery order, keys, defaults, and failure behavior: a bad value is a load error and the shell falls back to defaults. |
+| `strftime` | chrono strftime formatting | Format strings are validated at load; an unsupported specifier is an error, not garbage at runtime. |
+| `shell/bar` | wayle-shell bar | Anchor/exclusive-zone/namespace mapping matches `bar/methods.rs`; `FindLayout` ports `find_layout` + `merge_parent` (extends, cycles, `*` fallback). |
+| `cmd/wayle` | wayle bin | `wayle shell` runs the bar; unported subcommands say so and exit 1. |
+
+## Running
+
+```sh
+nix develop .#go -c just go-check   # fmt + vet + golangci-lint + test (pinned toolchain)
+go run ./cmd/wayle shell            # the bar, from ~/.config/wayle/config.toml
+```
+
+The `.#go` devShell is the Go counterpart of the Rust devShell: `go_1_27`
+pinned to the go.mod version (no toolchain downloads), the gelm lint stack,
+fontconfig with the config's default fonts wired over the host fontconfig
+(FONTCONFIG_FILE), and sway for a headless compositor session. gelm is pure
+Go, so the shell sets `CGO_ENABLED=0` and needs no native libraries.
+
+Lint enforcement is gelm's `.golangci.yml` verbatim (gci section
+repointed), wired into the justfile as `go-lint` / `go-check`.
+
+## Status
+
+- [x] config: paths, discovery, bar/general/clock subset, defaults, load errors
+- [x] bar: layer surfaces per output, layout resolution, clock module
+- [ ] config: YAML configs, runtime layer, hot reload, the rest of the schema
+- [ ] bar: styling tokens (wayle-styling port), per-side padding, groups as containers, remaining modules
+- [ ] services: hyprland/niri/sway IPC, audio, network, ... (the zbus crates)
+- [ ] OSD, launcher, lock screen, settings (per #19 M5 order)
+
+## Known deviations from the Rust shell
+
+- The `replace` directive in `go.mod` points at the local gelm checkout;
+  it carries the public `app.Connect`/`Font`/layer-enum aliases wayle
+  needs. Drop it once gelm tags a release with them.
+- Bar visuals: gelm dark palette stands in for the `bg-surface` token
+  system, `padding-ends` is parsed but not yet applied per-side, and
+  groups flatten into the section row. All land with the styling port.
+- YAML configs are discovered but not parsed yet; a `config.yaml` falls
+  back to defaults with a load error rather than being misread.
