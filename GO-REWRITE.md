@@ -38,10 +38,13 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] styling: palette + full token table, ColorValue/Size/rounding resolution
 - [x] bar: layer surfaces per output, layout resolution, chrome (classes,
       opacity mix, borders, insets, groups), clock, cava, separator,
-      hyprland-workspaces modules
+      hyprland-workspaces, battery, brightness, volume, media modules
 - [x] service/hyprland: command + event sockets, dispatch
+- [x] service/upower, service/brightness (sysfs+logind+inotify),
+      service/pulse (pactl), service/mpris (MPRIS2 over godbus)
 - [ ] config: YAML configs, runtime layer, hot reload, the rest of the schema
-- [ ] bar: remaining modules (battery, volume, network, ...), button component styling
+- [ ] bar: remaining modules (network, systray, keyboard layout, custom),
+      button component styling, module click/scroll actions
 - [ ] services: UPower, PipeWire, NetworkManager, ... (the zbus crates)
 - [ ] OSD, launcher, lock screen, settings (per #19 M5 order)
 
