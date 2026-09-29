@@ -43,6 +43,7 @@ type Factory func(ctx ModuleContext) (Module, error)
 
 var factories = map[string]Factory{
 	"clock": newClock,
+	"cava":  newCava,
 }
 
 // Create builds the module named by a layout entry. Custom modules

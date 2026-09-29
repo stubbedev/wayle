@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/stubbedev/gelm v0.0.0-20260928211541-e058e0048ab1
 	golang.org/x/image v0.46.0
+	gonum.org/v1/gonum v0.17.0
 )
 
 require (

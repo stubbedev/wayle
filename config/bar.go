@@ -70,6 +70,7 @@ type GeneralConfig struct {
 type Config struct {
 	Bar     Bar
 	Clock   ClockConfig
+	Cava    CavaConfig
 	General GeneralConfig
 }
 
@@ -105,6 +106,7 @@ func Defaults() *Config {
 		Clock: ClockConfig{
 			Format: "%a %b %d %I:%M %p",
 		},
+		Cava: DefaultsCava(),
 		General: GeneralConfig{
 			FontSans: "Inter",
 			FontMono: "JetBrains Mono",
@@ -129,6 +131,7 @@ type fileDoc struct {
 	Bar     *toml.Primitive `toml:"bar"`
 	Modules *struct {
 		Clock *toml.Primitive `toml:"clock"`
+		Cava  *toml.Primitive `toml:"cava"`
 	} `toml:"modules"`
 	General *toml.Primitive `toml:"general"`
 }
@@ -206,6 +209,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Clock.Format = clock.Format
+	}
+	if doc.Modules != nil && doc.Modules.Cava != nil {
+		cava, err := applyCava(md, *doc.Modules.Cava)
+		if err != nil {
+			return err
+		}
+		c.Cava = cava
 	}
 	if doc.General != nil {
 		general := generalDoc{}
