@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
+	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/powerprofiles"
@@ -37,6 +38,11 @@ type ModuleContext struct {
 	Bluetooth     bluetooth.Source
 	Network       network.Source
 	PowerProfiles powerprofiles.Source
+	IdleInhibit   *idleinhibit.State
+	// Attachers collects modules that need the live layer surface
+	// (idle-inhibit binds its inhibitor to it); RunWith calls Attach
+	// on each once the layer exists.
+	Attachers *[]interface{ Attach(app.Host) }
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
 	Connector string
@@ -90,6 +96,7 @@ var factories = map[string]Factory{
 	"keybind-mode":        newKeybindMode,
 	"power-profiles":      newPowerProfiles,
 	"hyprsunset":          newHyprsunset,
+	"idle-inhibit":        newIdleInhibit,
 	"volume":              newVolume,
 	"clock":               newClock,
 	"cava":                newCava,
@@ -141,6 +148,9 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	module, err := Create(item.Module, ctx)
 	if err != nil {
 		return err
+	}
+	if a, ok := module.(interface{ Attach(app.Host) }); ok && ctx.Attachers != nil {
+		*ctx.Attachers = append(*ctx.Attachers, a)
 	}
 	binding := moduleBinding(item.Module, ctx.Config)
 	var handler interface {
@@ -205,6 +215,8 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.PowerProfiles.Click
 	case "hyprsunset":
 		return cfg.Hyprsunset.Click
+	case "idle-inhibit":
+		return cfg.IdleInhibit.Click
 	case "clock":
 		return cfg.Clock.Click
 	case "cava":

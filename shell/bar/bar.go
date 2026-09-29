@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/widget"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
+	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/powerprofiles"
@@ -80,6 +82,20 @@ func RunWith(cfg *config.Config) error {
 		defer func() { _ = media.Close() }()
 		baseCtx.Media = media
 	}
+	// The idle-inhibit service owns its state here and serves it on the
+	// session bus for the `wayle idle` CLI.
+	inhibitState := idleinhibit.NewState(cfg.IdleInhibit.StartupDuration)
+	baseCtx.IdleInhibit = inhibitState
+	baseCtx.Attachers = &[]interface{ Attach(app.Host) }{}
+	if conn, err := dbus.ConnectSessionBus(); err == nil {
+		defer func() { _ = conn.Close() }()
+		daemon := idleinhibit.NewDaemon(inhibitState)
+		if release, err := daemon.Export(conn); err == nil {
+			defer release()
+		} else {
+			log.Printf("idle-inhibit: daemon: %v", err)
+		}
+	}
 
 	outputs := sess.Outputs()
 	if len(outputs) == 0 {
@@ -92,13 +108,18 @@ func RunWith(cfg *config.Config) error {
 		}
 		ctx := baseCtx
 		ctx.Connector = output.Name
+		ctx.Attachers = &[]interface{ Attach(app.Host) }{}
 		lc, err := layerConfigFor(ctx, layout, output.Name, logicalWidth(output.ModeW, output.Scale))
 		if err != nil {
 			return err
 		}
 		lc.Output = output
-		if _, err := application.NewLayer(*lc); err != nil {
+		layer, err := application.NewLayer(*lc)
+		if err != nil {
 			return err
+		}
+		for _, a := range *ctx.Attachers {
+			a.Attach(layer)
 		}
 	}
 	return application.Run()
