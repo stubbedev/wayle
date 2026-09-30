@@ -5,6 +5,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/sni"
@@ -36,6 +37,13 @@ func serveCLIDaemons(ctx ModuleContext, tray *sni.Host) func() {
 	if mixer, ok := ctx.Pulse.(pulse.Mixer); ok {
 		release, err := pulse.ServeDaemon(conn, mixer)
 		serve("audio", release, err)
+	}
+	if media, err := mpris.NewController(conn, ctx.Config.Media.PlayersIgnored, ctx.Config.Media.PlayerPriority); err == nil {
+		releases = append(releases, media.Close)
+		release, err := mpris.ServeDaemon(conn, media)
+		serve("media", release, err)
+	} else {
+		log.Printf("media: controller: %v", err)
 	}
 	if tray != nil {
 		release, err := sni.ServeDaemon(conn, ctx.SNI, tray.Actions(), tray.IsWatcher())
