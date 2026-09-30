@@ -19,12 +19,16 @@ func TestMicrophoneLabel(t *testing.T) {
 	if got := microphoneLabel("Mic {{ percent }}", 0); got != "Mic 0" {
 		t.Errorf("= %q, want Mic 0", got)
 	}
+	// Rounded like the Rust module, not truncated.
+	if got := microphoneLabel("{{ percent }}", 37.6); got != "38" {
+		t.Errorf("= %q, want 38", got)
+	}
 }
 
 func TestMicrophoneModuleDimsWhenMuted(t *testing.T) {
 	cfg := config.Defaults()
 	style := computeStyle(cfg, styling.Default())
-	source := &fakePulseSource{dev: pulse.Device{Name: "mic", Volume: 65}, ticks: make(chan struct{}, 2)}
+	source := &fakePulseSource{dev: pulse.Device{Name: "mic", Volume: pct(65)}, ticks: make(chan struct{}, 2)}
 	m := &microphoneModule{
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
 		source: source,

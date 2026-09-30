@@ -21,14 +21,20 @@ func volumeLabel(format string, percent float64) string {
 	return replaceTemplateVar(format, "percent", strconv.Itoa(int(math.Round(percent))))
 }
 
+// volumePercent is the level the Rust modules display: the channel
+// average as a percentage, rounded (average_percentage().round()).
+func volumePercent(dev pulse.Device) float64 {
+	return math.Round(dev.Volume.AveragePercentage())
+}
+
 // volumeColor resolves the label ink: muted wins (the Rust module's
 // icon-muted semantics on a label-only surface), then thresholds by
-// level, else the default fg.
+// the rounded level (apply_thresholds), else the default fg.
 func volumeColor(dev pulse.Device, cfg config.VolumeConfig, palette *styling.Palette, fallback render.Color) render.Color {
 	if dev.Muted {
 		return mutedFg(palette)
 	}
-	if override, ok := thresholdColor(dev.Volume, cfg.Thresholds, palette); ok {
+	if override, ok := thresholdColor(volumePercent(dev), cfg.Thresholds, palette); ok {
 		return override
 	}
 	return fallback
@@ -73,14 +79,15 @@ func newVolume(ctx ModuleContext) (Module, error) {
 
 // refresh re-reads and restyles the label and state icon.
 func (m *volumeModule) refresh() error {
-	dev, err := m.source.DefaultSink(context.Background())
+	out, err := m.source.DefaultSink(context.Background())
 	if err != nil {
 		return err
 	}
+	dev := out.Device
 	cfg := m.ctx.Config.Volume
 	label := ""
 	if cfg.LabelShow {
-		label = volumeLabel(cfg.Format, dev.Volume)
+		label = volumeLabel(cfg.Format, volumePercent(dev))
 	}
 	m.label.SetText(label)
 	m.label.SetColor(volumeColor(dev, cfg, m.ctx.Style.palette, m.ctx.Style.fg))
@@ -98,7 +105,7 @@ func volumeIconName(cfg config.VolumeConfig, dev pulse.Device) string {
 	if dev.Muted || len(cfg.LevelIcons) == 0 {
 		return cfg.IconMuted
 	}
-	return cfg.LevelIcons[levelIndexSpan(int(math.Round(dev.Volume)), len(cfg.LevelIcons))]
+	return cfg.LevelIcons[levelIndexSpan(int(volumePercent(dev)), len(cfg.LevelIcons))]
 }
 
 func (m *volumeModule) Root() widget.Widget { return m.root }

@@ -132,7 +132,7 @@ func TestBluetoothStateIcon(t *testing.T) {
 func TestMicrophoneStateIcon(t *testing.T) {
 	cfg := config.Defaults()
 	style := computeStyle(cfg, styling.Default())
-	source := &fakePulseSource{dev: pulse.Device{Volume: 40}}
+	source := &fakePulseSource{dev: pulse.Device{Volume: pct(40)}}
 	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
 	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
 	m.icon = moduleIcon(m.ctx, cfg.Microphone.Icon)

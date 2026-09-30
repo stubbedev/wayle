@@ -2,6 +2,7 @@ package bar
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,14 +14,18 @@ import (
 	"github.com/stubbedev/wayle/styling"
 )
 
-// fakePulseSource is a scripted pulse.Source.
+// fakePulseSource is a scripted pulse.Source: dev is both the default
+// sink and the default source.
 type fakePulseSource struct {
 	dev   pulse.Device
 	ticks chan struct{}
 }
 
-func (f *fakePulseSource) DefaultSink(context.Context) (pulse.Device, error) {
-	return f.dev, nil
+// pct is a stereo volume at a percentage.
+func pct(p float64) pulse.Volume { return pulse.VolumeFromPercentage(p, 2) }
+
+func (f *fakePulseSource) DefaultSink(context.Context) (pulse.OutputDevice, error) {
+	return pulse.OutputDevice{Device: f.dev}, nil
 }
 
 func (f *fakePulseSource) Subscribe(context.Context) (<-chan struct{}, func(), error) {
@@ -31,11 +36,15 @@ func (f *fakePulseSource) SetVolume(context.Context, float64) error { return nil
 
 func (f *fakePulseSource) SetMuted(context.Context, bool) error { return nil }
 
-func (f *fakePulseSource) DefaultSource(context.Context) (pulse.Device, error) {
-	return f.dev, nil
+func (f *fakePulseSource) DefaultSource(context.Context) (pulse.InputDevice, error) {
+	return pulse.InputDevice{Device: f.dev}, nil
 }
 
 func (f *fakePulseSource) SetSourceMuted(context.Context, bool) error { return nil }
+
+func (f *fakePulseSource) Capture(pulse.CaptureTarget, pulse.CaptureSpec, func([]byte)) (*pulse.Capture, error) {
+	return nil, errors.New("fake: no capture")
+}
 
 func TestVolumeLabelRounds(t *testing.T) {
 	if got := volumeLabel("{{ percent }}%", 12.4); got != "12%" {
@@ -43,6 +52,28 @@ func TestVolumeLabelRounds(t *testing.T) {
 	}
 	if got := volumeLabel("Vol {{ percent }}", 100); got != "Vol 100" {
 		t.Errorf("= %q, want Vol 100", got)
+	}
+}
+
+func TestVolumePercentAveragesAndRounds(t *testing.T) {
+	// Uneven channels show their rounded mean (average_percentage).
+	if got := volumePercent(pulse.Device{Volume: pulse.StereoVolume(0.3, 0.505)}); got != 40 {
+		t.Errorf("percent = %v, want 40", got)
+	}
+	if got := volumePercent(pulse.Device{Volume: pulse.NewVolume(nil)}); got != 0 {
+		t.Errorf("no channels = %v, want 0", got)
+	}
+	// A 94.6% level rounds to 95 and so crosses an above-94.9 line.
+	cfg := config.Defaults()
+	cv, _ := config.ParseColorValue("status-error")
+	cfg.Volume.Thresholds = []config.ThresholdEntry{{Above: ptrF(94.9), IconColor: cv, ColorSet: true}}
+	style := computeStyle(cfg, styling.Default())
+	got := volumeColor(pulse.Device{Volume: pct(94.6)}, cfg.Volume, style.palette, style.fg)
+	if want, _ := styling.ResolveColor(cv, styling.Default()); got != want {
+		t.Errorf("threshold on the rounded level: %#08x, want %#08x", got, want)
+	}
+	if got := volumeColor(pulse.Device{Volume: pct(94.4)}, cfg.Volume, style.palette, style.fg); got != style.fg {
+		t.Errorf("94.4%% rounds to 94 and stays default, got %#08x", got)
 	}
 }
 
@@ -56,7 +87,7 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 	cfg.Volume.Thresholds = []config.ThresholdEntry{loud}
 
 	source := &fakePulseSource{
-		dev:   pulse.Device{Name: "out", Volume: 42, Muted: false},
+		dev:   pulse.Device{Name: "out", Volume: pct(42), Muted: false},
 		ticks: make(chan struct{}, 2),
 	}
 	style := computeStyle(cfg, styling.Default())
@@ -75,7 +106,7 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 		t.Errorf("color = %#08x, want default fg", m.label.Color())
 	}
 
-	source.dev.Volume = 100
+	source.dev.Volume = pct(100)
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +122,7 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 func TestVolumeMutedDimsTheLabel(t *testing.T) {
 	cfg := config.Defaults()
 	source := &fakePulseSource{
-		dev:   pulse.Device{Volume: 42, Muted: true},
+		dev:   pulse.Device{Volume: pct(42), Muted: true},
 		ticks: make(chan struct{}, 1),
 	}
 	style := computeStyle(cfg, styling.Default())

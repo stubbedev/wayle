@@ -112,12 +112,12 @@ func audioDropdown(ctx ModuleContext) widget.Widget {
 	}
 	bctx := context.Background()
 	if sink, err := ctx.Pulse.DefaultSink(bctx); err == nil {
-		col.Append(audioDeviceRow(ctx, font, px, "Output", sink,
+		col.Append(audioDeviceRow(ctx, font, px, "Output", sink.Device,
 			func(v float64) { _ = ctx.Pulse.SetVolume(bctx, v) },
 			func(m bool) { _ = ctx.Pulse.SetMuted(bctx, m) }), false)
 	}
 	if source, err := ctx.Pulse.DefaultSource(bctx); err == nil {
-		col.Append(audioDeviceRow(ctx, font, px, "Input", source,
+		col.Append(audioDeviceRow(ctx, font, px, "Input", source.Device,
 			func(float64) {},
 			func(m bool) { _ = ctx.Pulse.SetSourceMuted(bctx, m) }), false)
 	}
@@ -136,7 +136,7 @@ func audioDeviceRow(ctx ModuleContext, font render.Font, px float64, title strin
 	muteButton.OnClick = func() { setMuted(!dev.Muted) }
 	row.Append(muteButton, false)
 	col.Append(row, false)
-	slider := widget.NewSlider(0, 100, 1, dev.Volume)
+	slider := widget.NewSlider(0, 100, 1, dev.Volume.AveragePercentage())
 	slider.OnChanged = func(v float64) { setVolume(v) }
 	col.Append(slider, false)
 	return col

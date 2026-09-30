@@ -85,7 +85,11 @@ func RunWith(cfg *config.Config) error {
 	backlights := brightness.NewSystem(cfg.Brightness.EnableExt)
 	defer func() { _ = backlights.Close() }()
 	baseCtx.Brightness = backlights
-	baseCtx.Pulse = pulse.New()
+	audio := connectAudio()
+	if audio != nil {
+		defer func() { _ = audio.Close() }()
+		baseCtx.Pulse = audio
+	}
 	if bt, err := bluetooth.NewSystem(); err == nil {
 		defer func() { _ = bt.Close() }()
 		baseCtx.Bluetooth = bt
@@ -127,6 +131,13 @@ func RunWith(cfg *config.Config) error {
 			defer release()
 		} else {
 			log.Printf("recorder: daemon: %v", err)
+		}
+		if audio != nil {
+			if release, err := pulse.NewDaemon(audio).Export(conn); err == nil {
+				defer release()
+			} else {
+				log.Printf("audio: daemon: %v", err)
+			}
 		}
 	}
 	stopMail := startMail(&baseCtx)
@@ -232,6 +243,20 @@ func brightnessOsdIcon(percent float64) string {
 	return "ld-sun-symbolic"
 }
 
+// connectAudio starts the audio service (the Rust bootstrap's
+// AudioService with its daemon). A missing sound server leaves the
+// shell without audio, logged, rather than failing it.
+func connectAudio() *pulse.Service {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	audio, err := pulse.Connect(ctx, "")
+	if err != nil {
+		log.Printf("audio: %v", err)
+		return nil
+	}
+	return audio
+}
+
 // microphoneOsdIcon resolves the input flash's glyph.
 func microphoneOsdIcon(cfg config.MicrophoneConfig, dev pulse.Device) string {
 	if dev.Muted {
@@ -252,26 +277,30 @@ func watchOsd(cfg *config.Config, ctx ModuleContext, server *osd.Osd) {
 		if ctx.Pulse == nil {
 			return
 		}
-		if sink, err := ctx.Pulse.DefaultSink(bctx); err == nil {
-			if sink.Volume != lastVolume || sink.Muted != lastMuted {
-				lastVolume, lastMuted = sink.Volume, sink.Muted
+		// Repeats dedupe on the rounded level and mute, the Rust
+		// last_volume snapshot.
+		if out, err := ctx.Pulse.DefaultSink(bctx); err == nil {
+			sink := out.Device
+			if level := volumePercent(sink); level != lastVolume || sink.Muted != lastMuted {
+				lastVolume, lastMuted = level, sink.Muted
 				server.Show(osd.Event{
 					Kind:  "volume",
 					Icon:  volumeIconName(cfg.Volume, sink),
 					Label: "Output",
-					Value: sink.Volume,
+					Value: sink.Volume.AveragePercentage(),
 					Muted: sink.Muted,
 				})
 			}
 		}
-		if source, err := ctx.Pulse.DefaultSource(bctx); err == nil {
-			if source.Volume != lastInput || source.Muted != lastInputMuted {
-				lastInput, lastInputMuted = source.Volume, source.Muted
+		if in, err := ctx.Pulse.DefaultSource(bctx); err == nil {
+			source := in.Device
+			if level := volumePercent(source); level != lastInput || source.Muted != lastInputMuted {
+				lastInput, lastInputMuted = level, source.Muted
 				server.Show(osd.Event{
 					Kind:  "input-volume",
 					Icon:  microphoneOsdIcon(cfg.Microphone, source),
 					Label: "Input",
-					Value: source.Volume,
+					Value: source.Volume.AveragePercentage(),
 					Muted: source.Muted,
 				})
 			}
