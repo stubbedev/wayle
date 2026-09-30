@@ -1,0 +1,10 @@
+args: media loop
+code: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <MODE>
+
+Usage: wayle media loop <MODE> [PLAYER_ID]
+
+For more information, try '--help'.

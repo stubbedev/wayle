@@ -1,0 +1,7 @@
+xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)
+
+Usage: wayle portal share-picker [OPTIONS]
+
+Options:
+      --allow-token  Pre-check the "allow restore token" box
+  -h, --help         Print help

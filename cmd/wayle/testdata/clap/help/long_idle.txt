@@ -1,0 +1,15 @@
+Idle inhibit control commands
+
+Usage: wayle idle <COMMAND>
+
+Commands:
+  on         Enable idle inhibition
+  off        Disable idle inhibition
+  duration   Adjust timer duration (upper limit)
+  remaining  Adjust remaining time on active timer
+  status     Show current idle inhibit status
+  toggle     Toggle idle inhibition on/off
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

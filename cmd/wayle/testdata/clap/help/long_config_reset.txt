@@ -1,0 +1,9 @@
+Reset a configuration path to its default value
+
+Usage: wayle config reset <PATH>
+
+Arguments:
+  <PATH>  The configuration path to reset (e.g., "bar.button_gap")
+
+Options:
+  -h, --help  Print help

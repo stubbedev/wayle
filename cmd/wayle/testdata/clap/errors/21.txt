@@ -1,0 +1,11 @@
+args: toast --icn x
+code: 2
+--- stdout
+--- stderr
+error: unexpected argument '--icn' found
+
+  tip: a similar argument exists: '--icon'
+
+Usage: wayle toast --icon <ICON> [LABEL]
+
+For more information, try '--help'.

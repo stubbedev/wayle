@@ -1,0 +1,6 @@
+Application chooser (`org.freedesktop.impl.portal.AppChooser`)
+
+Usage: wayle portal show app-chooser
+
+Options:
+  -h, --help  Print help

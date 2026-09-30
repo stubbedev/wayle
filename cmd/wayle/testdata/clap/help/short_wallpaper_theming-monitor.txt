@@ -1,0 +1,9 @@
+Set which monitor to use for color extraction
+
+Usage: wayle wallpaper theming-monitor <MONITOR>
+
+Arguments:
+  <MONITOR>  Monitor connector name (e.g., DP-1). Use empty string for default
+
+Options:
+  -h, --help  Print help

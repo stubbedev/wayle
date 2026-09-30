@@ -1,0 +1,8 @@
+args: media loop xyz
+code: 2
+--- stdout
+--- stderr
+error: invalid value 'xyz' for '<MODE>'
+  [possible values: none, track, playlist]
+
+For more information, try '--help'.

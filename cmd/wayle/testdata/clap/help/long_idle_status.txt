@@ -1,0 +1,6 @@
+Show current idle inhibit status
+
+Usage: wayle idle status
+
+Options:
+  -h, --help  Print help

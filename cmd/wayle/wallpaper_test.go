@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -132,11 +131,7 @@ func runScenario(t *testing.T, sc struct {
 		if *recordRust != "" {
 			stdout, stderr, code = runRust(t, args)
 		} else {
-			var out bytes.Buffer
-			if err := wallpaperCommand(context.Background(), args, &out); err != nil {
-				stderr, code = "Error: "+err.Error()+"\n", 1
-			}
-			stdout = out.String()
+			stdout, stderr, code = runCaptured(t, false, append([]string{"wallpaper"}, args...)...)
 		}
 		fmt.Fprintf(&log, "%s[stderr] %s[exit %d]\n", stdout, stderr, code)
 	}
@@ -191,7 +186,8 @@ func TestWallpaperCLIMatchesRust(t *testing.T) {
 }
 
 func TestWallpaperCLIRejectsBadArgsBeforeDialing(t *testing.T) {
-	// No bus at all: every case must fail in parsing, not connecting.
+	// No bus at all: every case must fail in parsing (clap's exit 2),
+	// not connecting.
 	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent/bus")
 	for _, args := range [][]string{
 		{},
@@ -205,20 +201,9 @@ func TestWallpaperCLIRejectsBadArgsBeforeDialing(t *testing.T) {
 		{"stop", "extra"},
 		{"theming-monitor"},
 	} {
-		err := wallpaperCommand(context.Background(), args, &bytes.Buffer{})
-		if err == nil || strings.Contains(err.Error(), "D-Bus") {
-			t.Errorf("%q: err = %v, want a parse error", args, err)
+		_, stderr, code := runCaptured(t, false, append([]string{"wallpaper"}, args...)...)
+		if code != 2 || strings.Contains(stderr, "D-Bus") {
+			t.Errorf("%q: code %d stderr %q, want a parse error", args, code, stderr)
 		}
-	}
-}
-
-func TestWallpaperFlagsForms(t *testing.T) {
-	aliases := map[string]string{"-f": "--fit", "--fit": "--fit", "--monitor": "--monitor"}
-	pos, flags, err := wallpaperFlags([]string{"a.png", "--fit=fit", "--monitor", "DP-1"}, aliases)
-	if err != nil || len(pos) != 1 || flags["--fit"] != "fit" || flags["--monitor"] != "DP-1" {
-		t.Errorf("= %v %v %v", pos, flags, err)
-	}
-	if _, flags, _ := wallpaperFlags([]string{"-f", "center"}, aliases); flags["--fit"] != "center" {
-		t.Errorf("short alias = %v", flags)
 	}
 }

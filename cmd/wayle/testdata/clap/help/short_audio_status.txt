@@ -1,0 +1,6 @@
+Show current audio status
+
+Usage: wayle audio status
+
+Options:
+  -h, --help  Print help

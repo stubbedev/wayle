@@ -1,0 +1,6 @@
+Skip to next wallpaper
+
+Usage: wayle wallpaper next
+
+Options:
+  -h, --help  Print help

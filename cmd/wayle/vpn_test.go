@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -22,7 +23,7 @@ func TestVPNSSOCallbackReportsTheSignInCompleted(t *testing.T) {
 	defer release()
 	bus.UseAsSessionBus(t)
 	var out bytes.Buffer
-	if err := runVPN([]string{"sso-callback", "globalprotectcallback:prelogin-cookie=x"}, &out); err != nil {
+	if err := runVPN(t, &out, "sso-callback", "globalprotectcallback:prelogin-cookie=x"); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != "Sign-in completed; you can close the browser tab.\n" {
@@ -42,7 +43,7 @@ func TestVPNSSOCallbackWithNothingWaitingFailsWithTheShellsReason(t *testing.T) 
 	defer release()
 	bus.UseAsSessionBus(t)
 	var out bytes.Buffer
-	err = runVPN([]string{"sso-callback", "globalprotectcallback:stale"}, &out)
+	err = runVPN(t, &out, "sso-callback", "globalprotectcallback:stale")
 	want := "VPN sign-in callback failed: org.freedesktop.DBus.Error.Failed: no VPN browser sign-in is waiting for a callback"
 	if err == nil || err.Error() != want {
 		t.Errorf("err = %v, want %q", err, want)
@@ -55,7 +56,7 @@ func TestVPNSSOCallbackWithNothingWaitingFailsWithTheShellsReason(t *testing.T) 
 func TestVPNSSOCallbackWithNoShellRunningFails(t *testing.T) {
 	bus := dbustest.Start(t)
 	bus.UseAsSessionBus(t)
-	err := runVPN([]string{"sso-callback", "globalprotectcallback:x"}, &bytes.Buffer{})
+	err := runVPN(t, &bytes.Buffer{}, "sso-callback", "globalprotectcallback:x")
 	if err == nil || !strings.HasPrefix(err.Error(), "VPN sign-in callback failed: ") {
 		t.Errorf("err = %v", err)
 	}
@@ -63,8 +64,20 @@ func TestVPNSSOCallbackWithNoShellRunningFails(t *testing.T) {
 
 func TestVPNArgumentsAreChecked(t *testing.T) {
 	for _, args := range [][]string{nil, {"sso-callback"}, {"sso-callback", "a", "b"}, {"connect"}} {
-		if err := runVPN(args, &bytes.Buffer{}); err == nil {
-			t.Errorf("wayle vpn %v succeeded", args)
+		if _, _, code := runCaptured(t, false, append([]string{"vpn"}, args...)...); code != 2 {
+			t.Errorf("wayle vpn %v exited %d, want clap's usage error 2", args, code)
 		}
 	}
+}
+
+// runVPN runs `wayle vpn args...` through the command tree, returning
+// the handler's error text (without the "Error: " prefix) as an error.
+func runVPN(t *testing.T, out *bytes.Buffer, args ...string) error {
+	t.Helper()
+	stdout, stderr, code := runCaptured(t, false, append([]string{"vpn"}, args...)...)
+	out.WriteString(stdout)
+	if code != 0 {
+		return errors.New(strings.TrimSuffix(strings.TrimPrefix(stderr, "Error: "), "\n"))
+	}
+	return nil
 }

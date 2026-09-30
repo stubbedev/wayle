@@ -1,0 +1,6 @@
+Stop recording
+
+Usage: wayle recorder stop
+
+Options:
+  -h, --help  Print help

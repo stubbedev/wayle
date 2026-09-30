@@ -1,0 +1,9 @@
+args: icons list -z
+code: 2
+--- stdout
+--- stderr
+error: unexpected argument '-z' found
+
+Usage: wayle icons list [OPTIONS]
+
+For more information, try '--help'.

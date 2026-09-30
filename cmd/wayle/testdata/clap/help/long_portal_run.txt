@@ -1,0 +1,6 @@
+Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `wayle portal`)
+
+Usage: wayle portal run
+
+Options:
+  -h, --help  Print help

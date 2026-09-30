@@ -1,0 +1,10 @@
+Install icons from a CDN source
+
+Usage: wayle icons install <SOURCE> <SLUGS>...
+
+Arguments:
+  <SOURCE>    Source name (run 'wayle icons sources' to see available sources)
+  <SLUGS>...  Icon slugs to install (e.g., home settings bell)
+
+Options:
+  -h, --help  Print help (see more with '--help')

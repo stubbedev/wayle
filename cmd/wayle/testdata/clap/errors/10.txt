@@ -1,0 +1,8 @@
+args: media shuffle maybe
+code: 2
+--- stdout
+--- stderr
+error: invalid value 'maybe' for '[SHUFFLE_STATE]'
+  [possible values: on, off, toggle]
+
+For more information, try '--help'.

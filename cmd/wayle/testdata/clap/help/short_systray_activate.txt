@@ -1,0 +1,9 @@
+Activate a tray item by ID
+
+Usage: wayle systray activate <ID>
+
+Arguments:
+  <ID>  Tray item ID to activate
+
+Options:
+  -h, --help  Print help

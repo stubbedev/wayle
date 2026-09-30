@@ -1,0 +1,34 @@
+args: --help extra
+code: 0
+--- stdout
+Wayland services CLI
+
+Usage: wayle <COMMAND>
+
+Commands:
+  audio        Audio control commands
+  config       Configuration management commands
+  icons        Icon management commands
+  media        Media player control commands
+  notify       Notification control commands
+  panel        Panel management commands
+  power        Power profile commands
+  systray      System tray commands
+  wallpaper    Wallpaper control commands
+  idle         Idle inhibit control commands
+  launcher     Application launcher / dmenu with rofi-compatible flags
+  lock         Lock the session via Wayle's lock screen
+  vpn          VPN commands
+  recorder     Screen recorder control commands
+  screenshot   Screenshot capture commands
+  widget       Widget control commands
+  toast        Show a custom on-screen toast
+  portal       xdg-desktop-portal backend, screencast picker stub, and dialog previewer
+  shell        Run the desktop shell in the foreground
+  completions  Generate shell completions
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+--- stderr

@@ -1,0 +1,5 @@
+args: -V
+code: 0
+--- stdout
+wayle 0.8.53
+--- stderr

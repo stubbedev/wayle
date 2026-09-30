@@ -1,0 +1,12 @@
+Screenshot capture commands
+
+Usage: wayle screenshot <COMMAND>
+
+Commands:
+  region  Capture a drag-selected region
+  output  Capture a whole output (the focused output when NAME is omitted)
+  window  Capture the active window
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

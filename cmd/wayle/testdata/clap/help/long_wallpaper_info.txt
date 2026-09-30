@@ -1,0 +1,7 @@
+Display current wallpaper information
+
+Usage: wayle wallpaper info [OPTIONS]
+
+Options:
+      --monitor <MONITOR>  Target monitor (e.g., DP-1, HDMI-A-1). If omitted, shows global state
+  -h, --help               Print help

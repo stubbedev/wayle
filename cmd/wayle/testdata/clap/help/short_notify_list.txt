@@ -1,0 +1,6 @@
+List all notifications
+
+Usage: wayle notify list
+
+Options:
+  -h, --help  Print help

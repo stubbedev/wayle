@@ -1,0 +1,6 @@
+Stop the panel daemon
+
+Usage: wayle panel stop
+
+Options:
+  -h, --help  Print help

@@ -1,0 +1,6 @@
+Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)
+
+Usage: wayle portal show dynamic-launcher
+
+Options:
+  -h, --help  Print help

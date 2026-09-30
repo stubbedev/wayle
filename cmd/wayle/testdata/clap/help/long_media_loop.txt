@@ -1,0 +1,19 @@
+Set loop/repeat mode
+
+Usage: wayle media loop <MODE> [PLAYER_ID]
+
+Arguments:
+  <MODE>
+          Loop mode
+
+          Possible values:
+          - none:     No looping
+          - track:    Loop current track
+          - playlist: Loop entire playlist
+
+  [PLAYER_ID]
+          Player identifier (number or partial name match)
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')

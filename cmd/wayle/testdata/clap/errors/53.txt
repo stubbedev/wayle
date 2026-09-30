@@ -1,0 +1,5 @@
+args: toast --icon=
+code: 1
+--- stdout
+--- stderr
+Error: a toast needs a label or --preset

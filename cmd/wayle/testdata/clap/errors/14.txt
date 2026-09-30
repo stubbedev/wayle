@@ -1,0 +1,7 @@
+args: notify dismiss 99999999999
+code: 2
+--- stdout
+--- stderr
+error: invalid value '99999999999' for '<ID>': 99999999999 is not in 0..=4294967295
+
+For more information, try '--help'.

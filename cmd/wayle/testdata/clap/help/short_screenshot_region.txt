@@ -1,0 +1,6 @@
+Capture a drag-selected region
+
+Usage: wayle screenshot region
+
+Options:
+  -h, --help  Print help

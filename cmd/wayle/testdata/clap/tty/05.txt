@@ -1,0 +1,8 @@
+args: toast --bogus
+[1m[31merror:[0m unexpected argument '[1m[33m--bogus[0m' found
+
+  [1m[32mtip:[0m to pass '[1m[33m--bogus[0m' as a value, use '[1m[32m-- --bogus[0m'
+
+[1m[32mUsage:[0m [1m[32mwayle toast[0m [32m[OPTIONS][0m [32m[LABEL][0m
+
+For more information, try '[1m[32m--help[0m'.

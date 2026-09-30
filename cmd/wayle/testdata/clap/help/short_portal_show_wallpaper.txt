@@ -1,0 +1,7 @@
+Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)
+
+Usage: wayle portal show wallpaper [OPTIONS]
+
+Options:
+      --uri <URI>  `file://` image URI to preview (defaults to a placeholder) [default: ]
+  -h, --help       Print help

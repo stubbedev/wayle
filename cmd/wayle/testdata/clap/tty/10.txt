@@ -1,0 +1,31 @@
+args: --help
+Wayland services CLI
+
+[1m[32mUsage:[0m [1m[32mwayle[0m [32m<COMMAND>[0m
+
+[1m[33mCommands:[0m
+  [1m[32maudio[0m        Audio control commands
+  [1m[32mconfig[0m       Configuration management commands
+  [1m[32micons[0m        Icon management commands
+  [1m[32mmedia[0m        Media player control commands
+  [1m[32mnotify[0m       Notification control commands
+  [1m[32mpanel[0m        Panel management commands
+  [1m[32mpower[0m        Power profile commands
+  [1m[32msystray[0m      System tray commands
+  [1m[32mwallpaper[0m    Wallpaper control commands
+  [1m[32midle[0m         Idle inhibit control commands
+  [1m[32mlauncher[0m     Application launcher / dmenu with rofi-compatible flags
+  [1m[32mlock[0m         Lock the session via Wayle's lock screen
+  [1m[32mvpn[0m          VPN commands
+  [1m[32mrecorder[0m     Screen recorder control commands
+  [1m[32mscreenshot[0m   Screenshot capture commands
+  [1m[32mwidget[0m       Widget control commands
+  [1m[32mtoast[0m        Show a custom on-screen toast
+  [1m[32mportal[0m       xdg-desktop-portal backend, screencast picker stub, and dialog previewer
+  [1m[32mshell[0m        Run the desktop shell in the foreground
+  [1m[32mcompletions[0m  Generate shell completions
+  [1m[32mhelp[0m         Print this message or the help of the given subcommand(s)
+
+[1m[33mOptions:[0m
+  [1m[32m-h[0m, [1m[32m--help[0m     Print help
+  [1m[32m-V[0m, [1m[32m--version[0m  Print version

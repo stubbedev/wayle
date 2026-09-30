@@ -1,0 +1,6 @@
+Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled
+
+Usage: wayle portal show print
+
+Options:
+  -h, --help  Print help

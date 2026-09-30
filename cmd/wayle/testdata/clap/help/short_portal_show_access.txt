@@ -1,0 +1,6 @@
+Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)
+
+Usage: wayle portal show access
+
+Options:
+  -h, --help  Print help

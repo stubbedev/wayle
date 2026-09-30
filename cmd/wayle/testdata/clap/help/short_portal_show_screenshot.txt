@@ -1,0 +1,8 @@
+Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)
+
+Usage: wayle portal show screenshot [OPTIONS]
+
+Options:
+      --mode <MODE>      Capture mode: `region`, `output`, `screen`, or `window` [default: region]
+      --target <TARGET>  Output connector name (used by `output` mode) [default: ]
+  -h, --help             Print help

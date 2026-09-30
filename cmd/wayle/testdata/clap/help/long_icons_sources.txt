@@ -1,0 +1,6 @@
+List available icon sources
+
+Usage: wayle icons sources
+
+Options:
+  -h, --help  Print help

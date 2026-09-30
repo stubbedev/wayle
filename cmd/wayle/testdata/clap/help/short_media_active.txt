@@ -1,0 +1,9 @@
+Get or set the active media player
+
+Usage: wayle media active [PLAYER_ID]
+
+Arguments:
+  [PLAYER_ID]  Player to set as active (number or partial name match)
+
+Options:
+  -h, --help  Print help

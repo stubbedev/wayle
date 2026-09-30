@@ -1,0 +1,7 @@
+args: media loop tr
+[1m[31merror:[0m invalid value '[1m[33mtr[0m' for '[1m[32m<MODE>[0m'
+  [possible values: [1m[32mnone[0m, [1m[32mtrack[0m, [1m[32mplaylist[0m]
+
+  [1m[32mtip:[0m a similar value exists: '[1m[32mtrack[0m'
+
+For more information, try '[1m[32m--help[0m'.

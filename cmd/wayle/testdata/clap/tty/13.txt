@@ -1,0 +1,15 @@
+args: toast -h
+Show a custom on-screen toast
+
+[1m[32mUsage:[0m [1m[32mwayle toast[0m [32m[OPTIONS][0m [32m[LABEL][0m
+
+[1m[33mArguments:[0m
+  [32m[LABEL][0m  Toast text. Optional when `--preset` supplies one
+
+[1m[33mOptions:[0m
+      [1m[32m--icon[0m[32m [0m[32m<ICON>[0m              Icon name shown beside the text
+      [1m[32m--percentage[0m[32m [0m[32m<PERCENTAGE>[0m  Progress percentage (0-100); shows a progress bar when set
+      [1m[32m--duration[0m[32m [0m[32m<DURATION>[0m      Auto-dismiss duration in milliseconds (toast config default when unset)
+      [1m[32m--preset[0m[32m [0m[32m<PRESET>[0m          Preset id from `[[toasts.presets]]` to base this toast on
+      [1m[32m--class[0m[32m [0m[32m<CLASS>[0m            Extra CSS class applied to the toast for custom styling
+  [1m[32m-h[0m, [1m[32m--help[0m                     Print help

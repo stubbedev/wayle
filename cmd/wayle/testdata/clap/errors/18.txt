@@ -1,0 +1,7 @@
+args: toast --duration abc
+code: 2
+--- stdout
+--- stderr
+error: invalid value 'abc' for '--duration <DURATION>': invalid digit found in string
+
+For more information, try '--help'.

@@ -1,0 +1,16 @@
+Wallpaper control commands
+
+Usage: wayle wallpaper <COMMAND>
+
+Commands:
+  set              Set wallpaper from an image file
+  cycle            Start cycling wallpapers from a directory
+  stop             Stop wallpaper cycling
+  next             Skip to next wallpaper
+  previous         Go back to previous wallpaper
+  info             Display current wallpaper information
+  theming-monitor  Set which monitor to use for color extraction
+  help             Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

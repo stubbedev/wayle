@@ -1,0 +1,8 @@
+Generate markdown reference pages for every registered schema
+
+Usage: wayle config docs [OPTIONS]
+
+Options:
+      --out <OUT>    Output directory for the generated pages [default: docs/config]
+      --only <ONLY>  Regenerate only the named module
+  -h, --help         Print help

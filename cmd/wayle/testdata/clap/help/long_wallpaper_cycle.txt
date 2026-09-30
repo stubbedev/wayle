@@ -1,0 +1,25 @@
+Start cycling wallpapers from a directory
+
+Usage: wayle wallpaper cycle [OPTIONS] <DIRECTORY>
+
+Arguments:
+  <DIRECTORY>
+          Directory containing wallpaper images
+
+Options:
+  -i, --interval <INTERVAL>
+          Interval in seconds between changes
+          
+          [default: 300]
+
+  -m, --mode <MODE>
+          Cycling mode
+
+          Possible values:
+          - sequential: Cycle in alphabetical order
+          - shuffle:    Cycle in random order
+          
+          [default: sequential]
+
+  -h, --help
+          Print help (see a summary with '-h')

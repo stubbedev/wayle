@@ -1,0 +1,6 @@
+Show notification status
+
+Usage: wayle notify status
+
+Options:
+  -h, --help  Print help

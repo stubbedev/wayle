@@ -1,0 +1,9 @@
+Get the value of a configuration path
+
+Usage: wayle config get <PATH>
+
+Arguments:
+  <PATH>  The configuration path to retrieve (e.g., "modules.battery.enabled")
+
+Options:
+  -h, --help  Print help

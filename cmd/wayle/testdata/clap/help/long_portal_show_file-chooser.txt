@@ -1,0 +1,9 @@
+File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)
+
+Usage: wayle portal show file-chooser [OPTIONS]
+
+Options:
+      --save       Show the save dialog instead of the open dialog
+      --multiple   Allow selecting multiple files (open only)
+      --directory  Select a directory instead of files (open only)
+  -h, --help       Print help

@@ -1,0 +1,6 @@
+Pause the active recording
+
+Usage: wayle recorder pause
+
+Options:
+  -h, --help  Print help

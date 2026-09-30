@@ -1,0 +1,10 @@
+Enable idle inhibition
+
+Usage: wayle idle on [OPTIONS] [MINUTES]
+
+Arguments:
+  [MINUTES]  Duration in minutes (omit to use default duration)
+
+Options:
+  -i, --indefinite  Force indefinite mode (ignore default duration)
+  -h, --help        Print help

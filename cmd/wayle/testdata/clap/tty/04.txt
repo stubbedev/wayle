@@ -1,0 +1,8 @@
+args: toast --icn x
+[1m[31merror:[0m unexpected argument '[1m[33m--icn[0m' found
+
+  [1m[32mtip:[0m a similar argument exists: '[1m[32m--icon[0m'
+
+[1m[32mUsage:[0m [1m[32mwayle toast[0m [1m[32m--icon[0m[32m [0m[32m<ICON>[0m [32m[LABEL][0m
+
+For more information, try '[1m[32m--help[0m'.

@@ -1,0 +1,9 @@
+Export all installed icons to a directory
+
+Usage: wayle icons export <DESTINATION>
+
+Arguments:
+  <DESTINATION>  Destination directory for exported icons
+
+Options:
+  -h, --help  Print help

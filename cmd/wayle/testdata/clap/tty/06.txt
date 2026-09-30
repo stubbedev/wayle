@@ -1,0 +1,4 @@
+args: notify dismiss abc
+[1m[31merror:[0m invalid value '[1m[33mabc[0m' for '[1m[32m<ID>[0m': invalid digit found in string
+
+For more information, try '[1m[32m--help[0m'.

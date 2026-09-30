@@ -1,0 +1,18 @@
+Panel management commands
+
+Usage: wayle panel <COMMAND>
+
+Commands:
+  start     Start the panel daemon
+  stop      Stop the panel daemon
+  restart   Restart the panel daemon
+  status    Check panel status
+  settings  Open panel settings
+  inspect   Open GTK Inspector for debugging
+  hide      Hide the bar on a monitor
+  show      Show the bar on a monitor
+  toggle    Toggle bar visibility on a monitor
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

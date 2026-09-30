@@ -1,0 +1,9 @@
+Adjust remaining time on active timer
+
+Usage: wayle idle remaining <VALUE>
+
+Arguments:
+  <VALUE>  +N to add, -N to subtract, N to set absolute
+
+Options:
+  -h, --help  Print help

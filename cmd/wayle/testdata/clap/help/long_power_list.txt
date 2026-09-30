@@ -1,0 +1,6 @@
+List available power profiles
+
+Usage: wayle power list
+
+Options:
+  -h, --help  Print help

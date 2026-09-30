@@ -1,0 +1,9 @@
+Hand a browser sign-in callback to the running shell
+
+Usage: wayle vpn sso-callback <URI>
+
+Arguments:
+  <URI>  The `globalprotectcallback:` URI the browser was sent to
+
+Options:
+  -h, --help  Print help (see more with '--help')

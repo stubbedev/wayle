@@ -1,0 +1,9 @@
+Go to previous track
+
+Usage: wayle media previous [PLAYER_ID]
+
+Arguments:
+  [PLAYER_ID]  Player identifier (number or partial name match)
+
+Options:
+  -h, --help  Print help

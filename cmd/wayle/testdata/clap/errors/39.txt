@@ -1,0 +1,10 @@
+args: power set
+code: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <PROFILE>
+
+Usage: wayle power set <PROFILE>
+
+For more information, try '--help'.

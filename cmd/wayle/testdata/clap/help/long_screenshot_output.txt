@@ -1,0 +1,9 @@
+Capture a whole output (the focused output when NAME is omitted)
+
+Usage: wayle screenshot output [NAME]
+
+Arguments:
+  [NAME]  Output connector name (e.g. DP-1)
+
+Options:
+  -h, --help  Print help

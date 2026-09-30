@@ -1,0 +1,7 @@
+args: toast --percentage=
+code: 2
+--- stdout
+--- stderr
+error: invalid value '' for '--percentage <PERCENTAGE>': cannot parse float from empty string
+
+For more information, try '--help'.

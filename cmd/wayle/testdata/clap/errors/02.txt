@@ -1,0 +1,11 @@
+args: audi
+code: 2
+--- stdout
+--- stderr
+error: unrecognized subcommand 'audi'
+
+  tip: a similar subcommand exists: 'audio'
+
+Usage: wayle <COMMAND>
+
+For more information, try '--help'.

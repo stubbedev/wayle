@@ -1,0 +1,9 @@
+Show the bar on a monitor
+
+Usage: wayle panel show [MONITOR]
+
+Arguments:
+  [MONITOR]  Monitor connector name (e.g., "DP-1"). Omit to show all
+
+Options:
+  -h, --help  Print help

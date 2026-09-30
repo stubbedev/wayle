@@ -1,0 +1,9 @@
+Set power profile
+
+Usage: wayle power set <PROFILE>
+
+Arguments:
+  <PROFILE>  Profile name (power-saver, balanced, performance)
+
+Options:
+  -h, --help  Print help

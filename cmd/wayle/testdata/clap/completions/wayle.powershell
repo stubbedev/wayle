@@ -1,0 +1,1675 @@
+
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Language
+
+Register-ArgumentCompleter -Native -CommandName 'wayle' -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    $commandElements = $commandAst.CommandElements
+    $command = @(
+        'wayle'
+        for ($i = 1; $i -lt $commandElements.Count; $i++) {
+            $element = $commandElements[$i]
+            if ($element -isnot [StringConstantExpressionAst] -or
+                $element.StringConstantType -ne [StringConstantType]::BareWord -or
+                $element.Value.StartsWith('-') -or
+                $element.Value -eq $wordToComplete) {
+                break
+        }
+        $element.Value
+    }) -join ';'
+
+    $completions = @(switch ($command) {
+        'wayle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('audio', 'audio', [CompletionResultType]::ParameterValue, 'Audio control commands')
+            [CompletionResult]::new('config', 'config', [CompletionResultType]::ParameterValue, 'Configuration management commands')
+            [CompletionResult]::new('icons', 'icons', [CompletionResultType]::ParameterValue, 'Icon management commands')
+            [CompletionResult]::new('media', 'media', [CompletionResultType]::ParameterValue, 'Media player control commands')
+            [CompletionResult]::new('notify', 'notify', [CompletionResultType]::ParameterValue, 'Notification control commands')
+            [CompletionResult]::new('panel', 'panel', [CompletionResultType]::ParameterValue, 'Panel management commands')
+            [CompletionResult]::new('power', 'power', [CompletionResultType]::ParameterValue, 'Power profile commands')
+            [CompletionResult]::new('systray', 'systray', [CompletionResultType]::ParameterValue, 'System tray commands')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper control commands')
+            [CompletionResult]::new('idle', 'idle', [CompletionResultType]::ParameterValue, 'Idle inhibit control commands')
+            [CompletionResult]::new('launcher', 'launcher', [CompletionResultType]::ParameterValue, 'Application launcher / dmenu with rofi-compatible flags')
+            [CompletionResult]::new('lock', 'lock', [CompletionResultType]::ParameterValue, 'Lock the session via Wayle''s lock screen')
+            [CompletionResult]::new('vpn', 'vpn', [CompletionResultType]::ParameterValue, 'VPN commands')
+            [CompletionResult]::new('recorder', 'recorder', [CompletionResultType]::ParameterValue, 'Screen recorder control commands')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture commands')
+            [CompletionResult]::new('widget', 'widget', [CompletionResultType]::ParameterValue, 'Widget control commands')
+            [CompletionResult]::new('toast', 'toast', [CompletionResultType]::ParameterValue, 'Show a custom on-screen toast')
+            [CompletionResult]::new('portal', 'portal', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer')
+            [CompletionResult]::new('shell', 'shell', [CompletionResultType]::ParameterValue, 'Run the desktop shell in the foreground')
+            [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;audio' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('output-volume', 'output-volume', [CompletionResultType]::ParameterValue, 'Get or set output volume level')
+            [CompletionResult]::new('output-mute', 'output-mute', [CompletionResultType]::ParameterValue, 'Toggle output mute state')
+            [CompletionResult]::new('input-volume', 'input-volume', [CompletionResultType]::ParameterValue, 'Get or set input volume level')
+            [CompletionResult]::new('input-mute', 'input-mute', [CompletionResultType]::ParameterValue, 'Toggle input mute state')
+            [CompletionResult]::new('sinks', 'sinks', [CompletionResultType]::ParameterValue, 'List available audio sinks (outputs)')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available audio sources (inputs)')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current audio status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;audio;output-volume' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;audio;output-mute' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;audio;input-volume' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;audio;input-mute' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;audio;sinks' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;audio;sources' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;audio;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;audio;help' {
+            [CompletionResult]::new('output-volume', 'output-volume', [CompletionResultType]::ParameterValue, 'Get or set output volume level')
+            [CompletionResult]::new('output-mute', 'output-mute', [CompletionResultType]::ParameterValue, 'Toggle output mute state')
+            [CompletionResult]::new('input-volume', 'input-volume', [CompletionResultType]::ParameterValue, 'Get or set input volume level')
+            [CompletionResult]::new('input-mute', 'input-mute', [CompletionResultType]::ParameterValue, 'Toggle input mute state')
+            [CompletionResult]::new('sinks', 'sinks', [CompletionResultType]::ParameterValue, 'List available audio sinks (outputs)')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available audio sources (inputs)')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current audio status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;audio;help;output-volume' {
+            break
+        }
+        'wayle;audio;help;output-mute' {
+            break
+        }
+        'wayle;audio;help;input-volume' {
+            break
+        }
+        'wayle;audio;help;input-mute' {
+            break
+        }
+        'wayle;audio;help;sinks' {
+            break
+        }
+        'wayle;audio;help;sources' {
+            break
+        }
+        'wayle;audio;help;status' {
+            break
+        }
+        'wayle;audio;help;help' {
+            break
+        }
+        'wayle;config' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('get', 'get', [CompletionResultType]::ParameterValue, 'Get the value of a configuration path')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set the value of a configuration path')
+            [CompletionResult]::new('reset', 'reset', [CompletionResultType]::ParameterValue, 'Reset a configuration path to its default value')
+            [CompletionResult]::new('schema', 'schema', [CompletionResultType]::ParameterValue, 'Output JSON Schema for the configuration (for editor intellisense)')
+            [CompletionResult]::new('default', 'default', [CompletionResultType]::ParameterValue, 'Output the default configuration as TOML')
+            [CompletionResult]::new('docs', 'docs', [CompletionResultType]::ParameterValue, 'Generate markdown reference pages for every registered schema')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;config;get' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;config;set' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;config;reset' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;config;schema' {
+            [CompletionResult]::new('--stdout', '--stdout', [CompletionResultType]::ParameterName, 'Print to stdout instead of writing to config directory')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;config;default' {
+            [CompletionResult]::new('--stdout', '--stdout', [CompletionResultType]::ParameterName, 'Print to stdout instead of writing config.toml.example')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;config;docs' {
+            [CompletionResult]::new('--out', '--out', [CompletionResultType]::ParameterName, 'Output directory for the generated pages')
+            [CompletionResult]::new('--only', '--only', [CompletionResultType]::ParameterName, 'Regenerate only the named module')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;config;help' {
+            [CompletionResult]::new('get', 'get', [CompletionResultType]::ParameterValue, 'Get the value of a configuration path')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set the value of a configuration path')
+            [CompletionResult]::new('reset', 'reset', [CompletionResultType]::ParameterValue, 'Reset a configuration path to its default value')
+            [CompletionResult]::new('schema', 'schema', [CompletionResultType]::ParameterValue, 'Output JSON Schema for the configuration (for editor intellisense)')
+            [CompletionResult]::new('default', 'default', [CompletionResultType]::ParameterValue, 'Output the default configuration as TOML')
+            [CompletionResult]::new('docs', 'docs', [CompletionResultType]::ParameterValue, 'Generate markdown reference pages for every registered schema')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;config;help;get' {
+            break
+        }
+        'wayle;config;help;set' {
+            break
+        }
+        'wayle;config;help;reset' {
+            break
+        }
+        'wayle;config;help;schema' {
+            break
+        }
+        'wayle;config;help;default' {
+            break
+        }
+        'wayle;config;help;docs' {
+            break
+        }
+        'wayle;config;help;help' {
+            break
+        }
+        'wayle;icons' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('setup', 'setup', [CompletionResultType]::ParameterValue, 'Install bundled icons required by Wayle components')
+            [CompletionResult]::new('install', 'install', [CompletionResultType]::ParameterValue, 'Install icons from a CDN source')
+            [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Import local SVG file(s) as icons')
+            [CompletionResult]::new('remove', 'remove', [CompletionResultType]::ParameterValue, 'Remove installed icons')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available icon sources')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List installed icons')
+            [CompletionResult]::new('open', 'open', [CompletionResultType]::ParameterValue, 'Open the icons directory in file manager')
+            [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Export all installed icons to a directory')
+            [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Install any icons referenced in config but not yet on disk')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;icons;setup' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;icons;install' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'wayle;icons;import' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'wayle;icons;remove' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;icons;sources' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;icons;list' {
+            [CompletionResult]::new('-s', '-s', [CompletionResultType]::ParameterName, 'Filter by source prefix (e.g., tb, si, md)')
+            [CompletionResult]::new('--source', '--source', [CompletionResultType]::ParameterName, 'Filter by source prefix (e.g., tb, si, md)')
+            [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Interactive fuzzy search (requires fzf)')
+            [CompletionResult]::new('--interactive', '--interactive', [CompletionResultType]::ParameterName, 'Interactive fuzzy search (requires fzf)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;icons;open' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;icons;export' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;icons;sync' {
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview what would be installed without making changes')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'wayle;icons;help' {
+            [CompletionResult]::new('setup', 'setup', [CompletionResultType]::ParameterValue, 'Install bundled icons required by Wayle components')
+            [CompletionResult]::new('install', 'install', [CompletionResultType]::ParameterValue, 'Install icons from a CDN source')
+            [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Import local SVG file(s) as icons')
+            [CompletionResult]::new('remove', 'remove', [CompletionResultType]::ParameterValue, 'Remove installed icons')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available icon sources')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List installed icons')
+            [CompletionResult]::new('open', 'open', [CompletionResultType]::ParameterValue, 'Open the icons directory in file manager')
+            [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Export all installed icons to a directory')
+            [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Install any icons referenced in config but not yet on disk')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;icons;help;setup' {
+            break
+        }
+        'wayle;icons;help;install' {
+            break
+        }
+        'wayle;icons;help;import' {
+            break
+        }
+        'wayle;icons;help;remove' {
+            break
+        }
+        'wayle;icons;help;sources' {
+            break
+        }
+        'wayle;icons;help;list' {
+            break
+        }
+        'wayle;icons;help;open' {
+            break
+        }
+        'wayle;icons;help;export' {
+            break
+        }
+        'wayle;icons;help;sync' {
+            break
+        }
+        'wayle;icons;help;help' {
+            break
+        }
+        'wayle;media' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all available media players')
+            [CompletionResult]::new('play-pause', 'play-pause', [CompletionResultType]::ParameterValue, 'Toggle play/pause for a media player')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next track')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go to previous track')
+            [CompletionResult]::new('shuffle', 'shuffle', [CompletionResultType]::ParameterValue, 'Toggle or set shuffle mode')
+            [CompletionResult]::new('loop', 'loop', [CompletionResultType]::ParameterValue, 'Set loop/repeat mode')
+            [CompletionResult]::new('active', 'active', [CompletionResultType]::ParameterValue, 'Get or set the active media player')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display detailed information about a media player')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;media;list' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;media;play-pause' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;media;next' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;media;previous' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;media;shuffle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'wayle;media;loop' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'wayle;media;active' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;media;info' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;media;help' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all available media players')
+            [CompletionResult]::new('play-pause', 'play-pause', [CompletionResultType]::ParameterValue, 'Toggle play/pause for a media player')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next track')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go to previous track')
+            [CompletionResult]::new('shuffle', 'shuffle', [CompletionResultType]::ParameterValue, 'Toggle or set shuffle mode')
+            [CompletionResult]::new('loop', 'loop', [CompletionResultType]::ParameterValue, 'Set loop/repeat mode')
+            [CompletionResult]::new('active', 'active', [CompletionResultType]::ParameterValue, 'Get or set the active media player')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display detailed information about a media player')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;media;help;list' {
+            break
+        }
+        'wayle;media;help;play-pause' {
+            break
+        }
+        'wayle;media;help;next' {
+            break
+        }
+        'wayle;media;help;previous' {
+            break
+        }
+        'wayle;media;help;shuffle' {
+            break
+        }
+        'wayle;media;help;loop' {
+            break
+        }
+        'wayle;media;help;active' {
+            break
+        }
+        'wayle;media;help;info' {
+            break
+        }
+        'wayle;media;help;help' {
+            break
+        }
+        'wayle;notify' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all notifications')
+            [CompletionResult]::new('dismiss', 'dismiss', [CompletionResultType]::ParameterValue, 'Dismiss a notification by ID')
+            [CompletionResult]::new('dismiss-all', 'dismiss-all', [CompletionResultType]::ParameterValue, 'Dismiss all notifications')
+            [CompletionResult]::new('dnd', 'dnd', [CompletionResultType]::ParameterValue, 'Toggle Do Not Disturb mode')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show notification status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;notify;list' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;notify;dismiss' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;notify;dismiss-all' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;notify;dnd' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;notify;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;notify;help' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all notifications')
+            [CompletionResult]::new('dismiss', 'dismiss', [CompletionResultType]::ParameterValue, 'Dismiss a notification by ID')
+            [CompletionResult]::new('dismiss-all', 'dismiss-all', [CompletionResultType]::ParameterValue, 'Dismiss all notifications')
+            [CompletionResult]::new('dnd', 'dnd', [CompletionResultType]::ParameterValue, 'Toggle Do Not Disturb mode')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show notification status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;notify;help;list' {
+            break
+        }
+        'wayle;notify;help;dismiss' {
+            break
+        }
+        'wayle;notify;help;dismiss-all' {
+            break
+        }
+        'wayle;notify;help;dnd' {
+            break
+        }
+        'wayle;notify;help;status' {
+            break
+        }
+        'wayle;notify;help;help' {
+            break
+        }
+        'wayle;panel' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start the panel daemon')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop the panel daemon')
+            [CompletionResult]::new('restart', 'restart', [CompletionResultType]::ParameterValue, 'Restart the panel daemon')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check panel status')
+            [CompletionResult]::new('settings', 'settings', [CompletionResultType]::ParameterValue, 'Open panel settings')
+            [CompletionResult]::new('inspect', 'inspect', [CompletionResultType]::ParameterValue, 'Open GTK Inspector for debugging')
+            [CompletionResult]::new('hide', 'hide', [CompletionResultType]::ParameterValue, 'Hide the bar on a monitor')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show the bar on a monitor')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;panel;start' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;panel;stop' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;panel;restart' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;panel;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;panel;settings' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;panel;inspect' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;panel;hide' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;panel;show' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;panel;toggle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;panel;help' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start the panel daemon')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop the panel daemon')
+            [CompletionResult]::new('restart', 'restart', [CompletionResultType]::ParameterValue, 'Restart the panel daemon')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check panel status')
+            [CompletionResult]::new('settings', 'settings', [CompletionResultType]::ParameterValue, 'Open panel settings')
+            [CompletionResult]::new('inspect', 'inspect', [CompletionResultType]::ParameterValue, 'Open GTK Inspector for debugging')
+            [CompletionResult]::new('hide', 'hide', [CompletionResultType]::ParameterValue, 'Hide the bar on a monitor')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show the bar on a monitor')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;panel;help;start' {
+            break
+        }
+        'wayle;panel;help;stop' {
+            break
+        }
+        'wayle;panel;help;restart' {
+            break
+        }
+        'wayle;panel;help;status' {
+            break
+        }
+        'wayle;panel;help;settings' {
+            break
+        }
+        'wayle;panel;help;inspect' {
+            break
+        }
+        'wayle;panel;help;hide' {
+            break
+        }
+        'wayle;panel;help;show' {
+            break
+        }
+        'wayle;panel;help;toggle' {
+            break
+        }
+        'wayle;panel;help;help' {
+            break
+        }
+        'wayle;power' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current power profile')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set power profile')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Cycle to next power profile')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List available power profiles')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;power;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;power;set' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;power;cycle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;power;list' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;power;help' {
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current power profile')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set power profile')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Cycle to next power profile')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List available power profiles')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;power;help;status' {
+            break
+        }
+        'wayle;power;help;set' {
+            break
+        }
+        'wayle;power;help;cycle' {
+            break
+        }
+        'wayle;power;help;list' {
+            break
+        }
+        'wayle;power;help;help' {
+            break
+        }
+        'wayle;systray' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all system tray items')
+            [CompletionResult]::new('activate', 'activate', [CompletionResultType]::ParameterValue, 'Activate a tray item by ID')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show system tray status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;systray;list' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;systray;activate' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;systray;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;systray;help' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all system tray items')
+            [CompletionResult]::new('activate', 'activate', [CompletionResultType]::ParameterValue, 'Activate a tray item by ID')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show system tray status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;systray;help;list' {
+            break
+        }
+        'wayle;systray;help;activate' {
+            break
+        }
+        'wayle;systray;help;status' {
+            break
+        }
+        'wayle;systray;help;help' {
+            break
+        }
+        'wayle;wallpaper' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set wallpaper from an image file')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Start cycling wallpapers from a directory')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop wallpaper cycling')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next wallpaper')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go back to previous wallpaper')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display current wallpaper information')
+            [CompletionResult]::new('theming-monitor', 'theming-monitor', [CompletionResultType]::ParameterValue, 'Set which monitor to use for color extraction')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;wallpaper;set' {
+            [CompletionResult]::new('-f', '-f', [CompletionResultType]::ParameterName, 'Image fit mode')
+            [CompletionResult]::new('--fit', '--fit', [CompletionResultType]::ParameterName, 'Image fit mode')
+            [CompletionResult]::new('--monitor', '--monitor', [CompletionResultType]::ParameterName, 'Target monitor (e.g., DP-1, HDMI-A-1). If omitted, applies to all monitors')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'wayle;wallpaper;cycle' {
+            [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Interval in seconds between changes')
+            [CompletionResult]::new('--interval', '--interval', [CompletionResultType]::ParameterName, 'Interval in seconds between changes')
+            [CompletionResult]::new('-m', '-m', [CompletionResultType]::ParameterName, 'Cycling mode')
+            [CompletionResult]::new('--mode', '--mode', [CompletionResultType]::ParameterName, 'Cycling mode')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'wayle;wallpaper;stop' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;wallpaper;next' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;wallpaper;previous' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;wallpaper;info' {
+            [CompletionResult]::new('--monitor', '--monitor', [CompletionResultType]::ParameterName, 'Target monitor (e.g., DP-1, HDMI-A-1). If omitted, shows global state')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;wallpaper;theming-monitor' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;wallpaper;help' {
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set wallpaper from an image file')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Start cycling wallpapers from a directory')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop wallpaper cycling')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next wallpaper')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go back to previous wallpaper')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display current wallpaper information')
+            [CompletionResult]::new('theming-monitor', 'theming-monitor', [CompletionResultType]::ParameterValue, 'Set which monitor to use for color extraction')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;wallpaper;help;set' {
+            break
+        }
+        'wayle;wallpaper;help;cycle' {
+            break
+        }
+        'wayle;wallpaper;help;stop' {
+            break
+        }
+        'wayle;wallpaper;help;next' {
+            break
+        }
+        'wayle;wallpaper;help;previous' {
+            break
+        }
+        'wayle;wallpaper;help;info' {
+            break
+        }
+        'wayle;wallpaper;help;theming-monitor' {
+            break
+        }
+        'wayle;wallpaper;help;help' {
+            break
+        }
+        'wayle;idle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('on', 'on', [CompletionResultType]::ParameterValue, 'Enable idle inhibition')
+            [CompletionResult]::new('off', 'off', [CompletionResultType]::ParameterValue, 'Disable idle inhibition')
+            [CompletionResult]::new('duration', 'duration', [CompletionResultType]::ParameterValue, 'Adjust timer duration (upper limit)')
+            [CompletionResult]::new('remaining', 'remaining', [CompletionResultType]::ParameterValue, 'Adjust remaining time on active timer')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current idle inhibit status')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle idle inhibition on/off')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;idle;on' {
+            [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Force indefinite mode (ignore default duration)')
+            [CompletionResult]::new('--indefinite', '--indefinite', [CompletionResultType]::ParameterName, 'Force indefinite mode (ignore default duration)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;idle;off' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;idle;duration' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;idle;remaining' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;idle;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;idle;toggle' {
+            [CompletionResult]::new('-i', '-i', [CompletionResultType]::ParameterName, 'Use indefinite mode when enabling')
+            [CompletionResult]::new('--indefinite', '--indefinite', [CompletionResultType]::ParameterName, 'Use indefinite mode when enabling')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;idle;help' {
+            [CompletionResult]::new('on', 'on', [CompletionResultType]::ParameterValue, 'Enable idle inhibition')
+            [CompletionResult]::new('off', 'off', [CompletionResultType]::ParameterValue, 'Disable idle inhibition')
+            [CompletionResult]::new('duration', 'duration', [CompletionResultType]::ParameterValue, 'Adjust timer duration (upper limit)')
+            [CompletionResult]::new('remaining', 'remaining', [CompletionResultType]::ParameterValue, 'Adjust remaining time on active timer')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current idle inhibit status')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle idle inhibition on/off')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;idle;help;on' {
+            break
+        }
+        'wayle;idle;help;off' {
+            break
+        }
+        'wayle;idle;help;duration' {
+            break
+        }
+        'wayle;idle;help;remaining' {
+            break
+        }
+        'wayle;idle;help;status' {
+            break
+        }
+        'wayle;idle;help;toggle' {
+            break
+        }
+        'wayle;idle;help;help' {
+            break
+        }
+        'wayle;launcher' {
+            break
+        }
+        'wayle;lock' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;vpn' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('sso-callback', 'sso-callback', [CompletionResultType]::ParameterValue, 'Hand a browser sign-in callback to the running shell')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;vpn;sso-callback' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'wayle;vpn;help' {
+            [CompletionResult]::new('sso-callback', 'sso-callback', [CompletionResultType]::ParameterValue, 'Hand a browser sign-in callback to the running shell')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;vpn;help;sso-callback' {
+            break
+        }
+        'wayle;vpn;help;help' {
+            break
+        }
+        'wayle;recorder' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start recording')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop recording')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle recording on/off')
+            [CompletionResult]::new('pause', 'pause', [CompletionResultType]::ParameterValue, 'Pause the active recording')
+            [CompletionResult]::new('resume', 'resume', [CompletionResultType]::ParameterValue, 'Resume a paused recording')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current recorder status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;recorder;start' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;recorder;stop' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;recorder;toggle' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;recorder;pause' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;recorder;resume' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;recorder;status' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;recorder;help' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start recording')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop recording')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle recording on/off')
+            [CompletionResult]::new('pause', 'pause', [CompletionResultType]::ParameterValue, 'Pause the active recording')
+            [CompletionResult]::new('resume', 'resume', [CompletionResultType]::ParameterValue, 'Resume a paused recording')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current recorder status')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;recorder;help;start' {
+            break
+        }
+        'wayle;recorder;help;stop' {
+            break
+        }
+        'wayle;recorder;help;toggle' {
+            break
+        }
+        'wayle;recorder;help;pause' {
+            break
+        }
+        'wayle;recorder;help;resume' {
+            break
+        }
+        'wayle;recorder;help;status' {
+            break
+        }
+        'wayle;recorder;help;help' {
+            break
+        }
+        'wayle;screenshot' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a drag-selected region')
+            [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
+            [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;screenshot;region' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;screenshot;output' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;screenshot;window' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;screenshot;help' {
+            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a drag-selected region')
+            [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
+            [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;screenshot;help;region' {
+            break
+        }
+        'wayle;screenshot;help;output' {
+            break
+        }
+        'wayle;screenshot;help;window' {
+            break
+        }
+        'wayle;screenshot;help;help' {
+            break
+        }
+        'wayle;widget' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('update', 'update', [CompletionResultType]::ParameterValue, 'Push an output update to a bar widget by its config id')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;widget;update' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'wayle;widget;help' {
+            [CompletionResult]::new('update', 'update', [CompletionResultType]::ParameterValue, 'Push an output update to a bar widget by its config id')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;widget;help;update' {
+            break
+        }
+        'wayle;widget;help;help' {
+            break
+        }
+        'wayle;toast' {
+            [CompletionResult]::new('--icon', '--icon', [CompletionResultType]::ParameterName, 'Icon name shown beside the text')
+            [CompletionResult]::new('--percentage', '--percentage', [CompletionResultType]::ParameterName, 'Progress percentage (0-100); shows a progress bar when set')
+            [CompletionResult]::new('--duration', '--duration', [CompletionResultType]::ParameterName, 'Auto-dismiss duration in milliseconds (toast config default when unset)')
+            [CompletionResult]::new('--preset', '--preset', [CompletionResultType]::ParameterName, 'Preset id from `[[toasts.presets]]` to base this toast on')
+            [CompletionResult]::new('--class', '--class', [CompletionResultType]::ParameterName, 'Extra CSS class applied to the toast for custom styling')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `wayle portal`)')
+            [CompletionResult]::new('share-picker', 'share-picker', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;portal;run' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;share-picker' {
+            [CompletionResult]::new('--allow-token', '--allow-token', [CompletionResultType]::ParameterName, 'Pre-check the "allow restore token" box')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('file-chooser', 'file-chooser', [CompletionResultType]::ParameterValue, 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)')
+            [CompletionResult]::new('color', 'color', [CompletionResultType]::ParameterValue, 'Interactive color picker (`Screenshot.PickColor`)')
+            [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled')
+            [CompletionResult]::new('screen-cast', 'screen-cast', [CompletionResultType]::ParameterValue, 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)')
+            [CompletionResult]::new('access', 'access', [CompletionResultType]::ParameterValue, 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)')
+            [CompletionResult]::new('account', 'account', [CompletionResultType]::ParameterValue, 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)')
+            [CompletionResult]::new('app-chooser', 'app-chooser', [CompletionResultType]::ParameterValue, 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)')
+            [CompletionResult]::new('dynamic-launcher', 'dynamic-launcher', [CompletionResultType]::ParameterValue, 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;portal;show;file-chooser' {
+            [CompletionResult]::new('--save', '--save', [CompletionResultType]::ParameterName, 'Show the save dialog instead of the open dialog')
+            [CompletionResult]::new('--multiple', '--multiple', [CompletionResultType]::ParameterName, 'Allow selecting multiple files (open only)')
+            [CompletionResult]::new('--directory', '--directory', [CompletionResultType]::ParameterName, 'Select a directory instead of files (open only)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;screenshot' {
+            [CompletionResult]::new('--mode', '--mode', [CompletionResultType]::ParameterName, 'Capture mode: `region`, `output`, `screen`, or `window`')
+            [CompletionResult]::new('--target', '--target', [CompletionResultType]::ParameterName, 'Output connector name (used by `output` mode)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;color' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;print' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;screen-cast' {
+            [CompletionResult]::new('--allow-token', '--allow-token', [CompletionResultType]::ParameterName, 'Pre-check the "allow restore token" box')
+            [CompletionResult]::new('--multiple', '--multiple', [CompletionResultType]::ParameterName, 'Allow selecting multiple sources')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;access' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;account' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;app-chooser' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;dynamic-launcher' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;wallpaper' {
+            [CompletionResult]::new('--uri', '--uri', [CompletionResultType]::ParameterName, '`file://` image URI to preview (defaults to a placeholder)')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;portal;show;help' {
+            [CompletionResult]::new('file-chooser', 'file-chooser', [CompletionResultType]::ParameterValue, 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)')
+            [CompletionResult]::new('color', 'color', [CompletionResultType]::ParameterValue, 'Interactive color picker (`Screenshot.PickColor`)')
+            [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled')
+            [CompletionResult]::new('screen-cast', 'screen-cast', [CompletionResultType]::ParameterValue, 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)')
+            [CompletionResult]::new('access', 'access', [CompletionResultType]::ParameterValue, 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)')
+            [CompletionResult]::new('account', 'account', [CompletionResultType]::ParameterValue, 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)')
+            [CompletionResult]::new('app-chooser', 'app-chooser', [CompletionResultType]::ParameterValue, 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)')
+            [CompletionResult]::new('dynamic-launcher', 'dynamic-launcher', [CompletionResultType]::ParameterValue, 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;portal;show;help;file-chooser' {
+            break
+        }
+        'wayle;portal;show;help;screenshot' {
+            break
+        }
+        'wayle;portal;show;help;color' {
+            break
+        }
+        'wayle;portal;show;help;print' {
+            break
+        }
+        'wayle;portal;show;help;screen-cast' {
+            break
+        }
+        'wayle;portal;show;help;access' {
+            break
+        }
+        'wayle;portal;show;help;account' {
+            break
+        }
+        'wayle;portal;show;help;app-chooser' {
+            break
+        }
+        'wayle;portal;show;help;dynamic-launcher' {
+            break
+        }
+        'wayle;portal;show;help;wallpaper' {
+            break
+        }
+        'wayle;portal;show;help;help' {
+            break
+        }
+        'wayle;portal;help' {
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `wayle portal`)')
+            [CompletionResult]::new('share-picker', 'share-picker', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;portal;help;run' {
+            break
+        }
+        'wayle;portal;help;share-picker' {
+            break
+        }
+        'wayle;portal;help;show' {
+            [CompletionResult]::new('file-chooser', 'file-chooser', [CompletionResultType]::ParameterValue, 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)')
+            [CompletionResult]::new('color', 'color', [CompletionResultType]::ParameterValue, 'Interactive color picker (`Screenshot.PickColor`)')
+            [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled')
+            [CompletionResult]::new('screen-cast', 'screen-cast', [CompletionResultType]::ParameterValue, 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)')
+            [CompletionResult]::new('access', 'access', [CompletionResultType]::ParameterValue, 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)')
+            [CompletionResult]::new('account', 'account', [CompletionResultType]::ParameterValue, 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)')
+            [CompletionResult]::new('app-chooser', 'app-chooser', [CompletionResultType]::ParameterValue, 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)')
+            [CompletionResult]::new('dynamic-launcher', 'dynamic-launcher', [CompletionResultType]::ParameterValue, 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)')
+            break
+        }
+        'wayle;portal;help;show;file-chooser' {
+            break
+        }
+        'wayle;portal;help;show;screenshot' {
+            break
+        }
+        'wayle;portal;help;show;color' {
+            break
+        }
+        'wayle;portal;help;show;print' {
+            break
+        }
+        'wayle;portal;help;show;screen-cast' {
+            break
+        }
+        'wayle;portal;help;show;access' {
+            break
+        }
+        'wayle;portal;help;show;account' {
+            break
+        }
+        'wayle;portal;help;show;app-chooser' {
+            break
+        }
+        'wayle;portal;help;show;dynamic-launcher' {
+            break
+        }
+        'wayle;portal;help;show;wallpaper' {
+            break
+        }
+        'wayle;portal;help;help' {
+            break
+        }
+        'wayle;shell' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;completions' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'wayle;help' {
+            [CompletionResult]::new('audio', 'audio', [CompletionResultType]::ParameterValue, 'Audio control commands')
+            [CompletionResult]::new('config', 'config', [CompletionResultType]::ParameterValue, 'Configuration management commands')
+            [CompletionResult]::new('icons', 'icons', [CompletionResultType]::ParameterValue, 'Icon management commands')
+            [CompletionResult]::new('media', 'media', [CompletionResultType]::ParameterValue, 'Media player control commands')
+            [CompletionResult]::new('notify', 'notify', [CompletionResultType]::ParameterValue, 'Notification control commands')
+            [CompletionResult]::new('panel', 'panel', [CompletionResultType]::ParameterValue, 'Panel management commands')
+            [CompletionResult]::new('power', 'power', [CompletionResultType]::ParameterValue, 'Power profile commands')
+            [CompletionResult]::new('systray', 'systray', [CompletionResultType]::ParameterValue, 'System tray commands')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper control commands')
+            [CompletionResult]::new('idle', 'idle', [CompletionResultType]::ParameterValue, 'Idle inhibit control commands')
+            [CompletionResult]::new('launcher', 'launcher', [CompletionResultType]::ParameterValue, 'Application launcher / dmenu with rofi-compatible flags')
+            [CompletionResult]::new('lock', 'lock', [CompletionResultType]::ParameterValue, 'Lock the session via Wayle''s lock screen')
+            [CompletionResult]::new('vpn', 'vpn', [CompletionResultType]::ParameterValue, 'VPN commands')
+            [CompletionResult]::new('recorder', 'recorder', [CompletionResultType]::ParameterValue, 'Screen recorder control commands')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture commands')
+            [CompletionResult]::new('widget', 'widget', [CompletionResultType]::ParameterValue, 'Widget control commands')
+            [CompletionResult]::new('toast', 'toast', [CompletionResultType]::ParameterValue, 'Show a custom on-screen toast')
+            [CompletionResult]::new('portal', 'portal', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer')
+            [CompletionResult]::new('shell', 'shell', [CompletionResultType]::ParameterValue, 'Run the desktop shell in the foreground')
+            [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'wayle;help;audio' {
+            [CompletionResult]::new('output-volume', 'output-volume', [CompletionResultType]::ParameterValue, 'Get or set output volume level')
+            [CompletionResult]::new('output-mute', 'output-mute', [CompletionResultType]::ParameterValue, 'Toggle output mute state')
+            [CompletionResult]::new('input-volume', 'input-volume', [CompletionResultType]::ParameterValue, 'Get or set input volume level')
+            [CompletionResult]::new('input-mute', 'input-mute', [CompletionResultType]::ParameterValue, 'Toggle input mute state')
+            [CompletionResult]::new('sinks', 'sinks', [CompletionResultType]::ParameterValue, 'List available audio sinks (outputs)')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available audio sources (inputs)')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current audio status')
+            break
+        }
+        'wayle;help;audio;output-volume' {
+            break
+        }
+        'wayle;help;audio;output-mute' {
+            break
+        }
+        'wayle;help;audio;input-volume' {
+            break
+        }
+        'wayle;help;audio;input-mute' {
+            break
+        }
+        'wayle;help;audio;sinks' {
+            break
+        }
+        'wayle;help;audio;sources' {
+            break
+        }
+        'wayle;help;audio;status' {
+            break
+        }
+        'wayle;help;config' {
+            [CompletionResult]::new('get', 'get', [CompletionResultType]::ParameterValue, 'Get the value of a configuration path')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set the value of a configuration path')
+            [CompletionResult]::new('reset', 'reset', [CompletionResultType]::ParameterValue, 'Reset a configuration path to its default value')
+            [CompletionResult]::new('schema', 'schema', [CompletionResultType]::ParameterValue, 'Output JSON Schema for the configuration (for editor intellisense)')
+            [CompletionResult]::new('default', 'default', [CompletionResultType]::ParameterValue, 'Output the default configuration as TOML')
+            [CompletionResult]::new('docs', 'docs', [CompletionResultType]::ParameterValue, 'Generate markdown reference pages for every registered schema')
+            break
+        }
+        'wayle;help;config;get' {
+            break
+        }
+        'wayle;help;config;set' {
+            break
+        }
+        'wayle;help;config;reset' {
+            break
+        }
+        'wayle;help;config;schema' {
+            break
+        }
+        'wayle;help;config;default' {
+            break
+        }
+        'wayle;help;config;docs' {
+            break
+        }
+        'wayle;help;icons' {
+            [CompletionResult]::new('setup', 'setup', [CompletionResultType]::ParameterValue, 'Install bundled icons required by Wayle components')
+            [CompletionResult]::new('install', 'install', [CompletionResultType]::ParameterValue, 'Install icons from a CDN source')
+            [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Import local SVG file(s) as icons')
+            [CompletionResult]::new('remove', 'remove', [CompletionResultType]::ParameterValue, 'Remove installed icons')
+            [CompletionResult]::new('sources', 'sources', [CompletionResultType]::ParameterValue, 'List available icon sources')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List installed icons')
+            [CompletionResult]::new('open', 'open', [CompletionResultType]::ParameterValue, 'Open the icons directory in file manager')
+            [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Export all installed icons to a directory')
+            [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Install any icons referenced in config but not yet on disk')
+            break
+        }
+        'wayle;help;icons;setup' {
+            break
+        }
+        'wayle;help;icons;install' {
+            break
+        }
+        'wayle;help;icons;import' {
+            break
+        }
+        'wayle;help;icons;remove' {
+            break
+        }
+        'wayle;help;icons;sources' {
+            break
+        }
+        'wayle;help;icons;list' {
+            break
+        }
+        'wayle;help;icons;open' {
+            break
+        }
+        'wayle;help;icons;export' {
+            break
+        }
+        'wayle;help;icons;sync' {
+            break
+        }
+        'wayle;help;media' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all available media players')
+            [CompletionResult]::new('play-pause', 'play-pause', [CompletionResultType]::ParameterValue, 'Toggle play/pause for a media player')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next track')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go to previous track')
+            [CompletionResult]::new('shuffle', 'shuffle', [CompletionResultType]::ParameterValue, 'Toggle or set shuffle mode')
+            [CompletionResult]::new('loop', 'loop', [CompletionResultType]::ParameterValue, 'Set loop/repeat mode')
+            [CompletionResult]::new('active', 'active', [CompletionResultType]::ParameterValue, 'Get or set the active media player')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display detailed information about a media player')
+            break
+        }
+        'wayle;help;media;list' {
+            break
+        }
+        'wayle;help;media;play-pause' {
+            break
+        }
+        'wayle;help;media;next' {
+            break
+        }
+        'wayle;help;media;previous' {
+            break
+        }
+        'wayle;help;media;shuffle' {
+            break
+        }
+        'wayle;help;media;loop' {
+            break
+        }
+        'wayle;help;media;active' {
+            break
+        }
+        'wayle;help;media;info' {
+            break
+        }
+        'wayle;help;notify' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all notifications')
+            [CompletionResult]::new('dismiss', 'dismiss', [CompletionResultType]::ParameterValue, 'Dismiss a notification by ID')
+            [CompletionResult]::new('dismiss-all', 'dismiss-all', [CompletionResultType]::ParameterValue, 'Dismiss all notifications')
+            [CompletionResult]::new('dnd', 'dnd', [CompletionResultType]::ParameterValue, 'Toggle Do Not Disturb mode')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show notification status')
+            break
+        }
+        'wayle;help;notify;list' {
+            break
+        }
+        'wayle;help;notify;dismiss' {
+            break
+        }
+        'wayle;help;notify;dismiss-all' {
+            break
+        }
+        'wayle;help;notify;dnd' {
+            break
+        }
+        'wayle;help;notify;status' {
+            break
+        }
+        'wayle;help;panel' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start the panel daemon')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop the panel daemon')
+            [CompletionResult]::new('restart', 'restart', [CompletionResultType]::ParameterValue, 'Restart the panel daemon')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check panel status')
+            [CompletionResult]::new('settings', 'settings', [CompletionResultType]::ParameterValue, 'Open panel settings')
+            [CompletionResult]::new('inspect', 'inspect', [CompletionResultType]::ParameterValue, 'Open GTK Inspector for debugging')
+            [CompletionResult]::new('hide', 'hide', [CompletionResultType]::ParameterValue, 'Hide the bar on a monitor')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show the bar on a monitor')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle bar visibility on a monitor')
+            break
+        }
+        'wayle;help;panel;start' {
+            break
+        }
+        'wayle;help;panel;stop' {
+            break
+        }
+        'wayle;help;panel;restart' {
+            break
+        }
+        'wayle;help;panel;status' {
+            break
+        }
+        'wayle;help;panel;settings' {
+            break
+        }
+        'wayle;help;panel;inspect' {
+            break
+        }
+        'wayle;help;panel;hide' {
+            break
+        }
+        'wayle;help;panel;show' {
+            break
+        }
+        'wayle;help;panel;toggle' {
+            break
+        }
+        'wayle;help;power' {
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current power profile')
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set power profile')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Cycle to next power profile')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List available power profiles')
+            break
+        }
+        'wayle;help;power;status' {
+            break
+        }
+        'wayle;help;power;set' {
+            break
+        }
+        'wayle;help;power;cycle' {
+            break
+        }
+        'wayle;help;power;list' {
+            break
+        }
+        'wayle;help;systray' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all system tray items')
+            [CompletionResult]::new('activate', 'activate', [CompletionResultType]::ParameterValue, 'Activate a tray item by ID')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show system tray status')
+            break
+        }
+        'wayle;help;systray;list' {
+            break
+        }
+        'wayle;help;systray;activate' {
+            break
+        }
+        'wayle;help;systray;status' {
+            break
+        }
+        'wayle;help;wallpaper' {
+            [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set wallpaper from an image file')
+            [CompletionResult]::new('cycle', 'cycle', [CompletionResultType]::ParameterValue, 'Start cycling wallpapers from a directory')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop wallpaper cycling')
+            [CompletionResult]::new('next', 'next', [CompletionResultType]::ParameterValue, 'Skip to next wallpaper')
+            [CompletionResult]::new('previous', 'previous', [CompletionResultType]::ParameterValue, 'Go back to previous wallpaper')
+            [CompletionResult]::new('info', 'info', [CompletionResultType]::ParameterValue, 'Display current wallpaper information')
+            [CompletionResult]::new('theming-monitor', 'theming-monitor', [CompletionResultType]::ParameterValue, 'Set which monitor to use for color extraction')
+            break
+        }
+        'wayle;help;wallpaper;set' {
+            break
+        }
+        'wayle;help;wallpaper;cycle' {
+            break
+        }
+        'wayle;help;wallpaper;stop' {
+            break
+        }
+        'wayle;help;wallpaper;next' {
+            break
+        }
+        'wayle;help;wallpaper;previous' {
+            break
+        }
+        'wayle;help;wallpaper;info' {
+            break
+        }
+        'wayle;help;wallpaper;theming-monitor' {
+            break
+        }
+        'wayle;help;idle' {
+            [CompletionResult]::new('on', 'on', [CompletionResultType]::ParameterValue, 'Enable idle inhibition')
+            [CompletionResult]::new('off', 'off', [CompletionResultType]::ParameterValue, 'Disable idle inhibition')
+            [CompletionResult]::new('duration', 'duration', [CompletionResultType]::ParameterValue, 'Adjust timer duration (upper limit)')
+            [CompletionResult]::new('remaining', 'remaining', [CompletionResultType]::ParameterValue, 'Adjust remaining time on active timer')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current idle inhibit status')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle idle inhibition on/off')
+            break
+        }
+        'wayle;help;idle;on' {
+            break
+        }
+        'wayle;help;idle;off' {
+            break
+        }
+        'wayle;help;idle;duration' {
+            break
+        }
+        'wayle;help;idle;remaining' {
+            break
+        }
+        'wayle;help;idle;status' {
+            break
+        }
+        'wayle;help;idle;toggle' {
+            break
+        }
+        'wayle;help;launcher' {
+            break
+        }
+        'wayle;help;lock' {
+            break
+        }
+        'wayle;help;vpn' {
+            [CompletionResult]::new('sso-callback', 'sso-callback', [CompletionResultType]::ParameterValue, 'Hand a browser sign-in callback to the running shell')
+            break
+        }
+        'wayle;help;vpn;sso-callback' {
+            break
+        }
+        'wayle;help;recorder' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start recording')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop recording')
+            [CompletionResult]::new('toggle', 'toggle', [CompletionResultType]::ParameterValue, 'Toggle recording on/off')
+            [CompletionResult]::new('pause', 'pause', [CompletionResultType]::ParameterValue, 'Pause the active recording')
+            [CompletionResult]::new('resume', 'resume', [CompletionResultType]::ParameterValue, 'Resume a paused recording')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current recorder status')
+            break
+        }
+        'wayle;help;recorder;start' {
+            break
+        }
+        'wayle;help;recorder;stop' {
+            break
+        }
+        'wayle;help;recorder;toggle' {
+            break
+        }
+        'wayle;help;recorder;pause' {
+            break
+        }
+        'wayle;help;recorder;resume' {
+            break
+        }
+        'wayle;help;recorder;status' {
+            break
+        }
+        'wayle;help;screenshot' {
+            [CompletionResult]::new('region', 'region', [CompletionResultType]::ParameterValue, 'Capture a drag-selected region')
+            [CompletionResult]::new('output', 'output', [CompletionResultType]::ParameterValue, 'Capture a whole output (the focused output when NAME is omitted)')
+            [CompletionResult]::new('window', 'window', [CompletionResultType]::ParameterValue, 'Capture the active window')
+            break
+        }
+        'wayle;help;screenshot;region' {
+            break
+        }
+        'wayle;help;screenshot;output' {
+            break
+        }
+        'wayle;help;screenshot;window' {
+            break
+        }
+        'wayle;help;widget' {
+            [CompletionResult]::new('update', 'update', [CompletionResultType]::ParameterValue, 'Push an output update to a bar widget by its config id')
+            break
+        }
+        'wayle;help;widget;update' {
+            break
+        }
+        'wayle;help;toast' {
+            break
+        }
+        'wayle;help;portal' {
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `wayle portal`)')
+            [CompletionResult]::new('share-picker', 'share-picker', [CompletionResultType]::ParameterValue, 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)')
+            [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)')
+            break
+        }
+        'wayle;help;portal;run' {
+            break
+        }
+        'wayle;help;portal;share-picker' {
+            break
+        }
+        'wayle;help;portal;show' {
+            [CompletionResult]::new('file-chooser', 'file-chooser', [CompletionResultType]::ParameterValue, 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)')
+            [CompletionResult]::new('screenshot', 'screenshot', [CompletionResultType]::ParameterValue, 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)')
+            [CompletionResult]::new('color', 'color', [CompletionResultType]::ParameterValue, 'Interactive color picker (`Screenshot.PickColor`)')
+            [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled')
+            [CompletionResult]::new('screen-cast', 'screen-cast', [CompletionResultType]::ParameterValue, 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)')
+            [CompletionResult]::new('access', 'access', [CompletionResultType]::ParameterValue, 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)')
+            [CompletionResult]::new('account', 'account', [CompletionResultType]::ParameterValue, 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)')
+            [CompletionResult]::new('app-chooser', 'app-chooser', [CompletionResultType]::ParameterValue, 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)')
+            [CompletionResult]::new('dynamic-launcher', 'dynamic-launcher', [CompletionResultType]::ParameterValue, 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)')
+            [CompletionResult]::new('wallpaper', 'wallpaper', [CompletionResultType]::ParameterValue, 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)')
+            break
+        }
+        'wayle;help;portal;show;file-chooser' {
+            break
+        }
+        'wayle;help;portal;show;screenshot' {
+            break
+        }
+        'wayle;help;portal;show;color' {
+            break
+        }
+        'wayle;help;portal;show;print' {
+            break
+        }
+        'wayle;help;portal;show;screen-cast' {
+            break
+        }
+        'wayle;help;portal;show;access' {
+            break
+        }
+        'wayle;help;portal;show;account' {
+            break
+        }
+        'wayle;help;portal;show;app-chooser' {
+            break
+        }
+        'wayle;help;portal;show;dynamic-launcher' {
+            break
+        }
+        'wayle;help;portal;show;wallpaper' {
+            break
+        }
+        'wayle;help;shell' {
+            break
+        }
+        'wayle;help;completions' {
+            break
+        }
+        'wayle;help;help' {
+            break
+        }
+    })
+
+    $completions.Where{ $_.CompletionText -like "$wordToComplete*" } |
+        Sort-Object -Property ListItemText
+}

@@ -1,0 +1,20 @@
+Install any icons referenced in config but not yet on disk
+
+Usage: wayle icons sync [OPTIONS]
+
+Options:
+      --dry-run
+          Preview what would be installed without making changes
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+    wayle icons sync
+        -> install every config-referenced icon not yet on disk
+
+    wayle icons sync --dry-run
+        -> list what would be installed; no downloads
+
+Useful when sharing dotfiles across machines. User-imported `cm-` icons
+cannot be auto-installed and are listed as skipped.

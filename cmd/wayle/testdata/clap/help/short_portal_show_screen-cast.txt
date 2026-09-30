@@ -1,0 +1,8 @@
+Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)
+
+Usage: wayle portal show screen-cast [OPTIONS]
+
+Options:
+      --allow-token  Pre-check the "allow restore token" box
+      --multiple     Allow selecting multiple sources
+  -h, --help         Print help

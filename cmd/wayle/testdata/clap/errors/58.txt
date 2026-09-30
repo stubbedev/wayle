@@ -1,0 +1,13 @@
+args: help audio output-volume
+code: 0
+--- stdout
+Get or set output volume level
+
+Usage: wayle audio output-volume [LEVEL]
+
+Arguments:
+  [LEVEL]  Volume level (0-100) or relative adjustment (+5, -10)
+
+Options:
+  -h, --help  Print help
+--- stderr

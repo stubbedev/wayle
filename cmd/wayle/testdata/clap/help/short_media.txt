@@ -1,0 +1,17 @@
+Media player control commands
+
+Usage: wayle media <COMMAND>
+
+Commands:
+  list        List all available media players
+  play-pause  Toggle play/pause for a media player
+  next        Skip to next track
+  previous    Go to previous track
+  shuffle     Toggle or set shuffle mode
+  loop        Set loop/repeat mode
+  active      Get or set the active media player
+  info        Display detailed information about a media player
+  help        Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

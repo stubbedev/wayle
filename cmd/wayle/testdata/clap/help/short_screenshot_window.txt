@@ -1,0 +1,6 @@
+Capture the active window
+
+Usage: wayle screenshot window
+
+Options:
+  -h, --help  Print help

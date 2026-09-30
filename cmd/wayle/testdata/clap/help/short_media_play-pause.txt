@@ -1,0 +1,9 @@
+Toggle play/pause for a media player
+
+Usage: wayle media play-pause [PLAYER_ID]
+
+Arguments:
+  [PLAYER_ID]  Player identifier (number or partial name match)
+
+Options:
+  -h, --help  Print help

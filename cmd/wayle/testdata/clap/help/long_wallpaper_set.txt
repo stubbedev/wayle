@@ -1,0 +1,24 @@
+Set wallpaper from an image file
+
+Usage: wayle wallpaper set [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>
+          Path to wallpaper image
+
+Options:
+  -f, --fit <FIT>
+          Image fit mode
+
+          Possible values:
+          - fill:    Scale to cover entire display
+          - fit:     Scale to fit within display
+          - center:  Display at original size, centered
+          - tile:    Tile the image
+          - stretch: Stretch to fill
+
+      --monitor <MONITOR>
+          Target monitor (e.g., DP-1, HDMI-A-1). If omitted, applies to all monitors
+
+  -h, --help
+          Print help (see a summary with '-h')

@@ -1,0 +1,9 @@
+Dismiss a notification by ID
+
+Usage: wayle notify dismiss <ID>
+
+Arguments:
+  <ID>  Notification ID to dismiss
+
+Options:
+  -h, --help  Print help

@@ -1,0 +1,6 @@
+Open GTK Inspector for debugging
+
+Usage: wayle panel inspect
+
+Options:
+  -h, --help  Print help

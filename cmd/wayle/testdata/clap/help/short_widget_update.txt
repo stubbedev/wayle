@@ -1,0 +1,10 @@
+Push an output update to a bar widget by its config id
+
+Usage: wayle widget update <ID> <OUTPUT>
+
+Arguments:
+  <ID>      Config id of the target widget (e.g. a custom module's `id`)
+  <OUTPUT>  Output payload (plain text, or a JSON object)
+
+Options:
+  -h, --help  Print help (see more with '--help')

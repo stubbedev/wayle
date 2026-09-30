@@ -1,0 +1,10 @@
+args: icons import
+code: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <PATH>
+
+Usage: wayle icons import <PATH> [NAME]
+
+For more information, try '--help'.

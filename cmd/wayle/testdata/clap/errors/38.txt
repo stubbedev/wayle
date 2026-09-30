@@ -1,0 +1,9 @@
+args: audio output-volume 1 2
+code: 2
+--- stdout
+--- stderr
+error: unexpected argument '2' found
+
+Usage: wayle audio output-volume [LEVEL]
+
+For more information, try '--help'.

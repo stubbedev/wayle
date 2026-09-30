@@ -1,0 +1,7 @@
+args: idle on abc
+code: 2
+--- stdout
+--- stderr
+error: invalid value 'abc' for '[MINUTES]': invalid digit found in string
+
+For more information, try '--help'.

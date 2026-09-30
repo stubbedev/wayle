@@ -1,0 +1,6 @@
+Lock the session via Wayle's lock screen
+
+Usage: wayle lock
+
+Options:
+  -h, --help  Print help

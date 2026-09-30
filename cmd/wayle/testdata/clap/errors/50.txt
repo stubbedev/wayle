@@ -1,0 +1,9 @@
+args: toast -- --notaflag extra
+code: 2
+--- stdout
+--- stderr
+error: unexpected argument 'extra' found
+
+Usage: wayle toast [OPTIONS] [LABEL]
+
+For more information, try '--help'.

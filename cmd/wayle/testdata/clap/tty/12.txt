@@ -1,0 +1,11 @@
+args: media loop -h
+Set loop/repeat mode
+
+[1m[32mUsage:[0m [1m[32mwayle media loop[0m [32m<MODE>[0m [32m[PLAYER_ID][0m
+
+[1m[33mArguments:[0m
+  [32m<MODE>[0m       Loop mode [possible values: none, track, playlist]
+  [32m[PLAYER_ID][0m  Player identifier (number or partial name match)
+
+[1m[33mOptions:[0m
+  [1m[32m-h[0m, [1m[32m--help[0m  Print help (see more with '--help')

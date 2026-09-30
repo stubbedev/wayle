@@ -1,0 +1,24 @@
+Install icons from a CDN source
+
+Usage: wayle icons install <SOURCE> <SLUGS>...
+
+Arguments:
+  <SOURCE>
+          Source name (run 'wayle icons sources' to see available sources)
+
+  <SLUGS>...
+          Icon slugs to install (e.g., home settings bell)
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+    wayle icons install tabler home settings bell
+        -> tb-home-symbolic, tb-settings-symbolic, tb-bell-symbolic
+
+    wayle icons install simple-icons firefox spotify
+        -> si-firefox-symbolic, si-spotify-symbolic
+
+Run 'wayle icons sources' to see all available icon sources.
+Icons are saved to ~/.local/share/wayle/icons/ as GTK symbolic icons.

@@ -1,0 +1,7 @@
+Output the default configuration as TOML
+
+Usage: wayle config default [OPTIONS]
+
+Options:
+      --stdout  Print to stdout instead of writing config.toml.example
+  -h, --help    Print help

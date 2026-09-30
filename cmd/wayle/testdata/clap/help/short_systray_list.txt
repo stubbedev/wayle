@@ -1,0 +1,6 @@
+List all system tray items
+
+Usage: wayle systray list
+
+Options:
+  -h, --help  Print help

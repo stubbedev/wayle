@@ -1,0 +1,11 @@
+args: aduio
+code: 2
+--- stdout
+--- stderr
+error: unrecognized subcommand 'aduio'
+
+  tip: a similar subcommand exists: 'audio'
+
+Usage: wayle <COMMAND>
+
+For more information, try '--help'.

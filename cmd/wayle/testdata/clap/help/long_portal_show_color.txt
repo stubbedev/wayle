@@ -1,0 +1,6 @@
+Interactive color picker (`Screenshot.PickColor`)
+
+Usage: wayle portal show color
+
+Options:
+  -h, --help  Print help

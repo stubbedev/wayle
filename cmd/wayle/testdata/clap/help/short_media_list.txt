@@ -1,0 +1,6 @@
+List all available media players
+
+Usage: wayle media list
+
+Options:
+  -h, --help  Print help

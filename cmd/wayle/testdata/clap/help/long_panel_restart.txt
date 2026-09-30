@@ -1,0 +1,6 @@
+Restart the panel daemon
+
+Usage: wayle panel restart
+
+Options:
+  -h, --help  Print help

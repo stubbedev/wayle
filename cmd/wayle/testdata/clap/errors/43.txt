@@ -1,0 +1,9 @@
+args: shell extra
+code: 2
+--- stdout
+--- stderr
+error: unexpected argument 'extra' found
+
+Usage: wayle shell
+
+For more information, try '--help'.

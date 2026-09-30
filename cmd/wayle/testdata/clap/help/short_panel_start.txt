@@ -1,0 +1,6 @@
+Start the panel daemon
+
+Usage: wayle panel start
+
+Options:
+  -h, --help  Print help

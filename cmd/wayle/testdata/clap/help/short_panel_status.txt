@@ -1,0 +1,6 @@
+Check panel status
+
+Usage: wayle panel status
+
+Options:
+  -h, --help  Print help

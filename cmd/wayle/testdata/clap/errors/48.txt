@@ -1,0 +1,9 @@
+args: lock --x
+code: 2
+--- stdout
+--- stderr
+error: unexpected argument '--x' found
+
+Usage: wayle lock
+
+For more information, try '--help'.

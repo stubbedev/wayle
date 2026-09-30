@@ -1,0 +1,9 @@
+Generate shell completions
+
+Usage: wayle completions <SHELL>
+
+Arguments:
+  <SHELL>  Shell to generate completions for [possible values: bash, elvish, fish, powershell, zsh]
+
+Options:
+  -h, --help  Print help

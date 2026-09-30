@@ -1,0 +1,10 @@
+Set the value of a configuration path
+
+Usage: wayle config set <PATH> <VALUE>
+
+Arguments:
+  <PATH>   The configuration path to set (e.g., "modules.battery.enabled")
+  <VALUE>  The value to set (use JSON format for complex types)
+
+Options:
+  -h, --help  Print help

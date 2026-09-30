@@ -1,0 +1,17 @@
+args: audio
+Audio control commands
+
+[1m[32mUsage:[0m [1m[32mwayle audio[0m [32m<COMMAND>[0m
+
+[1m[33mCommands:[0m
+  [1m[32moutput-volume[0m  Get or set output volume level
+  [1m[32moutput-mute[0m    Toggle output mute state
+  [1m[32minput-volume[0m   Get or set input volume level
+  [1m[32minput-mute[0m     Toggle input mute state
+  [1m[32msinks[0m          List available audio sinks (outputs)
+  [1m[32msources[0m        List available audio sources (inputs)
+  [1m[32mstatus[0m         Show current audio status
+  [1m[32mhelp[0m           Print this message or the help of the given subcommand(s)
+
+[1m[33mOptions:[0m
+  [1m[32m-h[0m, [1m[32m--help[0m  Print help

@@ -1,0 +1,9 @@
+Display detailed information about a media player
+
+Usage: wayle media info [PLAYER_ID]
+
+Arguments:
+  [PLAYER_ID]  Player identifier (number or partial name match)
+
+Options:
+  -h, --help  Print help

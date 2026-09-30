@@ -1,0 +1,23 @@
+Import local SVG file(s) as icons
+
+Usage: wayle icons import <PATH> [NAME]
+
+Arguments:
+  <PATH>
+          Path to SVG file or directory
+
+  [NAME]
+          Icon name (required for single file, ignored for directory)
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+    wayle icons import ~/Downloads/my-icon.svg my-icon
+        -> cm-my-icon-symbolic
+
+    wayle icons import ~/exported-icons/
+        -> Imports all SVGs, preserves names with known prefixes
+
+Icons without a known prefix (tb-, tbf-, si-, md-, ld-) get 'cm-' added.

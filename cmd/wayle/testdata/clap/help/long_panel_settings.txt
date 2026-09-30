@@ -1,0 +1,6 @@
+Open panel settings
+
+Usage: wayle panel settings
+
+Options:
+  -h, --help  Print help

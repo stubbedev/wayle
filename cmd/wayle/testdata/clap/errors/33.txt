@@ -1,0 +1,11 @@
+args: idle on -5
+code: 2
+--- stdout
+--- stderr
+error: unexpected argument '-5' found
+
+  tip: to pass '-5' as a value, use '-- -5'
+
+Usage: wayle idle on [OPTIONS] [MINUTES]
+
+For more information, try '--help'.

@@ -1,0 +1,18 @@
+Icon management commands
+
+Usage: wayle icons <COMMAND>
+
+Commands:
+  setup    Install bundled icons required by Wayle components
+  install  Install icons from a CDN source
+  import   Import local SVG file(s) as icons
+  remove   Remove installed icons
+  sources  List available icon sources
+  list     List installed icons
+  open     Open the icons directory in file manager
+  export   Export all installed icons to a directory
+  sync     Install any icons referenced in config but not yet on disk
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

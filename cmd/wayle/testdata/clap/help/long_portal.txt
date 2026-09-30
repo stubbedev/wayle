@@ -1,0 +1,12 @@
+xdg-desktop-portal backend, screencast picker stub, and dialog previewer
+
+Usage: wayle portal [COMMAND]
+
+Commands:
+  run           Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `wayle portal`)
+  share-picker  xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)
+  show          Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

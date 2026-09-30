@@ -1,0 +1,8 @@
+List installed icons
+
+Usage: wayle icons list [OPTIONS]
+
+Options:
+  -s, --source <SOURCE>  Filter by source prefix (e.g., tb, si, md)
+  -i, --interactive      Interactive fuzzy search (requires fzf)
+  -h, --help             Print help

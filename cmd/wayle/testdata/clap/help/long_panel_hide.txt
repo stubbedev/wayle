@@ -1,0 +1,9 @@
+Hide the bar on a monitor
+
+Usage: wayle panel hide [MONITOR]
+
+Arguments:
+  [MONITOR]  Monitor connector name (e.g., "DP-1"). Omit to hide all
+
+Options:
+  -h, --help  Print help

@@ -1,0 +1,14 @@
+Show a custom on-screen toast
+
+Usage: wayle toast [OPTIONS] [LABEL]
+
+Arguments:
+  [LABEL]  Toast text. Optional when `--preset` supplies one
+
+Options:
+      --icon <ICON>              Icon name shown beside the text
+      --percentage <PERCENTAGE>  Progress percentage (0-100); shows a progress bar when set
+      --duration <DURATION>      Auto-dismiss duration in milliseconds (toast config default when unset)
+      --preset <PRESET>          Preset id from `[[toasts.presets]]` to base this toast on
+      --class <CLASS>            Extra CSS class applied to the toast for custom styling
+  -h, --help                     Print help

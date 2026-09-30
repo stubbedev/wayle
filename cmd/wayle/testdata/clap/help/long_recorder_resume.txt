@@ -1,0 +1,6 @@
+Resume a paused recording
+
+Usage: wayle recorder resume
+
+Options:
+  -h, --help  Print help

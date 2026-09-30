@@ -1,0 +1,10 @@
+args: completions -h
+Generate shell completions
+
+[1m[32mUsage:[0m [1m[32mwayle completions[0m [32m<SHELL>[0m
+
+[1m[33mArguments:[0m
+  [32m<SHELL>[0m  Shell to generate completions for [possible values: bash, elvish, fish, powershell, zsh]
+
+[1m[33mOptions:[0m
+  [1m[32m-h[0m, [1m[32m--help[0m  Print help

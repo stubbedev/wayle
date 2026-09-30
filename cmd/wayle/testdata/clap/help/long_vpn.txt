@@ -1,0 +1,10 @@
+VPN commands
+
+Usage: wayle vpn <COMMAND>
+
+Commands:
+  sso-callback  Hand a browser sign-in callback to the running shell
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

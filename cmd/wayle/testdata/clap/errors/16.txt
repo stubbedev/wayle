@@ -1,0 +1,7 @@
+args: toast --percentage abc
+code: 2
+--- stdout
+--- stderr
+error: invalid value 'abc' for '--percentage <PERCENTAGE>': invalid float literal
+
+For more information, try '--help'.

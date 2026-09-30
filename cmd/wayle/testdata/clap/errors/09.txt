@@ -1,0 +1,10 @@
+args: media loop tr
+code: 2
+--- stdout
+--- stderr
+error: invalid value 'tr' for '<MODE>'
+  [possible values: none, track, playlist]
+
+  tip: a similar value exists: 'track'
+
+For more information, try '--help'.

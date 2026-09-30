@@ -1,0 +1,15 @@
+Configuration management commands
+
+Usage: wayle config <COMMAND>
+
+Commands:
+  get      Get the value of a configuration path
+  set      Set the value of a configuration path
+  reset    Reset a configuration path to its default value
+  schema   Output JSON Schema for the configuration (for editor intellisense)
+  default  Output the default configuration as TOML
+  docs     Generate markdown reference pages for every registered schema
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

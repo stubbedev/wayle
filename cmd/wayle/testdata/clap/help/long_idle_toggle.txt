@@ -1,0 +1,7 @@
+Toggle idle inhibition on/off
+
+Usage: wayle idle toggle [OPTIONS]
+
+Options:
+  -i, --indefinite  Use indefinite mode when enabling
+  -h, --help        Print help

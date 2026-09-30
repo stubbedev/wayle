@@ -1,0 +1,10 @@
+args: widget update a
+code: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <OUTPUT>
+
+Usage: wayle widget update <ID> <OUTPUT>
+
+For more information, try '--help'.

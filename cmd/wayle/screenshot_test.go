@@ -1,31 +1,33 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
 
-func TestParseScreenshot(t *testing.T) {
-	for _, tc := range []struct {
-		args         []string
-		mode, target string
-	}{
-		{[]string{"region"}, "region", ""},
-		{[]string{"window"}, "window", ""},
-		{[]string{"output"}, "output", ""},
-		{[]string{"output", "DP-1"}, "output", "DP-1"},
-	} {
-		mode, target, err := parseScreenshot(tc.args)
-		if err != nil || mode != tc.mode || target != tc.target {
-			t.Errorf("%v = %q %q %v", tc.args, mode, target, err)
+	"github.com/stubbedev/wayle/internal/dbustest"
+)
+
+func TestScreenshotSubcommandsReachTheService(t *testing.T) {
+	bus := dbustest.Start(t)
+	bus.UseAsSessionBus(t)
+	for _, args := range [][]string{{"region"}, {"window"}, {"output"}, {"output", "DP-1"}} {
+		_, stderr, code := runCaptured(t, false, append([]string{"screenshot"}, args...)...)
+		if code != 1 || !strings.Contains(stderr, "Screenshot service not running. Start wayle shell first.") {
+			t.Errorf("screenshot %v: code %d stderr %q, want the not-running error from the bus", args, code, stderr)
 		}
 	}
-	for _, bad := range [][]string{
+}
+
+func TestScreenshotRejectsBadArguments(t *testing.T) {
+	for _, args := range [][]string{
 		nil,
 		{"screen"}, // the daemon's composite mode is not a CLI subcommand
 		{"region", "extra"},
 		{"output", "DP-1", "DP-2"},
 		{"selfie"},
 	} {
-		if _, _, err := parseScreenshot(bad); err == nil {
-			t.Errorf("%v parsed", bad)
+		if _, _, code := runCaptured(t, false, append([]string{"screenshot"}, args...)...); code != 2 {
+			t.Errorf("screenshot %v exited %d, want the usage error 2", args, code)
 		}
 	}
 }

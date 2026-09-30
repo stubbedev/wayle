@@ -1,0 +1,9 @@
+Toggle bar visibility on a monitor
+
+Usage: wayle panel toggle [MONITOR]
+
+Arguments:
+  [MONITOR]  Monitor connector name (e.g., "DP-1"). Omit to toggle all
+
+Options:
+  -h, --help  Print help

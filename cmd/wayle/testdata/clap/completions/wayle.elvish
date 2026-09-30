@@ -1,0 +1,1321 @@
+
+use builtin;
+use str;
+
+set edit:completion:arg-completer[wayle] = {|@words|
+    fn spaces {|n|
+        builtin:repeat $n ' ' | str:join ''
+    }
+    fn cand {|text desc|
+        edit:complex-candidate $text &display=$text' '(spaces (- 14 (wcswidth $text)))$desc
+    }
+    var command = 'wayle'
+    for word $words[1..-1] {
+        if (str:has-prefix $word '-') {
+            break
+        }
+        set command = $command';'$word
+    }
+    var completions = [
+        &'wayle'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand audio 'Audio control commands'
+            cand config 'Configuration management commands'
+            cand icons 'Icon management commands'
+            cand media 'Media player control commands'
+            cand notify 'Notification control commands'
+            cand panel 'Panel management commands'
+            cand power 'Power profile commands'
+            cand systray 'System tray commands'
+            cand wallpaper 'Wallpaper control commands'
+            cand idle 'Idle inhibit control commands'
+            cand launcher 'Application launcher / dmenu with rofi-compatible flags'
+            cand lock 'Lock the session via Wayle''s lock screen'
+            cand vpn 'VPN commands'
+            cand recorder 'Screen recorder control commands'
+            cand screenshot 'Screenshot capture commands'
+            cand widget 'Widget control commands'
+            cand toast 'Show a custom on-screen toast'
+            cand portal 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer'
+            cand shell 'Run the desktop shell in the foreground'
+            cand completions 'Generate shell completions'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;audio'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand output-volume 'Get or set output volume level'
+            cand output-mute 'Toggle output mute state'
+            cand input-volume 'Get or set input volume level'
+            cand input-mute 'Toggle input mute state'
+            cand sinks 'List available audio sinks (outputs)'
+            cand sources 'List available audio sources (inputs)'
+            cand status 'Show current audio status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;audio;output-volume'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;audio;output-mute'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;audio;input-volume'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;audio;input-mute'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;audio;sinks'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;audio;sources'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;audio;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;audio;help'= {
+            cand output-volume 'Get or set output volume level'
+            cand output-mute 'Toggle output mute state'
+            cand input-volume 'Get or set input volume level'
+            cand input-mute 'Toggle input mute state'
+            cand sinks 'List available audio sinks (outputs)'
+            cand sources 'List available audio sources (inputs)'
+            cand status 'Show current audio status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;audio;help;output-volume'= {
+        }
+        &'wayle;audio;help;output-mute'= {
+        }
+        &'wayle;audio;help;input-volume'= {
+        }
+        &'wayle;audio;help;input-mute'= {
+        }
+        &'wayle;audio;help;sinks'= {
+        }
+        &'wayle;audio;help;sources'= {
+        }
+        &'wayle;audio;help;status'= {
+        }
+        &'wayle;audio;help;help'= {
+        }
+        &'wayle;config'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand get 'Get the value of a configuration path'
+            cand set 'Set the value of a configuration path'
+            cand reset 'Reset a configuration path to its default value'
+            cand schema 'Output JSON Schema for the configuration (for editor intellisense)'
+            cand default 'Output the default configuration as TOML'
+            cand docs 'Generate markdown reference pages for every registered schema'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;config;get'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;config;set'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;config;reset'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;config;schema'= {
+            cand --stdout 'Print to stdout instead of writing to config directory'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;config;default'= {
+            cand --stdout 'Print to stdout instead of writing config.toml.example'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;config;docs'= {
+            cand --out 'Output directory for the generated pages'
+            cand --only 'Regenerate only the named module'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;config;help'= {
+            cand get 'Get the value of a configuration path'
+            cand set 'Set the value of a configuration path'
+            cand reset 'Reset a configuration path to its default value'
+            cand schema 'Output JSON Schema for the configuration (for editor intellisense)'
+            cand default 'Output the default configuration as TOML'
+            cand docs 'Generate markdown reference pages for every registered schema'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;config;help;get'= {
+        }
+        &'wayle;config;help;set'= {
+        }
+        &'wayle;config;help;reset'= {
+        }
+        &'wayle;config;help;schema'= {
+        }
+        &'wayle;config;help;default'= {
+        }
+        &'wayle;config;help;docs'= {
+        }
+        &'wayle;config;help;help'= {
+        }
+        &'wayle;icons'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand setup 'Install bundled icons required by Wayle components'
+            cand install 'Install icons from a CDN source'
+            cand import 'Import local SVG file(s) as icons'
+            cand remove 'Remove installed icons'
+            cand sources 'List available icon sources'
+            cand list 'List installed icons'
+            cand open 'Open the icons directory in file manager'
+            cand export 'Export all installed icons to a directory'
+            cand sync 'Install any icons referenced in config but not yet on disk'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;icons;setup'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;icons;install'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'wayle;icons;import'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'wayle;icons;remove'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;icons;sources'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;icons;list'= {
+            cand -s 'Filter by source prefix (e.g., tb, si, md)'
+            cand --source 'Filter by source prefix (e.g., tb, si, md)'
+            cand -i 'Interactive fuzzy search (requires fzf)'
+            cand --interactive 'Interactive fuzzy search (requires fzf)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;icons;open'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;icons;export'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;icons;sync'= {
+            cand --dry-run 'Preview what would be installed without making changes'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'wayle;icons;help'= {
+            cand setup 'Install bundled icons required by Wayle components'
+            cand install 'Install icons from a CDN source'
+            cand import 'Import local SVG file(s) as icons'
+            cand remove 'Remove installed icons'
+            cand sources 'List available icon sources'
+            cand list 'List installed icons'
+            cand open 'Open the icons directory in file manager'
+            cand export 'Export all installed icons to a directory'
+            cand sync 'Install any icons referenced in config but not yet on disk'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;icons;help;setup'= {
+        }
+        &'wayle;icons;help;install'= {
+        }
+        &'wayle;icons;help;import'= {
+        }
+        &'wayle;icons;help;remove'= {
+        }
+        &'wayle;icons;help;sources'= {
+        }
+        &'wayle;icons;help;list'= {
+        }
+        &'wayle;icons;help;open'= {
+        }
+        &'wayle;icons;help;export'= {
+        }
+        &'wayle;icons;help;sync'= {
+        }
+        &'wayle;icons;help;help'= {
+        }
+        &'wayle;media'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List all available media players'
+            cand play-pause 'Toggle play/pause for a media player'
+            cand next 'Skip to next track'
+            cand previous 'Go to previous track'
+            cand shuffle 'Toggle or set shuffle mode'
+            cand loop 'Set loop/repeat mode'
+            cand active 'Get or set the active media player'
+            cand info 'Display detailed information about a media player'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;media;list'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;media;play-pause'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;media;next'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;media;previous'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;media;shuffle'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'wayle;media;loop'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'wayle;media;active'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;media;info'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;media;help'= {
+            cand list 'List all available media players'
+            cand play-pause 'Toggle play/pause for a media player'
+            cand next 'Skip to next track'
+            cand previous 'Go to previous track'
+            cand shuffle 'Toggle or set shuffle mode'
+            cand loop 'Set loop/repeat mode'
+            cand active 'Get or set the active media player'
+            cand info 'Display detailed information about a media player'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;media;help;list'= {
+        }
+        &'wayle;media;help;play-pause'= {
+        }
+        &'wayle;media;help;next'= {
+        }
+        &'wayle;media;help;previous'= {
+        }
+        &'wayle;media;help;shuffle'= {
+        }
+        &'wayle;media;help;loop'= {
+        }
+        &'wayle;media;help;active'= {
+        }
+        &'wayle;media;help;info'= {
+        }
+        &'wayle;media;help;help'= {
+        }
+        &'wayle;notify'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List all notifications'
+            cand dismiss 'Dismiss a notification by ID'
+            cand dismiss-all 'Dismiss all notifications'
+            cand dnd 'Toggle Do Not Disturb mode'
+            cand status 'Show notification status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;notify;list'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;notify;dismiss'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;notify;dismiss-all'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;notify;dnd'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;notify;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;notify;help'= {
+            cand list 'List all notifications'
+            cand dismiss 'Dismiss a notification by ID'
+            cand dismiss-all 'Dismiss all notifications'
+            cand dnd 'Toggle Do Not Disturb mode'
+            cand status 'Show notification status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;notify;help;list'= {
+        }
+        &'wayle;notify;help;dismiss'= {
+        }
+        &'wayle;notify;help;dismiss-all'= {
+        }
+        &'wayle;notify;help;dnd'= {
+        }
+        &'wayle;notify;help;status'= {
+        }
+        &'wayle;notify;help;help'= {
+        }
+        &'wayle;panel'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand start 'Start the panel daemon'
+            cand stop 'Stop the panel daemon'
+            cand restart 'Restart the panel daemon'
+            cand status 'Check panel status'
+            cand settings 'Open panel settings'
+            cand inspect 'Open GTK Inspector for debugging'
+            cand hide 'Hide the bar on a monitor'
+            cand show 'Show the bar on a monitor'
+            cand toggle 'Toggle bar visibility on a monitor'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;panel;start'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;panel;stop'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;panel;restart'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;panel;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;panel;settings'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;panel;inspect'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;panel;hide'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;panel;show'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;panel;toggle'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;panel;help'= {
+            cand start 'Start the panel daemon'
+            cand stop 'Stop the panel daemon'
+            cand restart 'Restart the panel daemon'
+            cand status 'Check panel status'
+            cand settings 'Open panel settings'
+            cand inspect 'Open GTK Inspector for debugging'
+            cand hide 'Hide the bar on a monitor'
+            cand show 'Show the bar on a monitor'
+            cand toggle 'Toggle bar visibility on a monitor'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;panel;help;start'= {
+        }
+        &'wayle;panel;help;stop'= {
+        }
+        &'wayle;panel;help;restart'= {
+        }
+        &'wayle;panel;help;status'= {
+        }
+        &'wayle;panel;help;settings'= {
+        }
+        &'wayle;panel;help;inspect'= {
+        }
+        &'wayle;panel;help;hide'= {
+        }
+        &'wayle;panel;help;show'= {
+        }
+        &'wayle;panel;help;toggle'= {
+        }
+        &'wayle;panel;help;help'= {
+        }
+        &'wayle;power'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand status 'Show current power profile'
+            cand set 'Set power profile'
+            cand cycle 'Cycle to next power profile'
+            cand list 'List available power profiles'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;power;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;power;set'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;power;cycle'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;power;list'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;power;help'= {
+            cand status 'Show current power profile'
+            cand set 'Set power profile'
+            cand cycle 'Cycle to next power profile'
+            cand list 'List available power profiles'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;power;help;status'= {
+        }
+        &'wayle;power;help;set'= {
+        }
+        &'wayle;power;help;cycle'= {
+        }
+        &'wayle;power;help;list'= {
+        }
+        &'wayle;power;help;help'= {
+        }
+        &'wayle;systray'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List all system tray items'
+            cand activate 'Activate a tray item by ID'
+            cand status 'Show system tray status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;systray;list'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;systray;activate'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;systray;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;systray;help'= {
+            cand list 'List all system tray items'
+            cand activate 'Activate a tray item by ID'
+            cand status 'Show system tray status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;systray;help;list'= {
+        }
+        &'wayle;systray;help;activate'= {
+        }
+        &'wayle;systray;help;status'= {
+        }
+        &'wayle;systray;help;help'= {
+        }
+        &'wayle;wallpaper'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand set 'Set wallpaper from an image file'
+            cand cycle 'Start cycling wallpapers from a directory'
+            cand stop 'Stop wallpaper cycling'
+            cand next 'Skip to next wallpaper'
+            cand previous 'Go back to previous wallpaper'
+            cand info 'Display current wallpaper information'
+            cand theming-monitor 'Set which monitor to use for color extraction'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;wallpaper;set'= {
+            cand -f 'Image fit mode'
+            cand --fit 'Image fit mode'
+            cand --monitor 'Target monitor (e.g., DP-1, HDMI-A-1). If omitted, applies to all monitors'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'wayle;wallpaper;cycle'= {
+            cand -i 'Interval in seconds between changes'
+            cand --interval 'Interval in seconds between changes'
+            cand -m 'Cycling mode'
+            cand --mode 'Cycling mode'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'wayle;wallpaper;stop'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;wallpaper;next'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;wallpaper;previous'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;wallpaper;info'= {
+            cand --monitor 'Target monitor (e.g., DP-1, HDMI-A-1). If omitted, shows global state'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;wallpaper;theming-monitor'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;wallpaper;help'= {
+            cand set 'Set wallpaper from an image file'
+            cand cycle 'Start cycling wallpapers from a directory'
+            cand stop 'Stop wallpaper cycling'
+            cand next 'Skip to next wallpaper'
+            cand previous 'Go back to previous wallpaper'
+            cand info 'Display current wallpaper information'
+            cand theming-monitor 'Set which monitor to use for color extraction'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;wallpaper;help;set'= {
+        }
+        &'wayle;wallpaper;help;cycle'= {
+        }
+        &'wayle;wallpaper;help;stop'= {
+        }
+        &'wayle;wallpaper;help;next'= {
+        }
+        &'wayle;wallpaper;help;previous'= {
+        }
+        &'wayle;wallpaper;help;info'= {
+        }
+        &'wayle;wallpaper;help;theming-monitor'= {
+        }
+        &'wayle;wallpaper;help;help'= {
+        }
+        &'wayle;idle'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand on 'Enable idle inhibition'
+            cand off 'Disable idle inhibition'
+            cand duration 'Adjust timer duration (upper limit)'
+            cand remaining 'Adjust remaining time on active timer'
+            cand status 'Show current idle inhibit status'
+            cand toggle 'Toggle idle inhibition on/off'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;idle;on'= {
+            cand -i 'Force indefinite mode (ignore default duration)'
+            cand --indefinite 'Force indefinite mode (ignore default duration)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;idle;off'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;idle;duration'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;idle;remaining'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;idle;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;idle;toggle'= {
+            cand -i 'Use indefinite mode when enabling'
+            cand --indefinite 'Use indefinite mode when enabling'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;idle;help'= {
+            cand on 'Enable idle inhibition'
+            cand off 'Disable idle inhibition'
+            cand duration 'Adjust timer duration (upper limit)'
+            cand remaining 'Adjust remaining time on active timer'
+            cand status 'Show current idle inhibit status'
+            cand toggle 'Toggle idle inhibition on/off'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;idle;help;on'= {
+        }
+        &'wayle;idle;help;off'= {
+        }
+        &'wayle;idle;help;duration'= {
+        }
+        &'wayle;idle;help;remaining'= {
+        }
+        &'wayle;idle;help;status'= {
+        }
+        &'wayle;idle;help;toggle'= {
+        }
+        &'wayle;idle;help;help'= {
+        }
+        &'wayle;launcher'= {
+        }
+        &'wayle;lock'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;vpn'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand sso-callback 'Hand a browser sign-in callback to the running shell'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;vpn;sso-callback'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'wayle;vpn;help'= {
+            cand sso-callback 'Hand a browser sign-in callback to the running shell'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;vpn;help;sso-callback'= {
+        }
+        &'wayle;vpn;help;help'= {
+        }
+        &'wayle;recorder'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand start 'Start recording'
+            cand stop 'Stop recording'
+            cand toggle 'Toggle recording on/off'
+            cand pause 'Pause the active recording'
+            cand resume 'Resume a paused recording'
+            cand status 'Show current recorder status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;recorder;start'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;recorder;stop'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;recorder;toggle'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;recorder;pause'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;recorder;resume'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;recorder;status'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;recorder;help'= {
+            cand start 'Start recording'
+            cand stop 'Stop recording'
+            cand toggle 'Toggle recording on/off'
+            cand pause 'Pause the active recording'
+            cand resume 'Resume a paused recording'
+            cand status 'Show current recorder status'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;recorder;help;start'= {
+        }
+        &'wayle;recorder;help;stop'= {
+        }
+        &'wayle;recorder;help;toggle'= {
+        }
+        &'wayle;recorder;help;pause'= {
+        }
+        &'wayle;recorder;help;resume'= {
+        }
+        &'wayle;recorder;help;status'= {
+        }
+        &'wayle;recorder;help;help'= {
+        }
+        &'wayle;screenshot'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand region 'Capture a drag-selected region'
+            cand output 'Capture a whole output (the focused output when NAME is omitted)'
+            cand window 'Capture the active window'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;screenshot;region'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;screenshot;output'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;screenshot;window'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;screenshot;help'= {
+            cand region 'Capture a drag-selected region'
+            cand output 'Capture a whole output (the focused output when NAME is omitted)'
+            cand window 'Capture the active window'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;screenshot;help;region'= {
+        }
+        &'wayle;screenshot;help;output'= {
+        }
+        &'wayle;screenshot;help;window'= {
+        }
+        &'wayle;screenshot;help;help'= {
+        }
+        &'wayle;widget'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand update 'Push an output update to a bar widget by its config id'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;widget;update'= {
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+        }
+        &'wayle;widget;help'= {
+            cand update 'Push an output update to a bar widget by its config id'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;widget;help;update'= {
+        }
+        &'wayle;widget;help;help'= {
+        }
+        &'wayle;toast'= {
+            cand --icon 'Icon name shown beside the text'
+            cand --percentage 'Progress percentage (0-100); shows a progress bar when set'
+            cand --duration 'Auto-dismiss duration in milliseconds (toast config default when unset)'
+            cand --preset 'Preset id from `[[toasts.presets]]` to base this toast on'
+            cand --class 'Extra CSS class applied to the toast for custom styling'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand run 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `wayle portal`)'
+            cand share-picker 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)'
+            cand show 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;portal;run'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;share-picker'= {
+            cand --allow-token 'Pre-check the "allow restore token" box'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'
+            cand screenshot 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)'
+            cand color 'Interactive color picker (`Screenshot.PickColor`)'
+            cand print 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled'
+            cand screen-cast 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)'
+            cand access 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)'
+            cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
+            cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
+            cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;portal;show;file-chooser'= {
+            cand --save 'Show the save dialog instead of the open dialog'
+            cand --multiple 'Allow selecting multiple files (open only)'
+            cand --directory 'Select a directory instead of files (open only)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;screenshot'= {
+            cand --mode 'Capture mode: `region`, `output`, `screen`, or `window`'
+            cand --target 'Output connector name (used by `output` mode)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;color'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;print'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;screen-cast'= {
+            cand --allow-token 'Pre-check the "allow restore token" box'
+            cand --multiple 'Allow selecting multiple sources'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;access'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;account'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;app-chooser'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;dynamic-launcher'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;wallpaper'= {
+            cand --uri '`file://` image URI to preview (defaults to a placeholder)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;portal;show;help'= {
+            cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'
+            cand screenshot 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)'
+            cand color 'Interactive color picker (`Screenshot.PickColor`)'
+            cand print 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled'
+            cand screen-cast 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)'
+            cand access 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)'
+            cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
+            cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
+            cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;portal;show;help;file-chooser'= {
+        }
+        &'wayle;portal;show;help;screenshot'= {
+        }
+        &'wayle;portal;show;help;color'= {
+        }
+        &'wayle;portal;show;help;print'= {
+        }
+        &'wayle;portal;show;help;screen-cast'= {
+        }
+        &'wayle;portal;show;help;access'= {
+        }
+        &'wayle;portal;show;help;account'= {
+        }
+        &'wayle;portal;show;help;app-chooser'= {
+        }
+        &'wayle;portal;show;help;dynamic-launcher'= {
+        }
+        &'wayle;portal;show;help;wallpaper'= {
+        }
+        &'wayle;portal;show;help;help'= {
+        }
+        &'wayle;portal;help'= {
+            cand run 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `wayle portal`)'
+            cand share-picker 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)'
+            cand show 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;portal;help;run'= {
+        }
+        &'wayle;portal;help;share-picker'= {
+        }
+        &'wayle;portal;help;show'= {
+            cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'
+            cand screenshot 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)'
+            cand color 'Interactive color picker (`Screenshot.PickColor`)'
+            cand print 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled'
+            cand screen-cast 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)'
+            cand access 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)'
+            cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
+            cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
+            cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
+        }
+        &'wayle;portal;help;show;file-chooser'= {
+        }
+        &'wayle;portal;help;show;screenshot'= {
+        }
+        &'wayle;portal;help;show;color'= {
+        }
+        &'wayle;portal;help;show;print'= {
+        }
+        &'wayle;portal;help;show;screen-cast'= {
+        }
+        &'wayle;portal;help;show;access'= {
+        }
+        &'wayle;portal;help;show;account'= {
+        }
+        &'wayle;portal;help;show;app-chooser'= {
+        }
+        &'wayle;portal;help;show;dynamic-launcher'= {
+        }
+        &'wayle;portal;help;show;wallpaper'= {
+        }
+        &'wayle;portal;help;help'= {
+        }
+        &'wayle;shell'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;completions'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'wayle;help'= {
+            cand audio 'Audio control commands'
+            cand config 'Configuration management commands'
+            cand icons 'Icon management commands'
+            cand media 'Media player control commands'
+            cand notify 'Notification control commands'
+            cand panel 'Panel management commands'
+            cand power 'Power profile commands'
+            cand systray 'System tray commands'
+            cand wallpaper 'Wallpaper control commands'
+            cand idle 'Idle inhibit control commands'
+            cand launcher 'Application launcher / dmenu with rofi-compatible flags'
+            cand lock 'Lock the session via Wayle''s lock screen'
+            cand vpn 'VPN commands'
+            cand recorder 'Screen recorder control commands'
+            cand screenshot 'Screenshot capture commands'
+            cand widget 'Widget control commands'
+            cand toast 'Show a custom on-screen toast'
+            cand portal 'xdg-desktop-portal backend, screencast picker stub, and dialog previewer'
+            cand shell 'Run the desktop shell in the foreground'
+            cand completions 'Generate shell completions'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'wayle;help;audio'= {
+            cand output-volume 'Get or set output volume level'
+            cand output-mute 'Toggle output mute state'
+            cand input-volume 'Get or set input volume level'
+            cand input-mute 'Toggle input mute state'
+            cand sinks 'List available audio sinks (outputs)'
+            cand sources 'List available audio sources (inputs)'
+            cand status 'Show current audio status'
+        }
+        &'wayle;help;audio;output-volume'= {
+        }
+        &'wayle;help;audio;output-mute'= {
+        }
+        &'wayle;help;audio;input-volume'= {
+        }
+        &'wayle;help;audio;input-mute'= {
+        }
+        &'wayle;help;audio;sinks'= {
+        }
+        &'wayle;help;audio;sources'= {
+        }
+        &'wayle;help;audio;status'= {
+        }
+        &'wayle;help;config'= {
+            cand get 'Get the value of a configuration path'
+            cand set 'Set the value of a configuration path'
+            cand reset 'Reset a configuration path to its default value'
+            cand schema 'Output JSON Schema for the configuration (for editor intellisense)'
+            cand default 'Output the default configuration as TOML'
+            cand docs 'Generate markdown reference pages for every registered schema'
+        }
+        &'wayle;help;config;get'= {
+        }
+        &'wayle;help;config;set'= {
+        }
+        &'wayle;help;config;reset'= {
+        }
+        &'wayle;help;config;schema'= {
+        }
+        &'wayle;help;config;default'= {
+        }
+        &'wayle;help;config;docs'= {
+        }
+        &'wayle;help;icons'= {
+            cand setup 'Install bundled icons required by Wayle components'
+            cand install 'Install icons from a CDN source'
+            cand import 'Import local SVG file(s) as icons'
+            cand remove 'Remove installed icons'
+            cand sources 'List available icon sources'
+            cand list 'List installed icons'
+            cand open 'Open the icons directory in file manager'
+            cand export 'Export all installed icons to a directory'
+            cand sync 'Install any icons referenced in config but not yet on disk'
+        }
+        &'wayle;help;icons;setup'= {
+        }
+        &'wayle;help;icons;install'= {
+        }
+        &'wayle;help;icons;import'= {
+        }
+        &'wayle;help;icons;remove'= {
+        }
+        &'wayle;help;icons;sources'= {
+        }
+        &'wayle;help;icons;list'= {
+        }
+        &'wayle;help;icons;open'= {
+        }
+        &'wayle;help;icons;export'= {
+        }
+        &'wayle;help;icons;sync'= {
+        }
+        &'wayle;help;media'= {
+            cand list 'List all available media players'
+            cand play-pause 'Toggle play/pause for a media player'
+            cand next 'Skip to next track'
+            cand previous 'Go to previous track'
+            cand shuffle 'Toggle or set shuffle mode'
+            cand loop 'Set loop/repeat mode'
+            cand active 'Get or set the active media player'
+            cand info 'Display detailed information about a media player'
+        }
+        &'wayle;help;media;list'= {
+        }
+        &'wayle;help;media;play-pause'= {
+        }
+        &'wayle;help;media;next'= {
+        }
+        &'wayle;help;media;previous'= {
+        }
+        &'wayle;help;media;shuffle'= {
+        }
+        &'wayle;help;media;loop'= {
+        }
+        &'wayle;help;media;active'= {
+        }
+        &'wayle;help;media;info'= {
+        }
+        &'wayle;help;notify'= {
+            cand list 'List all notifications'
+            cand dismiss 'Dismiss a notification by ID'
+            cand dismiss-all 'Dismiss all notifications'
+            cand dnd 'Toggle Do Not Disturb mode'
+            cand status 'Show notification status'
+        }
+        &'wayle;help;notify;list'= {
+        }
+        &'wayle;help;notify;dismiss'= {
+        }
+        &'wayle;help;notify;dismiss-all'= {
+        }
+        &'wayle;help;notify;dnd'= {
+        }
+        &'wayle;help;notify;status'= {
+        }
+        &'wayle;help;panel'= {
+            cand start 'Start the panel daemon'
+            cand stop 'Stop the panel daemon'
+            cand restart 'Restart the panel daemon'
+            cand status 'Check panel status'
+            cand settings 'Open panel settings'
+            cand inspect 'Open GTK Inspector for debugging'
+            cand hide 'Hide the bar on a monitor'
+            cand show 'Show the bar on a monitor'
+            cand toggle 'Toggle bar visibility on a monitor'
+        }
+        &'wayle;help;panel;start'= {
+        }
+        &'wayle;help;panel;stop'= {
+        }
+        &'wayle;help;panel;restart'= {
+        }
+        &'wayle;help;panel;status'= {
+        }
+        &'wayle;help;panel;settings'= {
+        }
+        &'wayle;help;panel;inspect'= {
+        }
+        &'wayle;help;panel;hide'= {
+        }
+        &'wayle;help;panel;show'= {
+        }
+        &'wayle;help;panel;toggle'= {
+        }
+        &'wayle;help;power'= {
+            cand status 'Show current power profile'
+            cand set 'Set power profile'
+            cand cycle 'Cycle to next power profile'
+            cand list 'List available power profiles'
+        }
+        &'wayle;help;power;status'= {
+        }
+        &'wayle;help;power;set'= {
+        }
+        &'wayle;help;power;cycle'= {
+        }
+        &'wayle;help;power;list'= {
+        }
+        &'wayle;help;systray'= {
+            cand list 'List all system tray items'
+            cand activate 'Activate a tray item by ID'
+            cand status 'Show system tray status'
+        }
+        &'wayle;help;systray;list'= {
+        }
+        &'wayle;help;systray;activate'= {
+        }
+        &'wayle;help;systray;status'= {
+        }
+        &'wayle;help;wallpaper'= {
+            cand set 'Set wallpaper from an image file'
+            cand cycle 'Start cycling wallpapers from a directory'
+            cand stop 'Stop wallpaper cycling'
+            cand next 'Skip to next wallpaper'
+            cand previous 'Go back to previous wallpaper'
+            cand info 'Display current wallpaper information'
+            cand theming-monitor 'Set which monitor to use for color extraction'
+        }
+        &'wayle;help;wallpaper;set'= {
+        }
+        &'wayle;help;wallpaper;cycle'= {
+        }
+        &'wayle;help;wallpaper;stop'= {
+        }
+        &'wayle;help;wallpaper;next'= {
+        }
+        &'wayle;help;wallpaper;previous'= {
+        }
+        &'wayle;help;wallpaper;info'= {
+        }
+        &'wayle;help;wallpaper;theming-monitor'= {
+        }
+        &'wayle;help;idle'= {
+            cand on 'Enable idle inhibition'
+            cand off 'Disable idle inhibition'
+            cand duration 'Adjust timer duration (upper limit)'
+            cand remaining 'Adjust remaining time on active timer'
+            cand status 'Show current idle inhibit status'
+            cand toggle 'Toggle idle inhibition on/off'
+        }
+        &'wayle;help;idle;on'= {
+        }
+        &'wayle;help;idle;off'= {
+        }
+        &'wayle;help;idle;duration'= {
+        }
+        &'wayle;help;idle;remaining'= {
+        }
+        &'wayle;help;idle;status'= {
+        }
+        &'wayle;help;idle;toggle'= {
+        }
+        &'wayle;help;launcher'= {
+        }
+        &'wayle;help;lock'= {
+        }
+        &'wayle;help;vpn'= {
+            cand sso-callback 'Hand a browser sign-in callback to the running shell'
+        }
+        &'wayle;help;vpn;sso-callback'= {
+        }
+        &'wayle;help;recorder'= {
+            cand start 'Start recording'
+            cand stop 'Stop recording'
+            cand toggle 'Toggle recording on/off'
+            cand pause 'Pause the active recording'
+            cand resume 'Resume a paused recording'
+            cand status 'Show current recorder status'
+        }
+        &'wayle;help;recorder;start'= {
+        }
+        &'wayle;help;recorder;stop'= {
+        }
+        &'wayle;help;recorder;toggle'= {
+        }
+        &'wayle;help;recorder;pause'= {
+        }
+        &'wayle;help;recorder;resume'= {
+        }
+        &'wayle;help;recorder;status'= {
+        }
+        &'wayle;help;screenshot'= {
+            cand region 'Capture a drag-selected region'
+            cand output 'Capture a whole output (the focused output when NAME is omitted)'
+            cand window 'Capture the active window'
+        }
+        &'wayle;help;screenshot;region'= {
+        }
+        &'wayle;help;screenshot;output'= {
+        }
+        &'wayle;help;screenshot;window'= {
+        }
+        &'wayle;help;widget'= {
+            cand update 'Push an output update to a bar widget by its config id'
+        }
+        &'wayle;help;widget;update'= {
+        }
+        &'wayle;help;toast'= {
+        }
+        &'wayle;help;portal'= {
+            cand run 'Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `wayle portal`)'
+            cand share-picker 'xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)'
+            cand show 'Preview a portal dialog UI without an application request (developer tool; talks to the running shell over D-Bus, same as the real backend)'
+        }
+        &'wayle;help;portal;run'= {
+        }
+        &'wayle;help;portal;share-picker'= {
+        }
+        &'wayle;help;portal;show'= {
+            cand file-chooser 'File open/save dialog (`org.freedesktop.impl.portal.FileChooser`)'
+            cand screenshot 'Screenshot capture (`org.freedesktop.impl.portal.Screenshot`)'
+            cand color 'Interactive color picker (`Screenshot.PickColor`)'
+            cand print 'Printer selection dialog (`org.freedesktop.impl.portal.Print`); only the printer/settings prepare step is shown, no document is spooled'
+            cand screen-cast 'Screencast source picker (`org.freedesktop.impl.portal.ScreenCast`)'
+            cand access 'Generic grant/deny access prompt (`org.freedesktop.impl.portal.Access`)'
+            cand account 'Account info sharing consent (`org.freedesktop.impl.portal.Account`)'
+            cand app-chooser 'Application chooser (`org.freedesktop.impl.portal.AppChooser`)'
+            cand dynamic-launcher 'Dynamic launcher install confirmation (`org.freedesktop.impl.portal.DynamicLauncher`)'
+            cand wallpaper 'Wallpaper preview confirmation (`org.freedesktop.impl.portal.Wallpaper` `show-preview`)'
+        }
+        &'wayle;help;portal;show;file-chooser'= {
+        }
+        &'wayle;help;portal;show;screenshot'= {
+        }
+        &'wayle;help;portal;show;color'= {
+        }
+        &'wayle;help;portal;show;print'= {
+        }
+        &'wayle;help;portal;show;screen-cast'= {
+        }
+        &'wayle;help;portal;show;access'= {
+        }
+        &'wayle;help;portal;show;account'= {
+        }
+        &'wayle;help;portal;show;app-chooser'= {
+        }
+        &'wayle;help;portal;show;dynamic-launcher'= {
+        }
+        &'wayle;help;portal;show;wallpaper'= {
+        }
+        &'wayle;help;shell'= {
+        }
+        &'wayle;help;completions'= {
+        }
+        &'wayle;help;help'= {
+        }
+    ]
+    $completions[$command]
+}

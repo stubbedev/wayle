@@ -1,0 +1,7 @@
+Install any icons referenced in config but not yet on disk
+
+Usage: wayle icons sync [OPTIONS]
+
+Options:
+      --dry-run  Preview what would be installed without making changes
+  -h, --help     Print help (see more with '--help')

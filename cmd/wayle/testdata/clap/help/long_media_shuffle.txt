@@ -1,0 +1,19 @@
+Toggle or set shuffle mode
+
+Usage: wayle media shuffle [SHUFFLE_STATE] [PLAYER_ID]
+
+Arguments:
+  [SHUFFLE_STATE]
+          Shuffle state
+
+          Possible values:
+          - on:     Enable shuffle
+          - off:    Disable shuffle
+          - toggle: Toggle shuffle state
+
+  [PLAYER_ID]
+          Player identifier (number or partial name match)
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')

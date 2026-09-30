@@ -1,0 +1,10 @@
+args: idle duration
+code: 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <VALUE>
+
+Usage: wayle idle duration <VALUE>
+
+For more information, try '--help'.

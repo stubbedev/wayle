@@ -1,0 +1,6 @@
+Cycle to next power profile
+
+Usage: wayle power cycle
+
+Options:
+  -h, --help  Print help

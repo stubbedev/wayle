@@ -1,0 +1,7 @@
+args: help launcher
+Application launcher / dmenu with rofi-compatible flags
+
+[1m[32mUsage:[0m [1m[32mwayle launcher[0m [32m[ARGS]...[0m
+
+[1m[33mArguments:[0m
+  [32m[ARGS]...[0m  Raw rofi-style args (single-dash long flags, e.g. `-show drun`)
