@@ -6,7 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/neurlang/wayland v0.4.4
-	github.com/stubbedev/gelm v0.0.0-20260930152820-55598629cb14
+	github.com/stubbedev/gelm v0.0.0-20260930153100-975819b601b2
 	golang.org/x/image v0.46.0
 	golang.org/x/sys v0.48.0
 	gonum.org/v1/gonum v0.17.0
