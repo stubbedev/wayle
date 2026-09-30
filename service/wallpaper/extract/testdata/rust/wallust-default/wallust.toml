@@ -1,0 +1,8 @@
+palette = "dark16"
+backend = "fastresize"
+color_space = "labmixed"
+check_contrast = true
+dynamic_threshold = true
+
+[templates]
+colors = { template = "colors.json", target = "@ROOT@/cache/wayle/wallust-colors.json" }

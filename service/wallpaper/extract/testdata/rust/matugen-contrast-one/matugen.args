@@ -1,0 +1,12 @@
+image
+/walls/my image.png
+--json
+hex
+--source-color-index
+2
+--type
+scheme-tonal-spot
+--contrast
+1
+-m
+dark

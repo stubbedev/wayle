@@ -1,0 +1,6 @@
+run
+/walls/my image.png
+-C
+@ROOT@/data/wayle/wallust/wallust.toml
+--templates-dir
+@ROOT@/data/wayle/wallust/templates

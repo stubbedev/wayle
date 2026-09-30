@@ -1,0 +1,57 @@
+use std::path::Path;
+use wayle_wallpaper::{ColorExtractor, ColorExtractorConfig};
+
+#[tokio::main]
+async fn main() {
+    let mut args = std::env::args().skip(1);
+    let case = args.next().unwrap();
+    let image = args.next().unwrap();
+    let mut c = ColorExtractorConfig::default();
+    match case.as_str() {
+        "wallust-default" => {
+            c.tool = ColorExtractor::Wallust;
+        }
+        "wallust-custom" => {
+            c.tool = ColorExtractor::Wallust;
+            c.wallust_palette = "softlightcomp16".into();
+            c.wallust_saturation = 35;
+            c.wallust_check_contrast = false;
+            c.wallust_backend = "kmeans".into();
+            c.wallust_colorspace = "lchansi".into();
+            c.wallust_apply_globally = false;
+        }
+        "matugen-default" => {
+            c.tool = ColorExtractor::Matugen;
+        }
+        "matugen-custom" => {
+            c.tool = ColorExtractor::Matugen;
+            c.matugen_scheme = "scheme-fruit-salad".into();
+            c.matugen_contrast = -0.25;
+            c.matugen_source_color = 9;
+            c.matugen_light = true;
+        }
+        "matugen-contrast-one" => {
+            c.tool = ColorExtractor::Matugen;
+            c.matugen_contrast = 1.0;
+            c.matugen_source_color = 2;
+        }
+        "pywal-default" => {
+            c.tool = ColorExtractor::Pywal;
+        }
+        "pywal-custom" => {
+            c.tool = ColorExtractor::Pywal;
+            c.pywal_saturation = 0.7;
+            c.pywal_contrast = 4.5;
+            c.pywal_light = true;
+            c.pywal_apply_globally = false;
+        }
+        "none" => {
+            c.tool = ColorExtractor::None;
+        }
+        _ => panic!("case"),
+    }
+    match c.extract(Path::new(&image)).await {
+        Ok(()) => println!("ok"),
+        Err(e) => println!("err: {e}"),
+    }
+}

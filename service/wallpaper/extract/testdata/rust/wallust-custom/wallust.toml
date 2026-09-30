@@ -1,0 +1,9 @@
+palette = "softlightcomp16"
+backend = "kmeans"
+color_space = "lchansi"
+check_contrast = false
+dynamic_threshold = true
+saturation = 35
+
+[templates]
+colors = { template = "colors.json", target = "@ROOT@/cache/wayle/wallust-colors.json" }

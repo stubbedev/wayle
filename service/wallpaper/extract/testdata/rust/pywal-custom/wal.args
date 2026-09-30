@@ -1,0 +1,11 @@
+-i
+/walls/my image.png
+-n
+--saturate
+0.7
+--contrast
+4.5
+-l
+-s
+-t
+-e
