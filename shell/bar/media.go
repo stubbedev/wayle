@@ -1,14 +1,25 @@
 package bar
 
 import (
-	"context"
 	"errors"
-	"strings"
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/desktopentry"
+	"github.com/stubbedev/wayle/internal/glob"
 	"github.com/stubbedev/wayle/service/mpris"
 )
+
+// The status glyphs helpers.rs embeds (Nerd Font media icons).
+const (
+	mediaPlayGlyph  = "󰐊"
+	mediaPauseGlyph = "󰏤"
+	mediaStopGlyph  = "󰓛"
+)
+
+// mediaNoPlayerLabel is the label while no player is active.
+const mediaNoPlayerLabel = "--"
 
 // mediaStatusText is the _bar.ftl status vocabulary.
 var mediaStatusText = map[mpris.PlaybackState]string{
@@ -17,98 +28,187 @@ var mediaStatusText = map[mpris.PlaybackState]string{
 	mpris.StateStopped: "Stopped",
 }
 
-// mediaLabel renders the format with the full placeholder set
-// (helpers.rs's format_label): title, artist, album, status, and the
-// status icons.
-func mediaLabel(format string, track mpris.Track) string {
-	replacements := [][2]string{
-		{"{{ title }}", track.Title},
-		{"{{title}}", track.Title},
-		{"{{ artist }}", track.Artist},
-		{"{{artist}}", track.Artist},
-		{"{{ album }}", track.Album},
-		{"{{album}}", track.Album},
-		{"{{ status }}", mediaStatusText[track.State]},
-		{"{{status}}", mediaStatusText[track.State]},
-		{"{{ status_icon }}", mediaStatusIcon(track.State)},
-		{"{{status_icon}}", mediaStatusIcon(track.State)},
-	}
-	for _, r := range replacements {
-		format = strings.ReplaceAll(format, r[0], r[1])
-	}
-	return format
-}
-
-// mediaStatusIcon is the transport glyph set the Rust module embeds.
-func mediaStatusIcon(state mpris.PlaybackState) string {
+// mediaStatusGlyph maps the state onto its glyph.
+func mediaStatusGlyph(state mpris.PlaybackState) string {
 	switch state {
 	case mpris.StatePlaying:
-		return "⏵"
+		return mediaPlayGlyph
 	case mpris.StatePaused:
-		return "⏸"
+		return mediaPauseGlyph
 	}
-	return "⏹"
+	return mediaStopGlyph
+}
+
+// mediaLabel is helpers.rs format_label: title, artist, album, status,
+// and status_icon.
+func mediaLabel(format string, p mpris.Player) string {
+	out := replaceTemplateVar(format, "title", p.Title)
+	out = replaceTemplateVar(out, "artist", p.Artist)
+	out = replaceTemplateVar(out, "album", p.Album)
+	out = replaceTemplateVar(out, "status", mediaStatusText[p.State])
+	return replaceTemplateVar(out, "status_icon", mediaStatusGlyph(p.State))
 }
 
 // truncateLabel applies label-max-length with an ellipsis
 // (BarButtonBehavior's pango ellipsize-end, done manually).
-func truncateLabel(label string, max int) string {
-	if max <= 0 {
+func truncateLabel(label string, maxChars int) string {
+	if maxChars <= 0 {
 		return label
 	}
 	runes := []rune(label)
-	if len(runes) <= max {
+	if len(runes) <= maxChars {
 		return label
 	}
-	return string(runes[:max-1]) + "…"
+	return string(runes[:maxChars-1]) + "…"
 }
 
-// media is the module: the active player's now-playing label.
+// mediaIconEnv is what the icon pick reads beyond the config: whether
+// a theme icon exists and a desktop entry's Icon key. Tests fake both.
+type mediaIconEnv struct {
+	exists      func(name string) bool
+	desktopIcon func(entry string) (string, bool)
+}
+
+// liveMediaIconEnv reads the real icon theme and XDG applications dirs.
+func liveMediaIconEnv() mediaIconEnv {
+	return mediaIconEnv{
+		exists: widget.ThemeIconExists,
+		desktopIcon: func(entry string) (string, bool) {
+			return desktopentry.Icon(entry, desktopentry.Dirs())
+		},
+	}
+}
+
+// resolveMediaIcon is helpers.rs resolve_icon.
+func resolveMediaIcon(cfg config.MediaConfig, p mpris.Player) string {
+	entrySymbolic := func() string {
+		if p.DesktopEntry != "" {
+			return p.DesktopEntry + "-symbolic"
+		}
+		return cfg.Icon.Name
+	}
+	switch cfg.IconType {
+	case config.MediaIconDefault:
+		return cfg.Icon.Name
+	case config.MediaIconApplication:
+		return entrySymbolic()
+	case config.MediaIconSpinningDisc:
+		return cfg.SpinningDiscIcon
+	}
+	for _, m := range cfg.PlayerIcons {
+		if glob.Wildcard(m.Pattern, p.BusName) {
+			return m.Icon
+		}
+	}
+	for _, m := range config.MediaBuiltinIcons {
+		if glob.Wildcard(m.Pattern, p.BusName) {
+			return m.Icon
+		}
+	}
+	return entrySymbolic()
+}
+
+// mediaIconName is helpers.rs build_icon: application mode reads the
+// desktop entry's icon; the other modes resolve and keep the result
+// only when the theme has it, application-mapped trying the desktop
+// entry next; icon-name is the last resort.
+func mediaIconName(cfg config.MediaConfig, p mpris.Player, env mediaIconEnv) string {
+	if cfg.IconType == config.MediaIconApplication {
+		if icon, ok := env.desktopIcon(p.DesktopEntry); ok {
+			return icon
+		}
+		return cfg.Icon.Name
+	}
+	if resolved := resolveMediaIcon(cfg, p); env.exists(resolved) {
+		return resolved
+	}
+	if cfg.IconType == config.MediaIconApplicationMapped {
+		if icon, ok := env.desktopIcon(p.DesktopEntry); ok {
+			return icon
+		}
+	}
+	return cfg.Icon.Name
+}
+
+// mediaModule is the now-playing button: the active player's icon and
+// label, following the service.
 type mediaModule struct {
 	ctx    ModuleContext
 	source mpris.Source
+	env    mediaIconEnv
 	label  *widget.Label
+	icon   *widget.Icon
+	root   widget.Widget
 }
 
 func newMedia(ctx ModuleContext) (Module, error) {
-	if ctx.App == nil {
-		return nil, errors.New("media: requires the application loop")
-	}
 	if ctx.Media == nil {
 		return nil, errors.New("media: no MPRIS source available")
 	}
-	m := &mediaModule{ctx: ctx, source: ctx.Media}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	if err := m.refresh(); err != nil {
-		return nil, err
-	}
-	ticks, stop, err := ctx.Media.Subscribe(context.Background())
-	if err != nil {
-		return nil, err
-	}
+	m := &mediaModule{ctx: ctx, source: ctx.Media, env: liveMediaIconEnv()}
+	m.build()
+	feed := ctx.Media.Subscribe()
 	go func() {
-		for range ticks {
-			m.ctx.Invoke(func() { _ = m.refresh() })
+		for range feed {
+			if ctx.App == nil {
+				m.refresh()
+				continue
+			}
+			ctx.Invoke(m.refresh)
 		}
-		stop()
 	}()
 	return m, nil
 }
 
-// refresh re-reads and restyles the label.
-func (m *mediaModule) refresh() error {
-	track, err := m.source.Active(context.Background())
-	if err != nil {
-		return err
-	}
+// build assembles the icon+label tree and paints the first state.
+func (m *mediaModule) build() {
 	cfg := m.ctx.Config.Media
-	label := ""
-	if cfg.LabelShow {
-		label = truncateLabel(mediaLabel(cfg.Format, track), cfg.LabelMaxLength)
+	m.label = widget.NewLabel(m.ctx.Font, m.ctx.Style.labelPx, "", m.ctx.Style.fg)
+	m.icon = moduleIcon(m.ctx, cfg.Icon)
+	m.root = assembleModule(m.ctx, m.icon, m.label)
+	if c, ok := m.root.(classer); ok {
+		c.AddClass("media")
 	}
-	m.label.SetText(label)
-	m.label.SetColor(m.ctx.Style.fg)
-	return nil
+	m.refresh()
 }
 
-func (m *mediaModule) Root() widget.Widget { return m.label }
+// refresh is update_cmd's PlayerChanged/MetadataChanged/
+// PlaybackStateChanged: label, icon, and the disc classes.
+func (m *mediaModule) refresh() {
+	cfg := m.ctx.Config.Media
+	p, ok := m.source.Active()
+	label, icon := mediaNoPlayerLabel, cfg.Icon.Name
+	if ok {
+		label, icon = mediaLabel(cfg.Format, p), mediaIconName(cfg, p, m.env)
+	}
+	if !cfg.LabelShow {
+		label = ""
+	}
+	m.label.SetText(truncateLabel(label, cfg.LabelMaxLength))
+	if m.icon != nil {
+		m.icon.SetThemeName(icon)
+	}
+	classes, _ := m.root.(classer)
+	setClass(classes, "media-disc", ok && cfg.IconType == config.MediaIconSpinningDisc)
+	setClass(classes, "media-spinning", ok && p.State == mpris.StatePlaying)
+}
+
+// classer is a widget carrying style classes (every gelm node).
+type classer interface {
+	AddClass(names ...string)
+	RemoveClass(names ...string)
+}
+
+// setClass toggles one style class; a nil classer is a no-op.
+func setClass(w classer, class string, on bool) {
+	if w == nil {
+		return
+	}
+	if on {
+		w.AddClass(class)
+		return
+	}
+	w.RemoveClass(class)
+}
+
+func (m *mediaModule) Root() widget.Widget { return m.root }

@@ -67,7 +67,9 @@ func (r *dropdownRegistry) Names() []string {
 // another re-anchors (the Rust registry's toggle_for).
 func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) error {
 	r.mu.Lock()
-	if prev := r.openPop[connector]; prev != nil {
+	// A popover that already went away (click-away, Esc) no longer
+	// counts as open: the next click opens instead of toggling off.
+	if prev := r.openPop[connector]; prev != nil && !prev.Closed() {
 		delete(r.openPop, connector)
 		r.mu.Unlock()
 		prev.Dismiss()

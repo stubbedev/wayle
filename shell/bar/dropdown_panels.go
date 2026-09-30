@@ -67,37 +67,6 @@ func networkDropdown(ctx ModuleContext) widget.Widget {
 	return col
 }
 
-// mediaDropdown is the now-playing card: the active player's track.
-// Transport controls wait for the MPRIS control surface.
-func mediaDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 4, 14)
-	if ctx.Media == nil {
-		col.Append(widget.NewLabel(font, px, "No MPRIS", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	track, err := ctx.Media.Active(context.Background())
-	if err != nil {
-		col.Append(widget.NewLabel(font, px, "No players", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	if track.Title != "" {
-		col.Append(widget.NewLabel(font, px*1.3, track.Title, ctx.Style.fg), false)
-	} else {
-		col.Append(widget.NewLabel(font, px*1.3, "Nothing playing", ctx.Style.fg), false)
-	}
-	if track.Artist != "" {
-		col.Append(widget.NewLabel(font, px, track.Artist, mutedFg(ctx.Style.palette)), false)
-	}
-	if track.Album != "" {
-		col.Append(widget.NewLabel(font, px, track.Album, mutedFg(ctx.Style.palette)), false)
-	}
-	if track.Player != "" {
-		col.Append(widget.NewLabel(font, px, "via "+track.Player, mutedFg(ctx.Style.palette)), false)
-	}
-	return col
-}
-
 // notificationDropdown is the notification card: the DND toggle row
 // above the stored history, each row dismissable, with a clear-all.
 func notificationDropdown(ctx ModuleContext) widget.Widget {

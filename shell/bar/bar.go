@@ -108,7 +108,7 @@ func RunWith(cfg *config.Config) error {
 		defer func() { _ = pp.Close() }()
 		baseCtx.PowerProfiles = pp
 	}
-	if media, err := mpris.NewSession(); err == nil {
+	if media, err := mpris.NewSession(cfg.Media.PlayersIgnored, cfg.Media.PlayerPriority); err == nil {
 		defer func() { _ = media.Close() }()
 		baseCtx.Media = media
 	}
