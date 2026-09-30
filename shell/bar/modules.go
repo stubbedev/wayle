@@ -54,7 +54,9 @@ type ModuleContext struct {
 	// Clipboard is the session clipboard history, nil when the
 	// compositor has no data-control protocol (the launcher's
 	// clipboard mode reads it).
-	Clipboard     *clipboard.Clipboard
+	Clipboard *clipboard.Clipboard
+	// Tray drives the tray items and their menus; nil without a host.
+	Tray TrayService
 	CustomUpdates *customUpdates
 	// Dropdowns opens the dropdown:<name> popovers; RunWith owns one
 	// registry across outputs.
@@ -266,8 +268,6 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.Notification.Click
 	case "recorder":
 		return cfg.Recorder.Click
-	case "systray":
-		return cfg.Systray.Click
 	case "clock":
 		return cfg.Clock.Click
 	case "cava":

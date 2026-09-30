@@ -99,27 +99,40 @@ func ParseAddress(reg string) (bus, path string) {
 	return reg[:i], reg[i:]
 }
 
-// Store is the item set with a change feed.
+// Store is the item set with change feeds.
 type Store struct {
 	mu    sync.Mutex
 	items map[string]*Item
 	order []string
-	ticks chan struct{}
+	subs  []chan struct{}
 }
 
 // NewStore builds an empty store.
 func NewStore() *Store {
-	return &Store{items: make(map[string]*Item), ticks: make(chan struct{}, 8)}
+	return &Store{items: make(map[string]*Item)}
 }
 
-// Changes ticks whenever the item set or an item's snapshot changes.
-func (s *Store) Changes() <-chan struct{} { return s.ticks }
+// Subscribe returns a feed that ticks whenever the item set or an
+// item's snapshot changes. Every subscriber (one tray per output) sees
+// every change; feeds live as long as the store.
+func (s *Store) Subscribe() <-chan struct{} {
+	ch := make(chan struct{}, 1)
+	s.mu.Lock()
+	s.subs = append(s.subs, ch)
+	s.mu.Unlock()
+	return ch
+}
 
-// tick drops a change, coalescing pending ones.
+// tick signals every feed, coalescing pending ticks per feed.
 func (s *Store) tick() {
-	select {
-	case s.ticks <- struct{}{}:
-	default:
+	s.mu.Lock()
+	subs := s.subs
+	s.mu.Unlock()
+	for _, ch := range subs {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
 	}
 }
 
@@ -134,6 +147,17 @@ func (s *Store) Items() []Item {
 		}
 	}
 	return out
+}
+
+// Get returns one item by key.
+func (s *Store) Get(key string) (Item, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	it, ok := s.items[key]
+	if !ok {
+		return Item{}, false
+	}
+	return *it, true
 }
 
 // Put inserts or replaces an item, preserving registration order.

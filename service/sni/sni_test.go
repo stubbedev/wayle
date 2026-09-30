@@ -57,12 +57,13 @@ func TestParseAddress(t *testing.T) {
 
 func TestStoreOrderAndChanges(t *testing.T) {
 	s := NewStore()
+	feed := s.Subscribe()
 	a := &Item{Bus: ":1.1", Path: "/StatusNotifierItem", ID: "a"}
 	b := &Item{Bus: ":1.2", Path: "/StatusNotifierItem", ID: "b"}
 	s.Put(a)
-	<-s.Changes()
+	<-feed
 	s.Put(b)
-	<-s.Changes()
+	<-feed
 
 	// Registration order holds.
 	items := s.Items()
@@ -73,7 +74,7 @@ func TestStoreOrderAndChanges(t *testing.T) {
 	// Replacing keeps the slot.
 	a2 := &Item{Bus: ":1.1", Path: "/StatusNotifierItem", ID: "a", Title: "replaced"}
 	s.Put(a2)
-	<-s.Changes()
+	<-feed
 	items = s.Items()
 	if len(items) != 2 || items[0].Title != "replaced" {
 		t.Fatalf("after replace = %+v", items)
@@ -83,7 +84,7 @@ func TestStoreOrderAndChanges(t *testing.T) {
 	if !s.Remove(":1.1", "/StatusNotifierItem") {
 		t.Fatal("remove missed the item")
 	}
-	<-s.Changes()
+	<-feed
 	if !s.Remove(":1.1", "/StatusNotifierItem") {
 		// A double remove is false but harmless.
 	} else {
@@ -97,13 +98,14 @@ func TestStoreOrderAndChanges(t *testing.T) {
 
 func TestStoreNoTickOnMiss(t *testing.T) {
 	s := NewStore()
+	feed := s.Subscribe()
 	// Drain the (empty) buffer without blocking: a remove of a missing
 	// item must not enqueue.
 	if s.Remove("gone", "/x") {
 		t.Fatal("removed a ghost")
 	}
 	select {
-	case <-s.Changes():
+	case <-feed:
 		t.Fatal("a missed remove ticked the store")
 	default:
 	}

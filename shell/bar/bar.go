@@ -155,6 +155,7 @@ func RunWith(cfg *config.Config) error {
 	defer stopMail()
 	if host, err := sni.NewHost(sniStore); err == nil {
 		defer func() { _ = host.Close() }()
+		baseCtx.Tray = NewTrayService(host)
 	} else {
 		log.Printf("systray: host: %v", err)
 	}
