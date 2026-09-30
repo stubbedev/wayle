@@ -48,6 +48,9 @@ type ModuleContext struct {
 	Recorder      *recorder.State
 	SNI           *sni.Store
 	CustomUpdates *customUpdates
+	// Dropdowns opens the dropdown:<name> popovers; RunWith owns one
+	// registry across outputs.
+	Dropdowns *dropdownRegistry
 	// Attachers collects modules that need the live layer surface
 	// (idle-inhibit binds its inhibitor to it); RunWith calls Attach
 	// on each once the layer exists.
@@ -174,7 +177,14 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	}); ok {
 		handler = h
 	}
-	row.Append(wrapActions(module.Root(), binding, ctx.Style, func(action config.ClickAction) {
+	root := module.Root()
+	row.Append(wrapActions(root, binding, ctx.Style, func(action config.ClickAction) {
+		// Dropdown bindings anchor to this module's own root; the
+		// registry toggles the popover on the connector's host.
+		if action.Kind == config.ClickDropdown && ctx.Dropdowns != nil {
+			_ = ctx.Dropdowns.open(ctx.Connector, action.Dropdown, root)
+			return
+		}
 		if handler != nil {
 			handler.RunAction(action)
 			return

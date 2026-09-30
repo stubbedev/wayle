@@ -142,6 +142,8 @@ func RunWith(cfg *config.Config) error {
 		return errors.New("bar: no output to draw on")
 	}
 	osdSrv := osd.New(application, cfg.Osd, font, palette)
+	dropdowns := newDropdownRegistry(application, cfg, font, &style, baseCtx)
+	baseCtx.Dropdowns = dropdowns
 	for _, output := range outputs {
 		layout, ok := FindLayout(cfg.Bar.Layout, output.Name)
 		if !ok || !layout.Show {
@@ -162,6 +164,7 @@ func RunWith(cfg *config.Config) error {
 		for _, a := range *ctx.Attachers {
 			a.Attach(layer)
 		}
+		dropdowns.attachHost(output.Name, layer)
 		osdSrv.AttachOutput(output.Name, output)
 		// Notification popups render on the configured monitor only.
 		if cfg.Notification.Enabled && cfg.Notification.PopupMonitor == output.Name {
