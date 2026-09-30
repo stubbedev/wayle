@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"github.com/stubbedev/gelm/render"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/pulse"
+	"github.com/stubbedev/wayle/service/sysinfo"
 	"github.com/stubbedev/wayle/service/upower"
 )
 
@@ -33,7 +35,7 @@ func dropdownBuilders() map[string]func(ctx ModuleContext) widget.Widget {
 		"treeman":      treemanDropdown,
 		"mail":         mailDropdown,
 		"weather":      weatherDropdown,
-		"dashboard":    simpleStatusDropdown("Dashboard"),
+		"dashboard":    dashboardDropdown,
 	}
 }
 
@@ -95,21 +97,6 @@ func spawnCommand(command string) {
 	}
 	if err := exec.Command("sh", "-c", command).Start(); err != nil { //nolint:gosec // the command comes from the user's own config
 		log.Printf("command %q: %v", command, err)
-	}
-}
-
-// simpleStatusDropdown builds the placeholder cards: a titled panel
-// the real per-module content lands in one dropdown at a time. The
-// placeholder keeps every binding live instead of erroring.
-func simpleStatusDropdown(title string) func(ctx ModuleContext) widget.Widget {
-	return func(ctx ModuleContext) widget.Widget {
-		font, px := dropdownFont(ctx)
-		head := widget.NewLabel(font, px*1.2, title, ctx.Style.fg)
-		body := widget.NewLabel(font, px, "Coming soon", mutedFg(ctx.Style.palette))
-		col := widget.NewBox(widget.Column, 6, 16)
-		col.Append(head, false)
-		col.Append(body, false)
-		return col
 	}
 }
 
@@ -215,6 +202,52 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 	col.Append(widget.NewLabel(font, px, state, mutedFg(ctx.Style.palette)), false)
 	if dev.TimeToEmpty > 0 {
 		col.Append(widget.NewLabel(font, px, "Empty in "+idleinhibit.FormatDuration(int(dev.TimeToEmpty.Seconds())), mutedFg(ctx.Style.palette)), false)
+	}
+	return col
+}
+
+// dashboardDropdown is the dashboard card: the clock hero, the date,
+// and the system stats section (battery, CPU, memory), with the power
+// rows at the bottom. The weather section joins the weather cache
+// port; the severity colors wait for the status-token pass.
+func dashboardDropdown(ctx ModuleContext) widget.Widget {
+	font, px := dropdownFont(ctx)
+	col := widget.NewBox(widget.Column, 8, 16)
+	now := time.Now()
+	col.Append(widget.NewLabel(font, px*2.2, now.Format("15:04"), ctx.Style.fg), false)
+	col.Append(widget.NewLabel(font, px, now.Format("Monday, January 2"), mutedFg(ctx.Style.palette)), false)
+	if stats := dashboardStats(ctx, font, px); stats != nil {
+		col.Append(stats, false)
+	}
+	col.Append(powerDropdown(ctx), false)
+	return col
+}
+
+// dashboardStats builds the system stats lines; nil when nothing reads.
+func dashboardStats(ctx ModuleContext, font render.Font, px float64) widget.Widget {
+	var lines []string
+	if ctx.Battery != nil {
+		if dev, err := ctx.Battery.Read(context.Background()); err == nil {
+			lines = append(lines, "Battery: "+batteryLabel("{{ percent }}%", dev.Percentage, dev.Present()))
+		}
+	}
+	if prev, err := sysinfo.ReadCpuSample(); err == nil {
+		// Usage is a delta; the panel takes a short window rather than
+		// holding state between opens.
+		time.Sleep(120 * time.Millisecond)
+		if next, err := sysinfo.ReadCpuSample(); err == nil {
+			lines = append(lines, "CPU: "+strconv.FormatFloat(prev.Usage(next), 'f', 0, 64)+"%")
+		}
+	}
+	if mem, err := sysinfo.ReadMemory(); err == nil {
+		lines = append(lines, "Memory: "+strconv.FormatFloat(mem.UsagePercent(), 'f', 0, 64)+"%")
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	col := widget.NewBox(widget.Column, 4, 0)
+	for _, line := range lines {
+		col.Append(widget.NewLabel(font, px, line, ctx.Style.fg), false)
 	}
 	return col
 }
