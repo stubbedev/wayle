@@ -97,7 +97,7 @@ func runScenario(t *testing.T, sc struct {
 },
 ) string {
 	t.Helper()
-	addr := startBus(t)
+	dbustest.SessionBus(t)
 	dir, empty := t.TempDir(), t.TempDir()
 	for _, n := range []string{"a.png", "b.png"} {
 		if err := os.WriteFile(filepath.Join(dir, n), nil, 0o600); err != nil {
@@ -105,11 +105,7 @@ func runScenario(t *testing.T, sc struct {
 		}
 	}
 	if !sc.noDaemon {
-		conn, err := dbus.Connect(addr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = conn.Close() })
+		conn := dbustest.Conn(t)
 		svc := wallpaper.New(wallpaper.Options{Extractor: extract.Config{Tool: extract.None}})
 		svc.RegisterMonitor("DP-1")
 		svc.RegisterMonitor("DP-2")
