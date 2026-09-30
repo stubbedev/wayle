@@ -9,14 +9,14 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
+
+	"github.com/stubbedev/wayle/internal/rusterr"
 )
 
 // Methods.
@@ -115,7 +115,7 @@ func (s *Server) Listen() (func(), error) {
 	_ = os.Remove(path)
 	ln, err := net.Listen("unix", path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to bind widget socket at %s: %s", path, rustIOError(err))
+		return nil, fmt.Errorf("failed to bind widget socket at %s: %s", path, rusterr.IO(err))
 	}
 	_ = os.Chmod(path, 0o600)
 	s.mu.Lock()
@@ -231,7 +231,7 @@ func send(ctx context.Context, method string, params any) error {
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "unix", path)
 	if err != nil {
-		return &ClientError{msg: "cannot connect to wayle widget socket at " + path + ": " + rustIOError(err), err: err}
+		return &ClientError{msg: "cannot connect to wayle widget socket at " + path + ": " + rusterr.IO(err), err: err}
 	}
 	defer func() { _ = conn.Close() }()
 	body, err := json.Marshal(params)
@@ -243,7 +243,7 @@ func send(ctx context.Context, method string, params any) error {
 		return &ClientError{msg: "widget socket protocol error: " + err.Error(), err: err}
 	}
 	if _, err := conn.Write(append(line, '\n')); err != nil {
-		return &ClientError{msg: "widget socket I/O failed: " + rustIOError(err), err: err}
+		return &ClientError{msg: "widget socket I/O failed: " + rusterr.IO(err), err: err}
 	}
 	reply, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil && reply == "" {
@@ -257,18 +257,4 @@ func send(ctx context.Context, method string, params any) error {
 		return &ClientError{msg: "widget update rejected: " + resp.Error.Message}
 	}
 	return nil
-}
-
-// rustIOError renders an OS error the way Rust's io::Error Display
-// does: the C library's description and "(os error N)".
-func rustIOError(err error) string {
-	var errno syscall.Errno
-	if !errors.As(err, &errno) {
-		return err.Error()
-	}
-	desc := errno.Error()
-	if desc != "" {
-		desc = strings.ToUpper(desc[:1]) + desc[1:]
-	}
-	return fmt.Sprintf("%s (os error %d)", desc, int(errno))
 }

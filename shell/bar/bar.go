@@ -213,27 +213,38 @@ func RunWith(cfg *config.Config) error {
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
-	for _, output := range outputs {
-		layout, ok := FindLayout(cfg.Bar.Layout, output.Name)
-		if !ok || !layout.Show {
-			continue
-		}
+	// openBar builds one output's bar layer; `wayle panel show` reopens
+	// a hidden bar through it.
+	openBar := func(output *app.Output, layout config.BarLayout) (*app.LayerWindow, error) {
 		ctx := baseCtx
 		ctx.Connector = output.Name
 		ctx.Attachers = &[]interface{ Attach(app.Host) }{}
 		lc, err := layerConfigFor(ctx, layout, output.Name, logicalWidth(output.ModeW, output.Scale))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		lc.Output = output
 		layer, err := application.NewLayer(*lc)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, a := range *ctx.Attachers {
 			a.Attach(layer)
 		}
 		dropdowns.attachHost(output.Name, layer)
+		return layer, nil
+	}
+	bars := newBarSet(func(o *app.Output, l config.BarLayout) (barLayer, error) { return openBar(o, l) })
+	for _, output := range outputs {
+		layout, ok := FindLayout(cfg.Bar.Layout, output.Name)
+		if !ok || !layout.Show {
+			continue
+		}
+		layer, err := openBar(output, layout)
+		if err != nil {
+			return err
+		}
+		bars.add(output, layout, layer)
 		osdSrv.AttachOutput(output.Name, output)
 	}
 	// Notification popups render on one monitor, bar or not.
@@ -243,6 +254,7 @@ func RunWith(cfg *config.Config) error {
 			go p.Run()
 		}
 	}
+	defer serveShellIPC(application, bars)()
 	if cfg.Osd.Enabled {
 		go watchOsd(cfg, baseCtx, osdSrv)
 	}

@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/wayle/internal/rusterr"
 )
 
 // Controller is wayle-media's MediaService as its D-Bus daemon uses it:
@@ -330,21 +332,7 @@ type ControlError struct{ msg string }
 func (e *ControlError) Error() string { return e.msg }
 
 func controlErr(action string, err error) error {
-	return &ControlError{msg: "cannot control player: " + action + ": " + zbusText(err)}
-}
-
-// zbusText is zbus::Error's Display for a D-Bus error reply:
-// "<name>: <message>".
-func zbusText(err error) string {
-	if de, ok := errors.AsType[dbus.Error](err); ok {
-		if len(de.Body) > 0 {
-			if msg, ok := de.Body[0].(string); ok {
-				return de.Name + ": " + msg
-			}
-		}
-		return de.Name
-	}
-	return err.Error()
+	return &ControlError{msg: "cannot control player: " + action + ": " + rusterr.Zbus(err)}
 }
 
 func (c *Controller) call(ctx context.Context, name, action, method string, args ...any) error {
