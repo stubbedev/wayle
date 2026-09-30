@@ -9,7 +9,9 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/pulse"
+	"github.com/stubbedev/wayle/service/upower"
 )
 
 // dropdownBuilders maps the Rust registry's names onto content
@@ -21,8 +23,8 @@ func dropdownBuilders() map[string]func(ctx ModuleContext) widget.Widget {
 		"audio":        audioDropdown,
 		"volume":       audioDropdown,
 		"microphone":   audioDropdown,
-		"battery":      simpleStatusDropdown("Battery"),
-		"brightness":   simpleStatusDropdown("Brightness"),
+		"brightness":   brightnessDropdown,
+		"battery":      batteryDropdown,
 		"network":      simpleStatusDropdown("Network"),
 		"bluetooth":    simpleStatusDropdown("Bluetooth"),
 		"media":        simpleStatusDropdown("Media"),
@@ -150,6 +152,70 @@ func audioDeviceRow(ctx ModuleContext, font render.Font, px float64, title strin
 	slider := widget.NewSlider(0, 100, 1, dev.Volume)
 	slider.OnChanged = func(v float64) { setVolume(v) }
 	col.Append(slider, false)
+	return col
+}
+
+// brightnessDropdown is the backlight card: a slider per backlight
+// device, writing through the service's clamped Set.
+func brightnessDropdown(ctx ModuleContext) widget.Widget {
+	font, px := dropdownFont(ctx)
+	col := widget.NewBox(widget.Column, 10, 14)
+	if ctx.Brightness == nil {
+		col.Append(widget.NewLabel(font, px, "No backlight", mutedFg(ctx.Style.palette)), false)
+		return col
+	}
+	bctx := context.Background()
+	devices, err := ctx.Brightness.Devices(bctx)
+	if err != nil || len(devices) == 0 {
+		col.Append(widget.NewLabel(font, px, "No backlight", mutedFg(ctx.Style.palette)), false)
+		return col
+	}
+	for _, dev := range devices {
+		percent := dev.Percentage()
+		row := widget.NewBox(widget.Row, 8, 0)
+		row.Append(widget.NewThemeIcon(brightnessOsdIcon(percent), int(px)), false)
+		row.Append(widget.NewLabel(font, px, dev.Name, ctx.Style.fg), true)
+		col.Append(row, false)
+		slider := widget.NewSlider(0, 100, 1, percent)
+		name := dev.Name
+		slider.OnChanged = func(v float64) {
+			if err := ctx.Brightness.Set(bctx, name, v); err != nil {
+				log.Printf("brightness %s: %v", name, err)
+			}
+		}
+		col.Append(slider, false)
+	}
+	return col
+}
+
+// batteryDropdown is the battery card: percentage, state, and the
+// time-to-empty when the daemon reports one.
+func batteryDropdown(ctx ModuleContext) widget.Widget {
+	font, px := dropdownFont(ctx)
+	col := widget.NewBox(widget.Column, 8, 14)
+	if ctx.Battery == nil {
+		col.Append(widget.NewLabel(font, px, "No battery", mutedFg(ctx.Style.palette)), false)
+		return col
+	}
+	dev, err := ctx.Battery.Read(context.Background())
+	if err != nil {
+		col.Append(widget.NewLabel(font, px, "No battery", mutedFg(ctx.Style.palette)), false)
+		return col
+	}
+	state := "Discharging"
+	switch dev.State {
+	case upower.StateCharging, upower.StatePendingCharge:
+		state = "Charging"
+	case upower.StateFullyCharged:
+		state = "Full"
+	case upower.StateUnknown:
+		state = "Unknown"
+	}
+	col.Append(widget.NewLabel(font, px*1.6, batteryLabel("{{ percent }}%", dev.Percentage, dev.Present()), ctx.Style.fg), false)
+	col.Append(widget.NewLabel(font, px, state, mutedFg(ctx.Style.palette)), false)
+	if dev.TimeToEmpty > 0 {
+		col.Append(widget.NewLabel(font, px, "Empty in "+idleinhibit.FormatDuration(int(dev.TimeToEmpty.Seconds())), mutedFg(ctx.Style.palette)), false)
+	}
 	return col
 }
 
