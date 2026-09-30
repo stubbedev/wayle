@@ -112,6 +112,10 @@ func (p *Plan) Execute(samples []float64) []float64 {
 	return out
 }
 
+// InputSize is the sample ring's length: the most one Execute can
+// use, and so the capture backlog cava keeps before discarding.
+func (p *Plan) InputSize() int { return len(p.inputBuffer) }
+
 // Peaks reports the current per-bar peak values, the markers the peaks
 // draw style renders.
 func (p *Plan) Peaks() []float64 {

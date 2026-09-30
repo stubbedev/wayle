@@ -188,17 +188,3 @@ func TestNoiseReductionFallsOffAfterSilence(t *testing.T) {
 		t.Errorf("bars did not fall off: after silence %v >= peak/2 %v", after, peakValue/2)
 	}
 }
-
-func TestSourceArgs(t *testing.T) {
-	auto := NewSource("auto")
-	want := []string{"--raw", "--format=f32", "--rate=44100", "--channels=1", "--target=@DEFAULT_MONITOR@", "-"}
-	for i, arg := range auto.args() {
-		if arg != want[i] {
-			t.Errorf("arg %d = %q, want %q", i, arg, want[i])
-		}
-	}
-	explicit := NewSource("alsa_output.usb.monitor")
-	if got := explicit.args()[4]; got != "--target=alsa_output.usb.monitor" {
-		t.Errorf("explicit target = %q", got)
-	}
-}

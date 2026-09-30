@@ -148,28 +148,29 @@ func newCava(ctx ModuleContext) (Module, error) {
 	if ctx.App == nil {
 		return module, nil
 	}
-	module.source = analyzer.NewSource(cfg.Source)
-	if err := module.source.Start(); err != nil {
+	if ctx.Pulse == nil {
+		return nil, errCavaNoAudio
+	}
+	source, err := analyzer.NewSource(ctx.Pulse, cfg.Source, plan.InputSize())
+	if err != nil {
 		return nil, err
 	}
+	if err := source.Start(); err != nil {
+		return nil, err
+	}
+	module.source = source
 	ctx.App.Every(time.Second/time.Duration(cfg.Framerate), module.tick)
 	return module, nil
 }
 
-// tick drains the capture and repaints. A dead source restarts on the
-// next tick, matching the Rust service's monitoring.
+var errCavaNoAudio = errors.New("cava: no audio server connection")
+
+// tick analyzes what arrived and repaints, every frame as the Rust
+// service does: with no new samples the bars still fall off. The
+// capture keeps itself attached across default changes and server
+// kills.
 func (m *cavaModule) tick() {
-	samples, stopped, _ := m.source.Drained()
-	if stopped {
-		m.source.Stop()
-		if err := m.source.Start(); err != nil {
-			return
-		}
-		samples = nil
-	}
-	if len(samples) > 0 {
-		m.paint.SetFrame(m.plan.Execute(samples), m.plan.Peaks())
-	}
+	m.paint.SetFrame(m.plan.Execute(m.source.Drained()), m.plan.Peaks())
 }
 
 func (m *cavaModule) Root() widget.Widget { return m.paint }

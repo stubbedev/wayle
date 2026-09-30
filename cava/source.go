@@ -1,136 +1,116 @@
 package cava
 
 import (
-	"bufio"
-	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
-	"io"
-	"math"
-	"os/exec"
 	"sync"
+
+	"github.com/stubbedev/wayle/service/pulse"
 )
 
 // sampleRate is cava's fixed capture rate (service.rs's
 // DEFAULT_SAMPLERATE); the plan is built for it.
 const sampleRate = 44100
 
-// Source captures the audio output monitor through pw-record, writing
-// raw f32le mono frames to stdout. PipeWire is part of wayle's runtime
-// already (the recorder, the portals); this keeps the capture path
-// cgo-free while the Rust shell links libpulse.
-type Source struct {
-	target string
+// fragmentFrames is libcava's per-read chunk (PER_READ_CHUNK_SIZE in
+// ffi/wrappers/audio_input.rs).
+const fragmentFrames = 512
 
-	cmd     *exec.Cmd
-	cancel  context.CancelFunc
-	errOnce sync.Once
-	err     error
+// Capturer is the record-stream seam; *pulse.Service implements it.
+type Capturer interface {
+	Capture(target pulse.CaptureTarget, spec pulse.CaptureSpec, onData func([]byte)) (*pulse.Capture, error)
+}
+
+// Source records the configured PulseAudio source as 16-bit mono PCM
+// on the shell's native client, the counterpart of libcava's pulse
+// input: samples are handed over as raw int16 values, and a pending
+// buffer that would overflow is discarded whole, as cava's input
+// buffering does.
+type Source struct {
+	capturer Capturer
+	target   pulse.CaptureTarget
+	capacity int
+
+	capture *pulse.Capture
 
 	mu   sync.Mutex
 	pend []float64
 }
 
-// NewSource captures from target, a PipeWire node name. "auto" and the
-// empty string select the default monitor.
-func NewSource(target string) *Source {
-	if target == "" || target == "auto" {
-		target = "@DEFAULT_MONITOR@"
+// NewSource records source ("auto" or empty: the default sink's
+// monitor, following default changes; otherwise a device by name, a
+// sink recording its monitor). capacity is the analyzer's input size.
+func NewSource(capturer Capturer, source string, capacity int) (*Source, error) {
+	if capturer == nil {
+		return nil, errors.New("cava: no audio server connection")
 	}
-	return &Source{target: target}
+	if capacity <= 0 {
+		return nil, errors.New("cava: non-positive input capacity")
+	}
+	target := pulse.CaptureDefaultMonitor()
+	if source != "" && source != "auto" {
+		named, err := pulse.CaptureNamed(source)
+		if err != nil {
+			return nil, err
+		}
+		target = named
+	}
+	return &Source{capturer: capturer, target: target, capacity: capacity}, nil
 }
 
-// args builds the pw-record invocation; split out so tests pin it
-// without spawning a process.
-func (s *Source) args() []string {
-	return []string{
-		"--raw",
-		"--format=f32",
-		fmt.Sprintf("--rate=%d", sampleRate),
-		"--channels=1",
-		"--target=" + s.target,
-		"-", // stdout
-	}
-}
-
-// Start spawns pw-record and begins draining its stdout in the
-// background. Samples accumulate until Drained.
+// Start opens the record stream.
 func (s *Source) Start() error {
-	if s.cmd != nil {
+	if s.capture != nil {
 		return errors.New("cava: source already running")
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, "pw-record", s.args()...) //nolint:gosec // the target is a config value, the same trust level as the custom-module command
-	stdout, err := cmd.StdoutPipe()
+	capture, err := s.capturer.Capture(s.target, pulse.CaptureSpec{
+		Name:           "cava",
+		Rate:           sampleRate,
+		Channels:       1,
+		FragmentFrames: fragmentFrames,
+	}, s.accumulate)
 	if err != nil {
-		cancel()
-		return fmt.Errorf("cava: pw-record stdout: %w", err)
+		return err
 	}
-	cmd.Stderr = io.Discard
-	if err := cmd.Start(); err != nil {
-		cancel()
-		return fmt.Errorf("cava: start pw-record: %w", err)
-	}
-	s.cmd, s.cancel = cmd, cancel
-
-	go func() {
-		defer cancel()
-		reader := bufio.NewReaderSize(stdout, 1<<16)
-		var chunk [4 * 1024]byte
-		for {
-			n, err := reader.Read(chunk[:])
-			if n > 0 {
-				s.accumulate(chunk[:n])
-			}
-			if err != nil {
-				s.errOnce.Do(func() {
-					if err != io.EOF {
-						s.mu.Lock()
-						s.err = fmt.Errorf("cava: pw-record: %w", err)
-						s.mu.Unlock()
-					}
-				})
-				return
-			}
-		}
-	}()
+	s.capture = capture
 	return nil
 }
 
-// accumulate converts one raw read to samples.
+// accumulate converts one chunk of s16le frames.
 func (s *Source) accumulate(data []byte) {
-	n := len(data) / 4
-	samples := make([]float64, n)
+	n := len(data) / 2
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.pend)+n > s.capacity {
+		// cava drops the whole backlog rather than analyze stale audio.
+		s.pend = s.pend[:0]
+		if n > s.capacity {
+			data = data[(n-s.capacity)*2:]
+			n = s.capacity
+		}
+	}
 	for i := range n {
-		bits := binary.LittleEndian.Uint32(data[i*4 : i*4+4])
-		samples[i] = float64(math.Float32frombits(bits))
+		s.pend = append(s.pend, float64(int16(binary.LittleEndian.Uint16(data[i*2:]))))
 	}
-	s.mu.Lock()
-	s.pend = append(s.pend, samples...)
-	s.mu.Unlock()
 }
 
-// Drained hands over every sample captured since the last call. The
-// second return reports whether the capture stream is gone (process
-// exited or failed), so the caller can restart it.
-func (s *Source) Drained() ([]float64, bool, error) {
+// Drained hands over every sample captured since the last call.
+func (s *Source) Drained() []float64 {
 	s.mu.Lock()
-	pend := s.pend
-	s.pend = nil
-	err := s.err
-	s.mu.Unlock()
-	if s.cmd == nil {
-		return pend, true, nil
+	defer s.mu.Unlock()
+	if len(s.pend) == 0 {
+		return nil
 	}
-	return pend, false, err
+	out := make([]float64, len(s.pend))
+	copy(out, s.pend)
+	s.pend = s.pend[:0]
+	return out
 }
 
-// Stop terminates the capture process.
+// Stop closes the record stream.
 func (s *Source) Stop() {
-	if s.cancel != nil {
-		s.cancel()
-		_ = s.cmd.Wait()
-		s.cmd, s.cancel = nil, nil
+	if s.capture != nil {
+		s.capture.Close()
+		s.capture = nil
 	}
 }
