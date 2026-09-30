@@ -35,6 +35,11 @@ linters:
         # them as Go ints for math and converts back at the boundary, so
         # int -> int32 conversions round-trip protocol values.
         - G115 # integer overflow conversion
+    misspell:
+      ignore-rules:
+        # The freedesktop thumbnail spec's word (the `thumbnailers`
+        # directory, `.thumbnailer` descriptors).
+        - thumbnailers
     perfsprint:
       strconcat: true
       sprintf1: true
