@@ -33,7 +33,7 @@ func TestServerRoundTrip(t *testing.T) {
 	pct := 42.5
 	dur := uint32(1200)
 	cls := "mine"
-	if err := SendToast(context.Background(), ToastRequest{Label: strPtr("hello"), Percentage: &pct, DurationMS: &dur, Class: &cls}); err != nil {
+	if err := SendToast(context.Background(), ToastRequest{Label: new("hello"), Percentage: &pct, DurationMS: &dur, Class: &cls}); err != nil {
 		t.Fatalf("SendToast: %v", err)
 	}
 	select {
@@ -102,5 +102,3 @@ func TestListenReplacesStaleSocket(t *testing.T) {
 		t.Errorf("socket file left behind: %v", err)
 	}
 }
-
-func strPtr(s string) *string { return &s }
