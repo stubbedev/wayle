@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/service/hyprland"
@@ -168,6 +169,20 @@ func RunWith(cfg *config.Config) error {
 	if cfg.Osd.Enabled {
 		go watchOsd(cfg, baseCtx, osdSrv)
 	}
+	// The widget socket carries out-of-process pushes (`wayle toast`).
+	widgetSrv := widgetipc.NewServer()
+	if stop, err := widgetSrv.Listen(); err == nil {
+		defer stop()
+	} else {
+		log.Printf("widget socket: %v", err)
+	}
+	go func() {
+		for req := range widgetSrv.Toasts() {
+			if err := osdSrv.ShowToast(req); err != nil {
+				log.Printf("toast: %v", err)
+			}
+		}
+	}()
 	return application.Run()
 }
 

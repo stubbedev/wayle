@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
+	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/recorder"
@@ -23,6 +25,8 @@ Usage:
   wayle idle <cmd>   idle inhibition: on|off|toggle|duration|remaining|status
   wayle notify <cmd> notifications: list|dismiss|dismiss-all|dnd|status
   wayle recorder <cmd> recording: toggle|start|stop|pause|resume|status
+  wayle toast [flags] custom toast: --label --icon --percentage
+                     --duration --preset --class
 
 Not ported yet: audio, config, icons, launch, lock, media, notify,
 panel, power, recorder, screenshot, systray, toast, wallpaper, widget.
@@ -43,6 +47,8 @@ func main() {
 		err = runNotify(os.Args[2:])
 	case "recorder":
 		err = runRecorder(os.Args[2:])
+	case "toast":
+		err = runToast(os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return
@@ -53,6 +59,56 @@ func main() {
 		fmt.Fprintln(os.Stderr, "wayle:", err)
 		os.Exit(1)
 	}
+}
+
+// runToast sends one custom toast (wayle/src/cli/toast.rs). Either
+// --label or --preset must be given.
+func runToast(args []string) error {
+	var req widgetipc.ToastRequest
+	for i := 0; i < len(args); i++ {
+		value := func() string {
+			if i+1 < len(args) {
+				i++
+				return args[i]
+			}
+			return ""
+		}
+		switch args[i] {
+		case "--label", "-l":
+			v := value()
+			req.Label = &v
+		case "--icon":
+			v := value()
+			req.Icon = &v
+		case "--percentage":
+			pct, err := strconv.ParseFloat(value(), 64)
+			if err != nil {
+				return fmt.Errorf("toast percentage: %w", err)
+			}
+			req.Percentage = &pct
+		case "--duration":
+			ms, err := strconv.ParseUint(value(), 10, 32)
+			if err != nil {
+				return fmt.Errorf("toast duration: %w", err)
+			}
+			d := uint32(ms)
+			req.DurationMS = &d
+		case "--preset":
+			v := value()
+			req.Preset = &v
+		case "--class":
+			v := value()
+			req.Class = &v
+		default:
+			return fmt.Errorf("unknown toast flag %q", args[i])
+		}
+	}
+	if req.Label == nil && req.Preset == nil {
+		return errors.New("a toast needs a label or --preset")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return widgetipc.SendToast(ctx, req)
 }
 
 // runRecorder drives the shell's recorder daemon the way

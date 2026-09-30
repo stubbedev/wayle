@@ -22,6 +22,14 @@ const (
 // OsdPositions is the schema's position set.
 var OsdPositions = []string{OsdTopLeft, OsdTop, OsdTopRight, OsdRight, OsdBottomRight, OsdBottom, OsdBottomLeft, OsdLeft}
 
+// ToastPreset is one [[osd.presets]] entry, triggerable with
+// `wayle toast --preset <id>`.
+type ToastPreset struct {
+	ID    string
+	Label string
+	Icon  string
+}
+
 // OsdConfig is the on-screen display configuration.
 type OsdConfig struct {
 	Enabled    bool
@@ -30,6 +38,7 @@ type OsdConfig struct {
 	Margin     float64
 	Monitor    string
 	TextAlign  string
+	Presets    []ToastPreset
 }
 
 // DefaultsOsd returns the schema defaults.
@@ -42,6 +51,16 @@ func DefaultsOsd() OsdConfig {
 		Monitor:    "primary",
 		TextAlign:  "center",
 	}
+}
+
+// Preset finds a preset by id.
+func (o OsdConfig) Preset(id string) (ToastPreset, bool) {
+	for _, p := range o.Presets {
+		if p.ID == id {
+			return p, true
+		}
+	}
+	return ToastPreset{}, false
 }
 
 // ValidOsdPosition reports whether the position is in the schema set.
@@ -59,6 +78,11 @@ func applyOsd(md toml.MetaData, prim toml.Primitive) (OsdConfig, error) {
 		Margin     *float64 `toml:"margin"`
 		Monitor    *string  `toml:"monitor"`
 		TextAlign  *string  `toml:"text-align"`
+		Presets    []struct {
+			ID    *string `toml:"id"`
+			Label *string `toml:"label"`
+			Icon  *string `toml:"icon"`
+		} `toml:"presets"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -83,6 +107,19 @@ func applyOsd(md toml.MetaData, prim toml.Primitive) (OsdConfig, error) {
 	}
 	if doc.TextAlign != nil {
 		cfg.TextAlign = *doc.TextAlign
+	}
+	for _, preset := range doc.Presets {
+		if preset.ID == nil || *preset.ID == "" {
+			return cfg, errors.New("osd: preset needs an id")
+		}
+		p := ToastPreset{ID: *preset.ID}
+		if preset.Label != nil {
+			p.Label = *preset.Label
+		}
+		if preset.Icon != nil {
+			p.Icon = *preset.Icon
+		}
+		cfg.Presets = append(cfg.Presets, p)
 	}
 	return cfg, nil
 }

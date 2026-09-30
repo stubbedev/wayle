@@ -8,6 +8,7 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/widgetipc"
 )
 
 func testFont(t *testing.T) render.Font {
@@ -108,3 +109,53 @@ func TestDisabledOsdNeverShows(t *testing.T) {
 		t.Errorf("disabled OSD recorded %q", got.Kind)
 	}
 }
+
+func TestApplyToast(t *testing.T) {
+	cfg := config.DefaultsOsd()
+	cfg.Presets = []config.ToastPreset{{ID: "screenshot", Label: "Captured", Icon: "ld-camera-symbolic"}}
+	o := New(nil, cfg, testFont(t), nil)
+
+	// A plain label toast without a percentage shows no progress bar.
+	ev, err := o.applyToast(widgetipc.ToastRequest{Label: strPtr("hello")})
+	if err != nil {
+		t.Fatalf("applyToast: %v", err)
+	}
+	if ev.Label != "hello" || ev.Kind != "toast" {
+		t.Errorf("event = %+v", ev)
+	}
+	if ev.Value != -1 {
+		t.Errorf("no-percentage toast got value %v", ev.Value)
+	}
+
+	// The preset supplies the defaults; explicit fields override.
+	ev, err = o.applyToast(widgetipc.ToastRequest{Preset: strPtr("screenshot")})
+	if err != nil {
+		t.Fatalf("preset toast: %v", err)
+	}
+	if ev.Label != "Captured" || ev.Icon != "ld-camera-symbolic" {
+		t.Errorf("preset event = %+v", ev)
+	}
+	ev, err = o.applyToast(widgetipc.ToastRequest{Preset: strPtr("screenshot"), Label: strPtr("custom")})
+	if err != nil {
+		t.Fatalf("override toast: %v", err)
+	}
+	if ev.Label != "custom" {
+		t.Errorf("override label = %q", ev.Label)
+	}
+
+	// Neither label nor preset is an error; an unknown preset too.
+	if _, err := o.applyToast(widgetipc.ToastRequest{}); err == nil {
+		t.Error("no label: want an error")
+	}
+	if _, err := o.applyToast(widgetipc.ToastRequest{Preset: strPtr("nope")}); err == nil {
+		t.Error("unknown preset: want an error")
+	}
+	// A percentage clamps into the slider range.
+	pct := 140.0
+	ev, _ = o.applyToast(widgetipc.ToastRequest{Label: strPtr("x"), Percentage: &pct})
+	if ev.Value != 100 {
+		t.Errorf("clamped value = %v", ev.Value)
+	}
+}
+
+func strPtr(s string) *string { return &s }

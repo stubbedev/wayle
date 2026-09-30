@@ -4,6 +4,7 @@
 package osd
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -90,7 +92,10 @@ func (f *face) setEvent(ev Event) {
 	f.icon.SetThemeName(ev.Icon)
 	f.label.SetText(ev.Label)
 	f.slider.SetValue(clamp01(ev.Value / 100))
-	text := strconv.FormatFloat(ev.Value, 'f', 0, 64) + "%"
+	text := ""
+	if ev.Value >= 0 {
+		text = strconv.FormatFloat(ev.Value, 'f', 0, 64) + "%"
+	}
 	if ev.Muted {
 		text = "Muted"
 	}
@@ -210,6 +215,52 @@ func (o *Osd) ensure(outputName string, output *app.Output) (*face, error) {
 	f := &face{win: win, icon: icon, label: label, slider: slider, value: value}
 	o.faces[outputName] = f
 	return f, nil
+}
+
+// applyToast resolves a toast request against the presets: explicit
+// fields win, and the preset supplies the defaults (osd/methods.rs's
+// handle_show_toast). An absent label everywhere is an error.
+func (o *Osd) applyToast(req widgetipc.ToastRequest) (Event, error) {
+	var preset config.ToastPreset
+	if req.Preset != nil {
+		p, ok := o.cfg.Preset(*req.Preset)
+		if !ok {
+			return Event{}, fmt.Errorf("unknown toast preset %q", *req.Preset)
+		}
+		preset = p
+	}
+	label := preset.Label
+	if req.Label != nil {
+		label = *req.Label
+	}
+	if label == "" {
+		return Event{}, errors.New("a toast needs a label or preset")
+	}
+	icon := preset.Icon
+	if req.Icon != nil {
+		icon = *req.Icon
+	}
+	ev := Event{
+		Kind:  "toast",
+		Icon:  icon,
+		Label: label,
+	}
+	if req.Percentage != nil {
+		ev.Value = clamp01(*req.Percentage) * 100
+	} else {
+		ev.Value = -1 // no progress bar
+	}
+	return ev, nil
+}
+
+// ShowToast flashes a toast request.
+func (o *Osd) ShowToast(req widgetipc.ToastRequest) error {
+	ev, err := o.applyToast(req)
+	if err != nil {
+		return err
+	}
+	o.Show(ev)
+	return nil
 }
 
 // Current reads the event on display (tests).
