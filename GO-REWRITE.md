@@ -41,7 +41,14 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       hyprland-workspaces, battery, brightness, volume, media,
       keyboard-layout, microphone, bluetooth modules - the default
       layout's module set is fully covered
-- [x] service/hyprland: command + event sockets, dispatch
+- [x] service/hyprland: command + event sockets, dispatch, clients,
+      workspace rules, the v2 window events
+- [x] workspaces: hyprland, sway, niri, and mango modules at full
+      schema on one shared widget layer (filtering, placeholders and
+      rules, relative numbering, app icons, urgent pulse, all five
+      bindings, the _workspaces.scss cascade); service/sway (i3 IPC
+      with GET_TREE), service/niri (niri-ipc JSON lines), service/mango
+      (dispatch + watch frames)
 - [x] service/upower, service/brightness (sysfs+logind+inotify),
       service/pulse (pactl sink+source), service/mpris (MPRIS2),
       service/network (NetworkManager), service/bluetooth (BlueZ),
@@ -53,8 +60,7 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       (dropdown:, brightness:delta/toggle, shell), per-module config,
       and the native brightness/audio executors
 - [ ] config: YAML configs, runtime layer, hot reload, the rest of the schema
-- [ ] bar: screenshot (portal/screencopy design), sway/mango/niri
-      workspaces; hyprsunset auto-schedule (geoclue + solar) and
+- [ ] bar: screenshot (portal/screencopy design); hyprsunset auto-schedule (geoclue + solar) and
       persistence; button variant structures (block-prefix/icon-square);
       popup hover-pause; systray DBusMenu rendering + pixmap icons;
       MPRIS transport controls; status-token severity colors
@@ -78,6 +84,11 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
   split are not ported and error at module creation.
 
 ## Known deviations from the Rust shell
+
+- Workspace modules re-query the compositor on each relevant event
+  instead of folding events into a local state (the Rust services'
+  EventStreamState); the rendered result is the same, and events the
+  Rust module ignores cost no query.
 
 - The `replace` directive in `go.mod` points at the local gelm checkout;
   it carries the public `app.Connect`/`Font`/layer-enum aliases wayle
