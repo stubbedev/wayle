@@ -30,6 +30,7 @@ import (
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/shell/osd"
 	"github.com/stubbedev/wayle/shell/popups"
+	wallpapershell "github.com/stubbedev/wayle/shell/wallpaper"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -148,6 +149,10 @@ func RunWith(cfg *config.Config) error {
 	if len(outputs) == 0 {
 		return errors.New("bar: no output to draw on")
 	}
+	// Wallpapers render on their own Background layers; hotplugged
+	// outputs join once their connector name is known.
+	_, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, &sess.OnOutputIdentity, &sess.OnOutputRemoved)
+	defer stopWallpaper()
 	osdSrv := osd.New(application, cfg.Osd, font, palette)
 	dropdowns := newDropdownRegistry(application, cfg, font, &style, baseCtx)
 	baseCtx.Dropdowns = dropdowns
