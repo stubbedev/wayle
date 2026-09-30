@@ -1,10 +1,7 @@
 package bar
 
 import (
-	"bytes"
 	"image"
-	_ "image/jpeg" // ~/.face is often a JPEG
-	_ "image/png"  // or a PNG
 	"os"
 	"path/filepath"
 
@@ -12,6 +9,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/imagedecode"
 )
 
 // avatarPx is the user avatar's logical box in the session row.
@@ -65,11 +63,7 @@ func loadAvatar(path string) *render.Icon {
 	if path == "" {
 		return nil
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // the user's own ~/.face
-	if err != nil {
-		return nil
-	}
-	img, _, err := image.Decode(bytes.NewReader(data))
+	img, err := imagedecode.Open(path)
 	if err != nil {
 		return nil
 	}
