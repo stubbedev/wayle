@@ -113,6 +113,7 @@ var factories = map[string]Factory{
 	"netstat":             newNetstat,
 	"mail":                newMail,
 	"power":               newPower,
+	"dashboard":           newDashboard,
 	"keybind-mode":        newKeybindMode,
 	"power-profiles":      newPowerProfiles,
 	"hyprsunset":          newHyprsunset,
@@ -249,6 +250,8 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.Mail.Click
 	case "power":
 		return cfg.Power.Click
+	case "dashboard":
+		return cfg.Dashboard.Click
 	case "keybind-mode":
 		return cfg.KeybindMode.Click
 	case "power-profiles":

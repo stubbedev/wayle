@@ -207,9 +207,10 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 }
 
 // dashboardDropdown is the dashboard card: the clock hero, the date,
-// and the system stats section (battery, CPU, memory), with the power
-// rows at the bottom. The weather section joins the weather cache
-// port; the severity colors wait for the status-token pass.
+// and the system stats section (battery, CPU, memory), with the
+// user-session card at the bottom. The weather section joins the
+// weather cache port; the severity colors wait for the status-token
+// pass.
 func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	col := widget.NewBox(widget.Column, 8, 16)
@@ -219,7 +220,7 @@ func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	if stats := dashboardStats(ctx, font, px); stats != nil {
 		col.Append(stats, false)
 	}
-	col.Append(powerDropdown(ctx), false)
+	col.Append(userSessionSection(ctx), false)
 	return col
 }
 

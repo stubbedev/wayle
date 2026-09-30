@@ -104,6 +104,7 @@ type Config struct {
 	Netstat            NetstatConfig
 	Mail               MailConfig
 	Power              PowerConfig
+	Dashboard          DashboardConfig
 	KeybindMode        KeybindModeConfig
 	PowerProfiles      PowerProfilesConfig
 	Hyprsunset         HyprsunsetConfig
@@ -182,6 +183,7 @@ func Defaults() *Config {
 		Netstat:            DefaultsNetstat(),
 		Mail:               DefaultsMail(),
 		Power:              DefaultsPower(),
+		Dashboard:          DefaultsDashboard(),
 		KeybindMode:        DefaultsKeybindMode(),
 		PowerProfiles:      DefaultsPowerProfiles(),
 		Hyprsunset:         DefaultsHyprsunset(),
@@ -241,6 +243,7 @@ type fileDoc struct {
 		Netstat            *toml.Primitive `toml:"netstat"`
 		Mail               *toml.Primitive `toml:"mail"`
 		Power              *toml.Primitive `toml:"power"`
+		Dashboard          *toml.Primitive `toml:"dashboard"`
 		KeybindMode        *toml.Primitive `toml:"keybind-mode"`
 		PowerProfiles      *toml.Primitive `toml:"power-profiles"`
 		Hyprsunset         *toml.Primitive `toml:"hyprsunset"`
@@ -453,6 +456,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Power = pw
+	}
+	if doc.Modules != nil && doc.Modules.Dashboard != nil {
+		db, err := applyDashboard(md, *doc.Modules.Dashboard)
+		if err != nil {
+			return err
+		}
+		c.Dashboard = db
 	}
 	if doc.Modules != nil && doc.Modules.Mail != nil {
 		ml, err := applyMail(md, *doc.Modules.Mail)
