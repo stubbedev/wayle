@@ -15,7 +15,7 @@ import (
 // button bg opacity, with the border-show strips on top.
 type cwsContainer struct {
 	widget.Base
-	m       *cwsModule
+	m       *cwsView
 	box     *widget.Box
 	bg      render.Color
 	radius  int
@@ -23,13 +23,16 @@ type cwsContainer struct {
 	border  render.Color
 }
 
-func newCwsContainer(m *cwsModule) *cwsContainer {
+func newCwsContainer(m *cwsView) *cwsContainer {
 	axis := widget.Row
 	if m.vertical() {
 		axis = widget.Column
 	}
 	c := &cwsContainer{m: m, box: widget.NewBox(axis, 0, 0)}
-	c.AddClass("workspaces", m.kind)
+	c.AddClass("workspaces")
+	if m.kind != "" {
+		c.AddClass(m.kind)
+	}
 	palette := m.palette()
 	if base, ok := styling.ResolveColor(m.cfg.ContainerBgColor, palette); ok {
 		opacity := 100
@@ -107,7 +110,7 @@ func (c *cwsContainer) Children() []widget.Widget { return []widget.Widget{c.box
 
 // The pixel resolvers the widgets share.
 
-func (m *cwsModule) palette() *styling.Palette {
+func (m *cwsView) palette() *styling.Palette {
 	if m.ctx.Style != nil && m.ctx.Style.palette != nil {
 		return m.ctx.Style.palette
 	}
@@ -115,7 +118,7 @@ func (m *cwsModule) palette() *styling.Palette {
 }
 
 // buttonRadius is --bar-button-rounding-element.
-func (m *cwsModule) buttonRadius() int {
+func (m *cwsView) buttonRadius() int {
 	if m.ctx.Config == nil {
 		return styling.RoundingRadiusPx(config.RoundingSm, 1)
 	}
@@ -123,14 +126,14 @@ func (m *cwsModule) buttonRadius() int {
 }
 
 // fg is the inherited foreground a rule-less child paints with.
-func (m *cwsModule) fg() render.Color {
+func (m *cwsView) fg() render.Color {
 	if m.ctx.Style != nil {
 		return m.ctx.Style.fg
 	}
 	return m.palette().Fg
 }
 
-func (m *cwsModule) resolve(cv config.ColorValue) render.Color {
+func (m *cwsView) resolve(cv config.ColorValue) render.Color {
 	color, _ := styling.ResolveColor(cv, m.palette())
 	return color
 }
@@ -140,7 +143,8 @@ type cwsColors struct {
 	bg, hoverBg render.Color
 	underline   render.Color
 	label       render.Color // .workspace-label, .workspace-divider
-	icon        render.Color // .workspace-icon (mapped and app icons)
+	icon        render.Color // .workspace-icon (app icons; sway/niri/mango mapped icons)
+	custom      render.Color // .workspace-custom-icon (hyprland's mapped icon)
 	emptyIcon   render.Color // .workspace-icon-empty
 	opacity     float64
 }
@@ -149,7 +153,7 @@ type cwsColors struct {
 // classes: the override color stands in for every state color, the
 // indicator decides between a filled and an underlined active state,
 // and urgency without urgent-application halves the opacity.
-func (m *cwsModule) cwsResolveColors(model cwsButtonModel) cwsColors {
+func (m *cwsView) cwsResolveColors(model cwsButtonModel) cwsColors {
 	override, hasOverride := cwsOverrideColor(model.classes, m.cfg.WorkspaceMap)
 	pick := func(cv config.ColorValue) render.Color {
 		if hasOverride {
@@ -159,23 +163,34 @@ func (m *cwsModule) cwsResolveColors(model cwsButtonModel) cwsColors {
 	}
 	active := hasClass(model.classes, "active")
 	fg := m.fg()
-	out := cwsColors{label: fg, icon: fg, emptyIcon: fg, opacity: 1}
+	out := cwsColors{label: fg, icon: fg, custom: fg, emptyIcon: fg, opacity: 1}
 	background := m.cfg.ActiveIndicator == config.ActiveBackground
+	// The active and active-other-monitor rules differ only in the
+	// state color.
+	highlighted := func(cv config.ColorValue) {
+		if background {
+			out.bg = pick(cv)
+			onAccent := m.resolve(mustToken(config.TokenFgOnAccent))
+			out.label, out.icon, out.custom = onAccent, onAccent, onAccent
+			return
+		}
+		c := pick(cv)
+		out.underline = c
+		out.label, out.icon, out.custom = c, c, c
+	}
 	switch {
-	case active && background:
-		out.bg = pick(m.cfg.ActiveColor)
-		onAccent := m.resolve(mustToken(config.TokenFgOnAccent))
-		out.label, out.icon = onAccent, onAccent
 	case active:
-		out.underline = pick(m.cfg.ActiveColor)
-		c := pick(m.cfg.ActiveColor)
-		out.label, out.icon = c, c
+		highlighted(m.cfg.ActiveColor)
+	case hasClass(model.classes, "active-other-monitor"):
+		highlighted(m.otherMonitor)
 	case hasClass(model.classes, "occupied"):
 		c := pick(m.cfg.OccupiedColor)
-		out.label, out.icon = c, c
+		out.label, out.icon, out.custom = c, c, c
 	case hasClass(model.classes, "empty"):
+		// .workspace-icon is not in the empty rule; the custom icon and
+		// the empty placeholder are.
 		c := pick(m.cfg.EmptyColor)
-		out.label, out.emptyIcon = c, c
+		out.label, out.custom, out.emptyIcon = c, c, c
 	}
 	// &:hover:not(.active): the plain active color at 15%, never the
 	// override.
@@ -183,8 +198,12 @@ func (m *cwsModule) cwsResolveColors(model cwsButtonModel) cwsColors {
 	if !active {
 		out.hoverBg = styling.ColorMix(m.resolve(m.cfg.ActiveColor), transparentColor, 15)
 	}
-	if hasClass(model.classes, "urgent") && !hasClass(model.classes, "urgent-application") {
+	// .urgent:not(.urgent-application) outranks .special.
+	switch {
+	case hasClass(model.classes, "urgent") && !hasClass(model.classes, "urgent-application"):
 		out.opacity = 0.5
+	case hasClass(model.classes, "special"):
+		out.opacity = 0.8
 	}
 	return out
 }
@@ -194,7 +213,7 @@ func (m *cwsModule) cwsResolveColors(model cwsButtonModel) cwsColors {
 // five input bindings routed from the hit leaf.
 type cwsButton struct {
 	widget.Base
-	m       *cwsModule
+	m       *cwsView
 	model   cwsButtonModel
 	colors  cwsColors
 	content *inset
@@ -203,7 +222,7 @@ type cwsButton struct {
 	hovered bool
 }
 
-func newCwsButton(m *cwsModule, model cwsButtonModel) *cwsButton {
+func newCwsButton(m *cwsView, model cwsButtonModel) *cwsButton {
 	b := &cwsButton{m: m, model: model, radius: m.buttonRadius()}
 	b.AddClass(model.classes...)
 	b.colors = m.cwsResolveColors(model)
@@ -235,8 +254,13 @@ func (b *cwsButton) buildContent() *inset {
 		}
 		if b.model.showIcon(cfg.DisplayMode) {
 			icon := widget.NewThemeIcon(b.model.icon, m.iconPx())
-			icon.SetTint(b.colors.icon)
-			icon.AddClass("workspace-icon")
+			if b.model.flavor == cwsHyprland {
+				icon.SetTint(b.colors.custom)
+				icon.AddClass("workspace-custom-icon")
+			} else {
+				icon.SetTint(b.colors.icon)
+				icon.AddClass("workspace-icon")
+			}
 			identity.Append(icon, false)
 		}
 		if b.model.showDivider(cfg) {

@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 
 	"github.com/BurntSushi/toml"
@@ -11,7 +10,7 @@ import (
 // WorkspacesDisplayMode selects what a workspace button shows.
 type WorkspacesDisplayMode string
 
-// Display modes. Icons are not ported to the Go shell yet.
+// Display modes.
 const (
 	DisplayModeLabel WorkspacesDisplayMode = "label"
 	DisplayModeIcon  WorkspacesDisplayMode = "icon"
@@ -36,169 +35,184 @@ const (
 	ActiveUnderline  ActiveIndicator = "underline"
 )
 
-// WorkspaceStyle is one workspace-map entry: per-workspace overrides.
-type WorkspaceStyle struct {
-	Icon  string
-	Color ColorValue
-	// ColorSet distinguishes an unset color from transparent.
-	ColorSet bool
-}
-
 // HyprlandWorkspacesConfig is the hyprland-workspaces module config.
+// The button styling it shares with the sway/niri schemas lives in
+// Shared (MonitorSpecific, the colors, sizes, app icons, urgency,
+// workspace-ignore, border, and bindings; WorkspaceMap is keyed by
+// the decimal workspace id). The rest is hyprland's own.
 type HyprlandWorkspacesConfig struct {
-	DisplayMode     WorkspacesDisplayMode
-	ActiveColor     ColorValue
-	OccupiedColor   ColorValue
-	EmptyColor      ColorValue
-	ActiveIndicator ActiveIndicator
-	Numbering       WorkspacesNumbering
-	LabelSize       Size
-	WorkspacePad    Size
-	MinWorkspace    int
-	LabelUseName    bool
-	ShowSpecial     bool
-	// MonitorSpecific keeps a bar's row to its own output's
-	// workspaces (the schema's monitor-specific).
-	MonitorSpecific bool
-	Divider         string
-	WorkspaceMap    map[int]WorkspaceStyle
+	Shared                        CompositorWorkspacesConfig
+	MinWorkspace                  int
+	ShowSpecial                   bool
+	LabelUseName                  bool
+	Numbering                     WorkspacesNumbering
+	HighlightActiveOnOtherMonitor bool
+	ActiveOnOtherMonitorColor     ColorValue
 }
 
 // DefaultsHyprlandWorkspaces returns the schema defaults.
 func DefaultsHyprlandWorkspaces() HyprlandWorkspacesConfig {
+	shared := defaultsCompositorWorkspaces(false)
 	return HyprlandWorkspacesConfig{
-		DisplayMode:     DisplayModeLabel,
-		ActiveColor:     mustColor("accent"),
-		OccupiedColor:   mustColor("fg-muted"),
-		EmptyColor:      mustColor("fg-subtle"),
-		ActiveIndicator: ActiveBackground,
-		Numbering:       NumberingAbsolute,
-		LabelSize:       Size{Value: 1.0, Unit: SizeMultiplier},
-		WorkspacePad:    Size{Value: 0.5, Unit: SizeMultiplier},
-		MinWorkspace:    0,
-		LabelUseName:    false,
-		ShowSpecial:     true,
-		MonitorSpecific: true,
-		Divider:         " ",
-		WorkspaceMap:    map[int]WorkspaceStyle{},
+		Shared:                        shared,
+		MinWorkspace:                  0,
+		ShowSpecial:                   true,
+		LabelUseName:                  false,
+		Numbering:                     NumberingAbsolute,
+		HighlightActiveOnOtherMonitor: true,
+		ActiveOnOtherMonitorColor:     mustColor("accent"),
 	}
 }
 
 // applyHyprlandWorkspaces overlays [modules.hyprland-workspaces].
 func applyHyprlandWorkspaces(md toml.MetaData, prim toml.Primitive) (HyprlandWorkspacesConfig, error) {
+	const module = "hyprland-workspaces"
 	cfg := DefaultsHyprlandWorkspaces()
 	var doc struct {
-		DisplayMode     string               `toml:"display-mode"`
-		ActiveColor     string               `toml:"active-color"`
-		OccupiedColor   string               `toml:"occupied-color"`
-		EmptyColor      string               `toml:"empty-color"`
-		ActiveIndicator string               `toml:"active-indicator"`
-		Numbering       string               `toml:"numbering"`
-		LabelSize       tomlValue            `toml:"label-size"`
-		WorkspacePad    tomlValue            `toml:"workspace-padding"`
-		MinWorkspace    *int                 `toml:"min-workspace-count"`
-		LabelUseName    *bool                `toml:"label-use-name"`
-		ShowSpecial     *bool                `toml:"show-special"`
-		MonitorSpecific *bool                `toml:"monitor-specific"`
-		Divider         *string              `toml:"divider"`
-		WorkspaceMap    map[string]tomlValue `toml:"workspace-map"`
+		workspaceClicksDoc
+		MinWorkspace     *int                 `toml:"min-workspace-count"`
+		MonitorSpecific  *bool                `toml:"monitor-specific"`
+		ShowSpecial      *bool                `toml:"show-special"`
+		UrgentShow       *bool                `toml:"urgent-show"`
+		UrgentMode       *string              `toml:"urgent-mode"`
+		DisplayMode      *string              `toml:"display-mode"`
+		LabelUseName     *bool                `toml:"label-use-name"`
+		Numbering        *string              `toml:"numbering"`
+		Divider          *string              `toml:"divider"`
+		AppIconsShow     *bool                `toml:"app-icons-show"`
+		AppIconsDedupe   *bool                `toml:"app-icons-dedupe"`
+		AppIconsFallback *string              `toml:"app-icons-fallback"`
+		AppIconsEmpty    *string              `toml:"app-icons-empty"`
+		IconGap          tomlValue            `toml:"icon-gap"`
+		WorkspacePad     tomlValue            `toml:"workspace-padding"`
+		IconSize         tomlValue            `toml:"icon-size"`
+		LabelSize        tomlValue            `toml:"label-size"`
+		WorkspaceIgnore  []string             `toml:"workspace-ignore"`
+		ActiveIndicator  *string              `toml:"active-indicator"`
+		HighlightOther   *bool                `toml:"highlight-active-on-other-monitor"`
+		ActiveColor      string               `toml:"active-color"`
+		OccupiedColor    string               `toml:"occupied-color"`
+		EmptyColor       string               `toml:"empty-color"`
+		ContainerBgColor string               `toml:"container-bg-color"`
+		BorderShow       *bool                `toml:"border-show"`
+		BorderColor      string               `toml:"border-color"`
+		ActiveOtherColor string               `toml:"active-on-other-monitor-color"`
+		WorkspaceMap     map[string]tomlValue `toml:"workspace-map"`
+		AppIconMap       map[string]string    `toml:"app-icon-map"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
+		return cfg, fmt.Errorf("%s: %w", module, err)
 	}
-	if doc.DisplayMode != "" {
-		cfg.DisplayMode = WorkspacesDisplayMode(doc.DisplayMode)
-	}
-	if doc.ActiveColor != "" {
-		cv, err := ParseColorValue(doc.ActiveColor)
-		if err != nil {
-			return cfg, fmt.Errorf("hyprland-workspaces: active-color: %w", err)
-		}
-		cfg.ActiveColor = cv
-	}
-	if doc.OccupiedColor != "" {
-		cv, err := ParseColorValue(doc.OccupiedColor)
-		if err != nil {
-			return cfg, fmt.Errorf("hyprland-workspaces: occupied-color: %w", err)
-		}
-		cfg.OccupiedColor = cv
-	}
-	if doc.EmptyColor != "" {
-		cv, err := ParseColorValue(doc.EmptyColor)
-		if err != nil {
-			return cfg, fmt.Errorf("hyprland-workspaces: empty-color: %w", err)
-		}
-		cfg.EmptyColor = cv
-	}
-	if doc.ActiveIndicator != "" {
-		cfg.ActiveIndicator = ActiveIndicator(doc.ActiveIndicator)
-	}
-	if doc.Numbering != "" {
-		cfg.Numbering = WorkspacesNumbering(doc.Numbering)
-	}
-	if doc.LabelSize.value != nil {
-		if err := cfg.LabelSize.unmarshal(doc.LabelSize.value, "label-size"); err != nil {
-			return cfg, err
+	s := &cfg.Shared
+	for _, b := range []struct {
+		raw    *bool
+		target *bool
+	}{
+		{doc.MonitorSpecific, &s.MonitorSpecific},
+		{doc.ShowSpecial, &cfg.ShowSpecial},
+		{doc.UrgentShow, &s.UrgentShow},
+		{doc.LabelUseName, &cfg.LabelUseName},
+		{doc.AppIconsShow, &s.AppIconsShow},
+		{doc.AppIconsDedupe, &s.AppIconsDedupe},
+		{doc.HighlightOther, &cfg.HighlightActiveOnOtherMonitor},
+		{doc.BorderShow, &s.BorderShow},
+	} {
+		if b.raw != nil {
+			*b.target = *b.raw
 		}
 	}
-	if doc.WorkspacePad.value != nil {
-		if err := cfg.WorkspacePad.unmarshal(doc.WorkspacePad.value, "workspace-padding"); err != nil {
-			return cfg, err
+	for _, str := range []struct {
+		raw    *string
+		target *string
+	}{
+		{doc.Divider, &s.Divider},
+		{doc.AppIconsFallback, &s.AppIconsFallback},
+		{doc.AppIconsEmpty, &s.AppIconsEmpty},
+	} {
+		if str.raw != nil {
+			*str.target = *str.raw
 		}
 	}
 	if doc.MinWorkspace != nil {
+		if *doc.MinWorkspace < 0 || *doc.MinWorkspace > 255 {
+			return cfg, fmt.Errorf("%s: min-workspace-count %d outside 0-255", module, *doc.MinWorkspace)
+		}
 		cfg.MinWorkspace = *doc.MinWorkspace
 	}
-	if doc.LabelUseName != nil {
-		cfg.LabelUseName = *doc.LabelUseName
+	if doc.DisplayMode != nil {
+		s.DisplayMode = WorkspacesDisplayMode(*doc.DisplayMode)
 	}
-	if doc.ShowSpecial != nil {
-		cfg.ShowSpecial = *doc.ShowSpecial
+	if doc.UrgentMode != nil {
+		s.UrgentMode = UrgentMode(*doc.UrgentMode)
 	}
-	if doc.MonitorSpecific != nil {
-		cfg.MonitorSpecific = *doc.MonitorSpecific
+	if doc.Numbering != nil {
+		cfg.Numbering = WorkspacesNumbering(*doc.Numbering)
 	}
-	if doc.Divider != nil {
-		cfg.Divider = *doc.Divider
+	if doc.ActiveIndicator != nil {
+		s.ActiveIndicator = ActiveIndicator(*doc.ActiveIndicator)
+	}
+	for _, sz := range []struct {
+		key    string
+		raw    tomlValue
+		target *Size
+	}{
+		{"icon-gap", doc.IconGap, &s.IconGap},
+		{"workspace-padding", doc.WorkspacePad, &s.WorkspacePad},
+		{"icon-size", doc.IconSize, &s.IconSize},
+		{"label-size", doc.LabelSize, &s.LabelSize},
+	} {
+		if err := parseSizeKey(module, sz.key, sz.raw, sz.target); err != nil {
+			return cfg, err
+		}
+	}
+	if doc.WorkspaceIgnore != nil {
+		s.WorkspaceIgnore = doc.WorkspaceIgnore
+	}
+	for _, c := range []struct {
+		key    string
+		raw    string
+		target *ColorValue
+	}{
+		{"active-color", doc.ActiveColor, &s.ActiveColor},
+		{"occupied-color", doc.OccupiedColor, &s.OccupiedColor},
+		{"empty-color", doc.EmptyColor, &s.EmptyColor},
+		{"container-bg-color", doc.ContainerBgColor, &s.ContainerBgColor},
+		{"border-color", doc.BorderColor, &s.BorderColor},
+		{"active-on-other-monitor-color", doc.ActiveOtherColor, &cfg.ActiveOnOtherMonitorColor},
+	} {
+		if err := parseColorKey(module, c.key, c.raw, c.target); err != nil {
+			return cfg, err
+		}
 	}
 	if doc.WorkspaceMap != nil {
-		cfg.WorkspaceMap = map[int]WorkspaceStyle{}
-		ids := make([]string, 0, len(doc.WorkspaceMap))
-		for key := range doc.WorkspaceMap {
-			ids = append(ids, key)
-		}
-		sort.Strings(ids)
-		for _, key := range ids {
-			id, err := strconv.Atoi(key)
+		s.WorkspaceMap = map[string]NamedWorkspaceStyle{}
+		for key, raw := range doc.WorkspaceMap {
+			// WorkspaceMap(BTreeMap<i32, _>): keys are workspace ids.
+			id, err := strconv.ParseInt(key, 10, 32)
 			if err != nil {
-				return cfg, fmt.Errorf("hyprland-workspaces: workspace-map key %q is not a workspace id", key)
+				return cfg, fmt.Errorf("%s: workspace-map key %q is not a workspace id", module, key)
 			}
-			style := WorkspaceStyle{}
-			if table, ok := doc.WorkspaceMap[key].value.(map[string]any); ok {
-				if icon, ok := table["icon"].(string); ok {
-					style.Icon = icon
-				}
-				if color, ok := table["color"].(string); ok {
-					cv, err := ParseColorValue(color)
-					if err != nil {
-						return cfg, fmt.Errorf("hyprland-workspaces: workspace-map[%s] color: %w", key, err)
-					}
-					style.Color, style.ColorSet = cv, true
-				}
+			style, err := parseNamedWorkspaceStyle(raw.value)
+			if err != nil {
+				return cfg, fmt.Errorf("%s: workspace-map[%s]: %w", module, key, err)
 			}
-			cfg.WorkspaceMap[id] = style
+			s.WorkspaceMap[strconv.FormatInt(id, 10)] = style
 		}
 	}
+	if doc.AppIconMap != nil {
+		s.AppIconMap = doc.AppIconMap
+	}
+	doc.apply(&s.Click)
 
 	switch {
-	case cfg.DisplayMode != DisplayModeLabel && cfg.DisplayMode != DisplayModeNone:
-		return cfg, fmt.Errorf("hyprland-workspaces: display-mode %q not supported (want label or none; icons are not ported yet)", cfg.DisplayMode)
-	case cfg.ActiveIndicator != ActiveBackground && cfg.ActiveIndicator != ActiveUnderline:
-		return cfg, fmt.Errorf("hyprland-workspaces: invalid active-indicator %q (want background|underline)", cfg.ActiveIndicator)
+	case s.DisplayMode != DisplayModeLabel && s.DisplayMode != DisplayModeIcon && s.DisplayMode != DisplayModeNone:
+		return cfg, fmt.Errorf("%s: invalid display-mode %q (want label|icon|none)", module, s.DisplayMode)
+	case s.ActiveIndicator != ActiveBackground && s.ActiveIndicator != ActiveUnderline:
+		return cfg, fmt.Errorf("%s: invalid active-indicator %q (want background|underline)", module, s.ActiveIndicator)
 	case cfg.Numbering != NumberingAbsolute && cfg.Numbering != NumberingRelative:
-		return cfg, fmt.Errorf("hyprland-workspaces: invalid numbering %q (want absolute|relative)", cfg.Numbering)
-	case cfg.MinWorkspace < 0 || cfg.MinWorkspace > 255:
-		return cfg, fmt.Errorf("hyprland-workspaces: min-workspace-count %d outside 0-255", cfg.MinWorkspace)
+		return cfg, fmt.Errorf("%s: invalid numbering %q (want absolute|relative)", module, cfg.Numbering)
+	case s.UrgentMode != UrgentWorkspace && s.UrgentMode != UrgentApplication:
+		return cfg, fmt.Errorf("%s: invalid urgent-mode %q (want workspace|application)", module, s.UrgentMode)
 	}
 	return cfg, nil
 }

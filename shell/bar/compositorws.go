@@ -27,6 +27,9 @@ type cwsFlavor int
 const (
 	cwsWorkspaces cwsFlavor = iota
 	cwsTags
+	// cwsHyprland is hyprland_workspaces/: the module builds its own
+	// models; the flavor picks its identity rules and custom-icon class.
+	cwsHyprland
 )
 
 // cwsWorkspace is filtering.rs's WorkspaceSnapshot. num is sway's
@@ -248,6 +251,10 @@ func cwsOverrideColor(classes []string, m map[string]config.NamedWorkspaceStyle)
 		if id, err := strconv.ParseUint(key, 10, 64); err == nil && has[cwsIDClass(id)] {
 			match = true
 		}
+		// hyprland's workspace-map is keyed by the (signed) id.
+		if id, err := strconv.Atoi(key); err == nil && has[hyprIDClass(id)] {
+			match = true
+		}
 		// mango's tag_map_css_class: a numeric key targets tag-N.
 		if index, err := strconv.ParseUint(key, 10, 32); err == nil && has[cwsTagClass(index)] {
 			match = true
@@ -448,6 +455,11 @@ func (m cwsButtonModel) showLabel(mode config.WorkspacesDisplayMode) bool {
 	if !m.hasLabel || m.label == "" {
 		return false
 	}
+	if m.flavor == cwsHyprland {
+		// populate_identity: a mapped icon, else the label; nothing
+		// under display-mode none.
+		return mode != config.DisplayModeNone && m.icon == ""
+	}
 	if m.flavor == cwsTags {
 		switch mode {
 		case config.DisplayModeLabel:
@@ -466,10 +478,17 @@ func (m cwsButtonModel) showIcon(mode config.WorkspacesDisplayMode) bool {
 	if m.flavor == cwsTags {
 		return mode == config.DisplayModeIcon && m.icon != ""
 	}
+	if m.flavor == cwsHyprland {
+		return mode != config.DisplayModeNone && m.icon != ""
+	}
 	return m.icon != "" && mode != config.DisplayModeNone
 }
 
-// showDivider is show_divider.
+// showDivider is show_divider (hyprland: should_show_divider, which
+// only looks at the display mode).
 func (m cwsButtonModel) showDivider(cfg config.CompositorWorkspacesConfig) bool {
+	if m.flavor == cwsHyprland {
+		return cfg.AppIconsShow && cfg.Divider != "" && cfg.DisplayMode != config.DisplayModeNone
+	}
 	return cfg.AppIconsShow && cfg.Divider != "" && (m.showLabel(cfg.DisplayMode) || m.showIcon(cfg.DisplayMode))
 }

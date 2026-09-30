@@ -97,7 +97,7 @@ func TestLoadFileSwayWorkspacesDoesNotTouchHyprland(t *testing.T) {
 	if cfg.SwayWorkspaces.MonitorSpecific || cfg.SwayWorkspaces.LabelStrategy != LabelIndex {
 		t.Errorf("sway config not applied: %+v", cfg.SwayWorkspaces)
 	}
-	if !cfg.HyprlandWorkspaces.MonitorSpecific {
+	if !cfg.HyprlandWorkspaces.Shared.MonitorSpecific {
 		t.Error("sway-workspaces overwrote hyprland-workspaces")
 	}
 }

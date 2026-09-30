@@ -40,15 +40,34 @@ type cwsBackend interface {
 	close()
 }
 
-// cwsModule is the sway/niri workspaces component: the container, its
-// buttons rebuilt from the latest snapshot, and the urgent blink.
+// cwsActions are the compositor requests the bindings map to.
+type cwsActions struct {
+	focus    func(ctx context.Context, ws cwsWorkspace) error
+	next     func(ctx context.Context) error
+	previous func(ctx context.Context) error
+	last     func(ctx context.Context) error
+}
+
+// cwsView is what the container and button widgets read: the module
+// context and shared config, the resolved face, and the actions. The
+// sway/niri/mango module and the hyprland module each carry one.
+type cwsView struct {
+	ctx      ModuleContext
+	cfg      config.CompositorWorkspacesConfig
+	kind     string
+	flavor   cwsFlavor
+	boldFace render.Font
+	root     *cwsContainer
+	actions  cwsActions
+	// otherMonitor is hyprland's active-on-other-monitor-color.
+	otherMonitor config.ColorValue
+}
+
+// cwsModule is the sway/niri/mango workspaces component: the container,
+// its buttons rebuilt from the latest snapshot, and the urgent blink.
 type cwsModule struct {
-	ctx     ModuleContext
-	cfg     config.CompositorWorkspacesConfig
-	kind    string
-	flavor  cwsFlavor
+	cwsView
 	backend cwsBackend
-	root    *cwsContainer
 
 	workspaces []cwsWorkspace
 	windows    []cwsWindow
@@ -58,15 +77,15 @@ type cwsModule struct {
 	blinkStop  func()
 	urgentSeen bool
 	stopEvents func()
-	boldFace   render.Font
 }
 
 // newCwsModule builds the module over a connected backend and, with a
 // live loop, subscribes to its events.
 func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.CompositorWorkspacesConfig, backend cwsBackend) (*cwsModule, error) {
 	m := &cwsModule{ctx: ctx, cfg: cfg, kind: kind, flavor: flavor, backend: backend}
+	m.actions = cwsActions{focus: backend.focus, next: backend.focusNext, previous: backend.focusPrevious, last: backend.focusLast}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
-	m.root = newCwsContainer(m)
+	m.root = newCwsContainer(&m.cwsView)
 	if err := m.refresh(); err != nil {
 		backend.close()
 		return nil, err
@@ -171,7 +190,7 @@ func (m *cwsModule) stopBlink() {
 }
 
 // vertical reports a side-docked bar.
-func (m *cwsModule) vertical() bool {
+func (m *cwsView) vertical() bool {
 	if m.ctx.Config == nil {
 		return false
 	}
@@ -179,7 +198,7 @@ func (m *cwsModule) vertical() bool {
 	return loc == config.LocationLeft || loc == config.LocationRight
 }
 
-func (m *cwsModule) scale() float64 {
+func (m *cwsView) scale() float64 {
 	if m.ctx.Config == nil || m.ctx.Config.Bar.Scale <= 0 {
 		return 1
 	}
@@ -187,18 +206,18 @@ func (m *cwsModule) scale() float64 {
 }
 
 // labelPx is label-size resolved against LABEL_BASE_REM.
-func (m *cwsModule) labelPx() float64 {
+func (m *cwsView) labelPx() float64 {
 	return math.Round(m.cfg.LabelSize.ResolvePx(cwsLabelBaseRem*styling.RemBase, m.scale()))
 }
 
 // iconPx is icon-size resolved against ICON_BASE_REM.
-func (m *cwsModule) iconPx() int {
+func (m *cwsView) iconPx() int {
 	return int(math.Round(m.cfg.IconSize.ResolvePx(cwsIconBaseRem*styling.RemBase, m.scale())))
 }
 
 // iconGapPx is methods.rs's icon_gap_px: a scale is rem without the
 // bar scale, pixels are literal.
-func (m *cwsModule) iconGapPx() int {
+func (m *cwsView) iconGapPx() int {
 	if m.cfg.IconGap.Unit == config.SizePixels {
 		return int(math.Round(m.cfg.IconGap.Value))
 	}
@@ -206,14 +225,14 @@ func (m *cwsModule) iconGapPx() int {
 }
 
 // paddingPx is workspace-padding at a 1 rem base.
-func (m *cwsModule) paddingPx() int {
+func (m *cwsView) paddingPx() int {
 	return int(math.Round(m.cfg.WorkspacePad.ResolvePx(styling.RemBase, m.scale())))
 }
 
 // dispatchClick is dispatch_click_action for a clicked workspace.
-func (m *cwsModule) dispatchClick(action config.WorkspaceClickAction, ws cwsWorkspace) {
+func (m *cwsView) dispatchClick(action config.WorkspaceClickAction, ws cwsWorkspace) {
 	if action.Kind == config.WorkspaceClickFocusThis {
-		m.run(func(ctx context.Context) error { return m.backend.focus(ctx, ws) })
+		m.run(func(ctx context.Context) error { return m.actions.focus(ctx, ws) })
 		return
 	}
 	m.dispatchScroll(action)
@@ -221,17 +240,17 @@ func (m *cwsModule) dispatchClick(action config.WorkspaceClickAction, ws cwsWork
 
 // dispatchScroll is dispatch_scroll_action: focus:this needs a clicked
 // workspace, so scrolling ignores it.
-func (m *cwsModule) dispatchScroll(action config.WorkspaceClickAction) {
+func (m *cwsView) dispatchScroll(action config.WorkspaceClickAction) {
 	switch action.Kind {
 	case config.WorkspaceClickNone:
 	case config.WorkspaceClickFocusThis:
 		log.Printf("%s-workspaces: focus:this requires a clicked workspace; scroll ignored", m.kind)
 	case config.WorkspaceClickFocusNext:
-		m.run(m.backend.focusNext)
+		m.run(m.actions.next)
 	case config.WorkspaceClickFocusPrevious:
-		m.run(m.backend.focusPrevious)
+		m.run(m.actions.previous)
 	case config.WorkspaceClickFocusLast:
-		m.run(m.backend.focusLast)
+		m.run(m.actions.last)
 	case config.WorkspaceClickDropdown:
 		if m.ctx.Dropdowns != nil {
 			if err := m.ctx.Dropdowns.open(m.ctx.Connector, action.Arg, m.root); err != nil {
@@ -248,7 +267,7 @@ func (m *cwsModule) dispatchScroll(action config.WorkspaceClickAction) {
 
 // run fires one compositor request off the loop goroutine, like the
 // Rust tokio::spawn, logging a failure.
-func (m *cwsModule) run(fn func(context.Context) error) {
+func (m *cwsView) run(fn func(context.Context) error) {
 	go func() {
 		if err := fn(context.Background()); err != nil {
 			log.Printf("%s-workspaces: %v", m.kind, err)

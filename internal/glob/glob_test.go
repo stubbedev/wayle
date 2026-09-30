@@ -70,3 +70,40 @@ func TestFindWildcardFirstMatchWins(t *testing.T) {
 		t.Errorf("no pattern matches, got %q", got)
 	}
 }
+
+func TestGlob(t *testing.T) {
+	for _, tc := range []struct {
+		pattern, text string
+		want          bool
+	}{
+		{"1*", "10", true},
+		{"1?", "1", false},
+		{"[1-3]", "2", true},
+		{"[1-3]", "4", false},
+		{"[!1-3]", "4", true},
+		{"[!1-3]", "2", false},
+		{"[]a]", "]", true},
+		{"[!]a]", "b", true},
+		{"-*", "-99", true},
+		{"**", "anything/at/all", true},
+		{"*org*", "firefox.org.x", true},
+		{"Fire", "fire", false},
+		// Syntax errors never match.
+		{"[abc", "a", false},
+		{"***", "x", false},
+		{"a**", "ab", false},
+	} {
+		if got := Glob(tc.pattern, tc.text); got != tc.want {
+			t.Errorf("Glob(%q, %q) = %v, want %v", tc.pattern, tc.text, got, tc.want)
+		}
+	}
+}
+
+func TestFoldLowersTheText(t *testing.T) {
+	if !Fold("Firefox", "firefox") || !Fold("org.Mozilla.Firefox", "*firefox*") {
+		t.Error("case-folded text did not match")
+	}
+	if Fold("chromium", "*firefox*") {
+		t.Error("unrelated text matched")
+	}
+}
