@@ -32,24 +32,27 @@ import (
 // builds its tree without scheduling updates. Hyprland is nil when the
 // compositor is not Hyprland; Hyprland-only modules error in that case.
 type ModuleContext struct {
-	Config        *config.Config
-	App           *app.Application
-	Font          render.Font
-	Style         *barStyle
-	Hyprland      *hyprland.Connection
-	Battery       upower.Source
-	Brightness    brightness.Source
-	Pulse         pulse.Source
-	Media         mpris.Source
-	Bluetooth     bluetooth.Source
-	Network       network.Source
-	PowerProfiles powerprofiles.Source
-	IdleInhibit   *idleinhibit.State
-	Treeman       treeman.Source
-	Notifications *notifications.Service
-	Recorder      *recorder.State
-	Mail          *mail.Service
-	SNI           *sni.Store
+	Config     *config.Config
+	App        *app.Application
+	Font       render.Font
+	Style      *barStyle
+	Hyprland   *hyprland.Connection
+	Battery    upower.Source
+	Brightness brightness.Source
+	Pulse      pulse.Source
+	Media      mpris.Source
+	Bluetooth  bluetooth.Source
+	Network    network.Source
+	// NetworkService is the secret agent, VPNs, and wifi controls; nil
+	// without NetworkManager.
+	NetworkService *network.Service
+	PowerProfiles  powerprofiles.Source
+	IdleInhibit    *idleinhibit.State
+	Treeman        treeman.Source
+	Notifications  *notifications.Service
+	Recorder       *recorder.State
+	Mail           *mail.Service
+	SNI            *sni.Store
 	// Clipboard is the session clipboard history, nil when the
 	// compositor has no data-control protocol (the launcher's
 	// clipboard mode reads it).

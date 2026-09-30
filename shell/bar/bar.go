@@ -98,6 +98,12 @@ func RunWith(cfg *config.Config) error {
 		defer func() { _ = nm.Close() }()
 		baseCtx.Network = nm
 	}
+	if svc, stop, err := startNetworkService(); err == nil {
+		defer stop()
+		baseCtx.NetworkService = svc
+	} else {
+		log.Printf("network: %v", err)
+	}
 	if pp, err := powerprofiles.NewSystem(); err == nil {
 		defer func() { _ = pp.Close() }()
 		baseCtx.PowerProfiles = pp
@@ -138,6 +144,11 @@ func RunWith(cfg *config.Config) error {
 			} else {
 				log.Printf("audio: daemon: %v", err)
 			}
+		}
+		if release, err := exportShellIPC(conn); err == nil {
+			defer release()
+		} else {
+			log.Printf("shell ipc: %v", err)
 		}
 	}
 	stopMail := startMail(&baseCtx)
