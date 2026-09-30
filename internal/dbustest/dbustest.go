@@ -45,9 +45,16 @@ func Start(t *testing.T) *Bus {
 	if err != nil {
 		t.Fatalf("dbustest: dbus-daemon not on PATH: %v", err)
 	}
-	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "bus.conf")
-	if err := os.WriteFile(cfgPath, []byte(strings.ReplaceAll(config, "%DIR%", dir)), 0o600); err != nil {
+	// The socket lives in a short directory of its own: t.TempDir()
+	// embeds the test name, and a long one overflows sun_path's 108
+	// bytes, which dbus-daemon answers by exiting.
+	sockDir, err := os.MkdirTemp("", "dbt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(sockDir) })
+	cfgPath := filepath.Join(t.TempDir(), "bus.conf")
+	if err := os.WriteFile(cfgPath, []byte(strings.ReplaceAll(config, "%DIR%", sockDir)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cmd := exec.Command(daemon, "--config-file="+cfgPath, "--nofork", "--print-address=1") //nolint:gosec // the daemon path comes from PATH lookup in a test

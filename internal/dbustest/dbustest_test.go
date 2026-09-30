@@ -10,6 +10,16 @@ type echo struct{}
 
 func (echo) Echo(s string) (string, *dbus.Error) { return s, nil }
 
+// The name is long on purpose: t.TempDir() embeds it, and a socket
+// under that path would overflow sun_path.
+func TestAPrivateBusStartsEvenWhenTheTestNameIsFarLongerThanAUnixSocketPathMayBeWithoutBeingTruncated(t *testing.T) {
+	bus := Start(t)
+	if bus.Address == "" {
+		t.Fatal("no address")
+	}
+	_ = bus.Conn(t)
+}
+
 func TestPrivateBusCarriesCallsBetweenPeers(t *testing.T) {
 	bus := Start(t)
 	server := bus.Conn(t)
