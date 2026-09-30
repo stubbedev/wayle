@@ -164,3 +164,27 @@ func TestLoadFileAppliesAndRejectsClickBindings(t *testing.T) {
 		t.Error("bad delta: want a load error")
 	}
 }
+
+// The real input path: gelm's Router hit-tests the tree and drives the
+// hit leaf, so a routed left press must reach the binding and a hover
+// must shade the button.
+func TestWrapActionsRoutesThroughTheRouter(t *testing.T) {
+	binding := config.ClickConfig{LeftClick: config.MustClickAction("left")}
+	button, rec := newWrappedModule(t, binding)
+	button.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 50}})
+	button.Arrange(render.Rect{X: 0, Y: 0, W: 100, H: 30})
+	router := &widget.Router{Root: button}
+	p := widget.Point{X: 10, Y: 10}
+	router.Move(p)
+	if !button.inner.Hovered {
+		t.Fatal("routed hover did not shade the button")
+	}
+	router.Press(widget.BTNLeft, p)
+	if !button.inner.Pressed {
+		t.Fatal("routed press did not shade the button")
+	}
+	router.Release(widget.BTNLeft, p)
+	if len(rec.actions) != 1 || rec.actions[0].Command != "left" {
+		t.Fatalf("routed left click dispatched %+v, want the left binding", rec.actions)
+	}
+}

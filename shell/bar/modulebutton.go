@@ -61,6 +61,18 @@ func (a *actionButton) Paint(cv *render.Canvas) { a.inner.Paint(cv) }
 
 func (a *actionButton) HitTest(p widget.Point) widget.Widget { return a.HitLeaf(a, p) }
 
+// The wrapper is the router's hit leaf, so the primary-button protocol
+// (hover and pressed shades, the click) forwards to the inner button.
+
+// SetHovered implements widget.HoverSetter.
+func (a *actionButton) SetHovered(on bool) { a.inner.SetHovered(on) }
+
+// SetPressed implements widget.PressSetter.
+func (a *actionButton) SetPressed(on bool) { a.inner.SetPressed(on) }
+
+// ClickAt implements widget.Clicker: the left binding.
+func (a *actionButton) ClickAt(p widget.Point) { a.inner.ClickAt(p) }
+
 // PointerButton routes middle and right presses; with no bindings the
 // hooks pass through unconsumed.
 func (a *actionButton) PointerButton(button uint32) {
