@@ -2,6 +2,7 @@ package bar
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -123,6 +124,8 @@ func RunWith(cfg *config.Config) error {
 	} else {
 		log.Printf("systray: host: %v", err)
 	}
+	customUpd := newCustomUpdates()
+	baseCtx.CustomUpdates = customUpd
 	baseCtx.Attachers = &[]interface{ Attach(app.Host) }{}
 	if conn, err := dbus.ConnectSessionBus(); err == nil {
 		defer func() { _ = conn.Close() }()
@@ -181,6 +184,18 @@ func RunWith(cfg *config.Config) error {
 			if err := osdSrv.ShowToast(req); err != nil {
 				log.Printf("toast: %v", err)
 			}
+		}
+	}()
+	go func() {
+		for raw := range widgetSrv.Updates() {
+			var params struct {
+				ID     string `json:"id"`
+				Output string `json:"output"`
+			}
+			if err := json.Unmarshal(raw, &params); err != nil {
+				continue
+			}
+			customUpd.dispatch(params.ID, params.Output)
 		}
 	}()
 	return application.Run()

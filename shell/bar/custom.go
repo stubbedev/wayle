@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/stubbedev/gelm/widget"
@@ -136,6 +137,47 @@ type customModule struct {
 	cancel context.CancelFunc
 }
 
+// customUpdates routes widget.update pushes to the module with the
+// target id. RunWith owns one; modules register at construction.
+type customUpdates struct {
+	mu      sync.Mutex
+	modules map[string]*customModule
+}
+
+func newCustomUpdates() *customUpdates {
+	return &customUpdates{modules: make(map[string]*customModule)}
+}
+
+func (c *customUpdates) register(m *customModule) {
+	c.mu.Lock()
+	c.modules[m.def.ID] = m
+	c.mu.Unlock()
+}
+
+func (c *customUpdates) unregister(m *customModule) {
+	c.mu.Lock()
+	if cur, ok := c.modules[m.def.ID]; ok && cur == m {
+		delete(c.modules, m.def.ID)
+	}
+	c.mu.Unlock()
+}
+
+// dispatch applies one push; an unknown id is a quiet no-op (the
+// Rust shell drops it the same way). Headless modules apply inline.
+func (c *customUpdates) dispatch(id, output string) {
+	c.mu.Lock()
+	m := c.modules[id]
+	c.mu.Unlock()
+	if m == nil {
+		return
+	}
+	if m.ctx.App == nil {
+		m.apply(output)
+		return
+	}
+	m.ctx.Invoke(func() { m.apply(output) })
+}
+
 // newCustomByID resolves the definition behind a "custom-<id>" layout
 // entry.
 func newCustomByID(ctx ModuleContext, id string) (Module, error) {
@@ -152,6 +194,9 @@ func newCustom(ctx ModuleContext, def config.CustomModuleConfig) (Module, error)
 	}
 	m := &customModule{ctx: ctx, def: def}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	if ctx.CustomUpdates != nil {
+		ctx.CustomUpdates.register(m)
+	}
 	runCtx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
 	switch def.Mode {
@@ -252,10 +297,13 @@ func (m *customModule) Root() widget.Widget {
 	return assembleModule(m.ctx, m.def.Icon, m.label)
 }
 
-// Stop releases the poll/watch goroutine.
+// Stop releases the poll/watch goroutine and the update registration.
 func (m *customModule) Stop() {
 	if m.cancel != nil {
 		m.cancel()
+	}
+	if m.ctx.CustomUpdates != nil {
+		m.ctx.CustomUpdates.unregister(m)
 	}
 }
 

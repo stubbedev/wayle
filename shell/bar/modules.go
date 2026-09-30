@@ -47,6 +47,7 @@ type ModuleContext struct {
 	Notifications *notifications.Service
 	Recorder      *recorder.State
 	SNI           *sni.Store
+	CustomUpdates *customUpdates
 	// Attachers collects modules that need the live layer surface
 	// (idle-inhibit binds its inhibitor to it); RunWith calls Attach
 	// on each once the layer exists.
