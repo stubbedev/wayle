@@ -202,8 +202,8 @@ func applyContainer(md toml.MetaData, prim toml.Primitive, defaults ContainerCon
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return defaults, err
 	}
-	setIf(doc.BorderShow, &defaults.BorderShow)
-	setIf(doc.BorderColor, &defaults.BorderColor)
-	setIf(doc.ButtonBgColor, &defaults.Background)
+	setIf(&defaults.BorderShow, doc.BorderShow)
+	setIf(&defaults.BorderColor, doc.BorderColor)
+	setIf(&defaults.Background, doc.ButtonBgColor)
 	return defaults, nil
 }

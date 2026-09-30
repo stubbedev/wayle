@@ -198,13 +198,13 @@ func applyLock(md toml.MetaData, prim toml.Primitive, base LockConfig) (LockConf
 	if err := doc.apply("lock", &cfg.Background, &cfg.Clock); err != nil {
 		return base, err
 	}
-	setIf(doc.Enabled, &cfg.Enabled)
-	setIf(doc.LockOnStart, &cfg.LockOnStart)
-	setIf(doc.Blur, &cfg.Blur)
-	setIf(doc.GracePeriodMS, &cfg.GracePeriodMS)
-	setIf(doc.MaxAttempts, &cfg.MaxAttempts)
-	setIf(doc.ShowFailedAttempts, &cfg.ShowFailedAttempts)
-	setIf(doc.BlankTimeoutMS, &cfg.BlankTimeoutMS)
-	setIf(doc.PamService, &cfg.PamService)
+	setIf(&cfg.Enabled, doc.Enabled)
+	setIf(&cfg.LockOnStart, doc.LockOnStart)
+	setIf(&cfg.Blur, doc.Blur)
+	setIf(&cfg.GracePeriodMS, doc.GracePeriodMS)
+	setIf(&cfg.MaxAttempts, doc.MaxAttempts)
+	setIf(&cfg.ShowFailedAttempts, doc.ShowFailedAttempts)
+	setIf(&cfg.BlankTimeoutMS, doc.BlankTimeoutMS)
+	setIf(&cfg.PamService, doc.PamService)
 	return cfg, nil
 }

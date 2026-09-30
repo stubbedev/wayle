@@ -67,7 +67,7 @@ func applyVolume(md toml.MetaData, prim toml.Primitive) (VolumeConfig, error) {
 	if doc.IconMuted != nil {
 		cfg.IconMuted = *doc.IconMuted
 	}
-	setIf(doc.Thresholds, &cfg.Thresholds)
+	setIf(&cfg.Thresholds, doc.Thresholds)
 	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
 	if err != nil {
 		return cfg, err

@@ -408,7 +408,7 @@ func (c *Config) applyTOML(data []byte) error {
 		}
 		c.Clock.Click = clicks
 		c.Clock.Button = button
-		setIf(clock.Format, &c.Clock.Format)
+		setIf(&c.Clock.Format, clock.Format)
 	}
 	if doc.Modules != nil && doc.Modules.CPU != nil {
 		cpu, err := applyCpu(md, *doc.Modules.CPU)
@@ -706,12 +706,12 @@ func (b barDoc) toBar() (Bar, error) {
 	if b.Layer != "" {
 		bar.Layer = Layer(b.Layer)
 	}
-	setIf(b.Exclusive, &bar.Exclusive)
-	setIf(b.Shadow, &bar.Shadow)
-	setIf(b.ButtonVariant, &bar.ButtonVariant)
-	setIf(b.ButtonLabelWeight, &bar.ButtonLabelWeight)
-	setIf(b.ButtonIconPosition, &bar.ButtonIconPosition)
-	setIf(b.DropdownShadow, &bar.DropdownShadow)
+	setIf(&bar.Exclusive, b.Exclusive)
+	setIf(&bar.Shadow, b.Shadow)
+	setIf(&bar.ButtonVariant, b.ButtonVariant)
+	setIf(&bar.ButtonLabelWeight, b.ButtonLabelWeight)
+	setIf(&bar.ButtonIconPosition, b.ButtonIconPosition)
+	setIf(&bar.DropdownShadow, b.DropdownShadow)
 	for _, pct := range []struct {
 		raw *int
 		dst *int

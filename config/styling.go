@@ -143,26 +143,19 @@ func applyStyling(md toml.MetaData, prim toml.Primitive) (StylingConfig, error) 
 		}
 		cfg.Rounding = level
 	}
-	setIf(doc.Appearance, &cfg.Appearance)
-	setIf(doc.PaletteBaseTheme, &cfg.PaletteBaseTheme)
+	setIf(&cfg.Appearance, doc.Appearance)
+	setIf(&cfg.PaletteBaseTheme, doc.PaletteBaseTheme)
 	if p := doc.Palette; p != nil {
-		setIf(p.Bg, &cfg.Palette.Bg)
-		setIf(p.Surface, &cfg.Palette.Surface)
-		setIf(p.Elevated, &cfg.Palette.Elevated)
-		setIf(p.Fg, &cfg.Palette.Fg)
-		setIf(p.FgMuted, &cfg.Palette.FgMuted)
-		setIf(p.Primary, &cfg.Palette.Primary)
-		setIf(p.Red, &cfg.Palette.Red)
-		setIf(p.Yellow, &cfg.Palette.Yellow)
-		setIf(p.Green, &cfg.Palette.Green)
-		setIf(p.Blue, &cfg.Palette.Blue)
+		setIf(&cfg.Palette.Bg, p.Bg)
+		setIf(&cfg.Palette.Surface, p.Surface)
+		setIf(&cfg.Palette.Elevated, p.Elevated)
+		setIf(&cfg.Palette.Fg, p.Fg)
+		setIf(&cfg.Palette.FgMuted, p.FgMuted)
+		setIf(&cfg.Palette.Primary, p.Primary)
+		setIf(&cfg.Palette.Red, p.Red)
+		setIf(&cfg.Palette.Yellow, p.Yellow)
+		setIf(&cfg.Palette.Green, p.Green)
+		setIf(&cfg.Palette.Blue, p.Blue)
 	}
 	return cfg, nil
-}
-
-// setIf overlays one decoded optional key onto its default.
-func setIf[T any](raw *T, dst *T) {
-	if raw != nil {
-		*dst = *raw
-	}
 }

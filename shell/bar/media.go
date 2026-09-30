@@ -79,7 +79,7 @@ func liveMediaIconEnv() mediaIconEnv {
 	return mediaIconEnv{
 		exists: widget.ThemeIconExists,
 		desktopIcon: func(entry string) (string, bool) {
-			return desktopentry.Icon(entry, desktopentry.Dirs())
+			return desktopentry.Icon(entry, desktopentry.ApplicationDirs())
 		},
 	}
 }

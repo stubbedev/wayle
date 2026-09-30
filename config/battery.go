@@ -83,7 +83,7 @@ func applyBattery(md toml.MetaData, prim toml.Primitive) (BatteryConfig, error) 
 	if doc.ChargingIcon != nil {
 		cfg.ChargingIcon = *doc.ChargingIcon
 	}
-	setIf(doc.Thresholds, &cfg.Thresholds)
+	setIf(&cfg.Thresholds, doc.Thresholds)
 	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
 	if err != nil {
 		return cfg, err

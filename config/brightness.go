@@ -55,7 +55,7 @@ func applyBrightness(md toml.MetaData, prim toml.Primitive) (BrightnessConfig, e
 	if doc.EnableExt != nil {
 		cfg.EnableExt = *doc.EnableExt
 	}
-	setIf(doc.Thresholds, &cfg.Thresholds)
+	setIf(&cfg.Thresholds, doc.Thresholds)
 	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
 	if err != nil {
 		return cfg, err

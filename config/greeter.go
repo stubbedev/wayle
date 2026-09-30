@@ -61,8 +61,8 @@ func applyGreeter(md toml.MetaData, prim toml.Primitive, base GreeterConfig) (Gr
 	if err := doc.apply("greeter", &cfg.Background, &cfg.Clock); err != nil {
 		return base, err
 	}
-	setIf(doc.ShowUserList, &cfg.ShowUserList)
-	setIf(doc.ShowPowerButtons, &cfg.ShowPowerButtons)
+	setIf(&cfg.ShowUserList, doc.ShowUserList)
+	setIf(&cfg.ShowPowerButtons, doc.ShowPowerButtons)
 	if doc.CursorTheme != nil {
 		cfg.CursorTheme = *doc.CursorTheme
 		cfg.CursorThemeExplicit = true

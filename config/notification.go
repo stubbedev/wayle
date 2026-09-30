@@ -138,7 +138,7 @@ func applyNotification(md toml.MetaData, prim toml.Primitive) (NotificationConfi
 	if doc.PopupHoverPause != nil {
 		cfg.PopupHoverPause = *doc.PopupHoverPause
 	}
-	setIf(doc.Thresholds, &cfg.Thresholds)
+	setIf(&cfg.Thresholds, doc.Thresholds)
 	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
 	if err != nil {
 		return cfg, err
