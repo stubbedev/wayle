@@ -4,8 +4,8 @@
 // the frequency range on a log scale (with the bass split onto a
 // double-size FFT), Execute turns PCM frames into 0..1 bar heights with
 // cava's gravity falloff and integral smoothing, and the autosens
-// feedback keeps the output normalized. Capture comes from a pw-record
-// subprocess, keeping the module pure Go.
+// feedback keeps the output normalized. Capture is a record stream on
+// the shell's PulseAudio native client (source.go).
 package cava
 
 import (
