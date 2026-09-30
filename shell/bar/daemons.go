@@ -6,6 +6,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/wayle/service/powerprofiles"
+	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/sni"
 )
 
@@ -31,6 +32,10 @@ func serveCLIDaemons(ctx ModuleContext, tray *sni.Host) func() {
 	if ctx.PowerProfiles != nil {
 		release, err := powerprofiles.ServeDaemon(conn, ctx.PowerProfiles)
 		serve("power-profiles", release, err)
+	}
+	if mixer, ok := ctx.Pulse.(pulse.Mixer); ok {
+		release, err := pulse.ServeDaemon(conn, mixer)
+		serve("audio", release, err)
 	}
 	if tray != nil {
 		release, err := sni.ServeDaemon(conn, ctx.SNI, tray.Actions(), tray.IsWatcher())

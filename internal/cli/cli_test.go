@@ -40,56 +40,6 @@ func TestDidYouMeanThresholdAndOrder(t *testing.T) {
 	}
 }
 
-func TestParseRustI64(t *testing.T) {
-	for in, want := range map[string]int64{"0": 0, "42": 42, "+7": 7, "-3": -3} {
-		if got, msg := parseRustI64(in); msg != "" || got != want {
-			t.Errorf("%q -> %d %q", in, got, msg)
-		}
-	}
-	for in, want := range map[string]string{
-		"":                      "cannot parse integer from empty string",
-		"abc":                   "invalid digit found in string",
-		"-":                     "invalid digit found in string",
-		"+-1":                   "invalid digit found in string",
-		"1_000":                 "invalid digit found in string",
-		" 1":                    "invalid digit found in string",
-		"99999999999999999999":  "number too large to fit in target type",
-		"-99999999999999999999": "number too small to fit in target type",
-	} {
-		if _, msg := parseRustI64(in); msg != want {
-			t.Errorf("%q: got %q, want %q", in, msg, want)
-		}
-	}
-}
-
-func TestParseRustF64(t *testing.T) {
-	for in, want := range map[string]float64{"1.5": 1.5, "+2": 2, ".5": 0.5, "3.": 3, "1e3": 1000, "-0": 0} {
-		if got, msg := parseRustF64(in); msg != "" || got != want {
-			t.Errorf("%q -> %v %q", in, got, msg)
-		}
-	}
-	if got, msg := parseRustF64("inf"); msg != "" || !math.IsInf(got, 1) {
-		t.Errorf("inf -> %v %q", got, msg)
-	}
-	if got, msg := parseRustF64("1e999"); msg != "" || !math.IsInf(got, 1) {
-		t.Errorf("overflow saturates like Rust: %v %q", got, msg)
-	}
-	for in, want := range map[string]string{
-		"":      "cannot parse float from empty string",
-		"abc":   "invalid float literal",
-		"0x10":  "invalid float literal",
-		"1_0":   "invalid float literal",
-		".":     "invalid float literal",
-		"1e":    "invalid float literal",
-		" 1.0":  "invalid float literal",
-		"0x1p3": "invalid float literal",
-	} {
-		if _, msg := parseRustF64(in); msg != want {
-			t.Errorf("%q: got %q, want %q", in, msg, want)
-		}
-	}
-}
-
 func TestColorChoice(t *testing.T) {
 	env := func(vars map[string]string) func(string) (string, bool) {
 		return func(k string) (string, bool) { v, ok := vars[k]; return v, ok }

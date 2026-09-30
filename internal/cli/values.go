@@ -1,10 +1,9 @@
 package cli
 
 import (
-	"errors"
-	"regexp"
 	"strconv"
-	"strings"
+
+	"github.com/stubbedev/wayle/internal/rustparse"
 )
 
 // ValueParser turns one raw command-line value into its typed form
@@ -46,9 +45,9 @@ var Path ValueParser = pathParser{}
 type u32Parser struct{}
 
 func (u32Parser) parse(_ *cmd, a *arg, raw string) (any, *Error) {
-	v, msg := parseRustI64(raw)
-	if msg != "" {
-		return nil, valueValidationError(a.String(), raw, msg)
+	v, err := rustparse.Int(raw, 64)
+	if err != nil {
+		return nil, valueValidationError(a.String(), raw, err.Error())
 	}
 	if v < 0 || v > 1<<32-1 {
 		return nil, valueValidationError(a.String(), raw, strconv.FormatInt(v, 10)+" is not in 0..=4294967295")
@@ -64,9 +63,9 @@ var U32 ValueParser = u32Parser{}
 type f64Parser struct{}
 
 func (f64Parser) parse(_ *cmd, a *arg, raw string) (any, *Error) {
-	v, msg := parseRustF64(raw)
-	if msg != "" {
-		return nil, valueValidationError(a.String(), raw, msg)
+	v, err := rustparse.Float(raw)
+	if err != nil {
+		return nil, valueValidationError(a.String(), raw, err.Error())
 	}
 	return v, nil
 }
@@ -92,53 +91,3 @@ func (e enumParser) possibleValues() []PossibleValue { return e.values }
 // Enum accepts exactly one of values (a clap ValueEnum); the parsed
 // value is the matching Name.
 func Enum(values ...PossibleValue) ValueParser { return enumParser{values: values} }
-
-// parseRustI64 is str::parse::<i64>: an optional sign, ASCII digits,
-// and Rust's ParseIntError messages.
-func parseRustI64(s string) (int64, string) {
-	if s == "" {
-		return 0, "cannot parse integer from empty string"
-	}
-	digits := s
-	if digits[0] == '+' || digits[0] == '-' {
-		digits = digits[1:]
-	}
-	if digits == "" {
-		return 0, "invalid digit found in string"
-	}
-	for _, r := range digits {
-		if r < '0' || r > '9' {
-			return 0, "invalid digit found in string"
-		}
-	}
-	v, err := strconv.ParseInt(s, 10, 64)
-	if errors.Is(err, strconv.ErrRange) {
-		if strings.HasPrefix(s, "-") {
-			return 0, "number too small to fit in target type"
-		}
-		return 0, "number too large to fit in target type"
-	}
-	if err != nil {
-		return 0, "invalid digit found in string"
-	}
-	return v, ""
-}
-
-// rustFloat is f64::from_str's grammar: decimal digits with an optional
-// fraction and exponent, or inf/infinity/nan in any case, all with an
-// optional sign. Unlike strconv it takes no hex floats or underscores.
-var rustFloat = regexp.MustCompile(`^[+-]?(?:(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|(?i:inf|infinity|nan))$`)
-
-func parseRustF64(s string) (float64, string) {
-	if s == "" {
-		return 0, "cannot parse float from empty string"
-	}
-	if !rustFloat.MatchString(s) {
-		return 0, "invalid float literal"
-	}
-	v, err := strconv.ParseFloat(s, 64)
-	if err != nil && !errors.Is(err, strconv.ErrRange) {
-		return 0, "invalid float literal"
-	}
-	return v, "" // out of range is ±inf or 0, as in Rust
-}
