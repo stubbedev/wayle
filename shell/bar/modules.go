@@ -68,6 +68,9 @@ type ModuleContext struct {
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
 	Connector string
+	// Screenshot starts a capture on the in-process screenshot host
+	// (the `wayle screenshot ...` builtin); nil before the host is up.
+	Screenshot func(mode, target string)
 }
 
 // Invoke marshals fn onto the loop goroutine; a no-op when the context
@@ -131,6 +134,7 @@ var factories = map[string]Factory{
 	"sway-workspaces":     newSwayWorkspaces,
 	"niri-workspaces":     newNiriWorkspaces,
 	"mango-workspaces":    newMangoWorkspaces,
+	"screenshot":          newScreenshot,
 	"separator":           newSeparator,
 }
 
@@ -250,6 +254,8 @@ func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
 		return cfg.Netstat.Click
 	case "mail":
 		return cfg.Mail.Click
+	case "screenshot":
+		return cfg.Screenshot.Click
 	case "power":
 		return cfg.Power.Click
 	case "dashboard":

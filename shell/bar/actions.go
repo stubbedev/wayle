@@ -35,6 +35,10 @@ func runClickAction(ctx ModuleContext, action config.ClickAction) {
 // else.
 func runShellBuiltin(ctx ModuleContext, cmd string) {
 	verb, _ := splitBuiltin(cmd)
+	if mode, target, ok := screenshotBuiltin(verb); ok && ctx.Screenshot != nil {
+		ctx.Screenshot(mode, target)
+		return
+	}
 	switch verb {
 	case "audio output-mute":
 		toggleSourceMute(ctx, false)

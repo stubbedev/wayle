@@ -55,6 +55,11 @@ func RunWith(cfg *config.Config) error {
 	defer sess.Close()
 
 	application := app.NewApplication(sess)
+	// Programmatic copies (the screenshot host) and the ctrl+c/v keys
+	// share one clipboard.
+	if application.Clipboard() == nil {
+		application.SetClipboard(app.NewClipboard(sess))
+	}
 	palette := styling.Default()
 	applyPalette(palette)
 
@@ -183,6 +188,9 @@ func RunWith(cfg *config.Config) error {
 	osdSrv := osd.New(application, cfg.Osd, font, palette)
 	dropdowns := newDropdownRegistry(application, cfg, font, &style, baseCtx)
 	baseCtx.Dropdowns = dropdowns
+	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland)
+	defer captureSvc.close()
+	baseCtx.Screenshot = captureSvc.trigger
 	for _, output := range outputs {
 		layout, ok := FindLayout(cfg.Bar.Layout, output.Name)
 		if !ok || !layout.Show {
