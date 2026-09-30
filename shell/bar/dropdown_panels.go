@@ -61,6 +61,9 @@ func networkDropdown(ctx ModuleContext) widget.Widget {
 		wired = cfg.Connecting
 	}
 	col.Append(widget.NewLabel(font, px, "Wired: "+wired, ctx.Style.fg), false)
+	if vpns := vpnSection(ctx, font, px); vpns != nil {
+		col.Append(vpns, false)
+	}
 	return col
 }
 
