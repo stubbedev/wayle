@@ -56,7 +56,7 @@ type ModuleContext struct {
 	// clipboard mode reads it).
 	Clipboard *clipboard.Clipboard
 	// Tray drives the tray items and their menus; nil without a host.
-	Tray TrayService
+	Tray          TrayService
 	CustomUpdates *customUpdates
 	// Dropdowns opens the dropdown:<name> popovers; RunWith owns one
 	// registry across outputs.

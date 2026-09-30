@@ -39,23 +39,42 @@ func TestBatteryLabelMatchesRustAssertions(t *testing.T) {
 }
 
 func TestThresholdMatching(t *testing.T) {
-	above := config.ThresholdEntry{Above: ptrF(70), ColorSet: true}
-	if !above.Matches(80) || !above.Matches(70.5) {
-		t.Error("above=70: 80 and 70.5 should match")
+	// threshold.rs matches: value >= above, value <= below, inclusive.
+	above := config.ThresholdEntry{Above: ptrF(70)}
+	if !above.Matches(80) || !above.Matches(70) {
+		t.Error("above=70: 80 and 70 should match (inclusive)")
 	}
-	if above.Matches(70) {
-		t.Error("above=70: 70 should not match (strictly above)")
+	if above.Matches(69.9) {
+		t.Error("above=70: 69.9 should not match")
 	}
-	both := config.ThresholdEntry{Above: ptrF(10), Below: ptrF(20), ColorSet: true}
-	if !both.Matches(15) {
-		t.Error("10<x<20: 15 should match")
+	both := config.ThresholdEntry{Above: ptrF(10), Below: ptrF(20)}
+	if !both.Matches(15) || !both.Matches(10) || !both.Matches(20) {
+		t.Error("10..20: 10, 15, and 20 should match")
 	}
 	if both.Matches(5) || both.Matches(25) {
-		t.Error("10<x<20: 5 and 25 should not match")
+		t.Error("10..20: 5 and 25 should not match")
 	}
-	neither := config.ThresholdEntry{ColorSet: true}
-	if neither.Matches(50) {
+	if (config.ThresholdEntry{}).Matches(50) {
 		t.Error("a threshold without bounds never matches")
+	}
+}
+
+func TestEvaluateThresholdsLastMatchWinsPerColor(t *testing.T) {
+	warn, _ := config.ParseColorValue("status-warning")
+	errc, _ := config.ParseColorValue("status-error")
+	entries := []config.ThresholdEntry{
+		{Above: ptrF(50), IconColor: &warn, LabelColor: &warn},
+		{Above: ptrF(90), IconColor: &errc},
+	}
+	got := config.EvaluateThresholds(95, entries)
+	if got.IconColor == nil || *got.IconColor != errc {
+		t.Errorf("icon = %v, want the later error override", got.IconColor)
+	}
+	if got.LabelColor == nil || *got.LabelColor != warn {
+		t.Errorf("label = %v, want the warning (the later entry sets no label color)", got.LabelColor)
+	}
+	if none := config.EvaluateThresholds(10, entries); none.IconColor != nil || none.LabelColor != nil {
+		t.Errorf("below every bound = %+v, want no overrides", none)
 	}
 }
 
@@ -92,13 +111,12 @@ func (f *fakeBattery) Push() { f.ticks <- struct{}{} }
 
 func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	cfg := config.Defaults()
-	threshold := config.ThresholdEntry{Below: ptrF(20), ColorSet: true}
 	cv, err := config.ParseColorValue("status-error")
 	if err != nil {
 		t.Fatal(err)
 	}
-	threshold.IconColor, threshold.ColorSet = cv, true
-	cfg.Battery.Thresholds = []config.ThresholdEntry{threshold}
+	// label-color recolors the label; icon-color the icon.
+	cfg.Battery.Thresholds = []config.ThresholdEntry{{Below: ptrF(20), LabelColor: &cv, IconColor: &cv}}
 	cfg.Bar.Layout = []config.BarLayout{{Monitor: "*"}}
 
 	source := newFakeBattery(upower.Device{Percentage: 75, State: upower.StateDischarging})
@@ -114,6 +132,7 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	// The refresh path itself is App-independent; drive it directly.
 	m := &battery{ctx: ctx, source: source}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	m.icon = moduleIcon(ctx, cfg.Battery.Icon)
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
@@ -135,6 +154,17 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	errorColor, _ := styling.ResolveColor(cv, styling.Default())
 	if m.label.Color() != errorColor {
 		t.Errorf("color at 12%% = %#08x, want the status-error override", m.label.Color())
+	}
+	if m.icon.Tint() != errorColor {
+		t.Errorf("icon tint at 12%% = %#08x, want the status-error override", m.icon.Tint())
+	}
+	// Back above: the defaults return.
+	source.dev.Percentage = 60
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if m.label.Color() != style.fg || m.icon.Tint() != moduleIconTint(ctx, cfg.Battery.Icon.Color) {
+		t.Errorf("above the bound: label %#08x icon %#08x, want the defaults", m.label.Color(), m.icon.Tint())
 	}
 }
 
@@ -222,7 +252,7 @@ icon-color = "status-success"
 	if c.Battery.Thresholds[0].Below == nil || *c.Battery.Thresholds[0].Below != 15 {
 		t.Errorf("threshold[0] = %+v", c.Battery.Thresholds[0])
 	}
-	if !c.Battery.Thresholds[1].ColorSet || c.Battery.Thresholds[1].IconColor.Token != config.TokenStatusSuccess {
+	if c.Battery.Thresholds[1].IconColor == nil || c.Battery.Thresholds[1].IconColor.Token != config.TokenStatusSuccess || c.Battery.Thresholds[1].LabelColor != nil {
 		t.Errorf("threshold[1] = %+v", c.Battery.Thresholds[1])
 	}
 }
@@ -231,6 +261,8 @@ func TestLoadFileRejectsBadBattery(t *testing.T) {
 	for _, content := range []string{
 		"[modules.battery]\n[[modules.battery.thresholds]]\nicon-color = \"accent\"\n",
 		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = 10\nicon-color = \"nope\"\n",
+		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = \"low\"\n",
+		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = 10\nlabel-color = \"nope\"\n",
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

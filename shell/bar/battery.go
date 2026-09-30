@@ -35,16 +35,40 @@ func replaceTemplateVar(format, name, value string) string {
 	return format
 }
 
-// thresholdColor returns the first matching threshold's color override.
-func thresholdColor(percentage float64, thresholds []config.ThresholdEntry, palette *styling.Palette) (render.Color, bool) {
-	for _, t := range thresholds {
-		if t.Matches(percentage) && t.ColorSet {
-			if color, ok := styling.ResolveColor(t.IconColor, palette); ok {
-				return color, true
-			}
-		}
+// thresholdColor returns the label-color override the thresholds
+// resolve for value (evaluate_thresholds: last match wins).
+func thresholdColor(value float64, thresholds []config.ThresholdEntry, palette *styling.Palette) (render.Color, bool) {
+	return resolveOverride(config.EvaluateThresholds(value, thresholds).LabelColor, palette)
+}
+
+// resolveOverride resolves an optional color override.
+func resolveOverride(cv *config.ColorValue, palette *styling.Palette) (render.Color, bool) {
+	if cv == nil {
+		return 0, false
 	}
-	return 0, false
+	return styling.ResolveColor(*cv, palette)
+}
+
+// applyThresholds is BarButton's SetThresholdColors on the parts the
+// Go chrome paints: the label ink and the icon tint follow the
+// matching overrides and fall back to the module's own (the bar fg,
+// the configured icon color) when none applies.
+func applyThresholds(ctx ModuleContext, value float64, thresholds []config.ThresholdEntry, label *widget.Label, icon *widget.Icon, iconColor config.ColorValue) {
+	colors := config.EvaluateThresholds(value, thresholds)
+	if label != nil {
+		ink := ctx.Style.fg
+		if c, ok := resolveOverride(colors.LabelColor, ctx.Style.palette); ok {
+			ink = c
+		}
+		label.SetColor(ink)
+	}
+	if icon != nil {
+		tint := moduleIconTint(ctx, iconColor)
+		if c, ok := resolveOverride(colors.IconColor, ctx.Style.palette); ok {
+			tint = c
+		}
+		icon.SetTint(tint)
+	}
 }
 
 // battery is the module: a label fed from the UPower device snapshot,
@@ -90,12 +114,8 @@ func (m *battery) refresh() error {
 	if cfg.LabelShow {
 		label = batteryLabel(cfg.Format, dev.Percentage, dev.Present())
 	}
-	color := m.ctx.Style.fg
-	if override, ok := thresholdColor(dev.Percentage, cfg.Thresholds, m.ctx.Style.palette); ok {
-		color = override
-	}
 	m.label.SetText(label)
-	m.label.SetColor(color)
+	applyThresholds(m.ctx, dev.Percentage, cfg.Thresholds, m.label, m.icon, cfg.Icon.Color)
 	m.setIcon(cfg, dev)
 	return nil
 }

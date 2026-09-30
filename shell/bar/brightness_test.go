@@ -60,7 +60,7 @@ func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	above := config.ThresholdEntry{Above: ptrF(80), IconColor: cv, ColorSet: true}
+	above := config.ThresholdEntry{Above: ptrF(80), LabelColor: &cv}
 	cfg.Brightness.Thresholds = []config.ThresholdEntry{above}
 
 	source := &fakeBrightnessSource{

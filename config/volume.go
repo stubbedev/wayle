@@ -1,9 +1,6 @@
 package config
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/BurntSushi/toml"
 )
 
@@ -45,18 +42,14 @@ func DefaultsVolume() VolumeConfig {
 func applyVolume(md toml.MetaData, prim toml.Primitive) (VolumeConfig, error) {
 	cfg := DefaultsVolume()
 	var doc struct {
-		Format        *string     `toml:"format"`
-		LabelShow     *bool       `toml:"label-show"`
-		IconShow      *bool       `toml:"icon-show"`
-		IconName      *string     `toml:"icon-name"`
-		IconColor     *ColorValue `toml:"icon-color"`
-		LevelIcons    *[]string   `toml:"level-icons"`
-		IconMuted     *string     `toml:"icon-muted"`
-		ThresholdList []struct {
-			Above     *float64 `toml:"above"`
-			Below     *float64 `toml:"below"`
-			IconColor string   `toml:"icon-color"`
-		} `toml:"thresholds"`
+		Format        *string          `toml:"format"`
+		LabelShow     *bool            `toml:"label-show"`
+		IconShow      *bool            `toml:"icon-show"`
+		IconName      *string          `toml:"icon-name"`
+		IconColor     *ColorValue      `toml:"icon-color"`
+		LevelIcons    *[]string        `toml:"level-icons"`
+		IconMuted     *string          `toml:"icon-muted"`
+		ThresholdList []ThresholdEntry `toml:"thresholds"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -82,19 +75,8 @@ func applyVolume(md toml.MetaData, prim toml.Primitive) (VolumeConfig, error) {
 	if doc.IconMuted != nil {
 		cfg.IconMuted = *doc.IconMuted
 	}
-	for _, entry := range doc.ThresholdList {
-		if entry.Above == nil && entry.Below == nil {
-			return cfg, errors.New("volume: threshold needs above or below")
-		}
-		t := ThresholdEntry{Above: entry.Above, Below: entry.Below}
-		if entry.IconColor != "" {
-			cv, err := ParseColorValue(entry.IconColor)
-			if err != nil {
-				return cfg, fmt.Errorf("volume: threshold icon-color: %w", err)
-			}
-			t.IconColor, t.ColorSet = cv, true
-		}
-		cfg.Thresholds = append(cfg.Thresholds, t)
+	if doc.ThresholdList != nil {
+		cfg.Thresholds = doc.ThresholdList
 	}
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {

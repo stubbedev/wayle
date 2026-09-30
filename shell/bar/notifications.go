@@ -4,12 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/notifications"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // notificationLabel is helpers.rs's format_label: the count
@@ -28,15 +26,6 @@ func notificationIconName(cfg config.NotificationConfig, count int, dnd bool) st
 		return cfg.IconUnread
 	}
 	return cfg.Icon.Name
-}
-
-// notificationColor resolves the count's threshold color, the bar fg
-// otherwise.
-func notificationColor(cfg config.NotificationConfig, count int, palette *styling.Palette, fallback render.Color) render.Color {
-	if override, ok := thresholdColor(float64(count), cfg.Thresholds, palette); ok {
-		return override
-	}
-	return fallback
 }
 
 // notificationModule is the bell: count and dnd from the shared
@@ -83,7 +72,7 @@ func (m *notificationModule) refresh() {
 		text = notificationLabel(count)
 	}
 	m.label.SetText(text)
-	m.label.SetColor(notificationColor(cfg, count, m.ctx.Style.palette, m.ctx.Style.fg))
+	applyThresholds(m.ctx, float64(count), cfg.Thresholds, m.label, m.icon, cfg.Icon.Color)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(notificationIconName(cfg, count, dnd))
 	}

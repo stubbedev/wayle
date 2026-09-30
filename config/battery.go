@@ -1,31 +1,8 @@
 package config
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/BurntSushi/toml"
 )
-
-// ThresholdEntry maps a numeric range to a color override; at least
-// one bound must be set, and both set means AND.
-type ThresholdEntry struct {
-	Above     *float64
-	Below     *float64
-	IconColor ColorValue
-	ColorSet  bool
-}
-
-// Matches reports whether value falls in the entry's range.
-func (t ThresholdEntry) Matches(value float64) bool {
-	if t.Above != nil && value <= *t.Above {
-		return false
-	}
-	if t.Below != nil && value >= *t.Below {
-		return false
-	}
-	return t.Above != nil || t.Below != nil
-}
 
 // BatteryConfig is the battery module config.
 type BatteryConfig struct {
@@ -77,19 +54,15 @@ func DefaultsBattery() BatteryConfig {
 func applyBattery(md toml.MetaData, prim toml.Primitive) (BatteryConfig, error) {
 	cfg := DefaultsBattery()
 	var doc struct {
-		Format        *string     `toml:"format"`
-		LabelShow     *bool       `toml:"label-show"`
-		IconShow      *bool       `toml:"icon-show"`
-		IconName      *string     `toml:"icon-name"`
-		IconColor     *ColorValue `toml:"icon-color"`
-		LevelIcons    *[]string   `toml:"level-icons"`
-		AlertIcon     *string     `toml:"alert-icon"`
-		ChargingIcon  *string     `toml:"charging-icon"`
-		ThresholdList []struct {
-			Above     *float64 `toml:"above"`
-			Below     *float64 `toml:"below"`
-			IconColor string   `toml:"icon-color"`
-		} `toml:"thresholds"`
+		Format        *string          `toml:"format"`
+		LabelShow     *bool            `toml:"label-show"`
+		IconShow      *bool            `toml:"icon-show"`
+		IconName      *string          `toml:"icon-name"`
+		IconColor     *ColorValue      `toml:"icon-color"`
+		LevelIcons    *[]string        `toml:"level-icons"`
+		AlertIcon     *string          `toml:"alert-icon"`
+		ChargingIcon  *string          `toml:"charging-icon"`
+		ThresholdList []ThresholdEntry `toml:"thresholds"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -118,19 +91,8 @@ func applyBattery(md toml.MetaData, prim toml.Primitive) (BatteryConfig, error) 
 	if doc.ChargingIcon != nil {
 		cfg.ChargingIcon = *doc.ChargingIcon
 	}
-	for _, entry := range doc.ThresholdList {
-		if entry.Above == nil && entry.Below == nil {
-			return cfg, errors.New("battery: threshold needs above or below")
-		}
-		t := ThresholdEntry{Above: entry.Above, Below: entry.Below}
-		if entry.IconColor != "" {
-			cv, err := ParseColorValue(entry.IconColor)
-			if err != nil {
-				return cfg, fmt.Errorf("battery: threshold icon-color: %w", err)
-			}
-			t.IconColor, t.ColorSet = cv, true
-		}
-		cfg.Thresholds = append(cfg.Thresholds, t)
+	if doc.ThresholdList != nil {
+		cfg.Thresholds = doc.ThresholdList
 	}
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {

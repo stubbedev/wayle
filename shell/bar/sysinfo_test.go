@@ -3,6 +3,8 @@ package bar
 import (
 	"testing"
 
+	"github.com/stubbedev/gelm/widget"
+
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -30,17 +32,19 @@ func TestSysinfoThresholdColors(t *testing.T) {
 		t.Fatal(err)
 	}
 	style := computeStyle(cfg, styling.Default())
-	thresholds := []config.ThresholdEntry{{Above: ptrF(90), IconColor: cv, ColorSet: true}}
+	cfg.CPU.Thresholds = []config.ThresholdEntry{{Above: ptrF(90), LabelColor: &cv, IconColor: &cv}}
+	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style}
+	m := &pollModule{ctx: ctx, cfg: cfg.CPU}
+	m.label = widget.NewLabel(ctx.Font, style.labelPx, "", style.fg)
+	m.icon = moduleIcon(ctx, cfg.CPU.Icon)
 
-	if _, ok := sysinfoThreshold(50, thresholds, style.palette); ok {
-		t.Error("50 below the threshold should not match")
+	m.render(50)
+	if m.label.Color() != style.fg || m.icon.Tint() != moduleIconTint(ctx, cfg.CPU.Icon.Color) {
+		t.Error("50 below the threshold recolored the module")
 	}
-	color, ok := sysinfoThreshold(95, thresholds, style.palette)
-	if !ok {
-		t.Fatal("95 above the threshold should match")
-	}
+	m.render(95)
 	want, _ := styling.ResolveColor(config.ColorValue{Token: "status-error"}, styling.Default())
-	if color != want {
-		t.Errorf("color = %#08x, want status-error", color)
+	if m.label.Color() != want || m.icon.Tint() != want {
+		t.Errorf("at 95: label %#08x icon %#08x, want status-error", m.label.Color(), m.icon.Tint())
 	}
 }

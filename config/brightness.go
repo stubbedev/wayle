@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/BurntSushi/toml"
@@ -32,15 +31,11 @@ func DefaultsBrightness() BrightnessConfig {
 func applyBrightness(md toml.MetaData, prim toml.Primitive) (BrightnessConfig, error) {
 	cfg := DefaultsBrightness()
 	var doc struct {
-		Format        *string `toml:"format"`
-		LabelShow     *bool   `toml:"label-show"`
-		MinBright     *int    `toml:"min-brightness"`
-		EnableExt     *bool   `toml:"enable-external"`
-		ThresholdList []struct {
-			Above     *float64 `toml:"above"`
-			Below     *float64 `toml:"below"`
-			IconColor string   `toml:"icon-color"`
-		} `toml:"thresholds"`
+		Format        *string          `toml:"format"`
+		LabelShow     *bool            `toml:"label-show"`
+		MinBright     *int             `toml:"min-brightness"`
+		EnableExt     *bool            `toml:"enable-external"`
+		ThresholdList []ThresholdEntry `toml:"thresholds"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -60,19 +55,8 @@ func applyBrightness(md toml.MetaData, prim toml.Primitive) (BrightnessConfig, e
 	if doc.EnableExt != nil {
 		cfg.EnableExt = *doc.EnableExt
 	}
-	for _, entry := range doc.ThresholdList {
-		if entry.Above == nil && entry.Below == nil {
-			return cfg, errors.New("brightness: threshold needs above or below")
-		}
-		t := ThresholdEntry{Above: entry.Above, Below: entry.Below}
-		if entry.IconColor != "" {
-			cv, err := ParseColorValue(entry.IconColor)
-			if err != nil {
-				return cfg, fmt.Errorf("brightness: threshold icon-color: %w", err)
-			}
-			t.IconColor, t.ColorSet = cv, true
-		}
-		cfg.Thresholds = append(cfg.Thresholds, t)
+	if doc.ThresholdList != nil {
+		cfg.Thresholds = doc.ThresholdList
 	}
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {

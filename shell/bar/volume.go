@@ -6,12 +6,10 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/pulse"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // volumeLabel renders the format; "percent" like the other level
@@ -25,16 +23,6 @@ func volumeLabel(format string, percent float64) string {
 // average as a percentage, rounded (average_percentage().round()).
 func volumePercent(dev pulse.Device) float64 {
 	return math.Round(dev.Volume.AveragePercentage())
-}
-
-// volumeColor resolves the label ink: the thresholds by the rounded
-// level (apply_thresholds), else the default fg. Mute does not recolor
-// (methods.rs applies the thresholds on the level alone).
-func volumeColor(dev pulse.Device, cfg config.VolumeConfig, palette *styling.Palette, fallback render.Color) render.Color {
-	if override, ok := thresholdColor(volumePercent(dev), cfg.Thresholds, palette); ok {
-		return override
-	}
-	return fallback
 }
 
 // volume is the module: the default sink's volume label, refreshed on
@@ -87,7 +75,7 @@ func (m *volumeModule) refresh() error {
 		label = volumeLabel(cfg.Format, volumePercent(dev))
 	}
 	m.label.SetText(label)
-	m.label.SetColor(volumeColor(dev, cfg, m.ctx.Style.palette, m.ctx.Style.fg))
+	applyThresholds(m.ctx, volumePercent(dev), cfg.Thresholds, m.label, m.icon, cfg.Icon.Color)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(volumeIconName(cfg, dev))
 	}

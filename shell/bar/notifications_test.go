@@ -50,7 +50,7 @@ func TestLoadFileAppliesNotification(t *testing.T) {
 	if c.Notification.IconUnread != "ld-bell-ring-symbolic" {
 		t.Errorf("icon-unread = %q", c.Notification.IconUnread)
 	}
-	if len(c.Notification.Thresholds) != 1 || !c.Notification.Thresholds[0].ColorSet {
+	if len(c.Notification.Thresholds) != 1 || c.Notification.Thresholds[0].IconColor == nil {
 		t.Errorf("thresholds = %+v", c.Notification.Thresholds)
 	}
 }

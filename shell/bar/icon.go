@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -21,12 +22,17 @@ func moduleIcon(ctx ModuleContext, icon config.IconConfig) *widget.Icon {
 		return nil
 	}
 	ic := widget.NewThemeIcon(icon.Name, iconPx)
-	tint := ctx.Style.fg
-	if resolved, ok := styling.ResolveColor(icon.Color, ctx.Style.palette); ok {
-		tint = resolved
-	}
-	ic.SetTint(tint)
+	ic.SetTint(moduleIconTint(ctx, icon.Color))
 	return ic
+}
+
+// moduleIconTint resolves an icon color; auto (and anything that does
+// not resolve) is the bar fg.
+func moduleIconTint(ctx ModuleContext, cv config.ColorValue) render.Color {
+	if resolved, ok := styling.ResolveColor(cv, ctx.Style.palette); ok {
+		return resolved
+	}
+	return ctx.Style.fg
 }
 
 // assembleModule pairs the module's icon (nil when it shows none) with

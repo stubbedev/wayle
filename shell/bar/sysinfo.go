@@ -6,12 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/sysinfo"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // sysinfoLabel renders the {{ percent }} template the level modules
@@ -24,30 +22,29 @@ func sysinfoLabel(format string, percent float64) string {
 	return replaceTemplateVar(format, "percent", padded)
 }
 
-// sysinfoThreshold applies the first matching threshold's color.
-func sysinfoThreshold(percent float64, thresholds []config.ThresholdEntry, palette *styling.Palette) (render.Color, bool) {
-	return thresholdColor(percent, thresholds, palette)
-}
-
 // pollModule is the shared poll loop of cpu/ram/storage: read on an
-// interval, render through a formatter.
+// interval, render the label, icon, and threshold colors.
 type pollModule struct {
 	ctx    ModuleContext
+	cfg    config.SysinfoConfig
 	label  *widget.Label
-	icon   config.IconConfig
+	icon   *widget.Icon
+	root   widget.Widget
 	read   func() (float64, error)
-	render func(m ModuleContext, label *widget.Label, percent float64)
 	cancel context.CancelFunc
 }
 
-func newPollModule(ctx ModuleContext, pollMs int, read func() (float64, error), render func(ModuleContext, *widget.Label, float64)) (*pollModule, error) {
+func newPollModule(ctx ModuleContext, cfg config.SysinfoConfig, read func() (float64, error)) (*pollModule, error) {
 	if ctx.App == nil {
 		return nil, errors.New("poll: requires the application loop")
 	}
-	m := &pollModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg), read: read, render: render}
+	m := &pollModule{ctx: ctx, cfg: cfg, read: read}
+	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	m.icon = moduleIcon(ctx, cfg.Icon)
+	m.root = assembleModule(ctx, m.icon, m.label)
 	runCtx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
-	if pollMs > 0 {
+	if cfg.PollMs > 0 {
 		go func() {
 			timer := time.NewTimer(0)
 			defer timer.Stop()
@@ -58,21 +55,19 @@ func newPollModule(ctx ModuleContext, pollMs int, read func() (float64, error), 
 				case <-timer.C:
 				}
 				if percent, err := m.read(); err == nil {
-					m.ctx.Invoke(func() { m.render(m.ctx, m.label, percent) })
+					m.ctx.Invoke(func() { m.render(percent) })
 				}
-				timer.Reset(time.Duration(pollMs) * time.Millisecond)
+				timer.Reset(time.Duration(cfg.PollMs) * time.Millisecond)
 			}
 		}()
 	} else if percent, err := read(); err == nil {
-		render(ctx, m.label, percent)
+		m.render(percent)
 	}
 	return m, nil
 }
 
-// Root assembles the icon beside the label when the module shows one.
-func (m *pollModule) Root() widget.Widget {
-	return assembleModule(m.ctx, moduleIcon(m.ctx, m.icon), m.label)
-}
+// Root is the icon beside the label (the label alone without an icon).
+func (m *pollModule) Root() widget.Widget { return m.root }
 
 // Stop ends the poll loop.
 func (m *pollModule) Stop() {
@@ -81,19 +76,15 @@ func (m *pollModule) Stop() {
 	}
 }
 
-// renderSysinfo is the shared label renderer: the format with the
-// zero-padded percent, then the threshold color over the default fg.
-func renderSysinfo(cfg config.SysinfoConfig, ctx ModuleContext, label *widget.Label, percent float64) {
+// render is the shared renderer: the format with the zero-padded
+// percent, then the threshold colors over the defaults.
+func (m *pollModule) render(percent float64) {
 	text := ""
-	if cfg.LabelShow {
-		text = sysinfoLabel(cfg.Format, percent)
+	if m.cfg.LabelShow {
+		text = sysinfoLabel(m.cfg.Format, percent)
 	}
-	label.SetText(text)
-	if color, ok := sysinfoThreshold(percent, cfg.Thresholds, ctx.Style.palette); ok {
-		label.SetColor(color)
-	} else {
-		label.SetColor(ctx.Style.fg)
-	}
+	m.label.SetText(text)
+	applyThresholds(m.ctx, percent, m.cfg.Thresholds, m.label, m.icon, m.cfg.Icon.Color)
 }
 
 // newCpu builds the cpu module: usage percent from /proc/stat deltas.
@@ -114,11 +105,7 @@ func newCpu(ctx ModuleContext) (Module, error) {
 		prev = sample
 		return percent, nil
 	}
-	m, err := newPollModule(ctx, ctx.Config.CPU.PollMs, read, func(ctx ModuleContext, label *widget.Label, percent float64) {
-		renderSysinfo(ctx.Config.CPU, ctx, label, percent)
-	})
-	m.icon = ctx.Config.CPU.Icon
-	return m, err
+	return newPollModule(ctx, ctx.Config.CPU, read)
 }
 
 // newRam builds the ram module: used/total from /proc/meminfo.
@@ -130,22 +117,13 @@ func newRam(ctx ModuleContext) (Module, error) {
 		}
 		return mem.UsagePercent(), nil
 	}
-	m, err := newPollModule(ctx, ctx.Config.RAM.PollMs, read, func(ctx ModuleContext, label *widget.Label, percent float64) {
-		renderSysinfo(ctx.Config.RAM, ctx, label, percent)
-	})
-	m.icon = ctx.Config.RAM.Icon
-	return m, err
+	return newPollModule(ctx, ctx.Config.RAM, read)
 }
 
 // newStorage builds the storage module: used/total on one mount point.
 func newStorage(ctx ModuleContext) (Module, error) {
 	path := ctx.Config.Storage.Path
-	read := func() (float64, error) {
+	return newPollModule(ctx, ctx.Config.Storage, func() (float64, error) {
 		return sysinfo.ReadStoragePercent(path)
-	}
-	m, err := newPollModule(ctx, ctx.Config.Storage.PollMs, read, func(ctx ModuleContext, label *widget.Label, percent float64) {
-		renderSysinfo(ctx.Config.Storage, ctx, label, percent)
 	})
-	m.icon = ctx.Config.Storage.Icon
-	return m, err
 }

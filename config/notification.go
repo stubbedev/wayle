@@ -2,7 +2,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"slices"
 
 	"github.com/BurntSushi/toml"
@@ -67,26 +66,22 @@ func DefaultsNotification() NotificationConfig {
 func applyNotification(md toml.MetaData, prim toml.Primitive) (NotificationConfig, error) {
 	cfg := DefaultsNotification()
 	var doc struct {
-		LabelShow        *bool       `toml:"label-show"`
-		Enabled          *bool       `toml:"enabled"`
-		IconShow         *bool       `toml:"icon-show"`
-		IconName         *string     `toml:"icon-name"`
-		IconColor        *ColorValue `toml:"icon-color"`
-		IconUnread       *string     `toml:"icon-unread"`
-		IconDnd          *string     `toml:"icon-dnd"`
-		PopupDurationMS  *int        `toml:"popup-duration"`
-		PopupMaxVisible  *int        `toml:"popup-max-visible"`
-		PopupPosition    *string     `toml:"popup-position"`
-		PopupGap         *float64    `toml:"popup-gap"`
-		PopupMonitor     *string     `toml:"popup-monitor"`
-		PopupStacking    *string     `toml:"popup-stacking-order"`
-		PopupCloseAction *string     `toml:"popup-close-behavior"`
-		PopupHoverPause  *bool       `toml:"popup-hover-pause"`
-		ThresholdList    []struct {
-			Above     *float64 `toml:"above"`
-			Below     *float64 `toml:"below"`
-			IconColor string   `toml:"icon-color"`
-		} `toml:"thresholds"`
+		LabelShow        *bool            `toml:"label-show"`
+		Enabled          *bool            `toml:"enabled"`
+		IconShow         *bool            `toml:"icon-show"`
+		IconName         *string          `toml:"icon-name"`
+		IconColor        *ColorValue      `toml:"icon-color"`
+		IconUnread       *string          `toml:"icon-unread"`
+		IconDnd          *string          `toml:"icon-dnd"`
+		PopupDurationMS  *int             `toml:"popup-duration"`
+		PopupMaxVisible  *int             `toml:"popup-max-visible"`
+		PopupPosition    *string          `toml:"popup-position"`
+		PopupGap         *float64         `toml:"popup-gap"`
+		PopupMonitor     *string          `toml:"popup-monitor"`
+		PopupStacking    *string          `toml:"popup-stacking-order"`
+		PopupCloseAction *string          `toml:"popup-close-behavior"`
+		PopupHoverPause  *bool            `toml:"popup-hover-pause"`
+		ThresholdList    []ThresholdEntry `toml:"thresholds"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -151,19 +146,8 @@ func applyNotification(md toml.MetaData, prim toml.Primitive) (NotificationConfi
 	if doc.PopupHoverPause != nil {
 		cfg.PopupHoverPause = *doc.PopupHoverPause
 	}
-	for _, entry := range doc.ThresholdList {
-		if entry.Above == nil && entry.Below == nil {
-			return cfg, errors.New("notifications: threshold needs above or below")
-		}
-		th := ThresholdEntry{Above: entry.Above, Below: entry.Below}
-		if entry.IconColor != "" {
-			cv, err := ParseColorValue(entry.IconColor)
-			if err != nil {
-				return cfg, fmt.Errorf("notifications: threshold icon-color: %w", err)
-			}
-			th.IconColor, th.ColorSet = cv, true
-		}
-		cfg.Thresholds = append(cfg.Thresholds, th)
+	if doc.ThresholdList != nil {
+		cfg.Thresholds = doc.ThresholdList
 	}
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {

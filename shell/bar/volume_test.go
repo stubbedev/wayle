@@ -66,14 +66,14 @@ func TestVolumePercentAveragesAndRounds(t *testing.T) {
 	// A 94.6% level rounds to 95 and so crosses an above-94.9 line.
 	cfg := config.Defaults()
 	cv, _ := config.ParseColorValue("status-error")
-	cfg.Volume.Thresholds = []config.ThresholdEntry{{Above: ptrF(94.9), IconColor: cv, ColorSet: true}}
+	cfg.Volume.Thresholds = []config.ThresholdEntry{{Above: ptrF(94.9), LabelColor: &cv}}
 	style := computeStyle(cfg, styling.Default())
-	got := volumeColor(pulse.Device{Volume: pct(94.6)}, cfg.Volume, style.palette, style.fg)
+	got, _ := thresholdColor(volumePercent(pulse.Device{Volume: pct(94.6)}), cfg.Volume.Thresholds, style.palette)
 	if want, _ := styling.ResolveColor(cv, styling.Default()); got != want {
 		t.Errorf("threshold on the rounded level: %#08x, want %#08x", got, want)
 	}
-	if got := volumeColor(pulse.Device{Volume: pct(94.4)}, cfg.Volume, style.palette, style.fg); got != style.fg {
-		t.Errorf("94.4%% rounds to 94 and stays default, got %#08x", got)
+	if _, hit := thresholdColor(volumePercent(pulse.Device{Volume: pct(94.4)}), cfg.Volume.Thresholds, style.palette); hit {
+		t.Error("94.4%% rounds to 94 and must stay default")
 	}
 }
 
@@ -83,7 +83,7 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loud := config.ThresholdEntry{Above: ptrF(95), IconColor: cv, ColorSet: true}
+	loud := config.ThresholdEntry{Above: ptrF(95), LabelColor: &cv}
 	cfg.Volume.Thresholds = []config.ThresholdEntry{loud}
 
 	source := &fakePulseSource{
