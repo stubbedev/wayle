@@ -55,7 +55,7 @@ func Run(root *Command, args []string, out Output) int {
 	for m.sub != nil {
 		m = m.sub
 	}
-	m.stdout = out.Stdout
+	m.stdout, m.stderr = out.Stdout, out.Stderr
 	if m.cmd.decl == nil || m.cmd.decl.Run == nil {
 		// Unreachable for a valid tree: validate requires a subcommand
 		// wherever there is no handler.

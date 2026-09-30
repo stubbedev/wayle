@@ -175,7 +175,7 @@ func TestVersionTracksCargoWorkspace(t *testing.T) {
 func TestRofiInvocationRoutesToLauncher(t *testing.T) {
 	var out, errOut bytes.Buffer
 	code := run([]string{"/usr/bin/rofi", "-show", "drun"}, cli.Output{Stdout: &out, Stderr: &errOut})
-	if code != 1 || !strings.Contains(errOut.String(), "`wayle launcher` is not ported") {
+	if code != 1 || !strings.Contains(errOut.String(), "cannot connect to wayle launcher socket") {
 		t.Fatalf("rofi: code %d stderr %q", code, errOut.String())
 	}
 	out.Reset()

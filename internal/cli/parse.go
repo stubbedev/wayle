@@ -16,6 +16,7 @@ type Matches struct {
 	subName string
 	cmd     *cmd
 	stdout  io.Writer
+	stderr  io.Writer
 }
 
 // Stdout is where the handler prints its output.
@@ -24,6 +25,15 @@ func (m *Matches) Stdout() io.Writer {
 		return os.Stdout
 	}
 	return m.stdout
+}
+
+// Stderr is where the handler prints diagnostics it reports itself
+// (a returned error is printed by Run as "Error: ...").
+func (m *Matches) Stderr() io.Writer {
+	if m.stderr == nil {
+		return os.Stderr
+	}
+	return m.stderr
 }
 
 func newMatches(c *cmd) *Matches {

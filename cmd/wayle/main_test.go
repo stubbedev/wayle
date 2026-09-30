@@ -10,6 +10,11 @@ import (
 // test (or a daemon it starts, such as the notification service's
 // persisted do-not-disturb flag) touches the real user's files.
 func TestMain(m *testing.M) {
+	// The launcher session tests re-exec the test binary as the CLI.
+	if os.Getenv("WAYLE_TEST_CLI") == "1" {
+		main()
+		os.Exit(0)
+	}
 	home, err := os.MkdirTemp("", "wayle-cli-test-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
