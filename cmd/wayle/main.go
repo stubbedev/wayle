@@ -27,9 +27,11 @@ Usage:
   wayle recorder <cmd> recording: toggle|start|stop|pause|resume|status
   wayle toast [flags] custom toast: --label --icon --percentage
                      --duration --preset --class
+  wayle wallpaper <cmd> wallpapers: set|cycle|stop|next|previous|info|
+                     theming-monitor
 
 Not ported yet: audio, config, icons, launcher, lock, media, panel,
-power, screenshot, systray, vpn, wallpaper, widget.
+power, screenshot, systray, vpn, widget.
 `
 
 func main() {
@@ -49,6 +51,8 @@ func main() {
 		err = runRecorder(os.Args[2:])
 	case "toast":
 		err = runToast(os.Args[2:])
+	case "wallpaper":
+		err = runWallpaper(os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return

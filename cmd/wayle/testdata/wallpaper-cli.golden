@@ -1,0 +1,152 @@
+### info-fresh
+$ wallpaper ["info"]
+Wallpaper Information
+---------------------
+Current:    (none)
+Fit Mode:   fill
+Cycling:    inactive
+[stderr] [exit 0]
+$ wallpaper ["info" "--monitor" "DP-1"]
+Wallpaper Information (DP-1)
+-----------------------------
+Current:    (none)
+Fit Mode:   fill
+Cycling:    inactive
+[stderr] [exit 0]
+### set-all
+$ wallpaper ["set" "@DIR@/a.png"]
+Wallpaper set to @DIR@/a.png
+[stderr] [exit 0]
+$ wallpaper ["info" "--monitor" "DP-1"]
+Wallpaper Information (DP-1)
+-----------------------------
+Current:    @DIR@/a.png
+Fit Mode:   fill
+Cycling:    inactive
+[stderr] [exit 0]
+$ wallpaper ["info" "--monitor" "DP-2"]
+Wallpaper Information (DP-2)
+-----------------------------
+Current:    @DIR@/a.png
+Fit Mode:   fill
+Cycling:    inactive
+[stderr] [exit 0]
+### set-monitor-fit
+$ wallpaper ["set" "@DIR@/b.png" "--fit" "center" "--monitor" "DP-2"]
+Wallpaper set to @DIR@/b.png on DP-2
+[stderr] [exit 0]
+$ wallpaper ["info" "--monitor" "DP-2"]
+Wallpaper Information (DP-2)
+-----------------------------
+Current:    @DIR@/b.png
+Fit Mode:   center
+Cycling:    inactive
+[stderr] [exit 0]
+$ wallpaper ["info" "--monitor" "DP-1"]
+Wallpaper Information (DP-1)
+-----------------------------
+Current:    (none)
+Fit Mode:   fill
+Cycling:    inactive
+[stderr] [exit 0]
+$ wallpaper ["info"]
+Wallpaper Information
+---------------------
+Current:    (none)
+Fit Mode:   fill
+Cycling:    inactive
+[stderr] [exit 0]
+### set-tile
+$ wallpaper ["set" "@DIR@/a.png" "-f" "tile"]
+[stderr] Error: Failed to set fit mode: Invalid fit mode: tile
+[exit 1]
+### set-missing
+$ wallpaper ["set" "/nonexistent/x.png"]
+[stderr] Error: Failed to set wallpaper: image not found: /nonexistent/x.png
+[exit 1]
+$ wallpaper ["set" "/nonexistent/x.png" "--monitor" "DP-1"]
+[stderr] Error: Failed to set wallpaper: image not found: /nonexistent/x.png
+[exit 1]
+### cycle
+$ wallpaper ["cycle" "@DIR@"]
+Started cycling wallpapers from @DIR@ every 300 seconds
+[stderr] [exit 0]
+$ wallpaper ["info" "--monitor" "DP-1"]
+Wallpaper Information (DP-1)
+-----------------------------
+Current:    @DIR@/a.png
+Fit Mode:   fill
+Cycling:    active
+[stderr] [exit 0]
+$ wallpaper ["next"]
+Advanced to next wallpaper
+[stderr] [exit 0]
+$ wallpaper ["info" "--monitor" "DP-2"]
+Wallpaper Information (DP-2)
+-----------------------------
+Current:    @DIR@/b.png
+Fit Mode:   fill
+Cycling:    active
+[stderr] [exit 0]
+$ wallpaper ["previous"]
+Went back to previous wallpaper
+[stderr] [exit 0]
+$ wallpaper ["info" "--monitor" "DP-1"]
+Wallpaper Information (DP-1)
+-----------------------------
+Current:    @DIR@/a.png
+Fit Mode:   fill
+Cycling:    active
+[stderr] [exit 0]
+$ wallpaper ["stop"]
+Wallpaper cycling stopped
+[stderr] [exit 0]
+$ wallpaper ["info"]
+Wallpaper Information
+---------------------
+Current:    (none)
+Fit Mode:   fill
+Cycling:    inactive
+[stderr] [exit 0]
+### cycle-flags
+$ wallpaper ["cycle" "@DIR@" "-i" "60" "-m" "shuffle"]
+Started cycling wallpapers from @DIR@ every 60 seconds
+[stderr] [exit 0]
+$ wallpaper ["cycle" "@DIR@" "--interval=5" "--mode=sequential"]
+Started cycling wallpapers from @DIR@ every 5 seconds
+[stderr] [exit 0]
+### cycle-missing
+$ wallpaper ["cycle" "/nonexistent/dir"]
+[stderr] Error: Failed to start cycling: directory not found: /nonexistent/dir
+[exit 1]
+### cycle-empty
+$ wallpaper ["cycle" "@EMPTY@"]
+[stderr] Error: Failed to start cycling: no images found in directory: @EMPTY@
+[exit 1]
+### next-without-cycle
+$ wallpaper ["next"]
+Advanced to next wallpaper
+[stderr] [exit 0]
+$ wallpaper ["previous"]
+Went back to previous wallpaper
+[stderr] [exit 0]
+$ wallpaper ["stop"]
+Wallpaper cycling stopped
+[stderr] [exit 0]
+### theming
+$ wallpaper ["theming-monitor" "DP-1"]
+Theming monitor: DP-1
+[stderr] [exit 0]
+$ wallpaper ["theming-monitor" ""]
+Theming monitor: default
+[stderr] [exit 0]
+### not-running
+$ wallpaper ["info"]
+[stderr] Error: Wallpaper service not running. Start wayle shell first.
+[exit 1]
+$ wallpaper ["stop"]
+[stderr] Error: Wallpaper service not running. Start wayle shell first.
+[exit 1]
+$ wallpaper ["set" "@DIR@/a.png"]
+[stderr] Error: Wallpaper service not running. Start wayle shell first.
+[exit 1]
