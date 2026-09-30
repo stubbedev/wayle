@@ -61,5 +61,5 @@ func run(argv []string, out cli.Output) int {
 	if len(argv) > 0 && filepath.Base(argv[0]) == "rofi" {
 		args = append([]string{"launcher"}, args...)
 	}
-	return cli.Run(rootCommand(), args, out)
+	return cli.Run(withCLIMode(rootCommand()), args, out)
 }

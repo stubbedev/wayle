@@ -8,6 +8,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/wayle/internal/cli"
+	"github.com/stubbedev/wayle/internal/logging"
 	"github.com/stubbedev/wayle/service/shellipc"
 	"github.com/stubbedev/wayle/shell/bar"
 )
@@ -17,7 +18,16 @@ func shellCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "shell",
 		About: "Run the desktop shell in the foreground",
-		Run:   func(*cli.Matches) error { return runShell(os.Stderr, bar.Run) },
+		Run: func(*cli.Matches) error {
+			// wayle-shell's tracing_init: its own daily file, echoed to
+			// stdout.
+			closer, err := logging.Setup("wayle-shell", os.Stdout)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = closer.Close() }()
+			return runShell(os.Stderr, bar.Run)
+		},
 	}
 }
 
