@@ -155,7 +155,7 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 		buttonBg:       buttonBg,
 		buttonBgHover:  buttonBgHover,
 		buttonBgActive: buttonBgActive,
-		buttonRadius:   styling.RoundingRadiusPx(bar.ButtonGroupRounding, scale),
+		buttonRadius:   styling.RoundingRadiusPx(bar.ButtonRounding, scale),
 		buttonIconPad:  remPad(bar.ButtonIconPadding),
 		buttonLabelPad: remPad(bar.ButtonLabelPadding),
 

@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -24,7 +25,11 @@ const (
 	msgRunCommand    = 0
 	msgGetWorkspaces = 1
 	msgSubscribe     = 2
+	msgGetTree       = 4
 )
+
+// eventBit marks a message as an event rather than a reply.
+const eventBit = 0x80000000
 
 // magic is the fixed i3-ipc header.
 const magic = "i3-ipc"
@@ -54,22 +59,23 @@ func writeFrame(conn net.Conn, msgType uint32, payload []byte) error {
 	return err
 }
 
-// readFrame reads one reply: validates the magic, returns the type
-// and payload.
-func readFrame(conn net.Conn) ([]byte, error) {
+// readFrame reads one message: validates the magic, returns the raw
+// type and payload.
+func readFrame(conn net.Conn) (uint32, []byte, error) {
 	head := make([]byte, 14)
 	if err := readFull(conn, head); err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	if string(head[:6]) != magic {
-		return nil, errors.New("sway: bad magic in reply")
+		return 0, nil, errors.New("sway: bad magic in reply")
 	}
 	length := binary.LittleEndian.Uint32(head[6:])
+	msgType := binary.LittleEndian.Uint32(head[10:])
 	payload := make([]byte, length)
 	if err := readFull(conn, payload); err != nil {
-		return nil, err
+		return 0, nil, err
 	}
-	return payload, nil
+	return msgType, payload, nil
 }
 
 func readFull(conn net.Conn, buf []byte) error {
@@ -114,7 +120,7 @@ func (c *Conn) request(msgType uint32, payload []byte) ([]byte, error) {
 	if err := writeFrame(c.conn, msgType, payload); err != nil {
 		return nil, err
 	}
-	body, err := readFrame(c.conn)
+	_, body, err := readFrame(c.conn)
 	return body, err
 }
 
@@ -153,43 +159,166 @@ func (c *Conn) RunCommand(ctx context.Context, command string) error {
 	return nil
 }
 
-// SwitchTo focuses one workspace by name.
-func (c *Conn) SwitchTo(ctx context.Context, name string) error {
-	return c.RunCommand(ctx, "workspace "+strconv.Quote(name))
+// Quote is service.rs's quote: a double-quoted workspace name with
+// embedded backslashes and quotes escaped.
+func Quote(name string) string {
+	return `"` + strings.ReplaceAll(strings.ReplaceAll(name, `\`, `\\`), `"`, `\"`) + `"`
 }
 
-// Event is one workspace event payload.
-type Event struct {
-	Change string `json:"change"`
+// FocusCommand is focus_command for a workspace the snapshot knows:
+// by number when it has one, else by quoted name.
+func FocusCommand(ws Workspace) string {
+	if ws.Num >= 0 {
+		return "workspace --no-auto-back-and-forth number " + strconv.Itoa(ws.Num)
+	}
+	return "workspace --no-auto-back-and-forth " + Quote(ws.Name)
 }
 
-// Subscribe connects a second socket, subscribes to the workspace
-// stream, and ticks per event. The returned stop closes the socket.
-func Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
+// FocusWorkspace focuses one workspace (focus:this).
+func (c *Conn) FocusWorkspace(ctx context.Context, ws Workspace) error {
+	return c.RunCommand(ctx, FocusCommand(ws))
+}
+
+// FocusNextOnOutput is focus:next.
+func (c *Conn) FocusNextOnOutput(ctx context.Context) error {
+	return c.RunCommand(ctx, "workspace next_on_output")
+}
+
+// FocusPrevOnOutput is focus:previous.
+func (c *Conn) FocusPrevOnOutput(ctx context.Context) error {
+	return c.RunCommand(ctx, "workspace prev_on_output")
+}
+
+// FocusBackAndForth is focus:last.
+func (c *Conn) FocusBackAndForth(ctx context.Context) error {
+	return c.RunCommand(ctx, "workspace back_and_forth")
+}
+
+// Window is one leaf window of the container tree (core/window.rs's
+// snapshot), tagged with the enclosing workspace's id.
+type Window struct {
+	ID          int64
+	Title       string
+	HasTitle    bool
+	AppID       string
+	HasAppID    bool
+	WorkspaceID int64
+	// HasWorkspace is false for windows outside any workspace (the
+	// scratchpad's __i3 container still counts as a workspace node).
+	HasWorkspace bool
+	Focused      bool
+	Floating     bool
+	Urgent       bool
+}
+
+// treeNode is types.rs's TreeNode.
+type treeNode struct {
+	ID               int64   `json:"id"`
+	Type             string  `json:"type"`
+	Name             *string `json:"name"`
+	AppID            *string `json:"app_id"`
+	Focused          bool    `json:"focused"`
+	Urgent           bool    `json:"urgent"`
+	WindowProperties *struct {
+		Class *string `json:"class"`
+	} `json:"window_properties"`
+	Nodes         []treeNode `json:"nodes"`
+	FloatingNodes []treeNode `json:"floating_nodes"`
+}
+
+// isWindow is TreeNode::is_window: a con/floating_con leaf.
+func (n *treeNode) isWindow() bool {
+	return (n.Type == "con" || n.Type == "floating_con") && len(n.Nodes) == 0 && len(n.FloatingNodes) == 0
+}
+
+// collectWindows is refresh.rs's collect_windows.
+func collectWindows(n *treeNode, workspace int64, hasWorkspace bool, out *[]Window) {
+	if n.Type == "workspace" {
+		workspace, hasWorkspace = n.ID, true
+	}
+	if n.isWindow() {
+		w := Window{
+			ID: n.ID, WorkspaceID: workspace, HasWorkspace: hasWorkspace,
+			Focused: n.Focused, Floating: n.Type == "floating_con", Urgent: n.Urgent,
+		}
+		if n.Name != nil {
+			w.Title, w.HasTitle = *n.Name, true
+		}
+		// resolved_app_id: the Wayland app_id, else the X11 class.
+		switch {
+		case n.AppID != nil:
+			w.AppID, w.HasAppID = *n.AppID, true
+		case n.WindowProperties != nil && n.WindowProperties.Class != nil:
+			w.AppID, w.HasAppID = *n.WindowProperties.Class, true
+		}
+		*out = append(*out, w)
+		return
+	}
+	for i := range n.Nodes {
+		collectWindows(&n.Nodes[i], workspace, hasWorkspace, out)
+	}
+	for i := range n.FloatingNodes {
+		collectWindows(&n.FloatingNodes[i], workspace, hasWorkspace, out)
+	}
+}
+
+// Windows walks GET_TREE into its leaf windows, tiling before
+// floating per container, in tree order.
+func (c *Conn) Windows() ([]Window, error) {
+	body, err := c.request(msgGetTree, nil)
+	if err != nil {
+		return nil, err
+	}
+	var root treeNode
+	if err := json.Unmarshal(body, &root); err != nil {
+		return nil, err
+	}
+	var out []Window
+	collectWindows(&root, 0, false, &out)
+	return out, nil
+}
+
+// Subscribe connects a second socket, subscribes to the workspace and
+// window streams, and ticks per event; each tick is the cue to
+// re-query. The channel closes when the stream ends; stop closes the
+// socket.
+func Subscribe() (<-chan struct{}, func(), error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, nil, errors.New("sway: SWAYSOCK is not set")
 	}
 	conn, err := net.DialTimeout("unix", path, 2*time.Second)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("sway: %w", err)
 	}
-	if err := writeFrame(conn, msgSubscribe, []byte(`["workspace"]`)); err != nil {
+	if werr := writeFrame(conn, msgSubscribe, []byte(`["workspace","window"]`)); werr != nil {
 		_ = conn.Close()
-		return nil, nil, err
+		return nil, nil, werr
 	}
-	// The subscribe reply arrives before the stream.
-	if _, err := readFrame(conn); err != nil {
-		_ = conn.Close()
-		return nil, nil, err
+	// The ack is an ordinary reply; skip any event racing ahead of it.
+	for {
+		msgType, body, rerr := readFrame(conn)
+		if rerr != nil {
+			_ = conn.Close()
+			return nil, nil, rerr
+		}
+		if msgType&eventBit != 0 {
+			continue
+		}
+		var ack struct {
+			Success bool `json:"success"`
+		}
+		if json.Unmarshal(body, &ack) != nil || !ack.Success {
+			_ = conn.Close()
+			return nil, nil, errors.New("sway: subscribe rejected")
+		}
+		break
 	}
-	ticks := make(chan struct{}, 4)
-	done := make(chan struct{})
+	ticks := make(chan struct{}, 1)
 	go func() {
 		defer close(ticks)
 		for {
-			_, err := readFrame(conn)
-			if err != nil {
+			if _, _, err := readFrame(conn); err != nil {
 				return
 			}
 			select {
@@ -198,16 +327,10 @@ func Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
 			}
 		}
 	}()
-	stop := func() {
-		close(done)
-		_ = conn.Close()
-	}
-	go func() {
-		<-done
-	}()
-	_ = ctx
+	var once sync.Once
+	stop := func() { once.Do(func() { _ = conn.Close() }) }
 	return ticks, stop, nil
 }
 
-// IsRunning reports whether a sway socket is reachable.
+// IsRunning reports whether a sway socket is advertised.
 func IsRunning() bool { return SocketPath() != "" }

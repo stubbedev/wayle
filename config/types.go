@@ -107,6 +107,10 @@ func (s Size) ResolvePx(remBase, scale float64) float64 {
 func (s Size) IsZero() bool { return s.Value == 0 }
 
 func (s *Size) unmarshal(value any, key string) error {
+	// TOML integers are numbers too (serde's f32 accepts them).
+	if i, ok := value.(int64); ok {
+		value = float64(i)
+	}
 	switch v := value.(type) {
 	case float64:
 		if v < 0 {
@@ -115,10 +119,16 @@ func (s *Size) unmarshal(value any, key string) error {
 		s.Value, s.Unit = v, SizeMultiplier
 		return nil
 	case string:
+		// A bare number string is a scale, as Size::parse reads it.
+		if scale, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil && scale >= 0 {
+			s.Value, s.Unit = scale, SizeMultiplier
+			return nil
+		}
+		v = strings.TrimSpace(v)
 		if !strings.HasSuffix(v, "px") {
 			return fmt.Errorf("config: bar %s: invalid size %q (want a number or \"Npx\")", key, v)
 		}
-		px, err := strconv.ParseFloat(strings.TrimSuffix(v, "px"), 64)
+		px, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimSuffix(v, "px")), 64)
 		if err != nil || px < 0 {
 			return fmt.Errorf("config: bar %s: invalid size %q (want a number or \"Npx\")", key, v)
 		}

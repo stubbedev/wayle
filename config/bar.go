@@ -40,6 +40,13 @@ type Bar struct {
 	ButtonGroupBorderLocation BorderLocation
 	ButtonGroupBorderWidth    int
 	ButtonGroupRounding       RoundingLevel
+	// ButtonRounding is the element radius of module buttons and
+	// workspace buttons (--bar-button-rounding-element).
+	ButtonRounding RoundingLevel
+	// ButtonBorderLocation/Width place the border of bordered button
+	// chrome (the workspace containers' border-show).
+	ButtonBorderLocation BorderLocation
+	ButtonBorderWidth    int
 
 	// Per-button chrome. The colors default to the group background
 	// (ColorAuto); hover and active deepen the base.
@@ -110,6 +117,8 @@ type Config struct {
 	Cava               CavaConfig
 	Separator          SeparatorConfig
 	HyprlandWorkspaces HyprlandWorkspacesConfig
+	SwayWorkspaces     CompositorWorkspacesConfig
+	NiriWorkspaces     CompositorWorkspacesConfig
 	General            GeneralConfig
 }
 
@@ -142,6 +151,9 @@ func Defaults() *Config {
 			ButtonGroupBorderLocation: BorderNone,
 			ButtonGroupBorderWidth:    1,
 			ButtonGroupRounding:       RoundingSm,
+			ButtonRounding:            RoundingSm,
+			ButtonBorderLocation:      BorderAll,
+			ButtonBorderWidth:         1,
 			ButtonIconPadding:         Size{Value: 1.0, Unit: SizeMultiplier},
 			ButtonLabelPadding:        Size{Value: 1.0, Unit: SizeMultiplier},
 		},
@@ -178,6 +190,8 @@ func Defaults() *Config {
 		Osd:                DefaultsOsd(),
 		Separator:          DefaultsSeparator(),
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
+		SwayWorkspaces:     DefaultsSwayWorkspaces(),
+		NiriWorkspaces:     DefaultsNiriWorkspaces(),
 		General: GeneralConfig{
 			FontSans: "Inter",
 			FontMono: "JetBrains Mono",
@@ -233,6 +247,7 @@ type fileDoc struct {
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
 		SwayWorkspaces     *toml.Primitive `toml:"sway-workspaces"`
+		NiriWorkspaces     *toml.Primitive `toml:"niri-workspaces"`
 	} `toml:"modules"`
 	General *toml.Primitive `toml:"general"`
 }
@@ -259,6 +274,9 @@ type barDoc struct {
 	ButtonGroupBorderLocation string      `toml:"button-group-border-location"`
 	ButtonGroupBorderWidth    *int        `toml:"button-group-border-width"`
 	ButtonGroupRounding       string      `toml:"button-group-rounding"`
+	ButtonRounding            string      `toml:"button-rounding"`
+	ButtonBorderLocation      string      `toml:"button-border-location"`
+	ButtonBorderWidth         *int        `toml:"button-border-width"`
 	ButtonBGColor             string      `toml:"button-bg-color"`
 	ButtonBGOpacity           *int        `toml:"button-bg-opacity"`
 	ButtonHoverBGColor        string      `toml:"button-hover-bg-color"`
@@ -526,11 +544,18 @@ func (c *Config) applyTOML(data []byte) error {
 		c.Separator = sep
 	}
 	if doc.Modules != nil && doc.Modules.SwayWorkspaces != nil {
-		sw, err := applyHyprlandWorkspaces(md, *doc.Modules.SwayWorkspaces)
+		sw, err := applyCompositorWorkspaces(md, *doc.Modules.SwayWorkspaces, "sway-workspaces", DefaultsSwayWorkspaces())
 		if err != nil {
 			return err
 		}
-		c.HyprlandWorkspaces = sw
+		c.SwayWorkspaces = sw
+	}
+	if doc.Modules != nil && doc.Modules.NiriWorkspaces != nil {
+		nw, err := applyCompositorWorkspaces(md, *doc.Modules.NiriWorkspaces, "niri-workspaces", DefaultsNiriWorkspaces())
+		if err != nil {
+			return err
+		}
+		c.NiriWorkspaces = nw
 	}
 	if doc.Modules != nil && doc.Modules.HyprlandWorkspaces != nil {
 		hw, err := applyHyprlandWorkspaces(md, *doc.Modules.HyprlandWorkspaces)
@@ -650,6 +675,18 @@ func (b barDoc) toBar() (Bar, error) {
 	if b.ButtonGroupRounding != "" {
 		bar.ButtonGroupRounding = RoundingLevel(b.ButtonGroupRounding)
 	}
+	if b.ButtonRounding != "" {
+		bar.ButtonRounding = RoundingLevel(b.ButtonRounding)
+	}
+	if b.ButtonBorderLocation != "" {
+		bar.ButtonBorderLocation = BorderLocation(b.ButtonBorderLocation)
+	}
+	if b.ButtonBorderWidth != nil {
+		if *b.ButtonBorderWidth < 0 || *b.ButtonBorderWidth > 255 {
+			return Bar{}, fmt.Errorf("bar: button-border-width %d outside 0-255", *b.ButtonBorderWidth)
+		}
+		bar.ButtonBorderWidth = *b.ButtonBorderWidth
+	}
 	if b.ButtonBGColor != "" {
 		cv, err := ParseColorValue(b.ButtonBGColor)
 		if err != nil {
@@ -717,6 +754,12 @@ func (b barDoc) toBar() (Bar, error) {
 	}
 	if !validRounding[bar.ButtonGroupRounding] {
 		return Bar{}, fmt.Errorf("bar: invalid button-group-rounding %q (want none|sm|md|lg|full)", bar.ButtonGroupRounding)
+	}
+	if !validBorderLocations[bar.ButtonBorderLocation] {
+		return Bar{}, fmt.Errorf("bar: invalid button-border-location %q (want none|top|bottom|left|right|all)", bar.ButtonBorderLocation)
+	}
+	if !validRounding[bar.ButtonRounding] {
+		return Bar{}, fmt.Errorf("bar: invalid button-rounding %q (want none|sm|md|lg|full)", bar.ButtonRounding)
 	}
 	if bar.ButtonGroupOpacity < 0 || bar.ButtonGroupOpacity > 100 {
 		return Bar{}, fmt.Errorf("bar: button-group-opacity %d outside 0-100", bar.ButtonGroupOpacity)

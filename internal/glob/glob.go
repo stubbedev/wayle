@@ -32,3 +32,68 @@ func Match(pattern, name string) bool {
 	}
 	return true
 }
+
+// Wildcard is wayle-shell-core's glob::matches (the wildcard crate):
+// case-sensitive, byte-wise, `*` for any run and `?` for exactly one
+// byte, `\` escaping one of `*`, `?`, `\`. A malformed pattern (a
+// dangling or needless escape) never matches, as the crate's
+// constructor error does.
+func Wildcard(pattern, text string) bool {
+	type token struct {
+		lit  byte
+		kind byte // 0 literal, '*' any run, '?' one byte
+	}
+	tokens := make([]token, 0, len(pattern))
+	for i := 0; i < len(pattern); i++ {
+		switch c := pattern[i]; c {
+		case '\\':
+			if i+1 >= len(pattern) {
+				return false
+			}
+			next := pattern[i+1]
+			if next != '*' && next != '?' && next != '\\' {
+				return false
+			}
+			tokens = append(tokens, token{lit: next})
+			i++
+		case '*', '?':
+			tokens = append(tokens, token{kind: c})
+		default:
+			tokens = append(tokens, token{lit: c})
+		}
+	}
+	// Greedy two-pointer match with backtracking to the last star.
+	ti, pi := 0, 0
+	star, mark := -1, 0
+	for ti < len(text) {
+		switch {
+		case pi < len(tokens) && tokens[pi].kind == '*':
+			star, mark = pi, ti
+			pi++
+		case pi < len(tokens) && (tokens[pi].kind == '?' || (tokens[pi].kind == 0 && tokens[pi].lit == text[ti])):
+			pi++
+			ti++
+		case star >= 0:
+			pi = star + 1
+			mark++
+			ti = mark
+		default:
+			return false
+		}
+	}
+	for pi < len(tokens) && tokens[pi].kind == '*' {
+		pi++
+	}
+	return pi == len(tokens)
+}
+
+// FindWildcard is glob::find_match: the value of the first pattern
+// that matches text, in the given order.
+func FindWildcard(patterns []string, values []string, text string) (string, bool) {
+	for i, pattern := range patterns {
+		if Wildcard(pattern, text) {
+			return values[i], true
+		}
+	}
+	return "", false
+}

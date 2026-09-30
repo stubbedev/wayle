@@ -203,3 +203,35 @@ func TestLoadFileSelfExtendingLayoutErrors(t *testing.T) {
 		t.Fatal("self-extending layout: want error, got nil")
 	}
 }
+
+func TestLoadFileButtonRounding(t *testing.T) {
+	cfg, err := LoadFile(writeConfig(t, "[bar]\nbutton-rounding = \"lg\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Bar.ButtonRounding != RoundingLg || cfg.Bar.ButtonGroupRounding != RoundingSm {
+		t.Errorf("rounding = %q/%q, want lg with the group untouched", cfg.Bar.ButtonRounding, cfg.Bar.ButtonGroupRounding)
+	}
+	if _, err := LoadFile(writeConfig(t, "[bar]\nbutton-rounding = \"round\"\n")); err == nil || !strings.Contains(err.Error(), "button-rounding") {
+		t.Errorf("bad button-rounding: err = %v", err)
+	}
+}
+
+func TestLoadFileButtonBorder(t *testing.T) {
+	cfg := Defaults()
+	if cfg.Bar.ButtonBorderLocation != BorderAll || cfg.Bar.ButtonBorderWidth != 1 {
+		t.Fatalf("defaults = %q/%d, want all/1", cfg.Bar.ButtonBorderLocation, cfg.Bar.ButtonBorderWidth)
+	}
+	cfg, err := LoadFile(writeConfig(t, "[bar]\nbutton-border-location = \"bottom\"\nbutton-border-width = 3\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Bar.ButtonBorderLocation != BorderBottom || cfg.Bar.ButtonBorderWidth != 3 {
+		t.Errorf("got %q/%d", cfg.Bar.ButtonBorderLocation, cfg.Bar.ButtonBorderWidth)
+	}
+	for _, body := range []string{"button-border-location = \"middle\"", "button-border-width = 300"} {
+		if _, err := LoadFile(writeConfig(t, "[bar]\n"+body+"\n")); err == nil {
+			t.Errorf("%s: want error", body)
+		}
+	}
+}

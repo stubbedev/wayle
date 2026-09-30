@@ -256,3 +256,18 @@ func TestBorderPainterPaintsOnlyTheEdges(t *testing.T) {
 		}
 	}
 }
+
+func TestButtonRadiusFollowsButtonRounding(t *testing.T) {
+	s := testStyle(t, func(b *config.Bar) { b.ButtonRounding = config.RoundingLg })
+	if want := styling.RoundingRadiusPx(config.RoundingLg, 1); s.buttonRadius != want {
+		t.Errorf("button radius = %d, want button-rounding lg's %d", s.buttonRadius, want)
+	}
+	// The group rounding shapes the group, not its buttons.
+	s = testStyle(t, func(b *config.Bar) { b.ButtonGroupRounding = config.RoundingFull })
+	if want := styling.RoundingRadiusPx(config.RoundingSm, 1); s.buttonRadius != want {
+		t.Errorf("button radius = %d, want the default sm %d with only the group rounding changed", s.buttonRadius, want)
+	}
+	if s.groupRadius != styling.RoundingRadiusPx(config.RoundingFull, 1) {
+		t.Errorf("group radius = %d, want full", s.groupRadius)
+	}
+}

@@ -118,6 +118,7 @@ var factories = map[string]Factory{
 	"cava":                newCava,
 	"hyprland-workspaces": newHyprlandWorkspaces,
 	"sway-workspaces":     newSwayWorkspaces,
+	"niri-workspaces":     newNiriWorkspaces,
 	"separator":           newSeparator,
 }
 
@@ -179,6 +180,12 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 		handler = h
 	}
 	root := module.Root()
+	// Components that are not BarButtons in the Rust shell (the
+	// workspace rows) carry their own chrome and input handling.
+	if _, ok := module.(interface{ ownsChrome() }); ok {
+		row.Append(root, false)
+		return nil
+	}
 	row.Append(wrapActions(root, binding, ctx.Style, func(action config.ClickAction) {
 		// Dropdown bindings anchor to this module's own root; the
 		// registry toggles the popover on the connector's host.
