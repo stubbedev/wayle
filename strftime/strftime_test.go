@@ -69,6 +69,58 @@ func TestCompileRejectsEverySpecifierItFormats(t *testing.T) {
 	}
 }
 
+// TestPaddingFlags pins chrono's padding modifiers, which the lock
+// screen's default date format ("%A, %B %-d") depends on: "-" drops
+// the padding, "_" pads with spaces, "0" with zeros, and text fields
+// ignore the flag.
+func TestPaddingFlags(t *testing.T) {
+	early := time.Date(2026, 3, 5, 7, 4, 9, 0, time.UTC)
+	for _, tc := range []struct {
+		format string
+		want   string
+	}{
+		{"%A, %B %-d", "Thursday, March 5"},
+		{"%-m/%-d %-H:%M", "3/5 7:04"},
+		{"%_d|%_H", " 5| 7"},
+		{"%0e", "05"},
+		{"%-j", "64"},
+		{"%-M", "4"},
+		{"%-A", "Thursday"},
+		{"%-%", "%"},
+		{"%d", "05"},
+	} {
+		layout, err := Compile(tc.format)
+		if err != nil {
+			t.Errorf("Compile(%q): %v", tc.format, err)
+			continue
+		}
+		if got := layout.Format(early); got != tc.want {
+			t.Errorf("Format(%q) = %q, want %q", tc.format, got, tc.want)
+		}
+	}
+	zero := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	layout, _ := Compile("%-H:%-M")
+	if got := layout.Format(zero); got != "0:0" {
+		t.Errorf("unpadded zero fields = %q, want 0:0", got)
+	}
+}
+
+// TestPaddingFlagsStillValidate: a flag does not smuggle an
+// unsupported specifier past Compile, and a dangling flag renders
+// literally.
+func TestPaddingFlagsStillValidate(t *testing.T) {
+	if _, err := Compile("%-Q"); err == nil {
+		t.Error("Compile(%-Q): want error, got nil")
+	}
+	layout, err := Compile("%H%-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := layout.Format(ref); got != "14%-" {
+		t.Errorf("dangling flag renders = %q, want 14%%-", got)
+	}
+}
+
 func TestFormatPreservesLiteralPercentAtEnd(t *testing.T) {
 	layout, err := Compile("%H%")
 	if err != nil {
