@@ -21,20 +21,31 @@ type actionButton struct {
 	onRun   func(config.ClickAction)
 }
 
-// wrapActions wraps the module root when any binding is set; with all
-// five empty the module root goes in bare, like the Rust component
-// with an action-free module.
-func wrapActions(root widget.Widget, binding config.ClickConfig, onRun func(config.ClickAction)) widget.Widget {
-	if binding.LeftClick.Kind == config.ClickNone &&
-		binding.MiddleClick.Kind == config.ClickNone &&
-		binding.RightClick.Kind == config.ClickNone &&
-		binding.ScrollUp.Kind == config.ClickNone &&
-		binding.ScrollDown.Kind == config.ClickNone {
-		return root
+// wrapActions wraps the module root in the styled button. The chrome
+// (bg states, rounding, paddings) applies with or without bindings -
+// the Rust BarButton is styled either way - but with all five bindings
+// empty the wrapper hands the input hooks back unconsumed so scroll
+// containers keep scrolling through inert modules.
+func wrapActions(root widget.Widget, binding config.ClickConfig, style *barStyle, onRun func(config.ClickAction)) widget.Widget {
+	bound := binding.LeftClick.Kind != config.ClickNone ||
+		binding.MiddleClick.Kind != config.ClickNone ||
+		binding.RightClick.Kind != config.ClickNone ||
+		binding.ScrollUp.Kind != config.ClickNone ||
+		binding.ScrollDown.Kind != config.ClickNone
+	var inner *widget.Button
+	if style != nil {
+		inner = widget.NewButton(root, style.buttonLabelPad, style.buttonRadius)
+		inner.Bg = style.buttonBg
+		inner.BgHover = style.buttonBgHover
+		inner.BgPressed = style.buttonBgActive
+	} else {
+		inner = widget.NewButton(root, 0, 0)
 	}
-	button := &actionButton{binding: binding, onRun: onRun}
-	button.inner = widget.NewButton(root, 0, 0)
+	button := &actionButton{binding: binding, onRun: onRun, inner: inner}
 	button.inner.OnClick = func() { onRun(binding.LeftClick) }
+	if !bound {
+		button.binding = config.ClickConfig{}
+	}
 	return button
 }
 
@@ -50,8 +61,12 @@ func (a *actionButton) Paint(cv *render.Canvas) { a.inner.Paint(cv) }
 
 func (a *actionButton) HitTest(p widget.Point) widget.Widget { return a.HitLeaf(a, p) }
 
-// PointerButton routes middle and right presses.
+// PointerButton routes middle and right presses; with no bindings the
+// hooks pass through unconsumed.
 func (a *actionButton) PointerButton(button uint32) {
+	if a.binding.MiddleClick.Kind == config.ClickNone && a.binding.RightClick.Kind == config.ClickNone {
+		return
+	}
 	switch button {
 	case widget.BTNMiddle:
 		a.onRun(a.binding.MiddleClick)
@@ -63,6 +78,9 @@ func (a *actionButton) PointerButton(button uint32) {
 // ScrollInput maps vertical steps to the up/down bindings; positive dy
 // scrolls down, matching the wire convention Axis feeds ScrollBy.
 func (a *actionButton) ScrollInput(dy int) bool {
+	if a.binding.ScrollUp.Kind == config.ClickNone && a.binding.ScrollDown.Kind == config.ClickNone {
+		return false
+	}
 	switch {
 	case dy > 0:
 		a.onRun(a.binding.ScrollDown)

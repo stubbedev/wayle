@@ -174,7 +174,7 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	}); ok {
 		handler = h
 	}
-	row.Append(wrapActions(module.Root(), binding, func(action config.ClickAction) {
+	row.Append(wrapActions(module.Root(), binding, ctx.Style, func(action config.ClickAction) {
 		if handler != nil {
 			handler.RunAction(action)
 			return

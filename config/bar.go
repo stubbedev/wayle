@@ -40,6 +40,15 @@ type Bar struct {
 	ButtonGroupBorderLocation BorderLocation
 	ButtonGroupBorderWidth    int
 	ButtonGroupRounding       RoundingLevel
+
+	// Per-button chrome. The colors default to the group background
+	// (ColorAuto); hover and active deepen the base.
+	ButtonBGColor       ColorValue
+	ButtonBGOpacity     int
+	ButtonHoverBGColor  ColorValue
+	ButtonActiveBGColor ColorValue
+	ButtonIconPadding   Size
+	ButtonLabelPadding  Size
 }
 
 // BarLayout is the bar layout for one monitor. Monitor is a connector
@@ -128,10 +137,13 @@ func Defaults() *Config {
 			ButtonGroupPadding:        Size{Value: 0.0, Unit: SizeMultiplier},
 			ButtonGroupBackground:     mustColor("bg-elevated"),
 			ButtonGroupOpacity:        100,
+			ButtonBGOpacity:           100,
 			ButtonGroupBorderColor:    mustColor("border-accent"),
 			ButtonGroupBorderLocation: BorderNone,
 			ButtonGroupBorderWidth:    1,
 			ButtonGroupRounding:       RoundingSm,
+			ButtonIconPadding:         Size{Value: 1.0, Unit: SizeMultiplier},
+			ButtonLabelPadding:        Size{Value: 1.0, Unit: SizeMultiplier},
 		},
 		Clock: ClockConfig{
 			Click:  DefaultsClick(map[string]string{"left-click": "dropdown:calendar", "right-click": "dropdown:weather"}),
@@ -246,6 +258,12 @@ type barDoc struct {
 	ButtonGroupBorderLocation string      `toml:"button-group-border-location"`
 	ButtonGroupBorderWidth    *int        `toml:"button-group-border-width"`
 	ButtonGroupRounding       string      `toml:"button-group-rounding"`
+	ButtonBGColor             string      `toml:"button-bg-color"`
+	ButtonBGOpacity           *int        `toml:"button-bg-opacity"`
+	ButtonHoverBGColor        string      `toml:"button-hover-bg-color"`
+	ButtonActiveBGColor       string      `toml:"button-active-bg-color"`
+	ButtonIconPadding         tomlValue   `toml:"button-icon-padding"`
+	ButtonLabelPadding        tomlValue   `toml:"button-label-padding"`
 	Padding                   tomlValue   `toml:"padding"`
 	PaddingEnds               tomlValue   `toml:"padding-ends"`
 	InsetEdge                 tomlValue   `toml:"inset-edge"`
@@ -623,6 +641,45 @@ func (b barDoc) toBar() (Bar, error) {
 	}
 	if b.ButtonGroupRounding != "" {
 		bar.ButtonGroupRounding = RoundingLevel(b.ButtonGroupRounding)
+	}
+	if b.ButtonBGColor != "" {
+		cv, err := ParseColorValue(b.ButtonBGColor)
+		if err != nil {
+			return Bar{}, fmt.Errorf("bar: button-bg-color: %w", err)
+		}
+		bar.ButtonBGColor = cv
+	}
+	if b.ButtonBGOpacity != nil {
+		bar.ButtonBGOpacity = *b.ButtonBGOpacity
+	}
+	if b.ButtonHoverBGColor != "" {
+		cv, err := ParseColorValue(b.ButtonHoverBGColor)
+		if err != nil {
+			return Bar{}, fmt.Errorf("bar: button-hover-bg-color: %w", err)
+		}
+		bar.ButtonHoverBGColor = cv
+	}
+	if b.ButtonActiveBGColor != "" {
+		cv, err := ParseColorValue(b.ButtonActiveBGColor)
+		if err != nil {
+			return Bar{}, fmt.Errorf("bar: button-active-bg-color: %w", err)
+		}
+		bar.ButtonActiveBGColor = cv
+	}
+	for _, set := range []struct {
+		raw  tomlValue
+		dest *Size
+		name string
+	}{
+		{b.ButtonIconPadding, &bar.ButtonIconPadding, "button-icon-padding"},
+		{b.ButtonLabelPadding, &bar.ButtonLabelPadding, "button-label-padding"},
+	} {
+		if set.raw.value == nil {
+			continue
+		}
+		if err := set.dest.unmarshal(set.raw.value, set.name); err != nil {
+			return Bar{}, err
+		}
 	}
 	if b.Rounding != "" {
 		bar.Rounding = RoundingLevel(b.Rounding)

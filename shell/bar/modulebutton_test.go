@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -74,7 +75,7 @@ func newWrappedModule(t *testing.T, binding config.ClickConfig) (*actionButton, 
 	t.Helper()
 	rec := &recordedActions{}
 	label := widget.NewLabel(testFont(t), 12, "x", 0xFF000000)
-	wrapped := wrapActions(label, binding, func(action config.ClickAction) {
+	wrapped := wrapActions(label, binding, nil, func(action config.ClickAction) {
 		rec.actions = append(rec.actions, action)
 	})
 	button, ok := wrapped.(*actionButton)
@@ -114,11 +115,28 @@ func TestWrapActionsRoutesAllFiveBindings(t *testing.T) {
 	}
 }
 
-func TestWrapActionsBareWhenUnbound(t *testing.T) {
+func TestWrapActionsAlwaysWraps(t *testing.T) {
 	label := widget.NewLabel(testFont(t), 12, "x", 0xFF000000)
-	wrapped := wrapActions(label, config.ClickConfig{}, func(config.ClickAction) {})
-	if wrapped != widget.Widget(label) {
-		t.Fatalf("unbound module wrapped as %T, want the bare root", wrapped)
+	// Unbound modules still wrap: the button chrome applies either way.
+	wrapped := wrapActions(label, config.ClickConfig{}, nil, func(config.ClickAction) {})
+	btn, ok := wrapped.(*actionButton)
+	if !ok {
+		t.Fatalf("unbound module wrapped as %T, want the actionButton", wrapped)
+	}
+	// The unbound hooks pass through unconsumed.
+	if btn.ScrollInput(1) {
+		t.Error("an unbound button consumed scroll")
+	}
+	btn.PointerButton(widget.BTNRight)
+	// And a styled wrap carries the chrome.
+	bg := render.Color(0x112233FF)
+	style := &barStyle{buttonBg: bg, buttonRadius: 6, buttonLabelPad: 3}
+	styled := wrapActions(label, config.ClickConfig{}, style, func(config.ClickAction) {}).(*actionButton)
+	if styled.inner.Bg != bg {
+		t.Errorf("styled button bg = %#08x", uint32(styled.inner.Bg))
+	}
+	if got := styled.inner.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 50}}); got.W <= label.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 50}}).W {
+		t.Errorf("padding not applied: %v", got)
 	}
 }
 

@@ -62,6 +62,13 @@ type barStyle struct {
 	groupRadius  int
 	groupPadding int
 	groupGap     int
+
+	buttonBg       render.Color
+	buttonBgHover  render.Color
+	buttonBgActive render.Color
+	buttonRadius   int
+	buttonIconPad  int
+	buttonLabelPad int
 }
 
 // computeStyle resolves the bar chrome: sizes through Size::resolve_px
@@ -106,6 +113,31 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 		groupPadding = int(math.Round(bar.ButtonGroupPadding.Value * 0.25 * styling.RemBase * scale))
 	}
 
+	// Button chrome: the variant bg defaults to the group background at
+	// the configured opacity, hover and active deepen it, and the
+	// paddings follow the same 0.25-rem fine-tuning (styling.rs).
+	buttonBase := resolve(bar.ButtonGroupBackground)
+	if bar.ButtonBGColor.Kind == config.ColorCustom {
+		buttonBase = resolve(bar.ButtonBGColor)
+	}
+	buttonBg := styling.ColorMix(buttonBase, transparentColor, bar.ButtonBGOpacity)
+	hoverBase := buttonBase
+	if bar.ButtonHoverBGColor.Kind == config.ColorCustom {
+		hoverBase = resolve(bar.ButtonHoverBGColor)
+	}
+	buttonBgHover := styling.ColorMix(hoverBase, buttonBg, 50)
+	activeBase := hoverBase
+	if bar.ButtonActiveBGColor.Kind == config.ColorCustom {
+		activeBase = resolve(bar.ButtonActiveBGColor)
+	}
+	buttonBgActive := styling.ColorMix(activeBase, buttonBg, 80)
+	remPad := func(s config.Size) int {
+		if s.Unit == config.SizePixels {
+			return int(math.Round(s.Value))
+		}
+		return int(math.Round(s.Value * 0.25 * styling.RemBase * scale))
+	}
+
 	return barStyle{
 		palette:     palette,
 		bg:          bg,
@@ -119,6 +151,13 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 		paddingEnds: px(bar.PaddingEnds),
 		moduleGap:   px(bar.ModuleGap),
 		labelPx:     labelPx,
+
+		buttonBg:       buttonBg,
+		buttonBgHover:  buttonBgHover,
+		buttonBgActive: buttonBgActive,
+		buttonRadius:   styling.RoundingRadiusPx(bar.ButtonGroupRounding, scale),
+		buttonIconPad:  remPad(bar.ButtonIconPadding),
+		buttonLabelPad: remPad(bar.ButtonLabelPadding),
 
 		groupBg:      styling.ColorMix(resolve(bar.ButtonGroupBackground), transparentColor, bar.ButtonGroupOpacity),
 		groupBorder:  resolve(bar.ButtonGroupBorderColor),
