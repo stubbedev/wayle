@@ -154,6 +154,7 @@
               # a headless test session has no host fonts to fall back on.
               fontconfig
               sway # headless compositor for the wayle-go test gate (gelm parity)
+              dbus # dbus-daemon for the private test buses (internal/dbustest)
 
               inter # config default font-sans
               jetbrains-mono # config default font-mono
