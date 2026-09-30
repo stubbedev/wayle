@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/wayle/shell/colorpicker"
 	"github.com/stubbedev/wayle/shell/regionoverlay"
 	"github.com/stubbedev/wayle/shell/screenshot"
+	"github.com/stubbedev/wayle/shell/sharepicker"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -22,8 +23,9 @@ import (
 const overlayLabelPx = 14
 
 // captureServices is the shell's capture side: the region overlay, the
-// color picker, and the screenshot host behind com.wayle.Screenshot1
-// (bootstrap's screenshot service start).
+// color picker, the screenshot host behind com.wayle.Screenshot1, and
+// the share picker behind com.wayle.SharePicker1
+// (bootstrap's screenshot and share picker service starts).
 type captureServices struct {
 	host    *screenshot.Host
 	release []func()
@@ -32,13 +34,14 @@ type captureServices struct {
 // startCapture builds the overlays and the host on the application and
 // serves the host on the session bus. A bus failure leaves the
 // in-process builtin working.
-func startCapture(application *app.Application, outputs func() []*app.Output, cfg *config.Config, palette *styling.Palette, hypr *hyprland.Connection) *captureServices {
+func startCapture(application *app.Application, outputs func() []*app.Output, cfg *config.Config, palette *styling.Palette, hypr *hyprland.Connection, sans render.Font, labelPx float64) *captureServices {
 	var font render.Font
 	if face, err := app.FontWeighted(cfg.General.FontMono, overlayLabelPx, 700, false); err == nil {
 		font = app.FontFallback(face)
 	} else {
 		log.Printf("screenshot: overlay font %q: %v", cfg.General.FontMono, err)
 	}
+	region := regionoverlay.New(application, outputs, regionoverlay.Style{Accent: palette.Primary, Font: font})
 	monitors := func() []regionoverlay.Monitor {
 		outs := outputs()
 		mons := make([]regionoverlay.Monitor, len(outs))
@@ -50,7 +53,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cf
 	s := &captureServices{host: &screenshot.Host{
 		Config:   cfg.Screenshot,
 		Monitors: monitors,
-		Region:   regionoverlay.New(application, outputs, regionoverlay.Style{Accent: palette.Primary, Font: font}),
+		Region:   region,
 		Picker:   colorpicker.New(application, outputs, font, colorpicker.HistoryPath()),
 		Focus:    screenshot.CompositorFocus{Hyprland: hypr},
 		Copy:     clipboardCopier(application),
@@ -61,12 +64,17 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cf
 		return s
 	}
 	s.release = append(s.release, func() { _ = conn.Close() })
-	release, err := screenshot.NewDaemon(s.host).Export(conn)
-	if err != nil {
+	if release, err := screenshot.NewDaemon(s.host).Export(conn); err == nil {
+		s.release = append(s.release, release)
+	} else {
 		log.Printf("screenshot: daemon: %v", err)
-		return s
 	}
-	s.release = append(s.release, release)
+	picker := sharepicker.New(application, cfg.SharePicker, sharepicker.Style{Font: sans, LabelPx: labelPx, Palette: palette}, region)
+	if release, err := sharepicker.NewDaemon(picker).Export(conn); err == nil {
+		s.release = append(s.release, release)
+	} else {
+		log.Printf("share picker: daemon: %v", err)
+	}
 	return s
 }
 

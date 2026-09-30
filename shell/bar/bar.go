@@ -188,7 +188,7 @@ func RunWith(cfg *config.Config) error {
 	osdSrv := osd.New(application, cfg.Osd, font, palette)
 	dropdowns := newDropdownRegistry(application, cfg, font, &style, baseCtx)
 	baseCtx.Dropdowns = dropdowns
-	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland)
+	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
 	for _, output := range outputs {
