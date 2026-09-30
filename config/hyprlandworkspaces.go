@@ -57,6 +57,9 @@ type HyprlandWorkspacesConfig struct {
 	MinWorkspace    int
 	LabelUseName    bool
 	ShowSpecial     bool
+	// MonitorSpecific keeps a bar's row to its own output's
+	// workspaces (the schema's monitor-specific).
+	MonitorSpecific bool
 	Divider         string
 	WorkspaceMap    map[int]WorkspaceStyle
 }
@@ -75,6 +78,7 @@ func DefaultsHyprlandWorkspaces() HyprlandWorkspacesConfig {
 		MinWorkspace:    0,
 		LabelUseName:    false,
 		ShowSpecial:     true,
+		MonitorSpecific: true,
 		Divider:         " ",
 		WorkspaceMap:    map[int]WorkspaceStyle{},
 	}
@@ -95,6 +99,7 @@ func applyHyprlandWorkspaces(md toml.MetaData, prim toml.Primitive) (HyprlandWor
 		MinWorkspace    *int                 `toml:"min-workspace-count"`
 		LabelUseName    *bool                `toml:"label-use-name"`
 		ShowSpecial     *bool                `toml:"show-special"`
+		MonitorSpecific *bool                `toml:"monitor-specific"`
 		Divider         *string              `toml:"divider"`
 		WorkspaceMap    map[string]tomlValue `toml:"workspace-map"`
 	}
@@ -149,6 +154,9 @@ func applyHyprlandWorkspaces(md toml.MetaData, prim toml.Primitive) (HyprlandWor
 	}
 	if doc.ShowSpecial != nil {
 		cfg.ShowSpecial = *doc.ShowSpecial
+	}
+	if doc.MonitorSpecific != nil {
+		cfg.MonitorSpecific = *doc.MonitorSpecific
 	}
 	if doc.Divider != nil {
 		cfg.Divider = *doc.Divider

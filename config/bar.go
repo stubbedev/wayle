@@ -232,6 +232,7 @@ type fileDoc struct {
 		Custom             *[]customDoc    `toml:"custom"`
 		Separator          *toml.Primitive `toml:"separator"`
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
+		SwayWorkspaces     *toml.Primitive `toml:"sway-workspaces"`
 	} `toml:"modules"`
 	General *toml.Primitive `toml:"general"`
 }
@@ -523,6 +524,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Separator = sep
+	}
+	if doc.Modules != nil && doc.Modules.SwayWorkspaces != nil {
+		sw, err := applyHyprlandWorkspaces(md, *doc.Modules.SwayWorkspaces)
+		if err != nil {
+			return err
+		}
+		c.HyprlandWorkspaces = sw
 	}
 	if doc.Modules != nil && doc.Modules.HyprlandWorkspaces != nil {
 		hw, err := applyHyprlandWorkspaces(md, *doc.Modules.HyprlandWorkspaces)

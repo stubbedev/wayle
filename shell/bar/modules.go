@@ -117,6 +117,7 @@ var factories = map[string]Factory{
 	"clock":               newClock,
 	"cava":                newCava,
 	"hyprland-workspaces": newHyprlandWorkspaces,
+	"sway-workspaces":     newSwayWorkspaces,
 	"separator":           newSeparator,
 }
 
