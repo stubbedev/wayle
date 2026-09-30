@@ -28,8 +28,8 @@ Usage:
   wayle toast [flags] custom toast: --label --icon --percentage
                      --duration --preset --class
 
-Not ported yet: audio, config, icons, launch, lock, media, notify,
-panel, power, recorder, screenshot, systray, toast, wallpaper, widget.
+Not ported yet: audio, config, icons, launcher, lock, media, panel,
+power, screenshot, systray, vpn, wallpaper, widget.
 `
 
 func main() {
