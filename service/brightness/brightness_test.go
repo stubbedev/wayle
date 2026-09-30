@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
-	"golang.org/x/sys/unix"
 )
 
 // fakeBacklightDir builds a sysfs-looking tree in a temp dir and
@@ -101,7 +100,7 @@ func TestSetFallsBackToSysfs(t *testing.T) {
 	}{
 		"intel_backlight": {"raw", 3000, 12000},
 	})
-	source := NewSysfs()
+	source := newTestSystem(t, false)
 	if err := source.Set(context.Background(), "intel_backlight", 50); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
@@ -129,7 +128,7 @@ func TestSubscribeTicksOnWrites(t *testing.T) {
 	}{
 		"intel_backlight": {"raw", 3000, 12000},
 	})
-	source := NewSysfs()
+	source := newTestSystem(t, false)
 	ctx := t.Context()
 	ticks, stop, err := source.Subscribe(ctx)
 	if err != nil {
@@ -145,5 +144,4 @@ func TestSubscribeTicksOnWrites(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("no tick within 3s of a brightness write")
 	}
-	_ = unix.Close(-1)
 }

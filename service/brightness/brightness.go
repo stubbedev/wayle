@@ -1,23 +1,20 @@
 // Package brightness reads and sets backlight levels, the Go
 // counterpart of crates/wayle-brightness: sysfs enumeration and reads,
-// logind SetBrightness as the write path with a direct sysfs fallback.
-// External DDC/CI monitors are not ported yet.
+// logind SetBrightness as the write path with a direct sysfs fallback,
+// and external monitors over DDC/CI (ddc.go) with kernel-uevent
+// hotplug (uevent.go).
 package brightness
 
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/godbus/dbus/v5"
-	"golang.org/x/sys/unix"
 )
 
 // BacklightDir is the sysfs class directory for backlight devices; a
@@ -33,6 +30,8 @@ const (
 	TypeRaw Type = iota
 	TypeFirmware
 	TypePlatform
+	// TypeDDC is an external monitor driven over DDC/CI.
+	TypeDDC
 )
 
 // TypeFromSysfs parses the sysfs `type` file; unknown values are Raw,
@@ -159,115 +158,3 @@ type Source interface {
 	// Set applies a percentage to one device, clamped to 0..100.
 	Set(ctx context.Context, name string, percent float64) error
 }
-
-// Sysfs is the real source: sysfs reads, logind writes with sysfs
-// fallback, inotify watching.
-type Sysfs struct {
-	mu     sync.Mutex
-	bus    *dbus.Conn
-	busErr error
-}
-
-// NewSysfs connects to the system bus for logind; failure is deferred
-// to writes, which fall back to sysfs.
-func NewSysfs() *Sysfs {
-	conn, err := sessionBus()
-	return &Sysfs{bus: conn, busErr: err}
-}
-
-// Devices reads every device.
-func (s *Sysfs) Devices(context.Context) ([]Device, error) {
-	return Enumerate(), nil
-}
-
-// Set writes the clamped raw level: logind first, sysfs on failure.
-func (s *Sysfs) Set(_ context.Context, name string, percent float64) error {
-	device, err := ReadDevice(name)
-	if err != nil {
-		return err
-	}
-	clamped := percent
-	if clamped < 0 {
-		clamped = 0
-	}
-	if clamped > 100 {
-		clamped = 100
-	}
-	value := uint32(clamped / 100 * float64(device.Max))
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.bus != nil {
-		if err := setLogind(s.bus, name, value); err == nil {
-			return nil
-		}
-	}
-	return writeSysfs(name, value)
-}
-
-// Subscribe inotify-watches every device directory for level writes
-// and re-checks each second as a cheap drift correction (other
-// processes, DDC interactions).
-func (s *Sysfs) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
-	fd, err := unix.InotifyInit1(unix.IN_CLOEXEC)
-	if err != nil {
-		return nil, nil, fmt.Errorf("brightness: inotify: %w", err)
-	}
-	watches := map[string]int{}
-	entries, err := os.ReadDir(BacklightDir)
-	if err != nil {
-		_ = unix.Close(fd)
-		return nil, nil, fmt.Errorf("brightness: %w", err)
-	}
-	for _, entry := range entries {
-		wd, err := unix.InotifyAddWatch(fd, filepath.Join(BacklightDir, entry.Name()), unix.IN_MODIFY)
-		if err == nil {
-			watches[entry.Name()] = wd
-		}
-	}
-
-	ticks := make(chan struct{}, 1)
-	done := make(chan struct{})
-	go func() {
-		defer close(ticks)
-		buf := make([]byte, 4096)
-		poll := time.NewTicker(time.Second)
-		defer poll.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-done:
-				return
-			case <-poll.C:
-				tick(ticks)
-			default:
-				// Drain inotify without blocking: a read with no
-				// pending events would block, so poll readiness via
-				// a short SetNonblock cycle.
-				_ = unix.SetNonblock(fd, true)
-				n, err := unix.Read(fd, buf)
-				_ = unix.SetNonblock(fd, false)
-				if err == nil && n > 0 {
-					tick(ticks)
-				} else {
-					time.Sleep(50 * time.Millisecond)
-				}
-			}
-		}
-	}()
-	stop := func() {
-		close(done)
-		_ = unix.Close(fd)
-	}
-	return ticks, stop, nil
-}
-
-func tick(ticks chan struct{}) {
-	select {
-	case ticks <- struct{}{}:
-	default:
-	}
-}
-
-// ErrNoDevices is returned when the class directory yields nothing.
-var ErrNoDevices = errors.New("brightness: no backlight devices found")

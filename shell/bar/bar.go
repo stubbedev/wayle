@@ -82,7 +82,9 @@ func RunWith(cfg *config.Config) error {
 		defer func() { _ = battery.Close() }()
 		baseCtx.Battery = battery
 	}
-	baseCtx.Brightness = brightness.NewSysfs()
+	backlights := brightness.NewSystem(cfg.Brightness.EnableExt)
+	defer func() { _ = backlights.Close() }()
+	baseCtx.Brightness = backlights
 	baseCtx.Pulse = pulse.New()
 	if bt, err := bluetooth.NewSystem(); err == nil {
 		defer func() { _ = bt.Close() }()
