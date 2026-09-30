@@ -82,7 +82,7 @@ type networkModule struct {
 	ctx    ModuleContext
 	source network.Source
 	label  *widget.Label
-	icon   widget.Widget
+	icon   *widget.Icon
 	root   widget.Widget
 }
 
@@ -96,7 +96,7 @@ func newNetwork(ctx ModuleContext) (Module, error) {
 	m := &networkModule{ctx: ctx, source: ctx.Network}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Network.Icon)
-	m.root = assembleModule(ctx, ctx.Config.Network.Icon, m.label)
+	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (m *networkModule) refresh() error {
 	}
 	m.label.SetText(label)
 	m.label.SetColor(networkColor(snap, m.ctx.Style.palette, m.ctx.Style.fg))
-	if setter, ok := m.icon.(interface{ SetThemeName(name string) }); ok {
+	if setter := m.icon; setter != nil {
 		setter.SetThemeName(networkIconName(cfg, snap))
 	}
 	return nil

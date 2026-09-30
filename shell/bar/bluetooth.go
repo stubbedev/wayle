@@ -48,7 +48,7 @@ type bluetoothModule struct {
 	ctx    ModuleContext
 	source bluetooth.Source
 	label  *widget.Label
-	icon   widget.Widget
+	icon   *widget.Icon
 	root   widget.Widget
 }
 
@@ -62,7 +62,7 @@ func newBluetooth(ctx ModuleContext) (Module, error) {
 	m := &bluetoothModule{ctx: ctx, source: ctx.Bluetooth}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Bluetooth.Icon)
-	m.root = assembleModule(ctx, ctx.Config.Bluetooth.Icon, m.label)
+	m.root = assembleModule(ctx, m.icon, m.label)
 	m.refresh()
 	startBtPairingNotifier(ctx.Bluetooth)
 	// The module lives as long as the bar; the subscription ends with
@@ -90,7 +90,7 @@ func (m *bluetoothModule) refresh() {
 	}
 	m.label.SetText(label)
 	m.label.SetColor(color)
-	if setter, ok := m.icon.(interface{ SetThemeName(name string) }); ok {
+	if setter := m.icon; setter != nil {
 		setter.SetThemeName(bluetoothIconName(cfg, snap))
 	}
 }

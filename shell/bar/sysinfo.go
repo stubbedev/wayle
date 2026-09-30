@@ -70,7 +70,9 @@ func newPollModule(ctx ModuleContext, pollMs int, read func() (float64, error), 
 }
 
 // Root assembles the icon beside the label when the module shows one.
-func (m *pollModule) Root() widget.Widget { return assembleModule(m.ctx, m.icon, m.label) }
+func (m *pollModule) Root() widget.Widget {
+	return assembleModule(m.ctx, moduleIcon(m.ctx, m.icon), m.label)
+}
 
 // Stop ends the poll loop.
 func (m *pollModule) Stop() {

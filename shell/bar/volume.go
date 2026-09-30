@@ -15,8 +15,8 @@ import (
 )
 
 // volumeLabel renders the format; "percent" like the other level
-// modules. A muted sink shows the same label (the Rust module's
-// icon-muted governs the icon, which is not ported here).
+// modules. A muted sink keeps its percent label: mute shows through
+// the icon (icon-muted), exactly as methods.rs's update_display.
 func volumeLabel(format string, percent float64) string {
 	return replaceTemplateVar(format, "percent", strconv.Itoa(int(math.Round(percent))))
 }
@@ -27,13 +27,10 @@ func volumePercent(dev pulse.Device) float64 {
 	return math.Round(dev.Volume.AveragePercentage())
 }
 
-// volumeColor resolves the label ink: muted wins (the Rust module's
-// icon-muted semantics on a label-only surface), then thresholds by
-// the rounded level (apply_thresholds), else the default fg.
+// volumeColor resolves the label ink: the thresholds by the rounded
+// level (apply_thresholds), else the default fg. Mute does not recolor
+// (methods.rs applies the thresholds on the level alone).
 func volumeColor(dev pulse.Device, cfg config.VolumeConfig, palette *styling.Palette, fallback render.Color) render.Color {
-	if dev.Muted {
-		return mutedFg(palette)
-	}
 	if override, ok := thresholdColor(volumePercent(dev), cfg.Thresholds, palette); ok {
 		return override
 	}
@@ -46,7 +43,7 @@ type volumeModule struct {
 	ctx    ModuleContext
 	source pulse.Source
 	label  *widget.Label
-	icon   widget.Widget
+	icon   *widget.Icon
 	root   widget.Widget
 }
 
@@ -60,7 +57,7 @@ func newVolume(ctx ModuleContext) (Module, error) {
 	m := &volumeModule{ctx: ctx, source: ctx.Pulse}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Volume.Icon)
-	m.root = assembleModule(ctx, ctx.Config.Volume.Icon, m.label)
+	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -91,7 +88,7 @@ func (m *volumeModule) refresh() error {
 	}
 	m.label.SetText(label)
 	m.label.SetColor(volumeColor(dev, cfg, m.ctx.Style.palette, m.ctx.Style.fg))
-	if setter, ok := m.icon.(interface{ SetThemeName(name string) }); ok {
+	if setter := m.icon; setter != nil {
 		setter.SetThemeName(volumeIconName(cfg, dev))
 	}
 	return nil

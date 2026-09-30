@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/widget"
-
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/notifications"
 )
@@ -72,7 +70,7 @@ func TestNotificationModuleFollowsService(t *testing.T) {
 		t.Fatalf("resting label = %q, want 00", got)
 	}
 	tm := module.(*notificationModule)
-	icon := tm.icon.(*widget.Icon)
+	icon := tm.icon
 
 	// A notification flips the count and the icon.
 	ctx.Notifications.Notify("app", 0, "", "hello", "", nil, 0)

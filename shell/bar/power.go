@@ -12,7 +12,7 @@ import (
 // commands, and the native `:menu` binding opens the power dropdown.
 type powerModule struct {
 	ctx  ModuleContext
-	icon widget.Widget
+	icon *widget.Icon
 }
 
 func newPower(ctx ModuleContext) (Module, error) {

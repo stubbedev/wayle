@@ -14,8 +14,9 @@ const iconPx = 16
 // moduleIcon builds the theme icon a module shows beside its label;
 // nil when the module shows none or the name is empty. Symbolic
 // glyphs recolor through SetTint to the configured color (auto
-// resolves to the bar fg).
-func moduleIcon(ctx ModuleContext, icon config.IconConfig) widget.Widget {
+// resolves to the bar fg). The concrete return type keeps nil checks
+// honest: a nil *widget.Icon never hides inside a non-nil interface.
+func moduleIcon(ctx ModuleContext, icon config.IconConfig) *widget.Icon {
 	if !icon.Show || icon.Name == "" {
 		return nil
 	}
@@ -28,11 +29,12 @@ func moduleIcon(ctx ModuleContext, icon config.IconConfig) widget.Widget {
 	return ic
 }
 
-// assembleModule pairs an icon (when configured) with the module's
-// label; without an icon the label stays the whole root, which keeps
-// single-label modules cheap and their tests simple.
-func assembleModule(ctx ModuleContext, icon config.IconConfig, label *widget.Label) widget.Widget {
-	ic := moduleIcon(ctx, icon)
+// assembleModule pairs the module's icon (nil when it shows none) with
+// its label; without an icon the label stays the whole root, which
+// keeps single-label modules cheap and their tests simple. The icon is
+// the caller's own instance, so state-icon swaps (SetThemeName) land
+// on the widget in the tree.
+func assembleModule(ctx ModuleContext, ic *widget.Icon, label *widget.Label) widget.Widget {
 	if ic == nil {
 		return label
 	}

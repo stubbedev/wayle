@@ -149,7 +149,7 @@ func TestBatteryStateIcon(t *testing.T) {
 	if m.icon == nil {
 		t.Fatal("the battery icon defaults on")
 	}
-	icon := m.icon.(*widget.Icon)
+	icon := m.icon
 
 	// Discharging: the level list bucketed over the percentage.
 	if err := m.refresh(); err != nil {

@@ -22,7 +22,7 @@ type microphoneModule struct {
 	ctx    ModuleContext
 	source pulse.Source
 	label  *widget.Label
-	icon   widget.Widget
+	icon   *widget.Icon
 	root   widget.Widget
 }
 
@@ -36,7 +36,7 @@ func newMicrophone(ctx ModuleContext) (Module, error) {
 	m := &microphoneModule{ctx: ctx, source: ctx.Pulse}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Microphone.Icon)
-	m.root = assembleModule(ctx, ctx.Config.Microphone.Icon, m.label)
+	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (m *microphoneModule) refresh() error {
 	}
 	m.label.SetText(label)
 	m.label.SetColor(color)
-	if setter, ok := m.icon.(interface{ SetThemeName(name string) }); ok {
+	if setter := m.icon; setter != nil {
 		name := cfg.Icon.Name
 		if dev.Muted {
 			name = cfg.IconMuted

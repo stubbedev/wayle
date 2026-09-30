@@ -53,7 +53,7 @@ type battery struct {
 	ctx    ModuleContext
 	source upower.Source
 	label  *widget.Label
-	icon   widget.Widget
+	icon   *widget.Icon
 	root   widget.Widget
 	cancel context.CancelFunc
 }
@@ -69,7 +69,7 @@ func newBattery(ctx ModuleContext) (Module, error) {
 	m := &battery{ctx: ctx, source: ctx.Battery}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Battery.Icon)
-	m.root = assembleModule(ctx, ctx.Config.Battery.Icon, m.label)
+	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -104,8 +104,8 @@ func (m *battery) refresh() error {
 // or unknown, charging when charging or pending charge, else the
 // level list bucketed by percentage.
 func (m *battery) setIcon(cfg config.BatteryConfig, dev upower.Device) {
-	setter, ok := m.icon.(interface{ SetThemeName(name string) })
-	if !ok {
+	setter := m.icon
+	if setter == nil {
 		return
 	}
 	var name string

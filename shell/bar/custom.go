@@ -294,7 +294,7 @@ func (m *customModule) apply(out string) {
 }
 
 func (m *customModule) Root() widget.Widget {
-	return assembleModule(m.ctx, m.def.Icon, m.label)
+	return assembleModule(m.ctx, moduleIcon(m.ctx, m.def.Icon), m.label)
 }
 
 // Stop releases the poll/watch goroutine and the update registration.

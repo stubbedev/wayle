@@ -45,7 +45,7 @@ type notificationModule struct {
 	ctx   ModuleContext
 	src   *notifications.Service
 	label *widget.Label
-	icon  widget.Widget
+	icon  *widget.Icon
 	root  widget.Widget
 }
 
@@ -55,7 +55,7 @@ func newNotification(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("notifications: no notification service available")
 	}
 	m.icon = moduleIcon(ctx, ctx.Config.Notification.Icon)
-	m.root = assembleModule(ctx, ctx.Config.Notification.Icon, m.label)
+	m.root = assembleModule(ctx, m.icon, m.label)
 	m.refresh()
 	// Follow the service's change feed; the events also drive the OSD
 	// popups later. Headless construction refreshes inline.
@@ -86,7 +86,7 @@ func (m *notificationModule) refresh() {
 	}
 	m.label.SetText(text)
 	m.label.SetColor(notificationColor(cfg, count, m.ctx.Style.palette, m.ctx.Style.fg))
-	if setter, ok := m.icon.(interface{ SetThemeName(name string) }); ok {
+	if setter := m.icon; setter != nil {
 		setter.SetThemeName(notificationIconName(cfg, count, dnd))
 	}
 }

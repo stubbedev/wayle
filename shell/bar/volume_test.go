@@ -119,27 +119,77 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 	}
 }
 
-func TestVolumeMutedDimsTheLabel(t *testing.T) {
-	cfg := config.Defaults()
-	source := &fakePulseSource{
-		dev:   pulse.Device{Volume: pct(42), Muted: true},
-		ticks: make(chan struct{}, 1),
-	}
+// newVolumeForTest builds the module around a fake source the way
+// newVolume does, minus the loop subscription.
+func newVolumeForTest(t *testing.T, cfg *config.Config, source *fakePulseSource) *volumeModule {
+	t.Helper()
 	style := computeStyle(cfg, styling.Default())
-	m := &volumeModule{
-		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
-		source: source,
+	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style}
+	m := &volumeModule{ctx: ctx, source: source}
+	m.label = widget.NewLabel(ctx.Font, style.labelPx, "", style.fg)
+	m.icon = moduleIcon(ctx, cfg.Volume.Icon)
+	m.root = assembleModule(ctx, m.icon, m.label)
+	if err := m.refresh(); err != nil {
+		t.Fatalf("refresh: %v", err)
 	}
-	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	return m
+}
+
+func TestVolumeMutedSwapsTheIconInTheTree(t *testing.T) {
+	cfg := config.Defaults()
+	source := &fakePulseSource{dev: pulse.Device{Volume: pct(42), Muted: true}}
+	m := newVolumeForTest(t, cfg, source)
+	row, ok := m.root.(*widget.Box)
+	if !ok || len(row.Children()) != 2 {
+		t.Fatalf("root = %T, want the icon+label row", m.root)
+	}
+	icon, ok := row.Children()[0].(*widget.Icon)
+	if !ok || icon != m.icon {
+		t.Fatal("the icon the module updates is not the one in the tree")
+	}
+	if icon.Name() != cfg.Volume.IconMuted {
+		t.Errorf("muted icon = %q, want icon-muted %q", icon.Name(), cfg.Volume.IconMuted)
+	}
+	// Mute keeps the percent label and the default ink.
+	if got := m.label.Text(); got != "42%" {
+		t.Errorf("muted label = %q, want the percent", got)
+	}
+	if m.label.Color() != m.ctx.Style.fg {
+		t.Errorf("muted color = %#08x, want the default fg (mute does not recolor)", m.label.Color())
+	}
+
+	// Unmuting leaves icon-muted for the level icon.
+	source.dev.Muted = false
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := m.label.Text(); got != "42%" {
-		t.Errorf("muted label = %q, want the percent (icons are not ported; mute shows as fg-muted)", got)
+	if want := cfg.Volume.LevelIcons[1]; icon.Name() != want {
+		t.Errorf("unmuted icon at 42%% = %q, want %q", icon.Name(), want)
 	}
-	mutedColor, _ := styling.ResolveColor(config.ColorValue{Token: config.TokenFgMuted}, styling.Default())
-	if m.label.Color() != mutedColor {
-		t.Errorf("muted color = %#08x, want fg-muted", m.label.Color())
+}
+
+func TestVolumeIconNameSelection(t *testing.T) {
+	cfg := config.DefaultsVolume()
+	cfg.LevelIcons = []string{"vol-1", "vol-2", "vol-3"}
+	cfg.IconMuted = "muted"
+	for _, tc := range []struct {
+		dev  pulse.Device
+		want string
+	}{
+		{pulse.Device{Volume: pct(50), Muted: true}, "muted"},
+		{pulse.Device{Volume: pct(0)}, "vol-1"},
+		{pulse.Device{Volume: pct(15)}, "vol-1"},
+		{pulse.Device{Volume: pct(50)}, "vol-2"},
+		{pulse.Device{Volume: pct(100)}, "vol-3"},
+		{pulse.Device{Volume: pct(150)}, "vol-3"},
+	} {
+		if got := volumeIconName(cfg, tc.dev); got != tc.want {
+			t.Errorf("%v%%: icon = %q, want %q", tc.dev.Volume.AveragePercentage(), got, tc.want)
+		}
+	}
+	cfg.LevelIcons = nil
+	if got := volumeIconName(cfg, pulse.Device{Volume: pct(50)}); got != "muted" {
+		t.Errorf("no level icons: icon = %q, want the muted icon", got)
 	}
 }
 

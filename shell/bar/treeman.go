@@ -31,7 +31,7 @@ type treemanModule struct {
 	ctx   ModuleContext
 	src   treeman.Source
 	label *widget.Label
-	icon  widget.Widget
+	icon  *widget.Icon
 	root  widget.Widget
 	stop  func()
 }
@@ -39,7 +39,7 @@ type treemanModule struct {
 func newTreeman(ctx ModuleContext) (Module, error) {
 	m := &treemanModule{ctx: ctx, src: ctx.Treeman, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.icon = moduleIcon(ctx, ctx.Config.Treeman.Icon)
-	m.root = assembleModule(ctx, ctx.Config.Treeman.Icon, m.label)
+	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -84,9 +84,7 @@ func (m *treemanModule) refresh() error {
 	}
 	m.label.SetText(text)
 	m.label.SetColor(treemanColor(cfg, status.WorstBucket(), m.ctx.Style.palette, m.ctx.Style.fg))
-	if setter, ok := m.icon.(interface {
-		SetThemeName(name string)
-	}); ok {
+	if setter := m.icon; setter != nil {
 		name := cfg.Icons[config.TreemanBucketStable].Name
 		switch status.WorstBucket() {
 		case treeman.BucketFailed:

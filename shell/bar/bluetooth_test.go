@@ -81,7 +81,7 @@ func TestBluetoothStateIcon(t *testing.T) {
 	if m.icon == nil {
 		t.Fatal("the bluetooth icon defaults on")
 	}
-	icon := m.icon.(*widget.Icon)
+	icon := m.icon
 
 	// The connected state first.
 	m.refresh()
@@ -118,7 +118,7 @@ func TestMicrophoneStateIcon(t *testing.T) {
 	if m.icon == nil {
 		t.Fatal("the microphone icon defaults on")
 	}
-	icon := m.icon.(*widget.Icon)
+	icon := m.icon
 
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)

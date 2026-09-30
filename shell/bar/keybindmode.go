@@ -30,7 +30,7 @@ type keybindModeModule struct {
 	ctx    ModuleContext
 	root   widget.Widget
 	label  *widget.Label
-	icon   widget.Widget
+	icon   *widget.Icon
 	submap string
 }
 
@@ -82,7 +82,7 @@ func (m *keybindModeModule) render() {
 	m.label.SetText(text)
 	visible := keybindModeVisible(m.submap, cfg.AutoHide)
 	m.label.SetVisible(visible)
-	if setter, ok := m.icon.(interface{ SetVisible(bool) }); ok {
+	if setter := m.icon; setter != nil {
 		setter.SetVisible(visible)
 	}
 }

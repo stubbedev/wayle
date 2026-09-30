@@ -25,7 +25,7 @@ type powerProfilesModule struct {
 	ctx   ModuleContext
 	src   powerprofiles.Source
 	label *widget.Label
-	icon  widget.Widget
+	icon  *widget.Icon
 	root  widget.Widget
 	snap  powerprofiles.Snapshot
 	stop  func()
@@ -76,10 +76,7 @@ func (m *powerProfilesModule) refresh() error {
 	}
 	m.label.SetText(text)
 	m.label.SetColor(m.profileColor(snap.Active))
-	if setter, ok := m.icon.(interface {
-		SetTint(c render.Color)
-		SetThemeName(name string)
-	}); ok {
+	if setter := m.icon; setter != nil {
 		setter.SetTint(m.profileColor(snap.Active))
 		setter.SetThemeName(cfg.Icons[snap.Active].Name)
 	}

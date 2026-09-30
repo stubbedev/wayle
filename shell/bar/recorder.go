@@ -65,7 +65,7 @@ type recorderModule struct {
 	ctx   ModuleContext
 	src   *recorder.State
 	label *widget.Label
-	icon  widget.Widget
+	icon  *widget.Icon
 	root  widget.Widget
 }
 
@@ -75,7 +75,7 @@ func newRecorder(ctx ModuleContext) (Module, error) {
 		m.src = recorder.NewState(recorder.WfRecorder{}, 0)
 	}
 	m.icon = moduleIcon(ctx, ctx.Config.Recorder.Icon)
-	m.root = assembleModule(ctx, ctx.Config.Recorder.Icon, m.label)
+	m.root = assembleModule(ctx, m.icon, m.label)
 	m.refresh()
 	// Follow the shared state; headless construction refreshes inline.
 	if ctx.App == nil {
@@ -104,7 +104,7 @@ func (m *recorderModule) refresh() {
 	}
 	m.label.SetText(text)
 	m.label.SetColor(recorderColor(cfg, snap, m.ctx.Style.palette, m.ctx.Style.fg))
-	if setter, ok := m.icon.(interface{ SetThemeName(name string) }); ok {
+	if setter := m.icon; setter != nil {
 		setter.SetThemeName(recorderIconName(cfg, snap))
 	}
 }

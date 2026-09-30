@@ -31,7 +31,7 @@ func hyprsunsetLabel(format string, enabled bool, temp, gamma, configTemp, confi
 type hyprsunsetModule struct {
 	ctx     ModuleContext
 	label   *widget.Label
-	icon    widget.Widget
+	icon    *widget.Icon
 	root    widget.Widget
 	child   *exec.Cmd
 	enabled bool
@@ -63,9 +63,7 @@ func (m *hyprsunsetModule) render() {
 		text = hyprsunsetLabel(cfg.Format, m.enabled, m.temp, m.gamma, cfg.Temperature, cfg.Gamma)
 	}
 	m.label.SetText(text)
-	if setter, ok := m.icon.(interface {
-		SetThemeName(name string)
-	}); ok {
+	if setter := m.icon; setter != nil {
 		icon := cfg.IconOff
 		if m.enabled {
 			icon = cfg.IconOn

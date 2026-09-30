@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stubbedev/gelm/widget"
-
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/treeman"
 )
@@ -80,7 +78,7 @@ func TestTreemanModuleFollowsBuckets(t *testing.T) {
 	}
 
 	// A failure in the buckets flips the icon.
-	icon := tm.icon.(*widget.Icon)
+	icon := tm.icon
 	src.status = &treeman.Status{Total: 2, Stable: 1, Failed: 1}
 	if err := tm.refresh(); err != nil {
 		t.Fatal(err)

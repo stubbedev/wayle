@@ -177,7 +177,7 @@ func (m *worldClockModule) apply(format string) {
 }
 
 func (m *worldClockModule) Root() widget.Widget {
-	return assembleModule(m.ctx, m.ctx.Config.WorldClock.Icon, m.label)
+	return assembleModule(m.ctx, moduleIcon(m.ctx, m.ctx.Config.WorldClock.Icon), m.label)
 }
 
 // Stop ends the render ticker.
@@ -238,7 +238,7 @@ func (m *weatherModule) refresh(ctx context.Context) {
 }
 
 func (m *weatherModule) Root() widget.Widget {
-	return assembleModule(m.ctx, m.ctx.Config.Weather.Icon, m.label)
+	return assembleModule(m.ctx, moduleIcon(m.ctx, m.ctx.Config.Weather.Icon), m.label)
 }
 
 // Stop ends the refresh loop.

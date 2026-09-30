@@ -62,7 +62,7 @@ type idleInhibitModule struct {
 	ctx     ModuleContext
 	state   *idleinhibit.State
 	label   *widget.Label
-	icon    widget.Widget
+	icon    *widget.Icon
 	root    widget.Widget
 	host    app.Host
 	release func()
@@ -139,16 +139,14 @@ func (m *idleInhibitModule) render() {
 	}
 	m.label.SetText(text)
 	m.label.SetColor(idleInhibitColor(cfg, snap.Active, m.ctx.Style.palette, m.ctx.Style.fg))
-	if setter, ok := m.icon.(interface {
-		SetThemeName(name string)
-	}); ok {
+	if setter := m.icon; setter != nil {
 		icon := cfg.Icons[config.IdleInhibitInactive]
 		if snap.Active {
 			icon = cfg.Icons[config.IdleInhibitActive]
 		}
 		setter.SetThemeName(icon.Name)
 	}
-	if setter, ok := m.icon.(interface{ SetTint(c render.Color) }); ok {
+	if setter := m.icon; setter != nil {
 		setter.SetTint(idleInhibitColor(cfg, snap.Active, m.ctx.Style.palette, m.ctx.Style.fg))
 	}
 }
