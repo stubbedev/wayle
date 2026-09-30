@@ -262,6 +262,12 @@ func collectWindows(n *treeNode, workspace int64, hasWorkspace bool, out *[]Wind
 	}
 }
 
+// Tree returns the raw GET_TREE reply, for callers that walk fields
+// Windows does not model (the launcher's window mode).
+func (c *Conn) Tree() ([]byte, error) {
+	return c.request(msgGetTree, nil)
+}
+
 // Windows walks GET_TREE into its leaf windows, tiling before
 // floating per container, in tree order.
 func (c *Conn) Windows() ([]Window, error) {
