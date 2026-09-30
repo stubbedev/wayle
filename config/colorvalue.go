@@ -115,30 +115,13 @@ func ParseColorValue(s string) (ColorValue, error) {
 		if err != nil {
 			return ColorValue{}, err
 		}
-		return ColorValue{Kind: ColorCustom, Hex: string(hex)}, nil
+		return ColorValue{Kind: ColorCustom, Hex: hex.String()}, nil
 	}
 	token := CssToken(s)
 	if !validTokens[token] {
 		return ColorValue{}, fmt.Errorf("config: unknown color %q (want a token name, #hex, \"transparent\", or \"auto\")", s)
 	}
 	return ColorValue{Kind: ColorToken, Token: token}, nil
-}
-
-// validHex reports whether s is #rgb, #rgba, #rrggbb, or #rrggbbaa: the
-// HexColor::validate lengths.
-func validHex(s string) bool {
-	if !strings.HasPrefix(s, "#") {
-		return false
-	}
-	if n := len(s) - 1; n != 3 && n != 4 && n != 6 && n != 8 {
-		return false
-	}
-	for _, r := range s[1:] {
-		if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
-			return false
-		}
-	}
-	return true
 }
 
 // UnmarshalText decodes a TOML color string through ParseColorValue, so
@@ -172,29 +155,4 @@ func (c ColorValue) ToCSS() string {
 	default: // ColorAuto
 		return TokenAccent.CSSVar()
 	}
-}
-
-// HexColor is a validated CSS hex color: #rgb, #rgba, #rrggbb, or
-// #rrggbbaa (crates/wayle-config/src/schemas/styling/types/validated/
-// hex_color.rs). Construct it with ParseHexColor.
-type HexColor string
-
-// ParseHexColor validates one hex color string, rejecting the
-// HexColor::new error cases: a missing '#', a wrong digit count, a
-// non-hex digit.
-func ParseHexColor(s string) (HexColor, error) {
-	if !validHex(s) {
-		return "", fmt.Errorf("config: invalid hex color %q (want #rgb, #rgba, #rrggbb, or #rrggbbaa)", s)
-	}
-	return HexColor(s), nil
-}
-
-// UnmarshalText decodes a TOML hex string through ParseHexColor.
-func (h *HexColor) UnmarshalText(text []byte) error {
-	hex, err := ParseHexColor(string(text))
-	if err != nil {
-		return err
-	}
-	*h = hex
-	return nil
 }

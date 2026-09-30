@@ -87,10 +87,10 @@ func DefaultsStyling() StylingConfig {
 // (the Go field of that name holds the colors).
 func (s StylingConfig) ActivePalette() Palette {
 	base := Palette{
-		Bg: string(s.Palette.Bg), Surface: string(s.Palette.Surface), Elevated: string(s.Palette.Elevated),
-		Fg: string(s.Palette.Fg), FgMuted: string(s.Palette.FgMuted), Primary: string(s.Palette.Primary),
-		Red: string(s.Palette.Red), Yellow: string(s.Palette.Yellow),
-		Green: string(s.Palette.Green), Blue: string(s.Palette.Blue),
+		Bg: s.Palette.Bg.String(), Surface: s.Palette.Surface.String(), Elevated: s.Palette.Elevated.String(),
+		Fg: s.Palette.Fg.String(), FgMuted: s.Palette.FgMuted.String(), Primary: s.Palette.Primary.String(),
+		Red: s.Palette.Red.String(), Yellow: s.Palette.Yellow.String(),
+		Green: s.Palette.Green.String(), Blue: s.Palette.Blue.String(),
 	}
 	light, forced := s.Appearance.ForcedLight()
 	if !forced || s.PaletteBaseTheme == "" {

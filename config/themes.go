@@ -37,12 +37,12 @@ var wayleTheme = Palette{
 }
 
 // paletteConfigOf lifts a built-in palette into the [styling.palette]
-// form; the built-in literals are valid hex by construction.
+// form; a malformed built-in literal panics at init (mustHex).
 func paletteConfigOf(p Palette) PaletteConfig {
 	return PaletteConfig{
-		Bg: HexColor(p.Bg), Surface: HexColor(p.Surface), Elevated: HexColor(p.Elevated),
-		Fg: HexColor(p.Fg), FgMuted: HexColor(p.FgMuted), Primary: HexColor(p.Primary),
-		Red: HexColor(p.Red), Yellow: HexColor(p.Yellow), Green: HexColor(p.Green), Blue: HexColor(p.Blue),
+		Bg: mustHex(p.Bg), Surface: mustHex(p.Surface), Elevated: mustHex(p.Elevated),
+		Fg: mustHex(p.Fg), FgMuted: mustHex(p.FgMuted), Primary: mustHex(p.Primary),
+		Red: mustHex(p.Red), Yellow: mustHex(p.Yellow), Green: mustHex(p.Green), Blue: mustHex(p.Blue),
 	}
 }
 

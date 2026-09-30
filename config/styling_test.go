@@ -37,7 +37,7 @@ blue = "#11223344"
 		Scale: 1.5, Rounding: RoundingLg, Appearance: AppearanceDark, PaletteBaseTheme: "nord",
 		Palette: paletteConfigOf(wayleTheme),
 	}
-	want.Palette.Bg, want.Palette.FgMuted, want.Palette.Blue = "#000000", "#abc", "#11223344"
+	want.Palette.Bg, want.Palette.FgMuted, want.Palette.Blue = mustHex("#000000"), mustHex("#abc"), mustHex("#11223344")
 	if cfg.Styling != want {
 		t.Errorf("styling =\n%+v\nwant\n%+v", cfg.Styling, want)
 	}
@@ -100,7 +100,7 @@ func TestActivePaletteSwapsToTheForcedVariant(t *testing.T) {
 	mocha, _ := PaletteByName("catppuccin-mocha")
 	latte, _ := PaletteByName("catppuccin-latte")
 	configured := DefaultsStyling()
-	configured.Palette.Bg = "#010203"
+	configured.Palette.Bg = mustHex("#010203")
 	base := configured.ActivePalette()
 	if base.Bg != "#010203" {
 		t.Fatalf("auto palette bg = %q, want the configured color", base.Bg)

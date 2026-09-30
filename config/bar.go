@@ -143,6 +143,8 @@ type Config struct {
 	Wallpaper          WallpaperConfig
 	ColorExtractor     ColorExtractorConfig
 	Styling            StylingConfig
+	Lock               LockConfig
+	Greeter            GreeterConfig
 }
 
 // Defaults returns the schema defaults for every modeled section.
@@ -231,6 +233,8 @@ func Defaults() *Config {
 		MangoWorkspaces:    DefaultsMangoWorkspaces(),
 		Wallpaper:          DefaultsWallpaper(),
 		ColorExtractor:     DefaultsColorExtractor(),
+		Lock:               DefaultsLock(),
+		Greeter:            DefaultsGreeter(),
 		General: GeneralConfig{
 			FontSans: "Inter",
 			FontMono: "JetBrains Mono",
@@ -296,6 +300,8 @@ type fileDoc struct {
 	General   *toml.Primitive `toml:"general"`
 	Wallpaper *toml.Primitive `toml:"wallpaper"`
 	Styling   *toml.Primitive `toml:"styling"`
+	Lock      *toml.Primitive `toml:"lock"`
+	Greeter   *toml.Primitive `toml:"greeter"`
 }
 
 // barDoc mirrors the [bar] table; the leaf values defer through
@@ -679,7 +685,7 @@ func (c *Config) applyTOML(data []byte) error {
 		}
 		c.General = GeneralConfig(general)
 	}
-	return nil
+	return c.applyScreens(md, doc.Lock, doc.Greeter)
 }
 
 func (b barDoc) toBar() (Bar, error) {
