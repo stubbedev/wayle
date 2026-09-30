@@ -121,6 +121,8 @@ type Config struct {
 	NiriWorkspaces     CompositorWorkspacesConfig
 	MangoWorkspaces    MangoWorkspacesConfig
 	General            GeneralConfig
+	Wallpaper          WallpaperConfig
+	ColorExtractor     ColorExtractorConfig
 }
 
 // Defaults returns the schema defaults for every modeled section.
@@ -194,6 +196,8 @@ func Defaults() *Config {
 		SwayWorkspaces:     DefaultsSwayWorkspaces(),
 		NiriWorkspaces:     DefaultsNiriWorkspaces(),
 		MangoWorkspaces:    DefaultsMangoWorkspaces(),
+		Wallpaper:          DefaultsWallpaper(),
+		ColorExtractor:     DefaultsColorExtractor(),
 		General: GeneralConfig{
 			FontSans: "Inter",
 			FontMono: "JetBrains Mono",
@@ -252,7 +256,9 @@ type fileDoc struct {
 		NiriWorkspaces     *toml.Primitive `toml:"niri-workspaces"`
 		MangoWorkspaces    *toml.Primitive `toml:"mango-workspaces"`
 	} `toml:"modules"`
-	General *toml.Primitive `toml:"general"`
+	General   *toml.Primitive `toml:"general"`
+	Wallpaper *toml.Primitive `toml:"wallpaper"`
+	Styling   *toml.Primitive `toml:"styling"`
 }
 
 // barDoc mirrors the [bar] table; the leaf values defer through
@@ -363,6 +369,20 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Weather = w
+	}
+	if doc.Wallpaper != nil {
+		w, err := applyWallpaper(md, *doc.Wallpaper)
+		if err != nil {
+			return err
+		}
+		c.Wallpaper = w
+	}
+	if doc.Styling != nil {
+		ce, err := applyColorExtractor(md, *doc.Styling)
+		if err != nil {
+			return err
+		}
+		c.ColorExtractor = ce
 	}
 	if doc.Osd != nil {
 		o, err := applyOsd(md, *doc.Osd)
