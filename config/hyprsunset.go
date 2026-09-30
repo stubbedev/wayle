@@ -29,7 +29,7 @@ func DefaultsHyprsunset() HyprsunsetConfig {
 		Gamma:        100,
 		AutoSchedule: false,
 		Click:        DefaultsClick(map[string]string{"left-click": ":toggle"}),
-		IconOn:       DefaultsIcon(true, "ld-sunset-symbolic"),
+		IconOn:       DefaultsIcon(true, "ld-moon-symbolic"),
 		IconOff:      DefaultsIcon(true, "ld-sun-symbolic"),
 	}
 }
@@ -88,8 +88,15 @@ func applyHyprsunset(md toml.MetaData, prim toml.Primitive) (HyprsunsetConfig, e
 		cfg.IconOn.Color = *doc.IconColor
 		cfg.IconOff.Color = *doc.IconColor
 	}
-	if cfg.Temperature < 1000 || cfg.Temperature > 10000 {
-		return cfg, errors.New("hyprsunset: temperature must be 1000..10000")
+	// The schema documents these ranges.
+	if cfg.Temperature < 1000 || cfg.Temperature > 20000 {
+		return cfg, errors.New("hyprsunset: temperature must be 1000..20000")
+	}
+	if cfg.Latitude < -90 || cfg.Latitude > 90 {
+		return cfg, errors.New("hyprsunset: latitude must be -90..90")
+	}
+	if cfg.Longitude < -180 || cfg.Longitude > 180 {
+		return cfg, errors.New("hyprsunset: longitude must be -180..180")
 	}
 	if cfg.Gamma < 0 || cfg.Gamma > 200 {
 		return cfg, errors.New("hyprsunset: gamma must be 0..200")

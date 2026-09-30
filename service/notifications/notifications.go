@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/wayle/internal/glob"
+	"github.com/stubbedev/wayle/internal/xdg"
 )
 
 // D-Bus identity and server information.
@@ -499,17 +500,8 @@ func globMatch(pattern, name string) bool {
 	return glob.Match(pattern, name)
 }
 
-// StateDir is the DND flag's directory ($XDG_STATE_HOME/wayle).
-func StateDir() (string, bool) {
-	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
-		return filepath.Join(dir, "wayle"), true
-	}
-	home := os.Getenv("HOME")
-	if home == "" {
-		return "", false
-	}
-	return filepath.Join(home, ".local/state/wayle"), true
-}
+// StateDir is the DND flag's directory, wayle's state dir.
+func StateDir() (string, bool) { return xdg.StateDir() }
 
 // loadDND restores the sticky flag; anything but "on" reads off.
 func loadDND() bool {

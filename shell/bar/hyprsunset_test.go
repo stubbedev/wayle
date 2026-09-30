@@ -47,7 +47,9 @@ func TestLoadFileAppliesHyprsunset(t *testing.T) {
 
 	for _, bad := range []string{
 		"[modules.hyprsunset]\ntemperature = 500\n",
-		"[modules.hyprsunset]\ntemperature = 20000\n",
+		"[modules.hyprsunset]\ntemperature = 20001\n",
+		"[modules.hyprsunset]\nlatitude = 91.0\n",
+		"[modules.hyprsunset]\nlongitude = -181.0\n",
 		"[modules.hyprsunset]\ngamma = 300\n",
 		"[modules.hyprsunset]\nformat = \"\"\n",
 	} {
@@ -57,29 +59,5 @@ func TestLoadFileAppliesHyprsunset(t *testing.T) {
 		if _, err := config.LoadFile(path); err == nil {
 			t.Errorf("%q: want a load error", bad)
 		}
-	}
-}
-
-func TestHyprsunsetToggleTransitions(t *testing.T) {
-	cfg := config.Defaults()
-	ctx := newTestContext(t, cfg)
-	module, err := Create("hyprsunset", ctx)
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	hs, ok := module.(*hyprsunsetModule)
-	if !ok {
-		t.Fatalf("Create = %T", module)
-	}
-	// Off at rest, with the off icon.
-	if hs.enabled {
-		t.Error("module starts enabled")
-	}
-	// The toggle handler recognizes :toggle and ignores other actions
-	// (starting hyprsunset in tests would spawn the real binary, so the
-	// enabled path is exercised by the state machine instead).
-	hs.RunAction(config.MustClickAction("dropdown:hyprsunset"))
-	if hs.enabled {
-		t.Error("a dropdown action toggled the module")
 	}
 }

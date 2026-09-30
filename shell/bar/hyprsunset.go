@@ -1,14 +1,24 @@
 package bar
 
 import (
+	"context"
 	"log"
-	"os/exec"
 	"strconv"
-	"syscall"
+	"time"
 
+	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/xdg"
+	"github.com/stubbedev/wayle/service/hyprsunset"
+)
+
+// Hyprsunset cadences (watchers.rs).
+const (
+	hyprsunsetStatePoll    = time.Second
+	hyprsunsetScheduleTick = time.Minute
+	hyprsunsetLocationEach = 6 * time.Hour
 )
 
 // hyprsunsetLabel is helpers.rs's build_label: On/Off status with the
@@ -26,36 +36,148 @@ func hyprsunsetLabel(format string, enabled bool, temp, gamma, configTemp, confi
 	return out
 }
 
-// hyprsunset is the module: the night-light toggle over a spawned
-// hyprsunset child.
+// sunsetEnv is everything the module touches outside itself; the shell
+// wires the real filter, socket, clock, state dir, and GeoClue, tests
+// fake them.
+type sunsetEnv struct {
+	start    func(temp, gamma int) error
+	stop     func() error
+	query    func() (hyprsunset.State, bool)
+	now      func() time.Time
+	stateDir string
+	// locate resolves the schedule location; nil disables the lookup.
+	locate func(ctx context.Context) (hyprsunset.Location, error)
+}
+
+// liveSunsetEnv is the real environment.
+func liveSunsetEnv() sunsetEnv {
+	filter := hyprsunset.NewFilter()
+	dir, _ := xdg.StateDir()
+	return sunsetEnv{
+		start: filter.Start,
+		stop:  filter.Stop,
+		query: func() (hyprsunset.State, bool) {
+			sock, ok := hyprsunset.SocketPath()
+			if !ok {
+				return hyprsunset.State{}, false
+			}
+			return hyprsunset.QueryState(sock)
+		},
+		now:      time.Now,
+		stateDir: dir,
+		locate: func(ctx context.Context) (hyprsunset.Location, error) {
+			conn, err := dbus.ConnectSystemBus()
+			if err != nil {
+				return hyprsunset.Location{}, err
+			}
+			defer func() { _ = conn.Close() }()
+			return hyprsunset.QueryLocation(ctx, conn)
+		},
+	}
+}
+
+// hyprsunsetModule is the night-light toggle with the solar
+// auto-schedule (hyprsunset/mod.rs).
 type hyprsunsetModule struct {
-	ctx     ModuleContext
-	label   *widget.Label
-	icon    *widget.Icon
-	root    widget.Widget
-	child   *exec.Cmd
+	ctx   ModuleContext
+	env   sunsetEnv
+	label *widget.Label
+	icon  *widget.Icon
+	root  widget.Widget
+
 	enabled bool
 	temp    int
 	gamma   int
+	// autoPhase is the last phase the schedule applied (zero while the
+	// schedule is off); manualOverride holds a manual toggle until the
+	// next sunrise/sunset.
+	autoPhase      hyprsunset.Phase
+	manualOverride bool
+	// geo is the GeoClue location, preferred over the configured one.
+	geo    *hyprsunset.Location
+	cancel context.CancelFunc
 }
 
 func newHyprsunset(ctx ModuleContext) (Module, error) {
-	cfg := ctx.Config.Hyprsunset
-	m := &hyprsunsetModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg), temp: cfg.Temperature, gamma: cfg.Gamma}
-	m.icon = moduleIcon(ctx, cfg.IconOff)
-	if m.icon != nil {
-		row := widget.NewBox(widget.Row, ctx.Style.moduleGap, 0)
-		row.Append(m.icon, false)
-		row.Append(m.label, false)
-		m.root = row
-	} else {
-		m.root = m.label
-	}
-	m.render()
-	return m, nil
+	return newHyprsunsetWith(ctx, liveSunsetEnv()), nil
 }
 
-// render applies the enabled state to label and icon.
+// newHyprsunsetWith builds the module over env: it replays a remembered
+// manual toggle, then (with the loop) polls the filter, ticks the
+// schedule, and resolves the location.
+func newHyprsunsetWith(ctx ModuleContext, env sunsetEnv) *hyprsunsetModule {
+	cfg := ctx.Config.Hyprsunset
+	m := &hyprsunsetModule{ctx: ctx, env: env, temp: cfg.Temperature, gamma: cfg.Gamma}
+	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	m.icon = moduleIcon(ctx, cfg.IconOff)
+	m.root = assembleModule(ctx, m.icon, m.label)
+
+	// The filter dies with the shell, so a manual toggle is replayed
+	// rather than lost to the schedule.
+	if restored, ok := hyprsunset.LoadOverride(env.stateDir, env.now()); ok {
+		m.autoPhase, m.manualOverride = restored.Phase, true
+		if restored.Enabled {
+			m.startFilter()
+		}
+	}
+	m.render()
+	if ctx.App != nil {
+		m.run()
+	}
+	return m
+}
+
+// run starts the watchers: the 1s state poll, the 60s schedule tick,
+// and the GeoClue lookup (at start and every six hours while the
+// schedule is on).
+func (m *hyprsunsetModule) run() {
+	runCtx, cancel := context.WithCancel(context.Background())
+	m.cancel = cancel
+	go func() {
+		poll := time.NewTicker(hyprsunsetStatePoll)
+		tick := time.NewTicker(hyprsunsetScheduleTick)
+		defer poll.Stop()
+		defer tick.Stop()
+		m.ctx.Invoke(m.evaluate)
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			case <-poll.C:
+				st, ok := m.env.query()
+				m.ctx.Invoke(func() { m.applyState(st, ok) })
+			case <-tick.C:
+				m.ctx.Invoke(m.evaluate)
+			}
+		}
+	}()
+	if m.ctx.Config.Hyprsunset.AutoSchedule && m.env.locate != nil {
+		go func() {
+			for {
+				lookup, done := context.WithTimeout(runCtx, 30*time.Second)
+				loc, err := m.env.locate(lookup)
+				done()
+				if err == nil {
+					m.ctx.Invoke(func() { m.setLocation(loc) })
+				}
+				select {
+				case <-runCtx.Done():
+					return
+				case <-time.After(hyprsunsetLocationEach):
+				}
+			}
+		}()
+	}
+}
+
+// Stop ends the watchers.
+func (m *hyprsunsetModule) Stop() {
+	if m.cancel != nil {
+		m.cancel()
+	}
+}
+
+// render is update_display: the state icon and the label.
 func (m *hyprsunsetModule) render() {
 	cfg := m.ctx.Config.Hyprsunset
 	text := ""
@@ -63,16 +185,77 @@ func (m *hyprsunsetModule) render() {
 		text = hyprsunsetLabel(cfg.Format, m.enabled, m.temp, m.gamma, cfg.Temperature, cfg.Gamma)
 	}
 	m.label.SetText(text)
-	if setter := m.icon; setter != nil {
+	if m.icon != nil {
 		icon := cfg.IconOff
 		if m.enabled {
 			icon = cfg.IconOn
 		}
-		setter.SetThemeName(icon.Name)
+		m.icon.SetThemeName(icon.Name)
 	}
 }
 
-// RunAction handles the module's own `:toggle`; the rest fall through.
+// applyState is StateChanged: a running filter reports its values, a
+// silent socket means off (with the configured values shown).
+func (m *hyprsunsetModule) applyState(st hyprsunset.State, running bool) {
+	cfg := m.ctx.Config.Hyprsunset
+	temp, gamma := cfg.Temperature, cfg.Gamma
+	if running {
+		temp, gamma = st.Temp, st.Gamma
+	}
+	if m.enabled == running && m.temp == temp && m.gamma == gamma {
+		return
+	}
+	m.enabled, m.temp, m.gamma = running, temp, gamma
+	m.render()
+}
+
+// currentPhase is the phase here and now: the GeoClue location when
+// resolved, else the configured coordinates.
+func (m *hyprsunsetModule) currentPhase() hyprsunset.Phase {
+	cfg := m.ctx.Config.Hyprsunset
+	lat, lng := cfg.Latitude, cfg.Longitude
+	if m.geo != nil {
+		lat, lng = m.geo.Latitude, m.geo.Longitude
+	}
+	return hyprsunset.PhaseAt(m.env.now(), lat, lng)
+}
+
+// setLocation is LocationResolved: a new fix re-evaluates at once.
+func (m *hyprsunsetModule) setLocation(loc hyprsunset.Location) {
+	if m.geo != nil && *m.geo == loc {
+		return
+	}
+	m.geo = &loc
+	m.evaluate()
+}
+
+// evaluate is evaluate_schedule: night turns the filter on, day off; a
+// manual toggle holds until the phase changes, which clears it and the
+// remembered record.
+func (m *hyprsunsetModule) evaluate() {
+	if !m.ctx.Config.Hyprsunset.AutoSchedule {
+		m.autoPhase, m.manualOverride = 0, false
+		return
+	}
+	phase := m.currentPhase()
+	if m.autoPhase != phase {
+		m.autoPhase = phase
+		m.manualOverride = false
+		hyprsunset.ClearOverride(m.env.stateDir)
+	}
+	if m.manualOverride {
+		return
+	}
+	if wantOn := phase == hyprsunset.PhaseNight; wantOn != m.enabled {
+		if wantOn {
+			m.startFilter()
+		} else {
+			m.stopFilter()
+		}
+	}
+}
+
+// RunAction handles the module's own :toggle; the rest fall through.
 func (m *hyprsunsetModule) RunAction(action config.ClickAction) {
 	if action.Kind == config.ClickShell && action.Command == ":toggle" {
 		m.toggle()
@@ -81,39 +264,42 @@ func (m *hyprsunsetModule) RunAction(action config.ClickAction) {
 	runClickAction(m.ctx, action)
 }
 
-// toggle spawns hyprsunset with the configured temperature and gamma,
-// or SIGTERMs the tracked child (its exit handler restores the gamma
-// ramp). One global child, like the Rust module's ponytail note.
+// toggle is the left-click :toggle: under the schedule it sets the
+// override (seeding the phase when the schedule has not ticked yet),
+// records the new state for restarts, and flips the filter.
 func (m *hyprsunsetModule) toggle() {
+	if m.ctx.Config.Hyprsunset.AutoSchedule {
+		m.manualOverride = true
+		if m.autoPhase == 0 {
+			m.autoPhase = m.currentPhase()
+		}
+	}
+	hyprsunset.SaveOverride(m.env.stateDir, hyprsunset.Override{Phase: m.autoPhase, Enabled: !m.enabled}, m.env.now())
 	if m.enabled {
-		m.setEnabled(false)
+		m.stopFilter()
 		return
 	}
+	m.startFilter()
+}
+
+// startFilter spawns the filter at the configured values.
+func (m *hyprsunsetModule) startFilter() {
 	cfg := m.ctx.Config.Hyprsunset
-	child := exec.Command("hyprsunset", //nolint:gosec // the binary name and numeric args are the module's own
-		"-t", strconv.Itoa(cfg.Temperature),
-		"-g", strconv.Itoa(cfg.Gamma))
-	if err := child.Start(); err != nil {
+	if err := m.env.start(cfg.Temperature, cfg.Gamma); err != nil {
 		log.Printf("hyprsunset: start: %v", err)
 		return
 	}
-	m.child = child
-	m.temp, m.gamma = cfg.Temperature, cfg.Gamma
-	m.setEnabled(true)
-	go func() {
-		_ = m.child.Wait()
-	}()
+	m.enabled, m.temp, m.gamma = true, cfg.Temperature, cfg.Gamma
+	m.render()
 }
 
-// setEnabled flips the state, terminating any tracked child first.
-func (m *hyprsunsetModule) setEnabled(enabled bool) {
-	if !enabled && m.child != nil && m.child.Process != nil {
-		if err := m.child.Process.Signal(syscall.SIGTERM); err != nil {
-			log.Printf("hyprsunset: stop: %v", err)
-		}
-		m.child = nil
+// stopFilter terminates the filter.
+func (m *hyprsunsetModule) stopFilter() {
+	if err := m.env.stop(); err != nil {
+		log.Printf("hyprsunset: stop: %v", err)
 	}
-	m.enabled = enabled
+	cfg := m.ctx.Config.Hyprsunset
+	m.enabled, m.temp, m.gamma = false, cfg.Temperature, cfg.Gamma
 	m.render()
 }
 
