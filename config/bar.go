@@ -121,6 +121,8 @@ type Config struct {
 	SwayWorkspaces     CompositorWorkspacesConfig
 	NiriWorkspaces     CompositorWorkspacesConfig
 	MangoWorkspaces    MangoWorkspacesConfig
+	Screenshot         ScreenshotConfig
+	SharePicker        SharePickerConfig
 	General            GeneralConfig
 	Wallpaper          WallpaperConfig
 	ColorExtractor     ColorExtractorConfig
@@ -190,6 +192,8 @@ func Defaults() *Config {
 		IdleInhibit:        DefaultsIdleInhibit(),
 		Treeman:            DefaultsTreeman(),
 		Notification:       DefaultsNotification(),
+		Screenshot:         DefaultsScreenshot(),
+		SharePicker:        DefaultsSharePicker(),
 		Recorder:           DefaultsRecorder(),
 		Systray:            DefaultsSystray(),
 		Osd:                DefaultsOsd(),
@@ -221,9 +225,10 @@ func mustColor(s string) ColorValue {
 // does not model yet (osd, launcher, modules beyond the clock, ...) are
 // ignored here exactly as serde ignores unknown fields in Rust.
 type fileDoc struct {
-	Bar     *toml.Primitive `toml:"bar"`
-	Osd     *toml.Primitive `toml:"osd"`
-	Modules *struct {
+	Bar         *toml.Primitive `toml:"bar"`
+	SharePicker *toml.Primitive `toml:"share-picker"`
+	Osd         *toml.Primitive `toml:"osd"`
+	Modules     *struct {
 		Clock              *toml.Primitive `toml:"clock"`
 		Cava               *toml.Primitive `toml:"cava"`
 		Battery            *toml.Primitive `toml:"battery"`
@@ -250,6 +255,7 @@ type fileDoc struct {
 		IdleInhibit        *toml.Primitive `toml:"idle-inhibit"`
 		Treeman            *toml.Primitive `toml:"treeman"`
 		Notifications      *toml.Primitive `toml:"notifications"`
+		Screenshot         *toml.Primitive `toml:"screenshot"`
 		Recorder           *toml.Primitive `toml:"recorder"`
 		Systray            *toml.Primitive `toml:"systray"`
 		Custom             *[]customDoc    `toml:"custom"`
@@ -400,6 +406,20 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Systray = st
+	}
+	if doc.Modules != nil && doc.Modules.Screenshot != nil {
+		s, err := applyScreenshot(md, *doc.Modules.Screenshot)
+		if err != nil {
+			return err
+		}
+		c.Screenshot = s
+	}
+	if doc.SharePicker != nil {
+		sp, err := applySharePicker(md, *doc.SharePicker)
+		if err != nil {
+			return err
+		}
+		c.SharePicker = sp
 	}
 	if doc.Modules != nil && doc.Modules.Recorder != nil {
 		r, err := applyRecorder(md, *doc.Modules.Recorder)
