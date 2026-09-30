@@ -127,7 +127,7 @@ func withGap(w widget.Widget, gap int) widget.Widget {
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.Append(NewSpacer(0, gap), false)
 	if _, isEntry := w.(*widget.Entry); isEntry {
-		w = NewFixedWidth(w, entryWidth)
+		w = NewFixed(w, entryWidth, 0)
 	}
 	col.Append(w, false)
 	return col

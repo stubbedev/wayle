@@ -88,43 +88,56 @@ func (s *Spacer) Paint(*render.Canvas) {}
 // HitTest never claims input.
 func (s *Spacer) HitTest(widget.Point) widget.Widget { return nil }
 
-// FixedWidth pins a child's width (an entry's width-chars), keeping its
-// natural height.
-type FixedWidth struct {
+// Fixed pins a child's size: an entry's width-chars width, an avatar's
+// 64x64. A zero axis keeps the child's natural extent.
+type Fixed struct {
 	widget.Base
 	child widget.Widget
-	width int
+	w, h  int
 }
 
-// NewFixedWidth wraps child at width.
-func NewFixedWidth(child widget.Widget, width int) *FixedWidth {
-	return &FixedWidth{child: child, width: width}
+// NewFixed wraps child at w x h (0 = natural).
+func NewFixed(child widget.Widget, w, h int) *Fixed {
+	return &Fixed{child: child, w: w, h: h}
 }
 
-// Measure reports the pinned width and the child's height.
-func (f *FixedWidth) Measure(con widget.Constraints) widget.Size {
-	sz := f.child.Measure(widget.Constraints{Min: widget.Size{W: f.width}, Max: widget.Size{W: f.width, H: con.Max.H}})
-	return clamp(widget.Size{W: f.width, H: sz.H}, con)
+// Measure reports the pinned axes and the child's natural others.
+func (f *Fixed) Measure(con widget.Constraints) widget.Size {
+	inner := widget.Constraints{Min: widget.Size{W: f.w, H: f.h}, Max: con.Max}
+	if f.w > 0 {
+		inner.Max.W = f.w
+	}
+	if f.h > 0 {
+		inner.Max.H = f.h
+	}
+	sz := f.child.Measure(inner)
+	if f.w > 0 {
+		sz.W = f.w
+	}
+	if f.h > 0 {
+		sz.H = f.h
+	}
+	return clamp(sz, con)
 }
 
 // Arrange gives the child the whole rect.
-func (f *FixedWidth) Arrange(r render.Rect) {
+func (f *Fixed) Arrange(r render.Rect) {
 	f.ArrangeSelf(r)
 	f.child.Arrange(r)
 	widget.SetParents(f, f.child)
 }
 
 // ArrangeRoot mirrors Arrange for the tree-root path.
-func (f *FixedWidth) ArrangeRoot(r render.Rect) { f.Arrange(r) }
+func (f *Fixed) ArrangeRoot(r render.Rect) { f.Arrange(r) }
 
 // Paint paints the child.
-func (f *FixedWidth) Paint(cv *render.Canvas) { f.child.Paint(cv) }
+func (f *Fixed) Paint(cv *render.Canvas) { f.child.Paint(cv) }
 
 // HitTest forwards to the child.
-func (f *FixedWidth) HitTest(pt widget.Point) widget.Widget { return f.child.HitTest(pt) }
+func (f *Fixed) HitTest(pt widget.Point) widget.Widget { return f.child.HitTest(pt) }
 
 // Children exposes the child for focus traversal.
-func (f *FixedWidth) Children() []widget.Widget { return []widget.Widget{f.child} }
+func (f *Fixed) Children() []widget.Widget { return []widget.Widget{f.child} }
 
 // Fill paints its whole rect one color: the solid background, the
 // image scrim, and the blank-screen blackout. A Fill that is off paints
