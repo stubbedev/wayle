@@ -109,26 +109,16 @@ func (s *Service) Subscribe() (<-chan struct{}, func()) {
 // Run seeds the counts without notifying (existing unread mail at
 // startup is not "new"), then re-queries after each settled burst of
 // maildir changes until ctx ends. Without a notmuch database the seed
-// is all there is, as in the Rust service.
+// is all there is, as in the Rust service. The watch is armed before
+// the seed query so a change during it is not lost.
 func (s *Service) Run(ctx context.Context) {
+	watcher := s.watchMaildir(ctx)
 	s.recompute(ctx, false)
-	path, ok := s.notmuch.DatabasePath(ctx)
-	if !ok {
-		<-ctx.Done()
-		return
-	}
-	watcher, err := fswatch.New(fswatch.Changes, true)
-	if err != nil {
-		log.Printf("mail: cannot create maildir watcher: %v", err)
+	if watcher == nil {
 		<-ctx.Done()
 		return
 	}
 	defer func() { _ = watcher.Close() }()
-	if err := watcher.Add(path); err != nil {
-		log.Printf("mail: cannot watch maildir %s: %v", path, err)
-		<-ctx.Done()
-		return
-	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -151,6 +141,26 @@ func (s *Service) Run(ctx context.Context) {
 		}
 		s.recompute(ctx, true)
 	}
+}
+
+// watchMaildir arms a recursive watch on the notmuch database path;
+// nil when there is no database or it cannot be watched.
+func (s *Service) watchMaildir(ctx context.Context) *fswatch.Watcher {
+	path, ok := s.notmuch.DatabasePath(ctx)
+	if !ok {
+		return nil
+	}
+	watcher, err := fswatch.New(fswatch.Changes, true)
+	if err != nil {
+		log.Printf("mail: cannot create maildir watcher: %v", err)
+		return nil
+	}
+	if err := watcher.Add(path); err != nil {
+		log.Printf("mail: cannot watch maildir %s: %v", path, err)
+		_ = watcher.Close()
+		return nil
+	}
+	return watcher
 }
 
 // recompute re-runs the queries and publishes; with notify (and the
