@@ -4,11 +4,12 @@ import (
 	"errors"
 
 	"github.com/stubbedev/gelm/widget"
+
+	"github.com/stubbedev/wayle/config"
 )
 
 // power is the icon-only power module: its bindings run the session
-// commands, with the schema's default left-click being the native
-// `:menu` power menu (a dropdown; it logs until the panels land).
+// commands, and the native `:menu` binding opens the power dropdown.
 type powerModule struct {
 	ctx  ModuleContext
 	icon widget.Widget
@@ -24,3 +25,15 @@ func newPower(ctx ModuleContext) (Module, error) {
 }
 
 func (m *powerModule) Root() widget.Widget { return m.icon }
+
+// RunAction intercepts the native :menu verb: it opens the power
+// dropdown anchored to the module's icon.
+func (m *powerModule) RunAction(action config.ClickAction) {
+	if action.Kind == config.ClickShell && action.Command == ":menu" {
+		if m.ctx.Dropdowns != nil {
+			_ = m.ctx.Dropdowns.open(m.ctx.Connector, "power", m.icon)
+		}
+		return
+	}
+	runClickAction(m.ctx, action)
+}

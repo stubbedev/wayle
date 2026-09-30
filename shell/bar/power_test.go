@@ -28,7 +28,7 @@ func TestLoadFileAppliesPower(t *testing.T) {
 		t.Errorf("left-click = %q", c.Power.Click.LeftClick.String())
 	}
 
-	if err := osWrite(path, "[modules.power]\nlock-command = \"\"\nlogout-command = \"\"\nreboot-command = \"\"\nshutdown-command = \"\"\n"); err != nil {
+	if err := osWrite(path, "[modules.power]\nlock-command = \"\"\nlogout-command = \"\"\nreboot-command = \"\"\nshutdown-command = \"\"\nsuspend-command = \"\"\n"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := config.LoadFile(path); err == nil {

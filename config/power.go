@@ -7,7 +7,7 @@ import (
 )
 
 // PowerConfig is the power module configuration: an icon button whose
-// bindings run session commands.
+// :menu opens the session command list, whose bindings run them.
 type PowerConfig struct {
 	Click   ClickConfig
 	Icon    IconConfig
@@ -15,6 +15,7 @@ type PowerConfig struct {
 	Logout  string
 	Reboot  string
 	Shutoff string
+	Suspend string
 }
 
 // DefaultsPower returns the schema defaults.
@@ -26,6 +27,7 @@ func DefaultsPower() PowerConfig {
 		Logout:  "loginctl terminate-session $XDG_SESSION_ID",
 		Reboot:  "systemctl reboot",
 		Shutoff: "systemctl poweroff",
+		Suspend: "systemctl suspend",
 	}
 }
 
@@ -40,6 +42,7 @@ func applyPower(md toml.MetaData, prim toml.Primitive) (PowerConfig, error) {
 		Logout    *string     `toml:"logout-command"`
 		Reboot    *string     `toml:"reboot-command"`
 		Shutoff   *string     `toml:"shutdown-command"`
+		Suspend   *string     `toml:"suspend-command"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -65,7 +68,10 @@ func applyPower(md toml.MetaData, prim toml.Primitive) (PowerConfig, error) {
 	if doc.Shutoff != nil {
 		cfg.Shutoff = *doc.Shutoff
 	}
-	if cfg.Lock == "" && cfg.Logout == "" && cfg.Reboot == "" && cfg.Shutoff == "" {
+	if doc.Suspend != nil {
+		cfg.Suspend = *doc.Suspend
+	}
+	if cfg.Lock == "" && cfg.Logout == "" && cfg.Reboot == "" && cfg.Shutoff == "" && cfg.Suspend == "" {
 		return cfg, errors.New("power: every command is empty")
 	}
 	clicks, err := applyClicks(md, prim, cfg.Click)
