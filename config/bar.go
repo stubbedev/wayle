@@ -56,6 +56,20 @@ type Bar struct {
 	ButtonActiveBGColor ColorValue
 	ButtonIconPadding   Size
 	ButtonLabelPadding  Size
+
+	// The styling keys the CSS generation reads (BarConfig in
+	// crates/wayle-config/src/schemas/bar/mod.rs).
+	Shadow        ShadowPreset
+	ButtonVariant BarButtonVariant
+	// ButtonOpacity is 0-100.
+	ButtonOpacity      int
+	ButtonIconSize     Size
+	ButtonLabelWeight  FontWeightClass
+	ButtonGap          Size
+	ButtonIconPosition IconPosition
+	DropdownShadow     bool
+	// DropdownOpacity is 0-100.
+	DropdownOpacity int
 }
 
 // BarLayout is the bar layout for one monitor. Monitor is a connector
@@ -73,7 +87,9 @@ type BarLayout struct {
 
 // ClockConfig is the clock module configuration; the format is strftime.
 type ClockConfig struct {
-	Click  ClickConfig
+	Click ClickConfig
+	// Button is the clock's bar-button key set.
+	Button ButtonConfig
 	Format string
 }
 
@@ -126,6 +142,7 @@ type Config struct {
 	General            GeneralConfig
 	Wallpaper          WallpaperConfig
 	ColorExtractor     ColorExtractorConfig
+	Styling            StylingConfig
 }
 
 // Defaults returns the schema defaults for every modeled section.
@@ -162,9 +179,19 @@ func Defaults() *Config {
 			ButtonBorderWidth:         1,
 			ButtonIconPadding:         Size{Value: 1.0, Unit: SizeMultiplier},
 			ButtonLabelPadding:        Size{Value: 1.0, Unit: SizeMultiplier},
+			Shadow:                    ShadowNone,
+			ButtonVariant:             ButtonVariantBlockPrefix,
+			ButtonOpacity:             100,
+			ButtonIconSize:            Size{Value: 1.0, Unit: SizeMultiplier},
+			ButtonLabelWeight:         WeightSemibold,
+			ButtonGap:                 Size{Value: 1.0, Unit: SizeMultiplier},
+			ButtonIconPosition:        IconStart,
+			DropdownShadow:            true,
+			DropdownOpacity:           100,
 		},
 		Clock: ClockConfig{
 			Click:  DefaultsClick(map[string]string{"left-click": "dropdown:calendar", "right-click": "dropdown:weather"}),
+			Button: DefaultsButton(buttonColors("auto", "accent", "accent", "bg-surface-elevated", "border-accent"), TokenAccent, true, 0),
 			Format: "%a %b %d %I:%M %p",
 		},
 		Cava:               DefaultsCava(),
@@ -208,6 +235,7 @@ func Defaults() *Config {
 			FontSans: "Inter",
 			FontMono: "JetBrains Mono",
 		},
+		Styling: DefaultsStyling(),
 	}
 }
 
@@ -276,7 +304,7 @@ type fileDoc struct {
 type barDoc struct {
 	Location                  string      `toml:"location"`
 	Layer                     string      `toml:"layer"`
-	Exclusive                 bool        `toml:"exclusive"`
+	Exclusive                 *bool       `toml:"exclusive"`
 	BG                        string      `toml:"bg"`
 	BackgroundOpacity         *int        `toml:"background-opacity"`
 	BorderColor               string      `toml:"border-color"`
@@ -308,6 +336,16 @@ type barDoc struct {
 	Rounding                  string      `toml:"rounding"`
 	Scale                     *float64    `toml:"scale"`
 	Layout                    []BarLayout `toml:"layout"`
+
+	Shadow             *ShadowPreset     `toml:"shadow"`
+	ButtonVariant      *BarButtonVariant `toml:"button-variant"`
+	ButtonOpacity      *int              `toml:"button-opacity"`
+	ButtonIconSize     tomlValue         `toml:"button-icon-size"`
+	ButtonLabelWeight  *FontWeightClass  `toml:"button-label-weight"`
+	ButtonGap          tomlValue         `toml:"button-gap"`
+	ButtonIconPosition *IconPosition     `toml:"button-icon-position"`
+	DropdownShadow     *bool             `toml:"dropdown-shadow"`
+	DropdownOpacity    *int              `toml:"dropdown-opacity"`
 }
 
 type generalDoc struct {
@@ -346,7 +384,7 @@ func (c *Config) applyTOML(data []byte) error {
 	}
 	if doc.Modules != nil && doc.Modules.Clock != nil {
 		clock := struct {
-			Format string `toml:"format"`
+			Format *string `toml:"format"`
 		}{}
 		if err := md.PrimitiveDecode(*doc.Modules.Clock, &clock); err != nil {
 			return err
@@ -355,8 +393,13 @@ func (c *Config) applyTOML(data []byte) error {
 		if err != nil {
 			return err
 		}
+		button, err := applyButton(md, *doc.Modules.Clock, c.Clock.Button, AllButtonKeys)
+		if err != nil {
+			return err
+		}
 		c.Clock.Click = clicks
-		c.Clock.Format = clock.Format
+		c.Clock.Button = button
+		setIf(clock.Format, &c.Clock.Format)
 	}
 	if doc.Modules != nil && doc.Modules.CPU != nil {
 		cpu, err := applyCpu(md, *doc.Modules.CPU)
@@ -392,6 +435,11 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.ColorExtractor = ce
+		s, err := applyStyling(md, *doc.Styling)
+		if err != nil {
+			return err
+		}
+		c.Styling = s
 	}
 	if doc.Osd != nil {
 		o, err := applyOsd(md, *doc.Osd)
@@ -642,7 +690,29 @@ func (b barDoc) toBar() (Bar, error) {
 	if b.Layer != "" {
 		bar.Layer = Layer(b.Layer)
 	}
-	bar.Exclusive = b.Exclusive
+	setIf(b.Exclusive, &bar.Exclusive)
+	setIf(b.Shadow, &bar.Shadow)
+	setIf(b.ButtonVariant, &bar.ButtonVariant)
+	setIf(b.ButtonLabelWeight, &bar.ButtonLabelWeight)
+	setIf(b.ButtonIconPosition, &bar.ButtonIconPosition)
+	setIf(b.DropdownShadow, &bar.DropdownShadow)
+	for _, pct := range []struct {
+		raw *int
+		dst *int
+		key string
+	}{
+		{b.ButtonOpacity, &bar.ButtonOpacity, "button-opacity"},
+		{b.ButtonBGOpacity, &bar.ButtonBGOpacity, "button-bg-opacity"},
+		{b.DropdownOpacity, &bar.DropdownOpacity, "dropdown-opacity"},
+	} {
+		if pct.raw == nil {
+			continue
+		}
+		if *pct.raw < 0 || *pct.raw > 100 {
+			return Bar{}, fmt.Errorf("bar: %s %d outside 0-100", pct.key, *pct.raw)
+		}
+		*pct.dst = *pct.raw
+	}
 	if b.BG != "" {
 		cv, err := ParseColorValue(b.BG)
 		if err != nil {
@@ -754,9 +824,6 @@ func (b barDoc) toBar() (Bar, error) {
 		}
 		bar.ButtonBGColor = cv
 	}
-	if b.ButtonBGOpacity != nil {
-		bar.ButtonBGOpacity = *b.ButtonBGOpacity
-	}
 	if b.ButtonHoverBGColor != "" {
 		cv, err := ParseColorValue(b.ButtonHoverBGColor)
 		if err != nil {
@@ -778,6 +845,8 @@ func (b barDoc) toBar() (Bar, error) {
 	}{
 		{b.ButtonIconPadding, &bar.ButtonIconPadding, "button-icon-padding"},
 		{b.ButtonLabelPadding, &bar.ButtonLabelPadding, "button-label-padding"},
+		{b.ButtonIconSize, &bar.ButtonIconSize, "button-icon-size"},
+		{b.ButtonGap, &bar.ButtonGap, "button-gap"},
 	} {
 		if set.raw.value == nil {
 			continue

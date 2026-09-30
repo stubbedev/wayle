@@ -6,7 +6,10 @@ import (
 
 // BatteryConfig is the battery module config.
 type BatteryConfig struct {
-	Click        ClickConfig
+	Click ClickConfig
+	// Button is the bar-button key set; LabelShow and Icon.Show/Color
+	// mirror its label-show, icon-show, and icon-color.
+	Button       ButtonConfig
 	Format       string
 	LabelShow    bool
 	Icon         IconConfig
@@ -41,6 +44,7 @@ func DefaultBatteryLevelIcons() []string {
 func DefaultsBattery() BatteryConfig {
 	return BatteryConfig{
 		Click:        DefaultsClick(map[string]string{"left-click": "dropdown:battery"}),
+		Button:       DefaultsButton(buttonColors("auto", "yellow", "yellow", "bg-surface-elevated", "yellow"), TokenYellow, true, 0),
 		Format:       "{{ percent }}%",
 		LabelShow:    true,
 		Icon:         DefaultsIcon(true, defaultAlertIcon),
@@ -54,15 +58,12 @@ func DefaultsBattery() BatteryConfig {
 func applyBattery(md toml.MetaData, prim toml.Primitive) (BatteryConfig, error) {
 	cfg := DefaultsBattery()
 	var doc struct {
-		Format        *string          `toml:"format"`
-		LabelShow     *bool            `toml:"label-show"`
-		IconShow      *bool            `toml:"icon-show"`
-		IconName      *string          `toml:"icon-name"`
-		IconColor     *ColorValue      `toml:"icon-color"`
-		LevelIcons    *[]string        `toml:"level-icons"`
-		AlertIcon     *string          `toml:"alert-icon"`
-		ChargingIcon  *string          `toml:"charging-icon"`
-		ThresholdList []ThresholdEntry `toml:"thresholds"`
+		Format       *string           `toml:"format"`
+		IconName     *string           `toml:"icon-name"`
+		LevelIcons   *[]string         `toml:"level-icons"`
+		AlertIcon    *string           `toml:"alert-icon"`
+		ChargingIcon *string           `toml:"charging-icon"`
+		Thresholds   *[]ThresholdEntry `toml:"thresholds"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -70,17 +71,8 @@ func applyBattery(md toml.MetaData, prim toml.Primitive) (BatteryConfig, error) 
 	if doc.Format != nil {
 		cfg.Format = *doc.Format
 	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
-	}
-	if doc.IconShow != nil {
-		cfg.Icon.Show = *doc.IconShow
-	}
 	if doc.IconName != nil {
 		cfg.Icon.Name = *doc.IconName
-	}
-	if doc.IconColor != nil {
-		cfg.Icon.Color = *doc.IconColor
 	}
 	if doc.LevelIcons != nil {
 		cfg.LevelIcons = *doc.LevelIcons
@@ -91,9 +83,14 @@ func applyBattery(md toml.MetaData, prim toml.Primitive) (BatteryConfig, error) 
 	if doc.ChargingIcon != nil {
 		cfg.ChargingIcon = *doc.ChargingIcon
 	}
-	if doc.ThresholdList != nil {
-		cfg.Thresholds = doc.ThresholdList
+	setIf(doc.Thresholds, &cfg.Thresholds)
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
 	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
+	button.mirrorIcon(&cfg.Icon)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

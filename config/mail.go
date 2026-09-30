@@ -55,10 +55,13 @@ func (a MailAccountConfig) ResolvedIcon() string {
 
 // MailConfig is the mail module configuration.
 type MailConfig struct {
-	Click        ClickConfig
-	Accounts     []MailAccountConfig
-	Query        string
-	Format       string
+	Click    ClickConfig
+	Accounts []MailAccountConfig
+	Query    string
+	Format   string
+	// Button is the bar-button key set; LabelShow mirrors its
+	// label-show.
+	Button       ButtonConfig
 	LabelShow    bool
 	HideWhenZero bool
 	// Notify fires a desktop notification per newly-arrived message.
@@ -82,6 +85,7 @@ func DefaultsMail() MailConfig {
 		NotifySummary: "{{ sender }}",
 		NotifyBody:    "{{ subject }}",
 		IconName:      "ld-mail-symbolic",
+		Button:        DefaultsButton(buttonColors("auto", "auto", "bg-surface-elevated", "bg-surface-elevated", "blue"), TokenBlue, true, 0),
 	}
 }
 
@@ -99,7 +103,6 @@ func applyMail(md toml.MetaData, prim toml.Primitive) (MailConfig, error) {
 		Accounts      *[]mailDoc `toml:"accounts"`
 		Query         *string    `toml:"query"`
 		Format        *string    `toml:"format"`
-		LabelShow     *bool      `toml:"label-show"`
 		HideWhenZero  *bool      `toml:"hide-when-zero"`
 		Notify        *bool      `toml:"notify"`
 		NotifySummary *string    `toml:"notify-summary"`
@@ -114,9 +117,6 @@ func applyMail(md toml.MetaData, prim toml.Primitive) (MailConfig, error) {
 	}
 	if doc.Format != nil {
 		cfg.Format = *doc.Format
-	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
 	}
 	if doc.HideWhenZero != nil {
 		cfg.HideWhenZero = *doc.HideWhenZero
@@ -143,6 +143,12 @@ func applyMail(md toml.MetaData, prim toml.Primitive) (MailConfig, error) {
 			cfg.Accounts = append(cfg.Accounts, out)
 		}
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

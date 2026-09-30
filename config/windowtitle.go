@@ -1,14 +1,15 @@
 package config
 
 import (
-	"errors"
-
 	"github.com/BurntSushi/toml"
 )
 
 // WindowTitleConfig is the window-title module config.
 type WindowTitleConfig struct {
-	Click          ClickConfig
+	Click ClickConfig
+	// Button is the bar-button key set; LabelShow and LabelMaxLength
+	// mirror its label-show and label-max-length.
+	Button         ButtonConfig
 	Format         string
 	LabelShow      bool
 	LabelMaxLength int
@@ -20,6 +21,7 @@ func DefaultsWindowTitle() WindowTitleConfig {
 		Format:         "{{ title }}",
 		LabelShow:      true,
 		LabelMaxLength: 50,
+		Button:         DefaultsButton(buttonColors("auto", "blue", "blue", "bg-surface-elevated", "blue"), TokenBlue, true, 50),
 	}
 }
 
@@ -27,9 +29,7 @@ func DefaultsWindowTitle() WindowTitleConfig {
 func applyWindowTitle(md toml.MetaData, prim toml.Primitive) (WindowTitleConfig, error) {
 	cfg := DefaultsWindowTitle()
 	var doc struct {
-		Format         *string `toml:"format"`
-		LabelShow      *bool   `toml:"label-show"`
-		LabelMaxLength *int    `toml:"label-max-length"`
+		Format *string `toml:"format"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -37,15 +37,12 @@ func applyWindowTitle(md toml.MetaData, prim toml.Primitive) (WindowTitleConfig,
 	if doc.Format != nil {
 		cfg.Format = *doc.Format
 	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
 	}
-	if doc.LabelMaxLength != nil {
-		cfg.LabelMaxLength = *doc.LabelMaxLength
-	}
-	if cfg.LabelMaxLength < 0 {
-		return cfg, errors.New("window-title: label-max-length is negative")
-	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, &cfg.LabelMaxLength)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

@@ -64,7 +64,8 @@ func EvaluateThresholds(value float64, entries []ThresholdEntry) ThresholdColors
 			{e.BorderColor, &out.BorderColor},
 		} {
 			if c.src != nil {
-				*c.dst = c.src
+				cv := *c.src // a copy: callers may not alias the config
+				*c.dst = &cv
 			}
 		}
 	}
@@ -124,4 +125,20 @@ func (t *ThresholdEntry) UnmarshalTOML(value any) error {
 		return errors.New("threshold: needs above or below")
 	}
 	return nil
+}
+
+// IsEmpty reports whether no slot is overridden.
+func (c ThresholdColors) IsEmpty() bool {
+	return c.IconColor == nil && c.LabelColor == nil && c.IconBgColor == nil &&
+		c.ButtonBgColor == nil && c.BorderColor == nil
+}
+
+// ResolveOr is one slot's CSS: the override's value when set, else the
+// module's configured color already resolved for the theme
+// (ThresholdColors::resolve_or).
+func ResolveOr(override *ColorValue, configCSS string) string {
+	if override != nil {
+		return override.ToCSS()
+	}
+	return configCSS
 }

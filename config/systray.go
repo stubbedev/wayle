@@ -27,11 +27,11 @@ type SystrayConfig struct {
 	ItemGap         Size
 	InternalPadding Size
 	// Blacklist globs hide items whose Id or Title matches.
-	Blacklist   []string
-	Overrides   []TrayItemOverride
-	BorderShow  bool
-	BorderColor ColorValue
-	ButtonBG    ColorValue
+	Blacklist []string
+	Overrides []TrayItemOverride
+	// Container is the bar_container key set: border-show,
+	// border-color, and button-bg-color.
+	Container ContainerConfig
 }
 
 // DefaultsSystray returns the schema defaults.
@@ -41,8 +41,7 @@ func DefaultsSystray() SystrayConfig {
 		ItemGap:         Size{Value: 0.25, Unit: SizeMultiplier},
 		InternalPadding: Size{Value: 0.5, Unit: SizeMultiplier},
 		Blacklist:       []string{},
-		BorderColor:     mustColor("border-accent"),
-		ButtonBG:        mustColor("bg-surface-elevated"),
+		Container:       DefaultsContainer("bg-surface-elevated", "border-accent"),
 	}
 }
 
@@ -50,13 +49,10 @@ func DefaultsSystray() SystrayConfig {
 func applySystray(md toml.MetaData, prim toml.Primitive) (SystrayConfig, error) {
 	cfg := DefaultsSystray()
 	var doc struct {
-		IconScale       tomlValue   `toml:"icon-scale"`
-		ItemGap         tomlValue   `toml:"item-gap"`
-		InternalPadding tomlValue   `toml:"internal-padding"`
-		Blacklist       *[]string   `toml:"blacklist"`
-		BorderShow      *bool       `toml:"border-show"`
-		BorderColor     *ColorValue `toml:"border-color"`
-		ButtonBG        *ColorValue `toml:"button-bg-color"`
+		IconScale       tomlValue `toml:"icon-scale"`
+		ItemGap         tomlValue `toml:"item-gap"`
+		InternalPadding tomlValue `toml:"internal-padding"`
+		Blacklist       *[]string `toml:"blacklist"`
 		Overrides       []struct {
 			Name  *string `toml:"name"`
 			Icon  *string `toml:"icon"`
@@ -85,15 +81,6 @@ func applySystray(md toml.MetaData, prim toml.Primitive) (SystrayConfig, error) 
 	if doc.Blacklist != nil {
 		cfg.Blacklist = *doc.Blacklist
 	}
-	if doc.BorderShow != nil {
-		cfg.BorderShow = *doc.BorderShow
-	}
-	if doc.BorderColor != nil {
-		cfg.BorderColor = *doc.BorderColor
-	}
-	if doc.ButtonBG != nil {
-		cfg.ButtonBG = *doc.ButtonBG
-	}
 	for _, o := range doc.Overrides {
 		if o.Name == nil {
 			return cfg, errors.New("systray: an override needs a name")
@@ -111,5 +98,10 @@ func applySystray(md toml.MetaData, prim toml.Primitive) (SystrayConfig, error) 
 		}
 		cfg.Overrides = append(cfg.Overrides, entry)
 	}
+	container, err := applyContainer(md, prim, cfg.Container)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Container = container
 	return cfg, nil
 }

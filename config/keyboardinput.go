@@ -11,8 +11,11 @@ import (
 
 // KeyboardInputConfig is the keyboard-input module config.
 type KeyboardInputConfig struct {
-	Click          ClickConfig
-	Format         string
+	Click  ClickConfig
+	Format string
+	// Button is the bar-button key set; LabelShow mirrors its
+	// label-show.
+	Button         ButtonConfig
 	LabelShow      bool
 	LayoutAliasMap map[string]string
 }
@@ -23,6 +26,7 @@ func DefaultsKeyboardInput() KeyboardInputConfig {
 		Click:          DefaultsClick(map[string]string{}),
 		Format:         "{{ alias }}",
 		LabelShow:      true,
+		Button:         DefaultsButton(buttonColors("auto", "yellow", "yellow", "bg-surface-elevated", "yellow"), TokenYellow, true, 0),
 		LayoutAliasMap: map[string]string{},
 	}
 }
@@ -31,18 +35,14 @@ func DefaultsKeyboardInput() KeyboardInputConfig {
 func applyKeyboardInput(md toml.MetaData, prim toml.Primitive) (KeyboardInputConfig, error) {
 	cfg := DefaultsKeyboardInput()
 	var doc struct {
-		Format    *string        `toml:"format"`
-		LabelShow *bool          `toml:"label-show"`
-		AliasMap  map[string]any `toml:"layout-alias-map"`
+		Format   *string        `toml:"format"`
+		AliasMap map[string]any `toml:"layout-alias-map"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
 	}
 	if doc.Format != nil {
 		cfg.Format = *doc.Format
-	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
 	}
 	if doc.AliasMap != nil {
 		cfg.LayoutAliasMap = map[string]string{}
@@ -62,6 +62,12 @@ func applyKeyboardInput(md toml.MetaData, prim toml.Primitive) (KeyboardInputCon
 	if strings.TrimSpace(cfg.Format) == "" {
 		return cfg, errors.New("keyboard-input: format is empty")
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

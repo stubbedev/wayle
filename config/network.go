@@ -33,7 +33,10 @@ func DefaultWifiSignalIcons() []string {
 
 // NetworkConfig is the network module config.
 type NetworkConfig struct {
-	Click     ClickConfig
+	Click ClickConfig
+	// Button is the bar-button key set; LabelShow and Icon.Show/Color
+	// mirror its label-show, icon-show, and icon-color.
+	Button    ButtonConfig
 	LabelShow bool
 	Icon      IconConfig
 	// WifiFallback is the label when connected but the SSID is hidden.
@@ -61,6 +64,7 @@ func DefaultsNetwork() NetworkConfig {
 		Click:                 DefaultsClick(map[string]string{"left-click": "dropdown:network"}),
 		LabelShow:             true,
 		Icon:                  DefaultsIcon(true, defaultWifiOfflineIcon),
+		Button:                DefaultsButton(buttonColors("auto", "accent", "accent", "bg-surface-elevated", "accent"), TokenAccent, true, 15),
 		WifiFallback:          "WiFi",
 		Connecting:            "Connecting...",
 		Disconnected:          "Disconnected",
@@ -83,40 +87,28 @@ func DefaultsNetwork() NetworkConfig {
 func applyNetwork(md toml.MetaData, prim toml.Primitive) (NetworkConfig, error) {
 	cfg := DefaultsNetwork()
 	var doc struct {
-		LabelShow             *bool       `toml:"label-show"`
-		IconShow              *bool       `toml:"icon-show"`
-		IconName              *string     `toml:"icon-name"`
-		IconColor             *ColorValue `toml:"icon-color"`
-		WifiFallback          *string     `toml:"wifi-fallback-label"`
-		Connecting            *string     `toml:"connecting-label"`
-		Disconnected          *string     `toml:"disconnected-label"`
-		Wired                 *string     `toml:"wired-label"`
-		WifiSignalIcons       *[]string   `toml:"wifi-signal-icons"`
-		WifiAcquiringIcon     *string     `toml:"wifi-acquiring-icon"`
-		WifiConnectedIcon     *string     `toml:"wifi-connected-icon"`
-		WifiDisabledIcon      *string     `toml:"wifi-disabled-icon"`
-		WifiOfflineIcon       *string     `toml:"wifi-offline-icon"`
-		WiredAcquiringIcon    *string     `toml:"wired-acquiring-icon"`
-		WiredConnectedIcon    *string     `toml:"wired-connected-icon"`
-		WiredDisconnectedIcon *string     `toml:"wired-disconnected-icon"`
-		VpnConnectedIcon      *string     `toml:"vpn-connected-icon"`
-		VpnConnectingIcon     *string     `toml:"vpn-connecting-icon"`
-		VpnDisconnectedIcon   *string     `toml:"vpn-disconnected-icon"`
+		IconName              *string   `toml:"icon-name"`
+		WifiFallback          *string   `toml:"wifi-fallback-label"`
+		Connecting            *string   `toml:"connecting-label"`
+		Disconnected          *string   `toml:"disconnected-label"`
+		Wired                 *string   `toml:"wired-label"`
+		WifiSignalIcons       *[]string `toml:"wifi-signal-icons"`
+		WifiAcquiringIcon     *string   `toml:"wifi-acquiring-icon"`
+		WifiConnectedIcon     *string   `toml:"wifi-connected-icon"`
+		WifiDisabledIcon      *string   `toml:"wifi-disabled-icon"`
+		WifiOfflineIcon       *string   `toml:"wifi-offline-icon"`
+		WiredAcquiringIcon    *string   `toml:"wired-acquiring-icon"`
+		WiredConnectedIcon    *string   `toml:"wired-connected-icon"`
+		WiredDisconnectedIcon *string   `toml:"wired-disconnected-icon"`
+		VpnConnectedIcon      *string   `toml:"vpn-connected-icon"`
+		VpnConnectingIcon     *string   `toml:"vpn-connecting-icon"`
+		VpnDisconnectedIcon   *string   `toml:"vpn-disconnected-icon"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
 	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
-	}
-	if doc.IconShow != nil {
-		cfg.Icon.Show = *doc.IconShow
-	}
 	if doc.IconName != nil {
 		cfg.Icon.Name = *doc.IconName
-	}
-	if doc.IconColor != nil {
-		cfg.Icon.Color = *doc.IconColor
 	}
 	for _, set := range []struct {
 		raw   *string
@@ -158,6 +150,13 @@ func applyNetwork(md toml.MetaData, prim toml.Primitive) (NetworkConfig, error) 
 	if doc.WifiSignalIcons != nil {
 		cfg.WifiSignalIcons = *doc.WifiSignalIcons
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
+	button.mirrorIcon(&cfg.Icon)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

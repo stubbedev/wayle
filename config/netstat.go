@@ -12,6 +12,9 @@ type NetstatConfig struct {
 	Format    string
 	Interface string
 	PollMs    int
+	// Button is the bar-button key set; LabelShow mirrors its
+	// label-show.
+	Button    ButtonConfig
 	LabelShow bool
 }
 
@@ -22,6 +25,7 @@ func DefaultsNetstat() NetstatConfig {
 		Interface: "auto",
 		PollMs:    2000,
 		LabelShow: true,
+		Button:    DefaultsButton(buttonColors("auto", "red", "red", "bg-surface-elevated", "red"), TokenRed, true, 0),
 	}
 }
 
@@ -32,7 +36,6 @@ func applyNetstat(md toml.MetaData, prim toml.Primitive) (NetstatConfig, error) 
 		Format    *string `toml:"format"`
 		Interface *string `toml:"interface"`
 		PollMs    *int    `toml:"poll-interval-ms"`
-		LabelShow *bool   `toml:"label-show"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -46,12 +49,15 @@ func applyNetstat(md toml.MetaData, prim toml.Primitive) (NetstatConfig, error) 
 	if doc.PollMs != nil {
 		cfg.PollMs = *doc.PollMs
 	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
-	}
 	if cfg.PollMs < 0 {
 		return cfg, errors.New("netstat: poll-interval-ms is negative")
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

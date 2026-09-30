@@ -63,7 +63,10 @@ var MediaBuiltinIcons = []IconMapping{
 
 // MediaConfig is [modules.media] (schemas/modules/media/mod.rs).
 type MediaConfig struct {
-	Click     ClickConfig
+	Click ClickConfig
+	// Button is the bar-button key set; LabelShow and LabelMaxLength
+	// mirror its label-show and label-max-length.
+	Button    ButtonConfig
 	Format    string
 	LabelShow bool
 	// LabelMaxLength truncates the label with an ellipsis; 0 disables.
@@ -86,6 +89,7 @@ type MediaConfig struct {
 func DefaultsMedia() MediaConfig {
 	return MediaConfig{
 		Click:            DefaultsClick(map[string]string{"left-click": "dropdown:media"}),
+		Button:           DefaultsButton(buttonColors("auto", "blue", "blue", "bg-surface-elevated", "blue"), TokenBlue, true, 35),
 		Format:           "{{ title }} - {{ artist }}",
 		LabelShow:        true,
 		LabelMaxLength:   35,
@@ -100,11 +104,7 @@ func applyMedia(md toml.MetaData, prim toml.Primitive) (MediaConfig, error) {
 	cfg := DefaultsMedia()
 	var doc struct {
 		Format           *string            `toml:"format"`
-		LabelShow        *bool              `toml:"label-show"`
-		LabelMax         *int               `toml:"label-max-length"`
-		IconShow         *bool              `toml:"icon-show"`
 		IconName         *string            `toml:"icon-name"`
-		IconColor        *ColorValue        `toml:"icon-color"`
 		IconType         *string            `toml:"icon-type"`
 		SpinningDiscIcon *string            `toml:"spinning-disc-icon"`
 		PlayerIcons      *map[string]string `toml:"player-icons"`
@@ -117,23 +117,8 @@ func applyMedia(md toml.MetaData, prim toml.Primitive) (MediaConfig, error) {
 	if doc.Format != nil {
 		cfg.Format = *doc.Format
 	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
-	}
-	if doc.LabelMax != nil {
-		if *doc.LabelMax < 0 {
-			return cfg, fmt.Errorf("media: label-max-length %d is negative", *doc.LabelMax)
-		}
-		cfg.LabelMaxLength = *doc.LabelMax
-	}
-	if doc.IconShow != nil {
-		cfg.Icon.Show = *doc.IconShow
-	}
 	if doc.IconName != nil {
 		cfg.Icon.Name = *doc.IconName
-	}
-	if doc.IconColor != nil {
-		cfg.Icon.Color = *doc.IconColor
 	}
 	if doc.IconType != nil {
 		t, err := ParseMediaIconType(*doc.IconType)
@@ -157,6 +142,13 @@ func applyMedia(md toml.MetaData, prim toml.Primitive) (MediaConfig, error) {
 	if doc.PlayerPriority != nil {
 		cfg.PlayerPriority = *doc.PlayerPriority
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, &cfg.LabelMaxLength)
+	button.mirrorIcon(&cfg.Icon)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

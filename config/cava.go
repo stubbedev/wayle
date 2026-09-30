@@ -36,7 +36,10 @@ var validCavaDirections = map[CavaDirection]bool{
 
 // CavaConfig is the cava module configuration.
 type CavaConfig struct {
-	Click          ClickConfig
+	Click ClickConfig
+	// Container is the bar_container key set: border-show,
+	// border-color, and button-bg-color.
+	Container      ContainerConfig
 	Bars           int
 	BarWidth       int
 	BarGap         int
@@ -56,6 +59,7 @@ type CavaConfig struct {
 func DefaultsCava() CavaConfig {
 	return CavaConfig{
 		Click:          DefaultsClick(nil),
+		Container:      DefaultsContainer("bg-surface-elevated", "border-accent"),
 		Bars:           20,
 		BarWidth:       6,
 		BarGap:         1,
@@ -155,6 +159,11 @@ func applyCava(md toml.MetaData, prim toml.Primitive) (CavaConfig, error) {
 	case !validCavaDirections[cfg.Direction]:
 		return cfg, fmt.Errorf("cava: invalid direction %q (want normal|reverse|mirror)", cfg.Direction)
 	}
+	container, err := applyContainer(md, prim, cfg.Container)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Container = container
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

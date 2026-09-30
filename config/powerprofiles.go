@@ -10,8 +10,11 @@ import (
 // active profile rendered per the format, with per-profile icons and
 // colors.
 type PowerProfilesConfig struct {
-	Click     ClickConfig
-	Format    string
+	Click  ClickConfig
+	Format string
+	// Button is the bar-button key set; LabelShow and the Show of every
+	// Icons entry mirror its label-show and icon-show.
+	Button    ButtonConfig
 	LabelShow bool
 	Icons     map[string]IconConfig
 	Colors    map[string]ColorValue
@@ -22,6 +25,7 @@ func DefaultsPowerProfiles() PowerProfilesConfig {
 	return PowerProfilesConfig{
 		Format:    "{{ profile }}",
 		LabelShow: false,
+		Button:    DefaultsButton(buttonColors("auto", "auto", "bg-surface-elevated", "bg-surface-elevated", "blue"), TokenBlue, false, 0),
 		Click:     DefaultsClick(map[string]string{"left-click": ":cycle"}),
 		Icons: map[string]IconConfig{
 			ProfileBalanced:    DefaultsIcon(true, "ld-scale-symbolic"),
@@ -37,8 +41,6 @@ func applyPowerProfiles(md toml.MetaData, prim toml.Primitive) (PowerProfilesCon
 	cfg := DefaultsPowerProfiles()
 	var doc struct {
 		Format        *string     `toml:"format"`
-		LabelShow     *bool       `toml:"label-show"`
-		IconShow      *bool       `toml:"icon-show"`
 		IconBalanced  *string     `toml:"icon-balanced"`
 		IconPerf      *string     `toml:"icon-performance"`
 		IconSaver     *string     `toml:"icon-power-saver"`
@@ -51,15 +53,6 @@ func applyPowerProfiles(md toml.MetaData, prim toml.Primitive) (PowerProfilesCon
 	}
 	if doc.Format != nil {
 		cfg.Format = *doc.Format
-	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
-	}
-	if doc.IconShow != nil {
-		for name, icon := range cfg.Icons {
-			icon.Show = *doc.IconShow
-			cfg.Icons[name] = icon
-		}
 	}
 	for name, key := range map[string]*string{
 		ProfileBalanced:    doc.IconBalanced,
@@ -86,6 +79,13 @@ func applyPowerProfiles(md toml.MetaData, prim toml.Primitive) (PowerProfilesCon
 	if doc.Format != nil && *doc.Format == "" {
 		return cfg, errors.New("power-profiles: format is empty")
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
+	button.mirrorIconShow(cfg.Icons)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

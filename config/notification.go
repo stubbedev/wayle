@@ -23,7 +23,10 @@ const (
 // bell with the unread count, the do-not-disturb state, and the popup
 // window knobs.
 type NotificationConfig struct {
-	Enabled    bool
+	Enabled bool
+	// Button is the bar-button key set; LabelShow and Icon.Show/Color
+	// mirror its label-show, icon-show, and icon-color.
+	Button     ButtonConfig
 	LabelShow  bool
 	Icon       IconConfig
 	IconUnread string
@@ -47,6 +50,7 @@ func DefaultsNotification() NotificationConfig {
 		Enabled:          true,
 		LabelShow:        true,
 		Icon:             DefaultsIcon(true, "ld-bell-symbolic"),
+		Button:           DefaultsButton(buttonColors("auto", "green", "green", "bg-surface-elevated", "green"), TokenGreen, true, 0),
 		IconUnread:       defaultNotifIconUnread,
 		IconDnd:          defaultNotifIconDnd,
 		Thresholds:       []ThresholdEntry{},
@@ -66,37 +70,25 @@ func DefaultsNotification() NotificationConfig {
 func applyNotification(md toml.MetaData, prim toml.Primitive) (NotificationConfig, error) {
 	cfg := DefaultsNotification()
 	var doc struct {
-		LabelShow        *bool            `toml:"label-show"`
-		Enabled          *bool            `toml:"enabled"`
-		IconShow         *bool            `toml:"icon-show"`
-		IconName         *string          `toml:"icon-name"`
-		IconColor        *ColorValue      `toml:"icon-color"`
-		IconUnread       *string          `toml:"icon-unread"`
-		IconDnd          *string          `toml:"icon-dnd"`
-		PopupDurationMS  *int             `toml:"popup-duration"`
-		PopupMaxVisible  *int             `toml:"popup-max-visible"`
-		PopupPosition    *string          `toml:"popup-position"`
-		PopupGap         *float64         `toml:"popup-gap"`
-		PopupMonitor     *string          `toml:"popup-monitor"`
-		PopupStacking    *string          `toml:"popup-stacking-order"`
-		PopupCloseAction *string          `toml:"popup-close-behavior"`
-		PopupHoverPause  *bool            `toml:"popup-hover-pause"`
-		ThresholdList    []ThresholdEntry `toml:"thresholds"`
+		Enabled          *bool             `toml:"enabled"`
+		IconName         *string           `toml:"icon-name"`
+		IconUnread       *string           `toml:"icon-unread"`
+		IconDnd          *string           `toml:"icon-dnd"`
+		PopupDurationMS  *int              `toml:"popup-duration"`
+		PopupMaxVisible  *int              `toml:"popup-max-visible"`
+		PopupPosition    *string           `toml:"popup-position"`
+		PopupGap         *float64          `toml:"popup-gap"`
+		PopupMonitor     *string           `toml:"popup-monitor"`
+		PopupStacking    *string           `toml:"popup-stacking-order"`
+		PopupCloseAction *string           `toml:"popup-close-behavior"`
+		PopupHoverPause  *bool             `toml:"popup-hover-pause"`
+		Thresholds       *[]ThresholdEntry `toml:"thresholds"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
 	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
-	}
-	if doc.IconShow != nil {
-		cfg.Icon.Show = *doc.IconShow
-	}
 	if doc.IconName != nil {
 		cfg.Icon.Name = *doc.IconName
-	}
-	if doc.IconColor != nil {
-		cfg.Icon.Color = *doc.IconColor
 	}
 	if doc.IconUnread != nil {
 		cfg.IconUnread = *doc.IconUnread
@@ -146,9 +138,14 @@ func applyNotification(md toml.MetaData, prim toml.Primitive) (NotificationConfi
 	if doc.PopupHoverPause != nil {
 		cfg.PopupHoverPause = *doc.PopupHoverPause
 	}
-	if doc.ThresholdList != nil {
-		cfg.Thresholds = doc.ThresholdList
+	setIf(doc.Thresholds, &cfg.Thresholds)
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
 	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
+	button.mirrorIcon(&cfg.Icon)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

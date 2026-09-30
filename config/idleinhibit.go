@@ -8,8 +8,11 @@ import (
 
 // IdleInhibitConfig is the idle-inhibit module configuration.
 type IdleInhibitConfig struct {
-	Click           ClickConfig
-	Format          string
+	Click  ClickConfig
+	Format string
+	// Button is the bar-button key set; LabelShow and the Show of every
+	// Icons entry mirror its label-show and icon-show.
+	Button          ButtonConfig
 	LabelShow       bool
 	StartupDuration uint32
 	Icons           map[string]IconConfig
@@ -21,6 +24,7 @@ func DefaultsIdleInhibit() IdleInhibitConfig {
 	return IdleInhibitConfig{
 		Format:          "{{ state }}",
 		LabelShow:       true,
+		Button:          DefaultsButton(buttonColors("auto", "green", "green", "bg-surface-elevated", "green"), TokenGreen, true, 0),
 		StartupDuration: 60,
 		Icons: map[string]IconConfig{
 			IdleInhibitActive:   DefaultsIcon(true, "tb-coffee-symbolic"),
@@ -41,9 +45,7 @@ func applyIdleInhibit(md toml.MetaData, prim toml.Primitive) (IdleInhibitConfig,
 	cfg := DefaultsIdleInhibit()
 	var doc struct {
 		Format          *string     `toml:"format"`
-		LabelShow       *bool       `toml:"label-show"`
 		StartupDuration *uint32     `toml:"startup-duration"`
-		IconShow        *bool       `toml:"icon-show"`
 		IconActive      *string     `toml:"icon-active"`
 		IconInactive    *string     `toml:"icon-inactive"`
 		ColorActive     *ColorValue `toml:"color-active"`
@@ -54,9 +56,6 @@ func applyIdleInhibit(md toml.MetaData, prim toml.Primitive) (IdleInhibitConfig,
 	}
 	if doc.Format != nil {
 		cfg.Format = *doc.Format
-	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
 	}
 	if doc.StartupDuration != nil {
 		cfg.StartupDuration = *doc.StartupDuration
@@ -72,12 +71,6 @@ func applyIdleInhibit(md toml.MetaData, prim toml.Primitive) (IdleInhibitConfig,
 		icon.Name = *key
 		cfg.Icons[name] = icon
 	}
-	if doc.IconShow != nil {
-		for name, icon := range cfg.Icons {
-			icon.Show = *doc.IconShow
-			cfg.Icons[name] = icon
-		}
-	}
 	for name, color := range map[string]*ColorValue{
 		IdleInhibitActive:   doc.ColorActive,
 		IdleInhibitInactive: doc.ColorInactive,
@@ -90,6 +83,13 @@ func applyIdleInhibit(md toml.MetaData, prim toml.Primitive) (IdleInhibitConfig,
 	if doc.Format != nil && *doc.Format == "" {
 		return cfg, errors.New("idle-inhibit: format is empty")
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
+	button.mirrorIconShow(cfg.Icons)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

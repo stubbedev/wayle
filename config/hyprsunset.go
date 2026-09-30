@@ -8,8 +8,11 @@ import (
 
 // HyprsunsetConfig is the hyprsunset module configuration.
 type HyprsunsetConfig struct {
-	Click        ClickConfig
-	Format       string
+	Click  ClickConfig
+	Format string
+	// Button is the bar-button key set; LabelShow and IconOn/IconOff
+	// Show/Color mirror its label-show, icon-show, and icon-color.
+	Button       ButtonConfig
 	LabelShow    bool
 	Temperature  int
 	Gamma        int
@@ -25,6 +28,7 @@ func DefaultsHyprsunset() HyprsunsetConfig {
 	return HyprsunsetConfig{
 		Format:       "{{ status }}",
 		LabelShow:    true,
+		Button:       DefaultsButton(buttonColors("auto", "yellow", "yellow", "bg-surface-elevated", "yellow"), TokenYellow, true, 0),
 		Temperature:  5000,
 		Gamma:        100,
 		AutoSchedule: false,
@@ -38,26 +42,20 @@ func DefaultsHyprsunset() HyprsunsetConfig {
 func applyHyprsunset(md toml.MetaData, prim toml.Primitive) (HyprsunsetConfig, error) {
 	cfg := DefaultsHyprsunset()
 	var doc struct {
-		Format       *string     `toml:"format"`
-		LabelShow    *bool       `toml:"label-show"`
-		Temperature  *int        `toml:"temperature"`
-		Gamma        *int        `toml:"gamma"`
-		AutoSchedule *bool       `toml:"auto-schedule"`
-		Latitude     *float64    `toml:"latitude"`
-		Longitude    *float64    `toml:"longitude"`
-		IconShow     *bool       `toml:"icon-show"`
-		IconOnName   *string     `toml:"icon-on"`
-		IconOffName  *string     `toml:"icon-off"`
-		IconColor    *ColorValue `toml:"icon-color"`
+		Format       *string  `toml:"format"`
+		Temperature  *int     `toml:"temperature"`
+		Gamma        *int     `toml:"gamma"`
+		AutoSchedule *bool    `toml:"auto-schedule"`
+		Latitude     *float64 `toml:"latitude"`
+		Longitude    *float64 `toml:"longitude"`
+		IconOnName   *string  `toml:"icon-on"`
+		IconOffName  *string  `toml:"icon-off"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
 	}
 	if doc.Format != nil {
 		cfg.Format = *doc.Format
-	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
 	}
 	if doc.Temperature != nil {
 		cfg.Temperature = *doc.Temperature
@@ -80,14 +78,6 @@ func applyHyprsunset(md toml.MetaData, prim toml.Primitive) (HyprsunsetConfig, e
 	if doc.IconOffName != nil {
 		cfg.IconOff.Name = *doc.IconOffName
 	}
-	if doc.IconShow != nil {
-		cfg.IconOn.Show = *doc.IconShow
-		cfg.IconOff.Show = *doc.IconShow
-	}
-	if doc.IconColor != nil {
-		cfg.IconOn.Color = *doc.IconColor
-		cfg.IconOff.Color = *doc.IconColor
-	}
 	// The schema documents these ranges.
 	if cfg.Temperature < 1000 || cfg.Temperature > 20000 {
 		return cfg, errors.New("hyprsunset: temperature must be 1000..20000")
@@ -104,6 +94,14 @@ func applyHyprsunset(md toml.MetaData, prim toml.Primitive) (HyprsunsetConfig, e
 	if doc.Format != nil && *doc.Format == "" {
 		return cfg, errors.New("hyprsunset: format is empty")
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
+	button.mirrorIcon(&cfg.IconOn)
+	button.mirrorIcon(&cfg.IconOff)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

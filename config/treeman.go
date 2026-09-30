@@ -9,8 +9,12 @@ import (
 // TreemanConfig is the treeman module configuration: the worktree
 // health aggregate, with a per-bucket icon.
 type TreemanConfig struct {
-	Click       ClickConfig
-	Format      string
+	Click  ClickConfig
+	Format string
+	// Button is the bar-button key set; LabelShow, Icon.Show/Color, and
+	// the Show of every Icons entry mirror its label-show, icon-show,
+	// and icon-color.
+	Button      ButtonConfig
 	LabelShow   bool
 	HideIfEmpty bool
 	Icon        IconConfig
@@ -34,6 +38,7 @@ func DefaultsTreeman() TreemanConfig {
 	return TreemanConfig{
 		Format:      "{{ total }}",
 		LabelShow:   true,
+		Button:      DefaultsButton(buttonColors("auto", "accent", "accent", "bg-surface-elevated", "border-accent"), TokenAccent, true, 0),
 		HideIfEmpty: false,
 		Icon:        DefaultsIcon(true, "ld-layers-symbolic"),
 		Icons: map[string]IconConfig{
@@ -50,15 +55,12 @@ func DefaultsTreeman() TreemanConfig {
 func applyTreeman(md toml.MetaData, prim toml.Primitive) (TreemanConfig, error) {
 	cfg := DefaultsTreeman()
 	var doc struct {
-		Format          *string     `toml:"format"`
-		LabelShow       *bool       `toml:"label-show"`
-		HideIfEmpty     *bool       `toml:"hide-if-empty"`
-		IconShow        *bool       `toml:"icon-show"`
-		IconName        *string     `toml:"icon-name"`
-		IconColor       *ColorValue `toml:"icon-color"`
-		IconFailed      *string     `toml:"icon-failed"`
-		IconPreparing   *string     `toml:"icon-preparing"`
-		IconTearingDown *string     `toml:"icon-tearing-down"`
+		Format          *string `toml:"format"`
+		HideIfEmpty     *bool   `toml:"hide-if-empty"`
+		IconName        *string `toml:"icon-name"`
+		IconFailed      *string `toml:"icon-failed"`
+		IconPreparing   *string `toml:"icon-preparing"`
+		IconTearingDown *string `toml:"icon-tearing-down"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
@@ -66,27 +68,14 @@ func applyTreeman(md toml.MetaData, prim toml.Primitive) (TreemanConfig, error) 
 	if doc.Format != nil {
 		cfg.Format = *doc.Format
 	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
-	}
 	if doc.HideIfEmpty != nil {
 		cfg.HideIfEmpty = *doc.HideIfEmpty
-	}
-	if doc.IconShow != nil {
-		for name, icon := range cfg.Icons {
-			icon.Show = *doc.IconShow
-			cfg.Icons[name] = icon
-		}
-		cfg.Icon.Show = *doc.IconShow
 	}
 	if doc.IconName != nil {
 		cfg.Icon.Name = *doc.IconName
 		stable := cfg.Icons[TreemanBucketStable]
 		stable.Name = *doc.IconName
 		cfg.Icons[TreemanBucketStable] = stable
-	}
-	if doc.IconColor != nil {
-		cfg.Icon.Color = *doc.IconColor
 	}
 	for name, key := range map[string]*string{
 		TreemanBucketFailed: doc.IconFailed,
@@ -103,6 +92,14 @@ func applyTreeman(md toml.MetaData, prim toml.Primitive) (TreemanConfig, error) 
 	if doc.Format != nil && *doc.Format == "" {
 		return cfg, errors.New("treeman: format is empty")
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
+	button.mirrorIcon(&cfg.Icon)
+	button.mirrorIconShow(cfg.Icons)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err

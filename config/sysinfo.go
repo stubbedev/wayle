@@ -9,7 +9,10 @@ import (
 // SysinfoConfig is the shared shape of the cpu/ram/storage poll
 // modules: a format, an interval, and thresholds.
 type SysinfoConfig struct {
-	Click      ClickConfig
+	Click ClickConfig
+	// Button is the bar-button key set; LabelShow and Icon.Show/Color
+	// mirror its label-show, icon-show, and icon-color.
+	Button     ButtonConfig
 	Format     string
 	LabelShow  bool
 	PollMs     int
@@ -23,7 +26,6 @@ type SysinfoConfig struct {
 func applySysinfo(md toml.MetaData, prim toml.Primitive, defaults SysinfoConfig, withPath bool) (SysinfoConfig, error) {
 	var doc struct {
 		Format    *string           `toml:"format"`
-		LabelShow *bool             `toml:"label-show"`
 		PollMs    *int              `toml:"poll-interval-ms"`
 		Threshold *[]ThresholdEntry `toml:"thresholds"`
 		Path      *string           `toml:"path"`
@@ -33,9 +35,6 @@ func applySysinfo(md toml.MetaData, prim toml.Primitive, defaults SysinfoConfig,
 	}
 	if doc.Format != nil {
 		defaults.Format = *doc.Format
-	}
-	if doc.LabelShow != nil {
-		defaults.LabelShow = *doc.LabelShow
 	}
 	if doc.PollMs != nil {
 		defaults.PollMs = *doc.PollMs
@@ -51,6 +50,13 @@ func applySysinfo(md toml.MetaData, prim toml.Primitive, defaults SysinfoConfig,
 		return defaults, err
 	}
 	defaults.Icon = icon
+	button, err := applyButton(md, prim, defaults.Button, AllButtonKeys)
+	if err != nil {
+		return defaults, err
+	}
+	defaults.Button = button
+	button.mirrorLabel(&defaults.LabelShow, nil)
+	button.mirrorIcon(&defaults.Icon)
 	if defaults.PollMs < 0 {
 		return defaults, errors.New("poll interval is negative")
 	}
@@ -69,6 +75,7 @@ func DefaultsSysinfoCpu() SysinfoConfig {
 		LabelShow: true,
 		PollMs:    2000,
 		Icon:      DefaultsIcon(true, "ld-cpu-symbolic"),
+		Button:    DefaultsButton(buttonColors("auto", "blue", "blue", "bg-surface-elevated", "blue"), TokenBlue, true, 0),
 	}
 }
 
@@ -79,6 +86,7 @@ func DefaultsSysinfoRam() SysinfoConfig {
 		LabelShow: true,
 		PollMs:    5000,
 		Icon:      DefaultsIcon(true, "ld-memory-stick-symbolic"),
+		Button:    DefaultsButton(buttonColors("auto", "green", "green", "bg-surface-elevated", "green"), TokenGreen, true, 0),
 	}
 }
 
@@ -89,6 +97,7 @@ func DefaultsSysinfoStorage() SysinfoConfig {
 		LabelShow: true,
 		PollMs:    30000,
 		Icon:      DefaultsIcon(true, "ld-hard-drive-symbolic"),
+		Button:    DefaultsButton(buttonColors("auto", "yellow", "yellow", "bg-surface-elevated", "yellow"), TokenYellow, true, 0),
 		Path:      "/",
 	}
 }

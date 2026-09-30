@@ -14,7 +14,10 @@ const (
 
 // BluetoothConfig is the bluetooth module config.
 type BluetoothConfig struct {
-	Click     ClickConfig
+	Click ClickConfig
+	// Button is the bar-button key set; LabelShow and Icon.Show/Color
+	// mirror its label-show, icon-show, and icon-color.
+	Button    ButtonConfig
 	LabelShow bool
 	Icon      IconConfig
 	// State icons: absent or powered-off, searching, and the plain
@@ -28,6 +31,7 @@ type BluetoothConfig struct {
 // DefaultsBluetooth returns the schema defaults.
 func DefaultsBluetooth() BluetoothConfig {
 	return BluetoothConfig{
+		Button:           DefaultsButton(buttonColors("auto", "blue", "blue", "bg-surface-elevated", "blue"), TokenBlue, true, 15),
 		LabelShow:        true,
 		Icon:             DefaultsIcon(true, defaultBtDisconnectedIcon),
 		ConnectedIcon:    defaultBtConnectedIcon,
@@ -41,29 +45,17 @@ func DefaultsBluetooth() BluetoothConfig {
 func applyBluetooth(md toml.MetaData, prim toml.Primitive) (BluetoothConfig, error) {
 	cfg := DefaultsBluetooth()
 	var doc struct {
-		LabelShow        *bool       `toml:"label-show"`
-		IconShow         *bool       `toml:"icon-show"`
-		IconName         *string     `toml:"icon-name"`
-		IconColor        *ColorValue `toml:"icon-color"`
-		ConnectedIcon    *string     `toml:"connected-icon"`
-		DisabledIcon     *string     `toml:"disabled-icon"`
-		DisconnectedIcon *string     `toml:"disconnected-icon"`
-		SearchingIcon    *string     `toml:"searching-icon"`
+		IconName         *string `toml:"icon-name"`
+		ConnectedIcon    *string `toml:"connected-icon"`
+		DisabledIcon     *string `toml:"disabled-icon"`
+		DisconnectedIcon *string `toml:"disconnected-icon"`
+		SearchingIcon    *string `toml:"searching-icon"`
 	}
 	if err := md.PrimitiveDecode(prim, &doc); err != nil {
 		return cfg, err
 	}
-	if doc.LabelShow != nil {
-		cfg.LabelShow = *doc.LabelShow
-	}
-	if doc.IconShow != nil {
-		cfg.Icon.Show = *doc.IconShow
-	}
 	if doc.IconName != nil {
 		cfg.Icon.Name = *doc.IconName
-	}
-	if doc.IconColor != nil {
-		cfg.Icon.Color = *doc.IconColor
 	}
 	for _, set := range []struct {
 		raw  *string
@@ -78,6 +70,13 @@ func applyBluetooth(md toml.MetaData, prim toml.Primitive) (BluetoothConfig, err
 			*set.icon = *set.raw
 		}
 	}
+	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Button = button
+	button.mirrorLabel(&cfg.LabelShow, nil)
+	button.mirrorIcon(&cfg.Icon)
 	clicks, err := applyClicks(md, prim, cfg.Click)
 	if err != nil {
 		return cfg, err
