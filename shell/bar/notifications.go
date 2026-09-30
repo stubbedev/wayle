@@ -57,18 +57,16 @@ func newNotification(ctx ModuleContext) (Module, error) {
 	m.icon = moduleIcon(ctx, ctx.Config.Notification.Icon)
 	m.root = assembleModule(ctx, m.icon, m.label)
 	m.refresh()
-	// Follow the service's change feed; the events also drive the OSD
-	// popups later. Headless construction refreshes inline.
-	if ctx.App == nil {
-		go func() {
-			for range m.src.Events() {
-				m.refresh()
-			}
-		}()
-		return m, nil
-	}
+	// Follow the service's change feed (subscribed before returning, so
+	// no event after construction is missed). Headless construction
+	// refreshes inline.
+	feed := m.src.Subscribe()
 	go func() {
-		for range m.src.Events() {
+		for range feed {
+			if ctx.App == nil {
+				m.refresh()
+				continue
+			}
 			m.ctx.Invoke(m.refresh)
 		}
 	}()

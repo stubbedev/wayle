@@ -204,8 +204,10 @@ func RunWith(cfg *config.Config) error {
 		}
 		dropdowns.attachHost(output.Name, layer)
 		osdSrv.AttachOutput(output.Name, output)
-		// Notification popups render on the configured monitor only.
-		if cfg.Notification.Enabled && cfg.Notification.PopupMonitor == output.Name {
+	}
+	// Notification popups render on one monitor, bar or not.
+	if cfg.Notification.Enabled {
+		if output := popups.Output(outputs, cfg.Notification.PopupMonitor); output != nil {
 			p := popups.New(application, notifSvc, cfg.Notification, font, palette, output)
 			go p.Run()
 		}

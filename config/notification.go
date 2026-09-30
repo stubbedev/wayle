@@ -137,7 +137,7 @@ func applyNotification(md toml.MetaData, prim toml.Primitive) (NotificationConfi
 		name    string
 	}{
 		{doc.PopupStacking, &cfg.PopupStacking, []string{"newest-first", "oldest-first"}, "popup-stacking-order"},
-		{doc.PopupCloseAction, &cfg.PopupCloseAction, []string{"dismiss", "close"}, "popup-close-behavior"},
+		{doc.PopupCloseAction, &cfg.PopupCloseAction, []string{"dismiss", "remove"}, "popup-close-behavior"},
 	} {
 		if set.raw == nil {
 			continue

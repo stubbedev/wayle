@@ -6,13 +6,13 @@ import (
 )
 
 // collect waits for n events.
-func collect(t *testing.T, s *Service, n int) []Event {
+func collect(t *testing.T, feed <-chan Event, n int) []Event {
 	t.Helper()
 	var out []Event
 	deadline := time.After(time.Second)
 	for len(out) < n {
 		select {
-		case ev := <-s.Events():
+		case ev := <-feed:
 			out = append(out, ev)
 		case <-deadline:
 			t.Fatalf("got %d events, want %d", len(out), n)
@@ -30,11 +30,12 @@ func newTestService(t *testing.T) *Service {
 
 func TestNotifyStoresAndEmits(t *testing.T) {
 	s := newTestService(t)
+	feed := s.Subscribe()
 	id := s.Notify("mail", 0, "", "New mail", "hello", nil, 0)
 	if id == 0 {
 		t.Fatal("ids start at one")
 	}
-	ev := collect(t, s, 1)[0]
+	ev := collect(t, feed, 1)[0]
 	if ev.Kind != EventAdd || ev.Notif.ID != id || ev.Notif.Summary != "New mail" {
 		t.Fatalf("event = %+v", ev)
 	}
@@ -49,13 +50,14 @@ func TestNotifyStoresAndEmits(t *testing.T) {
 
 func TestReplacesID(t *testing.T) {
 	s := newTestService(t)
+	feed := s.Subscribe()
 	id := s.Notify("app", 0, "", "First", "", nil, 0)
-	collect(t, s, 1)
+	collect(t, feed, 1)
 	again := s.Notify("app", id, "", "Second", "", nil, 0)
 	if again != id {
 		t.Fatalf("replaces returned %d, want %d", again, id)
 	}
-	<-s.Events()
+	<-feed
 	if got := s.Count(); got != 1 {
 		t.Fatalf("count = %d, want the replacement only", got)
 	}
@@ -63,13 +65,14 @@ func TestReplacesID(t *testing.T) {
 
 func TestBlocklistConsumes(t *testing.T) {
 	s := newTestService(t)
+	feed := s.Subscribe()
 	s.SetBlocklist([]string{"noisy*"})
 	id := s.Notify("noisy-app", 0, "", "spam", "", nil, 0)
 	if id == 0 {
 		t.Fatal("blocked notifications still return an id")
 	}
 	select {
-	case ev := <-s.Events():
+	case ev := <-feed:
 		t.Fatalf("blocked notification leaked: %+v", ev)
 	case <-time.After(50 * time.Millisecond):
 	}
@@ -80,35 +83,41 @@ func TestBlocklistConsumes(t *testing.T) {
 
 func TestDNDSuppressesPopups(t *testing.T) {
 	s := newTestService(t)
+	feed := s.Subscribe()
 	s.Notify("app", 0, "", "ping", "", nil, 0)
-	<-s.Events()
+	<-feed
 	if len(s.Popups()) != 1 {
 		t.Fatal("no dnd: the notification should be a popup")
 	}
 	s.SetDND(true)
-	if got := len(s.Popups()); got != 0 {
-		t.Fatalf("popups under dnd = %d", got)
-	}
 	if !s.DND() {
 		t.Fatal("dnd flag lost")
 	}
-	// The dnd event arrives.
-	for {
-		select {
-		case ev := <-s.Events():
-			if ev.Kind == EventDnd {
-				return
-			}
-		case <-time.After(time.Second):
-			t.Fatal("no dnd event")
+	select {
+	case ev := <-feed:
+		if ev.Kind != EventDnd {
+			t.Fatalf("event = %+v, want the dnd event", ev)
 		}
+	case <-time.After(time.Second):
+		t.Fatal("no dnd event")
+	}
+	// A popup already up stays; DND keeps new ones off the list while
+	// the history still takes them (handle_popup_added).
+	s.Notify("app", 0, "", "quiet", "", nil, 0)
+	<-feed
+	if got := len(s.Popups()); got != 1 {
+		t.Fatalf("popups under dnd = %d, want only the one shown before", got)
+	}
+	if got := s.Count(); got != 2 {
+		t.Fatalf("history under dnd = %d, want both", got)
 	}
 }
 
 func TestExpiryRemoves(t *testing.T) {
 	s := newTestService(t)
+	feed := s.Subscribe()
 	s.Notify("app", 0, "", "flash", "", nil, 30)
-	<-s.Events()
+	<-feed
 	deadline := time.Now().Add(2 * time.Second)
 	for s.Count() > 0 && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
@@ -119,7 +128,7 @@ func TestExpiryRemoves(t *testing.T) {
 	sawExpired := false
 	for {
 		select {
-		case ev := <-s.Events():
+		case ev := <-feed:
 			if ev.Kind == EventRemove && ev.Reason == Expired {
 				sawExpired = true
 			}
@@ -134,8 +143,9 @@ func TestExpiryRemoves(t *testing.T) {
 
 func TestZeroTimeoutNeverExpires(t *testing.T) {
 	s := newTestService(t)
+	feed := s.Subscribe()
 	s.Notify("app", 0, "", "sticky", "", nil, 0)
-	<-s.Events()
+	<-feed
 	time.Sleep(60 * time.Millisecond)
 	if got := s.Count(); got != 1 {
 		t.Fatalf("expire_timeout 0 removed the notification")
@@ -144,9 +154,10 @@ func TestZeroTimeoutNeverExpires(t *testing.T) {
 
 func TestDismissAll(t *testing.T) {
 	s := newTestService(t)
+	feed := s.Subscribe()
 	s.Notify("app", 0, "", "one", "", nil, 0)
 	s.Notify("app", 0, "", "two", "", nil, 0)
-	collect(t, s, 2)
+	collect(t, feed, 2)
 	s.DismissAll()
 	deadline := time.Now().Add(2 * time.Second)
 	for s.Count() > 0 && time.Now().Before(deadline) {
@@ -159,10 +170,11 @@ func TestDismissAll(t *testing.T) {
 
 func TestInvokeAction(t *testing.T) {
 	s := newTestService(t)
+	feed := s.Subscribe()
 	var signals []string
 	s.SetEmitter(func(signal string, _ ...any) { signals = append(signals, signal) })
 	id := s.Notify("app", 0, "", "hi", "", []string{"reply", "Reply"}, 0)
-	<-s.Events()
+	<-feed
 	s.InvokeAction(id, "reply")
 	if len(signals) == 0 || signals[0] != Interface+".ActionInvoked" {
 		t.Fatalf("signals = %v", signals)

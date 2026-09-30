@@ -2,8 +2,11 @@ package popups
 
 import (
 	"testing"
+	"time"
 
+	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/gelm/widget"
 	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
@@ -34,17 +37,14 @@ func TestSyncTracksPopupSet(t *testing.T) {
 	if got := p.Visible(); got != 1 {
 		t.Fatalf("visible = %d, want 1", got)
 	}
-	// DND clears the stack.
+	// DND keeps new cards off; the one already up stays.
 	svc.SetDND(true)
-	p.sync()
-	if got := p.Visible(); got != 0 {
-		t.Fatalf("under dnd = %d, want 0", got)
-	}
-	svc.SetDND(false)
+	svc.Notify("app", 0, "", "Two", "", nil, 0)
 	p.sync()
 	if got := p.Visible(); got != 1 {
-		t.Fatalf("after dnd off = %d, want 1", got)
+		t.Fatalf("under dnd = %d, want only the card shown before", got)
 	}
+	svc.SetDND(false)
 	// Dismissal drops the card.
 	svc.DismissAll()
 	p.sync()
@@ -76,11 +76,79 @@ func TestSyncHonorsStackingOrder(t *testing.T) {
 	a := svc.Notify("app", 0, "", "First", "", nil, 0)
 	b := svc.Notify("app", 0, "", "Second", "", nil, 0)
 	p.sync()
-	// Both stay; the order array puts the oldest at the top end.
+	// Oldest-first appends each new card: the oldest sits on top.
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.order[0] != a || p.order[1] != b {
-		t.Errorf("order = %v, want [%d %d]", p.order, a, b)
+	got := p.stackOrder()
+	p.mu.Unlock()
+	if len(got) != 2 || got[0] != a || got[1] != b {
+		t.Errorf("oldest-first order = %v, want [%d %d]", got, a, b)
+	}
+	// Newest-first (the default) prepends: the newest sits on top.
+	p.cfg.PopupStacking = "newest-first"
+	p.mu.Lock()
+	got = p.stackOrder()
+	p.mu.Unlock()
+	if len(got) != 2 || got[0] != b || got[1] != a {
+		t.Errorf("newest-first order = %v, want [%d %d]", got, b, a)
+	}
+}
+
+func TestHoverPausesTheCountdown(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupDurationMS = 40
+	p, svc := newTestPopups(t, cfg)
+	id := svc.Notify("app", 0, "", "Hover", "", nil, -1)
+	p.sync()
+	p.mu.Lock()
+	hc, ok := p.cards[id].root.(*hoverCard)
+	p.mu.Unlock()
+	if !ok {
+		t.Fatalf("card root = %T, want the hover wrapper under popup-hover-pause", p.cards[id].root)
+	}
+	hc.SetHovered(true)
+	time.Sleep(80 * time.Millisecond)
+	if got := len(svc.Popups()); got != 1 {
+		t.Fatalf("hovered popup timed out: popups = %d", got)
+	}
+	hc.SetHovered(false)
+	deadline := time.Now().Add(time.Second)
+	for len(svc.Popups()) > 0 && time.Now().Before(deadline) {
+		time.Sleep(2 * time.Millisecond)
+	}
+	if got := len(svc.Popups()); got != 0 {
+		t.Fatalf("popup survived the leave: popups = %d", got)
+	}
+}
+
+func TestHoverPauseOffLeavesTheCardBare(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	cfg.PopupHoverPause = false
+	cfg.PopupDurationMS = 30
+	p, svc := newTestPopups(t, cfg)
+	id := svc.Notify("app", 0, "", "Bare", "", nil, -1)
+	p.sync()
+	p.mu.Lock()
+	c := p.cards[id]
+	p.mu.Unlock()
+	if _, wrapped := c.root.(*hoverCard); wrapped || c.root != widget.Widget(c.box) {
+		t.Fatalf("card root = %T, want the plain box with hover-pause off", c.root)
+	}
+}
+
+func TestOutputPicksTheMonitor(t *testing.T) {
+	dp, hdmi := &app.Output{Name: "DP-1"}, &app.Output{Name: "HDMI-A-1"}
+	outs := []*app.Output{dp, hdmi}
+	if got := Output(outs, "primary"); got != dp {
+		t.Errorf("primary = %v, want the first output", got)
+	}
+	if got := Output(outs, "HDMI-A-1"); got != hdmi {
+		t.Errorf("connector = %v, want HDMI-A-1", got)
+	}
+	if got := Output(outs, "DP-9"); got != dp {
+		t.Errorf("missing connector = %v, want the primary fallback", got)
+	}
+	if got := Output(nil, "primary"); got != nil {
+		t.Errorf("no outputs = %v, want nil", got)
 	}
 }
 
