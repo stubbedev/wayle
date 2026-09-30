@@ -36,10 +36,7 @@ func (s *Sender) Ask(ctx context.Context, appName, summary, body, appIcon string
 	for _, a := range actions {
 		flat = append(flat, a.Key, a.Label)
 	}
-	hints := map[string]dbus.Variant{}
-	if appIcon != "" {
-		hints["image-path"] = dbus.MakeVariant(appIcon)
-	}
+	hints := iconHints(appIcon)
 	var id uint32
 	call := s.conn.Object(busName, path).CallWithContext(ctx, method, 0,
 		appName, uint32(0), appIcon, summary, body, flat, hints, int32(timeout.Milliseconds()))

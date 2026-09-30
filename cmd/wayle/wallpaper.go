@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stubbedev/wayle/internal/dbuscli"
 	"github.com/stubbedev/wayle/service/wallpaper"
 )
 
@@ -125,7 +126,7 @@ func wallpaperCommand(ctx context.Context, args []string, out io.Writer) error {
 	defer func() { _ = client.Close() }()
 	call := func(op string, err error) error {
 		if err != nil {
-			return dbusCallError(wallpaperService, op, err)
+			return dbuscli.FormatError(wallpaperService, op, err)
 		}
 		return nil
 	}
@@ -191,15 +192,15 @@ func wallpaperCommand(ctx context.Context, args []string, out io.Writer) error {
 func wallpaperInfo(ctx context.Context, client *wallpaper.Client, monitor string, hasMonitor bool, out io.Writer) error {
 	path, err := client.WallpaperForMonitor(ctx, monitor)
 	if err != nil {
-		return dbusCallError(wallpaperService, "get wallpaper", err)
+		return dbuscli.FormatError(wallpaperService, "get wallpaper", err)
 	}
 	fit, err := client.GetFitMode(ctx, monitor)
 	if err != nil {
-		return dbusCallError(wallpaperService, "get fit mode", err)
+		return dbuscli.FormatError(wallpaperService, "get fit mode", err)
 	}
 	cycling, err := client.GetIsCycling(ctx)
 	if err != nil {
-		return dbusCallError(wallpaperService, "get cycling state", err)
+		return dbuscli.FormatError(wallpaperService, "get cycling state", err)
 	}
 	if hasMonitor {
 		fmt.Fprintf(out, "Wallpaper Information (%s)\n-----------------------------\n", monitor)
