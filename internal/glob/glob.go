@@ -3,7 +3,10 @@
 // blacklist (wayle-core's glob.rs).
 package glob
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
 
 // Match reports whether name matches the wildcard pattern.
 func Match(pattern, name string) bool {
@@ -190,8 +193,18 @@ func charSpecifiers(s []rune) [][2]rune {
 	return out
 }
 
-func inRanges(ranges [][2]rune, c rune) bool {
+func inRanges(ranges [][2]rune, c rune, caseSensitive bool) bool {
 	for _, r := range ranges {
+		// The glob crate folds ASCII case only, and only for ranges
+		// whose both ends are letters (in_char_specifiers).
+		if !caseSensitive && c < 0x80 && r[0] < 0x80 && r[1] < 0x80 {
+			lo, hi := unicode.ToLower(r[0]), unicode.ToLower(r[1])
+			if lo != unicode.ToUpper(lo) && hi != unicode.ToUpper(hi) {
+				if lc := unicode.ToLower(c); lc >= lo && lc <= hi {
+					return true
+				}
+			}
+		}
 		if c >= r[0] && c <= r[1] {
 			return true
 		}
@@ -199,16 +212,25 @@ func inRanges(ranges [][2]rune, c rune) bool {
 	return false
 }
 
-// matchGlob is Pattern::matches with the default MatchOptions:
-// case-sensitive, `*` crossing separators, no leading-dot rule.
-func matchGlob(tokens []globToken, text []rune) bool {
+// charsEq is the glob crate's chars_eq: ASCII-only case folding when
+// the match is case-insensitive.
+func charsEq(a, b rune, caseSensitive bool) bool {
+	if !caseSensitive && a < 0x80 && b < 0x80 {
+		return unicode.ToLower(a) == unicode.ToLower(b)
+	}
+	return a == b
+}
+
+// matchGlob is Pattern::matches_with with `*` crossing separators and
+// no leading-dot rule; caseSensitive is MatchOptions.case_sensitive.
+func matchGlob(tokens []globToken, text []rune, caseSensitive bool) bool {
 	if len(tokens) == 0 {
 		return len(text) == 0
 	}
 	t := tokens[0]
 	if t.kind == '*' {
 		for k := 0; k <= len(text); k++ {
-			if matchGlob(tokens[1:], text[k:]) {
+			if matchGlob(tokens[1:], text[k:], caseSensitive) {
 				return true
 			}
 		}
@@ -223,13 +245,33 @@ func matchGlob(tokens []globToken, text []rune) bool {
 	case '?':
 		ok = true
 	case '[':
-		ok = inRanges(t.ranges, c)
+		ok = inRanges(t.ranges, c, caseSensitive)
 	case '!':
-		ok = !inRanges(t.ranges, c)
+		ok = !inRanges(t.ranges, c, caseSensitive)
 	default:
-		ok = c == t.char
+		ok = charsEq(c, t.char, caseSensitive)
 	}
-	return ok && matchGlob(tokens[1:], text[1:])
+	return ok && matchGlob(tokens[1:], text[1:], caseSensitive)
+}
+
+// Pattern is a compiled glob crate Pattern, for callers that match one
+// pattern against many texts (the launcher's glob matching).
+type Pattern struct {
+	tokens []globToken
+}
+
+// Compile is glob::Pattern::new: false for a syntax error (a `***`, a
+// `**` that is not a whole path component, an unterminated `[`).
+func Compile(pattern string) (Pattern, bool) {
+	tokens, ok := compileGlob(pattern)
+	return Pattern{tokens: tokens}, ok
+}
+
+// Matches is Pattern::matches_with: `*` crosses separators, no
+// leading-dot rule, and case folding (ASCII only, as the crate does)
+// unless caseSensitive.
+func (p Pattern) Matches(text string, caseSensitive bool) bool {
+	return matchGlob(p.tokens, []rune(text), caseSensitive)
 }
 
 // Glob is the glob crate's Pattern::new(pattern).matches(text), as the
@@ -237,7 +279,7 @@ func matchGlob(tokens []globToken, text []rune) bool {
 // matches.
 func Glob(pattern, text string) bool {
 	tokens, ok := compileGlob(pattern)
-	return ok && matchGlob(tokens, []rune(text))
+	return ok && matchGlob(tokens, []rune(text), true)
 }
 
 // Fold is shell-core icons.rs's matches_glob: the text lowercased,
