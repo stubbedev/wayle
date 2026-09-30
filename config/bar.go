@@ -145,6 +145,7 @@ type Config struct {
 	Styling            StylingConfig
 	Lock               LockConfig
 	Greeter            GreeterConfig
+	Launcher           LauncherConfig
 }
 
 // Defaults returns the schema defaults for every modeled section.
@@ -235,6 +236,7 @@ func Defaults() *Config {
 		ColorExtractor:     DefaultsColorExtractor(),
 		Lock:               DefaultsLock(),
 		Greeter:            DefaultsGreeter(),
+		Launcher:           DefaultsLauncher(),
 		General: GeneralConfig{
 			FontSans: "Inter",
 			FontMono: "JetBrains Mono",
@@ -302,6 +304,7 @@ type fileDoc struct {
 	Styling   *toml.Primitive `toml:"styling"`
 	Lock      *toml.Primitive `toml:"lock"`
 	Greeter   *toml.Primitive `toml:"greeter"`
+	Launcher  *toml.Primitive `toml:"launcher"`
 }
 
 // barDoc mirrors the [bar] table; the leaf values defer through
@@ -446,6 +449,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.Styling = s
+	}
+	if doc.Launcher != nil {
+		l, err := applyLauncher(md, *doc.Launcher)
+		if err != nil {
+			return err
+		}
+		c.Launcher = l
 	}
 	if doc.Osd != nil {
 		o, err := applyOsd(md, *doc.Osd)
