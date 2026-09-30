@@ -36,6 +36,7 @@ func averagePercentage(devices []brightness.Device) (float64, bool) {
 // brightness is the module: the mean percentage label across backlights,
 // refreshed on sysfs changes.
 type brightnessModule struct {
+	buttonRef
 	ctx    ModuleContext
 	source brightness.Source
 	label  *widget.Label
@@ -74,19 +75,18 @@ func (m *brightnessModule) refresh() error {
 	}
 	cfg := m.ctx.Config.Brightness
 	label := ""
-	color := m.ctx.Style.fg
 	if percent, ok := averagePercentage(devices); ok {
 		if cfg.LabelShow {
 			label = brightnessLabel(cfg.Format, percent, true)
 		}
-		if override, ok := thresholdColor(percent, cfg.Thresholds, m.ctx.Style.palette); ok {
-			color = override
+		m.thresholds(percent, cfg.Thresholds)
+	} else {
+		if cfg.LabelShow {
+			label = brightnessLabel(cfg.Format, 0, false)
 		}
-	} else if cfg.LabelShow {
-		label = brightnessLabel(cfg.Format, 0, false)
+		m.thresholds(0, nil)
 	}
 	m.label.SetText(label)
-	m.label.SetColor(color)
 	return nil
 }
 

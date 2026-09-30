@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/gelm/widget"
@@ -37,14 +38,17 @@ func TestSysinfoThresholdColors(t *testing.T) {
 	m := &pollModule{ctx: ctx, cfg: cfg.CPU}
 	m.label = widget.NewLabel(ctx.Font, style.labelPx, "", style.fg)
 	m.icon = moduleIcon(ctx, cfg.CPU.Icon)
+	btn := newBarButton(ctx, m.icon, m.label)
+	m.setButton(btn)
 
 	m.render(50)
-	if m.label.Color() != style.fg || m.icon.Tint() != moduleIconTint(ctx, cfg.CPU.Icon.Color) {
-		t.Error("50 below the threshold recolored the module")
+	if strings.Contains(btn.InlineStyle(), cv.ToCSS()) {
+		t.Errorf("50 below the threshold recolored the button: %q", btn.InlineStyle())
 	}
 	m.render(95)
-	want, _ := styling.ResolveColor(config.ColorValue{Token: "status-error"}, styling.Default())
-	if m.label.Color() != want || m.icon.Tint() != want {
-		t.Errorf("at 95: label %#08x icon %#08x, want status-error", m.label.Color(), m.icon.Tint())
+	for _, slot := range []string{"--bar-btn-label-color: ", "--bar-btn-icon-color: "} {
+		if !strings.Contains(btn.InlineStyle(), slot+cv.ToCSS()) {
+			t.Errorf("at 95 the button vars = %q, want %sstatus-error", btn.InlineStyle(), slot)
+		}
 	}
 }

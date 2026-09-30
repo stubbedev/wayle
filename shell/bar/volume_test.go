@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/gelm/widget"
@@ -96,14 +97,16 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 		source: source,
 	}
 	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	btn := newBarButton(m.ctx, nil, m.label)
+	m.setButton(btn)
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 	if got := m.label.Text(); got != "42%" {
 		t.Errorf("label = %q, want 42%%", got)
 	}
-	if m.label.Color() != style.fg {
-		t.Errorf("color = %#08x, want default fg", m.label.Color())
+	if strings.Contains(btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
+		t.Errorf("below the threshold the button vars = %q, want no override", btn.InlineStyle())
 	}
 
 	source.dev.Volume = pct(100)
@@ -113,9 +116,8 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 	if got := m.label.Text(); got != "100%" {
 		t.Errorf("label = %q, want 100%%", got)
 	}
-	errorColor, _ := styling.ResolveColor(cv, styling.Default())
-	if m.label.Color() != errorColor {
-		t.Errorf("color at 100 = %#08x, want the status-error override", m.label.Color())
+	if !strings.Contains(btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
+		t.Errorf("at 100 the button vars = %q, want the status-error threshold", btn.InlineStyle())
 	}
 }
 
@@ -129,6 +131,7 @@ func newVolumeForTest(t *testing.T, cfg *config.Config, source *fakePulseSource)
 	m.label = widget.NewLabel(ctx.Font, style.labelPx, "", style.fg)
 	m.icon = moduleIcon(ctx, cfg.Volume.Icon)
 	m.root = assembleModule(ctx, m.icon, m.label)
+	m.setButton(m.root.(*barButton))
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
@@ -150,12 +153,12 @@ func TestVolumeMutedSwapsTheIconInTheTree(t *testing.T) {
 	if icon.Name() != cfg.Volume.IconMuted {
 		t.Errorf("muted icon = %q, want icon-muted %q", icon.Name(), cfg.Volume.IconMuted)
 	}
-	// Mute keeps the percent label and the default ink.
+	// Mute keeps the percent label and sets no color override.
 	if got := m.label.Text(); got != "42%" {
 		t.Errorf("muted label = %q, want the percent", got)
 	}
-	if m.label.Color() != m.ctx.Style.fg {
-		t.Errorf("muted color = %#08x, want the default fg (mute does not recolor)", m.label.Color())
+	if got := btn.InlineStyle(); strings.Contains(got, "--bar-btn-label-color: var(--status") {
+		t.Errorf("muted button vars = %q, want no label recolor (mute does not recolor)", got)
 	}
 
 	// Unmuting leaves icon-muted for the level icon.

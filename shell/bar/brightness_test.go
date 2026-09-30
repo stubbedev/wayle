@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/gelm/widget"
@@ -76,14 +77,16 @@ func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 		source: source,
 	}
 	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	btn := newBarButton(m.ctx, nil, m.label)
+	m.setButton(btn)
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 	if got := m.label.Text(); got != "50%" {
 		t.Errorf("label = %q, want 50%%", got)
 	}
-	if m.label.Color() != style.fg {
-		t.Errorf("color = %#08x, want default fg", m.label.Color())
+	if strings.Contains(btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
+		t.Errorf("the threshold colored the button at 50%%: %q", btn.InlineStyle())
 	}
 
 	source.devices = []brightness.Device{{Brightness: 9000, Max: 10000}}
@@ -93,9 +96,8 @@ func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 	if got := m.label.Text(); got != "90%" {
 		t.Errorf("label = %q, want 90%%", got)
 	}
-	warning, _ := styling.ResolveColor(cv, styling.Default())
-	if m.label.Color() != warning {
-		t.Errorf("color at 90%% = %#08x, want the status-warning override", m.label.Color())
+	if !strings.Contains(btn.InlineStyle(), "--bar-btn-label-color: "+cv.ToCSS()) {
+		t.Errorf("at 90%% the button vars = %q, want the status-warning threshold", btn.InlineStyle())
 	}
 }
 

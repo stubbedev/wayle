@@ -49,31 +49,10 @@ func resolveOverride(cv *config.ColorValue, palette *styling.Palette) (render.Co
 	return styling.ResolveColor(*cv, palette)
 }
 
-// applyThresholds is BarButton's SetThresholdColors on the parts the
-// Go chrome paints: the label ink and the icon tint follow the
-// matching overrides and fall back to the module's own (the bar fg,
-// the configured icon color) when none applies.
-func applyThresholds(ctx ModuleContext, value float64, thresholds []config.ThresholdEntry, label *widget.Label, icon *widget.Icon, iconColor config.ColorValue) {
-	colors := config.EvaluateThresholds(value, thresholds)
-	if label != nil {
-		ink := ctx.Style.fg
-		if c, ok := resolveOverride(colors.LabelColor, ctx.Style.palette); ok {
-			ink = c
-		}
-		label.SetColor(ink)
-	}
-	if icon != nil {
-		tint := moduleIconTint(ctx, iconColor)
-		if c, ok := resolveOverride(colors.IconColor, ctx.Style.palette); ok {
-			tint = c
-		}
-		icon.SetTint(tint)
-	}
-}
-
 // battery is the module: a label fed from the UPower device snapshot,
 // refreshed on PropertiesChanged.
 type battery struct {
+	buttonRef
 	ctx    ModuleContext
 	source upower.Source
 	label  *widget.Label
@@ -114,8 +93,8 @@ func (m *battery) refresh() error {
 	if cfg.LabelShow {
 		label = batteryLabel(cfg.Format, dev.Percentage, dev.Present())
 	}
+	m.thresholds(dev.Percentage, cfg.Thresholds)
 	m.label.SetText(label)
-	applyThresholds(m.ctx, dev.Percentage, cfg.Thresholds, m.label, m.icon, cfg.Icon.Color)
 	m.setIcon(cfg, dev)
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -133,14 +134,16 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	m := &battery{ctx: ctx, source: source}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, cfg.Battery.Icon)
+	btn := newBarButton(ctx, m.icon, m.label)
+	m.setButton(btn)
 	if err := m.refresh(); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 	if got := m.label.Text(); got != "75%" {
 		t.Errorf("label = %q, want 75%%", got)
 	}
-	if m.label.Color() != style.fg {
-		t.Errorf("color at 75%% = %#08x, want the default fg", m.label.Color())
+	if strings.Contains(btn.InlineStyle(), "--bar-btn-icon-color: "+cv.ToCSS()) {
+		t.Errorf("the threshold colored the button at 75%%: %q", btn.InlineStyle())
 	}
 
 	// Drop below the threshold: same template, error color.
@@ -151,20 +154,16 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	if got := m.label.Text(); got != "12%" {
 		t.Errorf("label = %q, want 12%%", got)
 	}
-	errorColor, _ := styling.ResolveColor(cv, styling.Default())
-	if m.label.Color() != errorColor {
-		t.Errorf("color at 12%% = %#08x, want the status-error override", m.label.Color())
-	}
-	if m.icon.Tint() != errorColor {
-		t.Errorf("icon tint at 12%% = %#08x, want the status-error override", m.icon.Tint())
+	if !strings.Contains(btn.InlineStyle(), "--bar-btn-icon-color: "+cv.ToCSS()) {
+		t.Errorf("at 12%% the button vars = %q, want the status-error threshold", btn.InlineStyle())
 	}
 	// Back above: the defaults return.
 	source.dev.Percentage = 60
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if m.label.Color() != style.fg || m.icon.Tint() != moduleIconTint(ctx, cfg.Battery.Icon.Color) {
-		t.Errorf("above the bound: label %#08x icon %#08x, want the defaults", m.label.Color(), m.icon.Tint())
+	if strings.Contains(btn.InlineStyle(), cv.ToCSS()) {
+		t.Errorf("above the bound: button vars = %q, want the threshold gone", btn.InlineStyle())
 	}
 }
 

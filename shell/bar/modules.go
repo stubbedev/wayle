@@ -232,6 +232,9 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 		runClickAction(ctx, action)
 	})
 	btn.AddClass(classes...)
+	if r, ok := module.(interface{ setButton(*barButton) }); ok {
+		r.setButton(btn)
+	}
 	row.Append(btn, false)
 	return nil
 }

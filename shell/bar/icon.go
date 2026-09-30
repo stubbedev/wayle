@@ -1,11 +1,9 @@
 package bar
 
 import (
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // iconPx is the bar's icon size in logical pixels; the label height
@@ -31,15 +29,6 @@ func moduleIcon(_ ModuleContext, icon config.IconConfig) *widget.Icon {
 // the tree.
 func assembleModule(ctx ModuleContext, ic *widget.Icon, label *widget.Label) widget.Widget {
 	return newBarButton(ctx, ic, label)
-}
-
-// moduleIconTint resolves an icon color; auto (and anything that does
-// not resolve) is the bar fg.
-func moduleIconTint(ctx ModuleContext, cv config.ColorValue) render.Color {
-	if resolved, ok := styling.ResolveColor(cv, ctx.Style.palette); ok {
-		return resolved
-	}
-	return ctx.Style.fg
 }
 
 // levelIndexFloor is battery helpers.rs's level math: the percentage

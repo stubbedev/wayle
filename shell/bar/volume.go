@@ -28,6 +28,7 @@ func volumePercent(dev pulse.Device) float64 {
 // volume is the module: the default sink's volume label, refreshed on
 // PulseAudio events, scroll to adjust.
 type volumeModule struct {
+	buttonRef
 	ctx    ModuleContext
 	source pulse.Source
 	label  *widget.Label
@@ -75,7 +76,7 @@ func (m *volumeModule) refresh() error {
 		label = volumeLabel(cfg.Format, volumePercent(dev))
 	}
 	m.label.SetText(label)
-	applyThresholds(m.ctx, volumePercent(dev), cfg.Thresholds, m.label, m.icon, cfg.Icon.Color)
+	m.thresholds(volumePercent(dev), cfg.Thresholds)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(volumeIconName(cfg, dev))
 	}

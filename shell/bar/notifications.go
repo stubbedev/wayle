@@ -31,6 +31,7 @@ func notificationIconName(cfg config.NotificationConfig, count int, dnd bool) st
 // notificationModule is the bell: count and dnd from the shared
 // notification service.
 type notificationModule struct {
+	buttonRef
 	ctx   ModuleContext
 	src   *notifications.Service
 	label *widget.Label
@@ -72,7 +73,7 @@ func (m *notificationModule) refresh() {
 		text = notificationLabel(count)
 	}
 	m.label.SetText(text)
-	applyThresholds(m.ctx, float64(count), cfg.Thresholds, m.label, m.icon, cfg.Icon.Color)
+	m.thresholds(float64(count), cfg.Thresholds)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(notificationIconName(cfg, count, dnd))
 	}

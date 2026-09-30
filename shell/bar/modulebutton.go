@@ -254,6 +254,31 @@ func (t *barToggle) ScrollInput(dy int) bool {
 	return true
 }
 
+// buttonRef lets a module reach the bar button appendModule builds
+// around its root, for the threshold overrides a BarButton takes as
+// input (BarButtonInput::SetThresholdColors). Embed it; overrides set
+// before the button exists apply when it is attached.
+type buttonRef struct {
+	btn     *barButton
+	pending config.ThresholdColors
+}
+
+// setButton attaches the module's button and applies the pending
+// overrides.
+func (r *buttonRef) setButton(b *barButton) {
+	r.btn = b
+	b.SetThresholds(r.pending)
+}
+
+// thresholds evaluates value against the module's thresholds
+// (evaluate_thresholds) and hands the matching colors to the button.
+func (r *buttonRef) thresholds(value float64, entries []config.ThresholdEntry) {
+	r.pending = config.EvaluateThresholds(value, entries)
+	if r.btn != nil {
+		r.btn.SetThresholds(r.pending)
+	}
+}
+
 // inlineDecls strips a `selector { ... }` rule down to its declaration
 // list: the Rust per-widget providers are `* { ... }` rules, which in
 // gelm are the widget's inline declarations.

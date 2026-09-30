@@ -25,6 +25,7 @@ func sysinfoLabel(format string, percent float64) string {
 // pollModule is the shared poll loop of cpu/ram/storage: read on an
 // interval, render the label, icon, and threshold colors.
 type pollModule struct {
+	buttonRef
 	ctx    ModuleContext
 	cfg    config.SysinfoConfig
 	label  *widget.Label
@@ -84,7 +85,7 @@ func (m *pollModule) render(percent float64) {
 		text = sysinfoLabel(m.cfg.Format, percent)
 	}
 	m.label.SetText(text)
-	applyThresholds(m.ctx, percent, m.cfg.Thresholds, m.label, m.icon, m.cfg.Icon.Color)
+	m.thresholds(percent, m.cfg.Thresholds)
 }
 
 // newCpu builds the cpu module: usage percent from /proc/stat deltas.
