@@ -53,12 +53,18 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       (dropdown:, brightness:delta/toggle, shell), per-module config,
       and the native brightness/audio executors
 - [ ] config: YAML configs, runtime layer, hot reload, the rest of the schema
-- [ ] bar: systray (SNI), dashboard, screenshot (portal/screencopy
-      design), sway/mango/niri workspaces; hyprsunset auto-schedule
-      (geoclue + solar) and persistence; button component styling;
-      dropdown panels (calendar, weather detail, audio, network,
-      bluetooth, battery, media, notification, power menu, recorder);
-      notification popup rendering (with the OSD pass)
+- [ ] bar: screenshot (portal/screencopy design), sway/mango/niri
+      workspaces; hyprsunset auto-schedule (geoclue + solar) and
+      persistence; button variant structures (block-prefix/icon-square);
+      popup hover-pause; systray DBusMenu rendering + pixmap icons;
+      MPRIS transport controls; status-token severity colors
+      (dashboard thresholds, recorder classes, popup urgency bar).
+      Done this pass: all modules + state icons, OSD + toasts +
+      notification popups + widget socket, button chrome, every
+      dropdown panel (calendar, power, audio, brightness, battery,
+      network, bluetooth, media, notifications, recorder, treeman,
+      mail, weather, dashboard), the treeman/notifications/idle-
+      inhibit/recorder/systray services with their CLIs
 - [ ] services: UPower, PipeWire, NetworkManager, ... (the zbus crates)
 - [ ] OSD, launcher, lock screen, settings (per #19 M5 order)
 
