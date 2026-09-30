@@ -26,6 +26,7 @@ import (
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/shell/osd"
+	"github.com/stubbedev/wayle/shell/popups"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -158,6 +159,11 @@ func RunWith(cfg *config.Config) error {
 			a.Attach(layer)
 		}
 		osdSrv.AttachOutput(output.Name, output)
+		// Notification popups render on the configured monitor only.
+		if cfg.Notification.Enabled && cfg.Notification.PopupMonitor == output.Name {
+			p := popups.New(application, notifSvc, cfg.Notification, font, palette, output)
+			go p.Run()
+		}
 	}
 	if cfg.Osd.Enabled {
 		go watchOsd(cfg, baseCtx, osdSrv)
