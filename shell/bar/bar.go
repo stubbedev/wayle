@@ -29,6 +29,7 @@ import (
 	"github.com/stubbedev/wayle/service/sni"
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
+	"github.com/stubbedev/wayle/shell/lock"
 	"github.com/stubbedev/wayle/shell/osd"
 	"github.com/stubbedev/wayle/shell/popups"
 	wallpapershell "github.com/stubbedev/wayle/shell/wallpaper"
@@ -254,6 +255,9 @@ func RunWith(cfg *config.Config) error {
 	if cfg.Osd.Enabled {
 		go watchOsd(cfg, baseCtx, osdSrv)
 	}
+	// The ext-session-lock screen and its triggers (logind, `wayle lock`).
+	_, stopLock := lock.Start(application, cfg, lock.Fonts(cfg.General.FontSans, font), palette)
+	defer stopLock()
 	// The widget socket carries out-of-process pushes (`wayle toast`).
 	widgetSrv := widgetipc.NewServer()
 	if stop, err := widgetSrv.Listen(); err == nil {
