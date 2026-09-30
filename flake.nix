@@ -147,6 +147,7 @@
               gopls # Go language server
               delve # Go debugger
               just # task runner (`just go-check`)
+              grass-sass # SCSS compiler for `just go-css` (the grass crate wayle-styling builds with)
 
               # Runtime deps of the pure-Go stack. gelm needs no native
               # libraries: it speaks the Wayland protocol and rasterizes

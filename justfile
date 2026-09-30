@@ -32,6 +32,13 @@ go-test:
 go-fmt:
     golangci-lint fmt
 
+# Recompile the Rust SCSS into the Go shell's embedded stylesheet
+# (styling/static.css) with grass, the compiler wayle-styling's build.rs
+# uses, and record the source hash the freshness test checks.
+go-css:
+    grass --load-path crates/wayle-styling/scss crates/wayle-styling/scss/main.scss > styling/static.css
+    WAYLE_UPDATE_STATIC_CSS=1 {{go}} test ./styling -run TestStaticCSSIsFresh -count=1
+
 # ─────────────────────────── Build & Run ───────────────────────────
 
 # Build the release binary.
