@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
+	"github.com/stubbedev/wayle/service/clipboard"
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/mpris"
@@ -47,6 +48,10 @@ type ModuleContext struct {
 	Notifications *notifications.Service
 	Recorder      *recorder.State
 	SNI           *sni.Store
+	// Clipboard is the session clipboard history, nil when the
+	// compositor has no data-control protocol (the launcher's
+	// clipboard mode reads it).
+	Clipboard     *clipboard.Clipboard
 	CustomUpdates *customUpdates
 	// Dropdowns opens the dropdown:<name> popovers; RunWith owns one
 	// registry across outputs.

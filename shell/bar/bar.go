@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
+	"github.com/stubbedev/wayle/service/clipboard"
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/mpris"
@@ -65,6 +66,12 @@ func RunWith(cfg *config.Config) error {
 	}
 	font := app.FontFallback(face)
 	baseCtx := ModuleContext{Config: cfg, App: application, Font: font, Style: &style}
+	// The clipboard history starts with the shell rather than when the
+	// launcher first opens, so it covers the session; a compositor
+	// without data-control simply has none (bootstrap/mod.rs).
+	if clip, err := clipboard.Start(application, clipboard.DefaultHistory()); err == nil {
+		baseCtx.Clipboard = clip
+	}
 	if hyprland.IsRunning() {
 		if conn, err := hyprland.Connect(); err == nil {
 			baseCtx.Hyprland = conn
