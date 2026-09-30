@@ -6,6 +6,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/desktopentry"
 	"github.com/stubbedev/wayle/internal/glob"
 	"github.com/stubbedev/wayle/service/mpris"
@@ -22,10 +23,14 @@ const (
 const mediaNoPlayerLabel = "--"
 
 // mediaStatusText is the _bar.ftl status vocabulary.
-var mediaStatusText = map[mpris.PlaybackState]string{
-	mpris.StatePlaying: "Playing",
-	mpris.StatePaused:  "Paused",
-	mpris.StateStopped: "Stopped",
+func mediaStatusText(state mpris.PlaybackState) string {
+	switch state {
+	case mpris.StatePlaying:
+		return i18n.T("bar-media-playing")
+	case mpris.StatePaused:
+		return i18n.T("bar-media-paused")
+	}
+	return i18n.T("bar-media-stopped")
 }
 
 // mediaStatusGlyph maps the state onto its glyph.
@@ -45,7 +50,7 @@ func mediaLabel(format string, p mpris.Player) string {
 	out := replaceTemplateVar(format, "title", p.Title)
 	out = replaceTemplateVar(out, "artist", p.Artist)
 	out = replaceTemplateVar(out, "album", p.Album)
-	out = replaceTemplateVar(out, "status", mediaStatusText[p.State])
+	out = replaceTemplateVar(out, "status", mediaStatusText(p.State))
 	return replaceTemplateVar(out, "status_icon", mediaStatusGlyph(p.State))
 }
 

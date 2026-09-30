@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -62,31 +63,30 @@ func newTestNetworkModule(t *testing.T, cfg *config.Config, snap network.Snapsho
 }
 
 func TestNetworkLabelPicksWifiThenWired(t *testing.T) {
-	cfg := config.Defaults()
 	wifi := network.Snapshot{WifiEnabled: true, WifiConnected: true, WifiSSID: "homewifi"}
-	if got := networkLabel(wifi, cfg.Network); got != "homewifi" {
+	if got := networkLabel(wifi); got != "homewifi" {
 		t.Errorf("wifi ssid = %q", got)
 	}
 	hidden := wifi
 	hidden.WifiSSID = ""
-	if got := networkLabel(hidden, cfg.Network); got != "WiFi" {
+	if got := networkLabel(hidden); got != i18n.T("bar-network-wifi-fallback") {
 		t.Errorf("hidden ssid = %q, want the WiFi fallback", got)
 	}
 	connecting := network.Snapshot{WifiEnabled: true, WifiConnecting: true}
-	if got := networkLabel(connecting, cfg.Network); got != "Connecting..." {
+	if got := networkLabel(connecting); got != i18n.T("bar-network-connecting") {
 		t.Errorf("connecting = %q", got)
 	}
 	wired := network.Snapshot{WifiEnabled: false, WiredConnected: true}
-	if got := networkLabel(wired, cfg.Network); got != "Wired" {
+	if got := networkLabel(wired); got != i18n.T("bar-network-wired") {
 		t.Errorf("wired = %q", got)
 	}
 	off := network.Snapshot{}
-	if got := networkLabel(off, cfg.Network); got != "Disconnected" {
+	if got := networkLabel(off); got != i18n.T("bar-network-disconnected") {
 		t.Errorf("offline = %q", got)
 	}
 	// Wifi preferred over wired while enabled.
 	both := network.Snapshot{WifiEnabled: true, WifiConnected: true, WifiSSID: "a", WiredConnected: true}
-	if got := networkLabel(both, cfg.Network); got != "a" {
+	if got := networkLabel(both); got != "a" {
 		t.Errorf("both = %q, want the wifi ssid", got)
 	}
 }
@@ -99,7 +99,7 @@ func TestNetworkModuleDimsWhenOffline(t *testing.T) {
 	if err := offline.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := offline.label.Text(); got != "Disconnected" {
+	if got := offline.label.Text(); got != i18n.T("bar-network-disconnected") {
 		t.Errorf("label = %q", got)
 	}
 	muted, _ := styling.ResolveColor(config.ColorValue{Token: config.TokenFgMuted}, styling.Default())

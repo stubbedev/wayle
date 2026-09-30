@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -21,7 +22,7 @@ import (
 // whitespace-insensitive. No battery maps to the unavailable label.
 func batteryLabel(format string, percentage float64, present bool) string {
 	if !present {
-		return "N/A"
+		return i18n.T("bar-battery-unavailable")
 	}
 	percent := strconv.Itoa(int(math.Round(percentage)))
 	return replaceTemplateVar(format, "percent", percent)

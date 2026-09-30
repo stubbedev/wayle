@@ -7,6 +7,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/hyprland"
 )
 
@@ -15,7 +16,7 @@ func TestKeybindModeLabel(t *testing.T) {
 		t.Errorf("= %q", got)
 	}
 	// An empty submap renders the "default" vocabulary word.
-	if got := keybindModeLabel("{{ mode }}", ""); got != "default" {
+	if got := keybindModeLabel("{{ mode }}", ""); got != i18n.T("bar-keybind-mode-default") {
 		t.Errorf("= %q, want default", got)
 	}
 	if got := keybindModeLabel("[{{ mode }}]", "move"); got != "[move]" {

@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
@@ -364,7 +365,7 @@ func watchOsd(cfg *config.Config, ctx ModuleContext, server *osd.Osd) {
 			server.Show(osd.Event{
 				Kind:  "brightness",
 				Icon:  brightnessOsdIcon(percent),
-				Label: "Brightness",
+				Label: i18n.T("osd-brightness"),
 				Value: percent,
 			})
 		}

@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/styling"
@@ -15,13 +16,13 @@ import (
 
 func TestBluetoothLabelMatchesRustAssertions(t *testing.T) {
 	// helpers.rs's cases: disabled, none, one alias, count.
-	if got := bluetoothLabel(bluetooth.Snapshot{Available: true}); got != "Off" {
+	if got := bluetoothLabel(bluetooth.Snapshot{Available: true}); got != i18n.T("bar-bluetooth-disabled") {
 		t.Errorf("unpowered = %q, want Off", got)
 	}
-	if got := bluetoothLabel(bluetooth.Snapshot{}); got != "Off" {
+	if got := bluetoothLabel(bluetooth.Snapshot{}); got != i18n.T("bar-bluetooth-disabled") {
 		t.Errorf("no adapter = %q, want Off", got)
 	}
-	if got := bluetoothLabel(bluetooth.Snapshot{Available: true, Enabled: true}); got != "Disconnected" {
+	if got := bluetoothLabel(bluetooth.Snapshot{Available: true, Enabled: true}); got != i18n.T("bar-bluetooth-disconnected") {
 		t.Errorf("idle = %q, want Disconnected", got)
 	}
 	one := bluetooth.Snapshot{Available: true, Enabled: true, Connected: []string{"WH-1000XM5"}}
@@ -29,7 +30,7 @@ func TestBluetoothLabelMatchesRustAssertions(t *testing.T) {
 		t.Errorf("one device = %q, want the alias", got)
 	}
 	many := bluetooth.Snapshot{Available: true, Enabled: true, Connected: []string{"a", "b"}}
-	if got := bluetoothLabel(many); got != "2 Connected" {
+	if got := bluetoothLabel(many); got != i18n.T("bar-bluetooth-connected-count", i18n.Int("count", 2)) {
 		t.Errorf("two devices = %q, want the count", got)
 	}
 }
@@ -63,7 +64,7 @@ func TestBluetoothModuleDimsWhenIdle(t *testing.T) {
 
 	source.setState(btState())
 	m.refresh()
-	if got := m.label.Text(); got != "Disconnected" {
+	if got := m.label.Text(); got != i18n.T("bar-bluetooth-disconnected") {
 		t.Errorf("idle label = %q", got)
 	}
 	if m.label.Color() != mutedFg(style.palette) {

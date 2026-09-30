@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/hyprland"
 )
 
@@ -14,7 +15,7 @@ import (
 func keybindModeLabel(format, submap string) string {
 	mode := submap
 	if mode == "" {
-		mode = "default"
+		mode = i18n.T("bar-keybind-mode-default")
 	}
 	return replaceTemplateVar(format, "mode", mode)
 }

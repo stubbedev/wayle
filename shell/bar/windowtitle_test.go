@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/hyprland"
 )
 
@@ -62,7 +63,7 @@ func TestWindowTitleLabel(t *testing.T) {
 		t.Errorf("= %q, want the combined render", got)
 	}
 	// A blank render (no window, empty format) falls back to Desktop.
-	if got := windowTitleLabel("{{ title }}", "", ""); got != "Desktop" {
+	if got := windowTitleLabel("{{ title }}", "", ""); got != i18n.T("bar-window-title-empty") {
 		t.Errorf("= %q, want Desktop", got)
 	}
 }

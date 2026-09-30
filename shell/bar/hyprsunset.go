@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/xdg"
 	"github.com/stubbedev/wayle/service/hyprsunset"
 )
@@ -24,9 +25,9 @@ const (
 // hyprsunsetLabel is helpers.rs's build_label: On/Off status with the
 // live temp and gamma while running, "--" placeholders when off.
 func hyprsunsetLabel(format string, enabled bool, temp, gamma, configTemp, configGamma int) string {
-	status, tempText, gammaText := "Off", "--", "--"
+	status, tempText, gammaText := i18n.T("bar-hyprsunset-off"), "--", "--"
 	if enabled {
-		status, tempText, gammaText = "On", strconv.Itoa(temp), strconv.Itoa(gamma)
+		status, tempText, gammaText = i18n.T("bar-hyprsunset-on"), strconv.Itoa(temp), strconv.Itoa(gamma)
 	}
 	out := replaceTemplateVar(format, "status", status)
 	out = replaceTemplateVar(out, "temp", tempText)

@@ -2,11 +2,11 @@ package bar
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/bluetooth"
 )
 
@@ -15,15 +15,15 @@ import (
 // count.
 func bluetoothLabel(snap bluetooth.Snapshot) string {
 	if !snap.Available || !snap.Enabled {
-		return "Off"
+		return i18n.T("bar-bluetooth-disabled")
 	}
 	switch len(snap.Connected) {
 	case 0:
-		return "Disconnected"
+		return i18n.T("bar-bluetooth-disconnected")
 	case 1:
 		return snap.Connected[0]
 	default:
-		return fmt.Sprintf("%d Connected", len(snap.Connected))
+		return i18n.T("bar-bluetooth-connected-count", i18n.Int("count", int64(len(snap.Connected))))
 	}
 }
 

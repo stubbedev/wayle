@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/weather"
 	"github.com/stubbedev/wayle/strftime"
 )
@@ -92,6 +93,38 @@ func renderTz(zoneID, layout string, now time.Time) string {
 
 // weatherFormatLabel is helpers.rs's format_label over the schema's
 // nine placeholders.
+// weatherConditionIDs is helpers.rs's condition_label vocabulary: one
+// _weather.ftl message per condition.
+var weatherConditionIDs = map[weather.Condition]string{
+	weather.CondClear:        "weather-clear",
+	weather.CondPartlyCloudy: "weather-partly-cloudy",
+	weather.CondCloudy:       "weather-cloudy",
+	weather.CondOvercast:     "weather-overcast",
+	weather.CondMist:         "weather-mist",
+	weather.CondFog:          "weather-fog",
+	weather.CondLightRain:    "weather-light-rain",
+	weather.CondRain:         "weather-rain",
+	weather.CondHeavyRain:    "weather-heavy-rain",
+	weather.CondDrizzle:      "weather-drizzle",
+	weather.CondLightSnow:    "weather-light-snow",
+	weather.CondSnow:         "weather-snow",
+	weather.CondHeavySnow:    "weather-heavy-snow",
+	weather.CondSleet:        "weather-sleet",
+	weather.CondThunderstorm: "weather-thunderstorm",
+	weather.CondWindy:        "weather-windy",
+	weather.CondHail:         "weather-hail",
+	weather.CondUnknown:      "weather-unknown",
+}
+
+// weatherConditionLabel is helpers.rs's condition_label.
+func weatherConditionLabel(c weather.Condition) string {
+	id, ok := weatherConditionIDs[c]
+	if !ok {
+		id = weatherConditionIDs[weather.CondUnknown]
+	}
+	return i18n.T(id)
+}
+
 func weatherFormatLabel(format string, current weather.Current, imperial bool) string {
 	temp, unit, speed := formatWeatherUnits(current, imperial)
 	humidity := strconv.Itoa(current.Humidity) + "%"
@@ -105,7 +138,7 @@ func weatherFormatLabel(format string, current weather.Current, imperial bool) s
 	out := replaceTemplateVar(format, "temp", temp)
 	out = replaceTemplateVar(out, "temp_unit", unit)
 	out = replaceTemplateVar(out, "feels_like", tempString(current.FeelsLikeC, imperial))
-	out = replaceTemplateVar(out, "condition", current.Condition.Label())
+	out = replaceTemplateVar(out, "condition", weatherConditionLabel(current.Condition))
 	out = replaceTemplateVar(out, "humidity", humidity)
 	out = replaceTemplateVar(out, "wind_speed", speed)
 	out = replaceTemplateVar(out, "wind_dir", weather.Cardinal(current.WindDir))

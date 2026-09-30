@@ -86,47 +86,6 @@ func FromWmoCode(code uint8) Condition {
 	return CondUnknown
 }
 
-// Label is the en-US condition vocabulary (_weather.ftl).
-func (c Condition) Label() string {
-	switch c {
-	case CondClear:
-		return "Clear"
-	case CondPartlyCloudy:
-		return "Partly Cloudy"
-	case CondCloudy:
-		return "Cloudy"
-	case CondOvercast:
-		return "Overcast"
-	case CondMist:
-		return "Mist"
-	case CondFog:
-		return "Fog"
-	case CondLightRain:
-		return "Light Rain"
-	case CondRain:
-		return "Rain"
-	case CondHeavyRain:
-		return "Heavy Rain"
-	case CondDrizzle:
-		return "Drizzle"
-	case CondLightSnow:
-		return "Light Snow"
-	case CondSnow:
-		return "Snow"
-	case CondHeavySnow:
-		return "Heavy Snow"
-	case CondSleet:
-		return "Sleet"
-	case CondThunderstorm:
-		return "Thunderstorm"
-	case CondWindy:
-		return "Windy"
-	case CondHail:
-		return "Hail"
-	}
-	return "Unknown"
-}
-
 // Cardinal is types.rs WindDirection::cardinal.
 func Cardinal(deg uint16) string {
 	switch {

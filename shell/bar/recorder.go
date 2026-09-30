@@ -5,6 +5,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/recorder"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -13,12 +14,12 @@ import (
 // for {{ state }}, the H:MM:SS (or M:SS) clock for {{ elapsed }}, a
 // dash while idle.
 func recorderLabel(format string, active, paused bool, elapsedSecs uint32) string {
-	state := "Idle"
+	state := i18n.T("bar-recorder-idle")
 	switch {
 	case active && paused:
-		state = "Paused"
+		state = i18n.T("bar-recorder-paused")
 	case active:
-		state = "Recording"
+		state = i18n.T("bar-recorder-recording")
 	}
 	elapsed := "-"
 	if active {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/recorder"
 )
 
@@ -18,7 +19,7 @@ func TestRecorderLabel(t *testing.T) {
 	if got := recorderLabel("{{ elapsed }}", true, false, 65); got != "1:05" {
 		t.Errorf("recording = %q", got)
 	}
-	if got := recorderLabel("{{ state }} {{ elapsed }}", true, true, 3661); got != "Paused 1:01:01" {
+	if got := recorderLabel("{{ state }} {{ elapsed }}", true, true, 3661); got != i18n.T("bar-recorder-paused")+" 1:01:01" {
 		t.Errorf("paused = %q", got)
 	}
 }

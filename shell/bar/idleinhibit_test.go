@@ -8,23 +8,24 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/idleinhibit"
 )
 
 func TestIdleInhibitLabel(t *testing.T) {
 	// Off: dashes for remaining, the stored duration still shows.
-	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", false, 60, 0); got != "Off - 60" {
+	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", false, 60, 0); got != i18n.T("bar-idle-inhibit-off")+" - 60" {
 		t.Errorf("= %q", got)
 	}
 	// On, timed: H:MM:SS above the hour, M:SS within it.
-	if got := idleInhibitLabel("{{ state }} {{ remaining }}", true, 60, 3661); got != "On 1:01:01" {
+	if got := idleInhibitLabel("{{ state }} {{ remaining }}", true, 60, 3661); got != i18n.T("bar-idle-inhibit-on")+" 1:01:01" {
 		t.Errorf("= %q", got)
 	}
-	if got := idleInhibitLabel("{{ state }} {{ remaining }}", true, 60, 95); got != "On 1:35" {
+	if got := idleInhibitLabel("{{ state }} {{ remaining }}", true, 60, 95); got != i18n.T("bar-idle-inhibit-on")+" 1:35" {
 		t.Errorf("= %q", got)
 	}
 	// On, indefinite: the infinity sign for both.
-	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", true, 0, 0); got != "On ∞ ∞" {
+	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", true, 0, 0); got != i18n.T("bar-idle-inhibit-on")+" ∞ ∞" {
 		t.Errorf("= %q", got)
 	}
 }
@@ -68,16 +69,16 @@ func TestIdleInhibitModuleFollowsState(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	label := findLabel(module.Root())
-	if label.Text() != "Off" {
+	if label.Text() != i18n.T("bar-idle-inhibit-off") {
 		t.Errorf("initial label = %q, want Off", label.Text())
 	}
 
 	// Enabling the shared state flips the label (the module's follower
 	// goroutine consumes the change ticks; poll the label).
 	state.Enable(true)
-	waitForIdleText(t, label, "On")
+	waitForIdleText(t, label, i18n.T("bar-idle-inhibit-on"))
 	state.Disable()
-	waitForIdleText(t, label, "Off")
+	waitForIdleText(t, label, i18n.T("bar-idle-inhibit-off"))
 
 	// A module built without the shared state still works standalone.
 	standalone, err := Create("idle-inhibit", newTestContext(t, cfg))
@@ -87,7 +88,7 @@ func TestIdleInhibitModuleFollowsState(t *testing.T) {
 	if _, ok := standalone.(*idleInhibitModule); !ok {
 		t.Errorf("standalone = %T", standalone)
 	}
-	if label := findLabel(standalone.Root()); label.Text() != "Off" {
+	if label := findLabel(standalone.Root()); label.Text() != i18n.T("bar-idle-inhibit-off") {
 		t.Errorf("standalone label = %q", label.Text())
 	}
 }

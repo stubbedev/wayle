@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/mail"
 	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/recorder"
@@ -41,26 +42,25 @@ func networkDropdown(ctx ModuleContext) widget.Widget {
 		col.Append(widget.NewLabel(font, px, "NM unreachable", mutedFg(ctx.Style.palette)), false)
 		return col
 	}
-	cfg := ctx.Config.Network
 	if snap.WifiEnabled {
-		line := cfg.Disconnected
+		line := i18n.T("bar-network-disconnected")
 		switch {
 		case snap.WifiConnected:
 			line = snap.WifiSSID + " (" + strconv.Itoa(int(snap.WifiStrength)) + "%)"
 		case snap.WifiConnecting:
-			line = cfg.Connecting
+			line = i18n.T("bar-network-connecting")
 		}
-		col.Append(widget.NewLabel(font, px, "WiFi: "+line, ctx.Style.fg), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-network-wifi")+": "+line, ctx.Style.fg), false)
 	} else {
 		col.Append(widget.NewLabel(font, px, "WiFi off", mutedFg(ctx.Style.palette)), false)
 	}
-	wired := cfg.Disconnected
+	wired := i18n.T("bar-network-disconnected")
 	if snap.WiredConnected {
-		wired = cfg.Wired
+		wired = i18n.T("bar-network-wired")
 	} else if snap.WiredConnecting {
-		wired = cfg.Connecting
+		wired = i18n.T("bar-network-connecting")
 	}
-	col.Append(widget.NewLabel(font, px, "Wired: "+wired, ctx.Style.fg), false)
+	col.Append(widget.NewLabel(font, px, i18n.T("dropdown-network-ethernet")+": "+wired, ctx.Style.fg), false)
 	if vpns := vpnSection(ctx, font, px); vpns != nil {
 		col.Append(vpns, false)
 	}
@@ -77,17 +77,17 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 		col.Append(widget.NewLabel(font, px, "No notification service", mutedFg(ctx.Style.palette)), false)
 		return col
 	}
-	dndLabel := "Do Not Disturb"
+	dndLabel := i18n.T("notification-dropdown-dnd-label")
 	if svc.DND() {
-		dndLabel = "Do Not Disturb (on)"
+		dndLabel += " (on)"
 	}
 	col.Append(dropdownRow(ctx, font, px, dndLabel, "ld-bell-off-symbolic", func() { svc.ToggleDND() }), false)
 	notifs := svc.Notifications()
 	if len(notifs) == 0 {
-		col.Append(widget.NewLabel(font, px, "No notifications", mutedFg(ctx.Style.palette)), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("notification-dropdown-empty-description"), mutedFg(ctx.Style.palette)), false)
 		return col
 	}
-	col.Append(dropdownRow(ctx, font, px, "Clear all", "ld-trash-2-symbolic", func() { svc.DismissAll() }), false)
+	col.Append(dropdownRow(ctx, font, px, i18n.T("notification-dropdown-clear-all"), "ld-trash-2-symbolic", func() { svc.DismissAll() }), false)
 	for _, n := range notifs {
 		summary := n.Summary
 		if n.AppName != "" {
@@ -110,13 +110,13 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 		return col
 	}
 	snap := ctx.Recorder.Snapshot()
-	toggle := "Start recording"
+	toggle := i18n.T("dropdown-recorder-record")
 	if snap.Status != recorder.StatusIdle {
-		toggle = "Stop recording"
+		toggle = i18n.T("dropdown-recorder-stop")
 	}
 	col.Append(dropdownRow(ctx, font, px, toggle, "ld-circle-dot-symbolic", func() { ctx.Recorder.Toggle() }), false)
 	if snap.Status != recorder.StatusIdle {
-		col.Append(widget.NewLabel(font, px, "Recording: "+recorder.FormatElapsed(snap.ElapsedSecs), ctx.Style.fg), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-recorder-recording")+": "+recorder.FormatElapsed(snap.ElapsedSecs), ctx.Style.fg), false)
 	}
 	if snap.OutputPath != "" {
 		col.Append(widget.NewLabel(font, px, snap.OutputPath, mutedFg(ctx.Style.palette)), false)
@@ -134,15 +134,19 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	}
 	status, err := ctx.Treeman.Read(context.Background())
 	if err != nil || status == nil {
-		col.Append(widget.NewLabel(font, px, "Treeman unavailable", mutedFg(ctx.Style.palette)), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-treeman-empty-title"), mutedFg(ctx.Style.palette)), false)
 		return col
 	}
-	return dropdownStatus(ctx, "Worktrees", []string{
+	// views.rs renders each bucket chip as "{count} {bucket}".
+	bucket := func(count uint32, id string) string {
+		return strconv.FormatUint(uint64(count), 10) + " " + i18n.T(id)
+	}
+	return dropdownStatus(ctx, i18n.T("dropdown-treeman-title"), []string{
 		"Total: " + strconv.FormatUint(uint64(status.Total), 10),
-		"Stable: " + strconv.FormatUint(uint64(status.Stable), 10),
-		"Up: " + strconv.FormatUint(uint64(status.Up), 10),
-		"Down: " + strconv.FormatUint(uint64(status.Down), 10),
-		"Failed: " + strconv.FormatUint(uint64(status.Failed), 10),
+		bucket(status.Stable, "dropdown-treeman-bucket-stable"),
+		bucket(status.Up, "dropdown-treeman-bucket-up"),
+		bucket(status.Down, "dropdown-treeman-bucket-down"),
+		bucket(status.Failed, "dropdown-treeman-bucket-failed"),
 	})
 }
 
@@ -155,7 +159,7 @@ func mailDropdown(ctx ModuleContext) widget.Widget {
 		accounts = ctx.Mail.State().Accounts
 	}
 	if len(accounts) == 0 {
-		col.Append(widget.NewLabel(font, px, "No accounts configured", mutedFg(ctx.Style.palette)), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-mail-empty"), mutedFg(ctx.Style.palette)), false)
 		return col
 	}
 	for _, account := range accounts {
@@ -193,10 +197,10 @@ func weatherDropdown(ctx ModuleContext) widget.Widget {
 		col.Append(widget.NewLabel(font, px, "Forecast failed", mutedFg(ctx.Style.palette)), false)
 		return col
 	}
-	col.Append(widget.NewLabel(font, px*1.6, strconv.FormatFloat(current.TempC, 'f', 0, 64)+"°C "+current.Condition.Label(), ctx.Style.fg), false)
+	col.Append(widget.NewLabel(font, px*1.6, strconv.FormatFloat(current.TempC, 'f', 0, 64)+"°C "+weatherConditionLabel(current.Condition), ctx.Style.fg), false)
 	lines := []string{
 		"Feels like " + strconv.FormatFloat(current.FeelsLikeC, 'f', 0, 64) + "°C",
-		"Humidity " + strconv.Itoa(current.Humidity) + "%",
+		i18n.T("dropdown-weather-humidity") + " " + strconv.Itoa(current.Humidity) + "%",
 	}
 	if current.HasHigh {
 		lines = append(lines, "High "+strconv.FormatFloat(current.HighC, 'f', 0, 64)+"°")

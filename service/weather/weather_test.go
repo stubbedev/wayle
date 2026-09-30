@@ -41,21 +41,6 @@ func TestFromWmoCodePinsTheRustEdges(t *testing.T) {
 	}
 }
 
-func TestConditionLabels(t *testing.T) {
-	if got := CondClear.Label(); got != "Clear" {
-		t.Errorf("clear = %q", got)
-	}
-	if got := CondPartlyCloudy.Label(); got != "Partly Cloudy" {
-		t.Errorf("partly cloudy = %q", got)
-	}
-	if got := CondUnknown.Label(); got != "Unknown" {
-		t.Errorf("unknown = %q", got)
-	}
-	if CondHail.Label() != "Hail" {
-		t.Error("hail label drifted")
-	}
-}
-
 func TestCardinalBuckets(t *testing.T) {
 	for _, tc := range []struct {
 		deg  uint16

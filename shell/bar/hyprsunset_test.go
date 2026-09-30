@@ -5,17 +5,18 @@ import (
 	"testing"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 )
 
 func TestHyprsunsetLabel(t *testing.T) {
 	// Running: the live temp and gamma.
 	got := hyprsunsetLabel("{{ status }} {{ temp }}K {{ gamma }}%", true, 4500, 90, 5000, 100)
-	if got != "On 4500K 90%" {
+	if got != i18n.T("bar-hyprsunset-on")+" 4500K 90%" {
 		t.Errorf("= %q, want On 4500K 90%%", got)
 	}
 	// Off: the status word with -- placeholders.
 	got = hyprsunsetLabel("{{ status }} {{ temp }} {{ gamma }}", false, 4500, 90, 5000, 100)
-	if got != "Off -- --" {
+	if got != i18n.T("bar-hyprsunset-off")+" -- --" {
 		t.Errorf("= %q, want Off -- --", got)
 	}
 	// The configured values land on their own placeholders.

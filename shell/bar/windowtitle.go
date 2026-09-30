@@ -7,6 +7,7 @@ import (
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/hyprland"
 )
 
@@ -18,7 +19,7 @@ func windowTitleLabel(format, title, appID string) string {
 	label = replaceTemplateVar(label, "title", title)
 	label = replaceTemplateVar(label, "app", appID)
 	if strings.TrimSpace(label) == "" {
-		return "Desktop"
+		return i18n.T("bar-window-title-empty")
 	}
 	return label
 }

@@ -2,6 +2,7 @@ package bar
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os/exec"
 	"strconv"
@@ -10,7 +11,7 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/service/idleinhibit"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/sysinfo"
 	"github.com/stubbedev/wayle/service/upower"
@@ -74,11 +75,11 @@ func powerDropdown(ctx ModuleContext) widget.Widget {
 		icon    string
 		command string
 	}{
-		{"Lock", "ld-lock-symbolic", cfg.Lock},
-		{"Log Out", "ld-log-out-symbolic", cfg.Logout},
+		{i18n.T("dropdown-dashboard-lock"), "ld-lock-symbolic", cfg.Lock},
+		{i18n.T("dropdown-dashboard-logout"), "ld-log-out-symbolic", cfg.Logout},
 		{"Suspend", "ld-moon-symbolic", cfg.Suspend},
-		{"Reboot", "ld-refresh-cw-symbolic", cfg.Reboot},
-		{"Power Off", "ld-power-symbolic", cfg.Shutoff},
+		{i18n.T("dropdown-dashboard-reboot"), "ld-refresh-cw-symbolic", cfg.Reboot},
+		{i18n.T("dropdown-dashboard-power-off"), "ld-power-symbolic", cfg.Shutoff},
 	} {
 		if row.command == "" {
 			continue
@@ -107,17 +108,17 @@ func audioDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	col := widget.NewBox(widget.Column, 10, 14)
 	if ctx.Pulse == nil {
-		col.Append(widget.NewLabel(font, px, "No audio service", mutedFg(ctx.Style.palette)), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-audio-no-devices-title"), mutedFg(ctx.Style.palette)), false)
 		return col
 	}
 	bctx := context.Background()
 	if sink, err := ctx.Pulse.DefaultSink(bctx); err == nil {
-		col.Append(audioDeviceRow(ctx, font, px, "Output", sink.Device,
+		col.Append(audioDeviceRow(ctx, font, px, i18n.T("dropdown-audio-output"), sink.Device,
 			func(v float64) { _ = ctx.Pulse.SetVolume(bctx, v) },
 			func(m bool) { _ = ctx.Pulse.SetMuted(bctx, m) }), false)
 	}
 	if source, err := ctx.Pulse.DefaultSource(bctx); err == nil {
-		col.Append(audioDeviceRow(ctx, font, px, "Input", source.Device,
+		col.Append(audioDeviceRow(ctx, font, px, i18n.T("dropdown-audio-input"), source.Device,
 			func(float64) {},
 			func(m bool) { _ = ctx.Pulse.SetSourceMuted(bctx, m) }), false)
 	}
@@ -148,13 +149,13 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	col := widget.NewBox(widget.Column, 10, 14)
 	if ctx.Brightness == nil {
-		col.Append(widget.NewLabel(font, px, "No backlight", mutedFg(ctx.Style.palette)), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-brightness-empty-title"), mutedFg(ctx.Style.palette)), false)
 		return col
 	}
 	bctx := context.Background()
 	devices, err := ctx.Brightness.Devices(bctx)
 	if err != nil || len(devices) == 0 {
-		col.Append(widget.NewLabel(font, px, "No backlight", mutedFg(ctx.Style.palette)), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-brightness-empty-title"), mutedFg(ctx.Style.palette)), false)
 		return col
 	}
 	for _, dev := range devices {
@@ -181,29 +182,60 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	col := widget.NewBox(widget.Column, 8, 14)
 	if ctx.Battery == nil {
-		col.Append(widget.NewLabel(font, px, "No battery", mutedFg(ctx.Style.palette)), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-battery-no-battery-title"), mutedFg(ctx.Style.palette)), false)
 		return col
 	}
 	dev, err := ctx.Battery.Read(context.Background())
 	if err != nil {
-		col.Append(widget.NewLabel(font, px, "No battery", mutedFg(ctx.Style.palette)), false)
+		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-battery-no-battery-title"), mutedFg(ctx.Style.palette)), false)
 		return col
 	}
-	state := "Discharging"
-	switch dev.State {
-	case upower.StateCharging, upower.StatePendingCharge:
-		state = "Charging"
-	case upower.StateFullyCharged:
-		state = "Full"
-	case upower.StateUnknown:
-		state = "Unknown"
-	}
 	col.Append(widget.NewLabel(font, px*1.6, batteryLabel("{{ percent }}%", dev.Percentage, dev.Present()), ctx.Style.fg), false)
-	col.Append(widget.NewLabel(font, px, state, mutedFg(ctx.Style.palette)), false)
-	if dev.TimeToEmpty > 0 {
-		col.Append(widget.NewLabel(font, px, "Empty in "+idleinhibit.FormatDuration(int(dev.TimeToEmpty.Seconds())), mutedFg(ctx.Style.palette)), false)
+	col.Append(widget.NewLabel(font, px, batteryStateLabel(dev.State), mutedFg(ctx.Style.palette)), false)
+	if text := batteryTimeDisplay(dev); text != "" {
+		col.Append(widget.NewLabel(font, px, text, mutedFg(ctx.Style.palette)), false)
 	}
 	return col
+}
+
+// batteryCharging is battery_section/methods.rs's is_charging.
+func batteryCharging(state upower.DeviceState) bool {
+	return state == upower.StateCharging || state == upower.StatePendingCharge
+}
+
+// batteryStateLabel is methods.rs's state_label. The critical state
+// keys off UPower's WarningLevel, which the Go service does not read
+// yet, so the label starts at charging.
+func batteryStateLabel(state upower.DeviceState) string {
+	switch {
+	case batteryCharging(state):
+		return i18n.T("dropdown-battery-charging")
+	case state == upower.StateFullyCharged:
+		return i18n.T("dropdown-battery-plugged-in")
+	default:
+		return i18n.T("dropdown-battery-on-battery")
+	}
+}
+
+// batteryTimeDisplay is methods.rs's time_display: the time until full
+// while charging, the time remaining otherwise, "" when unknown.
+func batteryTimeDisplay(dev upower.Device) string {
+	remaining, id := dev.TimeToEmpty, "dropdown-battery-time-remaining"
+	if batteryCharging(dev.State) {
+		remaining, id = dev.TimeToFull, "dropdown-battery-time-until-full"
+	}
+	seconds := int64(remaining.Seconds())
+	if seconds <= 0 {
+		return ""
+	}
+	hours, minutes := seconds/3600, (seconds%3600)/60
+	duration := i18n.T("dropdown-battery-duration-m", i18n.Str("minutes", strconv.FormatInt(minutes, 10)))
+	if hours > 0 {
+		duration = i18n.T("dropdown-battery-duration-hm",
+			i18n.Str("hours", strconv.FormatInt(hours, 10)),
+			i18n.Str("minutes", fmt.Sprintf("%02d", minutes)))
+	}
+	return i18n.T(id, i18n.Str("duration", duration))
 }
 
 // dashboardDropdown is the dashboard card: the clock hero, the date,
@@ -229,7 +261,7 @@ func dashboardStats(ctx ModuleContext, font render.Font, px float64) widget.Widg
 	var lines []string
 	if ctx.Battery != nil {
 		if dev, err := ctx.Battery.Read(context.Background()); err == nil {
-			lines = append(lines, "Battery: "+batteryLabel("{{ percent }}%", dev.Percentage, dev.Present()))
+			lines = append(lines, i18n.T("dropdown-dashboard-battery")+": "+batteryLabel("{{ percent }}%", dev.Percentage, dev.Present()))
 		}
 	}
 	if prev, err := sysinfo.ReadCpuSample(); err == nil {
@@ -237,11 +269,11 @@ func dashboardStats(ctx ModuleContext, font render.Font, px float64) widget.Widg
 		// holding state between opens.
 		time.Sleep(120 * time.Millisecond)
 		if next, err := sysinfo.ReadCpuSample(); err == nil {
-			lines = append(lines, "CPU: "+strconv.FormatFloat(prev.Usage(next), 'f', 0, 64)+"%")
+			lines = append(lines, i18n.T("dropdown-dashboard-cpu")+": "+strconv.FormatFloat(prev.Usage(next), 'f', 0, 64)+"%")
 		}
 	}
 	if mem, err := sysinfo.ReadMemory(); err == nil {
-		lines = append(lines, "Memory: "+strconv.FormatFloat(mem.UsagePercent(), 'f', 0, 64)+"%")
+		lines = append(lines, i18n.T("dropdown-dashboard-ram")+": "+strconv.FormatFloat(mem.UsagePercent(), 'f', 0, 64)+"%")
 	}
 	if len(lines) == 0 {
 		return nil

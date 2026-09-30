@@ -13,6 +13,7 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -28,7 +29,7 @@ func TestBatteryLabelMatchesRustAssertions(t *testing.T) {
 	if got := batteryLabel("Bat: {{ percent }}", 0.4, true); got != "Bat: 0" {
 		t.Errorf("= %q, want rounding down to 0", got)
 	}
-	if got := batteryLabel("{{ percent }}%", 50.0, false); got != "N/A" {
+	if got := batteryLabel("{{ percent }}%", 50.0, false); got != i18n.T("bar-battery-unavailable") {
 		t.Errorf("absent battery = %q, want N/A", got)
 	}
 	if got := batteryLabel("{{percent}}%", 75.0, true); got != "75%" {
@@ -215,7 +216,7 @@ func TestBatteryAbsentBatteryShowsNA(t *testing.T) {
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := m.label.Text(); got != "N/A" {
+	if got := m.label.Text(); got != i18n.T("bar-battery-unavailable") {
 		t.Errorf("label = %q, want N/A", got)
 	}
 }
@@ -306,4 +307,34 @@ func testFont(t *testing.T) render.Font {
 		t.Fatal(err)
 	}
 	return face
+}
+
+// The dropdown hero follows methods.rs's state_label and time_display.
+func TestBatteryDropdownStateAndTime(t *testing.T) {
+	for state, id := range map[upower.DeviceState]string{
+		upower.StateCharging:         "dropdown-battery-charging",
+		upower.StatePendingCharge:    "dropdown-battery-charging",
+		upower.StateFullyCharged:     "dropdown-battery-plugged-in",
+		upower.StateDischarging:      "dropdown-battery-on-battery",
+		upower.StateUnknown:          "dropdown-battery-on-battery",
+		upower.StatePendingDischarge: "dropdown-battery-on-battery",
+	} {
+		if got := batteryStateLabel(state); got != i18n.T(id) {
+			t.Errorf("state %d = %q, want %s", state, got, id)
+		}
+	}
+	hm := i18n.T("dropdown-battery-duration-hm", i18n.Str("hours", "3"), i18n.Str("minutes", "04"))
+	discharging := upower.Device{State: upower.StateDischarging, TimeToEmpty: 3*time.Hour + 4*time.Minute, TimeToFull: time.Hour}
+	if got := batteryTimeDisplay(discharging); got != i18n.T("dropdown-battery-time-remaining", i18n.Str("duration", hm)) {
+		t.Errorf("discharging = %q", got)
+	}
+	m := i18n.T("dropdown-battery-duration-m", i18n.Str("minutes", "18"))
+	charging := upower.Device{State: upower.StateCharging, TimeToEmpty: 5 * time.Hour, TimeToFull: 18 * time.Minute}
+	if got := batteryTimeDisplay(charging); got != i18n.T("dropdown-battery-time-until-full", i18n.Str("duration", m)) {
+		t.Errorf("charging = %q", got)
+	}
+	// Unknown times (0) show nothing, whichever side the state reads.
+	if got := batteryTimeDisplay(upower.Device{State: upower.StateCharging, TimeToEmpty: time.Hour}); got != "" {
+		t.Errorf("charging without time-to-full = %q, want empty", got)
+	}
 }

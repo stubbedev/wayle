@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -16,28 +17,28 @@ import (
 // when connected (the _bar.ftl fallback when hidden), then the
 // connecting/disconnected vocabulary, with wifi preferred while
 // enabled.
-func networkLabel(snap network.Snapshot, cfg config.NetworkConfig) string {
+func networkLabel(snap network.Snapshot) string {
 	if snap.WifiEnabled {
 		switch {
 		case snap.WifiConnected:
 			if snap.WifiSSID != "" {
 				return snap.WifiSSID
 			}
-			return cfg.WifiFallback
+			return i18n.T("bar-network-wifi-fallback")
 		case snap.WifiConnecting:
-			return cfg.Connecting
+			return i18n.T("bar-network-connecting")
 		case snap.WiredConnected:
-			return cfg.Wired
+			return i18n.T("bar-network-wired")
 		}
-		return cfg.Disconnected
+		return i18n.T("bar-network-disconnected")
 	}
 	switch {
 	case snap.WiredConnected:
-		return cfg.Wired
+		return i18n.T("bar-network-wired")
 	case snap.WiredConnecting:
-		return cfg.Connecting
+		return i18n.T("bar-network-connecting")
 	}
-	return cfg.Disconnected
+	return i18n.T("bar-network-disconnected")
 }
 
 // networkColor dims the label when nothing is connected.
@@ -122,7 +123,7 @@ func (m *networkModule) refresh() error {
 	cfg := m.ctx.Config.Network
 	label := ""
 	if cfg.LabelShow {
-		label = networkLabel(snap, cfg)
+		label = networkLabel(snap)
 	}
 	m.label.SetText(label)
 	m.label.SetColor(networkColor(snap, m.ctx.Style.palette, m.ctx.Style.fg))

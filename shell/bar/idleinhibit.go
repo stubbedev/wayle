@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -16,9 +17,9 @@ import (
 // remaining time (H:MM:SS or M:SS, "∞" when indefinite, "-" when
 // off), and the stored duration ("∞" when indefinite).
 func idleInhibitLabel(format string, active bool, durationMins uint32, remainingSecs int) string {
-	state := "Off"
+	state := i18n.T("bar-idle-inhibit-off")
 	if active {
-		state = "On"
+		state = i18n.T("bar-idle-inhibit-on")
 	}
 	var remaining string
 	switch {

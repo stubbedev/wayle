@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/weather"
 )
 
@@ -82,7 +83,7 @@ func TestWeatherFormatLabel(t *testing.T) {
 	}
 	// The full placeholder set.
 	got := weatherFormatLabel("{{ condition }} {{ feels_like }}° {{ humidity }} {{ wind_speed }} {{ wind_dir }} {{ high }}/{{ low }}", current, false)
-	want := "Light Rain 18° 62% 12 km/h E 22/12"
+	want := i18n.T("weather-light-rain") + " 18° 62% 12 km/h E 22/12"
 	if got != want {
 		t.Errorf("= %q, want %q", got, want)
 	}
@@ -125,5 +126,28 @@ func TestLoadFileAppliesWeatherAndWorldClock(t *testing.T) {
 		if _, err := config.LoadFile(path); err == nil {
 			t.Errorf("%q: want a load error", bad)
 		}
+	}
+}
+
+// Every condition maps to its own _weather.ftl message; a value
+// outside the enum falls back to the unknown label, never a missing-id
+// marker.
+func TestWeatherConditionLabels(t *testing.T) {
+	seen := map[string]weather.Condition{}
+	for c := weather.CondClear; c <= weather.CondUnknown; c++ {
+		id, ok := weatherConditionIDs[c]
+		if !ok {
+			t.Fatalf("condition %d has no message id", c)
+		}
+		if prev, dup := seen[id]; dup {
+			t.Errorf("conditions %d and %d share %s", prev, c, id)
+		}
+		seen[id] = c
+		if got := weatherConditionLabel(c); got != i18n.T(id) || strings.HasPrefix(got, "No localization") {
+			t.Errorf("condition %d = %q", c, got)
+		}
+	}
+	if got := weatherConditionLabel(weather.CondUnknown + 1); got != i18n.T("weather-unknown") {
+		t.Errorf("out-of-range condition = %q", got)
 	}
 }
