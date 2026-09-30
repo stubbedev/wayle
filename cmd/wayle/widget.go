@@ -1,6 +1,12 @@
 package main
 
-import "github.com/stubbedev/wayle/internal/cli"
+import (
+	"context"
+	"time"
+
+	"github.com/stubbedev/wayle/internal/cli"
+	"github.com/stubbedev/wayle/internal/widgetipc"
+)
 
 // widgetCommand is wayle/src/cli/widget/commands.rs.
 func widgetCommand() *cli.Command {
@@ -16,8 +22,20 @@ func widgetCommand() *cli.Command {
 					{ID: "id", Required: true, Help: "Config id of the target widget (e.g. a custom module's `id`)"},
 					{ID: "output", Required: true, Help: "Output payload (plain text, or a JSON object)"},
 				},
-				Run: notPorted("widget update"),
+				Run: runWidgetUpdate,
 			},
 		},
 	}
+}
+
+// socketTimeout bounds one widget-socket exchange.
+const socketTimeout = 5 * time.Second
+
+// runWidgetUpdate is widget/update.rs.
+func runWidgetUpdate(m *cli.Matches) error {
+	id, _ := cli.Value[string](m, "id")
+	output, _ := cli.Value[string](m, "output")
+	ctx, cancel := context.WithTimeout(context.Background(), socketTimeout)
+	defer cancel()
+	return widgetipc.SendWidgetUpdate(ctx, id, output)
 }

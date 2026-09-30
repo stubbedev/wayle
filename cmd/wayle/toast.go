@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/stubbedev/wayle/internal/cli"
 	"github.com/stubbedev/wayle/internal/widgetipc"
@@ -40,7 +39,7 @@ func runToast(m *cli.Matches) error {
 	if req.Label == nil && req.Preset == nil {
 		return errors.New("a toast needs a label or --preset")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), socketTimeout)
 	defer cancel()
 	return widgetipc.SendToast(ctx, req)
 }
