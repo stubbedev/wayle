@@ -37,14 +37,7 @@ func newPowerProfiles(ctx ModuleContext) (Module, error) {
 	}
 	m := &powerProfilesModule{ctx: ctx, src: ctx.PowerProfiles, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.icon = moduleIcon(ctx, ctx.Config.PowerProfiles.Icons[config.ProfileBalanced])
-	if m.icon != nil {
-		row := widget.NewBox(widget.Row, ctx.Style.moduleGap, 0)
-		row.Append(m.icon, false)
-		row.Append(m.label, false)
-		m.root = row
-	} else {
-		m.root = m.label
-	}
+	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}

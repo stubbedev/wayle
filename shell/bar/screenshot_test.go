@@ -59,12 +59,12 @@ func TestScreenshotModule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	box, ok := m.Root().(*widget.Box)
-	if !ok {
-		t.Fatalf("labelled root %T, want icon + label", m.Root())
+	btn, ok := m.Root().(*barButton)
+	if !ok || btn.icon == nil || btn.label == nil {
+		t.Fatalf("labelled root %T, want the icon + label bar button", m.Root())
 	}
-	if l, ok := box.Children()[1].(*widget.Label); !ok || l.Text() != "Cap…" {
-		t.Fatalf("label %v", box.Children()[1])
+	if got := btn.label.Text(); got != "Cap…" {
+		t.Fatalf("label %q, want Cap…", got)
 	}
 	cfg.Screenshot.Icon.Show, cfg.Screenshot.LabelShow = false, false
 	if _, err := newScreenshot(newTestContext(t, cfg)); err == nil {
@@ -75,7 +75,7 @@ func TestScreenshotModule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := m.Root().(*widget.Label); !ok {
-		t.Fatalf("label-only root %T", m.Root())
+	if btn, ok := m.Root().(*barButton); !ok || btn.icon != nil || btn.label == nil {
+		t.Fatalf("label-only root %T, want a bar button with only a label", m.Root())
 	}
 }

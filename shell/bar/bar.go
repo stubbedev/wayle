@@ -10,6 +10,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -60,18 +61,27 @@ func RunWith(cfg *config.Config) error {
 	if application.Clipboard() == nil {
 		application.SetClipboard(app.NewClipboard(sess))
 	}
-	palette := styling.Default()
+	// The bars load the Rust stylesheet bundle; the surfaces it does not
+	// reach (OSD, popups, dropdowns) paint from the same resolved palette.
+	theme := newBarTheme(cfg)
+	theme.watchUserStyles(application)
+	widget.SetFaceResolver(fontResolver)
+	palette := theme.renderPalette()
 	applyPalette(palette)
 
 	style := computeStyle(cfg, palette)
-	loadBarStylesheet(style)
+	// Bar modules leave their normal ink to the stylesheet
+	// (--bar-btn-label-color): a zero fg is "unset" to gelm, so only a
+	// module's deliberate state color stays programmatic.
+	moduleStyle := style
+	moduleStyle.fg = 0
 
 	face, err := app.Font(cfg.General.FontSans, style.labelPx)
 	if err != nil {
 		return fmt.Errorf("bar: font %q: %w", cfg.General.FontSans, err)
 	}
 	font := app.FontFallback(face)
-	baseCtx := ModuleContext{Config: cfg, App: application, Font: font, Style: &style}
+	baseCtx := ModuleContext{Config: cfg, App: application, Font: font, Style: &moduleStyle, Theme: theme}
 	// The clipboard history starts with the shell rather than when the
 	// launcher first opens, so it covers the session; a compositor
 	// without data-control simply has none (bootstrap/mod.rs).
@@ -183,8 +193,19 @@ func RunWith(cfg *config.Config) error {
 	}
 	// Wallpapers render on their own Background layers; hotplugged
 	// outputs join once their connector name is known.
-	_, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, &sess.OnOutputIdentity, &sess.OnOutputRemoved)
+	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, &sess.OnOutputIdentity, &sess.OnOutputRemoved)
 	defer stopWallpaper()
+	// A fresh color extraction re-resolves the provider palette and
+	// recompiles the bundle, the Rust shell's theme hot-apply.
+	if wall != nil {
+		ticks, stopTicks := wall.Service().Extracted()
+		defer stopTicks()
+		go func() {
+			for range ticks {
+				application.Invoke(theme.reload)
+			}
+		}()
+	}
 	osdSrv := osd.New(application, cfg.Osd, font, palette)
 	dropdowns := newDropdownRegistry(application, cfg, font, &style, baseCtx)
 	baseCtx.Dropdowns = dropdowns
@@ -386,105 +407,84 @@ func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string
 	if err != nil {
 		return nil, err
 	}
+	// The surface is transparent and carries no layer margins: the
+	// window's CSS margins (insets and the shadow margin) sit inside it
+	// and the stylesheet paints the bar, as GTK sizes a layer window by
+	// its margin box.
 	height := measureHeight(root, width)
-	margins := ctx.Style.margins(ctx.Config.Bar.Location)
 	return &app.LayerConfig{
 		Layer:         LayerFor(ctx.Config.Bar.Layer),
 		Anchor:        AnchorsFor(ctx.Config.Bar.Location),
 		Height:        uint32(height),
 		ExclusiveZone: exclusiveZone(ctx.Config.Bar.Exclusive, height),
-		Margin: app.Margins{
-			Top:    margins[0],
-			Right:  margins[1],
-			Bottom: margins[2],
-			Left:   margins[3],
-		},
-		Namespace:  "wayle-bar-" + connector,
-		Root:       root,
-		Background: ctx.Style.bg,
+		Namespace:     "wayle-bar-" + connector,
+		Root:          root,
 	}, nil
 }
 
-// buildRoot assembles one bar: the row of sections with wayle's
-// section margins, the per-side border strips over it, and the root
-// classes the stylesheet targets.
+// buildRoot assembles one bar the way bar/mod.rs's view does, so the
+// compiled bar SCSS styles it:
+//
+//	window.bar.<location>.<connector>[.floating]   (the --bar-* variables inline)
+//	└ centerbox
+//	  ├ box.bar-section.bar-left
+//	  ├ box.bar-section.bar-center
+//	  └ box.bar-section.bar-right
+//
+// The window's CSS margins carry the insets and the shadow margin, its
+// border and background the bar chrome; the sections' margins carry the
+// padding (bar/_container.scss). Expanding fillers stand in for
+// GtkCenterBox's centering.
 func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) (widget.Widget, error) {
-	content, err := buildContent(ctx, layout)
-	if err != nil {
-		return nil, err
+	cfg := ctx.Config
+	axis := widget.Row
+	if cfg.Bar.Location.IsVertical() {
+		axis = widget.Column
 	}
-	addRootClasses(content, connector, ctx.Config)
-
-	if !ctx.Style.borders.any() {
-		return content, nil
+	root := widget.NewBox(axis, 0, 0)
+	root.SetElement("window")
+	root.AddClass(rootClasses(connector, cfg)...)
+	root.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.ColorExtractor.ThemeProvider)))
+	if ctx.Theme != nil {
+		ctx.Theme.attach(root)
 	}
-	root := widget.NewOverlay()
-	root.Append(content)
-	root.Append(newBorder(ctx.Style.borders, ctx.Style.border))
-	addRootClasses(root, connector, ctx.Config)
+	center := widget.NewBox(axis, 0, 0)
+	for i, part := range []struct {
+		class string
+		items []config.BarItem
+	}{
+		{"bar-left", layout.Left},
+		{"bar-center", layout.Center},
+		{"bar-right", layout.Right},
+	} {
+		section, err := CreateAll(part.items, ctx)
+		if err != nil {
+			return nil, err
+		}
+		section.AddClass("bar-section", part.class)
+		center.Append(section, false)
+		if i < 2 {
+			center.Append(widget.NewBox(axis, 0, 0), true)
+		}
+	}
+	root.Append(center, true)
 	return root, nil
 }
 
-// buildContent lays out the left, center, and right sections the way
-// bar/_container.scss does: padding on the cross axis of every
-// section, padding-ends on the outer ends, and expanding fillers
-// around the center.
-func buildContent(ctx ModuleContext, layout config.BarLayout) (*widget.Box, error) {
-	horizontal := ctx.Config.Bar.Location == config.LocationTop ||
-		ctx.Config.Bar.Location == config.LocationBottom
-	row := widget.NewBox(widget.Row, ctx.Style.moduleGap, 0)
-
-	appendSection := func(items []config.BarItem, leading, trailing bool) error {
-		if len(items) == 0 {
-			return nil
-		}
-		section, err := CreateAll(items, ctx)
-		if err != nil {
-			return err
-		}
-		var left, top, right, bottom int
-		if horizontal {
-			top, bottom = ctx.Style.padding, ctx.Style.padding
-			if leading {
-				left = ctx.Style.paddingEnds
-			}
-			if trailing {
-				right = ctx.Style.paddingEnds
-			}
-		} else {
-			left, right = ctx.Style.padding, ctx.Style.padding
-			if leading {
-				top = ctx.Style.paddingEnds
-			}
-			if trailing {
-				bottom = ctx.Style.paddingEnds
-			}
-		}
-		row.Append(newInset(section, left, top, right, bottom), false)
-		return nil
-	}
-
-	if err := appendSection(layout.Left, true, false); err != nil {
-		return nil, err
-	}
-	if len(layout.Center) > 0 {
-		row.Append(widget.NewBox(widget.Row, 0, 0), true)
-		if err := appendSection(layout.Center, false, false); err != nil {
-			return nil, err
-		}
-		row.Append(widget.NewBox(widget.Row, 0, 0), true)
-	}
-	if err := appendSection(layout.Right, false, true); err != nil {
-		return nil, err
-	}
-	return row, nil
-}
-
 // measureHeight resolves the bar's content-driven height: the natural
-// height of the tree at the output's width.
+// height of the tree at the output's width. A priming arrange runs
+// first: gelm links a widget to its container at arrange time, and the
+// bar stylesheet (attached to the root) reaches a widget only through
+// those links, so the unprimed tree would measure unstyled.
 func measureHeight(root widget.Widget, width int) int {
-	size := root.Measure(widget.Constraints{Max: widget.Size{W: width, H: 1 << 16}})
-	return size.H
+	con := widget.Constraints{Max: widget.Size{W: width, H: 1 << 16}}
+	size := root.Measure(con)
+	root.Arrange(render.Rect{W: width, H: size.H})
+	// The links drop the children's measure caches but not the root's.
+	if inv, ok := root.(interface{ InvalidateLayout() }); ok {
+		inv.InvalidateLayout()
+	}
+	return root.Measure(con).H
 }
 
 // exclusiveZone mirrors gtk4-layer-shell's auto exclusive zone: an

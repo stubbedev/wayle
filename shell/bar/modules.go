@@ -71,6 +71,9 @@ type ModuleContext struct {
 	// Screenshot starts a capture on the in-process screenshot host
 	// (the `wayle screenshot ...` builtin); nil before the host is up.
 	Screenshot func(mode, target string)
+	// Theme is the bar stylesheet every bar root attaches; nil in
+	// headless construction, where the tree builds unstyled.
+	Theme *barTheme
 }
 
 // Invoke marshals fn onto the loop goroutine; a no-op when the context
@@ -153,27 +156,33 @@ func Create(name string, ctx ModuleContext) (Module, error) {
 	return factory(ctx)
 }
 
-// CreateAll builds every item of one layout section into a row.
-// Groups become bar-group containers: a styled box (background,
-// padding, and rounding through the .bar-group stylesheet rule)
-// holding the group's modules with the group gap.
+// CreateAll builds every item of one layout section into a row: one
+// box.bar-item per layout item (bar/factory.rs BarItemFactory), a
+// group's carrying the bar-group class and the group name as its id,
+// each module inside classed `module` plus its per-instance class. The
+// gaps between items and grouped modules are the stylesheet's margins
+// (bar/_layout.scss), not box spacing.
 func CreateAll(items []config.BarItem, ctx ModuleContext) (*widget.Box, error) {
-	row := widget.NewBox(widget.Row, ctx.Style.moduleGap, 0)
+	axis := widget.Row
+	if ctx.Config != nil && ctx.Config.Bar.Location.IsVertical() {
+		axis = widget.Column
+	}
+	row := widget.NewBox(axis, 0, 0)
 	for _, item := range items {
+		box := widget.NewBox(axis, 0, 0)
+		box.AddClass("bar-item")
+		modules := []config.BarItem{item}
 		if item.IsGroup() {
-			group := widget.NewBox(widget.Row, ctx.Style.groupGap, 0)
-			group.AddClass("bar-group")
-			for _, inner := range item.Group.Modules {
-				if err := appendModule(group, inner, ctx); err != nil {
-					return nil, err
-				}
+			box.AddClass("bar-group")
+			box.SetID(item.Group.Name)
+			modules = item.Group.Modules
+		}
+		for _, inner := range modules {
+			if err := appendModule(box, inner, ctx); err != nil {
+				return nil, err
 			}
-			row.Append(group, false)
-			continue
 		}
-		if err := appendModule(row, item, ctx); err != nil {
-			return nil, err
-		}
+		row.Append(box, false)
 	}
 	return row, nil
 }
@@ -186,7 +195,20 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	if a, ok := module.(interface{ Attach(app.Host) }); ok && ctx.Attachers != nil {
 		*ctx.Attachers = append(*ctx.Attachers, a)
 	}
-	binding := moduleBinding(item.Module, ctx.Config)
+	root := module.Root()
+	classes := []string{"module"}
+	if item.Class != "" {
+		classes = append(classes, item.Class)
+	}
+	// Components that are not BarButtons in the Rust shell (the
+	// workspace rows) carry their own chrome and input handling.
+	if _, ok := module.(interface{ ownsChrome() }); ok {
+		if n, ok := root.(interface{ AddClass(...string) }); ok {
+			n.AddClass(classes...)
+		}
+		row.Append(root, false)
+		return nil
+	}
 	var handler interface {
 		RunAction(config.ClickAction)
 	}
@@ -195,18 +217,12 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	}); ok {
 		handler = h
 	}
-	root := module.Root()
-	// Components that are not BarButtons in the Rust shell (the
-	// workspace rows) carry their own chrome and input handling.
-	if _, ok := module.(interface{ ownsChrome() }); ok {
-		row.Append(root, false)
-		return nil
-	}
-	row.Append(wrapActions(root, binding, ctx.Style, func(action config.ClickAction) {
-		// Dropdown bindings anchor to this module's own root; the
+	btn := asBarButton(ctx, root)
+	btn.configure(moduleButton(item.Module, ctx.Config), moduleBinding(item.Module, ctx.Config), func(action config.ClickAction) {
+		// Dropdown bindings anchor to this module's own button; the
 		// registry toggles the popover on the connector's host.
 		if action.Kind == config.ClickDropdown && ctx.Dropdowns != nil {
-			_ = ctx.Dropdowns.open(ctx.Connector, action.Dropdown, root)
+			_ = ctx.Dropdowns.open(ctx.Connector, action.Dropdown, btn)
 			return
 		}
 		if handler != nil {
@@ -214,8 +230,88 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 			return
 		}
 		runClickAction(ctx, action)
-	}), false)
+	})
+	btn.AddClass(classes...)
+	row.Append(btn, false)
 	return nil
+}
+
+// asBarButton returns the module root as a bar button: the one the
+// module assembled, a bare label given the label container, or any
+// other content wrapped in the button chrome.
+func asBarButton(ctx ModuleContext, root widget.Widget) *barButton {
+	switch r := root.(type) {
+	case *barButton:
+		return r
+	case *widget.Label:
+		return newBarButton(ctx, nil, r)
+	}
+	return newBarButtonAround(ctx, root)
+}
+
+// moduleButton looks up the bar-button keys a layout item's module
+// carries; modules without them (custom modules resolve their own) get
+// the schema's neutral set.
+func moduleButton(name string, cfg *config.Config) config.ButtonConfig {
+	if cfg == nil {
+		return config.ButtonConfig{IconShow: true, LabelShow: true}
+	}
+	switch name {
+	case "battery":
+		return cfg.Battery.Button
+	case "brightness":
+		return cfg.Brightness.Button
+	case "volume":
+		return cfg.Volume.Button
+	case "media":
+		return cfg.Media.Button
+	case "network":
+		return cfg.Network.Button
+	case "bluetooth":
+		return cfg.Bluetooth.Button
+	case "microphone":
+		return cfg.Microphone.Button
+	case "keyboard-input":
+		return cfg.KeyboardInput.Button
+	case "window-title":
+		return cfg.WindowTitle.Button
+	case "cpu":
+		return cfg.CPU.Button
+	case "ram":
+		return cfg.RAM.Button
+	case "storage":
+		return cfg.Storage.Button
+	case "weather":
+		return cfg.Weather.Button
+	case "world-clock":
+		return cfg.WorldClock.Button
+	case "netstat":
+		return cfg.Netstat.Button
+	case "mail":
+		return cfg.Mail.Button
+	case "power":
+		return cfg.Power.Button
+	case "keybind-mode":
+		return cfg.KeybindMode.Button
+	case "power-profiles":
+		return cfg.PowerProfiles.Button
+	case "hyprsunset":
+		return cfg.Hyprsunset.Button
+	case "idle-inhibit":
+		return cfg.IdleInhibit.Button
+	case "treeman":
+		return cfg.Treeman.Button
+	case "notifications":
+		return cfg.Notification.Button
+	case "recorder":
+		return cfg.Recorder.Button
+	case "clock":
+		return cfg.Clock.Button
+	}
+	if def, ok := customDefinition(name, cfg); ok {
+		return def.Button
+	}
+	return config.ButtonConfig{IconShow: true, LabelShow: true}
 }
 
 // moduleBinding looks up the [modules.<name>] bindings a layout item's

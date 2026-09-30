@@ -40,14 +40,7 @@ func newKeybindMode(ctx ModuleContext) (Module, error) {
 	}
 	m := &keybindModeModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.icon = moduleIcon(ctx, ctx.Config.KeybindMode.Icon)
-	if m.icon != nil {
-		row := widget.NewBox(widget.Row, ctx.Style.moduleGap, 0)
-		row.Append(m.icon, false)
-		row.Append(m.label, false)
-		m.root = row
-	} else {
-		m.root = m.label
-	}
+	m.root = assembleModule(ctx, m.icon, m.label)
 	events, err := ctx.Hyprland.Events(context.Background())
 	if err != nil {
 		return nil, err

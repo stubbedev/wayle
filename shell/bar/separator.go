@@ -62,3 +62,11 @@ func (s *separator) Paint(cv *render.Canvas) {
 
 // HitTest misses: separators are not interactive.
 func (s *separator) HitTest(widget.Point) widget.Widget { return nil }
+
+// clampSize confines s to the constraint box.
+func clampSize(s widget.Size, con widget.Constraints) widget.Size {
+	return widget.Size{
+		W: min(max(s.W, con.Min.W), con.Max.W),
+		H: min(max(s.H, con.Min.H), con.Max.H),
+	}
+}

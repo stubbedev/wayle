@@ -2,6 +2,7 @@ package bar
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/gelm/render"
@@ -66,26 +67,25 @@ func TestModuleClickDefaultsMatchSchema(t *testing.T) {
 	}
 }
 
-// recordedActions captures what the wrapper dispatches.
+// recordedActions captures what the button dispatches.
 type recordedActions struct {
 	actions []config.ClickAction
 }
 
-func newWrappedModule(t *testing.T, binding config.ClickConfig) (*actionButton, *recordedActions) {
+func newWrappedModule(t *testing.T, binding config.ClickConfig) (*barButton, *recordedActions) {
 	t.Helper()
 	rec := &recordedActions{}
+	cfg := config.Defaults()
+	ctx := newTestContext(t, cfg)
 	label := widget.NewLabel(testFont(t), 12, "x", 0xFF000000)
-	wrapped := wrapActions(label, binding, nil, func(action config.ClickAction) {
+	button := asBarButton(ctx, label)
+	button.configure(cfg.Battery.Button, binding, func(action config.ClickAction) {
 		rec.actions = append(rec.actions, action)
 	})
-	button, ok := wrapped.(*actionButton)
-	if !ok {
-		t.Fatalf("wrapActions = %T, want an actionButton", wrapped)
-	}
 	return button, rec
 }
 
-func TestWrapActionsRoutesAllFiveBindings(t *testing.T) {
+func TestBarButtonRoutesAllFiveBindings(t *testing.T) {
 	binding := config.ClickConfig{
 		LeftClick:   config.MustClickAction("left"),
 		MiddleClick: config.MustClickAction("middle"),
@@ -95,11 +95,11 @@ func TestWrapActionsRoutesAllFiveBindings(t *testing.T) {
 	}
 	button, rec := newWrappedModule(t, binding)
 
-	button.inner.OnClick()
-	button.PointerButton(widget.BTNMiddle)
-	button.PointerButton(widget.BTNRight)
-	button.ScrollInput(-120)
-	button.ScrollInput(120)
+	button.toggle.OnClick()
+	button.toggle.PointerButton(widget.BTNMiddle)
+	button.toggle.PointerButton(widget.BTNRight)
+	button.toggle.ScrollInput(-120)
+	button.toggle.ScrollInput(120)
 	if len(rec.actions) != 5 {
 		t.Fatalf("dispatched %+v, want five", rec.actions)
 	}
@@ -109,34 +109,109 @@ func TestWrapActionsRoutesAllFiveBindings(t *testing.T) {
 		}
 	}
 	// A declined scroll step (dy == 0) dispatches nothing.
-	button.ScrollInput(0)
+	button.toggle.ScrollInput(0)
 	if len(rec.actions) != 5 {
 		t.Errorf("dy=0 dispatched %+v", rec.actions)
 	}
 }
 
-func TestWrapActionsAlwaysWraps(t *testing.T) {
-	label := widget.NewLabel(testFont(t), 12, "x", 0xFF000000)
-	// Unbound modules still wrap: the button chrome applies either way.
-	wrapped := wrapActions(label, config.ClickConfig{}, nil, func(config.ClickAction) {})
-	btn, ok := wrapped.(*actionButton)
-	if !ok {
-		t.Fatalf("unbound module wrapped as %T, want the actionButton", wrapped)
-	}
-	// The unbound hooks pass through unconsumed.
-	if btn.ScrollInput(1) {
+func TestUnboundBarButtonPassesInputThrough(t *testing.T) {
+	button, rec := newWrappedModule(t, config.ClickConfig{})
+	if button.toggle.ScrollInput(1) {
 		t.Error("an unbound button consumed scroll")
 	}
-	btn.PointerButton(widget.BTNRight)
-	// And a styled wrap carries the chrome.
-	bg := render.Color(0x112233FF)
-	style := &barStyle{buttonBg: bg, buttonRadius: 6, buttonLabelPad: 3}
-	styled := wrapActions(label, config.ClickConfig{}, style, func(config.ClickAction) {}).(*actionButton)
-	if styled.inner.Bg != bg {
-		t.Errorf("styled button bg = %#08x", uint32(styled.inner.Bg))
+	button.toggle.PointerButton(widget.BTNRight)
+	button.toggle.OnClick()
+	if len(rec.actions) != 0 || button.bound() {
+		t.Errorf("unbound button dispatched %+v", rec.actions)
 	}
-	if got := styled.inner.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 50}}); got.W <= label.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 50}}).W {
-		t.Errorf("padding not applied: %v", got)
+}
+
+func TestBarButtonTreeAndClasses(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := newTestContext(t, cfg)
+	label := widget.NewLabel(testFont(t), 12, "42%", 0xFF112233)
+	icon := widget.NewThemeIcon("x-symbolic", 16)
+	b := newBarButton(ctx, icon, label)
+	b.configure(cfg.Battery.Button, config.ClickConfig{}, nil)
+	if b.Element() != "menubutton" || b.toggle.Element() != "button" || !b.toggle.HasClass("toggle") {
+		t.Fatal("the menubutton > button.toggle spine")
+	}
+	if !b.content.HasClass("bar-button-content") || !b.iconBox.HasClass("icon-container") ||
+		!b.labelBox.HasClass("label-container") || !label.HasClass("bar-button-label") || icon.Element() != "image" {
+		t.Fatal("content, containers, image, and label classes")
+	}
+	if label.Color() != 0 {
+		t.Error("the label kept its programmatic ink over --bar-btn-label-color")
+	}
+	for _, c := range []string{"bar-button", cfg.Bar.ButtonVariant.CSSClass()} {
+		if !b.HasClass(c) {
+			t.Errorf("missing %q in %v", c, b.Classes())
+		}
+	}
+	for _, c := range []string{"icon-only", "label-only", "vertical", "icon-end", "border-all"} {
+		if b.HasClass(c) {
+			t.Errorf("default button carries %q", c)
+		}
+	}
+	if !strings.Contains(b.InlineStyle(), "--bar-btn-label-color: var(--yellow)") {
+		t.Errorf("inline vars = %q, want the battery's label color", b.InlineStyle())
+	}
+
+	// The modifiers follow the config: variant, hidden label/icon, the
+	// border class, the icon position, and a vertical bar.
+	cfg.Bar.ButtonVariant = config.ButtonVariantBlockPrefix
+	cfg.Bar.ButtonIconPosition = config.IconEnd
+	cfg.Bar.Location = config.LocationLeft
+	bc := cfg.Battery.Button
+	bc.LabelShow, bc.IconShow, bc.BorderShow = false, false, true
+	v := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), widget.NewLabel(testFont(t), 12, "x", 0))
+	v.configure(bc, config.ClickConfig{}, nil)
+	for _, c := range []string{"block-prefix", "icon-only", "label-only", "vertical", "icon-end", "border-all"} {
+		if !v.HasClass(c) {
+			t.Errorf("modified button misses %q in %v", c, v.Classes())
+		}
+	}
+	if v.content.Children()[0] != v.labelBox {
+		t.Error("icon-end did not put the label container first")
+	}
+	if !strings.Contains(v.InlineStyle(), "--bar-btn-icon-color: var(--fg-on-accent)") {
+		t.Errorf("block-prefix auto icon color = %q, want fg-on-accent", v.InlineStyle())
+	}
+}
+
+func TestBarButtonThresholdsOverrideTheColors(t *testing.T) {
+	cfg := config.Defaults()
+	b := newBarButton(newTestContext(t, cfg), nil, widget.NewLabel(testFont(t), 12, "x", 0))
+	b.configure(cfg.Battery.Button, config.ClickConfig{}, nil)
+	before := b.InlineStyle()
+	red := mustToken(config.TokenRed)
+	b.SetThresholds(config.ThresholdColors{LabelColor: &red})
+	if !strings.Contains(b.InlineStyle(), "--bar-btn-label-color: var(--red)") {
+		t.Errorf("threshold label color = %q", b.InlineStyle())
+	}
+	b.SetThresholds(config.ThresholdColors{})
+	if b.InlineStyle() != before {
+		t.Error("clearing the thresholds did not restore the config colors")
+	}
+}
+
+func TestBarButtonHidesAnEmptyLabelContainer(t *testing.T) {
+	cfg := config.Defaults()
+	label := widget.NewLabel(testFont(t), 12, "", 0)
+	b := newBarButton(newTestContext(t, cfg), nil, label)
+	b.configure(cfg.Battery.Button, config.ClickConfig{}, nil)
+	b.Measure(widgetConstraintsMax(200, 50))
+	if b.labelBox.Visible() {
+		t.Error("an empty label kept its container (and its gap margin)")
+	}
+	label.SetText("50%")
+	b.Measure(widgetConstraintsMax(200, 50))
+	if !b.labelBox.Visible() {
+		t.Error("a label with text stayed hidden")
+	}
+	if b.iconBox.Visible() {
+		t.Error("a button without an icon shows the icon container")
 	}
 }
 
@@ -167,8 +242,8 @@ func TestLoadFileAppliesAndRejectsClickBindings(t *testing.T) {
 
 // The real input path: gelm's Router hit-tests the tree and drives the
 // hit leaf, so a routed left press must reach the binding and a hover
-// must shade the button.
-func TestWrapActionsRoutesThroughTheRouter(t *testing.T) {
+// must shade the toggle.
+func TestBarButtonRoutesThroughTheRouter(t *testing.T) {
 	binding := config.ClickConfig{LeftClick: config.MustClickAction("left")}
 	button, rec := newWrappedModule(t, binding)
 	button.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 50}})
@@ -176,12 +251,12 @@ func TestWrapActionsRoutesThroughTheRouter(t *testing.T) {
 	router := &widget.Router{Root: button}
 	p := widget.Point{X: 10, Y: 10}
 	router.Move(p)
-	if !button.inner.Hovered {
-		t.Fatal("routed hover did not shade the button")
+	if !button.toggle.Hovered {
+		t.Fatal("routed hover did not reach the toggle")
 	}
 	router.Press(widget.BTNLeft, p)
-	if !button.inner.Pressed {
-		t.Fatal("routed press did not shade the button")
+	if !button.toggle.Pressed {
+		t.Fatal("routed press did not reach the toggle")
 	}
 	router.Release(widget.BTNLeft, p)
 	if len(rec.actions) != 1 || rec.actions[0].Command != "left" {

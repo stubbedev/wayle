@@ -139,11 +139,11 @@ func TestVolumeMutedSwapsTheIconInTheTree(t *testing.T) {
 	cfg := config.Defaults()
 	source := &fakePulseSource{dev: pulse.Device{Volume: pct(42), Muted: true}}
 	m := newVolumeForTest(t, cfg, source)
-	row, ok := m.root.(*widget.Box)
-	if !ok || len(row.Children()) != 2 {
-		t.Fatalf("root = %T, want the icon+label row", m.root)
+	btn, ok := m.root.(*barButton)
+	if !ok || btn.iconBox == nil || len(btn.iconBox.Children()) != 1 {
+		t.Fatalf("root = %T, want the icon+label bar button", m.root)
 	}
-	icon, ok := row.Children()[0].(*widget.Icon)
+	icon, ok := btn.iconBox.Children()[0].(*widget.Icon)
 	if !ok || icon != m.icon {
 		t.Fatal("the icon the module updates is not the one in the tree")
 	}

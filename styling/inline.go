@@ -52,8 +52,8 @@ func ButtonCSS(b config.ButtonConfig, bar config.Bar, provider config.ThemeProvi
 	return "* { " +
 		"--bar-btn-icon-color: " + config.ResolveOr(t.IconColor, ResolveIconColor(b, bar.ButtonVariant, provider)) + "; " +
 		"--bar-btn-label-color: " + config.ResolveOr(t.LabelColor, ResolveColorCSS(b.Colors.Label, b.Defaults.Label, provider)) + "; " +
-		"--bar-btn-icon-bg: " + config.ResolveOr(t.IconBackground, ResolveColorCSS(b.Colors.IconBg, b.Defaults.IconBg, provider)) + "; " +
-		"--bar-btn-bg: " + config.ResolveOr(t.ButtonBackground, ResolveColorCSS(b.Colors.ButtonBg, b.Defaults.ButtonBg, provider)) + "; " +
+		"--bar-btn-icon-bg: " + config.ResolveOr(t.IconBgColor, ResolveColorCSS(b.Colors.IconBg, b.Defaults.IconBg, provider)) + "; " +
+		"--bar-btn-bg: " + config.ResolveOr(t.ButtonBgColor, ResolveColorCSS(b.Colors.ButtonBg, b.Defaults.ButtonBg, provider)) + "; " +
 		"--bar-btn-border-color: " + config.ResolveOr(t.BorderColor, ResolveColorCSS(b.Colors.Border, b.Defaults.Border, provider)) + "; " +
 		"--bar-btn-border-width: " + strconv.Itoa(bar.ButtonBorderWidth) + "px; " +
 		"}"

@@ -1,9 +1,12 @@
 package bar
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 	"golang.org/x/image/font/gofont/goregular"
@@ -24,140 +27,31 @@ func testStyle(t *testing.T, mutate func(b *config.Bar)) barStyle {
 func TestComputeStyleDefaults(t *testing.T) {
 	s := testStyle(t, nil)
 	palette := styling.Default()
-
-	if s.bg != palette.Surface {
-		t.Errorf("bg = %#08x, want the bg-surface token at full opacity", s.bg)
-	}
 	if s.fg != palette.Fg {
 		t.Errorf("fg = %#08x, want fg-default", s.fg)
-	}
-	if s.borders.any() {
-		t.Errorf("borders = %+v, want none at the default location", s.borders)
 	}
 	if s.moduleGap != 8 { // 0.5 * 16 * 1.0
 		t.Errorf("module-gap = %d, want 8", s.moduleGap)
 	}
-	if s.padding != 6 { // 0.35 * 16, rounded
-		t.Errorf("padding = %d, want 6", s.padding)
-	}
-	if s.radius != 0 {
-		t.Errorf("radius = %d, want 0 (rounding none)", s.radius)
-	}
 	if s.labelPx != 1.04*styling.RemBase {
 		t.Errorf("label px = %v, want the 1.04rem base at multiplier 1.0", s.labelPx)
 	}
-}
-
-func TestComputeStyleOpacityMixesToTransparent(t *testing.T) {
-	if s := testStyle(t, func(b *config.Bar) { b.BackgroundOpacity = 0 }); s.bg>>24 != 0 {
-		t.Errorf("opacity 0: bg = %#08x, want fully transparent", s.bg)
-	}
-	s := testStyle(t, func(b *config.Bar) { b.BackgroundOpacity = 50 })
-	if s.bg>>24 != paletteSurfaceAlphaAt50() {
-		t.Errorf("opacity 50: bg = %#08x, want the color-mix halved alpha", s.bg)
+	if px := testStyle(t, func(b *config.Bar) { b.ButtonLabelSize = config.Size{Value: 20, Unit: config.SizePixels} }).labelPx; px != 20 {
+		t.Errorf("pixel label size = %v, want literal 20", px)
 	}
 }
 
-func paletteSurfaceAlphaAt50() render.Color {
-	p := styling.Default()
-	return styling.ColorMix(p.Surface, transparentColor, 50) >> 24
-}
-
-func TestComputeStyleBordersFromLocation(t *testing.T) {
-	s := testStyle(t, func(b *config.Bar) { b.BorderLocation = config.BorderTop })
-	if !s.borders.any() || s.borders.top != 1 || s.borders.left != 0 {
-		t.Errorf("top border: widths = %+v, want top-only at width 1", s.borders)
-	}
-	s = testStyle(t, func(b *config.Bar) {
-		b.BorderLocation = config.BorderAll
-		b.BorderWidth = 3
-	})
-	if s.borders != (borderWidths{left: 3, top: 3, right: 3, bottom: 3}) {
-		t.Errorf("all border: widths = %+v, want every edge at 3", s.borders)
-	}
-}
-
-func TestComputeStyleScalesSizes(t *testing.T) {
-	s := testStyle(t, func(b *config.Bar) {
-		b.Scale = 2
-		b.ModuleGap = config.Size{Value: 0.5, Unit: config.SizeMultiplier}
-		b.PaddingEnds = config.Size{Value: 8, Unit: config.SizePixels}
-	})
-	if s.moduleGap != 16 { // multipliers scale: 0.5 * 16 * 2
-		t.Errorf("module-gap = %d, want 16", s.moduleGap)
-	}
-	if s.paddingEnds != 8 { // pixels ignore the scale
-		t.Errorf("padding-ends = %d, want 8", s.paddingEnds)
-	}
-}
-
-func TestComputeStyleLabelSize(t *testing.T) {
-	if s := testStyle(t, nil); s.labelPx != 1.04*styling.RemBase {
-		t.Errorf("default label px = %v", s.labelPx)
-	}
-	s := testStyle(t, func(b *config.Bar) {
-		b.ButtonLabelSize = config.Size{Value: 14, Unit: config.SizePixels}
-	})
-	if s.labelPx != 14 {
-		t.Errorf("pixel label size = %v, want 14 (literal)", s.labelPx)
-	}
-}
-
-func TestComputeStyleGroupPaddingKeepsHistoricalFactor(t *testing.T) {
-	// Multipliers carry styling.rs's 0.25 fine-tuning factor.
-	s := testStyle(t, func(b *config.Bar) {
-		b.ButtonGroupPadding = config.Size{Value: 1.0, Unit: config.SizeMultiplier}
-	})
-	if s.groupPadding != 4 { // 1.0 * 0.25 * 16
-		t.Errorf("group padding = %d, want 4", s.groupPadding)
-	}
-	s = testStyle(t, func(b *config.Bar) {
-		b.ButtonGroupPadding = config.Size{Value: 9, Unit: config.SizePixels}
-	})
-	if s.groupPadding != 9 {
-		t.Errorf("group padding = %d, want 9 (pixels literal)", s.groupPadding)
-	}
-}
-
-func TestStyleMarginsFollowLocation(t *testing.T) {
-	cfg := config.Defaults()
-	cfg.Bar.InsetEdge = config.Size{Value: 4, Unit: config.SizePixels}
-	cfg.Bar.InsetEnds = config.Size{Value: 8, Unit: config.SizePixels}
-	s := computeStyle(cfg, styling.Default())
-
-	if got := s.margins(config.LocationTop); got != [4]int32{4, 8, 0, 8} {
-		t.Errorf("top margins = %v, want edge 4 on top, ends 8 on the sides", got)
-	}
-	if got := s.margins(config.LocationBottom); got != [4]int32{0, 8, 4, 8} {
-		t.Errorf("bottom margins = %v", got)
-	}
-	if got := s.margins(config.LocationLeft); got != [4]int32{8, 4, 8, 0} {
-		t.Errorf("left margins = %v", got)
-	}
-	if got := s.margins(config.LocationRight); got != [4]int32{8, 0, 8, 4} {
-		t.Errorf("right margins = %v", got)
-	}
-}
-
-func TestBarStylesheetTargetsRootAndGroups(t *testing.T) {
-	cfg := config.Defaults()
-	style := computeStyle(cfg, styling.Default())
-	sheet := barStylesheet(style)
-	if !strings.Contains(sheet, ".bar {") || !strings.Contains(sheet, styling.HexRGBA(style.bg)) {
-		t.Errorf("stylesheet misses the .bar background rule:\n%s", sheet)
-	}
-	if !strings.Contains(sheet, ".bar-group {") || !strings.Contains(sheet, styling.HexRGBA(style.groupBg)) {
-		t.Errorf("stylesheet misses the .bar-group rule:\n%s", sheet)
-	}
-	if strings.Contains(sheet, "var(") {
-		t.Error("stylesheet leaks CSS variables; gelm resolves concrete colors")
-	}
-}
-
-// widgetConstraintsMax is the unconstrained-max helper shared by the
-// painter tests.
 func widgetConstraintsMax(w, h int) widget.Constraints {
 	return widget.Constraints{Max: widget.Size{W: w, H: h}}
+}
+
+// isolateConfigDir points the config dir at a temp dir, so the theme
+// never reads the developer's own styles.
+func isolateConfigDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	return filepath.Join(dir, "wayle")
 }
 
 func newTestContext(t *testing.T, cfg *config.Config) ModuleContext {
@@ -170,104 +64,229 @@ func newTestContext(t *testing.T, cfg *config.Config) ModuleContext {
 	return ModuleContext{Config: cfg, Font: face, Style: &style}
 }
 
-func TestBuildRootCarriesClassesAndBorder(t *testing.T) {
-	cfg := config.Defaults()
-	cfg.Bar.BorderLocation = config.BorderTop
-	cfg.Bar.Layout = []config.BarLayout{{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}}
+// styledContext is newTestContext with the bar stylesheet attached, as
+// RunWith wires it.
+func styledContext(t *testing.T, cfg *config.Config) ModuleContext {
+	t.Helper()
+	isolateConfigDir(t)
 	ctx := newTestContext(t, cfg)
-	root, err := buildRoot(ctx, cfg.Bar.Layout[0], "DP-1")
+	ctx.Theme = newBarTheme(cfg)
+	return ctx
+}
+
+// paintBar builds, lays out, and paints one bar root at width w,
+// returning the pixels and the measured height.
+func paintBar(t *testing.T, ctx ModuleContext, layout config.BarLayout, w int) ([]byte, int, widget.Widget) {
+	t.Helper()
+	root, err := buildRoot(ctx, layout, "DP-1")
 	if err != nil {
 		t.Fatalf("buildRoot: %v", err)
 	}
-	if !widget.HasClass(root, "bar") || !widget.HasClass(root, "top") || !widget.HasClass(root, "DP-1") {
-		t.Error("root misses the bar/location/connector classes")
-	}
+	h := measureHeight(root, w)
+	root.Measure(widgetConstraintsMax(w, h))
+	root.Arrange(render.Rect{W: w, H: h})
+	widget.CollectDamage(root)
+	root.Measure(widgetConstraintsMax(w, h))
+	root.Arrange(render.Rect{W: w, H: h})
+	data := make([]byte, render.Stride(w)*max(h, 1))
+	root.Paint(render.New(data, render.Stride(w), w, max(h, 1)))
+	return data, h, root
 }
 
-func TestBuildRootWithoutBorderIsTheContentItself(t *testing.T) {
+func pixelAt(data []byte, w, x, y int) render.Color {
+	o := y*render.Stride(w) + x*4
+	return render.ColorFromBytes(data[o : o+4])
+}
+
+func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	cfg := config.Defaults()
-	cfg.Bar.Layout = []config.BarLayout{{Monitor: "*"}}
+	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock", Class: "mine"}}}
 	ctx := newTestContext(t, cfg)
-	root, err := buildRoot(ctx, cfg.Bar.Layout[0], "DP-1")
+	root, err := buildRoot(ctx, layout, "DP-1")
 	if err != nil {
 		t.Fatalf("buildRoot: %v", err)
 	}
-	if _, isOverlay := root.(*widget.Overlay); isOverlay {
-		t.Error("borderless bar: root is an overlay, want the content box directly")
+	for _, c := range []string{"bar", "top", "DP-1"} {
+		if !widget.HasClass(root, c) {
+			t.Errorf("root misses %q", c)
+		}
+	}
+	if widget.HasClass(root, "floating") {
+		t.Error("an inset-free bar is floating")
+	}
+	box := root.(*widget.Box)
+	if box.Element() != "window" {
+		t.Errorf("root element = %q, want window", box.Element())
+	}
+	if !strings.Contains(box.InlineStyle(), "--bar-padding-px: 6") {
+		t.Errorf("root inline vars = %q, want the build_css block", box.InlineStyle())
+	}
+	center := box.Children()[0].(*widget.Box)
+	var sections []*widget.Box
+	for _, k := range center.Children() {
+		if widget.HasClass(k, "bar-section") {
+			sections = append(sections, k.(*widget.Box))
+		}
+	}
+	if len(sections) != 3 || !widget.HasClass(sections[0], "bar-left") ||
+		!widget.HasClass(sections[1], "bar-center") || !widget.HasClass(sections[2], "bar-right") {
+		t.Fatalf("sections = %d, want left/center/right always present", len(sections))
+	}
+	items := sections[1].Children()
+	if len(items) != 1 || !widget.HasClass(items[0], "bar-item") {
+		t.Fatalf("center items = %v, want one bar-item", items)
+	}
+	btn, ok := items[0].(*widget.Box).Children()[0].(*barButton)
+	if !ok {
+		t.Fatalf("bar-item child = %T, want the bar button", items[0].(*widget.Box).Children()[0])
+	}
+	for _, c := range []string{"bar-button", cfg.Bar.ButtonVariant.CSSClass(), "module", "mine"} {
+		if !btn.HasClass(c) {
+			t.Errorf("bar button misses %q (classes %v)", c, btn.Classes())
+		}
+	}
+
+	cfg.Bar.InsetEdge = config.Size{Value: 4, Unit: config.SizePixels}
+	root, _ = buildRoot(newTestContext(t, cfg), layout, "DP-1")
+	if !widget.HasClass(root, "floating") {
+		t.Error("an inset bar is not floating")
 	}
 }
 
-func TestInsetMeasuresAndArranges(t *testing.T) {
-	child := widget.NewBox(widget.Row, 0, 0)
-	in := newInset(child, 2, 3, 4, 5)
-	sz := in.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}})
-	if sz.W != 6 || sz.H != 8 {
-		t.Fatalf("empty child 6x8 measured = %+v, want 6x8", sz)
+func TestGroupsAreBarItemsWithModules(t *testing.T) {
+	cfg := config.Defaults()
+	layout := config.BarLayout{Monitor: "*", Left: []config.BarItem{{Group: &config.BarGroup{
+		Name: "g1", Modules: []config.BarItem{{Module: "clock"}, {Module: "clock"}},
+	}}}}
+	root, err := buildRoot(newTestContext(t, cfg), layout, "DP-1")
+	if err != nil {
+		t.Fatal(err)
 	}
-	in.Arrange(render.Rect{X: 10, Y: 20, W: 106, H: 108})
-	bounds := child.Bounds()
-	if bounds.X != 12 || bounds.Y != 23 || bounds.W != 100 || bounds.H != 100 {
-		t.Errorf("child bounds = %+v, want inset by 2,3", bounds)
+	left := root.(*widget.Box).Children()[0].(*widget.Box).Children()[0].(*widget.Box)
+	group := left.Children()[0].(*widget.Box)
+	if !group.HasClass("bar-item") || !group.HasClass("bar-group") || group.ID() != "g1" {
+		t.Errorf("group box classes %v id %q", group.Classes(), group.ID())
 	}
-}
-
-func TestInsetClampsToConstraints(t *testing.T) {
-	in := newInset(widget.NewBox(widget.Row, 0, 0), 2, 2, 2, 2)
-	if sz := in.Measure(widget.Constraints{Max: widget.Size{W: 5, H: 5}}); sz.W != 4 || sz.H != 4 {
-		t.Errorf("measure = %+v, want the 4x4 child-plus-insets", sz)
+	if n := len(group.Children()); n != 2 {
+		t.Fatalf("group children = %d, want 2", n)
 	}
-	if sz := in.Measure(widget.Constraints{Max: widget.Size{W: 2, H: 2}}); sz.W != 2 || sz.H != 2 {
-		t.Errorf("clamped measure = %+v, want 2x2 (insets never exceed the box)", sz)
-	}
-}
-
-func TestBorderPainterPaintsOnlyTheEdges(t *testing.T) {
-	const (
-		w, h = 10, 6
-	)
-	data := make([]byte, render.Stride(w)*h)
-	cv := render.New(data, render.Stride(w), w, h)
-	cv.Clear(cv.Rect(), render.RGB(0, 0, 0))
-
-	painter := newBorder(borderWidths{left: 2, top: 1}, render.RGB(0xff, 0, 0))
-	painter.Arrange(render.Rect{X: 0, Y: 0, W: w, H: h})
-	painter.Paint(cv)
-
-	pixel := func(x, y int) render.Color {
-		start := y*render.Stride(w) + x*4
-		return render.ColorFromBytes(data[start : start+4])
-	}
-	red := render.RGB(0xff, 0, 0)
-	black := render.RGB(0, 0, 0)
-	for _, tc := range []struct {
-		x, y int
-		want render.Color
-		note string
-	}{
-		{0, 0, red, "left edge"},
-		{1, 3, red, "left edge mid-height"},
-		{5, 0, red, "top edge"},
-		{9, 3, black, "right side unpainted"},
-		{5, 5, black, "bottom side unpainted"},
-		{5, 3, black, "interior unpainted"},
-	} {
-		if got := pixel(tc.x, tc.y); got != tc.want {
-			t.Errorf("pixel(%d,%d) [%s] = %#08x, want %#08x", tc.x, tc.y, tc.note, got, tc.want)
+	for _, k := range group.Children() {
+		if !widget.HasClass(k, "module") {
+			t.Error("a grouped module lacks the module class")
 		}
 	}
 }
 
-func TestButtonRadiusFollowsButtonRounding(t *testing.T) {
-	s := testStyle(t, func(b *config.Bar) { b.ButtonRounding = config.RoundingLg })
-	if want := styling.RoundingRadiusPx(config.RoundingLg, 1); s.buttonRadius != want {
-		t.Errorf("button radius = %d, want button-rounding lg's %d", s.buttonRadius, want)
+func TestBarPaintsFromTheRustStylesheet(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Bar.BorderLocation = config.BorderBottom
+	cfg.Bar.BorderWidth = 2
+	cfg.Bar.BorderColor = mustToken(config.TokenRed)
+	ctx := styledContext(t, cfg)
+	palette := ctx.Theme.renderPalette()
+	data, h, _ := paintBar(t, ctx, config.BarLayout{Monitor: "*"}, 200)
+	if h <= 2 {
+		t.Fatalf("bar height = %d", h)
 	}
-	// The group rounding shapes the group, not its buttons.
-	s = testStyle(t, func(b *config.Bar) { b.ButtonGroupRounding = config.RoundingFull })
-	if want := styling.RoundingRadiusPx(config.RoundingSm, 1); s.buttonRadius != want {
-		t.Errorf("button radius = %d, want the default sm %d with only the group rounding changed", s.buttonRadius, want)
+	// .bar: background-color from --bar-bg (bg-surface), the bottom
+	// border from --bar-border-bottom and --bar-border-color.
+	if got := pixelAt(data, 200, 100, 1); got != palette.Surface {
+		t.Errorf("bar background = %#08x, want bg-surface %#08x", uint32(got), uint32(palette.Surface))
 	}
-	if s.groupRadius != styling.RoundingRadiusPx(config.RoundingFull, 1) {
-		t.Errorf("group radius = %d, want full", s.groupRadius)
+	if got := pixelAt(data, 200, 100, h-1); got != palette.Red {
+		t.Errorf("bottom border = %#08x, want red %#08x", uint32(got), uint32(palette.Red))
+	}
+	if got := pixelAt(data, 200, 100, 0); got == palette.Red {
+		t.Error("the top edge carries the bottom-only border")
+	}
+
+	// background-opacity 0: color-mix to transparent.
+	cfg.Bar.BackgroundOpacity = 0
+	cfg.Bar.BorderLocation = config.BorderNone
+	data, _, _ = paintBar(t, styledContext(t, cfg), config.BarLayout{Monitor: "*"}, 200)
+	if got := pixelAt(data, 200, 100, 1); got.A() != 0 {
+		t.Errorf("opacity 0 bar = %#08x, want transparent", uint32(got))
+	}
+}
+
+func TestBarInsetsAreWindowMargins(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Bar.InsetEdge = config.Size{Value: 10, Unit: config.SizePixels}
+	ctx := styledContext(t, cfg)
+	palette := ctx.Theme.renderPalette()
+	_, flatH, _ := paintBar(t, styledContext(t, config.Defaults()), config.BarLayout{Monitor: "*"}, 200)
+	data, h, _ := paintBar(t, ctx, config.BarLayout{Monitor: "*"}, 200)
+	if h != flatH+10 {
+		t.Errorf("inset bar height = %d, want the flat %d plus the 10px edge margin", h, flatH)
+	}
+	if got := pixelAt(data, 200, 100, 5); got.A() != 0 {
+		t.Errorf("inside the edge margin = %#08x, want transparent", uint32(got))
+	}
+	if got := pixelAt(data, 200, 100, 11); got != palette.Surface {
+		t.Errorf("below the margin = %#08x, want the bar", uint32(got))
+	}
+	lc, err := layerConfigFor(ctx, config.BarLayout{Monitor: "*"}, "DP-1", 200)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lc.Margin != (app.Margins{}) || lc.Height != uint32(h) {
+		t.Errorf("layer margins %+v height %d, want none and the full %d", lc.Margin, lc.Height, h)
+	}
+}
+
+func TestBundleCarriesStaticThemeAndUserCSS(t *testing.T) {
+	dir := isolateConfigDir(t)
+	cfg := config.Defaults()
+	theme := newBarTheme(cfg)
+	bundle := theme.bundle()
+	if !strings.HasPrefix(bundle, styling.StaticCSS) {
+		t.Error("the bundle does not open with the compiled SCSS")
+	}
+	if !strings.Contains(bundle, ":root {\n    --palette-bg: ") {
+		t.Error("the bundle lacks the theme :root block")
+	}
+	// The scaffold was created, and a user rule lands last.
+	if _, err := os.Stat(filepath.Join(dir, "styles", "index.scss")); err != nil {
+		t.Fatalf("scaffold: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "styles", "index.scss"), []byte(".bar { .x { color: red; } }"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if b := theme.bundle(); !strings.HasSuffix(strings.TrimSpace(b), "}") || !strings.Contains(b, ".bar .x") {
+		t.Errorf("user SCSS did not compile into the bundle tail: %q", b[max(0, len(b)-80):])
+	}
+	// A broken user stylesheet drops only the user part.
+	if err := os.WriteFile(filepath.Join(dir, "styles", "index.scss"), []byte(".bar { color: red"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if b := theme.bundle(); !strings.HasPrefix(b, styling.StaticCSS) || strings.Contains(b, ".bar .x") {
+		t.Error("a broken user stylesheet broke the bundle")
+	}
+}
+
+func TestUserStylesStampFollowsEdits(t *testing.T) {
+	dir := isolateConfigDir(t)
+	if userStylesStamp() != "" {
+		t.Error("stamp without a styles dir")
+	}
+	styles := filepath.Join(dir, "styles")
+	if err := os.MkdirAll(styles, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(styles, "index.scss"), []byte("a {}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	first := userStylesStamp()
+	if err := os.WriteFile(filepath.Join(styles, "notes.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if userStylesStamp() != first {
+		t.Error("a non-stylesheet file moved the stamp")
+	}
+	if err := os.WriteFile(filepath.Join(styles, "_part.scss"), []byte("b { }"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if userStylesStamp() == first {
+		t.Error("a new partial did not move the stamp")
 	}
 }

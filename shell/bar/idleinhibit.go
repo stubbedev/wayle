@@ -75,14 +75,7 @@ func newIdleInhibit(ctx ModuleContext) (Module, error) {
 	}
 	m := &idleInhibitModule{ctx: ctx, state: state, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.icon = moduleIcon(ctx, ctx.Config.IdleInhibit.Icons[config.IdleInhibitInactive])
-	if m.icon != nil {
-		row := widget.NewBox(widget.Row, ctx.Style.moduleGap, 0)
-		row.Append(m.icon, false)
-		row.Append(m.label, false)
-		m.root = row
-	} else {
-		m.root = m.label
-	}
+	m.root = assembleModule(ctx, m.icon, m.label)
 	m.render()
 	// Follow the shared state: every flip re-syncs the inhibitor and
 	// re-renders.

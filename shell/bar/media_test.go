@@ -192,7 +192,7 @@ func TestMediaModuleRenders(t *testing.T) {
 	if len([]rune(got)) != 35 || !strings.HasSuffix(got, "…") {
 		t.Errorf("label = %q (%d runes), want the default format truncated to 35", got, len([]rune(got)))
 	}
-	root := m.root.(*widget.Box)
+	root := m.root.(*barButton)
 	if !root.HasClass("media-disc") || !root.HasClass("media-spinning") {
 		t.Error("a playing player in disc mode misses media-disc/media-spinning")
 	}

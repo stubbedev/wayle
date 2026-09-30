@@ -398,7 +398,7 @@ func TestCwsClicksRouteThroughTheRouter(t *testing.T) {
 	router := &widget.Router{Root: m.root}
 
 	router.Move(p)
-	if !second.hovered {
+	if !second.Hovered {
 		t.Error("routed hover missed the button")
 	}
 	router.Press(widget.BTNLeft, p)

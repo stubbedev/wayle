@@ -127,7 +127,7 @@ func TestButtonCSS(t *testing.T) {
 
 	// Threshold overrides win per slot; unset slots keep the config.
 	errColor, bg := color(t, "status-error"), color(t, "#ff0000")
-	over := config.ThresholdColors{LabelColor: &errColor, ButtonBackground: &bg}
+	over := config.ThresholdColors{LabelColor: &errColor, ButtonBgColor: &bg}
 	want = "* { --bar-btn-icon-color: var(--fg-on-accent); --bar-btn-label-color: var(--status-error); " +
 		"--bar-btn-icon-bg: var(--yellow); --bar-btn-bg: #ff0000; " +
 		"--bar-btn-border-color: var(--yellow); --bar-btn-border-width: 1px; }"

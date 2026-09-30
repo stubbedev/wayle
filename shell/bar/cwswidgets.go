@@ -93,9 +93,8 @@ func (c *cwsContainer) Paint(cv *render.Canvas) {
 	}
 	c.box.Paint(cv)
 	if c.borders.any() {
-		b := borderPainter{widths: c.borders, color: c.border}
-		b.Base.Arrange(r)
-		b.Paint(cv)
+		// The border-show edges, rounded with the container.
+		cv.RoundedBorder(r, render.UniformCorners(c.radius), c.borders.insets(), c.border)
 	}
 }
 
@@ -208,33 +207,37 @@ func (m *cwsView) cwsResolveColors(model cwsButtonModel) cwsColors {
 	return out
 }
 
-// cwsButton is one `.workspace` button: its own painter (a gelm Button
-// cannot paint a transparent resting state), the content box, and the
-// five input bindings routed from the hit leaf.
+// cwsButton is one `.workspace` button: a gelm Button with literal
+// state backgrounds (BgExplicit: transparent at rest, the hover fill on
+// hover), the content box centered in it, the active underline and
+// inactive opacity painted around it, and the five input bindings
+// routed from the hit leaf.
 type cwsButton struct {
-	widget.Base
+	*widget.Button
 	m       *cwsView
 	model   cwsButtonModel
 	colors  cwsColors
-	content *inset
+	content *widget.Box
 	minPx   int
-	radius  int
-	hovered bool
 }
 
 func newCwsButton(m *cwsView, model cwsButtonModel) *cwsButton {
-	b := &cwsButton{m: m, model: model, radius: m.buttonRadius()}
-	b.AddClass(model.classes...)
+	b := &cwsButton{m: m, model: model}
 	b.colors = m.cwsResolveColors(model)
 	b.minPx = int(math.Round(cwsSpaceLgRem * styling.RemBase * m.scale()))
 	b.content = b.buildContent()
+	b.Button = widget.NewButton(b.content, 0, m.buttonRadius())
+	b.BgExplicit = true
+	b.Bg, b.BgHover, b.BgPressed = b.colors.bg, b.colors.hoverBg, b.colors.hoverBg
+	b.OnClick = func() { m.dispatchClick(m.cfg.Click.LeftClick, model.ws) }
+	b.AddClass(model.classes...)
 	return b
 }
 
 // buildContent is the button view!: the identity row (label, mapped
 // icon, divider) and the app-icon box, inside the workspace-content
 // margins.
-func (b *cwsButton) buildContent() *inset {
+func (b *cwsButton) buildContent() *widget.Box {
 	m, cfg := b.m, b.m.cfg
 	vertical := m.vertical()
 	axis := widget.Row
@@ -295,21 +298,25 @@ func (b *cwsButton) buildContent() *inset {
 		content.Append(icons, false)
 	}
 	pad := m.paddingPx()
+	padded := widget.NewBox(widget.Row, 0, 0)
+	padded.Append(content, true)
 	if vertical {
-		return newInset(content, 0, pad, 0, pad)
+		padded.SetPadding(render.Insets{Top: pad, Bottom: pad})
+	} else {
+		padded.SetPadding(render.Insets{Left: pad, Right: pad})
 	}
-	return newInset(content, pad, 0, pad, 0)
+	return padded
 }
 
-// Measure is the content grown to the --bar-space-lg minimum.
+// Measure is the button grown to the --bar-space-lg minimum.
 func (b *cwsButton) Measure(con widget.Constraints) widget.Size {
-	sz := b.content.Measure(con)
-	return clampSize(widget.Size{W: max(sz.W, b.minPx), H: max(sz.H, b.minPx)}, con)
+	sz := b.Button.Measure(con)
+	return widget.Size{W: min(max(sz.W, b.minPx), con.Max.W), H: min(max(sz.H, b.minPx), con.Max.H)}
 }
 
 // Arrange centers the content in the button rect.
 func (b *cwsButton) Arrange(r render.Rect) {
-	b.Base.Arrange(r)
+	b.Button.Arrange(r)
 	sz := b.content.Measure(widget.Constraints{Max: widget.Size{W: r.W, H: r.H}})
 	b.content.Arrange(render.Rect{
 		X: r.X + (r.W-sz.W)/2,
@@ -317,7 +324,6 @@ func (b *cwsButton) Arrange(r render.Rect) {
 		W: sz.W,
 		H: sz.H,
 	})
-	widget.SetParents(b, b.content)
 }
 
 func (b *cwsButton) ArrangeRoot(r render.Rect) { b.Arrange(r) }
@@ -327,14 +333,8 @@ func (b *cwsButton) Paint(cv *render.Canvas) {
 		prev := cv.PushAlpha(b.colors.opacity)
 		defer cv.PopAlpha(prev)
 	}
+	b.Button.Paint(cv)
 	r := b.Bounds()
-	bg := b.colors.bg
-	if b.hovered {
-		bg = b.colors.hoverBg
-	}
-	if bg != 0 {
-		cv.RoundedRect(r, b.radius, bg)
-	}
 	if b.colors.underline != 0 {
 		// linear-gradient(to top|right, color 2px, transparent 2px)
 		if b.m.vertical() {
@@ -343,27 +343,16 @@ func (b *cwsButton) Paint(cv *render.Canvas) {
 			cv.FillRect(render.Rect{X: r.X, Y: r.Y + r.H - 2, W: r.W, H: 2}, b.colors.underline)
 		}
 	}
-	b.content.Paint(cv)
 }
 
-// HitTest makes the button the hit leaf, so the router's hover, click,
-// and pointer-button calls land here.
-func (b *cwsButton) HitTest(p widget.Point) widget.Widget { return b.HitLeaf(b, p) }
-
-func (b *cwsButton) Children() []widget.Widget { return []widget.Widget{b.content} }
-
-// SetHovered implements widget.HoverSetter.
-func (b *cwsButton) SetHovered(on bool) {
-	if b.hovered == on {
-		return
+// HitTest keeps the workspace button the hit leaf, so the router's
+// hover, click (OnClick: connect_clicked's LeftClick(id)), and
+// pointer-button calls land here.
+func (b *cwsButton) HitTest(p widget.Point) widget.Widget {
+	if b.Button.HitTest(p) != nil {
+		return b
 	}
-	b.hovered = on
-	b.Invalidate()
-}
-
-// ClickAt is the left click: connect_clicked's LeftClick(id).
-func (b *cwsButton) ClickAt(widget.Point) {
-	b.m.dispatchClick(b.m.cfg.Click.LeftClick, b.model.ws)
+	return nil
 }
 
 // PointerButton is the middle/right GestureClick pair.

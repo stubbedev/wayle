@@ -15,6 +15,11 @@ type borderWidths struct {
 	left, top, right, bottom int
 }
 
+// insets converts the widths to gelm's per-side insets.
+func (b borderWidths) insets() render.Insets {
+	return render.Insets{Top: b.top, Right: b.right, Bottom: b.bottom, Left: b.left}
+}
+
 // any reports whether any edge carries width.
 func (b borderWidths) any() bool {
 	return b.left > 0 || b.top > 0 || b.right > 0 || b.bottom > 0
@@ -38,49 +43,30 @@ func (b borderWidths) fromLocation(location config.BorderLocation, width int) bo
 	return borderWidths{}
 }
 
-// barStyle is one bar's fully resolved chrome: every config size and
-// color already converted to pixels and palette colors, so the widget
-// builders never see config types.
+// barStyle is what the Go-painted surfaces (the dropdown panels, the
+// workspace buttons, the popups) read to match the bar: the resolved
+// palette, the text ink and size, and the dropdown button shades. The
+// bar itself is styled by the Rust stylesheet (barTheme); nothing here
+// re-derives its cascade.
 type barStyle struct {
 	palette *styling.Palette
 
-	bg          render.Color
-	fg          render.Color
-	border      render.Color
-	borders     borderWidths
-	radius      int
-	insetEdge   int
-	insetEnds   int
-	padding     int
-	paddingEnds int
-	moduleGap   int
-	labelPx     float64
+	// fg is the default ink. Bar modules get a copy with fg zero (unset,
+	// so the stylesheet's --bar-btn-label-color applies).
+	fg        render.Color
+	moduleGap int
+	labelPx   float64
 
-	groupBg      render.Color
-	groupBorder  render.Color
-	groupBorders borderWidths
-	groupRadius  int
-	groupPadding int
-	groupGap     int
-
-	buttonBg       render.Color
 	buttonBgHover  render.Color
 	buttonBgActive render.Color
-	buttonRadius   int
-	buttonIconPad  int
-	buttonLabelPad int
 }
 
-// computeStyle resolves the bar chrome: sizes through Size::resolve_px
-// (rem base times bar scale, pixels literal) and colors through the
-// token table, with the background mixed to the configured opacity
-// exactly as .bar's color-mix does in the Rust shell.
+// computeStyle resolves the Go-painted surfaces' parameters: sizes
+// through Size::resolve_px (rem base times bar scale, pixels literal)
+// and colors through the token table.
 func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 	bar := cfg.Bar
 	scale := bar.Scale
-	px := func(s config.Size) int {
-		return int(math.Round(s.ResolvePx(styling.RemBase, scale)))
-	}
 	resolve := func(cv config.ColorValue) render.Color {
 		color, ok := styling.ResolveColor(cv, palette)
 		if !ok {
@@ -88,9 +74,6 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 		}
 		return color
 	}
-
-	// color-mix(in srgb, var(--bar-bg) var(--bar-opacity), transparent)
-	bg := styling.ColorMix(resolve(bar.BG), transparentColor, bar.BackgroundOpacity)
 
 	// The module label size: pixels are literal; multipliers scale the
 	// SCSS base ($base-btn-label-size: 1.04rem) by the bar scale and the
@@ -103,19 +86,8 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 		labelPx = buttonLabelBaseRem * styling.RemBase * scale * labelSize.Value
 	}
 
-	// Group padding keeps the historical 0.25 rem fine-tuning factor
-	// for multipliers (styling.rs's match on button-group-padding);
-	// pixels are literal.
-	var groupPadding int
-	if bar.ButtonGroupPadding.Unit == config.SizePixels {
-		groupPadding = int(math.Round(bar.ButtonGroupPadding.Value))
-	} else {
-		groupPadding = int(math.Round(bar.ButtonGroupPadding.Value * 0.25 * styling.RemBase * scale))
-	}
-
-	// Button chrome: the variant bg defaults to the group background at
-	// the configured opacity, hover and active deepen it, and the
-	// paddings follow the same 0.25-rem fine-tuning (styling.rs).
+	// The dropdown buttons' hover and active shades deepen the group
+	// background at the button bg opacity.
 	buttonBase := resolve(bar.ButtonGroupBackground)
 	if bar.ButtonBGColor.Kind == config.ColorCustom {
 		buttonBase = resolve(bar.ButtonBGColor)
@@ -125,67 +97,19 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 	if bar.ButtonHoverBGColor.Kind == config.ColorCustom {
 		hoverBase = resolve(bar.ButtonHoverBGColor)
 	}
-	buttonBgHover := styling.ColorMix(hoverBase, buttonBg, 50)
 	activeBase := hoverBase
 	if bar.ButtonActiveBGColor.Kind == config.ColorCustom {
 		activeBase = resolve(bar.ButtonActiveBGColor)
 	}
-	buttonBgActive := styling.ColorMix(activeBase, buttonBg, 80)
-	remPad := func(s config.Size) int {
-		if s.Unit == config.SizePixels {
-			return int(math.Round(s.Value))
-		}
-		return int(math.Round(s.Value * 0.25 * styling.RemBase * scale))
-	}
 
 	return barStyle{
-		palette:     palette,
-		bg:          bg,
-		fg:          resolve(mustToken(config.TokenFgDefault)),
-		border:      resolve(bar.BorderColor),
-		borders:     borderWidths{}.fromLocation(bar.BorderLocation, bar.BorderWidth),
-		radius:      styling.RoundingRadiusPx(bar.Rounding, scale),
-		insetEdge:   px(bar.InsetEdge),
-		insetEnds:   px(bar.InsetEnds),
-		padding:     px(bar.Padding),
-		paddingEnds: px(bar.PaddingEnds),
-		moduleGap:   px(bar.ModuleGap),
-		labelPx:     labelPx,
-
-		buttonBg:       buttonBg,
-		buttonBgHover:  buttonBgHover,
-		buttonBgActive: buttonBgActive,
-		buttonRadius:   styling.RoundingRadiusPx(bar.ButtonRounding, scale),
-		buttonIconPad:  remPad(bar.ButtonIconPadding),
-		buttonLabelPad: remPad(bar.ButtonLabelPadding),
-
-		groupBg:      styling.ColorMix(resolve(bar.ButtonGroupBackground), transparentColor, bar.ButtonGroupOpacity),
-		groupBorder:  resolve(bar.ButtonGroupBorderColor),
-		groupBorders: borderWidths{}.fromLocation(bar.ButtonGroupBorderLocation, bar.ButtonGroupBorderWidth),
-		groupRadius:  styling.RoundingRadiusPx(bar.ButtonGroupRounding, scale),
-		groupPadding: groupPadding,
-		groupGap:     px(bar.ButtonGroupModuleGap),
+		palette:        palette,
+		fg:             resolve(mustToken(config.TokenFgDefault)),
+		moduleGap:      int(math.Round(bar.ModuleGap.ResolvePx(styling.RemBase, scale))),
+		labelPx:        labelPx,
+		buttonBgHover:  styling.ColorMix(hoverBase, buttonBg, 50),
+		buttonBgActive: styling.ColorMix(activeBase, buttonBg, 80),
 	}
-}
-
-// margins maps the insets onto layer-shell margins for one location:
-// the edge inset backs off the docked edge, the ends inset backs off
-// the stretch edges. The shadow margin is part of the shadow preset and
-// lands with that port.
-func (s barStyle) margins(location config.Location) [4]int32 {
-	edge := int32(s.insetEdge)
-	ends := int32(s.insetEnds)
-	switch location {
-	case config.LocationTop:
-		return [4]int32{edge, ends, 0, ends} // top, right, bottom, left
-	case config.LocationBottom:
-		return [4]int32{0, ends, edge, ends}
-	case config.LocationLeft:
-		return [4]int32{ends, edge, ends, 0}
-	case config.LocationRight:
-		return [4]int32{ends, 0, ends, edge}
-	}
-	return [4]int32{}
 }
 
 // buttonLabelBaseRem is tokens.scss's $base-btn-label-size, the base

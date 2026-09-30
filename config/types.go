@@ -17,6 +17,10 @@ const (
 	LocationRight  Location = "right"
 )
 
+// IsVertical reports whether the bar docks to a side edge and lays its
+// sections out top to bottom (Location::is_vertical).
+func (l Location) IsVertical() bool { return l == LocationLeft || l == LocationRight }
+
 var validLocations = map[Location]bool{
 	LocationTop: true, LocationBottom: true,
 	LocationLeft: true, LocationRight: true,
