@@ -1,0 +1,31 @@
+:root {
+    --palette-bg: #eff1f5;
+    --palette-surface: #e6e9ef;
+    --palette-elevated: #dce0e8;
+    --palette-fg: #4c4f69;
+    --palette-fg-muted: #5c5f77;
+    --palette-primary: #7287fd;
+    --palette-red: #d20f39;
+    --palette-yellow: #df8e1d;
+    --palette-green: #40a02b;
+    --palette-blue: #1e66f5;
+    --dropdown-surface: rgba(230, 233, 239, 0.33);
+
+    --cfg-font-sans: "Inter";
+    --cfg-font-mono: "JetBrains Mono";
+
+    --global-scale: 1.01;
+    --bar-scale: 1;
+    --bar-btn-icon-scale: 1;
+    --bar-btn-icon-padding-scale: 1;
+    --bar-btn-label-scale: 1;
+    --bar-btn-label-padding-scale: 1;
+    --bar-btn-gap-scale: 1;
+
+    --cfg-rounding-element: var(--radius-sm);
+    --cfg-rounding-container: var(--radius-md);
+    --cfg-bar-rounding-element: var(--radius-none);
+    --cfg-bar-rounding-container: var(--radius-none);
+    --cfg-bar-button-rounding-element: var(--bar-button-radius-sm);
+    --cfg-bar-group-rounding-element: var(--bar-button-radius-sm);
+}
