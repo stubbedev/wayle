@@ -2,6 +2,7 @@ package desktopnotify
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -10,6 +11,7 @@ import (
 )
 
 type fakeDaemon struct {
+	mu  sync.Mutex
 	got []string
 }
 
@@ -17,6 +19,8 @@ func (f *fakeDaemon) Notify(appName string, _ uint32, appIcon, summary, body str
 	if timeout != -1 {
 		return 0, dbus.MakeFailedError(nil)
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.got = append(f.got, appName, appIcon, summary, body)
 	return 7, nil
 }
@@ -40,6 +44,8 @@ func TestSendDeliversToTheDaemon(t *testing.T) {
 		t.Errorf("id = %d, want the daemon's 7", id)
 	}
 	want := []string{"Wayle", "ld-mail-symbolic", "Alice", "Lunch?"}
+	daemon.mu.Lock()
+	defer daemon.mu.Unlock()
 	for i, w := range want {
 		if i >= len(daemon.got) || daemon.got[i] != w {
 			t.Fatalf("daemon got %q, want %q", daemon.got, want)
