@@ -149,4 +149,3 @@ func (c *Config) applyScreens(md toml.MetaData, lock, greeter *toml.Primitive) e
 	}
 	return nil
 }
-

@@ -1,6 +1,8 @@
 package shellipc
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/wayle/internal/dbustest"
@@ -49,5 +51,57 @@ func TestVPNSSOCallbackWithNoShellRunningIsAnError(t *testing.T) {
 	bus := dbustest.Start(t)
 	if err := VPNSSOCallback(t.Context(), bus.Conn(t), "globalprotectcallback:x"); err == nil {
 		t.Error("a callback with no shell on the bus succeeded")
+	}
+}
+
+// TestLockMethod pins the Lock round trip over a real bus: a ready
+// lock screen succeeds, a not-ready one (or none) fails with the Rust
+// daemon's Failed error.
+func TestLockMethod(t *testing.T) {
+	bus := dbustest.Start(t)
+	ready := false
+	calls := 0
+	release, err := Serve(bus.Conn(t), NewState(nil), Hooks{Lock: func() bool { calls++; return ready }})
+	if err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+	defer release()
+	client := bus.Conn(t)
+	err = Lock(t.Context(), client)
+	if err == nil || !strings.Contains(err.Error(), "lock screen not ready") {
+		t.Fatalf("Lock before ready = %v, want the not-ready failure", err)
+	}
+	ready = true
+	if err := Lock(t.Context(), client); err != nil {
+		t.Fatalf("Lock when ready: %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("handler calls = %d, want 2", calls)
+	}
+}
+
+// TestLockCommand pins the CLI's output and error wording.
+func TestLockCommand(t *testing.T) {
+	bus := dbustest.Start(t)
+	release, err := Serve(bus.Conn(t), NewState(nil), Hooks{Lock: func() bool { return true }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	if err := LockCommand(t.Context(), bus.Conn(t), nil, &out); err != nil {
+		t.Fatalf("LockCommand: %v", err)
+	}
+	if out.String() != "Session locked\n" {
+		t.Errorf("stdout = %q", out.String())
+	}
+	out.Reset()
+	err = LockCommand(t.Context(), nil, errors.New("no bus"), &out)
+	if err == nil || err.Error() != "D-Bus session unavailable: no bus" || out.Len() != 0 {
+		t.Errorf("no bus: %v, stdout %q", err, out.String())
+	}
+	release()
+	err = LockCommand(t.Context(), bus.Conn(t), nil, &out)
+	if err == nil || !strings.HasPrefix(err.Error(), "lock failed: ") || out.Len() != 0 {
+		t.Errorf("no shell: %v, stdout %q", err, out.String())
 	}
 }

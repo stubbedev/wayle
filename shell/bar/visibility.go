@@ -65,9 +65,9 @@ func (b *barSet) apply(hidden map[string]bool) {
 }
 
 // serveShellIPC takes the application id (its quit action ends the
-// loop) and serves com.wayle.Shell1 over bars. A shell already owning
+// loop) and serves com.wayle.Shell1 over bars, with lock as its Lock hook. A shell already owning
 // the id is logged: the single-instance check runs before RunWith.
-func serveShellIPC(application *app.Application, bars *barSet) func() {
+func serveShellIPC(application *app.Application, bars *barSet, lock func() bool) func() {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		log.Printf("shell ipc: session bus: %v", err)
@@ -85,6 +85,7 @@ func serveShellIPC(application *app.Application, bars *barSet) func() {
 	})
 	state.SetConnectors(bars.connectors())
 	if release, err := shellipc.Serve(conn, state, shellipc.Hooks{
+		Lock: lock,
 		// The VPN callback goes straight to the native sign-in, whose
 		// waiting browser sign-ins are process-wide, as the Rust
 		// daemon's are.

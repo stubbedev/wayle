@@ -9,13 +9,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/shellipc"
 	"github.com/stubbedev/wayle/service/auth"
 	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/styling"
@@ -61,16 +59,11 @@ func Fonts(family string, text render.Font) credential.Fonts {
 
 const clockFontPx = 64
 
-// Start wires the lock screen into the running shell: the
-// com.wayle.Shell1 Lock method on the session bus, the logind
+// Start wires the lock screen into the running shell: the logind
 // triggers, lock-on-start, and the LockedHint restart recovery. The
-// returned stop releases the bus name and the logind listener.
+// shell serves `wayle lock` by handing Screen.Lock to its
+// com.wayle.Shell1 hooks. The returned stop ends the logind listener.
 func Start(a *app.Application, cfg *config.Config, fonts credential.Fonts, pal *styling.Palette) (*Screen, func()) {
-	sessionBus, err := dbus.ConnectSessionBus()
-	if err != nil {
-		log.Printf("lock: session bus unavailable; `wayle lock` disabled: %v", err)
-		sessionBus = nil
-	}
 	ld := systemLogind()
 	deps := Deps{
 		Locker: appLocker{a: a},
@@ -97,18 +90,6 @@ func Start(a *app.Application, cfg *config.Config, fonts credential.Fonts, pal *
 	s := New(cfg, fonts, pal, deps)
 
 	var stops []func()
-	if sessionBus != nil {
-		release, err := shellipc.Serve(sessionBus, shellipc.Handlers{Lock: func() bool {
-			a.Invoke(s.Lock)
-			return true
-		}})
-		if err != nil {
-			log.Printf("lock: shell IPC: %v", err)
-		} else {
-			stops = append(stops, release)
-		}
-		stops = append(stops, func() { _ = sessionBus.Close() })
-	}
 	if ld != nil {
 		ctx, cancel := context.WithCancel(context.Background())
 		stops = append(stops, cancel)

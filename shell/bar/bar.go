@@ -251,13 +251,17 @@ func RunWith(cfg *config.Config) error {
 			go p.Run()
 		}
 	}
-	defer serveShellIPC(application, bars)()
 	if cfg.Osd.Enabled {
 		go watchOsd(cfg, baseCtx, osdSrv)
 	}
-	// The ext-session-lock screen and its triggers (logind, `wayle lock`).
-	_, stopLock := lock.Start(application, cfg, lock.Fonts(cfg.General.FontSans, font), palette)
+	// The ext-session-lock screen and its triggers (logind, and `wayle
+	// lock` through Shell1).
+	lockScreen, stopLock := lock.Start(application, cfg, lock.Fonts(cfg.General.FontSans, font), palette)
 	defer stopLock()
+	defer serveShellIPC(application, bars, func() bool {
+		application.Invoke(lockScreen.Lock)
+		return true
+	})()
 	// The widget socket carries out-of-process pushes (`wayle toast`).
 	widgetSrv := widgetipc.NewServer()
 	if stop, err := widgetSrv.Listen(); err == nil {
