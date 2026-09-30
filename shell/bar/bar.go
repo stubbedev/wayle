@@ -100,7 +100,7 @@ func RunWith(cfg *config.Config) error {
 	}
 	if svc, stop, err := startNetworkService(); err == nil {
 		defer stop()
-		baseCtx.NetworkService = svc
+		baseCtx.Networking = svc
 	} else {
 		log.Printf("network: %v", err)
 	}

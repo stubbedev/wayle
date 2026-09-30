@@ -66,10 +66,10 @@ func sentence(reason string) string {
 
 // vpnSection builds the VPN rows, nil when NM holds no VPN.
 func vpnSection(ctx ModuleContext, font render.Font, px float64) widget.Widget {
-	if ctx.NetworkService == nil || ctx.NetworkService.VPN.IsEmpty() {
+	if ctx.Networking == nil || ctx.Networking.VPN.IsEmpty() {
 		return nil
 	}
-	vpn := ctx.NetworkService.VPN
+	vpn := ctx.Networking.VPN
 	col := widget.NewBox(widget.Column, 4, 0)
 	col.Append(widget.NewLabel(font, px, "VPN", mutedFg(ctx.Style.palette)), false)
 	for _, row := range vpn.Entries() {
