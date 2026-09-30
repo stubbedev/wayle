@@ -220,3 +220,58 @@ func TestPathsFromEnvironment(t *testing.T) {
 		t.Error("missing XDG_RUNTIME_DIR: want an error, got nil")
 	}
 }
+
+func TestParseEventWindowAddressesAndV2Payloads(t *testing.T) {
+	for _, tc := range []struct {
+		line string
+		want Event
+	}{
+		{"focusedmonv2>>DP-2,7", Event{Kind: EventFocusedMonV2, Name: "DP-2", ID: 7}},
+		{"urgent>>55d0a1", Event{Kind: EventUrgent, ID: -1, Address: "55d0a1"}},
+		{"activewindowv2>>55d0a1", Event{Kind: EventActiveWindowV2, ID: -1, Address: "55d0a1"}},
+		{"windowtitlev2>>55d0a1,a, b", Event{Kind: EventWindowTitleV2, ID: -1, Address: "55d0a1", Title: "a, b"}},
+		{"openwindow>>55d0a1,3,kitty,ed", Event{Kind: EventOpenWindow, ID: -1, Name: "3", Address: "55d0a1"}},
+		{"closewindow>>55d0a1", Event{Kind: EventCloseWindow, ID: -1, Name: "55d0a1", Address: "55d0a1"}},
+		{"movewindowv2>>55d0a1,4,DP-1", Event{Kind: EventMoveWindowV2, ID: 4, Name: "DP-1", Address: "55d0a1"}},
+		{"configreloaded>>", Event{Kind: EventConfigReloaded, ID: -1}},
+	} {
+		got, ok := ParseEvent(tc.line)
+		if !ok {
+			t.Errorf("%s: parse failed", tc.line)
+			continue
+		}
+		if got.Kind != tc.want.Kind || got.Name != tc.want.Name || got.ID != tc.want.ID || got.Address != tc.want.Address || got.Title != tc.want.Title {
+			t.Errorf("%s = %+v, want %+v", tc.line, got, tc.want)
+		}
+	}
+	if _, ok := ParseEvent("focusedmonv2>>DP-2"); ok {
+		t.Error("focusedmonv2 without a workspace id parsed")
+	}
+}
+
+func TestClientsRulesAndActiveWorkspace(t *testing.T) {
+	fake := startFake(t, map[string]string{
+		"j/clients":         `[{"address":"0x55d0a1","class":"kitty","title":"t","workspace":{"id":2,"name":"2"},"monitor":0,"floating":false,"at":[0,0],"size":[1,1],"pid":1}]`,
+		"j/workspacerules":  `[{"workspaceString":"3","monitor":"DP-1"},{"workspaceString":"special:magic"}]`,
+		"j/activeworkspace": `{"id":4,"name":"4","monitor":"DP-1","windows":1}`,
+	})
+	conn := ConnectTo(fake.commandPath, fake.eventPath)
+	clients, err := conn.Clients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(clients) != 1 || clients[0].Address != "55d0a1" || clients[0].Workspace.ID != 2 || clients[0].Class != "kitty" {
+		t.Errorf("clients = %+v, want the address normalized", clients)
+	}
+	rules, err := conn.WorkspaceRules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rules) != 2 || rules[0].WorkspaceString != "3" || *rules[0].Monitor != "DP-1" || rules[1].Monitor != nil {
+		t.Errorf("rules = %+v", rules)
+	}
+	ws, err := conn.ActiveWorkspace()
+	if err != nil || ws.ID != 4 {
+		t.Errorf("active = %+v %v", ws, err)
+	}
+}

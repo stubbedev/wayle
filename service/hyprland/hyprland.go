@@ -69,6 +69,25 @@ type Monitor struct {
 	Focused bool `json:"focused"`
 }
 
+// Client is the subset of j/clients the shell consumes.
+type Client struct {
+	Address   string `json:"address"`
+	Class     string `json:"class"`
+	Title     string `json:"title"`
+	Workspace struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"workspace"`
+	Monitor  int  `json:"monitor"`
+	Floating bool `json:"floating"`
+}
+
+// WorkspaceRule is one entry of j/workspacerules.
+type WorkspaceRule struct {
+	WorkspaceString string  `json:"workspaceString"`
+	Monitor         *string `json:"monitor"`
+}
+
 // Connection is a live handle to one Hyprland instance.
 type Connection struct {
 	commandPath string
@@ -125,6 +144,43 @@ func (c *Connection) Monitors() ([]Monitor, error) {
 		return nil, err
 	}
 	return decodeJSON[[]Monitor](reply)
+}
+
+// Clients lists the instance's windows (j/clients), addresses
+// normalized.
+func (c *Connection) Clients() ([]Client, error) {
+	reply, err := c.Command("j/clients")
+	if err != nil {
+		return nil, err
+	}
+	clients, err := decodeJSON[[]Client](reply)
+	if err != nil {
+		return nil, err
+	}
+	for i := range clients {
+		clients[i].Address = NormalizeAddress(clients[i].Address)
+	}
+	return clients, nil
+}
+
+// WorkspaceRules lists the configured workspace rules
+// (j/workspacerules).
+func (c *Connection) WorkspaceRules() ([]WorkspaceRule, error) {
+	reply, err := c.Command("j/workspacerules")
+	if err != nil {
+		return nil, err
+	}
+	return decodeJSON[[]WorkspaceRule](reply)
+}
+
+// ActiveWorkspace is j/activeworkspace: the focused monitor's
+// workspace.
+func (c *Connection) ActiveWorkspace() (Workspace, error) {
+	reply, err := c.Command("j/activeworkspace")
+	if err != nil {
+		return Workspace{}, err
+	}
+	return decodeJSON[Workspace](reply)
 }
 
 // Dispatch runs a dispatcher command ("workspace 3") and returns the

@@ -42,7 +42,20 @@ const (
 	EventActiveWindow   EventKind = "activewindow"
 	EventActiveWindowV2 EventKind = "activewindowv2"
 	EventSubmap         EventKind = "submap"
+
+	EventMoveWorkspaceV2  EventKind = "moveworkspacev2"
+	EventRenameWorkspace  EventKind = "renameworkspace"
+	EventActiveSpecialV2  EventKind = "activespecialv2"
+	EventMonitorAddedV2   EventKind = "monitoraddedv2"
+	EventMonitorRemovedV2 EventKind = "monitorremovedv2"
+	EventWindowTitleV2    EventKind = "windowtitlev2"
+	EventConfigReloaded   EventKind = "configreloaded"
 )
+
+// NormalizeAddress is Address::new: window addresses arrive with a 0x
+// prefix from j/clients and without one in events; both compare equal
+// once stripped.
+func NormalizeAddress(address string) string { return strings.TrimPrefix(address, "0x") }
 
 // Event is one parsed line from the event socket. Fields not named by
 // the event kind stay at their zero values.
@@ -56,6 +69,10 @@ type Event struct {
 	// Class and Title carry the activewindow event's window data.
 	Class string
 	Title string
+	// Address is the normalized window address of the window events
+	// (urgent, activewindowv2, windowtitlev2, openwindow, closewindow,
+	// movewindow/v2).
+	Address string
 	// Payload is the raw data after the ">>" separator.
 	Payload string
 }
@@ -80,27 +97,43 @@ func ParseEvent(line string) (Event, bool) {
 		monitor, ws, _ := strings.Cut(data, ",")
 		ev.Name, ev.ID = monitor, wsNameToID(ws)
 	case EventFocusedMonV2:
-		id, monitor, _ := strings.Cut(data, ",")
-		ev.ID, ev.Name = atoiOr(id), monitor
+		// "name,workspace_id" (monitor.rs's handle_focused_mon_v2).
+		monitor, id, found := strings.Cut(data, ",")
+		if !found {
+			return ev, false
+		}
+		ev.Name, ev.ID = monitor, atoiOr(id)
 	case EventMoveWorkspace, EventMoveWindow:
 		// "name,monitor" / "address,monitor"
-		_, monitor, _ := strings.Cut(data, ",")
+		first, monitor, _ := strings.Cut(data, ",")
 		ev.Name = monitor
+		if ev.Kind == EventMoveWindow {
+			ev.Address = NormalizeAddress(first)
+		}
 	case EventMoveWindowV2:
 		// "address,workspaceid,monitorname"
 		parts := strings.SplitN(data, ",", 3)
 		if len(parts) == 3 {
 			ev.ID, ev.Name = atoiOr(parts[1]), parts[2]
 		}
+		ev.Address = NormalizeAddress(parts[0])
 	case EventOpenWindow:
 		// "address,workspacename,class,title"
 		parts := strings.SplitN(data, ",", 3)
+		ev.Address = NormalizeAddress(parts[0])
 		if len(parts) >= 2 {
 			ev.Name = parts[1]
 		}
 	case EventCloseWindow:
 		ev.Name = data
-	case EventFullscreen, EventUrgent:
+		ev.Address = NormalizeAddress(data)
+	case EventUrgent:
+		ev.Address = NormalizeAddress(data)
+	case EventWindowTitleV2:
+		// "address,title"; the title may carry commas.
+		address, title, _ := strings.Cut(data, ",")
+		ev.Address, ev.Title = NormalizeAddress(address), title
+	case EventFullscreen:
 		// payload only
 	case EventActiveWindow:
 		// "class,title" - the title runs to the end of the line and may
@@ -114,7 +147,7 @@ func ParseEvent(line string) (Event, bool) {
 		// The submap name; empty means the default submap.
 		ev.Name = data
 	case EventActiveWindowV2:
-		// address only; event-driven modules re-read state on it.
+		ev.Address = NormalizeAddress(data)
 	}
 	return ev, true
 }
