@@ -157,5 +157,3 @@ func TestApplyToast(t *testing.T) {
 		t.Errorf("clamped value = %v", ev.Value)
 	}
 }
-
-func new(s string) *string { return &s }
