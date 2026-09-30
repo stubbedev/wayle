@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/service/mail"
 	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/recorder"
 	"github.com/stubbedev/wayle/service/weather"
@@ -208,15 +209,16 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 func mailDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	col := widget.NewBox(widget.Column, 6, 14)
-	cfg := ctx.Config.Mail
-	if len(cfg.Accounts) == 0 {
+	var accounts []mail.AccountUnread
+	if ctx.Mail != nil {
+		accounts = ctx.Mail.State().Accounts
+	}
+	if len(accounts) == 0 {
 		col.Append(widget.NewLabel(font, px, "No accounts configured", mutedFg(ctx.Style.palette)), false)
 		return col
 	}
-	bctx := context.Background()
-	for _, account := range cfg.Accounts {
-		count := mailQueryCount(bctx, account.Query)
-		col.Append(widget.NewLabel(font, px, account.Name+": "+strconv.Itoa(count), ctx.Style.fg), false)
+	for _, account := range accounts {
+		col.Append(widget.NewLabel(font, px, account.Name+": "+strconv.FormatUint(uint64(account.Count), 10), ctx.Style.fg), false)
 	}
 	return col
 }

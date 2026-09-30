@@ -3,94 +3,76 @@ package bar
 import (
 	"context"
 	"errors"
-	"os/exec"
 	"strconv"
-	"strings"
-	"time"
 
+	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/desktopnotify"
+	"github.com/stubbedev/wayle/service/mail"
 )
 
-// mailQueryCount runs `notmuch count <query>`, 0 on any failure — the
-// Rust query_count's warn-and-zero behavior.
-func mailQueryCount(ctx context.Context, query string) int {
-	out, err := exec.CommandContext(ctx, "notmuch", "count", query).Output() //nolint:gosec // the query comes from the user's own config
-	if err != nil {
-		return 0
+// startMail builds and runs the shared mail service, as the Rust
+// bootstrap does whether or not a mail module is placed. Without a
+// session bus it still counts; it only cannot notify. The returned
+// function stops it.
+func startMail(ctx *ModuleContext) func() {
+	var notifier mail.Notifier
+	if conn, err := dbus.ConnectSessionBus(); err == nil {
+		notifier = mail.DesktopNotifier{Sender: desktopnotify.NewSender(conn)}
 	}
-	count, err := strconv.Atoi(strings.TrimSpace(string(out)))
-	if err != nil {
-		return 0
-	}
-	return count
-}
-
-// mailTotal sums the configured queries: the per-account list when
-// present, else the single query.
-func mailTotal(ctx context.Context, cfg config.MailConfig) int {
-	if len(cfg.Accounts) == 0 {
-		return mailQueryCount(ctx, cfg.Query)
-	}
-	total := 0
-	for _, account := range cfg.Accounts {
-		total += mailQueryCount(ctx, account.Query)
-	}
-	return total
+	svc := mail.New(ctx.Config.Mail, mail.CLI{}, notifier)
+	ctx.Mail = svc
+	runCtx, cancel := context.WithCancel(context.Background())
+	go svc.Run(runCtx)
+	return cancel
 }
 
 // mailLabel renders {{ count }}; hide-when-zero blanks at zero.
-func mailLabel(format string, count int, hideWhenZero bool) string {
+func mailLabel(format string, count uint32, hideWhenZero bool) string {
 	if hideWhenZero && count == 0 {
 		return ""
 	}
-	return replaceTemplateVar(format, "count", strconv.Itoa(count))
+	return replaceTemplateVar(format, "count", strconv.FormatUint(uint64(count), 10))
 }
 
-// mail is the module: the notmuch unread total.
+// mailModule is the module: the shared service's unread total.
 type mailModule struct {
 	ctx   ModuleContext
 	label *widget.Label
 	stop  func()
 }
 
-// mailPollInterval is the re-query cadence. The Rust service is
-// inotify-driven; the Go port polls until the runtime grows a file
-// watcher.
-const mailPollInterval = 15 * time.Second
+var errMailNoService = errors.New("mail: requires the shared mail service")
 
 func newMail(ctx ModuleContext) (Module, error) {
-	if ctx.App == nil {
-		return nil, errors.New("mail: requires the application loop")
+	if ctx.Mail == nil {
+		return nil, errMailNoService
 	}
 	m := &mailModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	m.refresh()
-	runCtx, cancel := context.WithCancel(context.Background())
-	m.stop = cancel
+	m.apply(ctx.Mail.State().Total)
+	ticks, unsubscribe := ctx.Mail.Subscribe()
+	done := make(chan struct{})
+	m.stop = func() {
+		unsubscribe()
+		close(done)
+	}
 	go func() {
-		ticker := time.NewTicker(mailPollInterval)
-		defer ticker.Stop()
 		for {
 			select {
-			case <-runCtx.Done():
+			case <-done:
 				return
-			case <-ticker.C:
+			case <-ticks:
 			}
-			count := mailTotal(runCtx, m.ctx.Config.Mail)
-			m.ctx.Invoke(func() { m.apply(count) })
+			total := ctx.Mail.State().Total
+			m.ctx.Invoke(func() { m.apply(total) })
 		}
 	}()
 	return m, nil
 }
 
-// refresh re-queries synchronously at construction time.
-func (m *mailModule) refresh() {
-	m.apply(mailTotal(context.Background(), m.ctx.Config.Mail))
-}
-
 // apply renders one count.
-func (m *mailModule) apply(count int) {
+func (m *mailModule) apply(count uint32) {
 	cfg := m.ctx.Config.Mail
 	text := ""
 	if cfg.LabelShow {
@@ -101,9 +83,10 @@ func (m *mailModule) apply(count int) {
 
 func (m *mailModule) Root() widget.Widget { return m.label }
 
-// Stop ends the re-query loop.
+// Stop unsubscribes from the service.
 func (m *mailModule) Stop() {
 	if m.stop != nil {
 		m.stop()
+		m.stop = nil
 	}
 }

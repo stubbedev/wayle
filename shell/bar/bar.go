@@ -127,6 +127,8 @@ func RunWith(cfg *config.Config) error {
 			log.Printf("recorder: daemon: %v", err)
 		}
 	}
+	stopMail := startMail(&baseCtx)
+	defer stopMail()
 	if host, err := sni.NewHost(sniStore); err == nil {
 		defer func() { _ = host.Close() }()
 	} else {

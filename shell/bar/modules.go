@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/wayle/service/clipboard"
 	"github.com/stubbedev/wayle/service/hyprland"
 	"github.com/stubbedev/wayle/service/idleinhibit"
+	"github.com/stubbedev/wayle/service/mail"
 	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/notifications"
@@ -47,6 +48,7 @@ type ModuleContext struct {
 	Treeman       treeman.Source
 	Notifications *notifications.Service
 	Recorder      *recorder.State
+	Mail          *mail.Service
 	SNI           *sni.Store
 	// Clipboard is the session clipboard history, nil when the
 	// compositor has no data-control protocol (the launcher's
