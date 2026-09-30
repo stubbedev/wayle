@@ -119,6 +119,7 @@ var factories = map[string]Factory{
 	"hyprland-workspaces": newHyprlandWorkspaces,
 	"sway-workspaces":     newSwayWorkspaces,
 	"niri-workspaces":     newNiriWorkspaces,
+	"mango-workspaces":    newMangoWorkspaces,
 	"separator":           newSeparator,
 }
 

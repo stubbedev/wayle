@@ -201,20 +201,20 @@ func TestCwsBuildModelsBlinkGatesUrgency(t *testing.T) {
 	urgent := occupiedWS(1, 1, "DP-1")
 	urgent.urgent = true
 	all := []cwsWorkspace{urgent}
-	on := cwsBuildModels(all, nil, cfg, "DP-1", false, true)
+	on := cwsBuildModels(cwsWorkspaces, all, nil, cfg, "DP-1", false, true)
 	if !hasClass(on[0].classes, "urgent") {
 		t.Errorf("blink on: classes %v miss urgent", on[0].classes)
 	}
-	off := cwsBuildModels(all, nil, cfg, "DP-1", false, false)
+	off := cwsBuildModels(cwsWorkspaces, all, nil, cfg, "DP-1", false, false)
 	if hasClass(off[0].classes, "urgent") {
 		t.Errorf("blink off: classes %v carry urgent", off[0].classes)
 	}
 	cfg.UrgentShow = false
-	if m := cwsBuildModels(all, nil, cfg, "DP-1", false, true); hasClass(m[0].classes, "urgent") {
+	if m := cwsBuildModels(cwsWorkspaces, all, nil, cfg, "DP-1", false, true); hasClass(m[0].classes, "urgent") {
 		t.Error("urgent-show = false still marks the class")
 	}
 	cfg.UrgentShow, cfg.UrgentMode = true, config.UrgentApplication
-	if m := cwsBuildModels(all, nil, cfg, "DP-1", false, true); !hasClass(m[0].classes, "urgent-application") {
+	if m := cwsBuildModels(cwsWorkspaces, all, nil, cfg, "DP-1", false, true); !hasClass(m[0].classes, "urgent-application") {
 		t.Error("urgent-mode application misses its class")
 	}
 }
@@ -223,7 +223,7 @@ func TestCwsClassesMatchComputeCSSClasses(t *testing.T) {
 	cfg := config.DefaultsNiriWorkspaces()
 	ws := occupiedWS(5, 2, "DP-1")
 	ws.active, ws.focused, ws.name, ws.hasName = true, true, "web", true
-	m := cwsBuildModels([]cwsWorkspace{ws}, nil, cfg, "", true, false)
+	m := cwsBuildModels(cwsWorkspaces, []cwsWorkspace{ws}, nil, cfg, "", true, false)
 	want := []string{"workspace", "active", "focused", "indicator-background", "vertical", "ws-id-5", "ws-name-web"}
 	if !reflect.DeepEqual(m[0].classes, want) {
 		t.Errorf("classes = %v, want %v", m[0].classes, want)
@@ -306,7 +306,7 @@ func newTestCws(t *testing.T, cfg config.CompositorWorkspacesConfig, backend cws
 	t.Helper()
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Connector = "DP-1"
-	m, err := newCwsModule(ctx, "niri", cfg, backend)
+	m, err := newCwsModule(ctx, "niri", cwsWorkspaces, cfg, backend)
 	if err != nil {
 		t.Fatal(err)
 	}

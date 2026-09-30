@@ -46,6 +46,7 @@ type cwsModule struct {
 	ctx     ModuleContext
 	cfg     config.CompositorWorkspacesConfig
 	kind    string
+	flavor  cwsFlavor
 	backend cwsBackend
 	root    *cwsContainer
 
@@ -62,8 +63,8 @@ type cwsModule struct {
 
 // newCwsModule builds the module over a connected backend and, with a
 // live loop, subscribes to its events.
-func newCwsModule(ctx ModuleContext, kind string, cfg config.CompositorWorkspacesConfig, backend cwsBackend) (*cwsModule, error) {
-	m := &cwsModule{ctx: ctx, cfg: cfg, kind: kind, backend: backend}
+func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.CompositorWorkspacesConfig, backend cwsBackend) (*cwsModule, error) {
+	m := &cwsModule{ctx: ctx, cfg: cfg, kind: kind, flavor: flavor, backend: backend}
 	m.boldFace = cwsBoldFace(ctx, m.labelPx())
 	m.root = newCwsContainer(m)
 	if err := m.refresh(); err != nil {
@@ -120,7 +121,7 @@ func (m *cwsModule) refresh() error {
 // rebuild recomputes the button models from the cached snapshot and
 // swaps the buttons in.
 func (m *cwsModule) rebuild() {
-	m.models = cwsBuildModels(m.workspaces, m.windows, m.cfg, m.ctx.Connector, m.vertical(), m.blinkOn)
+	m.models = cwsBuildModels(m.flavor, m.workspaces, m.windows, m.cfg, m.ctx.Connector, m.vertical(), m.blinkOn)
 	displayed := make([]cwsWorkspace, len(m.models))
 	for i, model := range m.models {
 		displayed[i] = model.ws

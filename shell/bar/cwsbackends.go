@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/stubbedev/wayle/internal/appicons"
+	"github.com/stubbedev/wayle/service/mango"
 	"github.com/stubbedev/wayle/service/niri"
 	"github.com/stubbedev/wayle/service/sway"
 )
@@ -20,7 +21,7 @@ func newSwayWorkspaces(ctx ModuleContext) (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newCwsModule(ctx, "sway", ctx.Config.SwayWorkspaces, &swayBackend{conn: conn})
+	return newCwsModule(ctx, "sway", cwsWorkspaces, ctx.Config.SwayWorkspaces, &swayBackend{conn: conn})
 }
 
 // newNiriWorkspaces is the niri-workspaces factory.
@@ -32,7 +33,7 @@ func newNiriWorkspaces(ctx ModuleContext) (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newCwsModule(ctx, "niri", ctx.Config.NiriWorkspaces, &niriBackend{conn: conn})
+	return newCwsModule(ctx, "niri", cwsWorkspaces, ctx.Config.NiriWorkspaces, &niriBackend{conn: conn})
 }
 
 // swayBackend maps sway's GET_WORKSPACES/GET_TREE onto the shared
@@ -176,3 +177,98 @@ func (b *niriBackend) focusLast(ctx context.Context) error {
 }
 func (b *niriBackend) subscribe() (<-chan struct{}, func(), error) { return niri.Subscribe() }
 func (b *niriBackend) close()                                      { _ = b.conn.Close() }
+
+// newMangoWorkspaces is the mango-workspaces factory: the watcher runs
+// from construction, like MangoService::new's start_monitoring.
+func newMangoWorkspaces(ctx ModuleContext) (Module, error) {
+	if !mango.IsRunning() {
+		return nil, errors.New("mango-workspaces: mango is not running")
+	}
+	w, err := mango.Watch()
+	if err != nil {
+		return nil, err
+	}
+	cfg := ctx.Config.MangoWorkspaces
+	backend := &mangoBackend{watch: w, connector: ctx.Connector, hideEmpty: cfg.HideEmpty, minTagCount: cfg.MinTagCount}
+	return newCwsModule(ctx, "mango", cwsTags, cfg.Shared, backend)
+}
+
+// mangoBackend selects one monitor's tags (rebuild_tags): the bar's
+// own monitor, else the active one, else the first; hide-empty keeps
+// occupied, active, and the first min-tag-count tags. Clients map to
+// one window per tag they sit on, in mango's list order.
+type mangoBackend struct {
+	watch       *mango.Watcher
+	connector   string
+	hideEmpty   bool
+	minTagCount int
+}
+
+// chooseMonitor is chosen_monitor.
+func chooseMonitor(monitors []mango.Monitor, connector string) (mango.Monitor, bool) {
+	if connector != "" {
+		for _, m := range monitors {
+			if m.Name == connector {
+				return m, true
+			}
+		}
+	}
+	for _, m := range monitors {
+		if m.IsActive {
+			return m, true
+		}
+	}
+	if len(monitors) > 0 {
+		return monitors[0], true
+	}
+	return mango.Monitor{}, false
+}
+
+func (b *mangoBackend) snapshot() ([]cwsWorkspace, []cwsWindow, error) {
+	monitors, clients := b.watch.State()
+	monitor, ok := chooseMonitor(monitors, b.connector)
+	if !ok {
+		return nil, nil, nil
+	}
+	tags := make([]cwsWorkspace, 0, len(monitor.Tags))
+	for _, tag := range monitor.Tags {
+		// displayed_tags
+		if b.hideEmpty && tag.ClientCount == 0 && !tag.IsActive && int(tag.Index) > b.minTagCount {
+			continue
+		}
+		tags = append(tags, cwsWorkspace{
+			id: uint64(tag.Index), num: int(tag.Index),
+			output: monitor.Name, hasOutput: true,
+			urgent: tag.IsUrgent, active: tag.IsActive,
+			hasWindows: tag.ClientCount > 0,
+		})
+	}
+	windows := make([]cwsWindow, 0, len(clients))
+	for pos, c := range clients {
+		if c.Monitor != monitor.Name {
+			continue
+		}
+		for _, tag := range c.Tags {
+			windows = append(windows, cwsWindow{
+				id: uint64(c.ID), workspace: uint64(tag), hasWorkspace: true,
+				urgent: c.IsUrgent, order: [2]int{pos, 0},
+				app: appicons.Window{AppID: c.AppID, HasAppID: c.HasAppID, Title: c.Title, HasTitle: c.HasTitle},
+			})
+		}
+	}
+	return tags, windows, nil
+}
+
+func (b *mangoBackend) focus(_ context.Context, ws cwsWorkspace) error {
+	return mango.ViewTag(uint32(ws.id))
+}
+func (b *mangoBackend) focusNext(context.Context) error     { return mango.ViewRight() }
+func (b *mangoBackend) focusPrevious(context.Context) error { return mango.ViewLeft() }
+
+// focusLast is a no-op: mango has no last-tag action.
+func (b *mangoBackend) focusLast(context.Context) error { return nil }
+
+func (b *mangoBackend) subscribe() (<-chan struct{}, func(), error) {
+	return b.watch.Ticks(), b.watch.Close, nil
+}
+func (b *mangoBackend) close() { b.watch.Close() }

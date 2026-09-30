@@ -132,3 +132,43 @@ func TestParseWorkspaceClickActionRoundTrips(t *testing.T) {
 		t.Errorf("unknown focus target = %+v, want a shell command like the Rust from_str", got)
 	}
 }
+
+func TestMangoWorkspacesDefaults(t *testing.T) {
+	m := DefaultsMangoWorkspaces()
+	if !m.HideEmpty || m.MinTagCount != 0 {
+		t.Fatalf("tag rules = %+v", m)
+	}
+	if m.Shared.WorkspacePad != (Size{Value: 0.5, Unit: SizeMultiplier}) || m.Shared.Click != DefaultWorkspaceClicks() {
+		t.Fatalf("shared = %+v", m.Shared)
+	}
+}
+
+func TestLoadFileAppliesMangoWorkspaces(t *testing.T) {
+	cfg, err := LoadFile(writeConfig(t, `
+[modules.mango-workspaces]
+hide-empty = false
+min-tag-count = 5
+tag-padding = "2px"
+display-mode = "icon"
+tag-map = { "3" = { icon = "ld-globe-symbolic", label = "web" } }
+right-click = "focus:last"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := cfg.MangoWorkspaces
+	if m.HideEmpty || m.MinTagCount != 5 || m.Shared.WorkspacePad != (Size{Value: 2, Unit: SizePixels}) ||
+		m.Shared.DisplayMode != DisplayModeIcon || m.Shared.WorkspaceMap["3"].Icon != "ld-globe-symbolic" ||
+		m.Shared.Click.RightClick.Kind != WorkspaceClickFocusLast {
+		t.Fatalf("mango = %+v", m)
+	}
+}
+
+func TestLoadFileRejectsBadMangoWorkspaces(t *testing.T) {
+	for _, body := range []string{"min-tag-count = 300", "min-tag-count = -1", `urgent-mode = "x"`, `tag-padding = "wide"`, `tag-map = { "1" = { color = "nope" } }`} {
+		_, err := LoadFile(writeConfig(t, "[modules.mango-workspaces]\n"+body+"\n"))
+		if err == nil || !strings.Contains(err.Error(), "mango-workspaces") {
+			t.Errorf("%s: err = %v", body, err)
+		}
+	}
+}

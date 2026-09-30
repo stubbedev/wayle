@@ -19,6 +19,16 @@ import (
 // widget half. The backends map their compositor's snapshot onto
 // cwsWorkspace/cwsWindow.
 
+// cwsFlavor picks between the two Rust button families: the sway/niri
+// workspace buttons and mango's tag buttons (mango_workspaces/), which
+// differ in the label/icon rules, the CSS classes, and the tag set.
+type cwsFlavor int
+
+const (
+	cwsWorkspaces cwsFlavor = iota
+	cwsTags
+)
+
 // cwsWorkspace is filtering.rs's WorkspaceSnapshot. num is sway's
 // workspace number (-1 for a purely named workspace) or niri's idx.
 type cwsWorkspace struct {
@@ -192,6 +202,9 @@ func cwsStyleFor(ws cwsWorkspace, m map[string]config.NamedWorkspaceStyle) (conf
 	return style, ok
 }
 
+// cwsTagClass is mango's tag_css_class.
+func cwsTagClass(index uint64) string { return "tag-" + strconv.FormatUint(index, 10) }
+
 // cwsIDClass is workspace_id_css_class.
 func cwsIDClass(id uint64) string { return "ws-id-" + strconv.FormatUint(id, 10) }
 
@@ -235,6 +248,10 @@ func cwsOverrideColor(classes []string, m map[string]config.NamedWorkspaceStyle)
 		if id, err := strconv.ParseUint(key, 10, 64); err == nil && has[cwsIDClass(id)] {
 			match = true
 		}
+		// mango's tag_map_css_class: a numeric key targets tag-N.
+		if index, err := strconv.ParseUint(key, 10, 32); err == nil && has[cwsTagClass(index)] {
+			match = true
+		}
 		if match {
 			out, found = style.Color, true
 		}
@@ -250,8 +267,10 @@ type cwsAppIcon struct {
 	urgent    bool
 }
 
-// cwsButtonModel is NiriWorkspaceButtonInit/SwayWorkspaceButtonInit.
+// cwsButtonModel is NiriWorkspaceButtonInit/SwayWorkspaceButtonInit
+// (MangoTagButtonInit under cwsTags).
 type cwsButtonModel struct {
+	flavor   cwsFlavor
 	ws       cwsWorkspace
 	label    string
 	hasLabel bool
@@ -329,14 +348,18 @@ func cwsAnyUrgent(displayed []cwsWorkspace, windows []cwsWindow) bool {
 }
 
 // cwsBuildModels is rebuild_buttons's model pass: filter, then one
-// button init per displayed workspace.
-func cwsBuildModels(all []cwsWorkspace, windows []cwsWindow, cfg config.CompositorWorkspacesConfig, barMonitor string, vertical, blinkOn bool) []cwsButtonModel {
-	displayed := cwsCollectDisplayed(all, cwsFilter{
-		monitorSpecific:   cfg.MonitorSpecific,
-		barMonitor:        barMonitor,
-		hideTrailingEmpty: cfg.HideTrailingEmpty,
-		ignore:            cfg.WorkspaceIgnore,
-	})
+// button init per displayed workspace. Tags arrive already selected
+// and ordered (the mango backend's displayed_tags).
+func cwsBuildModels(flavor cwsFlavor, all []cwsWorkspace, windows []cwsWindow, cfg config.CompositorWorkspacesConfig, barMonitor string, vertical, blinkOn bool) []cwsButtonModel {
+	displayed := all
+	if flavor == cwsWorkspaces {
+		displayed = cwsCollectDisplayed(all, cwsFilter{
+			monitorSpecific:   cfg.MonitorSpecific,
+			barMonitor:        barMonitor,
+			hideTrailingEmpty: cfg.HideTrailingEmpty,
+			ignore:            cfg.WorkspaceIgnore,
+		})
+	}
 	out := make([]cwsButtonModel, 0, len(displayed))
 	for _, ws := range displayed {
 		on := cwsWindowsOn(windows, ws.id)
@@ -348,14 +371,25 @@ func cwsBuildModels(all []cwsWorkspace, windows []cwsWindow, cfg config.Composit
 				}
 			}
 		}
-		m := cwsButtonModel{ws: ws, urgent: ws.urgent && blinkOn}
+		m := cwsButtonModel{flavor: flavor, ws: ws, urgent: ws.urgent && blinkOn}
 		if cfg.AppIconsShow {
 			m.appIcons = cwsCollectAppIcons(on, cfg, urgentWindows)
 		}
-		style, styled := cwsStyleFor(ws, cfg.WorkspaceMap)
-		if styled && style.LabelSet {
-			m.label, m.hasLabel = style.Label, true
+		var style config.NamedWorkspaceStyle
+		var styled bool
+		if flavor == cwsTags {
+			// tag_style: the tag-map entry for the index; the label
+			// falls back to the index itself.
+			style, styled = cfg.WorkspaceMap[strconv.FormatUint(ws.id, 10)]
 		} else {
+			style, styled = cwsStyleFor(ws, cfg.WorkspaceMap)
+		}
+		switch {
+		case styled && style.LabelSet:
+			m.label, m.hasLabel = style.Label, true
+		case flavor == cwsTags:
+			m.label, m.hasLabel = strconv.FormatUint(ws.id, 10), true
+		default:
 			m.label, m.hasLabel = cwsLabel(ws.num, ws.name, ws.hasName, cfg.LabelStrategy)
 		}
 		if styled {
@@ -370,7 +404,7 @@ func cwsBuildModels(all []cwsWorkspace, windows []cwsWindow, cfg config.Composit
 // cwsClasses is compute_css_classes.
 func cwsClasses(m cwsButtonModel, cfg config.CompositorWorkspacesConfig, vertical bool) []string {
 	classes := []string{"workspace", cwsState(m.ws)}
-	if m.ws.focused {
+	if m.ws.focused && m.flavor == cwsWorkspaces {
 		classes = append(classes, "focused")
 	}
 	if m.urgent && cfg.UrgentShow {
@@ -382,6 +416,9 @@ func cwsClasses(m cwsButtonModel, cfg config.CompositorWorkspacesConfig, vertica
 	classes = append(classes, cfg.ActiveIndicator.CSSClass())
 	if vertical {
 		classes = append(classes, "vertical")
+	}
+	if m.flavor == cwsTags {
+		return append(classes, cwsTagClass(m.ws.id))
 	}
 	classes = append(classes, cwsIDClass(m.ws.id))
 	if m.ws.hasName {
@@ -404,14 +441,31 @@ func cwsState(ws cwsWorkspace) string {
 // hasClass reports whether classes carries name.
 func hasClass(classes []string, name string) bool { return slices.Contains(classes, name) }
 
-// showLabel is button/methods.rs's show_label: a mapped icon replaces
-// the label; display-mode none hides it.
+// showLabel is button/methods.rs's show_label. Workspaces: a mapped
+// icon replaces the label, display-mode none hides it. Tags: label
+// mode always shows it, icon mode only without a mapped icon.
 func (m cwsButtonModel) showLabel(mode config.WorkspacesDisplayMode) bool {
-	return m.icon == "" && m.hasLabel && m.label != "" && mode != config.DisplayModeNone
+	if !m.hasLabel || m.label == "" {
+		return false
+	}
+	if m.flavor == cwsTags {
+		switch mode {
+		case config.DisplayModeLabel:
+			return true
+		case config.DisplayModeIcon:
+			return m.icon == ""
+		}
+		return false
+	}
+	return m.icon == "" && mode != config.DisplayModeNone
 }
 
-// showIcon is show_icon: a mapped icon shows in every mode but none.
+// showIcon is show_icon. Workspaces: a mapped icon shows in every mode
+// but none. Tags: only in icon mode.
 func (m cwsButtonModel) showIcon(mode config.WorkspacesDisplayMode) bool {
+	if m.flavor == cwsTags {
+		return mode == config.DisplayModeIcon && m.icon != ""
+	}
 	return m.icon != "" && mode != config.DisplayModeNone
 }
 

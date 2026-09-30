@@ -119,6 +119,7 @@ type Config struct {
 	HyprlandWorkspaces HyprlandWorkspacesConfig
 	SwayWorkspaces     CompositorWorkspacesConfig
 	NiriWorkspaces     CompositorWorkspacesConfig
+	MangoWorkspaces    MangoWorkspacesConfig
 	General            GeneralConfig
 }
 
@@ -192,6 +193,7 @@ func Defaults() *Config {
 		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
 		SwayWorkspaces:     DefaultsSwayWorkspaces(),
 		NiriWorkspaces:     DefaultsNiriWorkspaces(),
+		MangoWorkspaces:    DefaultsMangoWorkspaces(),
 		General: GeneralConfig{
 			FontSans: "Inter",
 			FontMono: "JetBrains Mono",
@@ -248,6 +250,7 @@ type fileDoc struct {
 		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
 		SwayWorkspaces     *toml.Primitive `toml:"sway-workspaces"`
 		NiriWorkspaces     *toml.Primitive `toml:"niri-workspaces"`
+		MangoWorkspaces    *toml.Primitive `toml:"mango-workspaces"`
 	} `toml:"modules"`
 	General *toml.Primitive `toml:"general"`
 }
@@ -556,6 +559,13 @@ func (c *Config) applyTOML(data []byte) error {
 			return err
 		}
 		c.NiriWorkspaces = nw
+	}
+	if doc.Modules != nil && doc.Modules.MangoWorkspaces != nil {
+		mw, err := applyMangoWorkspaces(md, *doc.Modules.MangoWorkspaces)
+		if err != nil {
+			return err
+		}
+		c.MangoWorkspaces = mw
 	}
 	if doc.Modules != nil && doc.Modules.HyprlandWorkspaces != nil {
 		hw, err := applyHyprlandWorkspaces(md, *doc.Modules.HyprlandWorkspaces)
