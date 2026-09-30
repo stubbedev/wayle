@@ -28,6 +28,10 @@ type dropdownRegistry struct {
 	openPop map[string]*app.Popover
 }
 
+// dropdownCloser is live dropdown content (a service subscription) that
+// releases what it holds when its popover goes away.
+type dropdownCloser interface{ dropdownClosed() }
+
 func newDropdownRegistry(application *app.Application, cfg *config.Config, font render.Font, style *barStyle, base ModuleContext) *dropdownRegistry {
 	return &dropdownRegistry{
 		app:      application,
@@ -86,12 +90,19 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if content == nil {
 		return fmt.Errorf("dropdown %q has no content", name)
 	}
-	pop, err := r.app.OpenPopover(host, app.PopoverConfig{
+	cfg := app.PopoverConfig{
 		Anchor:  bound,
 		Content: content,
 		Serial:  r.app.LastPressSerial(host),
-	})
+	}
+	if closer, ok := content.(dropdownCloser); ok {
+		cfg.OnClosed = closer.dropdownClosed
+	}
+	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
+		if cfg.OnClosed != nil {
+			cfg.OnClosed()
+		}
 		return err
 	}
 	r.mu.Lock()

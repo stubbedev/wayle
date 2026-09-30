@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -64,28 +63,22 @@ func newBluetooth(ctx ModuleContext) (Module, error) {
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Bluetooth.Icon)
 	m.root = assembleModule(ctx, ctx.Config.Bluetooth.Icon, m.label)
-	if err := m.refresh(); err != nil {
-		return nil, err
-	}
-	ticks, stop, err := ctx.Bluetooth.Subscribe(context.Background())
-	if err != nil {
-		return nil, err
-	}
+	m.refresh()
+	startBtPairingNotifier(ctx.Bluetooth)
+	// The module lives as long as the bar; the subscription ends with
+	// the service.
+	ticks, _ := ctx.Bluetooth.Subscribe()
 	go func() {
 		for range ticks {
-			m.ctx.Invoke(func() { _ = m.refresh() })
+			m.ctx.Invoke(m.refresh)
 		}
-		stop()
 	}()
 	return m, nil
 }
 
-// refresh re-reads and restyles the label and state icon.
-func (m *bluetoothModule) refresh() error {
-	snap, err := m.source.Read(context.Background())
-	if err != nil {
-		return err
-	}
+// refresh restyles the label and state icon from the service state.
+func (m *bluetoothModule) refresh() {
+	snap := m.source.State().Snapshot()
 	cfg := m.ctx.Config.Bluetooth
 	label := ""
 	if cfg.LabelShow {
@@ -100,7 +93,6 @@ func (m *bluetoothModule) refresh() error {
 	if setter, ok := m.icon.(interface{ SetThemeName(name string) }); ok {
 		setter.SetThemeName(bluetoothIconName(cfg, snap))
 	}
-	return nil
 }
 
 func (m *bluetoothModule) Root() widget.Widget { return m.root }

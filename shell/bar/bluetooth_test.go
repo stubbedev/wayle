@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,35 +34,26 @@ func TestBluetoothLabelMatchesRustAssertions(t *testing.T) {
 	}
 }
 
-// fakeBluetoothSource is a scripted bluetooth.Source.
-type fakeBluetoothSource struct {
-	snap  bluetooth.Snapshot
-	ticks chan struct{}
-}
-
-func (f *fakeBluetoothSource) Read(context.Context) (bluetooth.Snapshot, error) {
-	return f.snap, nil
-}
-
-func (f *fakeBluetoothSource) Subscribe(context.Context) (<-chan struct{}, func(), error) {
-	return f.ticks, func() {}, nil
+// btState builds a powered single-adapter state with the given
+// connected aliases.
+func btState(connected ...string) bluetooth.State {
+	st := bluetooth.State{Available: true, Enabled: true, Primary: &bluetooth.Adapter{Powered: true}}
+	for _, alias := range connected {
+		st.Devices = append(st.Devices, bluetooth.Device{Alias: alias, Connected: true, Paired: true})
+	}
+	return st
 }
 
 func TestBluetoothModuleDimsWhenIdle(t *testing.T) {
 	cfg := config.Defaults()
 	style := computeStyle(cfg, styling.Default())
-	source := &fakeBluetoothSource{
-		snap:  bluetooth.Snapshot{Available: true, Enabled: true, Connected: []string{"Headset"}},
-		ticks: make(chan struct{}, 2),
-	}
+	source := newFakeBluetooth(btState("Headset"))
 	m := &bluetoothModule{
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
 		source: source,
 	}
 	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
-	if err := m.refresh(); err != nil {
-		t.Fatal(err)
-	}
+	m.refresh()
 	if got := m.label.Text(); got != "Headset" {
 		t.Errorf("label = %q, want the alias", got)
 	}
@@ -71,10 +61,8 @@ func TestBluetoothModuleDimsWhenIdle(t *testing.T) {
 		t.Errorf("connected color = %#08x, want the default fg", m.label.Color())
 	}
 
-	source.snap = bluetooth.Snapshot{Available: true, Enabled: true}
-	if err := m.refresh(); err != nil {
-		t.Fatal(err)
-	}
+	source.setState(btState())
+	m.refresh()
 	if got := m.label.Text(); got != "Disconnected" {
 		t.Errorf("idle label = %q", got)
 	}
@@ -86,10 +74,7 @@ func TestBluetoothModuleDimsWhenIdle(t *testing.T) {
 func TestBluetoothStateIcon(t *testing.T) {
 	cfg := config.Defaults()
 	style := computeStyle(cfg, styling.Default())
-	source := &fakeBluetoothSource{
-		snap:  bluetooth.Snapshot{Available: true, Enabled: true, Connected: []string{"Headset"}},
-		ticks: make(chan struct{}, 2),
-	}
+	source := newFakeBluetooth(btState("Headset"))
 	m := &bluetoothModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
 	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
 	m.icon = moduleIcon(m.ctx, cfg.Bluetooth.Icon)
@@ -99,31 +84,25 @@ func TestBluetoothStateIcon(t *testing.T) {
 	icon := m.icon.(*widget.Icon)
 
 	// The connected state first.
-	if err := m.refresh(); err != nil {
-		t.Fatal(err)
-	}
+	m.refresh()
 	if got := icon.Name(); got != cfg.Bluetooth.ConnectedIcon {
 		t.Errorf("connected icon = %q", got)
 	}
 	// Idle, searching, and disabled follow select_icon's order.
-	source.snap = bluetooth.Snapshot{Available: true, Enabled: true}
-	if err := m.refresh(); err != nil {
-		t.Fatal(err)
-	}
+	source.setState(btState())
+	m.refresh()
 	if got := icon.Name(); got != cfg.Bluetooth.DisconnectedIcon {
 		t.Errorf("idle icon = %q", got)
 	}
-	source.snap.Discovering = true
-	if err := m.refresh(); err != nil {
-		t.Fatal(err)
-	}
+	searching := btState()
+	searching.Primary.Discovering = true
+	source.setState(searching)
+	m.refresh()
 	if got := icon.Name(); got != cfg.Bluetooth.SearchingIcon {
 		t.Errorf("searching icon = %q", got)
 	}
-	source.snap = bluetooth.Snapshot{Available: true}
-	if err := m.refresh(); err != nil {
-		t.Fatal(err)
-	}
+	source.setState(bluetooth.State{Available: true, Primary: &bluetooth.Adapter{}})
+	m.refresh()
 	if got := icon.Name(); got != cfg.Bluetooth.DisabledIcon {
 		t.Errorf("disabled icon = %q", got)
 	}

@@ -64,37 +64,6 @@ func networkDropdown(ctx ModuleContext) widget.Widget {
 	return col
 }
 
-// bluetoothDropdown is the bluetooth card: the adapter state and the
-// connected device aliases.
-func bluetoothDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 6, 14)
-	if ctx.Bluetooth == nil {
-		col.Append(widget.NewLabel(font, px, "No BlueZ", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	snap, err := ctx.Bluetooth.Read(context.Background())
-	if err != nil {
-		col.Append(widget.NewLabel(font, px, "BlueZ unreachable", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	if !snap.Available || !snap.Enabled {
-		col.Append(widget.NewLabel(font, px, "Adapter off", ctx.Style.fg), false)
-		return col
-	}
-	if snap.Discovering {
-		col.Append(widget.NewLabel(font, px, "Searching…", mutedFg(ctx.Style.palette)), false)
-	}
-	if len(snap.Connected) == 0 {
-		col.Append(widget.NewLabel(font, px, "No devices connected", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	for _, alias := range snap.Connected {
-		col.Append(widget.NewLabel(font, px, alias, ctx.Style.fg), false)
-	}
-	return col
-}
-
 // mediaDropdown is the now-playing card: the active player's track.
 // Transport controls wait for the MPRIS control surface.
 func mediaDropdown(ctx ModuleContext) widget.Widget {
