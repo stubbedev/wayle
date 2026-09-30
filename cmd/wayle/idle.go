@@ -1,12 +1,11 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"strconv"
+	"strings"
 
 	"github.com/stubbedev/wayle/internal/cli"
+	"github.com/stubbedev/wayle/internal/rustparse"
 	"github.com/stubbedev/wayle/service/idleinhibit"
 )
 
@@ -27,8 +26,8 @@ func idleCommand() *cli.Command {
 				Run: withIdle(idleOn),
 			},
 			{Name: "off", About: "Disable idle inhibition", Run: withIdle(idleOff)},
-			{Name: "duration", About: "Adjust timer duration (upper limit)", AllowHyphenValues: true, Args: adjust, Run: withIdle(idleDuration)},
-			{Name: "remaining", About: "Adjust remaining time on active timer", AllowHyphenValues: true, Args: adjust, Run: withIdle(idleRemaining)},
+			{Name: "duration", About: "Adjust timer duration (upper limit)", AllowHyphenValues: true, Args: adjust, Run: withIdle(idleAdjuster{"duration", "Duration"}.run)},
+			{Name: "remaining", About: "Adjust remaining time on active timer", AllowHyphenValues: true, Args: adjust, Run: withIdle(idleAdjuster{"remaining", "Remaining"}.run)},
 			{Name: "status", About: "Show current idle inhibit status", Run: withIdle(idleStatus)},
 			{
 				Name:  "toggle",
@@ -42,111 +41,120 @@ func idleCommand() *cli.Command {
 	}
 }
 
-func withIdle(run func(context.Context, *cli.Matches, *idleinhibit.DBus) error) func(*cli.Matches) error {
-	return func(m *cli.Matches) error {
-		client, err := idleinhibit.Connect()
-		if err != nil {
-			return err
-		}
-		defer func() { _ = client.Close() }()
-		return run(context.Background(), m, client)
-	}
+func withIdle(run func(*cli.Matches, *daemonProxy) error) func(*cli.Matches) error {
+	return withDaemon("IdleInhibit", idleinhibit.ServiceName, idleinhibit.ServicePath, idleinhibit.ServiceName, run)
 }
 
-func idleOn(ctx context.Context, m *cli.Matches, client *idleinhibit.DBus) error {
-	if minutes, ok := cli.Value[uint32](m, "minutes"); ok {
-		if err := client.SetDuration(ctx, minutes); err != nil {
-			return err
-		}
-	}
-	return client.Enable(ctx, m.Flag("indefinite"))
-}
-
-func idleOff(ctx context.Context, _ *cli.Matches, client *idleinhibit.DBus) error {
-	return client.Disable(ctx)
-}
-
-func idleDuration(ctx context.Context, m *cli.Matches, client *idleinhibit.DBus) error {
-	value, _ := cli.Value[string](m, "value")
-	minutes, err := strconv.ParseUint(value, 10, 32)
-	if err != nil {
-		return fmt.Errorf("idle duration: %w", err)
-	}
-	return client.SetDuration(ctx, uint32(minutes))
-}
-
-func idleToggle(ctx context.Context, m *cli.Matches, client *idleinhibit.DBus) error {
-	indefinite := m.Flag("indefinite")
-	snap, err := client.Status(ctx)
-	if err != nil {
+// idleEnable is on.rs / toggle.rs's enable tail: the duration read is
+// best-effort, as Rust's unwrap_or(0).
+func idleEnable(m *cli.Matches, p *daemonProxy, indefinite bool) error {
+	if err := p.call("enable idle inhibit", "Enable", nil, indefinite); err != nil {
 		return err
 	}
-	if snap.Active {
-		if err := client.Disable(ctx); err != nil {
-			return err
-		}
-		fmt.Fprintln(m.Stdout(), "Disabled")
-		return nil
-	}
-	if err := client.Enable(ctx, indefinite); err != nil {
-		return err
-	}
-	if indefinite {
+	var duration uint32
+	_ = p.prop("get duration", "Duration", &duration)
+	if indefinite || duration == 0 {
 		fmt.Fprintln(m.Stdout(), "Enabled (indefinite)")
-		return nil
+	} else {
+		fmt.Fprintf(m.Stdout(), "Enabled for %d minutes\n", duration)
 	}
-	fmt.Fprintf(m.Stdout(), "Enabled for %d minutes\n", snap.DurationMins)
 	return nil
 }
 
-func idleRemaining(ctx context.Context, m *cli.Matches, client *idleinhibit.DBus) error {
-	value, _ := cli.Value[string](m, "value")
-	if value == "" {
-		return errors.New("idle remaining needs minutes (±m)")
-	}
-	if value[0] == '+' || value[0] == '-' {
-		delta, err := strconv.ParseInt(value, 10, 32)
-		if err != nil {
-			return fmt.Errorf("idle remaining: %w", err)
-		}
-		if err := client.AdjustRemaining(ctx, int32(delta)); err != nil {
+func idleOn(m *cli.Matches, p *daemonProxy) error {
+	if minutes, ok := cli.Value[uint32](m, "minutes"); ok {
+		if err := p.call("set duration", "SetDuration", nil, minutes); err != nil {
 			return err
 		}
-		if delta >= 0 {
-			fmt.Fprintf(m.Stdout(), "Added %d minutes to remaining\n", delta)
-		} else {
-			fmt.Fprintf(m.Stdout(), "Subtracted %d minutes from remaining\n", -delta)
-		}
-		return nil
 	}
-	minutes, err := strconv.ParseUint(value, 10, 32)
-	if err != nil {
-		return fmt.Errorf("idle remaining: %w", err)
-	}
-	if err := client.SetRemaining(ctx, uint32(minutes)); err != nil {
+	return idleEnable(m, p, m.Flag("indefinite"))
+}
+
+func idleOff(m *cli.Matches, p *daemonProxy) error {
+	if err := p.call("disable idle inhibit", "Disable", nil); err != nil {
 		return err
 	}
-	fmt.Fprintf(m.Stdout(), "Set remaining to %d minutes\n", minutes)
+	fmt.Fprintln(m.Stdout(), "Disabled")
 	return nil
 }
 
-func idleStatus(ctx context.Context, m *cli.Matches, client *idleinhibit.DBus) error {
-	snap, err := client.Status(ctx)
-	if err != nil {
+func idleToggle(m *cli.Matches, p *daemonProxy) error {
+	var active bool
+	if err := p.prop("get active state", "Active", &active); err != nil {
 		return err
 	}
-	duration := "indefinite"
-	if snap.DurationMins != 0 {
-		duration = strconv.FormatUint(uint64(snap.DurationMins), 10) + " min"
+	if active {
+		return idleOff(m, p)
 	}
-	if !snap.Active {
-		fmt.Fprintf(m.Stdout(), "Inactive (duration: %s)\n", duration)
+	return idleEnable(m, p, m.Flag("indefinite"))
+}
+
+// idleAdjuster is duration.rs / remaining.rs: "+N" adds, "-N"
+// subtracts, a bare N sets.
+type idleAdjuster struct {
+	noun   string // "duration" / "remaining"
+	member string // "Duration" / "Remaining"
+}
+
+func (a idleAdjuster) run(m *cli.Matches, p *daemonProxy) error {
+	raw, _ := cli.Value[string](m, "value")
+	value := strings.TrimSpace(raw)
+	switch {
+	case strings.HasPrefix(value, "+") || strings.HasPrefix(value, "-"):
+		digits := value
+		if value[0] == '+' {
+			digits = value[1:]
+		}
+		delta, err := rustparse.Int(digits, 32)
+		if err != nil {
+			return cliMessage("Invalid delta: " + value)
+		}
+		if err := p.call("adjust "+a.noun, "Adjust"+a.member, nil, int32(delta)); err != nil {
+			return err
+		}
+		if value[0] == '+' {
+			fmt.Fprintf(m.Stdout(), "Added %d minutes to %s\n", delta, a.noun)
+		} else {
+			fmt.Fprintf(m.Stdout(), "Subtracted %d minutes from %s\n", -delta, a.noun)
+		}
+	default:
+		minutes, err := rustparse.Uint(value, 32)
+		if err != nil {
+			return cliMessage("Invalid minutes: " + value)
+		}
+		if err := p.call("set "+a.noun, "Set"+a.member, nil, uint32(minutes)); err != nil {
+			return err
+		}
+		fmt.Fprintf(m.Stdout(), "Set %s to %d minutes\n", a.noun, minutes)
+	}
+	return nil
+}
+
+func idleStatus(m *cli.Matches, p *daemonProxy) error {
+	var active bool
+	var duration uint32
+	if err := p.prop("get active state", "Active", &active); err != nil {
+		return err
+	}
+	if err := p.prop("get duration", "Duration", &duration); err != nil {
+		return err
+	}
+	if !active {
+		label := "indefinite"
+		if duration != 0 {
+			label = fmt.Sprintf("%d min", duration)
+		}
+		fmt.Fprintf(m.Stdout(), "Inactive (duration: %s)\n", label)
 		return nil
 	}
-	if snap.DurationMins == 0 {
+	if duration == 0 {
 		fmt.Fprintln(m.Stdout(), "Active (indefinite)")
 		return nil
 	}
-	fmt.Fprintf(m.Stdout(), "Active (%d:%02d remaining, %s duration)\n", snap.RemainingS/60, snap.RemainingS%60, duration)
+	var remaining uint32
+	if err := p.prop("get remaining", "Remaining", &remaining); err != nil {
+		return err
+	}
+	fmt.Fprintf(m.Stdout(), "Active (%d:%02d remaining, %d min duration)\n", remaining/60, remaining%60, duration)
 	return nil
 }

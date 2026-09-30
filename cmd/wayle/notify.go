@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/stubbedev/wayle/internal/cli"
@@ -30,65 +29,77 @@ func notifyCommand() *cli.Command {
 	}
 }
 
-func withNotify(run func(context.Context, *cli.Matches, *notifications.Client) error) func(*cli.Matches) error {
-	return func(m *cli.Matches) error {
-		client, err := notifications.Connect()
-		if err != nil {
-			return err
-		}
-		defer func() { _ = client.Close() }()
-		return run(context.Background(), m, client)
-	}
+func withNotify(run func(*cli.Matches, *daemonProxy) error) func(*cli.Matches) error {
+	return withDaemon("Notification", notifications.WayleName, notifications.WaylePath, notifications.WayleName, run)
 }
 
-func notifyList(ctx context.Context, m *cli.Matches, client *notifications.Client) error {
-	rows, err := client.List(ctx)
-	if err != nil {
+func notifyList(m *cli.Matches, p *daemonProxy) error {
+	var rows []notifications.ListRow
+	if err := p.call("list notifications", "List", []any{&rows}); err != nil {
 		return err
 	}
 	if len(rows) == 0 {
 		fmt.Fprintln(m.Stdout(), "No notifications")
 		return nil
 	}
+	fmt.Fprintln(m.Stdout(), "Notifications:")
 	for _, r := range rows {
-		fmt.Fprintf(m.Stdout(), "%d %s: %s\n", r.ID, r.App, r.Summary)
+		fmt.Fprintf(m.Stdout(), "  [%d] %s: %s\n", r.ID, r.App, r.Summary)
 		if r.Body != "" {
-			fmt.Fprintf(m.Stdout(), "    %s\n", r.Body)
+			fmt.Fprintf(m.Stdout(), "      %s\n", r.Body)
 		}
 	}
 	return nil
 }
 
-func notifyDismiss(ctx context.Context, m *cli.Matches, client *notifications.Client) error {
+func notifyDismiss(m *cli.Matches, p *daemonProxy) error {
 	id, _ := cli.Value[uint32](m, "id")
-	return client.Dismiss(ctx, id)
-}
-
-func notifyDismissAll(ctx context.Context, _ *cli.Matches, client *notifications.Client) error {
-	return client.DismissAll(ctx)
-}
-
-func notifyDND(ctx context.Context, m *cli.Matches, client *notifications.Client) error {
-	on, err := client.ToggleDND(ctx)
-	if err != nil {
+	if err := p.call("dismiss notification", "Dismiss", nil, id); err != nil {
 		return err
 	}
-	fmt.Fprintf(m.Stdout(), "Do Not Disturb: %s\n", enabledWord(on))
+	fmt.Fprintf(m.Stdout(), "Dismissed notification %d\n", id)
 	return nil
 }
 
-func notifyStatus(ctx context.Context, m *cli.Matches, client *notifications.Client) error {
-	count, popups, dnd, err := client.Status(ctx)
-	if err != nil {
+func notifyDismissAll(m *cli.Matches, p *daemonProxy) error {
+	if err := p.call("dismiss notifications", "DismissAll", nil); err != nil {
 		return err
 	}
-	dndState := "off"
-	if dnd {
-		dndState = "on"
+	fmt.Fprintln(m.Stdout(), "Dismissed all notifications")
+	return nil
+}
+
+func notifyDND(m *cli.Matches, p *daemonProxy) error {
+	if err := p.call("toggle DND", "ToggleDnd", nil); err != nil {
+		return err
+	}
+	var dnd bool
+	if err := p.prop("get DND state", "Dnd", &dnd); err != nil {
+		return err
+	}
+	fmt.Fprintf(m.Stdout(), "Do Not Disturb: %s\n", enabledWord(dnd))
+	return nil
+}
+
+func notifyStatus(m *cli.Matches, p *daemonProxy) error {
+	var count, popups, duration uint32
+	var dnd bool
+	if err := p.prop("get notification count", "Count", &count); err != nil {
+		return err
+	}
+	if err := p.prop("get popup count", "PopupCount", &popups); err != nil {
+		return err
+	}
+	if err := p.prop("get DND state", "Dnd", &dnd); err != nil {
+		return err
+	}
+	if err := p.prop("get popup duration", "PopupDuration", &duration); err != nil {
+		return err
 	}
 	fmt.Fprintf(m.Stdout(), "Notifications: %d\n", count)
 	fmt.Fprintf(m.Stdout(), "Active popups: %d\n", popups)
-	fmt.Fprintf(m.Stdout(), "Do Not Disturb: %s\n", dndState)
+	fmt.Fprintf(m.Stdout(), "Do Not Disturb: %s\n", enabledWord(dnd))
+	fmt.Fprintf(m.Stdout(), "Popup duration: %dms\n", duration)
 	return nil
 }
 

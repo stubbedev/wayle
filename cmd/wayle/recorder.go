@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/stubbedev/wayle/internal/cli"
@@ -14,68 +13,68 @@ func recorderCommand() *cli.Command {
 		Name:  "recorder",
 		About: "Screen recorder control commands",
 		Subcommands: []*cli.Command{
-			{Name: "start", About: "Start recording", Run: withRecorder(recorderStart)},
-			{Name: "stop", About: "Stop recording", Run: withRecorder(recorderStop)},
+			{Name: "start", About: "Start recording", Run: withRecorder(recorderAction("start recording", "Start", "Recording started"))},
+			{Name: "stop", About: "Stop recording", Run: withRecorder(recorderAction("stop recording", "Stop", "Recording stopped"))},
 			{Name: "toggle", About: "Toggle recording on/off", Run: withRecorder(recorderToggle)},
-			{Name: "pause", About: "Pause the active recording", Run: withRecorder(recorderPause)},
-			{Name: "resume", About: "Resume a paused recording", Run: withRecorder(recorderResume)},
+			{Name: "pause", About: "Pause the active recording", Run: withRecorder(recorderAction("pause recording", "Pause", "Paused"))},
+			{Name: "resume", About: "Resume a paused recording", Run: withRecorder(recorderAction("resume recording", "Resume", "Resumed"))},
 			{Name: "status", About: "Show current recorder status", Run: withRecorder(recorderStatus)},
 		},
 	}
 }
 
-func withRecorder(run func(context.Context, *cli.Matches, *recorder.Client) error) func(*cli.Matches) error {
-	return func(m *cli.Matches) error {
-		client, err := recorder.Connect()
-		if err != nil {
+func withRecorder(run func(*cli.Matches, *daemonProxy) error) func(*cli.Matches) error {
+	return withDaemon("Recorder", recorder.ServiceName, recorder.ServicePath, recorder.ServiceName, run)
+}
+
+// recorderAction is start.rs / stop.rs / pause.rs / resume.rs.
+func recorderAction(op, method, done string) func(*cli.Matches, *daemonProxy) error {
+	return func(m *cli.Matches, p *daemonProxy) error {
+		if err := p.call(op, method, nil); err != nil {
 			return err
 		}
-		defer func() { _ = client.Close() }()
-		return run(context.Background(), m, client)
+		fmt.Fprintln(m.Stdout(), done)
+		return nil
 	}
 }
 
-func printRecording(m *cli.Matches, status string, err error) error {
-	if err == nil {
-		fmt.Fprintf(m.Stdout(), "Recording: %s\n", status)
-	}
-	return err
-}
-
-func recorderStart(ctx context.Context, m *cli.Matches, c *recorder.Client) error {
-	status, err := c.Start(ctx)
-	return printRecording(m, status, err)
-}
-
-func recorderStop(ctx context.Context, m *cli.Matches, c *recorder.Client) error {
-	status, err := c.Stop(ctx)
-	return printRecording(m, status, err)
-}
-
-func recorderToggle(ctx context.Context, m *cli.Matches, c *recorder.Client) error {
-	status, err := c.Toggle(ctx)
-	return printRecording(m, status, err)
-}
-
-func recorderPause(ctx context.Context, _ *cli.Matches, c *recorder.Client) error {
-	_, err := c.SetPaused(ctx, true)
-	return err
-}
-
-func recorderResume(ctx context.Context, _ *cli.Matches, c *recorder.Client) error {
-	_, err := c.SetPaused(ctx, false)
-	return err
-}
-
-func recorderStatus(ctx context.Context, m *cli.Matches, c *recorder.Client) error {
-	snap, err := c.Status(ctx)
-	if err != nil {
+func recorderToggle(m *cli.Matches, p *daemonProxy) error {
+	if err := p.call("toggle recording", "Toggle", nil); err != nil {
 		return err
 	}
-	fmt.Fprintf(m.Stdout(), "Recording: %s\n", snap.Status)
-	fmt.Fprintf(m.Stdout(), "Elapsed: %s\n", recorder.FormatElapsed(snap.ElapsedSecs))
-	if snap.OutputPath != "" {
-		fmt.Fprintf(m.Stdout(), "Output: %s\n", snap.OutputPath)
+	var active bool
+	_ = p.prop("get active state", "Active", &active)
+	if active {
+		fmt.Fprintln(m.Stdout(), "Recording started")
+	} else {
+		fmt.Fprintln(m.Stdout(), "Recording stopped")
+	}
+	return nil
+}
+
+func recorderStatus(m *cli.Matches, p *daemonProxy) error {
+	var active bool
+	if err := p.prop("get active state", "Active", &active); err != nil {
+		return err
+	}
+	if !active {
+		fmt.Fprintln(m.Stdout(), "Idle")
+		return nil
+	}
+	var paused bool
+	var elapsed uint32
+	var file string
+	_ = p.prop("get paused state", "Paused", &paused)
+	_ = p.prop("get elapsed", "Elapsed", &elapsed)
+	_ = p.prop("get file", "File", &file)
+	state := "Recording"
+	if paused {
+		state = "Paused"
+	}
+	if file == "" {
+		fmt.Fprintf(m.Stdout(), "%s (%d:%02d)\n", state, elapsed/60, elapsed%60)
+	} else {
+		fmt.Fprintf(m.Stdout(), "%s (%d:%02d) -> %s\n", state, elapsed/60, elapsed%60, file)
 	}
 	return nil
 }

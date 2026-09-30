@@ -1,20 +1,24 @@
 package notifications
 
 import (
-	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/wayle/internal/dbusx"
 )
 
-// Server serves org.freedesktop.Notifications on the session bus.
+// Server serves org.freedesktop.Notifications on the session bus and
+// wayle's com.wayle.Notifications1 extension beside it.
 type Server struct {
-	conn *dbus.Conn
-	svc  *Service
+	conn        *dbus.Conn
+	svc         *Service
+	releaseExts func()
 }
 
-// Serve requests the well-known name and exports the object; the
-// returned release function drops both.
+// Serve requests the well-known names and exports the objects; Release
+// drops them.
 func Serve(conn *dbus.Conn, svc *Service) (*Server, error) {
 	svc.SetEmitter(func(signal string, args ...any) {
 		if err := conn.Emit(ObjPath, signal, args...); err != nil {
@@ -25,9 +29,6 @@ func Serve(conn *dbus.Conn, svc *Service) (*Server, error) {
 	if err := conn.Export(server, ObjPath, Interface); err != nil {
 		return nil, fmt.Errorf("notifications: export: %w", err)
 	}
-	if err := conn.Export(server, ObjPath, ControlInterface); err != nil {
-		return nil, fmt.Errorf("notifications: export control: %w", err)
-	}
 	reply, err := conn.RequestName(Interface, dbus.NameFlagDoNotQueue)
 	if err != nil {
 		return nil, fmt.Errorf("notifications: request name: %w", err)
@@ -35,11 +36,20 @@ func Serve(conn *dbus.Conn, svc *Service) (*Server, error) {
 	if reply != dbus.RequestNameReplyPrimaryOwner {
 		return nil, fmt.Errorf("notifications: %s is already owned", Interface)
 	}
+	release, err := ServeWayle(conn, svc)
+	if err != nil {
+		_, _ = conn.ReleaseName(Interface)
+		return nil, err
+	}
+	server.releaseExts = release
 	return server, nil
 }
 
-// Release drops the name.
+// Release drops the names.
 func (s *Server) Release() error {
+	if s.releaseExts != nil {
+		s.releaseExts()
+	}
 	_, err := s.conn.ReleaseName(Interface)
 	return err
 }
@@ -66,108 +76,54 @@ func (s *Server) GetServerInformation() (string, string, string, string, *dbus.E
 	return ServerName, ServerVendor, ServerVersion, SpecVersion, nil
 }
 
-// ControlInterface is wayle's own control surface on the same object:
-// the `wayle notify` CLI drives this.
-const ControlInterface = "com.wayle.Notifications1"
+// wayle's control extension, which `wayle notify` drives
+// (wayle-notification/src/wayle_daemon.rs).
+const (
+	WayleName = "com.wayle.Notifications1"
+	WaylePath = dbus.ObjectPath("/com/wayle/Notifications")
+)
 
-// DismissAll empties the history.
-func (s *Server) DismissAll() *dbus.Error {
-	s.svc.DismissAll()
-	return nil
-}
+// defaultPopupDuration is the service builder's popup_duration.
+const defaultPopupDuration = 5000
 
-// Dismiss removes one notification.
-func (s *Server) Dismiss(id uint32) *dbus.Error {
-	s.svc.Close(id, Dismissed)
-	return nil
-}
-
-// SetDND flips do-not-disturb.
-func (s *Server) SetDND(enabled bool) *dbus.Error {
-	s.svc.SetDND(enabled)
-	return nil
-}
-
-// ToggleDND flips do-not-disturb, returning the new state.
-func (s *Server) ToggleDND() (bool, *dbus.Error) {
-	return s.svc.ToggleDND(), nil
-}
-
-// List snapshots the history as (id, app, summary, body) rows.
-func (s *Server) List() ([]ControlRow, *dbus.Error) {
-	notifs := s.svc.Notifications()
-	rows := make([]ControlRow, 0, len(notifs))
-	for _, n := range notifs {
-		rows = append(rows, ControlRow{n.ID, n.AppName, n.Summary, n.Body})
-	}
-	return rows, nil
-}
-
-// ControlRow is one List row.
-type ControlRow struct {
-	ID      uint32
-	App     string
-	Summary string
-	Body    string
-}
-
-// DND reports the flag.
-func (s *Server) DND() (bool, *dbus.Error) { return s.svc.DND(), nil }
-
-// PopupDuration reports the configured popup duration; the timers use
-// the notification's own expire_timeout, so this mirrors the config.
-func (s *Server) PopupDuration() (uint32, *dbus.Error) { return 5000, nil }
-
-// Count reports the history size.
-func (s *Server) Count() (uint32, *dbus.Error) { return uint32(s.svc.Count()), nil }
-
-// PopupCount reports the visible popups.
-func (s *Server) PopupCount() (uint32, *dbus.Error) {
-	return uint32(len(s.svc.Popups())), nil
-}
-
-// Client drives the daemon's control interface from the CLI.
-type Client struct {
-	conn *dbus.Conn
-	obj  dbus.BusObject
-}
-
-// Connect dials the session bus.
-func Connect() (*Client, error) {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		return nil, fmt.Errorf("notifications: session bus: %w", err)
-	}
-	return &Client{conn: conn, obj: conn.Object(Interface, ObjPath)}, nil
-}
-
-// Close drops the bus connection.
-func (c *Client) Close() error { return c.conn.Close() }
-
-// SetDND flips do-not-disturb.
-func (c *Client) SetDND(ctx context.Context, enabled bool) error {
-	return c.obj.CallWithContext(ctx, ControlInterface+".SetDND", 0, enabled).Err
-}
-
-// ToggleDND flips do-not-disturb, returning the new state.
-func (c *Client) ToggleDND(ctx context.Context) (bool, error) {
-	var on bool
-	err := c.obj.CallWithContext(ctx, ControlInterface+".ToggleDND", 0).Store(&on)
-	return on, err
+// wayleDaemon is the com.wayle.Notifications1 object (WayleDaemon).
+type wayleDaemon struct {
+	svc           *Service
+	popupDuration atomic.Uint32
 }
 
 // DismissAll empties the history.
-func (c *Client) DismissAll(ctx context.Context) error {
-	return c.obj.CallWithContext(ctx, ControlInterface+".DismissAll", 0).Err
+func (d *wayleDaemon) DismissAll() *dbus.Error {
+	d.svc.DismissAll()
+	return nil
 }
 
-// Dismiss removes one notification.
-func (c *Client) Dismiss(ctx context.Context, id uint32) error {
-	return c.obj.CallWithContext(ctx, ControlInterface+".Dismiss", 0, id).Err
+// Dismiss removes one notification as dismissed by the user.
+func (d *wayleDaemon) Dismiss(id uint32) *dbus.Error {
+	d.svc.Close(id, Dismissed)
+	return nil
 }
 
-// Row is one listed notification.
-type Row struct {
+// SetDnd sets do-not-disturb.
+func (d *wayleDaemon) SetDnd(enabled bool) *dbus.Error {
+	d.svc.SetDND(enabled)
+	return nil
+}
+
+// ToggleDnd flips do-not-disturb.
+func (d *wayleDaemon) ToggleDnd() *dbus.Error {
+	d.svc.ToggleDND()
+	return nil
+}
+
+// SetPopupDuration stores the popup duration the property reports.
+func (d *wayleDaemon) SetPopupDuration(ms uint32) *dbus.Error {
+	d.popupDuration.Store(ms)
+	return nil
+}
+
+// ListRow is one List row: (id, app, summary, body).
+type ListRow struct {
 	ID      uint32
 	App     string
 	Summary string
@@ -175,26 +131,29 @@ type Row struct {
 }
 
 // List snapshots the history.
-func (c *Client) List(ctx context.Context) ([]Row, error) {
-	var rows []ControlRow
-	if err := c.obj.CallWithContext(ctx, ControlInterface+".List", 0).Store(&rows); err != nil {
-		return nil, err
+func (d *wayleDaemon) List() ([]ListRow, *dbus.Error) {
+	notifs := d.svc.Notifications()
+	rows := make([]ListRow, 0, len(notifs))
+	for _, n := range notifs {
+		rows = append(rows, ListRow{n.ID, n.AppName, n.Summary, n.Body})
 	}
-	out := make([]Row, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, Row(r))
-	}
-	return out, nil
+	return rows, nil
 }
 
-// Status reads the daemon's counters.
-func (c *Client) Status(ctx context.Context) (count, popups uint32, dnd bool, err error) {
-	if err = c.obj.CallWithContext(ctx, ControlInterface+".Count", 0).Store(&count); err != nil {
-		return
-	}
-	if err = c.obj.CallWithContext(ctx, ControlInterface+".PopupCount", 0).Store(&popups); err != nil {
-		return
-	}
-	err = c.obj.CallWithContext(ctx, ControlInterface+".DND", 0).Store(&dnd)
-	return
+// ServeWayle exports com.wayle.Notifications1 over svc.
+func ServeWayle(conn *dbus.Conn, svc *Service) (func(), error) {
+	d := &wayleDaemon{svc: svc}
+	d.popupDuration.Store(defaultPopupDuration)
+	return dbusx.Serve(conn, dbusx.Service{
+		Name:      WayleName,
+		Path:      WaylePath,
+		Interface: WayleName,
+		Methods:   d,
+		Properties: dbusx.Getters{
+			"Dnd":           func() any { return svc.DND() },
+			"PopupDuration": func() any { return d.popupDuration.Load() },
+			"Count":         func() any { return uint32(svc.Count()) },
+			"PopupCount":    func() any { return uint32(len(svc.Popups())) },
+		},
+	})
 }
