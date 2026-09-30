@@ -642,3 +642,7 @@ func (a *Actions) ContextMenu(ctx context.Context, it Item, x, y int32) error {
 func (a *Actions) Scroll(ctx context.Context, it Item, delta int32, orientation string) error {
 	return a.conn.Object(it.Bus, dbus.ObjectPath(it.Path)).CallWithContext(ctx, ItemIface+".Scroll", 0, delta, orientation).Err
 }
+
+// IsWatcher reports whether this process serves the watcher role (the
+// Rust service in TrayMode::Auto having claimed it).
+func (h *Host) IsWatcher() bool { return h.watcher != nil }

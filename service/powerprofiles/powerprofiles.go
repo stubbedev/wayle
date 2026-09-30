@@ -52,6 +52,9 @@ type Snapshot struct {
 	Available bool
 	Active    string
 	Profiles  []string
+	// PerformanceDegraded is the daemon's degradation reason ("" when
+	// performance is not degraded).
+	PerformanceDegraded string
 }
 
 const (
@@ -105,6 +108,10 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 	snap.Available = true
 	snap.Active = active
 
+	var degraded string
+	if err := obj.CallWithContext(ctx, properties+".Get", 0, daemonIface, "PerformanceDegraded").Store(&degraded); err == nil {
+		snap.PerformanceDegraded = degraded
+	}
 	var raw []map[string]dbus.Variant
 	if err := obj.CallWithContext(ctx, properties+".Get", 0, daemonIface, "Profiles").Store(&raw); err == nil {
 		for _, entry := range raw {

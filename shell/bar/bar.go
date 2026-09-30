@@ -167,12 +167,14 @@ func RunWith(cfg *config.Config) error {
 	}
 	stopMail := startMail(&baseCtx)
 	defer stopMail()
-	if host, err := sni.NewHost(sniStore); err == nil {
-		defer func() { _ = host.Close() }()
-		baseCtx.Tray = NewTrayService(host)
+	sniHost, err := sni.NewHost(sniStore)
+	if err == nil {
+		defer func() { _ = sniHost.Close() }()
+		baseCtx.Tray = NewTrayService(sniHost)
 	} else {
 		log.Printf("systray: host: %v", err)
 	}
+	defer serveCLIDaemons(baseCtx, sniHost)()
 	customUpd := newCustomUpdates()
 	baseCtx.CustomUpdates = customUpd
 	baseCtx.Attachers = &[]interface{ Attach(app.Host) }{}
