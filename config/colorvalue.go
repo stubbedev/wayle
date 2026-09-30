@@ -94,7 +94,7 @@ const (
 type ColorValue struct {
 	Kind  ColorKind
 	Token CssToken
-	Hex   string // #rgb, #rrggbb, or #rrggbbaa; valid only for ColorCustom
+	Hex   string // #rgb, #rgba, #rrggbb, or #rrggbbaa; valid only for ColorCustom
 }
 
 // IsAuto reports whether the value defers to its consumer.
@@ -111,10 +111,11 @@ func ParseColorValue(s string) (ColorValue, error) {
 		return ColorValue{Kind: ColorAuto}, nil
 	}
 	if strings.HasPrefix(s, "#") {
-		if !validHex(s) {
-			return ColorValue{}, fmt.Errorf("config: invalid hex color %q (want #rgb, #rrggbb, or #rrggbbaa)", s)
+		hex, err := ParseHexColor(s)
+		if err != nil {
+			return ColorValue{}, err
 		}
-		return ColorValue{Kind: ColorCustom, Hex: s}, nil
+		return ColorValue{Kind: ColorCustom, Hex: string(hex)}, nil
 	}
 	token := CssToken(s)
 	if !validTokens[token] {
@@ -123,9 +124,13 @@ func ParseColorValue(s string) (ColorValue, error) {
 	return ColorValue{Kind: ColorToken, Token: token}, nil
 }
 
-// validHex reports whether s is #rgb, #rrggbb, or #rrggbbaa.
+// validHex reports whether s is #rgb, #rgba, #rrggbb, or #rrggbbaa: the
+// HexColor::validate lengths.
 func validHex(s string) bool {
-	if len(s) != 4 && len(s) != 7 && len(s) != 9 {
+	if !strings.HasPrefix(s, "#") {
+		return false
+	}
+	if n := len(s) - 1; n != 3 && n != 4 && n != 6 && n != 8 {
 		return false
 	}
 	for _, r := range s[1:] {
@@ -134,4 +139,62 @@ func validHex(s string) bool {
 		}
 	}
 	return true
+}
+
+// UnmarshalText decodes a TOML color string through ParseColorValue, so
+// module tables can decode `icon-color = "red"` straight into a
+// ColorValue field and a bad color is a load error.
+func (c *ColorValue) UnmarshalText(text []byte) error {
+	cv, err := ParseColorValue(string(text))
+	if err != nil {
+		return err
+	}
+	*c = cv
+	return nil
+}
+
+// CSSVar is the token's CSS variable reference, "var(--accent)": the
+// Rust CssToken::css_var.
+func (t CssToken) CSSVar() string { return "var(--" + string(t) + ")" }
+
+// ToCSS is the value for an inline declaration: a token is its var(),
+// a custom color its hex, transparent the keyword, and Auto the accent
+// var — consumers resolve Auto before calling it. This is the Rust
+// ColorValue::to_css.
+func (c ColorValue) ToCSS() string {
+	switch c.Kind {
+	case ColorToken:
+		return c.Token.CSSVar()
+	case ColorCustom:
+		return c.Hex
+	case ColorTransparent:
+		return "transparent"
+	default: // ColorAuto
+		return TokenAccent.CSSVar()
+	}
+}
+
+// HexColor is a validated CSS hex color: #rgb, #rgba, #rrggbb, or
+// #rrggbbaa (crates/wayle-config/src/schemas/styling/types/validated/
+// hex_color.rs). Construct it with ParseHexColor.
+type HexColor string
+
+// ParseHexColor validates one hex color string, rejecting the
+// HexColor::new error cases: a missing '#', a wrong digit count, a
+// non-hex digit.
+func ParseHexColor(s string) (HexColor, error) {
+	if !validHex(s) {
+		return "", fmt.Errorf("config: invalid hex color %q (want #rgb, #rgba, #rrggbb, or #rrggbbaa)", s)
+	}
+	return HexColor(s), nil
+}
+
+// UnmarshalText decodes a TOML hex string through ParseHexColor.
+func (h *HexColor) UnmarshalText(text []byte) error {
+	hex, err := ParseHexColor(string(text))
+	if err != nil {
+		return err
+	}
+	*h = hex
+	return nil
 }

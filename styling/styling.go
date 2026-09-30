@@ -171,15 +171,19 @@ func ResolveColor(cv config.ColorValue, p *Palette) (render.Color, bool) {
 	return 0, false
 }
 
-// parseHex decodes #rgb, #rrggbb, or #rrggbbaa (straight alpha, the CSS
-// form) into a premultiplied render.Color.
+// parseHex decodes #rgb, #rgba, #rrggbb, or #rrggbbaa (straight alpha,
+// the CSS form) into a premultiplied render.Color.
 func parseHex(s string) (render.Color, bool) {
-	if len(s) != 4 && len(s) != 7 && len(s) != 9 {
+	if len(s) != 4 && len(s) != 5 && len(s) != 7 && len(s) != 9 {
 		return 0, false
 	}
 	digits := s[1:]
-	if len(digits) == 3 { // #rgb expands each nibble, per CSS
-		digits = string([]byte{digits[0], digits[0], digits[1], digits[1], digits[2], digits[2]})
+	if len(digits) <= 4 { // #rgb/#rgba expand each nibble, per CSS
+		long := make([]byte, 0, 2*len(digits))
+		for i := range len(digits) {
+			long = append(long, digits[i], digits[i])
+		}
+		digits = string(long)
 	}
 	var vals [4]uint8
 	bytes := len(digits) / 2

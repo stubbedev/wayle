@@ -28,6 +28,47 @@ func TestParseColorValueVariants(t *testing.T) {
 	}
 }
 
+func TestParseColorValueAcceptsShortAlphaHex(t *testing.T) {
+	// HexColor accepts 3, 4, 6, or 8 digits.
+	got, err := ParseColorValue("#abcd")
+	if err != nil || got != (ColorValue{Kind: ColorCustom, Hex: "#abcd"}) {
+		t.Errorf("ParseColorValue(#abcd) = %+v, %v", got, err)
+	}
+	if _, err := ParseHexColor("abcdef"); err == nil {
+		t.Error("ParseHexColor without '#': want an error")
+	}
+}
+
+func TestColorValueToCSS(t *testing.T) {
+	for in, want := range map[string]string{
+		"accent":              "var(--accent)",
+		"bg-surface-elevated": "var(--bg-surface-elevated)",
+		"status-error-hover":  "var(--status-error-hover)",
+		"#414868":             "#414868",
+		"transparent":         "transparent",
+		"auto":                "var(--accent)", // consumers resolve auto first
+	} {
+		if got := mustColor(in).ToCSS(); got != want {
+			t.Errorf("%q.ToCSS() = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestColorValueDecodesFromTOML(t *testing.T) {
+	path := writeConfig(t, "[modules.weather]\nicon-color = \"red\"\n")
+	cfg, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("LoadFile: %v", err)
+	}
+	if cfg.Weather.Icon.Color.Token != TokenRed {
+		t.Errorf("icon-color = %+v, want red", cfg.Weather.Icon.Color)
+	}
+	path = writeConfig(t, "[modules.weather]\nicon-color = \"reddish\"\n")
+	if _, err := LoadFile(path); err == nil {
+		t.Error("an unknown icon-color: want a load error")
+	}
+}
+
 func TestParseColorValueRejectsGarbage(t *testing.T) {
 	for _, in := range []string{
 		"not-a-token", "bg-surface-x", "", "#12", "#12345", "#gggggg", "0x414868",
