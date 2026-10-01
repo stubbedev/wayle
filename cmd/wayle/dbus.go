@@ -2,20 +2,17 @@ package main
 
 import (
 	"context"
-	"errors"
-	"strings"
 	"time"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/wayle/internal/cli"
+	"github.com/stubbedev/wayle/internal/dbuscli"
 )
 
 // cliMessage is a user-facing CLI error: the Rust CLI's exact text,
 // printed as "Error: <text>".
-type cliMessage string
-
-func (m cliMessage) Error() string { return string(m) }
+type cliMessage = dbuscli.Message
 
 // callTimeout bounds one D-Bus round trip (zbus's default method
 // timeout is 25s, dbus-daemon's own reply timeout).
@@ -81,46 +78,11 @@ func (p *daemonProxy) prop(op, name string, out any) error {
 	return nil
 }
 
-// dbusError is dbus.rs's format_error. zbus surfaces a method's error
-// reply as a MethodError ("Failed to <op>: <message>", a name
-// containing ServiceUnknown meaning the shell is down) and a property
-// read's as an fdo::Error ("<name>: <message>", ServiceUnknown and
-// NameHasNoOwner meaning down, NoReply/Timeout a timeout).
+// dbusError is dbus.rs's format_error for a method (property false) or
+// a property read.
 func dbusError(service, op string, err error, property bool) error {
-	notRunning := cliMessage(service + " service not running. Start wayle shell first.")
-	timedOut := cliMessage(op + " timed out - service not responding")
-	var de dbus.Error
-	var dep *dbus.Error
-	switch {
-	case errors.As(err, &dep) && dep != nil:
-		de = *dep
-	case errors.As(err, &de):
-	default:
-		if errors.Is(err, context.DeadlineExceeded) {
-			return timedOut
-		}
-		return cliMessage("Failed to " + op + ": " + err.Error())
+	if property {
+		return dbuscli.FormatPropertyError(service, op, err)
 	}
-	msg := de.Name
-	if len(de.Body) > 0 {
-		if s, ok := de.Body[0].(string); ok {
-			msg = s
-		}
-	}
-	if !property {
-		if strings.Contains(de.Name, "ServiceUnknown") {
-			return notRunning
-		}
-		return cliMessage("Failed to " + op + ": " + msg)
-	}
-	switch de.Name {
-	case "org.freedesktop.DBus.Error.ServiceUnknown", "org.freedesktop.DBus.Error.NameHasNoOwner":
-		return notRunning
-	case "org.freedesktop.DBus.Error.NoReply", "org.freedesktop.DBus.Error.Timeout":
-		return timedOut
-	}
-	if strings.HasPrefix(de.Name, "org.freedesktop.DBus.Error.") {
-		return cliMessage("Failed to " + op + ": " + de.Name + ": " + msg)
-	}
-	return cliMessage("Failed to " + op + ": " + msg)
+	return dbuscli.FormatError(service, op, err)
 }

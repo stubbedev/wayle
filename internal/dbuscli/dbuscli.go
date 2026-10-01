@@ -1,57 +1,75 @@
 // Package dbuscli turns D-Bus call failures into the CLI's
-// user-facing messages (wayle/src/cli/dbus.rs's format_error): a
-// missing service says to start the shell, a timeout says the service
-// is not responding, and a method error shows the service's own
-// message.
+// user-facing messages (wayle/src/cli/dbus.rs's format_error).
+//
+// zbus surfaces a method's error reply as a MethodError: a name
+// containing ServiceUnknown means the shell is down, anything else
+// reads "Failed to <op>: <message>". A property read fails with an
+// fdo::Error instead: ServiceUnknown and NameHasNoOwner mean down,
+// NoReply and Timeout a timeout, and other fdo errors print their name
+// before the message.
 package dbuscli
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
 )
 
-// FormatError describes err from calling service's operation.
-func FormatError(service, operation string, err error) error {
-	name, msg, ok := dbusError(err)
+// Message is a user-facing CLI error: the Rust CLI's exact text,
+// printed as "Error: <text>".
+type Message string
+
+func (m Message) Error() string { return string(m) }
+
+// FormatError describes err from calling service's method for op.
+func FormatError(service, op string, err error) error { return format(service, op, err, false) }
+
+// FormatPropertyError describes err from reading service's property
+// for op.
+func FormatPropertyError(service, op string, err error) error {
+	return format(service, op, err, true)
+}
+
+func format(service, op string, err error, property bool) error {
+	notRunning := Message(service + " service not running. Start wayle shell first.")
+	timedOut := Message(op + " timed out - service not responding")
+	de, ok := replyError(err)
 	if !ok {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("%s timed out - service not responding", operation)
+			return timedOut
 		}
-		return fmt.Errorf("Failed to %s: %w", operation, err) //nolint:staticcheck // the Rust CLI's capitalized message
+		return Message("Failed to " + op + ": " + err.Error())
 	}
-	switch {
-	case strings.HasSuffix(name, ".ServiceUnknown") || strings.HasSuffix(name, ".NameHasNoOwner"):
-		return fmt.Errorf("%s service not running. Start wayle shell first.", service) //nolint:staticcheck // the Rust CLI's sentence
-	case strings.HasSuffix(name, ".NoReply") || strings.HasSuffix(name, ".Timeout"):
-		return fmt.Errorf("%s timed out - service not responding", operation)
+	msg := de.Name
+	if len(de.Body) > 0 {
+		if s, ok := de.Body[0].(string); ok {
+			msg = s
+		}
 	}
-	if msg == "" {
-		msg = name
+	if !property {
+		if strings.Contains(de.Name, "ServiceUnknown") {
+			return notRunning
+		}
+		return Message("Failed to " + op + ": " + msg)
 	}
-	return fmt.Errorf("Failed to %s: %s", operation, msg) //nolint:staticcheck // the Rust CLI's capitalized message
+	switch de.Name {
+	case "org.freedesktop.DBus.Error.ServiceUnknown", "org.freedesktop.DBus.Error.NameHasNoOwner":
+		return notRunning
+	case "org.freedesktop.DBus.Error.NoReply", "org.freedesktop.DBus.Error.Timeout":
+		return timedOut
+	}
+	if strings.HasPrefix(de.Name, "org.freedesktop.DBus.Error.") {
+		return Message("Failed to " + op + ": " + de.Name + ": " + msg)
+	}
+	return Message("Failed to " + op + ": " + msg)
 }
 
-// dbusError unpacks a D-Bus error reply: its name and first string
-// argument.
-func dbusError(err error) (name, msg string, ok bool) {
-	if e, ok := errors.AsType[dbus.Error](err); ok {
-		return e.Name, bodyMessage(e.Body), true
-	}
+// replyError unpacks a D-Bus error reply, by value or by pointer.
+func replyError(err error) (dbus.Error, bool) {
 	if pe, ok := errors.AsType[*dbus.Error](err); ok && pe != nil {
-		return pe.Name, bodyMessage(pe.Body), true
+		return *pe, true
 	}
-	return "", "", false
-}
-
-func bodyMessage(body []any) string {
-	if len(body) > 0 {
-		if s, ok := body[0].(string); ok {
-			return s
-		}
-	}
-	return ""
+	return errors.AsType[dbus.Error](err)
 }

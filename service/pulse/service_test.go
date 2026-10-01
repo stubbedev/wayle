@@ -11,42 +11,10 @@ import (
 	"github.com/stubbedev/wayle/service/pulse/pulsetest"
 )
 
-func stereoSpec() native.SampleSpec {
-	return native.SampleSpec{Format: native.SampleS16LE, Channels: 2, Rate: 48000}
-}
-
-func stereoMap() native.ChannelMap {
-	return native.ChannelMap{native.ChannelFrontLeft, native.ChannelFrontRight}
-}
-
-func sink(index uint32, name, desc string, monitor uint32) native.DeviceInfo {
-	return native.DeviceInfo{
-		Index: index, Name: name, Description: desc, SampleSpec: stereoSpec(), ChannelMap: stereoMap(),
-		OwnerModule: 4, Volume: native.CVolume{0x8000, 0x8000}, Monitor: monitor, MonitorName: name + ".monitor",
-		Driver: "alsa", Props: native.PropList{"device.description": desc}, BaseVolume: native.VolumeNorm,
-		State: native.StateRunning, VolumeSteps: 65537, Card: 0,
-		Ports: []native.Port{
-			{Name: "speaker", Description: "Speaker", Priority: 100, Available: native.PortAvailableUnknown},
-			{Name: "headphones", Description: "Headphones", Priority: 200, Available: native.PortAvailableNo},
-		},
-		ActivePort: "speaker",
-		Formats:    []native.FormatInfo{{Encoding: native.EncodingPCM, Props: native.PropList{}}},
-	}
-}
-
-func source(index uint32, name, desc string, monitorOf uint32, monitorName string) native.DeviceInfo {
-	return native.DeviceInfo{
-		Index: index, Name: name, Description: desc, SampleSpec: stereoSpec(), ChannelMap: stereoMap(),
-		OwnerModule: native.InvalidIndex, Volume: native.CVolume{native.VolumeNorm, native.VolumeNorm},
-		Monitor: monitorOf, MonitorName: monitorName, Driver: "alsa", Props: native.PropList{},
-		BaseVolume: native.VolumeNorm, State: native.StateSuspended, Card: native.InvalidIndex,
-	}
-}
-
 func playback(index, sinkIndex uint32) native.StreamInfo {
 	return native.StreamInfo{
 		Index: index, Name: "Playback", OwnerModule: native.InvalidIndex, Client: 12, Device: sinkIndex,
-		SampleSpec: stereoSpec(), ChannelMap: stereoMap(), Volume: native.CVolume{native.VolumeNorm, native.VolumeNorm},
+		SampleSpec: pulsetest.StereoSpec(), ChannelMap: pulsetest.StereoMap(), Volume: native.CVolume{native.VolumeNorm, native.VolumeNorm},
 		BufferLatency: 2000, DeviceLatency: 3000, ResampleMethod: "speex-float-1", Driver: "protocol-native.c",
 		Props: native.PropList{
 			"application.name": "Firefox", "application.process.id": "4242",
@@ -63,11 +31,11 @@ func playback(index, sinkIndex uint32) native.StreamInfo {
 func fixture(t *testing.T) *pulsetest.Server {
 	t.Helper()
 	srv := pulsetest.New(t)
-	srv.PutSink(sink(1, "speakers", "Speakers", 2))
-	srv.PutSink(sink(3, "headphones", "Headphones", 4))
-	srv.PutSource(source(2, "speakers.monitor", "Monitor of Speakers", 1, "speakers"))
-	srv.PutSource(source(4, "headphones.monitor", "Monitor of Headphones", 3, "headphones"))
-	srv.PutSource(source(10, "mic", "Microphone", native.InvalidIndex, ""))
+	srv.PutSink(pulsetest.Sink(1, "speakers", "Speakers", 2))
+	srv.PutSink(pulsetest.Sink(3, "headphones", "Headphones", 4))
+	srv.PutSource(pulsetest.Source(2, "speakers.monitor", "Monitor of Speakers", 1, "speakers"))
+	srv.PutSource(pulsetest.Source(4, "headphones.monitor", "Monitor of Headphones", 3, "headphones"))
+	srv.PutSource(pulsetest.Source(10, "mic", "Microphone", native.InvalidIndex, ""))
 	srv.PutSinkInput(playback(40, 1))
 	rec := playback(50, 10)
 	rec.Props = native.PropList{"application.name": "OBS", "application.process.id": "not-a-pid"}
@@ -211,7 +179,7 @@ func TestEventsFoldIntoState(t *testing.T) {
 	defer stop()
 
 	// A changed sink is re-queried.
-	loud := sink(1, "speakers", "Speakers", 2)
+	loud := pulsetest.Sink(1, "speakers", "Speakers", 2)
 	loud.Volume = native.CVolume{native.VolumeNorm, native.VolumeNorm}
 	loud.Mute = true
 	srv.PutSink(loud)
@@ -226,7 +194,7 @@ func TestEventsFoldIntoState(t *testing.T) {
 	})
 
 	// New and removed objects.
-	srv.PutSink(sink(7, "hdmi", "HDMI", 8))
+	srv.PutSink(pulsetest.Sink(7, "hdmi", "HDMI", 8))
 	waitFor(t, "hdmi to appear", func() bool { _, err := s.OutputDevice(7); return err == nil })
 	srv.RemoveSink(3)
 	waitFor(t, "headphones to go", func() bool { _, err := s.OutputDevice(3); return err != nil })
@@ -257,7 +225,7 @@ func TestStaleEventsAreDropped(t *testing.T) {
 	srv.Emit(native.SubscribeEvent{Facility: native.FacilitySink, Operation: native.OpChange, Index: 99})
 	srv.Emit(native.SubscribeEvent{Facility: native.FacilitySinkInput, Operation: native.OpNew, Index: 99})
 	srv.Emit(native.SubscribeEvent{Facility: native.FacilitySink, Operation: native.OpRemove, Index: 99})
-	srv.PutSink(sink(7, "hdmi", "HDMI", 8))
+	srv.PutSink(pulsetest.Sink(7, "hdmi", "HDMI", 8))
 	waitFor(t, "hdmi", func() bool { _, err := s.OutputDevice(7); return err == nil })
 	if len(s.OutputDevices()) != 3 || len(s.PlaybackStreams()) != 1 {
 		t.Errorf("stale events changed the state: %d outputs, %d streams", len(s.OutputDevices()), len(s.PlaybackStreams()))
@@ -274,7 +242,7 @@ func TestDefaultResolvesByName(t *testing.T) {
 	if _, err := s.DefaultSink(context.Background()); !errors.Is(err, ErrNoDefaultDevice) {
 		t.Errorf("DefaultSink = %v, want ErrNoDefaultDevice", err)
 	}
-	srv.PutSink(sink(9, "ghost", "Ghost", 11))
+	srv.PutSink(pulsetest.Sink(9, "ghost", "Ghost", 11))
 	waitFor(t, "the ghost to resolve", func() bool {
 		d, ok := s.DefaultOutput()
 		return ok && d.Name == "ghost"
@@ -514,7 +482,7 @@ func TestTicksCoalesce(t *testing.T) {
 	}
 	defer stop()
 	for i := range 20 {
-		d := sink(1, "speakers", "Speakers", 2)
+		d := pulsetest.Sink(1, "speakers", "Speakers", 2)
 		d.Volume = native.CVolume{native.Volume(i), native.Volume(i)}
 		srv.PutSink(d)
 	}

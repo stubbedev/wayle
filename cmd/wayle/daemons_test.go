@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/wayle/internal/dbusx/dbustest"
+	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/recorder"
@@ -34,10 +34,10 @@ func runSteps(t *testing.T, steps []step) {
 }
 
 func TestIdleCommands(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	runSteps(t, []step{{[]string{"idle", "status"}, "Error: IdleInhibit service not running. Start wayle shell first.\n"}})
 	state := idleinhibit.NewState(30)
-	release, err := idleinhibit.NewDaemon(state).Export(dbustest.Conn(t))
+	release, err := idleinhibit.NewDaemon(state).Export(dbustest.SessionConn(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,10 +69,10 @@ func TestIdleCommands(t *testing.T) {
 }
 
 func TestNotifyCommands(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	runSteps(t, []step{{[]string{"notify", "list"}, "Error: Notification service not running. Start wayle shell first.\n"}})
 	svc := notifications.NewService()
-	server, err := notifications.Serve(dbustest.Conn(t), svc)
+	server, err := notifications.Serve(dbustest.SessionConn(t), svc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,10 +110,10 @@ func (h *recHandle) Stop()              { h.once.Do(func() { close(h.done) }) }
 func (h *recHandle) Done() <-chan error { return h.done }
 
 func TestRecorderCommands(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	runSteps(t, []step{{[]string{"recorder", "status"}, "Error: Recorder service not running. Start wayle shell first.\n"}})
 	state := recorder.NewState(recEngine{}, 0)
-	release, err := recorder.NewDaemon(state).Export(dbustest.Conn(t))
+	release, err := recorder.NewDaemon(state).Export(dbustest.SessionConn(t))
 	if err != nil {
 		t.Fatal(err)
 	}

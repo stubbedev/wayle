@@ -134,6 +134,8 @@ type Player struct {
 	// the reads the same way).
 	CanLoop    bool
 	CanShuffle bool
+	// Volume is the player's Volume property, 0..1 (0 when unpublished).
+	Volume float64
 }
 
 // SelectBest is selection.rs select_best_player: the first priority
@@ -419,6 +421,7 @@ func parsePlayer(name string, root, player map[string]dbus.Variant) Player {
 		CanSeek:       variantBool(player["CanSeek"]),
 		Loop:          LoopUnsupported,
 	}
+	p.Volume, _ = player["Volume"].Value().(float64)
 	if loop, ok := player["LoopStatus"]; ok {
 		p.CanLoop = true
 		p.Loop = ParseLoopMode(variantString(loop))
@@ -484,8 +487,15 @@ func (s *Service) Active() (Player, bool) {
 }
 
 // SetActive implements Source (service.rs set_active_player).
+// An empty bus name clears the active player.
 func (s *Service) SetActive(busName string) error {
 	s.mu.Lock()
+	if busName == "" {
+		s.active = ""
+		s.mu.Unlock()
+		s.notify()
+		return nil
+	}
 	found := false
 	for _, p := range s.players {
 		if p.BusName == busName {
@@ -581,6 +591,27 @@ func (s *Service) ToggleShuffle(ctx context.Context, busName string) error {
 		return fmt.Errorf("mpris: %s: shuffle unsupported", busName)
 	}
 	return s.setProp(ctx, busName, "Shuffle", !p.Shuffle)
+}
+
+// SetShuffle sets the Shuffle property (player set_shuffle_mode).
+func (s *Service) SetShuffle(ctx context.Context, busName string, on bool) error {
+	if _, err := s.lookup(busName); err != nil {
+		return err
+	}
+	return s.setProp(ctx, busName, "Shuffle", on)
+}
+
+// SetLoop sets the LoopStatus property (player set_loop_mode);
+// LoopUnsupported is refused.
+func (s *Service) SetLoop(ctx context.Context, busName string, mode LoopMode) error {
+	wire, ok := mode.wire()
+	if !ok {
+		return fmt.Errorf("mpris: %s: loop mode %d has no LoopStatus", busName, mode)
+	}
+	if _, err := s.lookup(busName); err != nil {
+		return err
+	}
+	return s.setProp(ctx, busName, "LoopStatus", wire)
 }
 
 // Position implements Source.

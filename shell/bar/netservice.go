@@ -6,19 +6,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/shellipc"
 	"github.com/stubbedev/wayle/service/network"
 )
-
-// exportShellIPC serves com.wayle.Shell1 on the session bus
-// (services/shell_ipc). The VPN callback goes straight to the native
-// sign-in, whose waiting browser sign-ins are process-wide, as the
-// Rust daemon's does.
-func exportShellIPC(conn *dbus.Conn) (func(), error) {
-	return shellipc.Export(conn, shellipc.Handlers{
-		VPNSSOCallback: network.NativeSignIn.DeliverSSOCallback,
-	})
-}
 
 // startNetworkService brings up the NetworkManager service (the secret
 // agent, VPNs, wifi) on its own system-bus connection; stop ends its

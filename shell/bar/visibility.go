@@ -7,6 +7,7 @@ import (
 	"github.com/stubbedev/gelm/app"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/shellipc"
 )
 
@@ -83,7 +84,12 @@ func serveShellIPC(application *app.Application, bars *barSet) func() {
 		application.Invoke(func() { bars.apply(hidden) })
 	})
 	state.SetConnectors(bars.connectors())
-	if release, err := shellipc.Serve(conn, state, shellipc.Hooks{}); err == nil {
+	if release, err := shellipc.Serve(conn, state, shellipc.Hooks{
+		// The VPN callback goes straight to the native sign-in, whose
+		// waiting browser sign-ins are process-wide, as the Rust
+		// daemon's are.
+		VPNSSOCallback: network.NativeSignIn.DeliverSSOCallback,
+	}); err == nil {
 		releases = append(releases, release)
 	} else {
 		log.Printf("shell ipc: %v", err)

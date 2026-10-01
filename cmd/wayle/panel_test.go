@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stubbedev/wayle/internal/dbusx/dbustest"
+	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/service/shellipc"
 )
 
@@ -13,7 +13,7 @@ import (
 // process exiting would.
 func fakeShell(t *testing.T) {
 	t.Helper()
-	conn := dbustest.Conn(t)
+	conn := dbustest.SessionConn(t)
 	var release func()
 	var err error
 	release, err = shellipc.ServeApplication(conn, func() { go release() })
@@ -23,7 +23,7 @@ func fakeShell(t *testing.T) {
 }
 
 func TestPanelLifecycleCommands(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	if stdout, _, code := runCaptured(t, false, "panel", "status"); code != 0 || stdout != "Panel is not running\n" {
 		t.Errorf("status down: %d %q", code, stdout)
 	}
@@ -53,13 +53,13 @@ func TestPanelLifecycleCommands(t *testing.T) {
 }
 
 func TestPanelBarVisibility(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	if _, stderr, code := runCaptured(t, false, "panel", "hide"); code != 1 || stderr != "Error: Shell service not running. Start wayle shell first.\n" {
 		t.Errorf("shell down: %d %q", code, stderr)
 	}
 	state := shellipc.NewState(nil)
 	state.SetConnectors([]string{"DP-1", "DP-2"})
-	release, err := shellipc.Serve(dbustest.Conn(t), state, shellipc.Hooks{})
+	release, err := shellipc.Serve(dbustest.SessionConn(t), state, shellipc.Hooks{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestPanelBarVisibility(t *testing.T) {
 }
 
 func TestShellRefusesASecondInstance(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	started := 0
 	start := func() error { started++; return nil }
 	var stderr bytes.Buffer
@@ -105,7 +105,7 @@ func TestShellRefusesASecondInstance(t *testing.T) {
 	}
 	// A start failure is the shell's error.
 	stderr.Reset()
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	if err := runShell(&stderr, func() error { return errors.New("no output") }); err == nil {
 		t.Error("start error swallowed")
 	}

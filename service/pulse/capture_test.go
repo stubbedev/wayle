@@ -146,7 +146,7 @@ func TestCaptureRetriesAMissingSource(t *testing.T) {
 	if len(srv.Records()) != 0 || c.Source() != "" {
 		t.Fatal("recording a source that does not exist")
 	}
-	srv.PutSource(source(20, "late", "Late", native.InvalidIndex, ""))
+	srv.PutSource(pulsetest.Source(20, "late", "Late", native.InvalidIndex, ""))
 	if rec := onlyRecord(t, srv); rec.Source != "late" {
 		t.Errorf("recorded %q", rec.Source)
 	}

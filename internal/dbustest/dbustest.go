@@ -114,3 +114,24 @@ func (b *Bus) UseAsSystemBus(t *testing.T) {
 	t.Helper()
 	t.Setenv("DBUS_SYSTEM_BUS_ADDRESS", b.Address)
 }
+
+// Session starts a private bus and makes it the test's session bus,
+// for daemon and CLI halves that both dial the session bus.
+func Session(t *testing.T) *Bus {
+	t.Helper()
+	b := Start(t)
+	b.UseAsSessionBus(t)
+	return b
+}
+
+// SessionConn opens a connection to the session bus the test pointed
+// at a private bus (Session or UseAsSessionBus), closed at cleanup.
+func SessionConn(t *testing.T) *dbus.Conn {
+	t.Helper()
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		t.Fatalf("dbustest: connect session bus: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	return conn
+}

@@ -9,7 +9,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/prop"
 
-	"github.com/stubbedev/wayle/internal/dbusx/dbustest"
+	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/service/mpris"
 )
 
@@ -41,7 +41,7 @@ func (f *fakePlayer) Calls() []string {
 // Player properties; withShuffle adds a writable Shuffle.
 func startPlayer(t *testing.T, suffix, identity, status string, withShuffle bool) *fakePlayer {
 	t.Helper()
-	conn := dbustest.Conn(t)
+	conn := dbustest.SessionConn(t)
 	f := &fakePlayer{}
 	path := dbus.ObjectPath("/org/mpris/MediaPlayer2")
 	if err := conn.Export(f, path, "org.mpris.MediaPlayer2.Player"); err != nil {
@@ -49,7 +49,7 @@ func startPlayer(t *testing.T, suffix, identity, status string, withShuffle bool
 	}
 	player := map[string]*prop.Prop{
 		"PlaybackStatus": {Value: status, Emit: prop.EmitFalse},
-		"LoopStatus":     {Value: "None", Writable: true, Emit: prop.EmitFalse},
+		"LoopStatus":     {Value: "None", Writable: true, Emit: prop.EmitTrue},
 		"Volume":         {Value: 0.5, Emit: prop.EmitFalse},
 		"CanGoNext":      {Value: true, Emit: prop.EmitFalse},
 		"CanGoPrevious":  {Value: false, Emit: prop.EmitFalse},
@@ -62,7 +62,7 @@ func startPlayer(t *testing.T, suffix, identity, status string, withShuffle bool
 		}, Emit: prop.EmitFalse},
 	}
 	if withShuffle {
-		player["Shuffle"] = &prop.Prop{Value: false, Writable: true, Emit: prop.EmitFalse}
+		player["Shuffle"] = &prop.Prop{Value: false, Writable: true, Emit: prop.EmitTrue}
 	}
 	props, err := prop.Export(conn, path, prop.Map{
 		"org.mpris.MediaPlayer2":        {"Identity": {Value: identity, Emit: prop.EmitFalse}},
@@ -78,14 +78,14 @@ func startPlayer(t *testing.T, suffix, identity, status string, withShuffle bool
 	return f
 }
 
-func serveMedia(t *testing.T, priority []string) *mpris.Controller {
+func serveMedia(t *testing.T, priority []string) *mpris.Service {
 	t.Helper()
-	conn := dbustest.Conn(t)
-	c, err := mpris.NewController(conn, []string{"ignored"}, priority)
+	conn := dbustest.SessionConn(t)
+	c, err := mpris.New(conn, []string{"ignored"}, priority)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(c.Close)
+	t.Cleanup(func() { _ = c.Close() })
 	release, err := mpris.ServeDaemon(conn, c)
 	if err != nil {
 		t.Fatal(err)
@@ -95,14 +95,14 @@ func serveMedia(t *testing.T, priority []string) *mpris.Controller {
 }
 
 func TestMediaCommands(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	// vlc is discovered at start; spotify (and the ignored player)
 	// appear later, so the list order is deterministic.
 	vlc := startPlayer(t, "vlc", "VLC media player", "Paused", false)
 	c := serveMedia(t, nil)
 	spotify := startPlayer(t, "spotify", "Spotify", "Playing", true)
 	startPlayer(t, "ignored.instance1", "Hidden", "Playing", false)
-	waitFor(t, func() bool { return len(c.Players()) == 2 && c.Active() == "org.mpris.MediaPlayer2.spotify" })
+	waitFor(t, func() bool { return len(c.Players()) == 2 && activeName(c) == "org.mpris.MediaPlayer2.spotify" })
 
 	steps := []struct {
 		args []string
@@ -120,7 +120,12 @@ func TestMediaCommands(t *testing.T) {
 		{[]string{"media", "info", "spotify"}, "Player: Spotify\nStatus: Playing\nTitle: Song\nArtist: A, B\nAlbum: Record\nLength: 03:05\nVolume: 50%\nShuffle: On\nLoop: Track\nCapabilities: Seek, Next\n"},
 	}
 	for _, s := range steps {
-		stdout, stderr, code := runCaptured(t, false, s.args...)
+		run := runCaptured
+		if s.args[1] == "info" {
+			// The snapshot follows the player's PropertiesChanged.
+			run = func(t *testing.T, _ bool, args ...string) (string, string, int) { return runUntil(t, s.want, args...) }
+		}
+		stdout, stderr, code := run(t, false, s.args...)
 		if code != 0 || stdout != s.want {
 			t.Errorf("%v: code %d stdout %q stderr %q\nwant %q", s.args, code, stdout, stderr, s.want)
 		}
@@ -134,15 +139,15 @@ func TestMediaCommands(t *testing.T) {
 }
 
 func TestMediaPriorityAndHotplug(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	startPlayer(t, "vlc", "VLC", "Playing", false)
 	c := serveMedia(t, []string{"*firefox*"})
-	if got := c.Active(); got != "org.mpris.MediaPlayer2.vlc" {
+	if got := activeName(c); got != "org.mpris.MediaPlayer2.vlc" {
 		t.Fatalf("active = %q", got)
 	}
 	// A player matching the priority glob takes over when it appears.
 	startPlayer(t, "firefox.instance_1_2", "Firefox", "Paused", false)
-	waitFor(t, func() bool { return c.Active() == "org.mpris.MediaPlayer2.firefox.instance_1_2" })
+	waitFor(t, func() bool { return activeName(c) == "org.mpris.MediaPlayer2.firefox.instance_1_2" })
 }
 
 func waitFor(t *testing.T, cond func() bool) {
@@ -157,7 +162,7 @@ func waitFor(t *testing.T, cond func() bool) {
 }
 
 func TestMediaErrors(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	if _, stderr, code := runCaptured(t, false, "media", "list"); code != 1 || stderr != "Error: Media service not running. Start wayle shell first.\n" {
 		t.Errorf("not running: code %d %q", code, stderr)
 	}
@@ -200,4 +205,10 @@ func TestMediaErrors(t *testing.T) {
 			t.Errorf("%v: code %d %q, want %q", c.args, code, stderr, c.want)
 		}
 	}
+}
+
+// activeName is the media service's active bus name, "" when none.
+func activeName(s *mpris.Service) string {
+	p, _ := s.Active()
+	return p.BusName
 }

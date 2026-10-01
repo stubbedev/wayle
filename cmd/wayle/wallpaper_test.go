@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"flag"
@@ -12,8 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/godbus/dbus/v5"
-
+	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/service/wallpaper"
 	"github.com/stubbedev/wayle/service/wallpaper/extract"
 )
@@ -63,33 +61,6 @@ var wallpaperScenarios = []struct {
 	{name: "not-running", noDaemon: true, steps: [][]string{{"info"}, {"stop"}, {"set", "@DIR@/a.png"}}},
 }
 
-// startBus runs a private dbus-daemon and points the session address
-// at it.
-func startBus(t *testing.T) string {
-	t.Helper()
-	bin, err := exec.LookPath("dbus-daemon")
-	if err != nil {
-		t.Skip("dbus-daemon not installed")
-	}
-	addr := "unix:path=" + filepath.Join(t.TempDir(), "bus")
-	cmd := exec.Command(bin, "--session", "--nofork", "--nopidfile", "--print-address=1", "--address="+addr)
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Skipf("dbus-daemon: %v", err)
-	}
-	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
-	line, err := bufio.NewReader(out).ReadString('\n')
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr = strings.TrimSpace(line)
-	t.Setenv("DBUS_SESSION_BUS_ADDRESS", addr)
-	return addr
-}
-
 func runScenario(t *testing.T, sc struct {
 	name     string
 	noDaemon bool
@@ -97,7 +68,7 @@ func runScenario(t *testing.T, sc struct {
 },
 ) string {
 	t.Helper()
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	dir, empty := t.TempDir(), t.TempDir()
 	for _, n := range []string{"a.png", "b.png"} {
 		if err := os.WriteFile(filepath.Join(dir, n), nil, 0o600); err != nil {
@@ -105,7 +76,7 @@ func runScenario(t *testing.T, sc struct {
 		}
 	}
 	if !sc.noDaemon {
-		conn := dbustest.Conn(t)
+		conn := dbustest.SessionConn(t)
 		svc := wallpaper.New(wallpaper.Options{Extractor: extract.Config{Tool: extract.None}})
 		svc.RegisterMonitor("DP-1")
 		svc.RegisterMonitor("DP-2")

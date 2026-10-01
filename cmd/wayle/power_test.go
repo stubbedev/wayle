@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stubbedev/wayle/internal/dbusx/dbustest"
+	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 )
 
@@ -31,7 +31,7 @@ func (f *fakeProfiles) Subscribe(context.Context) (<-chan struct{}, func(), erro
 
 func servePower(t *testing.T, src *fakeProfiles) {
 	t.Helper()
-	release, err := powerprofiles.ServeDaemon(dbustest.Conn(t), src)
+	release, err := powerprofiles.ServeDaemon(dbustest.SessionConn(t), src)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func servePower(t *testing.T, src *fakeProfiles) {
 }
 
 func TestPowerCommandsAgainstTheDaemon(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	src := &fakeProfiles{snap: powerprofiles.Snapshot{
 		Available: true, Active: "balanced",
 		Profiles: []string{"power-saver", "balanced", "performance"},
@@ -70,7 +70,7 @@ func TestPowerCommandsAgainstTheDaemon(t *testing.T) {
 }
 
 func TestPowerErrorsMatchRust(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 
 	// No daemon on the bus: the shell is not running.
 	_, stderr, code := runCaptured(t, false, "power", "status")
@@ -94,8 +94,8 @@ func TestPowerErrorsMatchRust(t *testing.T) {
 }
 
 func TestPowerDaemonNeedsTheSystemDaemon(t *testing.T) {
-	dbustest.SessionBus(t)
-	if _, err := powerprofiles.ServeDaemon(dbustest.Conn(t), &fakeProfiles{}); err == nil {
+	dbustest.Session(t)
+	if _, err := powerprofiles.ServeDaemon(dbustest.SessionConn(t), &fakeProfiles{}); err == nil {
 		t.Fatal("served without power-profiles-daemon")
 	}
 	_, stderr, _ := runCaptured(t, false, "power", "list")

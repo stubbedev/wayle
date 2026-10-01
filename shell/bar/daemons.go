@@ -7,7 +7,6 @@ import (
 
 	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/powerprofiles"
-	"github.com/stubbedev/wayle/service/pulse"
 	"github.com/stubbedev/wayle/service/sni"
 )
 
@@ -34,16 +33,11 @@ func serveCLIDaemons(ctx ModuleContext, tray *sni.Host) func() {
 		release, err := powerprofiles.ServeDaemon(conn, ctx.PowerProfiles)
 		serve("power-profiles", release, err)
 	}
-	if mixer, ok := ctx.Pulse.(pulse.Mixer); ok {
-		release, err := pulse.ServeDaemon(conn, mixer)
-		serve("audio", release, err)
-	}
-	if media, err := mpris.NewController(conn, ctx.Config.Media.PlayersIgnored, ctx.Config.Media.PlayerPriority); err == nil {
-		releases = append(releases, media.Close)
+	// The bar's media service is the one the daemon serves, so `wayle
+	// media` and the module agree on the active player.
+	if media, ok := ctx.Media.(*mpris.Service); ok {
 		release, err := mpris.ServeDaemon(conn, media)
 		serve("media", release, err)
-	} else {
-		log.Printf("media: controller: %v", err)
 	}
 	if tray != nil {
 		release, err := sni.ServeDaemon(conn, ctx.SNI, tray.Actions(), tray.IsWatcher())

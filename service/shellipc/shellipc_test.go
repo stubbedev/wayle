@@ -7,8 +7,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/internal/dbusx/dbustest"
 )
 
 func TestBarVisibilityMatchesBarRS(t *testing.T) {
@@ -49,15 +49,15 @@ func TestBarVisibilityMatchesBarRS(t *testing.T) {
 }
 
 func TestShell1DaemonProperties(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	s := NewState(nil)
 	s.SetConnectors([]string{"HDMI-A-1", "DP-1"})
-	release, err := Serve(dbustest.Conn(t), s, Hooks{})
+	release, err := Serve(dbustest.SessionConn(t), s, Hooks{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer release()
-	obj := dbustest.Conn(t).Object(ServiceName, ServicePath)
+	obj := dbustest.SessionConn(t).Object(ServiceName, ServicePath)
 	if err := obj.Call(ServiceName+".BarHide", 0, "").Err; err != nil {
 		t.Fatal(err)
 	}
@@ -88,9 +88,9 @@ func TestShell1DaemonProperties(t *testing.T) {
 }
 
 func TestShell1HooksAnswer(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	var uri string
-	release, err := Serve(dbustest.Conn(t), NewState(nil), Hooks{
+	release, err := Serve(dbustest.SessionConn(t), NewState(nil), Hooks{
 		Lock:           func() bool { return true },
 		VPNSSOCallback: func(u string) bool { uri = u; return true },
 	})
@@ -98,7 +98,7 @@ func TestShell1HooksAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer release()
-	obj := dbustest.Conn(t).Object(ServiceName, ServicePath)
+	obj := dbustest.SessionConn(t).Object(ServiceName, ServicePath)
 	if err := obj.Call(ServiceName+".Lock", 0).Err; err != nil {
 		t.Errorf("Lock: %v", err)
 	}
@@ -108,13 +108,13 @@ func TestShell1HooksAnswer(t *testing.T) {
 }
 
 func TestApplicationActions(t *testing.T) {
-	dbustest.SessionBus(t)
-	conn := dbustest.Conn(t)
+	dbustest.Session(t)
+	conn := dbustest.SessionConn(t)
 	if running, err := IsRunning(conn); err != nil || running {
 		t.Fatalf("running before serving: %v %v", running, err)
 	}
 	quit := make(chan struct{}, 1)
-	release, err := ServeApplication(dbustest.Conn(t), func() { quit <- struct{}{} })
+	release, err := ServeApplication(dbustest.SessionConn(t), func() { quit <- struct{}{} })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestApplicationActions(t *testing.T) {
 	if err := obj.Call(ActionsIface+".List", 0).Store(&names); err != nil || !slices.Equal(names, []string{"inspector", "quit"}) {
 		t.Errorf("List = %v, %v", names, err)
 	}
-	if _, err := ServeApplication(dbustest.Conn(t), func() {}); err == nil {
+	if _, err := ServeApplication(dbustest.SessionConn(t), func() {}); err == nil {
 		t.Error("a second shell took the application id")
 	}
 }

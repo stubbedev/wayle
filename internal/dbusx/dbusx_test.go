@@ -6,8 +6,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/internal/dbusx"
-	"github.com/stubbedev/wayle/internal/dbusx/dbustest"
 )
 
 type echo struct{}
@@ -35,11 +35,11 @@ func serve(t *testing.T, conn *dbus.Conn, count *uint32) func() {
 }
 
 func TestServeMethodsAndLiveProperties(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	count := uint32(1)
-	defer serve(t, dbustest.Conn(t), &count)()
+	defer serve(t, dbustest.SessionConn(t), &count)()
 
-	obj := dbustest.Conn(t).Object(name, path)
+	obj := dbustest.SessionConn(t).Object(name, path)
 	var out string
 	if err := obj.Call(iface+".Echo", 0, "hi").Store(&out); err != nil || out != "hi" {
 		t.Fatalf("Echo = %q, %v", out, err)
@@ -65,10 +65,10 @@ func TestServeMethodsAndLiveProperties(t *testing.T) {
 }
 
 func TestServeRejectsUnknownAndWrites(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	count := uint32(0)
-	defer serve(t, dbustest.Conn(t), &count)()
-	obj := dbustest.Conn(t).Object(name, path)
+	defer serve(t, dbustest.SessionConn(t), &count)()
+	obj := dbustest.SessionConn(t).Object(name, path)
 
 	if _, err := obj.GetProperty(iface + ".Nope"); !isDBusError(err, dbusx.ErrUnknownProperty) {
 		t.Errorf("unknown property: %v", err)
@@ -82,10 +82,10 @@ func TestServeRejectsUnknownAndWrites(t *testing.T) {
 }
 
 func TestServeRefusesAnOwnedName(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	count := uint32(0)
-	defer serve(t, dbustest.Conn(t), &count)()
-	_, err := dbusx.Serve(dbustest.Conn(t), dbusx.Service{
+	defer serve(t, dbustest.SessionConn(t), &count)()
+	_, err := dbusx.Serve(dbustest.SessionConn(t), dbusx.Service{
 		Name: name, Path: path, Interface: iface, Methods: echo{}, Properties: dbusx.Getters{},
 	})
 	if err == nil {

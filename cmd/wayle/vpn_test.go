@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/stubbedev/wayle/internal/dbustest"
-	"github.com/stubbedev/wayle/internal/shellipc"
+	"github.com/stubbedev/wayle/service/shellipc"
 )
 
 func TestVPNSSOCallbackReportsTheSignInCompleted(t *testing.T) {
 	bus := dbustest.Start(t)
 	var delivered string
-	release, err := shellipc.Export(bus.Conn(t), shellipc.Handlers{VPNSSOCallback: func(uri string) bool {
+	release, err := shellipc.Serve(bus.Conn(t), shellipc.NewState(nil), shellipc.Hooks{VPNSSOCallback: func(uri string) bool {
 		delivered = uri
 		return true
 	}})
@@ -36,7 +36,7 @@ func TestVPNSSOCallbackReportsTheSignInCompleted(t *testing.T) {
 
 func TestVPNSSOCallbackWithNothingWaitingFailsWithTheShellsReason(t *testing.T) {
 	bus := dbustest.Start(t)
-	release, err := shellipc.Export(bus.Conn(t), shellipc.Handlers{VPNSSOCallback: func(string) bool { return false }})
+	release, err := shellipc.Serve(bus.Conn(t), shellipc.NewState(nil), shellipc.Hooks{VPNSSOCallback: func(string) bool { return false }})
 	if err != nil {
 		t.Fatal(err)
 	}

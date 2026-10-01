@@ -31,7 +31,7 @@ func audioCommand() *cli.Command {
 }
 
 func withAudio(run func(*cli.Matches, *daemonProxy) error) func(*cli.Matches) error {
-	return withDaemon("Audio", pulse.DaemonName, pulse.DaemonPath, pulse.DaemonName, run)
+	return withDaemon("Audio", pulse.ServiceName, pulse.ServicePath, pulse.Interface, run)
 }
 
 // audioSide is one direction of the Audio1 interface: the output and
@@ -137,7 +137,7 @@ func (s audioSide) toggleMute(m *cli.Matches, p *daemonProxy) error {
 }
 
 func (s audioSide) list(m *cli.Matches, p *daemonProxy) error {
-	var rows []pulse.DeviceRow
+	var rows []pulse.DeviceEntry
 	if err := p.call(s.listOp, "List"+s.listMember, []any{&rows}); err != nil {
 		return err
 	}

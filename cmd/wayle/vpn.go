@@ -9,7 +9,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/wayle/internal/cli"
-	"github.com/stubbedev/wayle/internal/shellipc"
+	"github.com/stubbedev/wayle/service/shellipc"
 )
 
 // vpnCommand is wayle/src/cli/vpn.rs: the browser's answer to a

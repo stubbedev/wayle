@@ -159,11 +159,6 @@ func RunWith(cfg *config.Config) error {
 				log.Printf("audio: daemon: %v", err)
 			}
 		}
-		if release, err := exportShellIPC(conn); err == nil {
-			defer release()
-		} else {
-			log.Printf("shell ipc: %v", err)
-		}
 	}
 	stopMail := startMail(&baseCtx)
 	defer stopMail()

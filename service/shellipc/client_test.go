@@ -6,11 +6,11 @@ import (
 	"github.com/stubbedev/wayle/internal/dbustest"
 )
 
-func TestVpnSsoCallbackReachesTheWaitingSignIn(t *testing.T) {
+func TestVPNSSOCallbackReachesTheWaitingSignIn(t *testing.T) {
 	bus := dbustest.Start(t)
 	var got []string
 	waiting := true
-	release, err := Export(bus.Conn(t), Handlers{VPNSSOCallback: func(uri string) bool {
+	release, err := Serve(bus.Conn(t), NewState(nil), Hooks{VPNSSOCallback: func(uri string) bool {
 		got = append(got, uri)
 		return waiting
 	}})
@@ -33,9 +33,9 @@ func TestVpnSsoCallbackReachesTheWaitingSignIn(t *testing.T) {
 	}
 }
 
-func TestANilHandlerHasNothingWaiting(t *testing.T) {
+func TestVPNSSOCallbackWithoutAHookHasNothingWaiting(t *testing.T) {
 	bus := dbustest.Start(t)
-	release, err := Export(bus.Conn(t), Handlers{})
+	release, err := Serve(bus.Conn(t), NewState(nil), Hooks{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,19 +45,7 @@ func TestANilHandlerHasNothingWaiting(t *testing.T) {
 	}
 }
 
-func TestASecondShellCannotTakeTheName(t *testing.T) {
-	bus := dbustest.Start(t)
-	release, err := Export(bus.Conn(t), Handlers{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer release()
-	if _, err := Export(bus.Conn(t), Handlers{}); err == nil {
-		t.Error("two shells owned com.wayle.Shell1")
-	}
-}
-
-func TestNoShellRunningIsAnError(t *testing.T) {
+func TestVPNSSOCallbackWithNoShellRunningIsAnError(t *testing.T) {
 	bus := dbustest.Start(t)
 	if err := VPNSSOCallback(t.Context(), bus.Conn(t), "globalprotectcallback:x"); err == nil {
 		t.Error("a callback with no shell on the bus succeeded")

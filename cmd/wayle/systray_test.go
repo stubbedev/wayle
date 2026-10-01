@@ -6,7 +6,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/stubbedev/wayle/internal/dbusx/dbustest"
+	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/service/sni"
 )
 
@@ -29,7 +29,7 @@ func serveTray(t *testing.T, act *fakeActivator, items ...*sni.Item) {
 	for _, it := range items {
 		store.Put(it)
 	}
-	release, err := sni.ServeDaemon(dbustest.Conn(t), store, act, true)
+	release, err := sni.ServeDaemon(dbustest.SessionConn(t), store, act, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func serveTray(t *testing.T, act *fakeActivator, items ...*sni.Item) {
 }
 
 func TestSystrayCommands(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	act := &fakeActivator{}
 	serveTray(t, act,
 		&sni.Item{Bus: ":1.2", Path: "/a", ID: "nm-applet", Title: "Network", IconName: "nm-signal-75", Status: sni.StatusActive},
@@ -59,7 +59,7 @@ func TestSystrayCommands(t *testing.T) {
 }
 
 func TestSystrayErrors(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	if _, stderr, code := runCaptured(t, false, "systray", "list"); code != 1 || stderr != "Error: System tray service not running. Start wayle shell first.\n" {
 		t.Errorf("not running: code %d %q", code, stderr)
 	}
@@ -78,7 +78,7 @@ func TestSystrayErrors(t *testing.T) {
 }
 
 func TestSystrayEmpty(t *testing.T) {
-	dbustest.SessionBus(t)
+	dbustest.Session(t)
 	serveTray(t, &fakeActivator{})
 	if stdout, _, code := runCaptured(t, false, "systray", "list"); code != 0 || stdout != "No system tray items\n" {
 		t.Errorf("empty: code %d %q", code, stdout)
