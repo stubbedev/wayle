@@ -28,6 +28,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/stubbedev/wayle/config"
 )
 
 // matugenMaxSourceColor clamps --source-color-index (MATUGEN_MAX_SOURCE_COLOR).
@@ -62,11 +64,11 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Tool:                 Wallust,
-		MatugenScheme:        SchemeTonalSpot,
-		WallustPalette:       PaletteDark16,
+		MatugenScheme:        config.MatugenSchemeTonalSpot,
+		WallustPalette:       config.WallustPaletteDark16,
 		WallustCheckContrast: true,
-		WallustBackend:       BackendFastresize,
-		WallustColorspace:    ColorspaceLabmixed,
+		WallustBackend:       config.WallustBackendFastresize,
+		WallustColorspace:    config.WallustColorspaceLabmixed,
 		WallustApplyGlobally: true,
 		PywalSaturation:      0.05,
 		PywalContrast:        3.0,

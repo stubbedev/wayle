@@ -6,6 +6,7 @@ package osd
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"sync"
 	"time"
@@ -35,7 +36,7 @@ type Event struct {
 }
 
 // anchors maps the schema's position onto layer-shell anchors.
-func anchors(position string) (app.Anchor, bool) {
+func anchors(position config.OsdPosition) (app.Anchor, bool) {
 	switch position {
 	case config.OsdTopLeft:
 		return app.AnchorTop | app.AnchorLeft, true
@@ -60,7 +61,7 @@ func anchors(position string) (app.Anchor, bool) {
 // marginsFor converts the rem margin into edge insets for the
 // position.
 func marginsFor(cfg config.OsdConfig) app.Margins {
-	m := int32(cfg.Margin * 16)
+	m := int32(math.Round(cfg.Margin.ResolvePx(config.OsdMarginBaseRem*16, 1)))
 	var out app.Margins
 	switch cfg.Position {
 	case config.OsdTopLeft, config.OsdTop, config.OsdTopRight:
@@ -150,7 +151,7 @@ func (o *Osd) Show(ev Event) {
 	if o.timer != nil {
 		o.timer.Stop()
 	}
-	o.timer = time.AfterFunc(time.Duration(o.cfg.DurationMS)*time.Millisecond, o.dismiss)
+	o.timer = time.AfterFunc(time.Duration(o.cfg.Duration)*time.Millisecond, o.dismiss)
 	o.mu.Unlock()
 }
 
@@ -160,6 +161,16 @@ func (o *Osd) AttachOutput(name string, output *app.Output) {
 	o.mu.Lock()
 	o.outputs[name] = output
 	o.mu.Unlock()
+}
+
+// SetConfig applies a reloaded [osd] section: the next Show uses it,
+// and faces on screen close so they reopen at the new position and
+// margin (the Rust OSD re-anchors on its config watchers).
+func (o *Osd) SetConfig(cfg config.OsdConfig) {
+	o.mu.Lock()
+	o.cfg = cfg
+	o.mu.Unlock()
+	o.dismiss()
 }
 
 // dismiss closes the windows; the next Show recreates them.
@@ -229,14 +240,14 @@ func (o *Osd) applyToast(req widgetipc.ToastRequest) (Event, error) {
 		}
 		preset = p
 	}
-	label := preset.Label
+	label := deref(preset.Label)
 	if req.Label != nil {
 		label = *req.Label
 	}
 	if label == "" {
 		return Event{}, errors.New("a toast needs a label or preset")
 	}
-	icon := preset.Icon
+	icon := deref(preset.Icon)
 	if req.Icon != nil {
 		icon = *req.Icon
 	}
@@ -268,4 +279,12 @@ func (o *Osd) Current() Event {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.current
+}
+
+// deref reads an optional preset string; unset is empty.
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

@@ -2,6 +2,7 @@ package bar
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/gelm/app"
@@ -65,6 +66,9 @@ type ModuleContext struct {
 	// (idle-inhibit binds its inhibitor to it); RunWith calls Attach
 	// on each once the layer exists.
 	Attachers *[]interface{ Attach(app.Host) }
+	// gen is the mount generation the module belongs to; a config
+	// reload retires it, so the old modules' scheduled work stops.
+	gen *mountGen
 	// Connector is the output this bar instance sits on; per-output
 	// modules (workspaces) key their state on it.
 	Connector string
@@ -82,7 +86,11 @@ func (c ModuleContext) Invoke(fn func()) {
 	if c.App == nil {
 		return
 	}
-	c.App.Invoke(fn)
+	c.App.Invoke(func() {
+		if !c.gen.retiredNow() {
+			fn()
+		}
+	})
 }
 
 // Every schedules fn on the application loop; a no-op when the context
@@ -91,8 +99,19 @@ func (c ModuleContext) Every(d time.Duration, fn func()) {
 	if c.App == nil {
 		return
 	}
-	c.App.Every(d, fn)
+	c.App.Every(d, func() {
+		if !c.gen.retiredNow() {
+			fn()
+		}
+	})
 }
+
+// mountGen is one generation of mounted bars. A config reload retires
+// it before mounting the next, so the old modules' Invoke and Every
+// work stops touching their (closed) trees.
+type mountGen struct{ retired atomic.Bool }
+
+func (g *mountGen) retiredNow() bool { return g != nil && g.retired.Load() }
 
 // Module is one bar module: a live widget tree plus whatever timers
 // keep it current. The interface grows update/message plumbing as
@@ -147,7 +166,7 @@ var factories = map[string]Factory{
 // cannot build fails loudly instead of silently shortening the bar.
 func Create(name string, ctx ModuleContext) (Module, error) {
 	if def, ok := customDefinition(name, ctx.Config); ok {
-		return newCustomByID(ctx, def.ID)
+		return newCustomByID(ctx, def.Id)
 	}
 	factory, ok := factories[name]
 	if !ok {
@@ -188,7 +207,7 @@ func CreateAll(items []config.BarItem, ctx ModuleContext) (*widget.Box, error) {
 }
 
 func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error {
-	module, err := Create(item.Module, ctx)
+	module, err := Create(string(item.Module), ctx)
 	if err != nil {
 		return err
 	}
@@ -218,7 +237,7 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 		handler = h
 	}
 	btn := asBarButton(ctx, root)
-	btn.configure(moduleButton(item.Module, ctx.Config), moduleBinding(item.Module, ctx.Config), func(action config.ClickAction) {
+	btn.configure(moduleButton(string(item.Module), ctx.Config), moduleBinding(string(item.Module), ctx.Config), func(action config.ClickAction) {
 		// Dropdown bindings anchor to this module's own button; the
 		// registry toggles the popover on the connector's host.
 		if action.Kind == config.ClickDropdown && ctx.Dropdowns != nil {
@@ -252,134 +271,27 @@ func asBarButton(ctx ModuleContext, root widget.Widget) *barButton {
 	return newBarButtonAround(ctx, root)
 }
 
-// moduleButton looks up the bar-button keys a layout item's module
-// carries; modules without them (custom modules resolve their own) get
-// the schema's neutral set.
+// moduleButton is the bar-button view a layout item's module carries;
+// a module without the key set (or no config) gets the neutral set.
 func moduleButton(name string, cfg *config.Config) config.ButtonConfig {
-	if cfg == nil {
-		return config.ButtonConfig{IconShow: true, LabelShow: true}
-	}
-	switch name {
-	case "battery":
-		return cfg.Battery.Button
-	case "brightness":
-		return cfg.Brightness.Button
-	case "volume":
-		return cfg.Volume.Button
-	case "media":
-		return cfg.Media.Button
-	case "network":
-		return cfg.Network.Button
-	case "bluetooth":
-		return cfg.Bluetooth.Button
-	case "microphone":
-		return cfg.Microphone.Button
-	case "keyboard-input":
-		return cfg.KeyboardInput.Button
-	case "window-title":
-		return cfg.WindowTitle.Button
-	case "cpu":
-		return cfg.CPU.Button
-	case "ram":
-		return cfg.RAM.Button
-	case "storage":
-		return cfg.Storage.Button
-	case "weather":
-		return cfg.Weather.Button
-	case "world-clock":
-		return cfg.WorldClock.Button
-	case "netstat":
-		return cfg.Netstat.Button
-	case "mail":
-		return cfg.Mail.Button
-	case "power":
-		return cfg.Power.Button
-	case "keybind-mode":
-		return cfg.KeybindMode.Button
-	case "power-profiles":
-		return cfg.PowerProfiles.Button
-	case "hyprsunset":
-		return cfg.Hyprsunset.Button
-	case "idle-inhibit":
-		return cfg.IdleInhibit.Button
-	case "treeman":
-		return cfg.Treeman.Button
-	case "notifications":
-		return cfg.Notification.Button
-	case "recorder":
-		return cfg.Recorder.Button
-	case "clock":
-		return cfg.Clock.Button
-	}
-	if def, ok := customDefinition(name, cfg); ok {
-		return def.Button
+	if cfg != nil {
+		if b, ok := cfg.ModuleButton(name); ok {
+			return b
+		}
+		if def, ok := customDefinition(name, cfg); ok {
+			return def.Button()
+		}
 	}
 	return config.ButtonConfig{IconShow: true, LabelShow: true}
 }
 
-// moduleBinding looks up the [modules.<name>] bindings a layout item's
-// module carries; unknown modules have none.
+// moduleBinding is the module's click and scroll bindings.
 func moduleBinding(name string, cfg *config.Config) config.ClickConfig {
-	switch name {
-	case "battery":
-		return cfg.Battery.Click
-	case "brightness":
-		return cfg.Brightness.Click
-	case "volume":
-		return cfg.Volume.Click
-	case "media":
-		return cfg.Media.Click
-	case "network":
-		return cfg.Network.Click
-	case "bluetooth":
-		return cfg.Bluetooth.Click
-	case "microphone":
-		return cfg.Microphone.Click
-	case "keyboard-input":
-		return cfg.KeyboardInput.Click
-	case "window-title":
-		return cfg.WindowTitle.Click
-	case "cpu":
-		return cfg.CPU.Click
-	case "ram":
-		return cfg.RAM.Click
-	case "storage":
-		return cfg.Storage.Click
-	case "weather":
-		return cfg.Weather.Click
-	case "world-clock":
-		return cfg.WorldClock.Click
-	case "netstat":
-		return cfg.Netstat.Click
-	case "mail":
-		return cfg.Mail.Click
-	case "screenshot":
-		return cfg.Screenshot.Click
-	case "power":
-		return cfg.Power.Click
-	case "dashboard":
-		return cfg.Dashboard.Click
-	case "keybind-mode":
-		return cfg.KeybindMode.Click
-	case "power-profiles":
-		return cfg.PowerProfiles.Click
-	case "hyprsunset":
-		return cfg.Hyprsunset.Click
-	case "idle-inhibit":
-		return cfg.IdleInhibit.Click
-	case "treeman":
-		return cfg.Treeman.Click
-	case "notifications":
-		return cfg.Notification.Click
-	case "recorder":
-		return cfg.Recorder.Click
-	case "clock":
-		return cfg.Clock.Click
-	case "cava":
-		return cfg.Cava.Click
+	if clicks, ok := cfg.ModuleClicks(name); ok {
+		return clicks
 	}
 	if def, ok := customDefinition(name, cfg); ok {
-		return def.Click
+		return def.Clicks()
 	}
 	return config.ClickConfig{}
 }

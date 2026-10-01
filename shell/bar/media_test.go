@@ -153,21 +153,21 @@ func TestMediaIconResolution(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		mode config.MediaIconType
-		user []config.IconMapping
+		user map[string]string
 		p    mpris.Player
 		env  mediaIconEnv
 		want string
 	}{
-		{"default mode", config.MediaIconDefault, nil, spotify, env("ld-music-symbolic"), "ld-music-symbolic"},
-		{"disc mode", config.MediaIconSpinningDisc, nil, spotify, env("ld-disc-3-symbolic"), "ld-disc-3-symbolic"},
-		{"mapped built-in", config.MediaIconApplicationMapped, nil, spotify, env("si-spotify-symbolic"), "si-spotify-symbolic"},
-		{"user mapping wins", config.MediaIconApplicationMapped, []config.IconMapping{{Pattern: "*spotify*", Icon: "my-spotify"}}, spotify, env("my-spotify", "si-spotify-symbolic"), "my-spotify"},
-		{"mapped falls to the entry's -symbolic", config.MediaIconApplicationMapped, nil, obscure, env("obscure-symbolic"), "obscure-symbolic"},
-		{"mapped missing tries the desktop icon", config.MediaIconApplicationMapped, nil, obscure, env(), "obscure-app"},
-		{"mapped with nothing is icon-name", config.MediaIconApplicationMapped, nil, bare, env(), "ld-music-symbolic"},
-		{"application reads the desktop entry", config.MediaIconApplication, nil, obscure, env(), "obscure-app"},
-		{"application without one is icon-name", config.MediaIconApplication, nil, spotify, env("spotify-symbolic"), "ld-music-symbolic"},
-		{"a missing resolved icon is icon-name", config.MediaIconSpinningDisc, nil, spotify, env(), "ld-music-symbolic"},
+		{"default mode", config.MediaIconTypeDefault, nil, spotify, env("ld-music-symbolic"), "ld-music-symbolic"},
+		{"disc mode", config.MediaIconTypeSpinningDisc, nil, spotify, env("ld-disc-3-symbolic"), "ld-disc-3-symbolic"},
+		{"mapped built-in", config.MediaIconTypeApplicationMapped, nil, spotify, env("si-spotify-symbolic"), "si-spotify-symbolic"},
+		{"user mapping wins", config.MediaIconTypeApplicationMapped, map[string]string{"*spotify*": "my-spotify"}, spotify, env("my-spotify", "si-spotify-symbolic"), "my-spotify"},
+		{"mapped falls to the entry's -symbolic", config.MediaIconTypeApplicationMapped, nil, obscure, env("obscure-symbolic"), "obscure-symbolic"},
+		{"mapped missing tries the desktop icon", config.MediaIconTypeApplicationMapped, nil, obscure, env(), "obscure-app"},
+		{"mapped with nothing is icon-name", config.MediaIconTypeApplicationMapped, nil, bare, env(), "ld-music-symbolic"},
+		{"application reads the desktop entry", config.MediaIconTypeApplication, nil, obscure, env(), "obscure-app"},
+		{"application without one is icon-name", config.MediaIconTypeApplication, nil, spotify, env("spotify-symbolic"), "ld-music-symbolic"},
+		{"a missing resolved icon is icon-name", config.MediaIconTypeSpinningDisc, nil, spotify, env(), "ld-music-symbolic"},
 	} {
 		c := cfg
 		c.IconType, c.PlayerIcons = tc.mode, tc.user
@@ -179,7 +179,7 @@ func TestMediaIconResolution(t *testing.T) {
 
 func TestMediaModuleRenders(t *testing.T) {
 	cfg := config.Defaults()
-	cfg.Media.IconType = config.MediaIconSpinningDisc
+	cfg.Media.IconType = config.MediaIconTypeSpinningDisc
 	source := newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: strings.Repeat("t", 50), Artist: "Band", State: mpris.StatePlaying})
 	ctx := newTestContext(t, cfg)
 	ctx.Media = source
@@ -203,7 +203,7 @@ func TestMediaModuleRenders(t *testing.T) {
 	if m.label.Text() != mediaNoPlayerLabel {
 		t.Errorf("no-player label = %q, want --", m.label.Text())
 	}
-	if m.icon.Name() != cfg.Media.Icon.Name {
+	if m.icon.Name() != cfg.Media.IconName {
 		t.Errorf("no-player icon = %q, want icon-name", m.icon.Name())
 	}
 	if root.HasClass("media-disc") || root.HasClass("media-spinning") {
@@ -233,17 +233,17 @@ func TestLoadFileAppliesMedia(t *testing.T) {
 		t.Fatalf("LoadFile: %v", err)
 	}
 	m := c.Media
-	if m.Format != "{{ artist }}: {{ title }}" || m.LabelMaxLength != 20 || m.LabelShow || m.IconType != config.MediaIconSpinningDisc {
+	if m.Format != "{{ artist }}: {{ title }}" || m.LabelMaxLength != 20 || m.LabelShow || m.IconType != config.MediaIconTypeSpinningDisc {
 		t.Errorf("config = %+v", m)
 	}
 	if len(m.PlayersIgnored) != 1 || len(m.PlayerPriority) != 1 {
 		t.Errorf("ignored/priority = %v %v", m.PlayersIgnored, m.PlayerPriority)
 	}
 	// player-icons walk in pattern order (the BTreeMap).
-	if len(m.PlayerIcons) != 2 || m.PlayerIcons[0].Pattern != "*aaa*" {
-		t.Errorf("player-icons = %v, want sorted", m.PlayerIcons)
+	if mappings := m.PlayerIconMappings(); len(mappings) != 2 || mappings[0].Pattern != "*aaa*" {
+		t.Errorf("player-icons = %v, want sorted", mappings)
 	}
-	if d := config.DefaultsMedia(); d.IconType != config.MediaIconApplicationMapped || d.SpinningDiscIcon != "ld-disc-3-symbolic" || d.Icon.Name != "ld-music-symbolic" {
+	if d := config.DefaultsMedia(); d.IconType != config.MediaIconTypeApplicationMapped || d.SpinningDiscIcon != "ld-disc-3-symbolic" || d.IconName != "ld-music-symbolic" {
 		t.Errorf("defaults = %+v", d)
 	}
 }

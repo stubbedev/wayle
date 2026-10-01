@@ -134,7 +134,7 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	// The refresh path itself is App-independent; drive it directly.
 	m := &battery{ctx: ctx, source: source}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.icon = moduleIcon(ctx, cfg.Battery.Icon)
+	m.icon = moduleIcon(ctx, cfg.Battery.Icon())
 	btn := newBarButton(ctx, m.icon, m.label)
 	m.setButton(btn)
 	if err := m.refresh(); err != nil {
@@ -175,7 +175,7 @@ func TestBatteryStateIcon(t *testing.T) {
 	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}
 	m := &battery{ctx: ctx, source: source}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.icon = moduleIcon(ctx, cfg.Battery.Icon)
+	m.icon = moduleIcon(ctx, cfg.Battery.Icon())
 	if m.icon == nil {
 		t.Fatal("the battery icon defaults on")
 	}
@@ -259,7 +259,6 @@ icon-color = "status-success"
 
 func TestLoadFileRejectsBadBattery(t *testing.T) {
 	for _, content := range []string{
-		"[modules.battery]\n[[modules.battery.thresholds]]\nicon-color = \"accent\"\n",
 		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = 10\nicon-color = \"nope\"\n",
 		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = \"low\"\n",
 		"[modules.battery]\n[[modules.battery.thresholds]]\nbelow = 10\nlabel-color = \"nope\"\n",

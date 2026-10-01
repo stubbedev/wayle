@@ -13,15 +13,15 @@ import (
 )
 
 func TestMicrophoneLabel(t *testing.T) {
-	if got := microphoneLabel("{{ percent }}%", 37.2); got != "37%" {
+	if got := microphoneLabel(37.2); got != "37%" {
 		t.Errorf("= %q, want 37%%", got)
 	}
-	if got := microphoneLabel("Mic {{ percent }}", 0); got != "Mic 0" {
-		t.Errorf("= %q, want Mic 0", got)
+	if got := microphoneLabel(0); got != "0%" {
+		t.Errorf("= %q, want 0%%", got)
 	}
 	// Rounded like the Rust module, not truncated.
-	if got := microphoneLabel("{{ percent }}", 37.6); got != "38" {
-		t.Errorf("= %q, want 38", got)
+	if got := microphoneLabel(37.6); got != "38%" {
+		t.Errorf("= %q, want 38%%", got)
 	}
 }
 
@@ -65,7 +65,7 @@ func TestNewMicrophoneRequiresSource(t *testing.T) {
 
 func TestLoadFileAppliesMicrophone(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.microphone]\nformat = \"M {{ percent }}\"\nlabel-show = false\n"
+	content := "[modules.microphone]\nicon-muted = \"m-off\"\nlabel-show = false\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestLoadFileAppliesMicrophone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if c.Microphone.Format != "M {{ percent }}" || c.Microphone.LabelShow {
+	if c.Microphone.IconMuted != "m-off" || c.Microphone.LabelShow {
 		t.Errorf("config = %+v", c.Microphone)
 	}
 }

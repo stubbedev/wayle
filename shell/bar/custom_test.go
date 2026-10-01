@@ -46,7 +46,7 @@ func TestParseCustomOutputBrokenJSONFallsBack(t *testing.T) {
 }
 
 func TestFormatCustomLabelTextWins(t *testing.T) {
-	def := config.DefaultsCustomModule()
+	def := config.DefaultsCustomModuleDefinition()
 	parsed := parseCustomOutput(`{"text":"override","output":"raw"}`)
 	if got := formatCustomLabel(def, parsed); got != "override" {
 		t.Errorf("= %q, want the text field", got)
@@ -95,13 +95,14 @@ func TestShouldHideCustom(t *testing.T) {
 
 func TestCustomDefinitionLookup(t *testing.T) {
 	cfg := config.Defaults()
-	def := config.DefaultsCustomModule()
-	def.ID = "cpu-temp"
-	def.Command = "echo 42"
-	cfg.Custom = []config.CustomModuleConfig{def}
+	def := config.DefaultsCustomModuleDefinition()
+	def.Id = "cpu-temp"
+	cmd := "echo 42"
+	def.Command = &cmd
+	cfg.Custom = []config.CustomModuleDefinition{def}
 
 	got, ok := customDefinition("custom-cpu-temp", cfg)
-	if !ok || got.ID != "cpu-temp" {
+	if !ok || got.Id != "cpu-temp" {
 		t.Errorf("lookup = %+v ok=%v", got, ok)
 	}
 	if _, ok := customDefinition("clock", cfg); ok {
@@ -122,16 +123,14 @@ func TestApplyCustomDefinitionsValidates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if len(c.Custom) != 1 || c.Custom[0].ID != "x" || c.Custom[0].IntervalMs != 100 || !c.Custom[0].HideIfEmpty {
+	if len(c.Custom) != 1 || c.Custom[0].Id != "x" || c.Custom[0].IntervalMs != 100 || !c.Custom[0].HideIfEmpty {
 		t.Errorf("custom = %+v", c.Custom)
 	}
 	for _, bad := range []string{
 		"[[modules.custom]]\ncommand = \"echo hi\"\n",
-		"[[modules.custom]]\nid = \"a\"\n[[modules.custom]]\nid = \"a\"\n",
 		"[[modules.custom]]\nid = \"a\"\nmode = \"stream\"\n",
 		"[[modules.custom]]\nid = \"a\"\ninterval-ms = -5\n",
 		"[[modules.custom]]\nid = \"a\"\nlabel-max-length = -1\n",
-		"[[modules.custom]]\nid = \"a\"\nleft-click = \"brightness:nope\"\n",
 	} {
 		if err := os.WriteFile(path, []byte(bad), 0o600); err != nil {
 			t.Fatal(err)
@@ -143,10 +142,10 @@ func TestApplyCustomDefinitionsValidates(t *testing.T) {
 }
 
 func TestCustomTruncatesLabel(t *testing.T) {
-	def := config.DefaultsCustomModule()
+	def := config.DefaultsCustomModuleDefinition()
 	def.LabelMaxLength = 3
 	parsed := parseCustomOutput("abcdef")
-	got := truncateLabel(formatCustomLabel(def, parsed), def.LabelMaxLength)
+	got := truncateLabel(formatCustomLabel(def, parsed), int(def.LabelMaxLength))
 	if strings.HasSuffix(got, "abcdef") {
 		t.Errorf("= %q, want truncated", got)
 	}

@@ -27,6 +27,7 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/unxed/xkb-go v0.1.8 // indirect
 	github.com/yalue/native_endian v1.0.2 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	modernc.org/libc v1.75.7 // indirect

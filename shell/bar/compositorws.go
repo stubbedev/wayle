@@ -195,7 +195,7 @@ func cwsLabel(num int, name string, hasName bool, strategy config.LabelStrategy)
 // cwsStyleFor is helpers.rs's workspace_style: the workspace-map entry
 // for the name first, then for the stable id. It drives the label and
 // icon overrides.
-func cwsStyleFor(ws cwsWorkspace, m map[string]config.NamedWorkspaceStyle) (config.NamedWorkspaceStyle, bool) {
+func cwsStyleFor(ws cwsWorkspace, m map[string]config.WorkspaceStyle) (config.WorkspaceStyle, bool) {
 	if ws.hasName {
 		if style, ok := m[ws.name]; ok {
 			return style, true
@@ -230,7 +230,7 @@ func cwsNameClass(name string) string {
 // provider would give this button: every workspace-map key with a
 // color emits rules for ws-name-<key> (and ws-id-<key> when numeric),
 // in key order, so the last matching key wins the cascade.
-func cwsOverrideColor(classes []string, m map[string]config.NamedWorkspaceStyle) (config.ColorValue, bool) {
+func cwsOverrideColor(classes []string, m map[string]config.WorkspaceStyle) (config.ColorValue, bool) {
 	has := make(map[string]bool, len(classes))
 	for _, c := range classes {
 		has[c] = true
@@ -244,7 +244,7 @@ func cwsOverrideColor(classes []string, m map[string]config.NamedWorkspaceStyle)
 	found := false
 	for _, key := range keys {
 		style := m[key]
-		if !style.ColorSet {
+		if style.Color == nil {
 			continue
 		}
 		match := has[cwsNameClass(key)]
@@ -260,7 +260,7 @@ func cwsOverrideColor(classes []string, m map[string]config.NamedWorkspaceStyle)
 			match = true
 		}
 		if match {
-			out, found = style.Color, true
+			out, found = *style.Color, true
 		}
 	}
 	return out, found
@@ -382,7 +382,7 @@ func cwsBuildModels(flavor cwsFlavor, all []cwsWorkspace, windows []cwsWindow, c
 		if cfg.AppIconsShow {
 			m.appIcons = cwsCollectAppIcons(on, cfg, urgentWindows)
 		}
-		var style config.NamedWorkspaceStyle
+		var style config.WorkspaceStyle
 		var styled bool
 		if flavor == cwsTags {
 			// tag_style: the tag-map entry for the index; the label
@@ -392,15 +392,15 @@ func cwsBuildModels(flavor cwsFlavor, all []cwsWorkspace, windows []cwsWindow, c
 			style, styled = cwsStyleFor(ws, cfg.WorkspaceMap)
 		}
 		switch {
-		case styled && style.LabelSet:
-			m.label, m.hasLabel = style.Label, true
+		case styled && style.Label != nil:
+			m.label, m.hasLabel = *style.Label, true
 		case flavor == cwsTags:
 			m.label, m.hasLabel = strconv.FormatUint(ws.id, 10), true
 		default:
 			m.label, m.hasLabel = cwsLabel(ws.num, ws.name, ws.hasName, cfg.LabelStrategy)
 		}
-		if styled {
-			m.icon = style.Icon
+		if styled && style.Icon != nil {
+			m.icon = *style.Icon
 		}
 		m.classes = cwsClasses(m, cfg, vertical)
 		out = append(out, m)
@@ -451,7 +451,7 @@ func hasClass(classes []string, name string) bool { return slices.Contains(class
 // showLabel is button/methods.rs's show_label. Workspaces: a mapped
 // icon replaces the label, display-mode none hides it. Tags: label
 // mode always shows it, icon mode only without a mapped icon.
-func (m cwsButtonModel) showLabel(mode config.WorkspacesDisplayMode) bool {
+func (m cwsButtonModel) showLabel(mode config.DisplayMode) bool {
 	if !m.hasLabel || m.label == "" {
 		return false
 	}
@@ -474,7 +474,7 @@ func (m cwsButtonModel) showLabel(mode config.WorkspacesDisplayMode) bool {
 
 // showIcon is show_icon. Workspaces: a mapped icon shows in every mode
 // but none. Tags: only in icon mode.
-func (m cwsButtonModel) showIcon(mode config.WorkspacesDisplayMode) bool {
+func (m cwsButtonModel) showIcon(mode config.DisplayMode) bool {
 	if m.flavor == cwsTags {
 		return mode == config.DisplayModeIcon && m.icon != ""
 	}

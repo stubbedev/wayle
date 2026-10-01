@@ -1,160 +1,129 @@
 package config
 
-import (
-	"fmt"
-
-	"github.com/BurntSushi/toml"
-)
-
-// MangoWorkspacesConfig is the mango-workspaces module config. The
-// tag schema shares the sway/niri button styling, carried in Shared
-// (tag-padding maps to WorkspacePad and tag-map, keyed by tag index,
-// to WorkspaceMap); the tag set rules are its own.
+// MangoWorkspacesConfig is ported from crates/wayle-config/src/schemas/modules/mango_workspaces/mod.rs.
+//
+// MangoWM tag switcher module configuration.
 type MangoWorkspacesConfig struct {
-	HideEmpty   bool
-	MinTagCount int
-	Shared      CompositorWorkspacesConfig
+	// Hide tags that hold no clients and are not active.
+	HideEmpty bool `cfg:"hide-empty"`
+	// Always show tags up to this one-based index, even when empty.
+	//
+	// `0` shows only occupied or active tags (subject to `hide-empty`). A
+	// value above the compositor's tag count just shows every tag.
+	MinTagCount uint8 `cfg:"min-tag-count"`
+	// What identifies each tag: its label, an icon, or nothing.
+	DisplayMode DisplayMode `cfg:"display-mode"`
+	// Text shown between the tag label and its application icons.
+	Divider string `cfg:"divider"`
+	// Show an application icon per client on each tag.
+	AppIconsShow bool `cfg:"app-icons-show"`
+	// Collapse clients that share an application to a single icon.
+	AppIconsDedupe bool `cfg:"app-icons-dedupe"`
+	// Icon for clients not matched by `app-icon-map`.
+	AppIconsFallback string `cfg:"app-icons-fallback"`
+	// Icon shown when a tag has no clients.
+	AppIconsEmpty string `cfg:"app-icons-empty"`
+	// Highlight tags whose clients requested attention.
+	UrgentShow bool `cfg:"urgent-show"`
+	// Whether urgency is tracked per tag or per application.
+	UrgentMode UrgentMode `cfg:"urgent-mode"`
+	// How the active tag is marked.
+	ActiveIndicator ActiveIndicator `cfg:"active-indicator"`
+	// Padding around each tag button, in rem.
+	TagPadding Size `cfg:"tag-padding"`
+	// Spacing between application icons. Accepts a scale multiplier or pixels (e.g. `"4px"`).
+	IconGap Size `cfg:"icon-gap"`
+	// Application icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
+	IconSize Size `cfg:"icon-size"`
+	// Tag label text size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
+	LabelSize Size `cfg:"label-size"`
+	// Color of the active tag.
+	ActiveColor ColorValue `cfg:"active-color"`
+	// Color of tags that hold clients but are not active.
+	OccupiedColor ColorValue `cfg:"occupied-color"`
+	// Color of empty tags.
+	EmptyColor ColorValue `cfg:"empty-color"`
+	// Background color of the tag container.
+	ContainerBgColor ColorValue `cfg:"container-bg-color"`
+	// Draw a border around the tag container.
+	BorderShow bool `cfg:"border-show"`
+	// Border color when the border is shown.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Window-to-icon mappings for the application icons.
+	//
+	// Keys are glob patterns matched against a client's app id, or `title:`
+	// patterns matched against its title. Values are symbolic icon names.
+	//
+	// ## Example
+	//
+	// ```toml
+	// [modules.mango-workspaces.app-icon-map]
+	// "*firefox*" = "ld-globe-symbolic"
+	// "title:*YouTube*" = "si-youtube-symbolic"
+	// ```
+	AppIconMap map[string]string `cfg:"app-icon-map"`
+	// Per-tag icon and color overrides, keyed by one-based tag index.
+	//
+	// ## Example
+	//
+	// ```toml
+	// [modules.mango-workspaces.tag-map.1]
+	// label = "web"
+	// icon = "ld-globe-symbolic"
+	// color = "#4a90d9"
+	//
+	// [modules.mango-workspaces.tag-map.2]
+	// label = "term"
+	// icon = "ld-terminal-symbolic"
+	// ```
+	TagMap map[string]WorkspaceStyle `cfg:"tag-map"`
+	// Action for a left click on a tag.
+	LeftClick WorkspaceClickAction `cfg:"left-click"`
+	// Action for a middle click on a tag.
+	MiddleClick WorkspaceClickAction `cfg:"middle-click"`
+	// Action for a right click on a tag.
+	RightClick WorkspaceClickAction `cfg:"right-click"`
+	// Action for scrolling up over the tag container.
+	ScrollUp WorkspaceClickAction `cfg:"scroll-up"`
+	// Action for scrolling down over the tag container.
+	ScrollDown WorkspaceClickAction `cfg:"scroll-down"`
 }
 
 // DefaultsMangoWorkspaces returns the schema defaults.
 func DefaultsMangoWorkspaces() MangoWorkspacesConfig {
-	shared := defaultsCompositorWorkspaces(false)
-	// The fields the tag schema does not have stay inert.
-	shared.MonitorSpecific = false
-	return MangoWorkspacesConfig{HideEmpty: true, MinTagCount: 0, Shared: shared}
+	return MangoWorkspacesConfig{
+		HideEmpty:        true,
+		MinTagCount:      0,
+		DisplayMode:      DisplayModeLabel,
+		Divider:          " ",
+		AppIconsShow:     false,
+		AppIconsDedupe:   true,
+		AppIconsFallback: "ld-app-window-symbolic",
+		AppIconsEmpty:    "tb-minus-symbolic",
+		UrgentShow:       true,
+		UrgentMode:       UrgentWorkspace,
+		ActiveIndicator:  ActiveBackground,
+		TagPadding:       Size{Value: 0.5, Unit: SizeMultiplier},
+		IconGap:          Size{Value: 0.3, Unit: SizeMultiplier},
+		IconSize:         Size{Value: 1, Unit: SizeMultiplier},
+		LabelSize:        Size{Value: 1, Unit: SizeMultiplier},
+		ActiveColor:      mustColor("accent"),
+		OccupiedColor:    mustColor("fg-muted"),
+		EmptyColor:       mustColor("fg-subtle"),
+		ContainerBgColor: mustColor("bg-surface-elevated"),
+		BorderShow:       false,
+		BorderColor:      mustColor("border-default"),
+		AppIconMap:       map[string]string{},
+		TagMap:           map[string]WorkspaceStyle{},
+		LeftClick:        ParseWorkspaceClickAction("focus:this"),
+		MiddleClick:      ParseWorkspaceClickAction(""),
+		RightClick:       ParseWorkspaceClickAction(""),
+		ScrollUp:         ParseWorkspaceClickAction("focus:previous"),
+		ScrollDown:       ParseWorkspaceClickAction("focus:next"),
+	}
 }
 
-// applyMangoWorkspaces overlays [modules.mango-workspaces].
-func applyMangoWorkspaces(md toml.MetaData, prim toml.Primitive) (MangoWorkspacesConfig, error) {
-	const module = "mango-workspaces"
-	cfg := DefaultsMangoWorkspaces()
-	var doc struct {
-		workspaceClicksDoc
-		HideEmpty        *bool                `toml:"hide-empty"`
-		MinTagCount      *int                 `toml:"min-tag-count"`
-		DisplayMode      *string              `toml:"display-mode"`
-		Divider          *string              `toml:"divider"`
-		AppIconsShow     *bool                `toml:"app-icons-show"`
-		AppIconsDedupe   *bool                `toml:"app-icons-dedupe"`
-		AppIconsFallback *string              `toml:"app-icons-fallback"`
-		AppIconsEmpty    *string              `toml:"app-icons-empty"`
-		UrgentShow       *bool                `toml:"urgent-show"`
-		UrgentMode       *string              `toml:"urgent-mode"`
-		ActiveIndicator  *string              `toml:"active-indicator"`
-		TagPadding       tomlValue            `toml:"tag-padding"`
-		IconGap          tomlValue            `toml:"icon-gap"`
-		IconSize         tomlValue            `toml:"icon-size"`
-		LabelSize        tomlValue            `toml:"label-size"`
-		ActiveColor      string               `toml:"active-color"`
-		OccupiedColor    string               `toml:"occupied-color"`
-		EmptyColor       string               `toml:"empty-color"`
-		ContainerBgColor string               `toml:"container-bg-color"`
-		BorderShow       *bool                `toml:"border-show"`
-		BorderColor      string               `toml:"border-color"`
-		AppIconMap       map[string]string    `toml:"app-icon-map"`
-		TagMap           map[string]tomlValue `toml:"tag-map"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, fmt.Errorf("%s: %w", module, err)
-	}
-	s := &cfg.Shared
-	if doc.HideEmpty != nil {
-		cfg.HideEmpty = *doc.HideEmpty
-	}
-	if doc.MinTagCount != nil {
-		if *doc.MinTagCount < 0 || *doc.MinTagCount > 255 {
-			return cfg, fmt.Errorf("%s: min-tag-count %d outside 0-255", module, *doc.MinTagCount)
-		}
-		cfg.MinTagCount = *doc.MinTagCount
-	}
-	for _, b := range []struct {
-		raw    *bool
-		target *bool
-	}{
-		{doc.AppIconsShow, &s.AppIconsShow},
-		{doc.AppIconsDedupe, &s.AppIconsDedupe},
-		{doc.UrgentShow, &s.UrgentShow},
-		{doc.BorderShow, &s.BorderShow},
-	} {
-		if b.raw != nil {
-			*b.target = *b.raw
-		}
-	}
-	for _, str := range []struct {
-		raw    *string
-		target *string
-	}{
-		{doc.Divider, &s.Divider},
-		{doc.AppIconsFallback, &s.AppIconsFallback},
-		{doc.AppIconsEmpty, &s.AppIconsEmpty},
-	} {
-		if str.raw != nil {
-			*str.target = *str.raw
-		}
-	}
-	if doc.DisplayMode != nil {
-		s.DisplayMode = WorkspacesDisplayMode(*doc.DisplayMode)
-	}
-	if doc.UrgentMode != nil {
-		s.UrgentMode = UrgentMode(*doc.UrgentMode)
-	}
-	if doc.ActiveIndicator != nil {
-		s.ActiveIndicator = ActiveIndicator(*doc.ActiveIndicator)
-	}
-	for _, sz := range []struct {
-		key    string
-		raw    tomlValue
-		target *Size
-	}{
-		{"tag-padding", doc.TagPadding, &s.WorkspacePad},
-		{"icon-gap", doc.IconGap, &s.IconGap},
-		{"icon-size", doc.IconSize, &s.IconSize},
-		{"label-size", doc.LabelSize, &s.LabelSize},
-	} {
-		if err := parseSizeKey(module, sz.key, sz.raw, sz.target); err != nil {
-			return cfg, err
-		}
-	}
-	for _, c := range []struct {
-		key    string
-		raw    string
-		target *ColorValue
-	}{
-		{"active-color", doc.ActiveColor, &s.ActiveColor},
-		{"occupied-color", doc.OccupiedColor, &s.OccupiedColor},
-		{"empty-color", doc.EmptyColor, &s.EmptyColor},
-		{"container-bg-color", doc.ContainerBgColor, &s.ContainerBgColor},
-		{"border-color", doc.BorderColor, &s.BorderColor},
-	} {
-		if err := parseColorKey(module, c.key, c.raw, c.target); err != nil {
-			return cfg, err
-		}
-	}
-	if doc.AppIconMap != nil {
-		s.AppIconMap = doc.AppIconMap
-	}
-	if doc.TagMap != nil {
-		s.WorkspaceMap = map[string]NamedWorkspaceStyle{}
-		for key, raw := range doc.TagMap {
-			style, err := parseNamedWorkspaceStyle(raw.value)
-			if err != nil {
-				return cfg, fmt.Errorf("%s: tag-map[%s]: %w", module, key, err)
-			}
-			s.WorkspaceMap[key] = style
-		}
-	}
-	doc.apply(&s.Click)
-
-	switch s.DisplayMode {
-	case DisplayModeLabel, DisplayModeIcon, DisplayModeNone:
-	default:
-		return cfg, fmt.Errorf("%s: invalid display-mode %q (want label|icon|none)", module, s.DisplayMode)
-	}
-	if s.UrgentMode != UrgentWorkspace && s.UrgentMode != UrgentApplication {
-		return cfg, fmt.Errorf("%s: invalid urgent-mode %q (want workspace|application)", module, s.UrgentMode)
-	}
-	if s.ActiveIndicator != ActiveBackground && s.ActiveIndicator != ActiveUnderline {
-		return cfg, fmt.Errorf("%s: invalid active-indicator %q (want background|underline)", module, s.ActiveIndicator)
-	}
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c MangoWorkspacesConfig) Clicks() WorkspaceClicks {
+	return WorkspaceClicks{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }

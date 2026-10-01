@@ -17,17 +17,17 @@ type HexColor struct {
 // mirroring the Rust newtype's three failure cases.
 func ParseHexColor(s string) (HexColor, error) {
 	if !strings.HasPrefix(s, "#") {
-		return HexColor{}, fmt.Errorf("config: hex color must start with '#', got: %s", s)
+		return HexColor{}, fmt.Errorf("hex color must start with '#', got: %s", s)
 	}
 	digits := s[1:]
 	switch len(digits) {
 	case 3, 4, 6, 8:
 	default:
-		return HexColor{}, fmt.Errorf("config: hex color must have 3, 4, 6, or 8 hex digits after '#', got %d digits in: %s", len(digits), s)
+		return HexColor{}, fmt.Errorf("hex color must have 3, 4, 6, or 8 hex digits after '#', got %d digits in: %s", len(digits), s)
 	}
 	for _, r := range digits {
 		if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
-			return HexColor{}, fmt.Errorf("config: hex color contains invalid character '%c' in: %s", r, s)
+			return HexColor{}, fmt.Errorf("hex color contains invalid character '%c' in: %s", r, s)
 		}
 	}
 	return HexColor{s: s}, nil
@@ -81,9 +81,13 @@ func hexNibble(c byte) uint8 {
 	}
 }
 
-// UnmarshalText decodes and validates a TOML string.
-func (c *HexColor) UnmarshalText(text []byte) error {
-	parsed, err := ParseHexColor(string(text))
+// UnmarshalConfig implements Unmarshaler.
+func (c *HexColor) UnmarshalConfig(v any) error {
+	s, ok := v.(string)
+	if !ok {
+		return invalidType(v, "a string")
+	}
+	parsed, err := ParseHexColor(s)
 	if err != nil {
 		return err
 	}
@@ -91,5 +95,14 @@ func (c *HexColor) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// MarshalText encodes the color as written.
-func (c HexColor) MarshalText() ([]byte, error) { return []byte(c.s), nil }
+// MarshalConfig implements Marshaler.
+func (c HexColor) MarshalConfig() any { return c.s }
+
+// configSchema is hex_color.rs's hand-written JsonSchema.
+func (HexColor) configSchema(*schemaGen) Schema {
+	return Schema{
+		"description": "GTK4 CSS hex color (#rgb, #rgba, #rrggbb, or #rrggbbaa)",
+		"type":        "string",
+		"pattern":     "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+	}
+}

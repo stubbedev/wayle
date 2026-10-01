@@ -74,14 +74,15 @@ func powerDropdown(ctx ModuleContext) widget.Widget {
 		label   string
 		icon    string
 		command string
+		show    bool
 	}{
-		{i18n.T("dropdown-dashboard-lock"), "ld-lock-symbolic", cfg.Lock},
-		{i18n.T("dropdown-dashboard-logout"), "ld-log-out-symbolic", cfg.Logout},
-		{"Suspend", "ld-moon-symbolic", cfg.Suspend},
-		{i18n.T("dropdown-dashboard-reboot"), "ld-refresh-cw-symbolic", cfg.Reboot},
-		{i18n.T("dropdown-dashboard-power-off"), "ld-power-symbolic", cfg.Shutoff},
+		{i18n.T("dropdown-dashboard-lock"), "ld-lock-symbolic", cfg.LockCommand, cfg.ShowLock},
+		{i18n.T("dropdown-dashboard-logout"), "ld-log-out-symbolic", cfg.LogoutCommand, cfg.ShowLogout},
+		{"Suspend", "ld-moon-symbolic", cfg.SuspendCommand, cfg.ShowSuspend},
+		{i18n.T("dropdown-dashboard-reboot"), "ld-refresh-cw-symbolic", cfg.RebootCommand, cfg.ShowReboot},
+		{i18n.T("dropdown-dashboard-power-off"), "ld-power-symbolic", cfg.ShutdownCommand, cfg.ShowShutdown},
 	} {
-		if row.command == "" {
+		if !row.show || row.command == "" {
 			continue
 		}
 		col.Append(dropdownRow(ctx, font, px, row.label, row.icon, func() {

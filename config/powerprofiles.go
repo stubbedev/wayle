@@ -1,102 +1,95 @@
 package config
 
-import (
-	"errors"
-
-	"github.com/BurntSushi/toml"
-)
-
-// PowerProfilesConfig is the power-profiles module configuration: the
-// active profile rendered per the format, with per-profile icons and
-// colors.
+// PowerProfilesConfig is ported from crates/wayle-config/src/schemas/modules/power_profiles/mod.rs.
+//
+// Power profile indicator and switcher (power-profiles-daemon).
+//
+// Shows the active profile with a per-profile icon and color, and cycles
+// through the available profiles on click. Backed by the same
+// power-profiles-daemon D-Bus interface as `powerprofilesctl`.
 type PowerProfilesConfig struct {
-	Click  ClickConfig
-	Format string
-	// Button is the bar-button key set; LabelShow and the Show of every
-	// Icons entry mirror its label-show and icon-show.
-	Button    ButtonConfig
-	LabelShow bool
-	Icons     map[string]IconConfig
-	Colors    map[string]ColorValue
+	// Format string for the label.
+	//
+	// ## Placeholders
+	//
+	// - `{{ profile }}` - Active profile name (power-saver, balanced, performance)
+	//
+	// ## Examples
+	//
+	// - `"{{ profile }}"` - "balanced"
+	Format string `cfg:"format"`
+	// Icon shown while the power-saver profile is active.
+	IconPowerSaver string `cfg:"icon-power-saver"`
+	// Icon shown while the balanced profile is active.
+	IconBalanced string `cfg:"icon-balanced"`
+	// Icon shown while the performance profile is active.
+	IconPerformance string `cfg:"icon-performance"`
+	// Icon/label color while the power-saver profile is active.
+	ColorPowerSaver ColorValue `cfg:"color-power-saver"`
+	// Icon/label color while the balanced profile is active.
+	ColorBalanced ColorValue `cfg:"color-balanced"`
+	// Icon/label color while the performance profile is active.
+	ColorPerformance ColorValue `cfg:"color-performance"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Display module icon.
+	IconShow bool `cfg:"icon-show"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	//
+	// Overridden per active profile by the `color-*` fields.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Display label.
+	LabelShow bool `cfg:"label-show"`
+	// Label text color token.
+	LabelColor ColorValue `cfg:"label-color"`
+	// Max label characters before truncation with ellipsis. Set to 0 to disable.
+	LabelMaxLength uint32 `cfg:"label-max-length"`
+	// Button background color token.
+	ButtonBgColor ColorValue `cfg:"button-bg-color"`
+	// Action on left click. Default cycles to the next power profile.
+	LeftClick ClickAction `cfg:"left-click"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
 }
 
 // DefaultsPowerProfiles returns the schema defaults.
 func DefaultsPowerProfiles() PowerProfilesConfig {
 	return PowerProfilesConfig{
-		Format:    "{{ profile }}",
-		LabelShow: false,
-		Button:    DefaultsButton(buttonColors("auto", "auto", "bg-surface-elevated", "bg-surface-elevated", "blue"), TokenBlue, false, 0),
-		Click:     DefaultsClick(map[string]string{"left-click": ":cycle"}),
-		Icons: map[string]IconConfig{
-			ProfileBalanced:    DefaultsIcon(true, "ld-scale-symbolic"),
-			ProfilePerformance: DefaultsIcon(true, "ld-rocket-symbolic"),
-			ProfilePowerSaver:  DefaultsIcon(true, "ld-leaf-symbolic"),
-		},
-		Colors: map[string]ColorValue{},
+		Format:           "{{ profile }}",
+		IconPowerSaver:   "ld-leaf-symbolic",
+		IconBalanced:     "ld-scale-symbolic",
+		IconPerformance:  "ld-rocket-symbolic",
+		ColorPowerSaver:  mustColor("green"),
+		ColorBalanced:    mustColor("blue"),
+		ColorPerformance: mustColor("red"),
+		BorderShow:       false,
+		BorderColor:      mustColor("blue"),
+		IconShow:         true,
+		IconColor:        mustColor("auto"),
+		IconBgColor:      mustColor("bg-surface-elevated"),
+		LabelShow:        false,
+		LabelColor:       mustColor("auto"),
+		LabelMaxLength:   0,
+		ButtonBgColor:    mustColor("bg-surface-elevated"),
+		LeftClick:        ParseClickAction(":cycle"),
+		RightClick:       ClickAction{},
+		MiddleClick:      ClickAction{},
+		ScrollUp:         ClickAction{},
+		ScrollDown:       ClickAction{},
 	}
 }
 
-// applyPowerProfiles overlays [modules.power-profiles].
-func applyPowerProfiles(md toml.MetaData, prim toml.Primitive) (PowerProfilesConfig, error) {
-	cfg := DefaultsPowerProfiles()
-	var doc struct {
-		Format        *string     `toml:"format"`
-		IconBalanced  *string     `toml:"icon-balanced"`
-		IconPerf      *string     `toml:"icon-performance"`
-		IconSaver     *string     `toml:"icon-power-saver"`
-		ColorBalanced *ColorValue `toml:"color-balanced"`
-		ColorPerf     *ColorValue `toml:"color-performance"`
-		ColorSaver    *ColorValue `toml:"color-power-saver"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.Format != nil {
-		cfg.Format = *doc.Format
-	}
-	for name, key := range map[string]*string{
-		ProfileBalanced:    doc.IconBalanced,
-		ProfilePerformance: doc.IconPerf,
-		ProfilePowerSaver:  doc.IconSaver,
-	} {
-		if key == nil {
-			continue
-		}
-		icon := cfg.Icons[name]
-		icon.Name = *key
-		cfg.Icons[name] = icon
-	}
-	for name, color := range map[string]*ColorValue{
-		ProfileBalanced:    doc.ColorBalanced,
-		ProfilePerformance: doc.ColorPerf,
-		ProfilePowerSaver:  doc.ColorSaver,
-	} {
-		if color == nil {
-			continue
-		}
-		cfg.Colors[name] = *color
-	}
-	if doc.Format != nil && *doc.Format == "" {
-		return cfg, errors.New("power-profiles: format is empty")
-	}
-	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Button = button
-	button.mirrorLabel(&cfg.LabelShow, nil)
-	button.mirrorIconShow(cfg.Icons)
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c PowerProfilesConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }
-
-// Profile names as the daemon spells them.
-const (
-	ProfileBalanced    = "balanced"
-	ProfilePerformance = "performance"
-	ProfilePowerSaver  = "power-saver"
-)

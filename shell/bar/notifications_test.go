@@ -32,7 +32,7 @@ func TestNotificationIconPriority(t *testing.T) {
 	if got := notificationIconName(cfg, 3, false); got != cfg.IconUnread {
 		t.Errorf("unread icon = %q", got)
 	}
-	if got := notificationIconName(cfg, 0, false); got != cfg.Icon.Name {
+	if got := notificationIconName(cfg, 0, false); got != cfg.Icon().Name {
 		t.Errorf("resting icon = %q", got)
 	}
 }

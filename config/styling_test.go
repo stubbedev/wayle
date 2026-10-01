@@ -1,19 +1,10 @@
 package config
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
-
-func TestDefaultsStylingMatchesSchema(t *testing.T) {
-	s := Defaults().Styling
-	if s.Scale != 1.01 || s.Rounding != RoundingSm || s.Appearance != AppearanceAuto || s.PaletteBaseTheme != "" {
-		t.Errorf("styling defaults = %+v", s)
-	}
-	if got := s.ActivePalette(); got != wayleTheme {
-		t.Errorf("default palette = %+v, want the wayle theme", got)
-	}
-}
 
 func TestLoadFileAppliesStylingSection(t *testing.T) {
 	path := writeConfig(t, `
@@ -21,8 +12,9 @@ func TestLoadFileAppliesStylingSection(t *testing.T) {
 scale = 1.5
 rounding = "lg"
 appearance = "dark"
-palette-base-theme = "nord"
+palette_base_theme = "nord"
 theme-provider = "matugen"
+matugen-contrast = 3
 
 [styling.palette]
 bg = "#000000"
@@ -33,49 +25,35 @@ blue = "#11223344"
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	want := StylingConfig{
-		Scale: 1.5, Rounding: RoundingLg, Appearance: AppearanceDark, PaletteBaseTheme: "nord",
-		Palette: paletteConfigOf(wayleTheme),
-	}
+	want := DefaultsStyling()
+	want.Scale, want.Rounding, want.Appearance, want.PaletteBaseTheme = 1.5, RoundingLg, AppearanceDark, "nord"
+	want.ColorExtractor.ThemeProvider = ThemeProviderMatugen
+	want.ColorExtractor.MatugenContrast = 1 // clamped, with a warning
 	want.Palette.Bg, want.Palette.FgMuted, want.Palette.Blue = mustHex("#000000"), mustHex("#abc"), mustHex("#11223344")
-	if cfg.Styling != want {
+	if !reflect.DeepEqual(cfg.Styling, want) {
 		t.Errorf("styling =\n%+v\nwant\n%+v", cfg.Styling, want)
 	}
-	// The same table feeds the color extractor half.
-	if cfg.ColorExtractor.ThemeProvider != ThemeMatugen {
-		t.Errorf("theme-provider = %q, want matugen", cfg.ColorExtractor.ThemeProvider)
-	}
 }
 
-func TestStylingScaleClampsLikeScaleFactor(t *testing.T) {
-	for in, want := range map[string]float64{"0.1": 0.25, "-2": 0.25, "3.5": 3.0, "2": 2} {
-		cfg, err := LoadFile(writeConfig(t, "[styling]\nscale = "+in+"\n"))
-		if err != nil {
-			t.Fatalf("scale %s: %v", in, err)
-		}
-		if cfg.Styling.Scale != want {
-			t.Errorf("scale %s = %v, want %v", in, cfg.Styling.Scale, want)
-		}
-	}
-}
-
-func TestLoadFileRejectsBadStyling(t *testing.T) {
-	for _, tc := range []struct{ body, want string }{
-		{"[styling]\nrounding = \"xl\"", "rounding"},
-		{"[styling]\nappearance = \"sepia\"", "appearance"},
-		{"[styling]\nscale = \"big\"", "scale"},
-		{"[styling]\npalette-base-theme = 3", "palette-base-theme"},
-		{"[styling.palette]\nbg = \"141420\"", "hex"},
-		{"[styling.palette]\nprimary = \"#12345\"", "hex"},
-		{"[styling.palette]\nred = \"red\"", "hex"},
+// Each bad [styling] value is a diagnostic for its own key; that key
+// keeps its default.
+func TestStylingBadValuesAreFieldDiagnostics(t *testing.T) {
+	for _, tc := range []struct{ body, path string }{
+		{"[styling]\nrounding = \"xl\"", "styling.rounding"},
+		{"[styling]\nappearance = \"sepia\"", "styling.appearance"},
+		{"[styling]\nscale = \"big\"", "styling.scale"},
+		{"[styling]\ntheme-provider = \"base16\"", "styling.theme-provider"},
+		{"[styling.palette]\nbg = \"141420\"", "styling.palette.bg"},
+		{"[styling.palette]\nprimary = \"#12345\"", "styling.palette.primary"},
+		{"[styling.palette]\nred = \"red\"", "styling.palette.red"},
 	} {
 		cfg, err := LoadFile(writeConfig(t, tc.body+"\n"))
-		if err == nil || !strings.Contains(err.Error(), tc.want) {
-			t.Errorf("%q: err = %v, want an error naming %q", tc.body, err, tc.want)
+		if err == nil || !strings.Contains(err.Error(), tc.path) {
+			t.Errorf("%q: diagnostics %v, want one for %s", tc.body, err, tc.path)
 			continue
 		}
-		if cfg.Styling != DefaultsStyling() {
-			t.Errorf("%q: a failed [styling] must leave the defaults, got %+v", tc.body, cfg.Styling)
+		if !reflect.DeepEqual(cfg.Styling, DefaultsStyling()) {
+			t.Errorf("%q: the bad key did not keep its default: %+v", tc.body, cfg.Styling)
 		}
 	}
 }

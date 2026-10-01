@@ -168,8 +168,8 @@ func (s trayIconSource) signature() string {
 // theme name - else the best IconPixmap, else the fallback glyph.
 func resolveTrayIcon(cfg config.SystrayConfig, it sni.Item) trayIconSource {
 	name := it.IconName
-	if o, ok := systrayOverride(cfg.Overrides, it); ok && o.Icon != "" {
-		name = o.Icon
+	if o, ok := systrayOverride(cfg.Overrides, it); ok && o.Icon != nil && *o.Icon != "" {
+		name = *o.Icon
 	}
 	if name != "" {
 		if file, ok := themePathIcon(it.IconThemePath, name); ok {
@@ -296,12 +296,12 @@ func newSystray(ctx ModuleContext) (Module, error) {
 
 // trayItemGap is item-gap in pixels (resolved at 1 rem).
 func trayItemGap(ctx ModuleContext) int {
-	return int(math.Round(ctx.Config.Systray.ItemGap.ResolvePx(styling.RemBase, ctx.Config.Bar.Scale)))
+	return int(math.Round(ctx.Config.Systray.ItemGap.ResolvePx(styling.RemBase, float64(ctx.Config.Bar.Scale))))
 }
 
 // iconPx is icon-scale resolved at the 1.25 rem base.
 func (m *systrayModule) iconPx() int {
-	return int(math.Round(m.ctx.Config.Systray.IconScale.ResolvePx(config.SystrayIconBaseRem*styling.RemBase, m.ctx.Config.Bar.Scale)))
+	return int(math.Round(m.ctx.Config.Systray.IconScale.ResolvePx(config.SystrayIconBaseRem*styling.RemBase, float64(m.ctx.Config.Bar.Scale))))
 }
 
 // Attach records the layer the menus open on.
@@ -379,8 +379,8 @@ func (m *systrayModule) updateIcon(e *trayEntry) {
 		e.sig = sig
 	}
 	var tint render.Color
-	if o, ok := systrayOverride(cfg.Overrides, e.item); ok && o.HasColor {
-		tint, _ = styling.ResolveColor(o.Color, m.ctx.Style.palette)
+	if o, ok := systrayOverride(cfg.Overrides, e.item); ok && o.Color != nil {
+		tint, _ = styling.ResolveColor(*o.Color, m.ctx.Style.palette)
 	}
 	e.icon.SetTint(tint)
 }

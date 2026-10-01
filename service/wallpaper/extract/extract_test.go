@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stubbedev/wayle/config"
 )
 
 // goldenCases mirror testdata/rust/generator.rs.txt: the Rust
@@ -20,17 +22,17 @@ var goldenCases = map[string]func(*Config){
 	"wallust-default": func(c *Config) { c.Tool = Wallust },
 	"wallust-custom": func(c *Config) {
 		c.Tool = Wallust
-		c.WallustPalette = PaletteSoftlightcomp16
+		c.WallustPalette = config.WallustPaletteSoftlightcomp16
 		c.WallustSaturation = 35
 		c.WallustCheckContrast = false
-		c.WallustBackend = BackendKmeans
-		c.WallustColorspace = ColorspaceLchansi
+		c.WallustBackend = config.WallustBackendKmeans
+		c.WallustColorspace = config.WallustColorspaceLchansi
 		c.WallustApplyGlobally = false
 	},
 	"matugen-default": func(c *Config) { c.Tool = Matugen },
 	"matugen-custom": func(c *Config) {
 		c.Tool = Matugen
-		c.MatugenScheme = SchemeFruitSalad
+		c.MatugenScheme = config.MatugenSchemeFruitSalad
 		c.MatugenContrast = -0.25
 		c.MatugenSourceColor = 9
 		c.MatugenLight = true

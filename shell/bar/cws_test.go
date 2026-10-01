@@ -124,16 +124,16 @@ func TestCwsLabelStrategies(t *testing.T) {
 }
 
 func TestCwsStylePrefersNameThenID(t *testing.T) {
-	m := map[string]config.NamedWorkspaceStyle{
-		"web": {Label: "W", LabelSet: true},
-		"5":   {Label: "five", LabelSet: true},
+	m := map[string]config.WorkspaceStyle{
+		"web": {Label: new("W")},
+		"5":   {Label: new("five")},
 	}
 	named := cwsWorkspace{id: 5, name: "web", hasName: true}
-	if s, ok := cwsStyleFor(named, m); !ok || s.Label != "W" {
+	if s, ok := cwsStyleFor(named, m); !ok || *s.Label != "W" {
 		t.Errorf("named = %+v %v, want the name entry", s, ok)
 	}
 	unmatched := cwsWorkspace{id: 5, name: "mail", hasName: true}
-	if s, ok := cwsStyleFor(unmatched, m); !ok || s.Label != "five" {
+	if s, ok := cwsStyleFor(unmatched, m); !ok || *s.Label != "five" {
 		t.Errorf("fallback = %+v %v, want the id entry", s, ok)
 	}
 	if _, ok := cwsStyleFor(cwsWorkspace{id: 6}, m); ok {
@@ -153,10 +153,10 @@ func TestCwsNameClassSanitizes(t *testing.T) {
 func TestCwsOverrideColorCascade(t *testing.T) {
 	red, _ := config.ParseColorValue("#ff0000")
 	green, _ := config.ParseColorValue("#00ff00")
-	m := map[string]config.NamedWorkspaceStyle{
-		"5":   {Color: red, ColorSet: true},
-		"web": {Color: green, ColorSet: true},
-		"x":   {Icon: "no-color"},
+	m := map[string]config.WorkspaceStyle{
+		"5":   {Color: &red},
+		"web": {Color: &green},
+		"x":   {Icon: new("no-color")},
 	}
 	// A numeric key reaches the id class; later keys win.
 	if c, ok := cwsOverrideColor([]string{"ws-id-5"}, m); !ok || c != red {
@@ -175,7 +175,7 @@ func TestCwsOverrideColorCascade(t *testing.T) {
 }
 
 func TestCwsAppIconsDedupeOrderAndUrgency(t *testing.T) {
-	cfg := config.DefaultsNiriWorkspaces()
+	cfg := config.DefaultsNiriWorkspaces().View()
 	windows := []cwsWindow{
 		{id: 3, workspace: 1, hasWorkspace: true, app: appicons.Window{AppID: "firefox", HasAppID: true}, order: [2]int{2, 1}},
 		{id: 1, workspace: 1, hasWorkspace: true, app: appicons.Window{AppID: "foot", HasAppID: true}, order: [2]int{1, 1}},
@@ -197,7 +197,7 @@ func TestCwsAppIconsDedupeOrderAndUrgency(t *testing.T) {
 }
 
 func TestCwsBuildModelsBlinkGatesUrgency(t *testing.T) {
-	cfg := config.DefaultsSwayWorkspaces()
+	cfg := config.DefaultsSwayWorkspaces().View()
 	urgent := occupiedWS(1, 1, "DP-1")
 	urgent.urgent = true
 	all := []cwsWorkspace{urgent}
@@ -220,7 +220,7 @@ func TestCwsBuildModelsBlinkGatesUrgency(t *testing.T) {
 }
 
 func TestCwsClassesMatchComputeCSSClasses(t *testing.T) {
-	cfg := config.DefaultsNiriWorkspaces()
+	cfg := config.DefaultsNiriWorkspaces().View()
 	ws := occupiedWS(5, 2, "DP-1")
 	ws.active, ws.focused, ws.name, ws.hasName = true, true, "web", true
 	m := cwsBuildModels(cwsWorkspaces, []cwsWorkspace{ws}, nil, cfg, "", true, false)
@@ -231,7 +231,7 @@ func TestCwsClassesMatchComputeCSSClasses(t *testing.T) {
 }
 
 func TestCwsShowRules(t *testing.T) {
-	cfg := config.DefaultsNiriWorkspaces()
+	cfg := config.DefaultsNiriWorkspaces().View()
 	labelled := cwsButtonModel{label: "1", hasLabel: true}
 	if !labelled.showLabel(cfg.DisplayMode) || labelled.showIcon(cfg.DisplayMode) || labelled.showDivider(cfg) {
 		t.Error("a labelled button without app icons: label only")
@@ -317,7 +317,7 @@ func TestCwsModuleBuildsOneButtonPerDisplayedWorkspace(t *testing.T) {
 	active := occupiedWS(1, 1, "DP-1")
 	active.active = true
 	f := newFakeCws([]cwsWorkspace{active, occupiedWS(2, 2, "DP-1"), emptyWS(3, 3, "DP-1"), occupiedWS(4, 1, "HDMI-A-1")}, nil)
-	m := newTestCws(t, config.DefaultsNiriWorkspaces(), f)
+	m := newTestCws(t, config.DefaultsNiriWorkspaces().View(), f)
 	buttons := m.root.buttons()
 	// niri hides the trailing empty 3; 4 is another output's.
 	if len(buttons) != 2 {
@@ -336,7 +336,7 @@ func TestCwsModuleBuildsOneButtonPerDisplayedWorkspace(t *testing.T) {
 }
 
 func TestCwsColorsFollowTheStylesheet(t *testing.T) {
-	cfg := config.DefaultsNiriWorkspaces()
+	cfg := config.DefaultsNiriWorkspaces().View()
 	m := newTestCws(t, cfg, newFakeCws(nil, nil))
 	palette := styling.Default()
 	resolve := func(cv config.ColorValue) render.Color { c, _ := styling.ResolveColor(cv, palette); return c }
@@ -370,7 +370,7 @@ func TestCwsColorsFollowTheStylesheet(t *testing.T) {
 	}
 	// The override replaces every state color but not the hover mix.
 	red, _ := config.ParseColorValue("#ff0000")
-	m.cfg.WorkspaceMap = map[string]config.NamedWorkspaceStyle{"web": {Color: red, ColorSet: true}}
+	m.cfg.WorkspaceMap = map[string]config.WorkspaceStyle{"web": {Color: &red}}
 	over := m.cwsResolveColors(cwsButtonModel{classes: []string{"workspace", "occupied", "ws-name-web"}})
 	if over.label != resolve(red) || over.hoverBg != styling.ColorMix(accent, transparentColor, 15) {
 		t.Errorf("override = %+v", over)
@@ -378,7 +378,7 @@ func TestCwsColorsFollowTheStylesheet(t *testing.T) {
 }
 
 func TestCwsButtonMinSize(t *testing.T) {
-	m := newTestCws(t, config.DefaultsNiriWorkspaces(), newFakeCws([]cwsWorkspace{occupiedWS(1, 1, "DP-1")}, nil))
+	m := newTestCws(t, config.DefaultsNiriWorkspaces().View(), newFakeCws([]cwsWorkspace{occupiedWS(1, 1, "DP-1")}, nil))
 	b := m.root.buttons()[0]
 	sz := b.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 500}})
 	if sz.W < 24 || sz.H < 24 {
@@ -388,7 +388,7 @@ func TestCwsButtonMinSize(t *testing.T) {
 
 func TestCwsClicksRouteThroughTheRouter(t *testing.T) {
 	f := newFakeCws([]cwsWorkspace{occupiedWS(1, 1, "DP-1"), occupiedWS(2, 2, "DP-1")}, nil)
-	cfg := config.DefaultsSwayWorkspaces()
+	cfg := config.DefaultsSwayWorkspaces().View()
 	cfg.Click.MiddleClick = config.ParseWorkspaceClickAction("focus:last")
 	m := newTestCws(t, cfg, f)
 	m.root.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 40}})
@@ -421,7 +421,7 @@ func TestCwsClicksRouteThroughTheRouter(t *testing.T) {
 
 func TestCwsScrollIgnoresFocusThis(t *testing.T) {
 	f := newFakeCws([]cwsWorkspace{occupiedWS(1, 1, "DP-1")}, nil)
-	cfg := config.DefaultsSwayWorkspaces()
+	cfg := config.DefaultsSwayWorkspaces().View()
 	cfg.Click.ScrollDown = config.ParseWorkspaceClickAction("focus:this")
 	cfg.Click.ScrollUp = config.ParseWorkspaceClickAction("")
 	m := newTestCws(t, cfg, f)
@@ -436,7 +436,7 @@ func TestCwsBlinkRunsOnlyWhileUrgent(t *testing.T) {
 	urgent := occupiedWS(1, 1, "DP-1")
 	urgent.urgent = true
 	f := newFakeCws([]cwsWorkspace{urgent}, nil)
-	m := newTestCws(t, config.DefaultsNiriWorkspaces(), f)
+	m := newTestCws(t, config.DefaultsNiriWorkspaces().View(), f)
 	if m.blinkStop == nil || !m.blinkOn {
 		t.Fatal("urgent workspace: blink not started on")
 	}
@@ -470,7 +470,7 @@ func TestCwsBlinkRunsOnlyWhileUrgent(t *testing.T) {
 }
 
 func TestCwsBorderShowUsesTheButtonBorder(t *testing.T) {
-	cfg := config.DefaultsNiriWorkspaces()
+	cfg := config.DefaultsNiriWorkspaces().View()
 	m := newTestCws(t, cfg, newFakeCws(nil, nil))
 	if m.root.borders.any() || widget.HasClass(m.root, "border-all") {
 		t.Error("border-show off draws a border")
@@ -485,7 +485,7 @@ func TestCwsBorderShowUsesTheButtonBorder(t *testing.T) {
 func TestCwsModuleIsNotWrappedInButtonChrome(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	row := widget.NewBox(widget.Row, 0, 0)
-	m := newTestCws(t, config.DefaultsNiriWorkspaces(), newFakeCws(nil, nil))
+	m := newTestCws(t, config.DefaultsNiriWorkspaces().View(), newFakeCws(nil, nil))
 	factories["test-cws"] = func(ModuleContext) (Module, error) { return m, nil }
 	defer delete(factories, "test-cws")
 	if err := appendModule(row, config.BarItem{Module: "test-cws"}, ctx); err != nil {

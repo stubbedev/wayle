@@ -35,14 +35,15 @@ func findByMonitor(layouts []config.BarLayout, monitor string) (config.BarLayout
 // matching the Rust shell's warn-and-skip behavior.
 func mergeParent(layout config.BarLayout, all []config.BarLayout, visited map[string]bool) config.BarLayout {
 	resolved := layout
-	if resolved.Extends == "" {
+	extends, ok := resolved.ExtendsName()
+	if !ok {
 		return resolved
 	}
-	if visited[resolved.Extends] {
+	if visited[extends] {
 		return resolved
 	}
-	visited[resolved.Extends] = true
-	parent, ok := findByMonitor(all, resolved.Extends)
+	visited[extends] = true
+	parent, ok := findByMonitor(all, extends)
 	if !ok {
 		return resolved
 	}

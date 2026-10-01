@@ -11,11 +11,8 @@ import (
 	"path/filepath"
 
 	"github.com/stubbedev/wayle/internal/cli"
+	"github.com/stubbedev/wayle/internal/version"
 )
-
-// version is the workspace version (Cargo.toml [workspace.package]);
-// release builds may override it with -ldflags "-X main.version=...".
-var version = "0.8.53"
 
 // rootCommand is wayle/src/cli/app.rs's Cli: the subcommands in the
 // Rust enum's order, which is the order help and completions list.
@@ -23,7 +20,7 @@ func rootCommand() *cli.Command {
 	return &cli.Command{
 		Name:    "wayle",
 		About:   "Wayland services CLI",
-		Version: version,
+		Version: version.Version,
 		Subcommands: []*cli.Command{
 			audioCommand(),
 			configCommand(),

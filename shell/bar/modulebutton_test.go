@@ -13,57 +13,57 @@ import (
 
 func TestParseClickActionForms(t *testing.T) {
 	// click_action.rs's from_str cases.
-	if action := config.MustClickAction(""); action.Kind != config.ClickNone {
+	if action := config.ParseClickAction(""); action.Kind != config.ClickNone {
 		t.Errorf("empty = %+v, want none", action)
 	}
-	if action := config.MustClickAction("dropdown:battery"); action.Kind != config.ClickDropdown || action.Dropdown != "battery" {
+	if action := config.ParseClickAction("dropdown:battery"); action.Kind != config.ClickDropdown || action.Dropdown != "battery" {
 		t.Errorf("dropdown = %+v", action)
 	}
-	if action := config.MustClickAction("brightness:5"); action.Kind != config.ClickBrightness || action.Brightness != 5 {
+	if action := config.ParseClickAction("brightness:5"); action.Kind != config.ClickBrightness || action.Brightness != 5 {
 		t.Errorf("brightness delta = %+v", action)
 	}
-	if action := config.MustClickAction("brightness:-5"); action.Kind != config.ClickBrightness || action.Brightness != -5 {
+	if action := config.ParseClickAction("brightness:-5"); action.Kind != config.ClickBrightness || action.Brightness != -5 {
 		t.Errorf("negative delta = %+v", action)
 	}
-	if action := config.MustClickAction("brightness:toggle"); action.Kind != config.ClickBrightnessToggle {
+	if action := config.ParseClickAction("brightness:toggle"); action.Kind != config.ClickBrightnessToggle {
 		t.Errorf("toggle = %+v", action)
 	}
-	if action := config.MustClickAction("wayle audio output-mute"); action.Kind != config.ClickShell || action.Command != "wayle audio output-mute" {
+	if action := config.ParseClickAction("wayle audio output-mute"); action.Kind != config.ClickShell || action.Command != "wayle audio output-mute" {
 		t.Errorf("shell = %+v", action)
 	}
 	// Round trip.
 	for _, raw := range []string{"", "dropdown:battery", "brightness:-5", "brightness:toggle", "true"} {
-		if got := config.MustClickAction(raw).String(); got != raw {
+		if got := config.ParseClickAction(raw).String(); got != raw {
 			t.Errorf("round trip %q -> %q", raw, got)
 		}
 	}
-	if _, err := config.ParseClickAction("brightness:louder"); err == nil {
-		t.Error("bad delta: want an error")
+	if got := config.ParseClickAction("brightness:louder"); got.Kind != config.ClickNone {
+		t.Errorf("bad delta = %+v, want no action (click_action.rs from_str)", got)
 	}
 }
 
 func TestModuleClickDefaultsMatchSchema(t *testing.T) {
 	cfg := config.Defaults()
-	if got := cfg.Battery.Click.LeftClick.String(); got != "dropdown:battery" {
+	if got := cfg.Battery.Clicks().LeftClick.String(); got != "dropdown:battery" {
 		t.Errorf("battery left-click = %q", got)
 	}
-	if got := cfg.Brightness.Click.ScrollUp.String(); got != "brightness:5" {
+	if got := cfg.Brightness.Clicks().ScrollUp.String(); got != "brightness:5" {
 		t.Errorf("brightness scroll-up = %q", got)
 	}
-	if got := cfg.Brightness.Click.ScrollDown.String(); got != "brightness:-5" {
+	if got := cfg.Brightness.Clicks().ScrollDown.String(); got != "brightness:-5" {
 		t.Errorf("brightness scroll-down = %q", got)
 	}
-	if got := cfg.Volume.Click.MiddleClick.String(); got != "wayle audio output-mute" {
+	if got := cfg.Volume.Clicks().MiddleClick.String(); got != "wayle audio output-mute" {
 		t.Errorf("volume middle-click = %q", got)
 	}
-	if got := cfg.Microphone.Click.MiddleClick.String(); got != "wayle audio input-mute" {
+	if got := cfg.Microphone.Clicks().MiddleClick.String(); got != "wayle audio input-mute" {
 		t.Errorf("microphone middle-click = %q", got)
 	}
-	if got := cfg.Clock.Click.RightClick.String(); got != "dropdown:weather" {
+	if got := cfg.Clock.Clicks().RightClick.String(); got != "dropdown:weather" {
 		t.Errorf("clock right-click = %q", got)
 	}
-	if cfg.KeyboardInput.Click.LeftClick.Kind != config.ClickNone {
-		t.Errorf("keyboard-input left-click = %+v, want none", cfg.KeyboardInput.Click.LeftClick)
+	if cfg.KeyboardInput.Clicks().LeftClick.Kind != config.ClickNone {
+		t.Errorf("keyboard-input left-click = %+v, want none", cfg.KeyboardInput.Clicks().LeftClick)
 	}
 }
 
@@ -79,7 +79,7 @@ func newWrappedModule(t *testing.T, binding config.ClickConfig) (*barButton, *re
 	ctx := newTestContext(t, cfg)
 	label := widget.NewLabel(testFont(t), 12, "x", 0xFF000000)
 	button := asBarButton(ctx, label)
-	button.configure(cfg.Battery.Button, binding, func(action config.ClickAction) {
+	button.configure(batteryButton(cfg), binding, func(action config.ClickAction) {
 		rec.actions = append(rec.actions, action)
 	})
 	return button, rec
@@ -87,11 +87,11 @@ func newWrappedModule(t *testing.T, binding config.ClickConfig) (*barButton, *re
 
 func TestBarButtonRoutesAllFiveBindings(t *testing.T) {
 	binding := config.ClickConfig{
-		LeftClick:   config.MustClickAction("left"),
-		MiddleClick: config.MustClickAction("middle"),
-		RightClick:  config.MustClickAction("right"),
-		ScrollUp:    config.MustClickAction("up"),
-		ScrollDown:  config.MustClickAction("down"),
+		LeftClick:   config.ParseClickAction("left"),
+		MiddleClick: config.ParseClickAction("middle"),
+		RightClick:  config.ParseClickAction("right"),
+		ScrollUp:    config.ParseClickAction("up"),
+		ScrollDown:  config.ParseClickAction("down"),
 	}
 	button, rec := newWrappedModule(t, binding)
 
@@ -133,7 +133,7 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	label := widget.NewLabel(testFont(t), 12, "42%", 0xFF112233)
 	icon := widget.NewThemeIcon("x-symbolic", 16)
 	b := newBarButton(ctx, icon, label)
-	b.configure(cfg.Battery.Button, config.ClickConfig{}, nil)
+	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
 	if b.Element() != "menubutton" || b.toggle.Element() != "button" || !b.toggle.HasClass("toggle") {
 		t.Fatal("the menubutton > button.toggle spine")
 	}
@@ -160,10 +160,10 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 
 	// The modifiers follow the config: variant, hidden label/icon, the
 	// border class, the icon position, and a vertical bar.
-	cfg.Bar.ButtonVariant = config.ButtonVariantBlockPrefix
+	cfg.Bar.ButtonVariant = config.ButtonBlockPrefix
 	cfg.Bar.ButtonIconPosition = config.IconEnd
 	cfg.Bar.Location = config.LocationLeft
-	bc := cfg.Battery.Button
+	bc := batteryButton(cfg)
 	bc.LabelShow, bc.IconShow, bc.BorderShow = false, false, true
 	v := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), widget.NewLabel(testFont(t), 12, "x", 0))
 	v.configure(bc, config.ClickConfig{}, nil)
@@ -183,7 +183,7 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 func TestBarButtonThresholdsOverrideTheColors(t *testing.T) {
 	cfg := config.Defaults()
 	b := newBarButton(newTestContext(t, cfg), nil, widget.NewLabel(testFont(t), 12, "x", 0))
-	b.configure(cfg.Battery.Button, config.ClickConfig{}, nil)
+	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
 	before := b.InlineStyle()
 	red := mustToken(config.TokenRed)
 	b.SetThresholds(config.ThresholdColors{LabelColor: &red})
@@ -200,7 +200,7 @@ func TestBarButtonHidesAnEmptyLabelContainer(t *testing.T) {
 	cfg := config.Defaults()
 	label := widget.NewLabel(testFont(t), 12, "", 0)
 	b := newBarButton(newTestContext(t, cfg), nil, label)
-	b.configure(cfg.Battery.Button, config.ClickConfig{}, nil)
+	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
 	b.Measure(widgetConstraintsMax(200, 50))
 	if b.labelBox.Visible() {
 		t.Error("an empty label kept its container (and its gap margin)")
@@ -225,18 +225,19 @@ func TestLoadFileAppliesAndRejectsClickBindings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if c.Battery.Click.LeftClick.Kind != config.ClickBrightnessToggle {
-		t.Errorf("left-click = %+v", c.Battery.Click.LeftClick)
+	if c.Battery.Clicks().LeftClick.Kind != config.ClickBrightnessToggle {
+		t.Errorf("left-click = %+v", c.Battery.Clicks().LeftClick)
 	}
-	if c.Battery.Click.ScrollDown.Dropdown != "battery" {
-		t.Errorf("scroll-down = %+v", c.Battery.Click.ScrollDown)
+	if c.Battery.Clicks().ScrollDown.Dropdown != "battery" {
+		t.Errorf("scroll-down = %+v", c.Battery.Clicks().ScrollDown)
 	}
 
 	if err := os.WriteFile(path, []byte("[modules.battery]\nscroll-up = \"brightness:sideways\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := config.LoadFile(path); err == nil {
-		t.Error("bad delta: want a load error")
+	// Every string parses: a bad delta is no action (click_action.rs).
+	if c, err := config.LoadFile(path); err != nil || c.Battery.Clicks().ScrollUp.Kind != config.ClickNone {
+		t.Errorf("bad delta: want no action and no error, got %v", err)
 	}
 }
 
@@ -244,7 +245,7 @@ func TestLoadFileAppliesAndRejectsClickBindings(t *testing.T) {
 // hit leaf, so a routed left press must reach the binding and a hover
 // must shade the toggle.
 func TestBarButtonRoutesThroughTheRouter(t *testing.T) {
-	binding := config.ClickConfig{LeftClick: config.MustClickAction("left")}
+	binding := config.ClickConfig{LeftClick: config.ParseClickAction("left")}
 	button, rec := newWrappedModule(t, binding)
 	button.Measure(widget.Constraints{Max: widget.Size{W: 200, H: 50}})
 	button.Arrange(render.Rect{X: 0, Y: 0, W: 100, H: 30})
@@ -262,4 +263,10 @@ func TestBarButtonRoutesThroughTheRouter(t *testing.T) {
 	if len(rec.actions) != 1 || rec.actions[0].Command != "left" {
 		t.Fatalf("routed left click dispatched %+v, want the left binding", rec.actions)
 	}
+}
+
+// batteryButton is the battery module's bar-button view.
+func batteryButton(cfg *config.Config) config.ButtonConfig {
+	b, _ := cfg.ModuleButton("battery")
+	return b
 }

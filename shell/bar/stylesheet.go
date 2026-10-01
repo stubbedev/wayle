@@ -52,7 +52,7 @@ func newBarTheme(cfg *config.Config) *barTheme {
 // (bootstrap.rs), resolving the palette on the way. The animation
 // overrides of [animations] have no Go consumer yet and are omitted.
 func (t *barTheme) bundle() string {
-	palette, err := styling.ResolvePalette(t.cfg.Styling.ActivePalette(), t.cfg.Styling, t.cfg.ColorExtractor)
+	palette, err := styling.ResolvePalette(t.cfg.Styling.ActivePalette(), t.cfg.Styling)
 	if err != nil {
 		log.Printf("styling: %v", err)
 	}

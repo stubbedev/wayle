@@ -90,17 +90,17 @@ func resolveMediaIcon(cfg config.MediaConfig, p mpris.Player) string {
 		if p.DesktopEntry != "" {
 			return p.DesktopEntry + "-symbolic"
 		}
-		return cfg.Icon.Name
+		return cfg.IconName
 	}
 	switch cfg.IconType {
-	case config.MediaIconDefault:
-		return cfg.Icon.Name
-	case config.MediaIconApplication:
+	case config.MediaIconTypeDefault:
+		return cfg.IconName
+	case config.MediaIconTypeApplication:
 		return entrySymbolic()
-	case config.MediaIconSpinningDisc:
+	case config.MediaIconTypeSpinningDisc:
 		return cfg.SpinningDiscIcon
 	}
-	for _, m := range cfg.PlayerIcons {
+	for _, m := range cfg.PlayerIconMappings() {
 		if glob.Wildcard(m.Pattern, p.BusName) {
 			return m.Icon
 		}
@@ -118,21 +118,21 @@ func resolveMediaIcon(cfg config.MediaConfig, p mpris.Player) string {
 // only when the theme has it, application-mapped trying the desktop
 // entry next; icon-name is the last resort.
 func mediaIconName(cfg config.MediaConfig, p mpris.Player, env mediaIconEnv) string {
-	if cfg.IconType == config.MediaIconApplication {
+	if cfg.IconType == config.MediaIconTypeApplication {
 		if icon, ok := env.desktopIcon(p.DesktopEntry); ok {
 			return icon
 		}
-		return cfg.Icon.Name
+		return cfg.IconName
 	}
 	if resolved := resolveMediaIcon(cfg, p); env.exists(resolved) {
 		return resolved
 	}
-	if cfg.IconType == config.MediaIconApplicationMapped {
+	if cfg.IconType == config.MediaIconTypeApplicationMapped {
 		if icon, ok := env.desktopIcon(p.DesktopEntry); ok {
 			return icon
 		}
 	}
-	return cfg.Icon.Name
+	return cfg.IconName
 }
 
 // mediaModule is the now-playing button: the active player's icon and
@@ -169,7 +169,7 @@ func newMedia(ctx ModuleContext) (Module, error) {
 func (m *mediaModule) build() {
 	cfg := m.ctx.Config.Media
 	m.label = widget.NewLabel(m.ctx.Font, m.ctx.Style.labelPx, "", m.ctx.Style.fg)
-	m.icon = moduleIcon(m.ctx, cfg.Icon)
+	m.icon = moduleIcon(m.ctx, cfg.Icon())
 	m.root = assembleModule(m.ctx, m.icon, m.label)
 	if c, ok := m.root.(classer); ok {
 		c.AddClass("media")
@@ -182,19 +182,19 @@ func (m *mediaModule) build() {
 func (m *mediaModule) refresh() {
 	cfg := m.ctx.Config.Media
 	p, ok := m.source.Active()
-	label, icon := mediaNoPlayerLabel, cfg.Icon.Name
+	label, icon := mediaNoPlayerLabel, cfg.IconName
 	if ok {
 		label, icon = mediaLabel(cfg.Format, p), mediaIconName(cfg, p, m.env)
 	}
 	if !cfg.LabelShow {
 		label = ""
 	}
-	m.label.SetText(truncateLabel(label, cfg.LabelMaxLength))
+	m.label.SetText(truncateLabel(label, int(cfg.LabelMaxLength)))
 	if m.icon != nil {
 		m.icon.SetThemeName(icon)
 	}
 	classes, _ := m.root.(classer)
-	setClass(classes, "media-disc", ok && cfg.IconType == config.MediaIconSpinningDisc)
+	setClass(classes, "media-disc", ok && cfg.IconType == config.MediaIconTypeSpinningDisc)
 	setClass(classes, "media-spinning", ok && p.State == mpris.StatePlaying)
 }
 

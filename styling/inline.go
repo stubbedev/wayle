@@ -20,7 +20,7 @@ import (
 // under the wayle provider but falls back to the field's schema default
 // under an extractor, where a fixed hex has no mapping.
 func ResolveColorCSS(value, fieldDefault config.ColorValue, provider config.ThemeProvider) string {
-	if value.Kind == config.ColorCustom && provider != config.ThemeWayle {
+	if value.Kind == config.ColorCustom && provider != config.ThemeProviderWayle {
 		return fieldDefault.ToCSS()
 	}
 	return value.ToCSS()
@@ -33,13 +33,13 @@ func ResolveColorCSS(value, fieldDefault config.ColorValue, provider config.Them
 // the block-prefix and icon-square chrome.
 func ResolveIconColor(b config.ButtonConfig, variant config.BarButtonVariant, provider config.ThemeProvider) string {
 	color := b.Colors.Icon
-	if color.Kind == config.ColorCustom && provider != config.ThemeWayle {
+	if color.Kind == config.ColorCustom && provider != config.ThemeProviderWayle {
 		color = b.Defaults.Icon
 	}
 	if !color.IsAuto() {
 		return color.ToCSS()
 	}
-	if variant == config.ButtonVariantBasic {
+	if variant == config.ButtonBasic {
 		return b.AutoIconColor.CSSVar()
 	}
 	return config.TokenFgOnAccent.CSSVar()
@@ -48,24 +48,24 @@ func ResolveIconColor(b config.ButtonConfig, variant config.BarButtonVariant, pr
 // ButtonCSS is one bar button's variable block (bar_buttons/styling.rs
 // build_css): the five colors, each a threshold override when one is
 // active, and the bar's button border width.
-func ButtonCSS(b config.ButtonConfig, bar config.Bar, provider config.ThemeProvider, t config.ThresholdColors) string {
+func ButtonCSS(b config.ButtonConfig, bar config.BarConfig, provider config.ThemeProvider, t config.ThresholdColors) string {
 	return "* { " +
 		"--bar-btn-icon-color: " + config.ResolveOr(t.IconColor, ResolveIconColor(b, bar.ButtonVariant, provider)) + "; " +
 		"--bar-btn-label-color: " + config.ResolveOr(t.LabelColor, ResolveColorCSS(b.Colors.Label, b.Defaults.Label, provider)) + "; " +
 		"--bar-btn-icon-bg: " + config.ResolveOr(t.IconBgColor, ResolveColorCSS(b.Colors.IconBg, b.Defaults.IconBg, provider)) + "; " +
 		"--bar-btn-bg: " + config.ResolveOr(t.ButtonBgColor, ResolveColorCSS(b.Colors.ButtonBg, b.Defaults.ButtonBg, provider)) + "; " +
 		"--bar-btn-border-color: " + config.ResolveOr(t.BorderColor, ResolveColorCSS(b.Colors.Border, b.Defaults.Border, provider)) + "; " +
-		"--bar-btn-border-width: " + strconv.Itoa(bar.ButtonBorderWidth) + "px; " +
+		"--bar-btn-border-width: " + strconv.Itoa(int(bar.ButtonBorderWidth)) + "px; " +
 		"}"
 }
 
 // ContainerCSS is a bar container's variable block
 // (bar_container/styling.rs build_css): background, border color, and
 // the bar's button border width, zero while border-show is off.
-func ContainerCSS(c config.ContainerConfig, bar config.Bar, provider config.ThemeProvider) string {
+func ContainerCSS(c config.ContainerConfig, bar config.BarConfig, provider config.ThemeProvider) string {
 	width := 0
 	if c.BorderShow {
-		width = bar.ButtonBorderWidth
+		width = int(bar.ButtonBorderWidth)
 	}
 	return "* { " +
 		"--bar-container-bg: " + ResolveColorCSS(c.Background, c.DefaultBackground, provider) + "; " +
@@ -115,11 +115,11 @@ func borderSides(location config.BorderLocation, width int) (top, bottom, left, 
 // styling.rs build_css): scale, colors, borders, the pixel-rounded
 // spacing, the button opacity and weight, the group chrome, and the
 // shadow.
-func BarCSS(bar config.Bar, provider config.ThemeProvider) string {
+func BarCSS(bar config.BarConfig, provider config.ThemeProvider) string {
 	defaults := config.Defaults().Bar
 	scale := float32(bar.Scale)
-	top, bottom, left, right := borderSides(bar.BorderLocation, bar.BorderWidth)
-	gTop, gBottom, gLeft, gRight := borderSides(bar.ButtonGroupBorderLocation, bar.ButtonGroupBorderWidth)
+	top, bottom, left, right := borderSides(bar.BorderLocation, int(bar.BorderWidth))
+	gTop, gBottom, gLeft, gRight := borderSides(bar.ButtonGroupBorderLocation, int(bar.ButtonGroupBorderWidth))
 	var groupPadding int
 	if px, ok := bar.ButtonGroupPadding.PxValue(); ok {
 		groupPadding = int(math.Round(float64(float32(px))))
@@ -134,7 +134,7 @@ func BarCSS(bar config.Bar, provider config.ThemeProvider) string {
 	b.WriteString(".bar { ")
 	decl("--bar-scale", formatF32(scale))
 	decl("--bar-bg", ResolveColorCSS(bar.BG, defaults.BG, provider))
-	decl("--bar-opacity", itoa(bar.BackgroundOpacity)+"%")
+	decl("--bar-opacity", itoa(int(bar.BackgroundOpacity))+"%")
 	decl("--bar-border-color", ResolveColorCSS(bar.BorderColor, defaults.BorderColor, provider))
 	decl("--bar-border-top", itoa(top))
 	decl("--bar-border-bottom", itoa(bottom))
@@ -146,19 +146,19 @@ func BarCSS(bar config.Bar, provider config.ThemeProvider) string {
 	decl("--bar-padding-ends-px", itoa(sizeToPxRounded(bar.PaddingEnds, scale)))
 	decl("--bar-module-gap-px", itoa(sizeToPxRounded(bar.ModuleGap, scale)))
 	decl("--bar-button-opacity", formatF64(float64(bar.ButtonOpacity)/100))
-	decl("--bar-button-bg-opacity", itoa(bar.ButtonBGOpacity)+"%")
+	decl("--bar-button-bg-opacity", itoa(int(bar.ButtonBGOpacity))+"%")
 	decl("--bar-btn-label-weight", "var("+bar.ButtonLabelWeight.CSSVar()+")")
 	decl("--bar-group-module-gap-px", itoa(sizeToPxRounded(bar.ButtonGroupModuleGap, scale)))
 	decl("--bar-group-padding-px", itoa(groupPadding))
 	decl("--bar-group-bg", ResolveColorCSS(bar.ButtonGroupBackground, defaults.ButtonGroupBackground, provider))
-	decl("--bar-group-opacity", itoa(bar.ButtonGroupOpacity)+"%")
+	decl("--bar-group-opacity", itoa(int(bar.ButtonGroupOpacity))+"%")
 	decl("--bar-group-border-color", ResolveColorCSS(bar.ButtonGroupBorderColor, defaults.ButtonGroupBorderColor, provider))
 	decl("--bar-group-border-top", itoa(gTop))
 	decl("--bar-group-border-bottom", itoa(gBottom))
 	decl("--bar-group-border-left", itoa(gLeft))
 	decl("--bar-group-border-right", itoa(gRight))
 	decl("--bar-shadow", bar.Shadow.CSSShadow(bar.Location))
-	decl("--bar-shadow-margin", itoa(bar.Shadow.OppositeMargin()))
+	decl("--bar-shadow-margin", itoa(int(bar.Shadow.OppositeMargin())))
 	b.WriteString("}")
 	return b.String()
 }

@@ -93,7 +93,7 @@ func scalarString(value any) string {
 
 // formatLabel is helpers.rs's format_label: an explicit JSON text
 // field wins over the rendered format.
-func formatCustomLabel(def config.CustomModuleConfig, parsed parsedOutput) string {
+func formatCustomLabel(def config.CustomModuleDefinition, parsed parsedOutput) string {
 	if parsed.text != "" {
 		return parsed.text
 	}
@@ -132,7 +132,7 @@ func shouldHideCustom(output string, hideIfEmpty bool) bool {
 // custom is the module: a shell command rendered into a label.
 type customModule struct {
 	ctx    ModuleContext
-	def    config.CustomModuleConfig
+	def    config.CustomModuleDefinition
 	label  *widget.Label
 	cancel context.CancelFunc
 }
@@ -150,14 +150,14 @@ func newCustomUpdates() *customUpdates {
 
 func (c *customUpdates) register(m *customModule) {
 	c.mu.Lock()
-	c.modules[m.def.ID] = m
+	c.modules[m.def.Id] = m
 	c.mu.Unlock()
 }
 
 func (c *customUpdates) unregister(m *customModule) {
 	c.mu.Lock()
-	if cur, ok := c.modules[m.def.ID]; ok && cur == m {
-		delete(c.modules, m.def.ID)
+	if cur, ok := c.modules[m.def.Id]; ok && cur == m {
+		delete(c.modules, m.def.Id)
 	}
 	c.mu.Unlock()
 }
@@ -188,7 +188,7 @@ func newCustomByID(ctx ModuleContext, id string) (Module, error) {
 	return newCustom(ctx, def)
 }
 
-func newCustom(ctx ModuleContext, def config.CustomModuleConfig) (Module, error) {
+func newCustom(ctx ModuleContext, def config.CustomModuleDefinition) (Module, error) {
 	if ctx.App == nil {
 		return nil, errors.New("custom: requires the application loop")
 	}
@@ -200,7 +200,7 @@ func newCustom(ctx ModuleContext, def config.CustomModuleConfig) (Module, error)
 	runCtx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
 	switch def.Mode {
-	case config.CustomModeWatch:
+	case config.ExecutionModeWatch:
 		go m.watch(runCtx)
 	default:
 		if def.IntervalMs > 0 {
@@ -215,9 +215,9 @@ func newCustom(ctx ModuleContext, def config.CustomModuleConfig) (Module, error)
 // success).
 func (m *customModule) poll(ctx context.Context) {
 	run := func() {
-		out, err := runCommand(ctx, m.def.Command)
+		out, err := runCommand(ctx, m.def.CommandOrEmpty())
 		if err != nil {
-			log.Printf("custom %s: %v", m.def.ID, err)
+			log.Printf("custom %s: %v", m.def.Id, err)
 			return
 		}
 		m.apply(out)
@@ -242,14 +242,14 @@ func (m *customModule) poll(ctx context.Context) {
 // the label. The restart policy (never, the schema default) means an
 // exiting command just ends the stream.
 func (m *customModule) watch(ctx context.Context) {
-	cmd := exec.CommandContext(ctx, "sh", "-c", m.def.Command) //nolint:gosec // the command comes from the user's own config
+	cmd := exec.CommandContext(ctx, "sh", "-c", m.def.CommandOrEmpty()) //nolint:gosec // the command comes from the user's own config
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Printf("custom %s: %v", m.def.ID, err)
+		log.Printf("custom %s: %v", m.def.Id, err)
 		return
 	}
 	if err := cmd.Start(); err != nil {
-		log.Printf("custom %s: %v", m.def.ID, err)
+		log.Printf("custom %s: %v", m.def.Id, err)
 		return
 	}
 	scanner := bufio.NewScanner(stdout)
@@ -259,7 +259,7 @@ func (m *customModule) watch(ctx context.Context) {
 	}
 	_ = cmd.Wait()
 	if err := scanner.Err(); err != nil {
-		log.Printf("custom %s: %v", m.def.ID, err)
+		log.Printf("custom %s: %v", m.def.Id, err)
 	}
 }
 
@@ -285,7 +285,7 @@ func (m *customModule) apply(out string) {
 		label = formatCustomLabel(m.def, parsed)
 	}
 	if m.def.LabelMaxLength > 0 {
-		label = truncateLabel(label, m.def.LabelMaxLength)
+		label = truncateLabel(label, int(m.def.LabelMaxLength))
 	}
 	m.label.SetText(label)
 	if shouldHideCustom(parsed.raw, m.def.HideIfEmpty) {
@@ -294,7 +294,7 @@ func (m *customModule) apply(out string) {
 }
 
 func (m *customModule) Root() widget.Widget {
-	return assembleModule(m.ctx, moduleIcon(m.ctx, m.def.Icon), m.label)
+	return assembleModule(m.ctx, moduleIcon(m.ctx, m.def.Icon()), m.label)
 }
 
 // Stop releases the poll/watch goroutine and the update registration.
@@ -309,10 +309,10 @@ func (m *customModule) Stop() {
 
 // customDefinition resolves the definition behind a "custom-<id>"
 // layout name; plain module names return false.
-func customDefinition(name string, cfg *config.Config) (config.CustomModuleConfig, bool) {
+func customDefinition(name string, cfg *config.Config) (config.CustomModuleDefinition, bool) {
 	const prefix = "custom-"
 	if !strings.HasPrefix(name, prefix) {
-		return config.CustomModuleConfig{}, false
+		return config.CustomModuleDefinition{}, false
 	}
 	return cfg.CustomByID(name[len(prefix):])
 }

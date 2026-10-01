@@ -25,7 +25,7 @@ func notificationIconName(cfg config.NotificationConfig, count int, dnd bool) st
 	if count > 0 {
 		return cfg.IconUnread
 	}
-	return cfg.Icon.Name
+	return cfg.Icon().Name
 }
 
 // notificationModule is the bell: count and dnd from the shared
@@ -44,7 +44,7 @@ func newNotification(ctx ModuleContext) (Module, error) {
 	if m.src == nil {
 		return nil, errors.New("notifications: no notification service available")
 	}
-	m.icon = moduleIcon(ctx, ctx.Config.Notification.Icon)
+	m.icon = moduleIcon(ctx, ctx.Config.Notification.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	m.refresh()
 	// Follow the service's change feed (subscribed before returning, so

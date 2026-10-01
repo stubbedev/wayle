@@ -13,8 +13,8 @@ import (
 
 // microphoneLabel is helpers.rs's format_label: the rounded percentage. A
 // muted mic dims via the color, like the Rust icon-muted semantics.
-func microphoneLabel(format string, percent float64) string {
-	return replaceTemplateVar(format, "percent", strconv.Itoa(int(math.Round(percent))))
+func microphoneLabel(percent float64) string {
+	return strconv.Itoa(int(math.Round(percent))) + "%"
 }
 
 // microphone is the module: the default input's level.
@@ -35,7 +35,7 @@ func newMicrophone(ctx ModuleContext) (Module, error) {
 	}
 	m := &microphoneModule{ctx: ctx, source: ctx.Pulse}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.icon = moduleIcon(ctx, ctx.Config.Microphone.Icon)
+	m.icon = moduleIcon(ctx, ctx.Config.Microphone.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (m *microphoneModule) refresh() error {
 	cfg := m.ctx.Config.Microphone
 	label := ""
 	if cfg.LabelShow {
-		label = microphoneLabel(cfg.Format, volumePercent(dev.Device))
+		label = microphoneLabel(volumePercent(dev.Device))
 	}
 	color := m.ctx.Style.fg
 	if dev.Muted {
@@ -71,7 +71,7 @@ func (m *microphoneModule) refresh() error {
 	m.label.SetText(label)
 	m.label.SetColor(color)
 	if setter := m.icon; setter != nil {
-		name := cfg.Icon.Name
+		name := cfg.IconActive
 		if dev.Muted {
 			name = cfg.IconMuted
 		}

@@ -53,19 +53,20 @@ func TestLoadFileAppliesPowerProfiles(t *testing.T) {
 	if c.PowerProfiles.Format != "P: {{ profile }}" || !c.PowerProfiles.LabelShow {
 		t.Errorf("config = %+v", c.PowerProfiles)
 	}
-	if got := c.PowerProfiles.Icons[config.ProfilePerformance].Name; got != "ld-zap-symbolic" {
+	if got := c.PowerProfiles.Icons()[config.ProfilePerformance].Name; got != "ld-zap-symbolic" {
 		t.Errorf("performance icon = %q", got)
 	}
 	// The schema's default left-click is :cycle.
-	if c.PowerProfiles.Click.LeftClick.String() != ":cycle" {
-		t.Errorf("left-click = %q", c.PowerProfiles.Click.LeftClick.String())
+	if c.PowerProfiles.Clicks().LeftClick.String() != ":cycle" {
+		t.Errorf("left-click = %q", c.PowerProfiles.Clicks().LeftClick.String())
 	}
 
 	if err := osWrite(path, "[modules.power-profiles]\nformat = \"\"\n"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := config.LoadFile(path); err == nil {
-		t.Error("empty format: want a load error")
+	// The schema puts no constraint on the format string.
+	if _, err := config.LoadFile(path); err != nil {
+		t.Errorf("empty format: accepted by the schema, got %v", err)
 	}
 }
 
@@ -88,13 +89,13 @@ func TestPowerProfilesModuleCycles(t *testing.T) {
 		t.Fatalf("Create = %T", module)
 	}
 	// The :cycle shell action is the module's own.
-	pp.RunAction(config.MustClickAction(":cycle"))
+	pp.RunAction(config.ParseClickAction(":cycle"))
 	if len(src.set) != 1 || src.set[0] != powerprofiles.ProfilePerformance {
 		t.Errorf("set = %v, want [performance]", src.set)
 	}
 	// A dropdown action falls through to the shared executor (a no-op
 	// log, not a profile write).
-	pp.RunAction(config.MustClickAction("dropdown:power"))
+	pp.RunAction(config.ParseClickAction("dropdown:power"))
 	if len(src.set) != 1 {
 		t.Errorf("dropdown action reached the daemon: %v", src.set)
 	}

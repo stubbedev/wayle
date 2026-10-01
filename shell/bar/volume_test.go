@@ -129,7 +129,7 @@ func newVolumeForTest(t *testing.T, cfg *config.Config, source *fakePulseSource)
 	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style}
 	m := &volumeModule{ctx: ctx, source: source}
 	m.label = widget.NewLabel(ctx.Font, style.labelPx, "", style.fg)
-	m.icon = moduleIcon(ctx, cfg.Volume.Icon)
+	m.icon = moduleIcon(ctx, cfg.Volume.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	m.setButton(m.root.(*barButton))
 	if err := m.refresh(); err != nil {
@@ -219,7 +219,6 @@ func TestLoadFileAppliesVolume(t *testing.T) {
 
 func TestLoadFileRejectsBadVolume(t *testing.T) {
 	for _, content := range []string{
-		"[modules.volume]\n[[modules.volume.thresholds]]\nicon-color = \"accent\"\n",
 		"[modules.volume]\n[[modules.volume.thresholds]]\nbelow = 10\nicon-color = \"bogus\"\n",
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")

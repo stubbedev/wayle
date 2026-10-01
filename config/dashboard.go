@@ -1,171 +1,133 @@
 package config
 
-import (
-	"fmt"
-
-	"github.com/BurntSushi/toml"
-)
-
-// SessionAction is one button of the dashboard's user-session row
-// (schemas/bar/dropdowns/dashboard/user_session.rs).
-type SessionAction string
-
-// Session actions, by their config spelling.
-const (
-	SessionLock     SessionAction = "lock"
-	SessionLogout   SessionAction = "log-out"
-	SessionReboot   SessionAction = "reboot"
-	SessionPowerOff SessionAction = "power-off"
-)
-
-// ParseSessionAction reads one actions entry; anything but the four
-// spellings is an error.
-func ParseSessionAction(raw string) (SessionAction, error) {
-	switch a := SessionAction(raw); a {
-	case SessionLock, SessionLogout, SessionReboot, SessionPowerOff:
-		return a, nil
-	}
-	return "", fmt.Errorf("unknown session action %q (want lock, log-out, reboot, or power-off)", raw)
-}
-
-// DashboardConfig is [modules.dashboard]: the distro-icon button that
-// opens the dashboard dropdown, the dropdown's session commands, its
-// severity thresholds, and the user-session row
-// (schemas/modules/dashboard/mod.rs).
+// DashboardConfig is ported from crates/wayle-config/src/schemas/modules/dashboard/mod.rs.
+//
+// Quick-access button with a distro icon; opens the dashboard dropdown.
 type DashboardConfig struct {
-	Click ClickConfig
-	// IconOverride replaces the auto-detected distro icon when set.
-	IconOverride string
-	IconColor    ColorValue
-	IconBgColor  ColorValue
-	BorderShow   bool
-	BorderColor  ColorValue
-
-	LockCommand     string
-	LogoutCommand   string
-	RebootCommand   string
-	PowerOffCommand string
-
-	// Ring thresholds: percent for CPU/RAM/disk usage, degrees Celsius
-	// for the CPU temperature, percent at or below for the battery.
-	UsageWarning    float64
-	UsageError      float64
-	TempWarning     float64
-	TempError       float64
-	BatteryWarning  float64
-	BatteryCritical float64
-
-	// SessionActions are the user-session row's buttons, in order.
-	SessionActions []SessionAction
+	// Override the auto-detected distro icon.
+	IconOverride string `cfg:"icon-override"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
+	// Action on left click.
+	LeftClick ClickAction `cfg:"left-click"`
+	// Shell command for the lock button in the dashboard dropdown.
+	DropdownLockCommand string `cfg:"dropdown-lock-command"`
+	// Shell command for the logout button in the dashboard dropdown.
+	DropdownLogoutCommand string `cfg:"dropdown-logout-command"`
+	// Shell command for the reboot button in the dashboard dropdown.
+	DropdownRebootCommand string `cfg:"dropdown-reboot-command"`
+	// Shell command for the power-off button in the dashboard dropdown.
+	DropdownPoweroffCommand string `cfg:"dropdown-poweroff-command"`
+	// CPU/RAM/disk usage percent at which the dashboard rings turn warning.
+	UsageWarning float32 `cfg:"usage-warning"`
+	// CPU/RAM/disk usage percent at which the dashboard rings turn error.
+	UsageError float32 `cfg:"usage-error"`
+	// CPU temperature (°C) at which the dashboard temp ring turns warning.
+	TempWarning float32 `cfg:"temp-warning"`
+	// CPU temperature (°C) at which the dashboard temp ring turns error.
+	TempError float32 `cfg:"temp-error"`
+	// Battery percent at or below which the dashboard battery shows warning.
+	BatteryWarning float32 `cfg:"battery-warning"`
+	// Battery percent at or below which the dashboard battery shows critical.
+	BatteryCritical float32 `cfg:"battery-critical"`
+	// User session configuration
+	UserSession UserSessionConfig `cfg:"user-session"`
 }
 
 // DefaultsDashboard returns the schema defaults.
 func DefaultsDashboard() DashboardConfig {
 	return DashboardConfig{
-		Click:           DefaultsClick(map[string]string{"left-click": "dropdown:dashboard"}),
-		IconColor:       mustColor("auto"),
-		IconBgColor:     mustColor("yellow"),
-		BorderColor:     mustColor("yellow"),
-		LockCommand:     "loginctl lock-session",
-		LogoutCommand:   "loginctl terminate-session $XDG_SESSION_ID",
-		RebootCommand:   "systemctl reboot",
-		PowerOffCommand: "systemctl poweroff",
-		UsageWarning:    60,
-		UsageError:      85,
-		TempWarning:     65,
-		TempError:       85,
-		BatteryWarning:  30,
-		BatteryCritical: 15,
-		SessionActions:  []SessionAction{SessionLock, SessionLogout, SessionReboot, SessionPowerOff},
+		IconOverride:            "",
+		BorderShow:              false,
+		BorderColor:             mustColor("yellow"),
+		IconColor:               mustColor("auto"),
+		IconBgColor:             mustColor("yellow"),
+		RightClick:              ClickAction{},
+		MiddleClick:             ClickAction{},
+		ScrollUp:                ClickAction{},
+		ScrollDown:              ClickAction{},
+		LeftClick:               ParseClickAction("dropdown:dashboard"),
+		DropdownLockCommand:     "loginctl lock-session",
+		DropdownLogoutCommand:   "loginctl terminate-session $XDG_SESSION_ID",
+		DropdownRebootCommand:   "systemctl reboot",
+		DropdownPoweroffCommand: "systemctl poweroff",
+		UsageWarning:            60,
+		UsageError:              85,
+		TempWarning:             65,
+		TempError:               85,
+		BatteryWarning:          30,
+		BatteryCritical:         15,
+		UserSession: UserSessionConfig{
+			Actions: []SessionAction{
+				SessionActionLock,
+				SessionActionLogOut,
+				SessionActionReboot,
+				SessionActionPowerOff,
+			},
+		},
 	}
 }
 
-// applyDashboard overlays [modules.dashboard] and its
-// [modules.dashboard.user-session] table.
-func applyDashboard(md toml.MetaData, prim toml.Primitive) (DashboardConfig, error) {
-	cfg := DefaultsDashboard()
-	var doc struct {
-		IconOverride    *string     `toml:"icon-override"`
-		IconColor       *ColorValue `toml:"icon-color"`
-		IconBgColor     *ColorValue `toml:"icon-bg-color"`
-		BorderShow      *bool       `toml:"border-show"`
-		BorderColor     *ColorValue `toml:"border-color"`
-		LockCommand     *string     `toml:"dropdown-lock-command"`
-		LogoutCommand   *string     `toml:"dropdown-logout-command"`
-		RebootCommand   *string     `toml:"dropdown-reboot-command"`
-		PowerOffCommand *string     `toml:"dropdown-poweroff-command"`
-		UsageWarning    *float64    `toml:"usage-warning"`
-		UsageError      *float64    `toml:"usage-error"`
-		TempWarning     *float64    `toml:"temp-warning"`
-		TempError       *float64    `toml:"temp-error"`
-		BatteryWarning  *float64    `toml:"battery-warning"`
-		BatteryCritical *float64    `toml:"battery-critical"`
-		UserSession     *struct {
-			Actions *[]string `toml:"actions"`
-		} `toml:"user-session"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	for _, s := range []struct {
-		raw  *string
-		dest *string
-	}{
-		{doc.IconOverride, &cfg.IconOverride},
-		{doc.LockCommand, &cfg.LockCommand},
-		{doc.LogoutCommand, &cfg.LogoutCommand},
-		{doc.RebootCommand, &cfg.RebootCommand},
-		{doc.PowerOffCommand, &cfg.PowerOffCommand},
-	} {
-		if s.raw != nil {
-			*s.dest = *s.raw
-		}
-	}
-	for _, c := range []struct {
-		raw  *ColorValue
-		dest *ColorValue
-	}{
-		{doc.IconColor, &cfg.IconColor},
-		{doc.IconBgColor, &cfg.IconBgColor},
-		{doc.BorderColor, &cfg.BorderColor},
-	} {
-		if c.raw != nil {
-			*c.dest = *c.raw
-		}
-	}
-	for _, f := range []struct {
-		raw  *float64
-		dest *float64
-	}{
-		{doc.UsageWarning, &cfg.UsageWarning},
-		{doc.UsageError, &cfg.UsageError},
-		{doc.TempWarning, &cfg.TempWarning},
-		{doc.TempError, &cfg.TempError},
-		{doc.BatteryWarning, &cfg.BatteryWarning},
-		{doc.BatteryCritical, &cfg.BatteryCritical},
-	} {
-		if f.raw != nil {
-			*f.dest = *f.raw
-		}
-	}
-	if doc.BorderShow != nil {
-		cfg.BorderShow = *doc.BorderShow
-	}
-	if doc.UserSession != nil && doc.UserSession.Actions != nil {
-		actions := make([]SessionAction, 0, len(*doc.UserSession.Actions))
-		for _, raw := range *doc.UserSession.Actions {
-			a, err := ParseSessionAction(raw)
-			if err != nil {
-				return cfg, fmt.Errorf("dashboard: user-session actions: %w", err)
-			}
-			actions = append(actions, a)
-		}
-		cfg.SessionActions = actions
-	}
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c DashboardConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }
+
+// UserSessionConfig is ported from crates/wayle-config/src/schemas/modules/dashboard/mod.rs.
+//
+// Settings for user session the in dashboard
+// ## Examples
+//
+// ```toml
+// [modules.dashboard.user-session]
+// actions = [ "lock", "log-out", "reboot", "power-off" ]
+// ```
+type UserSessionConfig struct {
+	// Session actions to show on dashboard
+	Actions []SessionAction `cfg:"actions"`
+}
+
+// DefaultsUserSession returns the schema defaults.
+func DefaultsUserSession() UserSessionConfig {
+	return UserSessionConfig{
+		Actions: []SessionAction{
+			SessionActionLock,
+			SessionActionLogOut,
+			SessionActionReboot,
+			SessionActionPowerOff,
+		},
+	}
+}
+
+// SessionAction is ported from crates/wayle-config/src/schemas/bar/dropdowns/dashboard/user_session.rs.
+//
+// One action the dashboard session actions
+type SessionAction string
+
+// SessionAction values.
+const (
+	// Lock the session
+	SessionActionLock SessionAction = "lock"
+	// Logout of the current session
+	SessionActionLogOut SessionAction = "log-out"
+	// Reboot the machine
+	SessionActionReboot SessionAction = "reboot"
+	// Power off the machine
+	SessionActionPowerOff SessionAction = "power-off"
+)
+
+var _ = registerEnum(SessionActionLock, SessionActionLogOut, SessionActionReboot, SessionActionPowerOff)

@@ -42,7 +42,7 @@ func TestLoadFileAppliesNetstat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if c.Netstat.Interface != "eth0" || c.Netstat.PollMs != 5000 || c.Netstat.Format != "{{ down_mib }} down" {
+	if c.Netstat.Interface != "eth0" || c.Netstat.PollIntervalMs != 5000 || c.Netstat.Format != "{{ down_mib }} down" {
 		t.Errorf("netstat = %+v", c.Netstat)
 	}
 

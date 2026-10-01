@@ -1,166 +1,124 @@
 package config
 
-import (
-	"fmt"
-
-	"github.com/BurntSushi/toml"
-)
-
-// Schema icon defaults (NetworkConfig's wifi/wired/vpn icon keys).
-const (
-	defaultWifiAcquiringIcon     = "cm-wireless-acquiring-symbolic"
-	defaultWifiConnectedIcon     = "cm-wireless-connected-symbolic"
-	defaultWifiDisabledIcon      = "cm-wireless-disabled-symbolic"
-	defaultWifiOfflineIcon       = "cm-wireless-offline-symbolic"
-	defaultWiredAcquiringIcon    = "cm-wired-acquiring-symbolic"
-	defaultWiredConnectedIcon    = "cm-wired-connected-symbolic"
-	defaultWiredDisconnectedIcon = "cm-wired-disconnected-symbolic"
-	defaultVpnConnectedIcon      = "ld-lock-symbolic"
-	defaultVpnConnectingIcon     = "ld-refresh-cw-symbolic"
-	defaultVpnDisconnectedIcon   = "ld-unplug-symbolic"
-)
-
-// DefaultWifiSignalIcons is the schema's wifi-signal-icons list, weak
-// to excellent.
-func DefaultWifiSignalIcons() []string {
-	return []string{
-		"cm-wireless-signal-weak-symbolic",
-		"cm-wireless-signal-ok-symbolic",
-		"cm-wireless-signal-good-symbolic",
-		"cm-wireless-signal-excellent-symbolic",
-	}
-}
-
-// NetworkConfig is the network module config.
+// NetworkConfig is ported from crates/wayle-config/src/schemas/modules/network/mod.rs.
+//
+// Network connection status with a dropdown for switching connections.
 type NetworkConfig struct {
-	Click ClickConfig
-	// Button is the bar-button key set; LabelShow and Icon.Show/Color
-	// mirror its label-show, icon-show, and icon-color.
-	Button    ButtonConfig
-	LabelShow bool
-	Icon      IconConfig
-	// WifiFallback is the label when connected but the SSID is hidden.
-	WifiFallback string
-	Connecting   string
-	Disconnected string
-	Wired        string
-	// State icons.
-	WifiSignalIcons       []string
-	WifiAcquiringIcon     string
-	WifiConnectedIcon     string
-	WifiDisabledIcon      string
-	WifiOfflineIcon       string
-	WiredAcquiringIcon    string
-	WiredConnectedIcon    string
-	WiredDisconnectedIcon string
-	VpnConnectedIcon      string
-	VpnConnectingIcon     string
-	VpnDisconnectedIcon   string
+	// WiFi icon when disabled.
+	WifiDisabledIcon string `cfg:"wifi-disabled-icon"`
+	// WiFi icon when connecting.
+	WifiAcquiringIcon string `cfg:"wifi-acquiring-icon"`
+	// WiFi icon when disconnected.
+	WifiOfflineIcon string `cfg:"wifi-offline-icon"`
+	// WiFi icon when connected but signal strength unavailable.
+	WifiConnectedIcon string `cfg:"wifi-connected-icon"`
+	// WiFi signal strength icons from weak to excellent.
+	//
+	// The signal percentage maps to icons: 0-25% uses icons\[0\], 26-50% uses
+	// icons\[1\], etc.
+	WifiSignalIcons []string `cfg:"wifi-signal-icons"`
+	// Wired icon when connected.
+	WiredConnectedIcon string `cfg:"wired-connected-icon"`
+	// Wired icon when connecting.
+	WiredAcquiringIcon string `cfg:"wired-acquiring-icon"`
+	// Wired icon when disconnected.
+	WiredDisconnectedIcon string `cfg:"wired-disconnected-icon"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Display module icon.
+	IconShow bool `cfg:"icon-show"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Display connection label (SSID for WiFi, "Wired" for ethernet).
+	LabelShow bool `cfg:"label-show"`
+	// Label text color token.
+	LabelColor ColorValue `cfg:"label-color"`
+	// Max label characters before truncation with ellipsis. Set to 0 to disable.
+	LabelMaxLength uint32 `cfg:"label-max-length"`
+	// Button background color token.
+	ButtonBgColor ColorValue `cfg:"button-bg-color"`
+	// Icon when a VPN is connected.
+	VpnConnectedIcon string `cfg:"vpn-connected-icon"`
+	// Icon while a VPN connection is in flight.
+	VpnConnectingIcon string `cfg:"vpn-connecting-icon"`
+	// Icon when a VPN is configured but disconnected.
+	VpnDisconnectedIcon string `cfg:"vpn-disconnected-icon"`
+	// When the VPN state replaces the wifi/wired icon.
+	//
+	// `auto` shows it only once NetworkManager holds a VPN profile, so adding
+	// the key changes nothing on a machine with no VPN.
+	VpnShow VpnShow `cfg:"vpn-show"`
+	// Action on left click.
+	LeftClick ClickAction `cfg:"left-click"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
 }
 
-// DefaultsNetwork returns the schema defaults (labels from _bar.ftl).
+// DefaultsNetwork returns the schema defaults.
 func DefaultsNetwork() NetworkConfig {
 	return NetworkConfig{
-		Click:                 DefaultsClick(map[string]string{"left-click": "dropdown:network"}),
+		WifiDisabledIcon:  "cm-wireless-disabled-symbolic",
+		WifiAcquiringIcon: "cm-wireless-acquiring-symbolic",
+		WifiOfflineIcon:   "cm-wireless-offline-symbolic",
+		WifiConnectedIcon: "cm-wireless-connected-symbolic",
+		WifiSignalIcons: []string{
+			"cm-wireless-signal-weak-symbolic",
+			"cm-wireless-signal-ok-symbolic",
+			"cm-wireless-signal-good-symbolic",
+			"cm-wireless-signal-excellent-symbolic",
+		},
+		WiredConnectedIcon:    "cm-wired-symbolic",
+		WiredAcquiringIcon:    "cm-wired-acquiring-symbolic",
+		WiredDisconnectedIcon: "cm-wired-disconnected-symbolic",
+		BorderShow:            false,
+		BorderColor:           mustColor("accent"),
+		IconShow:              true,
+		IconColor:             mustColor("auto"),
+		IconBgColor:           mustColor("accent"),
 		LabelShow:             true,
-		Icon:                  DefaultsIcon(true, defaultWifiOfflineIcon),
-		Button:                DefaultsButton(buttonColors("auto", "accent", "accent", "bg-surface-elevated", "accent"), TokenAccent, true, 15),
-		WifiFallback:          "WiFi",
-		Connecting:            "Connecting...",
-		Disconnected:          "Disconnected",
-		Wired:                 "Wired",
-		WifiSignalIcons:       DefaultWifiSignalIcons(),
-		WifiAcquiringIcon:     defaultWifiAcquiringIcon,
-		WifiConnectedIcon:     defaultWifiConnectedIcon,
-		WifiDisabledIcon:      defaultWifiDisabledIcon,
-		WifiOfflineIcon:       defaultWifiOfflineIcon,
-		WiredAcquiringIcon:    defaultWiredAcquiringIcon,
-		WiredConnectedIcon:    defaultWiredConnectedIcon,
-		WiredDisconnectedIcon: defaultWiredDisconnectedIcon,
-		VpnConnectedIcon:      defaultVpnConnectedIcon,
-		VpnConnectingIcon:     defaultVpnConnectingIcon,
-		VpnDisconnectedIcon:   defaultVpnDisconnectedIcon,
+		LabelColor:            mustColor("accent"),
+		LabelMaxLength:        15,
+		ButtonBgColor:         mustColor("bg-surface-elevated"),
+		VpnConnectedIcon:      "ld-lock-symbolic",
+		VpnConnectingIcon:     "ld-refresh-cw-symbolic",
+		VpnDisconnectedIcon:   "ld-unplug-symbolic",
+		VpnShow:               VpnShowAuto,
+		LeftClick:             ParseClickAction("dropdown:network"),
+		RightClick:            ClickAction{},
+		MiddleClick:           ClickAction{},
+		ScrollUp:              ClickAction{},
+		ScrollDown:            ClickAction{},
 	}
 }
 
-// applyNetwork overlays [modules.network].
-func applyNetwork(md toml.MetaData, prim toml.Primitive) (NetworkConfig, error) {
-	cfg := DefaultsNetwork()
-	var doc struct {
-		IconName              *string   `toml:"icon-name"`
-		WifiFallback          *string   `toml:"wifi-fallback-label"`
-		Connecting            *string   `toml:"connecting-label"`
-		Disconnected          *string   `toml:"disconnected-label"`
-		Wired                 *string   `toml:"wired-label"`
-		WifiSignalIcons       *[]string `toml:"wifi-signal-icons"`
-		WifiAcquiringIcon     *string   `toml:"wifi-acquiring-icon"`
-		WifiConnectedIcon     *string   `toml:"wifi-connected-icon"`
-		WifiDisabledIcon      *string   `toml:"wifi-disabled-icon"`
-		WifiOfflineIcon       *string   `toml:"wifi-offline-icon"`
-		WiredAcquiringIcon    *string   `toml:"wired-acquiring-icon"`
-		WiredConnectedIcon    *string   `toml:"wired-connected-icon"`
-		WiredDisconnectedIcon *string   `toml:"wired-disconnected-icon"`
-		VpnConnectedIcon      *string   `toml:"vpn-connected-icon"`
-		VpnConnectingIcon     *string   `toml:"vpn-connecting-icon"`
-		VpnDisconnectedIcon   *string   `toml:"vpn-disconnected-icon"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.IconName != nil {
-		cfg.Icon.Name = *doc.IconName
-	}
-	for _, set := range []struct {
-		raw   *string
-		label *string
-		name  string
-	}{
-		{doc.WifiFallback, &cfg.WifiFallback, "wifi-fallback-label"},
-		{doc.Connecting, &cfg.Connecting, "connecting-label"},
-		{doc.Disconnected, &cfg.Disconnected, "disconnected-label"},
-		{doc.Wired, &cfg.Wired, "wired-label"},
-	} {
-		if set.raw == nil {
-			continue
-		}
-		if *set.raw == "" {
-			return cfg, fmt.Errorf("network: %s is empty", set.name)
-		}
-		*set.label = *set.raw
-	}
-	for _, set := range []struct {
-		raw  *string
-		icon *string
-	}{
-		{doc.WifiAcquiringIcon, &cfg.WifiAcquiringIcon},
-		{doc.WifiConnectedIcon, &cfg.WifiConnectedIcon},
-		{doc.WifiDisabledIcon, &cfg.WifiDisabledIcon},
-		{doc.WifiOfflineIcon, &cfg.WifiOfflineIcon},
-		{doc.WiredAcquiringIcon, &cfg.WiredAcquiringIcon},
-		{doc.WiredConnectedIcon, &cfg.WiredConnectedIcon},
-		{doc.WiredDisconnectedIcon, &cfg.WiredDisconnectedIcon},
-		{doc.VpnConnectedIcon, &cfg.VpnConnectedIcon},
-		{doc.VpnConnectingIcon, &cfg.VpnConnectingIcon},
-		{doc.VpnDisconnectedIcon, &cfg.VpnDisconnectedIcon},
-	} {
-		if set.raw != nil {
-			*set.icon = *set.raw
-		}
-	}
-	if doc.WifiSignalIcons != nil {
-		cfg.WifiSignalIcons = *doc.WifiSignalIcons
-	}
-	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Button = button
-	button.mirrorLabel(&cfg.LabelShow, nil)
-	button.mirrorIcon(&cfg.Icon)
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c NetworkConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }
+
+// VpnShow is ported from crates/wayle-config/src/schemas/modules/network/vpn.rs.
+//
+// Whether the VPN indicator is part of the network module.
+type VpnShow string
+
+// VpnShow values.
+const (
+	// Show the VPN state only once NetworkManager holds a VPN profile.
+	VpnShowAuto VpnShow = "auto"
+	// Always overlay the VPN state on the network icon.
+	VpnShowAlways VpnShow = "always"
+	// Never show it; the dropdown still lists VPNs.
+	VpnShowNever VpnShow = "never"
+)
+
+var _ = registerEnum(VpnShowAuto, VpnShowAlways, VpnShowNever)

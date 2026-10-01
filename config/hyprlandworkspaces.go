@@ -1,218 +1,293 @@
 package config
 
-import (
-	"fmt"
-	"strconv"
+// DisplayMode is ported from crates/wayle-config/src/schemas/modules/hyprland_workspaces/mod.rs.
+//
+// What identifies a workspace in the UI.
+type DisplayMode string
 
-	"github.com/BurntSushi/toml"
-)
-
-// WorkspacesDisplayMode selects what a workspace button shows.
-type WorkspacesDisplayMode string
-
-// Display modes.
+// DisplayMode values.
 const (
-	DisplayModeLabel WorkspacesDisplayMode = "label"
-	DisplayModeIcon  WorkspacesDisplayMode = "icon"
-	DisplayModeNone  WorkspacesDisplayMode = "none"
+	// Show workspace number or name.
+	DisplayModeLabel DisplayMode = "label"
+	// Show icon from `workspace-map` (falls back to label if unmapped).
+	DisplayModeIcon DisplayMode = "icon"
+	// Show nothing - only app icons visible.
+	DisplayModeNone DisplayMode = "none"
 )
 
-// WorkspacesNumbering selects how workspace numbers render.
-type WorkspacesNumbering string
+var _ = registerEnum(DisplayModeLabel, DisplayModeIcon, DisplayModeNone)
 
-// Numbering modes.
+// Numbering is ported from crates/wayle-config/src/schemas/modules/hyprland_workspaces/mod.rs.
+//
+// How workspace numbers are displayed.
+type Numbering string
+
+// Numbering values.
 const (
-	NumberingAbsolute WorkspacesNumbering = "absolute"
-	NumberingRelative WorkspacesNumbering = "relative"
+	// Show actual Hyprland workspace IDs (1, 2, 3, 4, 5, 6...).
+	NumberingAbsolute Numbering = "absolute"
+	// Show numbers relative to monitor's starting workspace.
+	//
+	// If monitor has workspaces 4, 5, 6 assigned, they display as 1, 2, 3.
+	// Useful when keybinds use per-monitor numbering (Shift+1 for ws 4, etc.).
+	NumberingRelative Numbering = "relative"
 )
 
-// ActiveIndicator selects how the focused workspace stands out.
+var _ = registerEnum(NumberingAbsolute, NumberingRelative)
+
+// UrgentMode is ported from crates/wayle-config/src/schemas/modules/hyprland_workspaces/mod.rs.
+//
+// Where the urgent pulse animation is applied.
+type UrgentMode string
+
+// UrgentMode values.
+const (
+	// Pulse the entire workspace.
+	UrgentWorkspace UrgentMode = "workspace"
+	// Pulse only the app icon(s) belonging to the urgent window.
+	//
+	// Falls back to `workspace` when app icons are disabled.
+	UrgentApplication UrgentMode = "application"
+)
+
+var _ = registerEnum(UrgentWorkspace, UrgentApplication)
+
+// ActiveIndicator is ported from crates/wayle-config/src/schemas/modules/hyprland_workspaces/mod.rs.
+//
+// Visual indicator style for the active workspace.
 type ActiveIndicator string
 
-// Active indicators.
+// ActiveIndicator values.
 const (
+	// Entire button gets a colored background.
 	ActiveBackground ActiveIndicator = "background"
-	ActiveUnderline  ActiveIndicator = "underline"
+	// Small colored bar under the workspace button.
+	ActiveUnderline ActiveIndicator = "underline"
 )
 
-// HyprlandWorkspacesConfig is the hyprland-workspaces module config.
-// The button styling it shares with the sway/niri schemas lives in
-// Shared (MonitorSpecific, the colors, sizes, app icons, urgency,
-// workspace-ignore, border, and bindings; WorkspaceMap is keyed by
-// the decimal workspace id). The rest is hyprland's own.
+var _ = registerEnum(ActiveBackground, ActiveUnderline)
+
+// WorkspaceStyle is ported from crates/wayle-config/src/schemas/modules/hyprland_workspaces/mod.rs.
+//
+// Per-workspace styling override.
+type WorkspaceStyle struct {
+	// Custom icon for this workspace. When set, the icon is shown regardless
+	// of the module's `display-mode`, so a row can mix labelled workspaces
+	// with icon-only ones (e.g. `[1][2][icon]`).
+	Icon *string `cfg:"icon"`
+	// Custom background color for this workspace when active.
+	Color *ColorValue `cfg:"color"`
+	// Text shown instead of the workspace's name or index.
+	Label *string `cfg:"label"`
+}
+
+// HyprlandWorkspacesConfig is ported from crates/wayle-config/src/schemas/modules/hyprland_workspaces/mod.rs.
+//
+// Hyprland workspace indicators with click-to-switch.
 type HyprlandWorkspacesConfig struct {
-	Shared                        CompositorWorkspacesConfig
-	MinWorkspace                  int
-	ShowSpecial                   bool
-	LabelUseName                  bool
-	Numbering                     WorkspacesNumbering
-	HighlightActiveOnOtherMonitor bool
-	ActiveOnOtherMonitorColor     ColorValue
+	// Minimum number of workspace buttons to display.
+	//
+	// When set to 0 (default), only active and occupied workspaces are shown.
+	// When set to N, at least N buttons are always visible, with empty ones
+	// using `empty-color` styling.
+	MinWorkspaceCount uint8 `cfg:"min-workspace-count"`
+	// Show only workspaces belonging to the bar's monitor.
+	//
+	// When true, each bar shows only its monitor's workspaces.
+	// When false, all workspaces from all monitors are shown.
+	MonitorSpecific bool `cfg:"monitor-specific"`
+	// Include special workspaces (scratchpads) in the display.
+	//
+	// Special workspaces have negative IDs in Hyprland.
+	ShowSpecial bool `cfg:"show-special"`
+	// Pulse animation on workspaces with urgent windows.
+	//
+	// When a window requests attention (e.g., terminal bell), the workspace
+	// button pulses until you switch to it.
+	UrgentShow bool `cfg:"urgent-show"`
+	// Where the urgent pulse is applied.
+	//
+	// - `workspace`: Entire workspace pulses (default)
+	// - `application`: Only the app icon(s) belonging to the urgent window
+	//   pulse, falling back to `workspace` when app icons are disabled
+	UrgentMode UrgentMode `cfg:"urgent-mode"`
+	// What identifies each workspace button.
+	//
+	// - `label`: Shows workspace number (or name if `label-use-name` is true)
+	// - `icon`: Shows icon from `workspace-map` (falls back to label if unmapped)
+	// - `none`: Shows nothing - only app icons visible
+	DisplayMode DisplayMode `cfg:"display-mode"`
+	// Use workspace name instead of number when displaying labels.
+	//
+	// Only applies when `display-mode = "label"` or as fallback for unmapped
+	// workspaces in `display-mode = "icon"`.
+	LabelUseName bool `cfg:"label-use-name"`
+	// How workspace numbers are displayed.
+	//
+	// - `absolute`: Show actual Hyprland workspace IDs (1, 2, 3, 4, 5, 6...)
+	// - `relative`: Show numbers relative to monitor's starting workspace.
+	//   If a monitor has workspaces 4, 5, 6 assigned, they display as 1, 2, 3.
+	//   Useful when keybinds use per-monitor numbering.
+	Numbering Numbering `cfg:"numbering"`
+	// Text separator between workspace identity and app icons.
+	//
+	// Only shown when both `display-mode` is not `none` and `app-icons-show`
+	// is enabled. Common values: `"|"`, `"·"`, `"-"`.
+	Divider string `cfg:"divider"`
+	// Show application icons for windows in each workspace.
+	//
+	// When enabled, displays icons for running applications.
+	// Icons are resolved via `app-icon-map` configuration.
+	AppIconsShow bool `cfg:"app-icons-show"`
+	// Deduplicate application icons within a workspace.
+	//
+	// When true, shows only one icon per unique window class.
+	// When false, shows an icon for every window.
+	AppIconsDedupe bool `cfg:"app-icons-dedupe"`
+	// Fallback icon for applications not matched by `app-icon-map`.
+	AppIconsFallback string `cfg:"app-icons-fallback"`
+	// Icon shown for empty workspaces when `app-icons-show` is enabled.
+	//
+	// When a workspace has no windows but is displayed (via `min-workspace-count`),
+	// this icon appears as a placeholder.
+	AppIconsEmpty string `cfg:"app-icons-empty"`
+	// Gap between app icons within a workspace button.
+	//
+	// Only applies to spacing between app icons.
+	IconGap Size `cfg:"icon-gap"`
+	// Padding for workspace content along the bar direction. Accepts a scale multiplier or pixels (e.g. `"8px"`).
+	//
+	// For horizontal bars, controls horizontal (left/right) padding.
+	// For vertical bars, controls vertical (top/bottom) padding.
+	WorkspacePadding Size `cfg:"workspace-padding"`
+	// Workspace icon size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
+	//
+	// Applies to workspace identity icons and custom icons from `workspace-map`.
+	IconSize Size `cfg:"icon-size"`
+	// Workspace label and divider size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
+	//
+	// Applies to workspace number/name labels and the divider text.
+	LabelSize Size `cfg:"label-size"`
+	// Workspaces to hide from the display.
+	//
+	// Glob patterns matching workspace IDs. Examples:
+	// - `"10"` - hide workspace 10
+	// - `"1?"` - hide workspaces 10-19
+	WorkspaceIgnore []string `cfg:"workspace-ignore"`
+	// Visual indicator for the active workspace.
+	ActiveIndicator ActiveIndicator `cfg:"active-indicator"`
+	// Highlight workspaces active on other monitors with a different color.
+	//
+	// When true, workspaces active on a different monior are highlicted differently.
+	// When false, workspaces active on a another monitor are not specially highlighted.
+	//
+	// This setting only makes sense when `monitor-specific` is false.
+	HighlightActiveOnOtherMonitor bool `cfg:"highlight-active-on-other-monitor"`
+	// Color for the active (focused) workspace.
+	//
+	// Applied to icons and labels. In `background` indicator mode,
+	// also used as the button background.
+	ActiveColor ColorValue `cfg:"active-color"`
+	// Color for occupied workspaces (has windows but not focused).
+	//
+	// Applied to icons and labels.
+	OccupiedColor ColorValue `cfg:"occupied-color"`
+	// Color for empty workspaces.
+	//
+	// Applied to the empty placeholder icon and labels.
+	EmptyColor ColorValue `cfg:"empty-color"`
+	// Background color for the workspaces container.
+	ContainerBgColor ColorValue `cfg:"container-bg-color"`
+	// Display border around the workspaces container.
+	BorderShow bool `cfg:"border-show"`
+	// Border color for the workspaces container.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Active on other minitor indicator color.
+	//
+	// Only applies when `highlight-active-on-other-monitor` is `true`.
+	ActiveOnOtherMonitorColor ColorValue `cfg:"active-on-other-monitor-color"`
+	// Per-workspace icon and color overrides.
+	//
+	// Keys are workspace IDs (use negative for special workspaces).
+	//
+	// ## Example
+	//
+	// ```toml
+	// [modules.hyprland-workspaces.workspace-map]
+	// 1 = { icon = "ld-globe-symbolic", color = "#4a90d9" }
+	// 2 = { icon = "ld-terminal-symbolic" }
+	// ```
+	WorkspaceMap WorkspaceMap `cfg:"workspace-map"`
+	// Application icon mapping with glob pattern support.
+	//
+	// Maps window class or title to symbolic icon names. Supports:
+	// - No prefix: Matches window class (e.g., `"*firefox*"`)
+	// - `class:` prefix: Explicit class match (e.g., `"class:org.mozilla.*"`)
+	// - `title:` prefix: Matches window title (e.g., `"title:*YouTube*"`)
+	//
+	// User mappings are merged with built-in defaults for common applications.
+	//
+	// ## Example
+	//
+	// ```toml
+	// [modules.hyprland-workspaces.app-icon-map]
+	// "*firefox*" = "ld-globe-symbolic"
+	// "title:*YouTube*" = "ld-youtube-symbolic"
+	// ```
+	AppIconMap map[string]string `cfg:"app-icon-map"`
+	// Action on left-clicking a workspace. Default focuses it.
+	LeftClick WorkspaceClickAction `cfg:"left-click"`
+	// Action on middle-clicking a workspace.
+	MiddleClick WorkspaceClickAction `cfg:"middle-click"`
+	// Action on right-clicking a workspace.
+	RightClick WorkspaceClickAction `cfg:"right-click"`
+	// Action on scrolling up over the module. Default focuses the previous workspace.
+	ScrollUp WorkspaceClickAction `cfg:"scroll-up"`
+	// Action on scrolling down over the module. Default focuses the next workspace.
+	ScrollDown WorkspaceClickAction `cfg:"scroll-down"`
 }
 
 // DefaultsHyprlandWorkspaces returns the schema defaults.
 func DefaultsHyprlandWorkspaces() HyprlandWorkspacesConfig {
-	shared := defaultsCompositorWorkspaces(false)
 	return HyprlandWorkspacesConfig{
-		Shared:                        shared,
-		MinWorkspace:                  0,
+		MinWorkspaceCount:             0,
+		MonitorSpecific:               true,
 		ShowSpecial:                   true,
+		UrgentShow:                    true,
+		UrgentMode:                    UrgentWorkspace,
+		DisplayMode:                   DisplayModeLabel,
 		LabelUseName:                  false,
 		Numbering:                     NumberingAbsolute,
+		Divider:                       " ",
+		AppIconsShow:                  false,
+		AppIconsDedupe:                true,
+		AppIconsFallback:              "ld-app-window-symbolic",
+		AppIconsEmpty:                 "tb-minus-symbolic",
+		IconGap:                       Size{Value: 0.3, Unit: SizeMultiplier},
+		WorkspacePadding:              Size{Value: 0.5, Unit: SizeMultiplier},
+		IconSize:                      Size{Value: 1, Unit: SizeMultiplier},
+		LabelSize:                     Size{Value: 1, Unit: SizeMultiplier},
+		WorkspaceIgnore:               []string{},
+		ActiveIndicator:               ActiveBackground,
 		HighlightActiveOnOtherMonitor: true,
+		ActiveColor:                   mustColor("accent"),
+		OccupiedColor:                 mustColor("fg-muted"),
+		EmptyColor:                    mustColor("fg-subtle"),
+		ContainerBgColor:              mustColor("bg-surface-elevated"),
+		BorderShow:                    false,
+		BorderColor:                   mustColor("border-default"),
 		ActiveOnOtherMonitorColor:     mustColor("accent"),
+		WorkspaceMap:                  WorkspaceMap{},
+		AppIconMap:                    map[string]string{},
+		LeftClick:                     ParseWorkspaceClickAction("focus:this"),
+		MiddleClick:                   ParseWorkspaceClickAction(""),
+		RightClick:                    ParseWorkspaceClickAction(""),
+		ScrollUp:                      ParseWorkspaceClickAction("focus:previous"),
+		ScrollDown:                    ParseWorkspaceClickAction("focus:next"),
 	}
 }
 
-// applyHyprlandWorkspaces overlays [modules.hyprland-workspaces].
-func applyHyprlandWorkspaces(md toml.MetaData, prim toml.Primitive) (HyprlandWorkspacesConfig, error) {
-	const module = "hyprland-workspaces"
-	cfg := DefaultsHyprlandWorkspaces()
-	var doc struct {
-		workspaceClicksDoc
-		MinWorkspace     *int                 `toml:"min-workspace-count"`
-		MonitorSpecific  *bool                `toml:"monitor-specific"`
-		ShowSpecial      *bool                `toml:"show-special"`
-		UrgentShow       *bool                `toml:"urgent-show"`
-		UrgentMode       *string              `toml:"urgent-mode"`
-		DisplayMode      *string              `toml:"display-mode"`
-		LabelUseName     *bool                `toml:"label-use-name"`
-		Numbering        *string              `toml:"numbering"`
-		Divider          *string              `toml:"divider"`
-		AppIconsShow     *bool                `toml:"app-icons-show"`
-		AppIconsDedupe   *bool                `toml:"app-icons-dedupe"`
-		AppIconsFallback *string              `toml:"app-icons-fallback"`
-		AppIconsEmpty    *string              `toml:"app-icons-empty"`
-		IconGap          tomlValue            `toml:"icon-gap"`
-		WorkspacePad     tomlValue            `toml:"workspace-padding"`
-		IconSize         tomlValue            `toml:"icon-size"`
-		LabelSize        tomlValue            `toml:"label-size"`
-		WorkspaceIgnore  []string             `toml:"workspace-ignore"`
-		ActiveIndicator  *string              `toml:"active-indicator"`
-		HighlightOther   *bool                `toml:"highlight-active-on-other-monitor"`
-		ActiveColor      string               `toml:"active-color"`
-		OccupiedColor    string               `toml:"occupied-color"`
-		EmptyColor       string               `toml:"empty-color"`
-		ContainerBgColor string               `toml:"container-bg-color"`
-		BorderShow       *bool                `toml:"border-show"`
-		BorderColor      string               `toml:"border-color"`
-		ActiveOtherColor string               `toml:"active-on-other-monitor-color"`
-		WorkspaceMap     map[string]tomlValue `toml:"workspace-map"`
-		AppIconMap       map[string]string    `toml:"app-icon-map"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, fmt.Errorf("%s: %w", module, err)
-	}
-	s := &cfg.Shared
-	for _, b := range []struct {
-		raw    *bool
-		target *bool
-	}{
-		{doc.MonitorSpecific, &s.MonitorSpecific},
-		{doc.ShowSpecial, &cfg.ShowSpecial},
-		{doc.UrgentShow, &s.UrgentShow},
-		{doc.LabelUseName, &cfg.LabelUseName},
-		{doc.AppIconsShow, &s.AppIconsShow},
-		{doc.AppIconsDedupe, &s.AppIconsDedupe},
-		{doc.HighlightOther, &cfg.HighlightActiveOnOtherMonitor},
-		{doc.BorderShow, &s.BorderShow},
-	} {
-		if b.raw != nil {
-			*b.target = *b.raw
-		}
-	}
-	for _, str := range []struct {
-		raw    *string
-		target *string
-	}{
-		{doc.Divider, &s.Divider},
-		{doc.AppIconsFallback, &s.AppIconsFallback},
-		{doc.AppIconsEmpty, &s.AppIconsEmpty},
-	} {
-		if str.raw != nil {
-			*str.target = *str.raw
-		}
-	}
-	if doc.MinWorkspace != nil {
-		if *doc.MinWorkspace < 0 || *doc.MinWorkspace > 255 {
-			return cfg, fmt.Errorf("%s: min-workspace-count %d outside 0-255", module, *doc.MinWorkspace)
-		}
-		cfg.MinWorkspace = *doc.MinWorkspace
-	}
-	if doc.DisplayMode != nil {
-		s.DisplayMode = WorkspacesDisplayMode(*doc.DisplayMode)
-	}
-	if doc.UrgentMode != nil {
-		s.UrgentMode = UrgentMode(*doc.UrgentMode)
-	}
-	if doc.Numbering != nil {
-		cfg.Numbering = WorkspacesNumbering(*doc.Numbering)
-	}
-	if doc.ActiveIndicator != nil {
-		s.ActiveIndicator = ActiveIndicator(*doc.ActiveIndicator)
-	}
-	for _, sz := range []struct {
-		key    string
-		raw    tomlValue
-		target *Size
-	}{
-		{"icon-gap", doc.IconGap, &s.IconGap},
-		{"workspace-padding", doc.WorkspacePad, &s.WorkspacePad},
-		{"icon-size", doc.IconSize, &s.IconSize},
-		{"label-size", doc.LabelSize, &s.LabelSize},
-	} {
-		if err := parseSizeKey(module, sz.key, sz.raw, sz.target); err != nil {
-			return cfg, err
-		}
-	}
-	if doc.WorkspaceIgnore != nil {
-		s.WorkspaceIgnore = doc.WorkspaceIgnore
-	}
-	for _, c := range []struct {
-		key    string
-		raw    string
-		target *ColorValue
-	}{
-		{"active-color", doc.ActiveColor, &s.ActiveColor},
-		{"occupied-color", doc.OccupiedColor, &s.OccupiedColor},
-		{"empty-color", doc.EmptyColor, &s.EmptyColor},
-		{"container-bg-color", doc.ContainerBgColor, &s.ContainerBgColor},
-		{"border-color", doc.BorderColor, &s.BorderColor},
-		{"active-on-other-monitor-color", doc.ActiveOtherColor, &cfg.ActiveOnOtherMonitorColor},
-	} {
-		if err := parseColorKey(module, c.key, c.raw, c.target); err != nil {
-			return cfg, err
-		}
-	}
-	if doc.WorkspaceMap != nil {
-		s.WorkspaceMap = map[string]NamedWorkspaceStyle{}
-		for key, raw := range doc.WorkspaceMap {
-			// WorkspaceMap(BTreeMap<i32, _>): keys are workspace ids.
-			id, err := strconv.ParseInt(key, 10, 32)
-			if err != nil {
-				return cfg, fmt.Errorf("%s: workspace-map key %q is not a workspace id", module, key)
-			}
-			style, err := parseNamedWorkspaceStyle(raw.value)
-			if err != nil {
-				return cfg, fmt.Errorf("%s: workspace-map[%s]: %w", module, key, err)
-			}
-			s.WorkspaceMap[strconv.FormatInt(id, 10)] = style
-		}
-	}
-	if doc.AppIconMap != nil {
-		s.AppIconMap = doc.AppIconMap
-	}
-	doc.apply(&s.Click)
-
-	switch {
-	case s.DisplayMode != DisplayModeLabel && s.DisplayMode != DisplayModeIcon && s.DisplayMode != DisplayModeNone:
-		return cfg, fmt.Errorf("%s: invalid display-mode %q (want label|icon|none)", module, s.DisplayMode)
-	case s.ActiveIndicator != ActiveBackground && s.ActiveIndicator != ActiveUnderline:
-		return cfg, fmt.Errorf("%s: invalid active-indicator %q (want background|underline)", module, s.ActiveIndicator)
-	case cfg.Numbering != NumberingAbsolute && cfg.Numbering != NumberingRelative:
-		return cfg, fmt.Errorf("%s: invalid numbering %q (want absolute|relative)", module, cfg.Numbering)
-	case s.UrgentMode != UrgentWorkspace && s.UrgentMode != UrgentApplication:
-		return cfg, fmt.Errorf("%s: invalid urgent-mode %q (want workspace|application)", module, s.UrgentMode)
-	}
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c HyprlandWorkspacesConfig) Clicks() WorkspaceClicks {
+	return WorkspaceClicks{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }

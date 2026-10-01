@@ -22,12 +22,12 @@ func TestResolveColorCSS(t *testing.T) {
 		provider config.ThemeProvider
 		want     string
 	}{
-		{"#123456", config.ThemeWayle, "#123456"},
-		{"#123456", config.ThemeMatugen, "var(--bg-surface)"}, // a fixed hex has no mapping
-		{"#123456", config.ThemePywal, "var(--bg-surface)"},
-		{"accent", config.ThemeWallust, "var(--accent)"}, // tokens follow any palette
-		{"transparent", config.ThemeMatugen, "transparent"},
-		{"auto", config.ThemeMatugen, "var(--accent)"},
+		{"#123456", config.ThemeProviderWayle, "#123456"},
+		{"#123456", config.ThemeProviderMatugen, "var(--bg-surface)"}, // a fixed hex has no mapping
+		{"#123456", config.ThemeProviderPywal, "var(--bg-surface)"},
+		{"accent", config.ThemeProviderWallust, "var(--accent)"}, // tokens follow any palette
+		{"transparent", config.ThemeProviderMatugen, "transparent"},
+		{"auto", config.ThemeProviderMatugen, "var(--accent)"},
 	} {
 		if got := ResolveColorCSS(color(t, tc.value), def, tc.provider); got != tc.want {
 			t.Errorf("%s under %s = %q, want %q", tc.value, tc.provider, got, tc.want)
@@ -45,7 +45,7 @@ func TestBarCSSDefaults(t *testing.T) {
 		"--bar-group-opacity: 100%; --bar-group-border-color: var(--border-accent); " +
 		"--bar-group-border-top: 0; --bar-group-border-bottom: 0; --bar-group-border-left: 0; " +
 		"--bar-group-border-right: 0; --bar-shadow: none; --bar-shadow-margin: 0; }"
-	if got := BarCSS(config.Defaults().Bar, config.ThemeWayle); got != want {
+	if got := BarCSS(config.Defaults().Bar, config.ThemeProviderWayle); got != want {
 		t.Errorf("BarCSS defaults =\n%s\nwant\n%s", got, want)
 	}
 }
@@ -77,18 +77,18 @@ func TestBarCSSConfigured(t *testing.T) {
 		"--bar-group-border-top: 3; --bar-group-border-bottom: 3; --bar-group-border-left: 3; " +
 		"--bar-group-border-right: 3; --bar-shadow: 0 -1px 2px 1px rgba(0, 0, 0, 0.25); --bar-shadow-margin: 4; }"
 	// Under matugen the custom hexes fall back to the field defaults.
-	if got := BarCSS(bar, config.ThemeMatugen); got != want {
+	if got := BarCSS(bar, config.ThemeProviderMatugen); got != want {
 		t.Errorf("BarCSS =\n%s\nwant\n%s", got, want)
 	}
 	// Under wayle they are used as-is.
-	wayle := BarCSS(bar, config.ThemeWayle)
+	wayle := BarCSS(bar, config.ThemeProviderWayle)
 	for _, part := range []string{"--bar-bg: #123456;", "--bar-group-bg: #abcdef;"} {
 		if !contains(wayle, part) {
 			t.Errorf("wayle BarCSS lacks %q:\n%s", part, wayle)
 		}
 	}
 	bar.ButtonGroupPadding = config.Size{Value: 5.5, Unit: config.SizePixels}
-	if got := BarCSS(bar, config.ThemeWayle); !contains(got, "--bar-group-padding-px: 6;") {
+	if got := BarCSS(bar, config.ThemeProviderWayle); !contains(got, "--bar-group-padding-px: 6;") {
 		t.Errorf("a pixel group padding is taken literally (rounded):\n%s", got)
 	}
 }
@@ -104,24 +104,24 @@ func contains(s, sub string) bool {
 
 func TestButtonCSS(t *testing.T) {
 	d := config.Defaults()
-	battery := d.Battery.Button
+	battery, _ := d.ModuleButton("battery")
 	bar := d.Bar // block-prefix variant, border width 1
 
 	want := "* { --bar-btn-icon-color: var(--fg-on-accent); --bar-btn-label-color: var(--yellow); " +
 		"--bar-btn-icon-bg: var(--yellow); --bar-btn-bg: var(--bg-surface-elevated); " +
 		"--bar-btn-border-color: var(--yellow); --bar-btn-border-width: 1px; }"
-	if got := ButtonCSS(battery, bar, config.ThemeWayle, config.ThresholdColors{}); got != want {
+	if got := ButtonCSS(battery, bar, config.ThemeProviderWayle, config.ThresholdColors{}); got != want {
 		t.Errorf("ButtonCSS defaults =\n%s\nwant\n%s", got, want)
 	}
 
 	// Basic variant: auto resolves to the module's accent token.
 	basic := bar
-	basic.ButtonVariant = config.ButtonVariantBasic
+	basic.ButtonVariant = config.ButtonBasic
 	basic.ButtonBorderWidth = 3
 	want = "* { --bar-btn-icon-color: var(--yellow); --bar-btn-label-color: var(--yellow); " +
 		"--bar-btn-icon-bg: var(--yellow); --bar-btn-bg: var(--bg-surface-elevated); " +
 		"--bar-btn-border-color: var(--yellow); --bar-btn-border-width: 3px; }"
-	if got := ButtonCSS(battery, basic, config.ThemeWayle, config.ThresholdColors{}); got != want {
+	if got := ButtonCSS(battery, basic, config.ThemeProviderWayle, config.ThresholdColors{}); got != want {
 		t.Errorf("ButtonCSS basic =\n%s\nwant\n%s", got, want)
 	}
 
@@ -131,38 +131,38 @@ func TestButtonCSS(t *testing.T) {
 	want = "* { --bar-btn-icon-color: var(--fg-on-accent); --bar-btn-label-color: var(--status-error); " +
 		"--bar-btn-icon-bg: var(--yellow); --bar-btn-bg: #ff0000; " +
 		"--bar-btn-border-color: var(--yellow); --bar-btn-border-width: 1px; }"
-	if got := ButtonCSS(battery, bar, config.ThemeMatugen, over); got != want {
+	if got := ButtonCSS(battery, bar, config.ThemeProviderMatugen, over); got != want {
 		t.Errorf("ButtonCSS thresholds =\n%s\nwant\n%s", got, want)
 	}
 
 	// Custom hexes: kept under wayle, the schema default under a provider.
 	custom := battery
 	custom.Colors.Icon, custom.Colors.Label = color(t, "#010203"), color(t, "#040506")
-	if got := ButtonCSS(custom, bar, config.ThemeWayle, config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: #010203;") ||
+	if got := ButtonCSS(custom, bar, config.ThemeProviderWayle, config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: #010203;") ||
 		!contains(got, "--bar-btn-label-color: #040506;") {
 		t.Errorf("wayle keeps custom hexes:\n%s", got)
 	}
-	if got := ButtonCSS(custom, basic, config.ThemePywal, config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: var(--yellow);") ||
+	if got := ButtonCSS(custom, basic, config.ThemeProviderPywal, config.ThresholdColors{}); !contains(got, "--bar-btn-icon-color: var(--yellow);") ||
 		!contains(got, "--bar-btn-label-color: var(--yellow);") {
 		t.Errorf("a provider falls back to the defaults (auto icon → accent token):\n%s", got)
 	}
 }
 
 func TestResolveIconColor(t *testing.T) {
-	b := config.Defaults().Network.Button
+	b, _ := config.Defaults().ModuleButton("network")
 	for _, tc := range []struct {
 		icon     string
 		variant  config.BarButtonVariant
 		provider config.ThemeProvider
 		want     string
 	}{
-		{"auto", config.ButtonVariantBasic, config.ThemeWayle, "var(--accent)"},
-		{"auto", config.ButtonVariantBlockPrefix, config.ThemeWayle, "var(--fg-on-accent)"},
-		{"auto", config.ButtonVariantIconSquare, config.ThemeWayle, "var(--fg-on-accent)"},
-		{"red", config.ButtonVariantIconSquare, config.ThemeWayle, "var(--red)"},
-		{"#00ff00", config.ButtonVariantBasic, config.ThemeWayle, "#00ff00"},
-		{"#00ff00", config.ButtonVariantBasic, config.ThemeWallust, "var(--accent)"},
-		{"transparent", config.ButtonVariantBasic, config.ThemeWayle, "transparent"},
+		{"auto", config.ButtonBasic, config.ThemeProviderWayle, "var(--accent)"},
+		{"auto", config.ButtonBlockPrefix, config.ThemeProviderWayle, "var(--fg-on-accent)"},
+		{"auto", config.ButtonIconSquare, config.ThemeProviderWayle, "var(--fg-on-accent)"},
+		{"red", config.ButtonIconSquare, config.ThemeProviderWayle, "var(--red)"},
+		{"#00ff00", config.ButtonBasic, config.ThemeProviderWayle, "#00ff00"},
+		{"#00ff00", config.ButtonBasic, config.ThemeProviderWallust, "var(--accent)"},
+		{"transparent", config.ButtonBasic, config.ThemeProviderWayle, "transparent"},
 	} {
 		b.Colors.Icon = color(t, tc.icon)
 		if got := ResolveIconColor(b, tc.variant, tc.provider); got != tc.want {
@@ -173,10 +173,10 @@ func TestResolveIconColor(t *testing.T) {
 
 func TestContainerCSS(t *testing.T) {
 	d := config.Defaults()
-	c := d.Cava.Container
+	c, _ := d.ModuleContainer("cava")
 	want := "* { --bar-container-bg: var(--bg-surface-elevated); --bar-container-border-color: var(--border-accent); " +
 		"--bar-container-border-width: 0px; }"
-	if got := ContainerCSS(c, d.Bar, config.ThemeWayle); got != want {
+	if got := ContainerCSS(c, d.Bar, config.ThemeProviderWayle); got != want {
 		t.Errorf("ContainerCSS defaults =\n%s\nwant\n%s", got, want)
 	}
 	c.BorderShow = true
@@ -185,10 +185,10 @@ func TestContainerCSS(t *testing.T) {
 	bar.ButtonBorderWidth = 2
 	want = "* { --bar-container-bg: var(--bg-surface-elevated); --bar-container-border-color: var(--border-accent); " +
 		"--bar-container-border-width: 2px; }"
-	if got := ContainerCSS(c, bar, config.ThemeMatugen); got != want {
+	if got := ContainerCSS(c, bar, config.ThemeProviderMatugen); got != want {
 		t.Errorf("ContainerCSS shown border =\n%s\nwant\n%s", got, want)
 	}
-	if got := ContainerCSS(c, bar, config.ThemeWayle); !contains(got, "--bar-container-bg: #222222;") {
+	if got := ContainerCSS(c, bar, config.ThemeProviderWayle); !contains(got, "--bar-container-bg: #222222;") {
 		t.Errorf("wayle keeps the custom background:\n%s", got)
 	}
 }

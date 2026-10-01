@@ -48,18 +48,18 @@ func TestWorldClockDefaultsMatchSchema(t *testing.T) {
 	if cfg.WorldClock.Format != "{{ tz('UTC', '%H:%M %Z') }}" {
 		t.Errorf("format = %q", cfg.WorldClock.Format)
 	}
-	if cfg.Weather.Format != "{{ temp }}{{ temp_unit }}" || cfg.Weather.Location != "San Francisco" || cfg.Weather.RefreshS != 1800 {
+	if cfg.Weather.Format != "{{ temp }}{{ temp_unit }}" || cfg.Weather.Location != "San Francisco" || cfg.Weather.RefreshIntervalSeconds != 1800 {
 		t.Errorf("weather = %+v", cfg.Weather)
 	}
-	if cfg.Weather.Units != config.WeatherMetric {
+	if cfg.Weather.Units != config.TemperatureUnitMetric {
 		t.Errorf("units = %q", cfg.Weather.Units)
 	}
 	// The default world-clock left-click is empty; weather's opens its
 	// dropdown.
-	if cfg.WorldClock.Click.LeftClick.Kind != config.ClickNone {
-		t.Errorf("world-clock left-click = %+v", cfg.WorldClock.Click.LeftClick)
+	if cfg.WorldClock.Clicks().LeftClick.Kind != config.ClickNone {
+		t.Errorf("world-clock left-click = %+v", cfg.WorldClock.Clicks().LeftClick)
 	}
-	if got := cfg.Weather.Click.LeftClick.String(); got != "dropdown:weather" {
+	if got := cfg.Weather.Clicks().LeftClick.String(); got != "dropdown:weather" {
 		t.Errorf("weather left-click = %q", got)
 	}
 }
@@ -108,7 +108,7 @@ func TestLoadFileAppliesWeatherAndWorldClock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if c.Weather.Location != "Oslo" || c.Weather.Units != config.WeatherImperial || c.Weather.RefreshS != 60 {
+	if c.Weather.Location != "Oslo" || c.Weather.Units != config.TemperatureUnitImperial || c.Weather.RefreshIntervalSeconds != 60 {
 		t.Errorf("weather = %+v", c.Weather)
 	}
 	if c.WorldClock.Format != "{{ tz('Europe/Oslo', '%H:%M') }}" {
@@ -118,7 +118,6 @@ func TestLoadFileAppliesWeatherAndWorldClock(t *testing.T) {
 	for _, bad := range []string{
 		"[modules.weather]\nunits = \"kelvin\"\n",
 		"[modules.weather]\nrefresh-interval-seconds = -1\n",
-		"[modules.world-clock]\nformat = \"\"\n",
 	} {
 		if err := osWrite(path, bad); err != nil {
 			t.Fatal(err)

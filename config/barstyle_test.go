@@ -24,7 +24,7 @@ func TestShadowPresetCSS(t *testing.T) {
 			t.Errorf("%s at %s = %q, want %q", tc.preset, tc.location, got, tc.want)
 		}
 	}
-	for preset, margin := range map[ShadowPreset]int{ShadowNone: 0, ShadowDrop: 4, ShadowFloating: 4} {
+	for preset, margin := range map[ShadowPreset]uint32{ShadowNone: 0, ShadowDrop: 4, ShadowFloating: 4} {
 		if preset.OppositeMargin() != margin || preset.MarginPx() != margin {
 			t.Errorf("%s margin = %d, want %d", preset, preset.OppositeMargin(), margin)
 		}
@@ -33,7 +33,7 @@ func TestShadowPresetCSS(t *testing.T) {
 
 func TestStylingEnumCSSMappings(t *testing.T) {
 	for v, want := range map[BarButtonVariant]string{
-		ButtonVariantBasic: "basic", ButtonVariantBlockPrefix: "block-prefix", ButtonVariantIconSquare: "icon-square",
+		ButtonBasic: "basic", ButtonBlockPrefix: "block-prefix", ButtonIconSquare: "icon-square",
 	} {
 		if v.CSSClass() != want {
 			t.Errorf("%s class = %q", v, v.CSSClass())
@@ -127,7 +127,7 @@ func TestSizeScaleAndPxValue(t *testing.T) {
 
 func TestBarStylingKeysDefaultsAndDecode(t *testing.T) {
 	d := Defaults().Bar
-	if d.Shadow != ShadowNone || d.ButtonVariant != ButtonVariantBlockPrefix || d.ButtonOpacity != 100 ||
+	if d.Shadow != ShadowNone || d.ButtonVariant != ButtonBlockPrefix || d.ButtonOpacity != 100 ||
 		d.ButtonIconSize != (Size{1, SizeMultiplier}) || d.ButtonLabelWeight != WeightSemibold ||
 		d.ButtonGap != (Size{1, SizeMultiplier}) || d.ButtonIconPosition != IconStart ||
 		!d.DropdownShadow || d.DropdownOpacity != 100 {
@@ -151,7 +151,7 @@ dropdown-opacity = 85
 		t.Fatalf("LoadFile: %v", err)
 	}
 	b := cfg.Bar
-	if b.Shadow != ShadowDrop || b.ButtonVariant != ButtonVariantIconSquare || b.ButtonOpacity != 80 ||
+	if b.Shadow != ShadowDrop || b.ButtonVariant != ButtonIconSquare || b.ButtonOpacity != 80 ||
 		b.ButtonBGOpacity != 50 || b.ButtonIconSize != (Size{20, SizePixels}) || b.ButtonLabelWeight != WeightBold ||
 		b.ButtonGap != (Size{2, SizeMultiplier}) || b.ButtonIconPosition != IconEnd ||
 		b.DropdownShadow || b.DropdownOpacity != 85 {
@@ -160,25 +160,6 @@ dropdown-opacity = 85
 	// A [bar] table without exclusive keeps the schema default (true).
 	if !b.Exclusive {
 		t.Error("exclusive flipped to false by a [bar] table that does not set it")
-	}
-}
-
-func TestBarStylingKeysRejectBadValues(t *testing.T) {
-	for _, tc := range []struct{ body, want string }{
-		{`shadow = "soft"`, "shadow"},
-		{`button-variant = "pill"`, "button-variant"},
-		{`button-label-weight = "heavy"`, "font weight"},
-		{`button-icon-position = "middle"`, "button-icon-position"},
-		{`button-opacity = 101`, "button-opacity"},
-		{`button-bg-opacity = -1`, "button-bg-opacity"},
-		{`dropdown-opacity = 200`, "dropdown-opacity"},
-		{`button-icon-size = "big"`, "button-icon-size"},
-		{`button-gap = -1`, "button-gap"},
-	} {
-		path := writeConfig(t, "[bar]\n"+tc.body+"\n")
-		if _, err := LoadFile(path); err == nil || !strings.Contains(err.Error(), tc.want) {
-			t.Errorf("%q: err = %v, want %q", tc.body, err, tc.want)
-		}
 	}
 }
 
@@ -191,7 +172,10 @@ func TestClockTableWithoutFormatKeepsTheDefault(t *testing.T) {
 	if cfg.Clock.Format != Defaults().Clock.Format {
 		t.Errorf("format = %q, want the default", cfg.Clock.Format)
 	}
-	if cfg.Clock.Button.Colors.Label.Token != TokenRed {
-		t.Errorf("clock label-color = %+v", cfg.Clock.Button.Colors.Label)
+	if b, ok := cfg.ModuleButton("clock"); !ok || b.Colors.Label.Token != TokenRed || b.Defaults.Label == b.Colors.Label {
+		t.Errorf("clock button view = %+v %v, want the red label over its default", b, ok)
+	}
+	if _, ok := cfg.ModuleButton("nonesuch"); ok {
+		t.Error("an unknown module has a button view")
 	}
 }

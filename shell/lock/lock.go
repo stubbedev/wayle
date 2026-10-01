@@ -199,7 +199,7 @@ func (s *Screen) buildFace(*app.Output) app.LockSurface {
 	f.prompt = credential.Build(credential.Options{
 		Fonts:     s.fonts,
 		Palette:   s.pal,
-		ShowClock: s.cfg.Clock.Show,
+		ShowClock: s.cfg.ShowClock,
 	}, s.Submit)
 	f.prompt.Clock.SetText(s.clockText)
 	f.prompt.Date.SetText(s.dateText)
@@ -442,8 +442,8 @@ func (s *Screen) startClock() {
 
 func (s *Screen) refreshClockText() {
 	now := s.d.Now()
-	s.clockText = s.cfg.Clock.Time.Format(now)
-	s.dateText = s.cfg.Clock.Date.Format(now)
+	s.clockText = s.cfg.ClockFormat.Layout().Format(now)
+	s.dateText = s.cfg.DateFormat.Layout().Format(now)
 }
 
 func (s *Screen) refreshClock() {

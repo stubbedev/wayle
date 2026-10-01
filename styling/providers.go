@@ -200,7 +200,8 @@ func LoadWallust(path string, isLight bool) (config.Palette, error) {
 // provider that fails yields fallback and the failure, which the caller
 // logs — the palette is always usable, as in Rust, which logs and falls
 // back.
-func ResolvePalette(fallback config.Palette, s config.StylingConfig, ce config.ColorExtractorConfig) (config.Palette, error) {
+func ResolvePalette(fallback config.Palette, s config.StylingConfig) (config.Palette, error) {
+	ce := s.ColorExtractor
 	forcedLight, forced := s.Appearance.ForcedLight()
 	isLight := func(own bool) bool {
 		if forced {
@@ -208,22 +209,21 @@ func ResolvePalette(fallback config.Palette, s config.StylingConfig, ce config.C
 		}
 		return own
 	}
-	ex := ce.Extractor
 	var (
 		load  func(string, bool) (config.Palette, error)
 		light bool
 	)
 	switch ce.ThemeProvider {
-	case config.ThemeMatugen:
-		load, light = LoadMatugen, isLight(ex.MatugenLight)
-	case config.ThemeWallust:
-		load, light = LoadWallust, isLight(ex.WallustPalette.IsLight())
-	case config.ThemePywal:
-		load, light = LoadPywal, isLight(ex.PywalLight)
+	case config.ThemeProviderMatugen:
+		load, light = LoadMatugen, isLight(ce.MatugenLight)
+	case config.ThemeProviderWallust:
+		load, light = LoadWallust, isLight(ce.WallustPalette.IsLight())
+	case config.ThemeProviderPywal:
+		load, light = LoadPywal, isLight(ce.PywalLight)
 	default:
 		return fallback, nil
 	}
-	path, _, err := extract.ColorsPath(ce.ThemeProvider.Tool())
+	path, _, err := extract.ColorsPath(extract.ToolFor(ce.ThemeProvider))
 	if err != nil {
 		return fallback, fmt.Errorf("styling: %s palette load failed: %w", ce.ThemeProvider, err)
 	}

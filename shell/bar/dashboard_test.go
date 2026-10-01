@@ -87,22 +87,22 @@ func TestLoadFileAppliesDashboard(t *testing.T) {
 		t.Fatalf("LoadFile: %v", err)
 	}
 	d := c.Dashboard
-	if d.IconOverride != "x" || d.LockCommand != "swaylock" || d.UsageError != 90 {
+	if d.IconOverride != "x" || d.DropdownLockCommand != "swaylock" || d.UsageError != 90 {
 		t.Errorf("dashboard = %+v", d)
 	}
-	if d.LogoutCommand != "loginctl terminate-session $XDG_SESSION_ID" || d.UsageWarning != 60 {
+	if d.DropdownLogoutCommand != "loginctl terminate-session $XDG_SESSION_ID" || d.UsageWarning != 60 {
 		t.Errorf("unset keys lost their defaults: %+v", d)
 	}
-	if len(d.SessionActions) != 2 || d.SessionActions[0] != config.SessionReboot || d.SessionActions[1] != config.SessionLock {
-		t.Errorf("actions = %v, want [reboot lock]", d.SessionActions)
+	if len(d.UserSession.Actions) != 2 || d.UserSession.Actions[0] != config.SessionActionReboot || d.UserSession.Actions[1] != config.SessionActionLock {
+		t.Errorf("actions = %v, want [reboot lock]", d.UserSession.Actions)
 	}
-	if d.Click.RightClick.String() != "dropdown:calendar" || d.Click.LeftClick.String() != "dropdown:dashboard" {
-		t.Errorf("clicks = %+v", d.Click)
+	if d.Clicks().RightClick.String() != "dropdown:calendar" || d.Clicks().LeftClick.String() != "dropdown:dashboard" {
+		t.Errorf("clicks = %+v", d.Clicks())
 	}
 
 	// The defaults carry all four actions in schema order.
-	def := config.DefaultsDashboard().SessionActions
-	if len(def) != 4 || def[0] != config.SessionLock || def[3] != config.SessionPowerOff {
+	def := config.DefaultsDashboard().UserSession.Actions
+	if len(def) != 4 || def[0] != config.SessionActionLock || def[3] != config.SessionActionPowerOff {
 		t.Errorf("default actions = %v", def)
 	}
 
@@ -122,12 +122,12 @@ func TestLoadFileAppliesDashboard(t *testing.T) {
 
 func TestSessionButtonsFollowTheActions(t *testing.T) {
 	cfg := config.DefaultsDashboard()
-	cfg.RebootCommand = "my-reboot"
-	b := sessionButtonFor(config.SessionReboot, cfg)
+	cfg.DropdownRebootCommand = "my-reboot"
+	b := sessionButtonFor(config.SessionActionReboot, cfg)
 	if b.icon != "ld-refresh-cw-symbolic" || b.command != "my-reboot" {
 		t.Errorf("reboot button = %+v", b)
 	}
-	if b := sessionButtonFor(config.SessionLogout, cfg); b.icon != "ld-log-out-symbolic" || b.command != cfg.LogoutCommand {
+	if b := sessionButtonFor(config.SessionActionLogOut, cfg); b.icon != "ld-log-out-symbolic" || b.command != cfg.DropdownLogoutCommand {
 		t.Errorf("log-out button = %+v", b)
 	}
 }
@@ -136,7 +136,7 @@ func TestUserSessionSectionRendersConfiguredActions(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("USER", "alice")
 	cfg := config.Defaults()
-	cfg.Dashboard.SessionActions = []config.SessionAction{config.SessionLock, config.SessionPowerOff}
+	cfg.Dashboard.UserSession.Actions = []config.SessionAction{config.SessionActionLock, config.SessionActionPowerOff}
 	ctx := newTestContext(t, cfg)
 	row, ok := userSessionSection(ctx).(*widget.Box)
 	if !ok {

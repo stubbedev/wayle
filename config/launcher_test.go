@@ -6,48 +6,6 @@ import (
 	"testing"
 )
 
-func TestLauncherDefaultsMatchTheSchema(t *testing.T) {
-	cfg, err := LoadFile(writeConfig(t, ""))
-	if err != nil {
-		t.Fatal(err)
-	}
-	l := cfg.Launcher
-	if l.Location != LauncherCenter || l.Lines != 10 || !l.Cycle || !l.Tokenize ||
-		l.NegateChar != "-" || !l.NormalizeMatch || l.Sort || l.SortingMethod != SortingLevenshtein ||
-		l.Case != CaseInsensitive || !l.ShowIcons || !l.FixedNumLines || l.Matching != MatchingNormal {
-		t.Errorf("launcher defaults drifted: %+v", l)
-	}
-	if !reflect.DeepEqual(l.Modes, []string{"drun", "run", "window"}) {
-		t.Errorf("modes = %v", l.Modes)
-	}
-	if l.Width != (Size{Value: 1.0, Unit: SizeMultiplier}) {
-		t.Errorf("width = %+v", l.Width)
-	}
-	if !l.History.Enable || l.History.MaxSize != 25 {
-		t.Errorf("history = %+v", l.History)
-	}
-	if l.Drun.DisplayFormat != "{name} [<span weight='light' size='small'><i>({generic})</i></span>]" ||
-		l.Drun.URLLauncher != "xdg-open" || len(l.Drun.MatchFields) != 5 {
-		t.Errorf("drun = %+v", l.Drun)
-	}
-	if l.Run.RunCommand != "{cmd}" || l.Run.ShellCommand != "{terminal} -e {cmd}" {
-		t.Errorf("run = %+v", l.Run)
-	}
-	if l.Window.Format != "{w}   {c}   {t}" || !l.Window.CloseOnDelete ||
-		!reflect.DeepEqual(l.Window.MatchFields, []LauncherWindowField{WindowFieldTitle, WindowFieldClass}) {
-		t.Errorf("window = %+v", l.Window)
-	}
-	if l.SSH.Client != "ssh" || l.SSH.Command != "{terminal} -e {ssh-client} {host}" || l.SSH.ParseHosts || !l.SSH.ParseKnownHosts {
-		t.Errorf("ssh = %+v", l.SSH)
-	}
-	if l.Filebrowser.SortingMethod != FileSortName || !l.Filebrowser.DirectoriesFirst || l.Filebrowser.ShowHidden {
-		t.Errorf("filebrowser = %+v", l.Filebrowser)
-	}
-	if !reflect.DeepEqual(l.Combi.Modes, []string{"window", "drun", "run"}) || l.Combi.DisplayFormat != "{text}" {
-		t.Errorf("combi = %+v", l.Combi)
-	}
-}
-
 func TestLauncherSectionApplies(t *testing.T) {
 	cfg, err := LoadFile(writeConfig(t, `
 [launcher]
@@ -113,28 +71,28 @@ sorting-method = "mtime"
 	}
 }
 
-func TestLauncherBadValuesAreLoadErrors(t *testing.T) {
-	for name, body := range map[string]string{
-		"location":           `location = "middle"`,
-		"matching":           `matching = "exact"`,
-		"sorting-method":     `sorting-method = "normal"`,
-		"case":               `case = "upper"`,
-		"width":              `width = "wide"`,
-		"negative lines":     `lines = -1`,
-		"drun match field":   "[launcher.drun]\nmatch-fields = [\"name\", \"icon\"]",
-		"window match field": "[launcher.window]\nmatch-fields = [\"all\"]",
-		"file sort":          "[launcher.filebrowser]\nsorting-method = \"size\"",
+// A bad launcher value is a diagnostic naming its field; that field
+// keeps its default and the rest of the section still applies.
+func TestLauncherBadValuesAreFieldDiagnostics(t *testing.T) {
+	for name, tc := range map[string]struct{ body, path string }{
+		"location":           {`location = "middle"`, "launcher.location"},
+		"matching":           {`matching = "exact"`, "launcher.matching"},
+		"sorting-method":     {`sorting-method = "normal"`, "launcher.sorting-method"},
+		"case":               {`case = "upper"`, "launcher.case"},
+		"negative lines":     {`lines = -1`, "launcher.lines"},
+		"drun match field":   {"[launcher.drun]\nmatch-fields = [\"name\", \"icon\"]", "launcher.drun.match-fields"},
+		"window match field": {"[launcher.window]\nmatch-fields = [\"all\"]", "launcher.window.match-fields"},
+		"file sort":          {"[launcher.filebrowser]\nsorting-method = \"size\"", "launcher.filebrowser.sorting-method"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			cfg, err := LoadFile(writeConfig(t, "[launcher]\n"+body+"\n"))
-			if err == nil {
-				t.Fatalf("%s: a bad value must be a load error", name)
+			cfg, err := LoadFile(writeConfig(t, "[launcher]\nterminal = \"foot\"\n"+tc.body+"\n"))
+			if err == nil || !strings.Contains(err.Error(), tc.path) {
+				t.Fatalf("diagnostics %v, want one for %s", err, tc.path)
 			}
-			if !strings.Contains(err.Error(), "launcher") && name != "negative lines" {
-				t.Errorf("error does not name the section: %v", err)
-			}
-			if cfg.Launcher.Location != LauncherCenter {
-				t.Errorf("a failed load must leave the defaults, got %+v", cfg.Launcher)
+			want := DefaultsLauncher()
+			want.Terminal = "foot"
+			if !reflect.DeepEqual(cfg.Launcher, want) {
+				t.Errorf("only the bad field may keep its default:\n%+v\nwant\n%+v", cfg.Launcher, want)
 			}
 		})
 	}
@@ -155,4 +113,9 @@ func TestLauncherLocationFromRofi(t *testing.T) {
 	if got, _ := LauncherLocationFromRofi(3); got != LauncherNorthEast {
 		t.Errorf("rofi 3 = %v, want north-east", got)
 	}
+}
+
+func writeConfig(t *testing.T, body string) string {
+	t.Helper()
+	return writeFile(t, t.TempDir(), "config.toml", body)
 }

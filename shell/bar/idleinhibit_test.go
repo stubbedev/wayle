@@ -43,18 +43,19 @@ func TestLoadFileAppliesIdleInhibit(t *testing.T) {
 	if c.IdleInhibit.Format != "[{{ state }}]" || c.IdleInhibit.StartupDuration != 30 {
 		t.Errorf("config = %+v", c.IdleInhibit)
 	}
-	if got := c.IdleInhibit.Icons[config.IdleInhibitActive].Name; got != "tb-eye-symbolic" {
+	if got := c.IdleInhibit.Icons()[config.IdleInhibitActive].Name; got != "tb-eye-symbolic" {
 		t.Errorf("icon-active = %q", got)
 	}
-	if got := c.IdleInhibit.Icons[config.IdleInhibitInactive].Name; got != "tb-coffee-off-symbolic" {
+	if got := c.IdleInhibit.Icons()[config.IdleInhibitInactive].Name; got != "tb-coffee-off-symbolic" {
 		t.Errorf("icon-inactive default changed: %q", got)
 	}
 
 	if err := osWrite(path, "[modules.idle-inhibit]\nformat = \"\"\n"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := config.LoadFile(path); err == nil {
-		t.Error("empty format: want a load error")
+	// The schema puts no constraint on the format string.
+	if _, err := config.LoadFile(path); err != nil {
+		t.Errorf("empty format: accepted by the schema, got %v", err)
 	}
 }
 

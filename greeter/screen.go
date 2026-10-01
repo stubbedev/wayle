@@ -149,7 +149,7 @@ func newScreen(init Init, fonts credential.Fonts, pal *styling.Palette, d deps) 
 		header = credential.Center(s.userRow(fonts, pal))
 	}
 	s.prompt = credential.Build(credential.Options{
-		Fonts: fonts, Palette: pal, ShowClock: g.Clock.Show, WithUsername: true,
+		Fonts: fonts, Palette: pal, ShowClock: g.ShowClock, WithUsername: true,
 		Header: header, Extra: below, Focus: d.focus,
 	}, s.submit)
 
@@ -415,9 +415,9 @@ func (s *screen) rememberLogin() {
 
 func (s *screen) refreshClock() {
 	now := s.d.now()
-	c := s.init.Config.Greeter.Clock
-	s.prompt.Clock.SetText(c.Time.Format(now))
-	s.prompt.Date.SetText(c.Date.Format(now))
+	g := s.init.Config.Greeter
+	s.prompt.Clock.SetText(g.ClockFormat.Layout().Format(now))
+	s.prompt.Date.SetText(g.DateFormat.Layout().Format(now))
 }
 
 // setCapsLock shows or hides the warning.

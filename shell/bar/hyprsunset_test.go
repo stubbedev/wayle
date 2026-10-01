@@ -39,20 +39,19 @@ func TestLoadFileAppliesHyprsunset(t *testing.T) {
 	if c.Hyprsunset.Temperature != 3500 || c.Hyprsunset.Gamma != 80 {
 		t.Errorf("config = %+v", c.Hyprsunset)
 	}
-	if c.Hyprsunset.IconOn.Name != "ld-moon-symbolic" {
-		t.Errorf("icon-on = %q", c.Hyprsunset.IconOn.Name)
+	if c.Hyprsunset.IconOn != "ld-moon-symbolic" {
+		t.Errorf("icon-on = %q", c.Hyprsunset.IconOn)
 	}
-	if c.Hyprsunset.Click.LeftClick.String() != ":toggle" {
-		t.Errorf("left-click = %q", c.Hyprsunset.Click.LeftClick.String())
+	if c.Hyprsunset.Clicks().LeftClick.String() != ":toggle" {
+		t.Errorf("left-click = %q", c.Hyprsunset.Clicks().LeftClick.String())
 	}
 
 	for _, bad := range []string{
-		"[modules.hyprsunset]\ntemperature = 500\n",
-		"[modules.hyprsunset]\ntemperature = 20001\n",
-		"[modules.hyprsunset]\nlatitude = 91.0\n",
-		"[modules.hyprsunset]\nlongitude = -181.0\n",
-		"[modules.hyprsunset]\ngamma = 300\n",
-		"[modules.hyprsunset]\nformat = \"\"\n",
+		// The documented ranges are not enforced (plain u32/f64 in the
+		// Rust schema); a wrong type is.
+		"[modules.hyprsunset]\ntemperature = \"warm\"\n",
+		"[modules.hyprsunset]\nlatitude = true\n",
+		"[modules.hyprsunset]\ngamma = -1\n",
 	} {
 		if err := osWrite(path, bad); err != nil {
 			t.Fatal(err)

@@ -1,152 +1,143 @@
 package config
 
-import (
-	"errors"
-
-	"github.com/BurntSushi/toml"
-)
-
-// Recorder output formats.
-const (
-	RecorderMkv = "mkv"
-	RecorderMp4 = "mp4"
-)
-
-// Schema icon defaults (RecorderConfig's state trio).
-const (
-	defaultRecIdleIcon      = "ld-video-symbolic"
-	defaultRecRecordingIcon = "ld-circle-dot-symbolic"
-	defaultRecPausedIcon    = "ld-circle-pause-symbolic"
-)
-
-// RecorderConfig is the recorder module configuration.
+// RecorderConfig is ported from crates/wayle-config/src/schemas/modules/recorder/mod.rs.
+//
+// Native screen recorder backed by a GStreamer pipeline.
+//
+// Click the bar button to start/stop; the dropdown exposes the recording
+// options below. Controllable from the CLI / RPC socket:
+// `wayle recorder start|stop|toggle|pause|status`.
 type RecorderConfig struct {
-	Click  ClickConfig
-	Format string
-	// Button is the bar-button key set; LabelShow, Icon.Show/Color, and
-	// the Show of every Icons entry mirror its label-show, icon-show,
-	// and icon-color.
-	Button           ButtonConfig
-	LabelShow        bool
-	Framerate        int
-	Microphone       bool
-	MicrophoneDevice string
-	SystemAudio      bool
-	ShowCursor       bool
-	StartDelayMS     int
-	OutputDirectory  string
-	OutputFormat     string
-	Icon             IconConfig
-	Icons            map[string]IconConfig
-	Colors           map[string]ColorValue
+	// Icon when idle (not recording).
+	IconIdle string `cfg:"icon-idle"`
+	// Icon while recording.
+	IconRecording string `cfg:"icon-recording"`
+	// Icon while recording is paused.
+	IconPaused string `cfg:"icon-paused"`
+	// Format string for the label.
+	//
+	// ## Placeholders
+	//
+	// - `{{ state }}` - Recorder state text (Idle, Recording, Paused)
+	// - `{{ elapsed }}` - Elapsed recording time (e.g., "01:23", "--" when idle)
+	Format string `cfg:"format"`
+	// Capture the microphone in the recording.
+	Microphone bool `cfg:"microphone"`
+	// Microphone PipeWire/PulseAudio source name. Empty uses the default source.
+	MicrophoneDevice string `cfg:"microphone-device"`
+	// Capture desktop (system) audio in the recording.
+	SystemAudio bool `cfg:"system-audio"`
+	// Capture framerate in frames per second.
+	Framerate uint32 `cfg:"framerate"`
+	// Overlay a webcam picture-in-picture frame into the recording.
+	WebcamEnabled bool `cfg:"webcam-enabled"`
+	// Webcam V4L2 device path. Empty auto-selects the first camera.
+	WebcamDevice string `cfg:"webcam-device"`
+	// Webcam frame horizontal position, as a percentage of the free
+	// horizontal space (0 = flush left, 100 = flush right). Stored relative so
+	// it stays correct across monitors of different resolutions.
+	WebcamX Percentage `cfg:"webcam-x"`
+	// Webcam frame vertical position, as a percentage of the free vertical
+	// space (0 = flush top, 100 = flush bottom). Stored relative so it stays
+	// correct across monitors of different resolutions.
+	WebcamY Percentage `cfg:"webcam-y"`
+	// Webcam frame width as a percentage of the recording width.
+	WebcamSize Percentage `cfg:"webcam-size"`
+	// Output directory for recordings. Empty uses the XDG Videos directory.
+	OutputDirectory string `cfg:"output-directory"`
+	// Container format / codec preset.
+	OutputFormat RecorderFormat `cfg:"output-format"`
+	// Draw the mouse cursor in the recording.
+	ShowCursor bool `cfg:"show-cursor"`
+	// Delay between choosing the capture source and the recording actually
+	// starting, in milliseconds. Gives on-screen UI (the start toast) time to
+	// clear so it isn't captured in the video.
+	StartDelayMs uint32 `cfg:"start-delay-ms"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Display module icon.
+	IconShow bool `cfg:"icon-show"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Display label.
+	LabelShow bool `cfg:"label-show"`
+	// Label text color token.
+	LabelColor ColorValue `cfg:"label-color"`
+	// Max label characters before truncation with ellipsis. Set to 0 to disable.
+	LabelMaxLength uint32 `cfg:"label-max-length"`
+	// Button background color token.
+	ButtonBgColor ColorValue `cfg:"button-bg-color"`
+	// Action on left click. Default toggles recording.
+	LeftClick ClickAction `cfg:"left-click"`
+	// Action on right click. Default opens the recorder dropdown.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
 }
-
-// Icon keys.
-const (
-	RecorderIdle      = "idle"
-	RecorderRecording = "recording"
-	RecorderPaused    = "paused"
-)
 
 // DefaultsRecorder returns the schema defaults.
 func DefaultsRecorder() RecorderConfig {
 	return RecorderConfig{
+		IconIdle:         "ld-video-symbolic",
+		IconRecording:    "ld-circle-dot-symbolic",
+		IconPaused:       "ld-circle-pause-symbolic",
 		Format:           "{{ elapsed }}",
-		LabelShow:        true,
-		Button:           DefaultsButton(buttonColors("auto", "red", "red", "bg-surface-elevated", "red"), TokenRed, true, 0),
-		Framerate:        60,
 		Microphone:       false,
 		MicrophoneDevice: "",
 		SystemAudio:      true,
-		ShowCursor:       true,
-		StartDelayMS:     1400,
+		Framerate:        60,
+		WebcamEnabled:    false,
+		WebcamDevice:     "",
+		WebcamX:          100,
+		WebcamY:          100,
+		WebcamSize:       20,
 		OutputDirectory:  "",
-		OutputFormat:     RecorderMkv,
-		Icon:             DefaultsIcon(true, defaultRecIdleIcon),
-		Icons: map[string]IconConfig{
-			RecorderIdle:      DefaultsIcon(true, defaultRecIdleIcon),
-			RecorderRecording: DefaultsIcon(true, defaultRecRecordingIcon),
-			RecorderPaused:    DefaultsIcon(true, defaultRecPausedIcon),
-		},
-		Colors: map[string]ColorValue{},
-		Click:  DefaultsClick(map[string]string{"left-click": "wayle recorder toggle", "right-click": "dropdown:recorder"}),
+		OutputFormat:     RecorderFormatMkv,
+		ShowCursor:       true,
+		StartDelayMs:     1400,
+		BorderShow:       false,
+		BorderColor:      mustColor("red"),
+		IconShow:         true,
+		IconColor:        mustColor("auto"),
+		IconBgColor:      mustColor("red"),
+		LabelShow:        true,
+		LabelColor:       mustColor("red"),
+		LabelMaxLength:   0,
+		ButtonBgColor:    mustColor("bg-surface-elevated"),
+		LeftClick:        ParseClickAction("wayle recorder toggle"),
+		RightClick:       ParseClickAction("dropdown:recorder"),
+		MiddleClick:      ClickAction{},
+		ScrollUp:         ClickAction{},
+		ScrollDown:       ClickAction{},
 	}
 }
 
-// applyRecorder overlays [modules.recorder].
-func applyRecorder(md toml.MetaData, prim toml.Primitive) (RecorderConfig, error) {
-	cfg := DefaultsRecorder()
-	var doc struct {
-		Format           *string `toml:"format"`
-		Framerate        *int    `toml:"framerate"`
-		Microphone       *bool   `toml:"microphone"`
-		MicrophoneDevice *string `toml:"microphone-device"`
-		SystemAudio      *bool   `toml:"system-audio"`
-		ShowCursor       *bool   `toml:"show-cursor"`
-		StartDelayMS     *int    `toml:"start-delay-ms"`
-		OutputDirectory  *string `toml:"output-directory"`
-		OutputFormat     *string `toml:"output-format"`
-		IconIdle         *string `toml:"icon-idle"`
-		IconRecording    *string `toml:"icon-recording"`
-		IconPaused       *string `toml:"icon-paused"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.Format != nil {
-		cfg.Format = *doc.Format
-	}
-	if doc.Framerate != nil {
-		cfg.Framerate = *doc.Framerate
-	}
-	if doc.Microphone != nil {
-		cfg.Microphone = *doc.Microphone
-	}
-	if doc.MicrophoneDevice != nil {
-		cfg.MicrophoneDevice = *doc.MicrophoneDevice
-	}
-	if doc.SystemAudio != nil {
-		cfg.SystemAudio = *doc.SystemAudio
-	}
-	if doc.ShowCursor != nil {
-		cfg.ShowCursor = *doc.ShowCursor
-	}
-	if doc.StartDelayMS != nil {
-		cfg.StartDelayMS = *doc.StartDelayMS
-	}
-	if doc.OutputDirectory != nil {
-		cfg.OutputDirectory = *doc.OutputDirectory
-	}
-	if doc.OutputFormat != nil {
-		if *doc.OutputFormat != RecorderMkv && *doc.OutputFormat != RecorderMp4 {
-			return cfg, errors.New("recorder: output-format must be mkv or mp4")
-		}
-		cfg.OutputFormat = *doc.OutputFormat
-	}
-	for name, key := range map[string]*string{
-		RecorderIdle:      doc.IconIdle,
-		RecorderRecording: doc.IconRecording,
-		RecorderPaused:    doc.IconPaused,
-	} {
-		if key == nil {
-			continue
-		}
-		icon := cfg.Icons[name]
-		icon.Name = *key
-		cfg.Icons[name] = icon
-	}
-	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Button = button
-	button.mirrorLabel(&cfg.LabelShow, nil)
-	button.mirrorIcon(&cfg.Icon)
-	button.mirrorIconShow(cfg.Icons)
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c RecorderConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }
+
+// RecorderFormat is ported from crates/wayle-config/src/schemas/modules/recorder/types.rs.
+//
+// Container format / codec preset for recordings.
+type RecorderFormat string
+
+// RecorderFormat values.
+const (
+	// H.264 in an MP4 container.
+	RecorderFormatMp4 RecorderFormat = "mp4"
+	// H.264 in a Matroska container (resilient to crashes).
+	RecorderFormatMkv RecorderFormat = "mkv"
+	// VP9 in a WebM container.
+	RecorderFormatWebm RecorderFormat = "webm"
+)
+
+var _ = registerEnum(RecorderFormatMp4, RecorderFormatMkv, RecorderFormatWebm)

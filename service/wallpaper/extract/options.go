@@ -2,8 +2,9 @@ package extract
 
 import (
 	"fmt"
-	"slices"
 	"strings"
+
+	"github.com/stubbedev/wayle/config"
 )
 
 // Tool is the external program that extracts a palette from an image
@@ -50,159 +51,50 @@ func ParseTool(s string) (Tool, error) {
 	return 0, fmt.Errorf("Invalid color extractor: %s", s) //nolint:staticcheck // the Rust message, verbatim
 }
 
-// enumSet is a closed set of config spellings; each typed enum below
-// is an index into one.
-type enumSet []string
-
-func (e enumSet) parse(kind, s string) (int, error) {
-	if i := slices.Index(e, s); i >= 0 {
-		return i, nil
-	}
-	return 0, fmt.Errorf("unknown %s %q (valid: %s)", kind, s, strings.Join(e, ", "))
-}
-
-func (e enumSet) name(i int) string {
-	if i >= 0 && i < len(e) {
-		return e[i]
-	}
-	return fmt.Sprintf("invalid(%d)", i)
-}
-
-// MatugenScheme is matugen's color scheme type
-// (styling/types/extractor.rs). The config spelling is kebab-case
-// ("tonal-spot"); CLIValue is matugen's --type value.
-type MatugenScheme uint8
-
-// Matugen schemes; TonalSpot is the default.
-const (
-	SchemeContent MatugenScheme = iota
-	SchemeExpressive
-	SchemeFidelity
-	SchemeFruitSalad
-	SchemeMonochrome
-	SchemeNeutral
-	SchemeRainbow
-	SchemeTonalSpot
-	SchemeVibrant
+// The tool parameters are the [styling] schema enums themselves, so the
+// config and the tool invocations share one type.
+type (
+	// MatugenScheme is the matugen color scheme.
+	MatugenScheme = config.MatugenScheme
+	// WallustPalette is the wallust palette mode.
+	WallustPalette = config.WallustPalette
+	// WallustBackend is the wallust sampling backend.
+	WallustBackend = config.WallustBackend
+	// WallustColorspace is the wallust color space.
+	WallustColorspace = config.WallustColorspace
 )
 
-var matugenSchemes = enumSet{
-	"content", "expressive", "fidelity", "fruit-salad", "monochrome",
-	"neutral", "rainbow", "tonal-spot", "vibrant",
-}
-
-// ParseMatugenScheme reads the config spelling.
-func ParseMatugenScheme(s string) (MatugenScheme, error) {
-	i, err := matugenSchemes.parse("matugen scheme", s)
-	return MatugenScheme(i), err
-}
-
-// String is the config spelling.
-func (m MatugenScheme) String() string { return matugenSchemes.name(int(m)) }
-
-// CLIValue is the value of matugen's --type flag ("scheme-tonal-spot").
-func (m MatugenScheme) CLIValue() string { return "scheme-" + m.String() }
-
-// WallustPalette is wallust's palette mode.
-type WallustPalette uint8
-
-// Wallust palettes, in the Rust declaration order; Dark16 is the
-// default.
-const (
-	PaletteDark16 WallustPalette = iota
-	PaletteDark
-	PaletteDarkcomp
-	PaletteDarkcomp16
-	PaletteHarddark
-	PaletteHarddark16
-	PaletteHarddarkcomp
-	PaletteHarddarkcomp16
-	PaletteLight
-	PaletteLight16
-	PaletteLightcomp
-	PaletteLightcomp16
-	PaletteSoftdark
-	PaletteSoftdark16
-	PaletteSoftdarkcomp
-	PaletteSoftdarkcomp16
-	PaletteSoftlight
-	PaletteSoftlight16
-	PaletteSoftlightcomp
-	PaletteSoftlightcomp16
-	PaletteAnsidark
-	PaletteAnsidark16
-)
-
-var wallustPalettes = enumSet{
-	"dark16", "dark", "darkcomp", "darkcomp16", "harddark", "harddark16",
-	"harddarkcomp", "harddarkcomp16", "light", "light16", "lightcomp",
-	"lightcomp16", "softdark", "softdark16", "softdarkcomp", "softdarkcomp16",
-	"softlight", "softlight16", "softlightcomp", "softlightcomp16",
-	"ansidark", "ansidark16",
-}
-
-// ParseWallustPalette reads the config spelling.
-func ParseWallustPalette(s string) (WallustPalette, error) {
-	i, err := wallustPalettes.parse("wallust palette", s)
-	return WallustPalette(i), err
-}
-
-// String is the config (and wallust.toml) spelling.
-func (p WallustPalette) String() string { return wallustPalettes.name(int(p)) }
-
-// IsLight reports whether the palette produces a light background.
-func (p WallustPalette) IsLight() bool {
+// ToolFor is the extractor a theme provider needs
+// (build_extractor_config): the static wayle provider extracts nothing.
+func ToolFor(p config.ThemeProvider) Tool {
 	switch p {
-	case PaletteLight, PaletteLight16, PaletteLightcomp, PaletteLightcomp16,
-		PaletteSoftlight, PaletteSoftlight16, PaletteSoftlightcomp, PaletteSoftlightcomp16:
-		return true
+	case config.ThemeProviderMatugen:
+		return Matugen
+	case config.ThemeProviderPywal:
+		return Pywal
+	case config.ThemeProviderWallust:
+		return Wallust
 	}
-	return false
+	return None
 }
 
-// WallustBackend is wallust's image sampling backend.
-type WallustBackend uint8
-
-// Wallust backends; Fastresize is the default.
-const (
-	BackendFull WallustBackend = iota
-	BackendResized
-	BackendWal
-	BackendThumb
-	BackendFastresize
-	BackendKmeans
-)
-
-var wallustBackends = enumSet{"full", "resized", "wal", "thumb", "fastresize", "kmeans"}
-
-// ParseWallustBackend reads the config spelling.
-func ParseWallustBackend(s string) (WallustBackend, error) {
-	i, err := wallustBackends.parse("wallust backend", s)
-	return WallustBackend(i), err
+// FromConfig is the extraction config the [styling] keys describe.
+func FromConfig(c config.ColorExtractorConfig) Config {
+	return Config{
+		Tool:                 ToolFor(c.ThemeProvider),
+		MatugenScheme:        c.MatugenScheme,
+		MatugenContrast:      float64(c.MatugenContrast),
+		MatugenSourceColor:   c.MatugenSourceColor,
+		MatugenLight:         c.MatugenLight,
+		WallustPalette:       c.WallustPalette,
+		WallustSaturation:    uint8(c.WallustSaturation),
+		WallustCheckContrast: c.WallustCheckContrast,
+		WallustBackend:       c.WallustBackend,
+		WallustColorspace:    c.WallustColorspace,
+		WallustApplyGlobally: c.WallustApplyGlobally,
+		PywalSaturation:      float64(c.PywalSaturation),
+		PywalContrast:        float64(c.PywalContrast),
+		PywalLight:           c.PywalLight,
+		PywalApplyGlobally:   c.PywalApplyGlobally,
+	}
 }
-
-// String is the config (and wallust.toml) spelling.
-func (b WallustBackend) String() string { return wallustBackends.name(int(b)) }
-
-// WallustColorspace is wallust's color space for dominant colors.
-type WallustColorspace uint8
-
-// Wallust color spaces; Labmixed is the default.
-const (
-	ColorspaceLab WallustColorspace = iota
-	ColorspaceLabmixed
-	ColorspaceLch
-	ColorspaceLchmixed
-	ColorspaceLchansi
-)
-
-var wallustColorspaces = enumSet{"lab", "labmixed", "lch", "lchmixed", "lchansi"}
-
-// ParseWallustColorspace reads the config spelling.
-func ParseWallustColorspace(s string) (WallustColorspace, error) {
-	i, err := wallustColorspaces.parse("wallust colorspace", s)
-	return WallustColorspace(i), err
-}
-
-// String is the config (and wallust.toml) spelling.
-func (c WallustColorspace) String() string { return wallustColorspaces.name(int(c)) }

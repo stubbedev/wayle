@@ -26,17 +26,17 @@ func TestRecorderLabel(t *testing.T) {
 
 func TestRecorderIconPriority(t *testing.T) {
 	cfg := config.DefaultsRecorder()
-	if got := recorderIconName(cfg, recorder.Change{}); got != cfg.Icons[config.RecorderIdle].Name {
+	if got := recorderIconName(cfg, recorder.Change{}); got != cfg.Icons()[config.RecorderIdle].Name {
 		t.Errorf("idle icon = %q", got)
 	}
-	if got := recorderIconName(cfg, recorder.Change{Active: true}); got != cfg.Icons[config.RecorderRecording].Name {
+	if got := recorderIconName(cfg, recorder.Change{Active: true}); got != cfg.Icons()[config.RecorderRecording].Name {
 		t.Errorf("recording icon = %q", got)
 	}
-	if got := recorderIconName(cfg, recorder.Change{Active: true, Paused: true}); got != cfg.Icons[config.RecorderPaused].Name {
+	if got := recorderIconName(cfg, recorder.Change{Active: true, Paused: true}); got != cfg.Icons()[config.RecorderPaused].Name {
 		t.Errorf("paused icon = %q", got)
 	}
 	// Preparing keeps the recording glyph (the Rust pulse class).
-	if got := recorderIconName(cfg, recorder.Change{Preparing: true}); got != cfg.Icons[config.RecorderRecording].Name {
+	if got := recorderIconName(cfg, recorder.Change{Preparing: true}); got != cfg.Icons()[config.RecorderRecording].Name {
 		t.Errorf("preparing icon = %q", got)
 	}
 }
@@ -51,10 +51,10 @@ func TestLoadFileAppliesRecorder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if c.Recorder.OutputFormat != "mp4" || !c.Recorder.Microphone || c.Recorder.StartDelayMS != 0 {
+	if c.Recorder.OutputFormat != "mp4" || !c.Recorder.Microphone || c.Recorder.StartDelayMs != 0 {
 		t.Errorf("config = %+v", c.Recorder)
 	}
-	if got := c.Recorder.Icons[config.RecorderRecording].Name; got != "tb-circle-dot-symbolic" {
+	if got := c.Recorder.Icons()[config.RecorderRecording].Name; got != "tb-circle-dot-symbolic" {
 		t.Errorf("icon-recording = %q", got)
 	}
 

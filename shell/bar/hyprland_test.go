@@ -210,7 +210,7 @@ func TestHyprWorkspaceIconsDedupeByClass(t *testing.T) {
 		clients[i].Workspace.ID = 1
 	}
 	clients[3].Workspace.ID = 2
-	cfg := config.DefaultsHyprlandWorkspaces().Shared
+	cfg := config.DefaultsHyprlandWorkspaces().View()
 	icons := hyprWorkspaceIcons(1, clients, cfg, map[string]bool{"b": true})
 	if len(icons) != 2 || len(icons[0].windowIDs) != 2 || !icons[0].urgent || icons[1].urgent {
 		t.Fatalf("deduped = %+v", icons)
@@ -356,7 +356,7 @@ func TestHyprlandModuleBuildsTheBarMonitorsRow(t *testing.T) {
 }
 
 func TestHyprlandActiveOnOtherMonitor(t *testing.T) {
-	_, m := newTestHypr(t, func(c *config.Config) { c.HyprlandWorkspaces.Shared.MonitorSpecific = false })
+	_, m := newTestHypr(t, func(c *config.Config) { c.HyprlandWorkspaces.MonitorSpecific = false })
 	var three *cwsButtonModel
 	for i := range m.models {
 		if m.models[i].ws.num == 3 {
@@ -400,8 +400,8 @@ func TestHyprlandUrgencyFromEvents(t *testing.T) {
 
 func TestHyprlandPerIconUrgency(t *testing.T) {
 	_, m := newTestHypr(t, func(c *config.Config) {
-		c.HyprlandWorkspaces.Shared.AppIconsShow = true
-		c.HyprlandWorkspaces.Shared.UrgentMode = config.UrgentApplication
+		c.HyprlandWorkspaces.AppIconsShow = true
+		c.HyprlandWorkspaces.UrgentMode = config.UrgentApplication
 	})
 	m.handle(hyprland.Event{Kind: hyprland.EventUrgent, Address: "bb"})
 	one := m.models[1]
@@ -431,7 +431,7 @@ func TestHyprlandStaleUrgencyPrunedOnClientChange(t *testing.T) {
 
 func TestHyprlandMinCountPlaceholdersAndRelativeRules(t *testing.T) {
 	f, m := newTestHypr(t, func(c *config.Config) {
-		c.HyprlandWorkspaces.MinWorkspace = 4
+		c.HyprlandWorkspaces.MinWorkspaceCount = 4
 		c.HyprlandWorkspaces.Numbering = config.NumberingRelative
 	})
 	// No rules: monitor-specific placeholders need rules.
@@ -526,17 +526,18 @@ label = "ten"
 		t.Fatalf("LoadFile: %v", err)
 	}
 	hw := c.HyprlandWorkspaces
-	if hw.Shared.DisplayMode != config.DisplayModeIcon || hw.Shared.ActiveColor.Hex != "#89b4fa" ||
-		hw.Numbering != config.NumberingRelative || hw.MinWorkspace != 5 || !hw.LabelUseName || hw.ShowSpecial ||
+	shared := hw.View()
+	if shared.DisplayMode != config.DisplayModeIcon || shared.ActiveColor.Hex != "#89b4fa" ||
+		hw.Numbering != config.NumberingRelative || hw.MinWorkspaceCount != 5 || !hw.LabelUseName || hw.ShowSpecial ||
 		hw.HighlightActiveOnOtherMonitor || hw.ActiveOnOtherMonitorColor.Hex != "#123456" ||
-		hw.Shared.UrgentMode != config.UrgentApplication || !hw.Shared.AppIconsShow ||
-		hw.Shared.WorkspaceIgnore[0] != "1?" || hw.Shared.Click.LeftClick.Kind != config.WorkspaceClickFocusLast {
+		shared.UrgentMode != config.UrgentApplication || !shared.AppIconsShow ||
+		shared.WorkspaceIgnore[0] != "1?" || shared.Click.LeftClick.Kind != config.WorkspaceClickFocusLast {
 		t.Fatalf("config = %+v", hw)
 	}
-	if s := hw.Shared.WorkspaceMap["-98"]; !s.ColorSet {
+	if s := shared.WorkspaceMap["-98"]; s.Color == nil {
 		t.Errorf("map[-98] = %+v", s)
 	}
-	if s := hw.Shared.WorkspaceMap["10"]; s.Label != "ten" {
+	if s := shared.WorkspaceMap["10"]; s.Label == nil || *s.Label != "ten" {
 		t.Errorf("map[10] = %+v", s)
 	}
 }

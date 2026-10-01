@@ -175,38 +175,36 @@ func TestResolvePalette(t *testing.T) {
   "colors": {"color1": "#1", "color2": "#2", "color3": "#3", "color4": "#4", "color7": "#7"}}`)
 
 	s := config.DefaultsStyling()
-	ce := config.DefaultsColorExtractor()
-	if got, err := ResolvePalette(fallback, s, ce); err != nil || got != fallback {
+	if got, err := ResolvePalette(fallback, s); err != nil || got != fallback {
 		t.Errorf("wayle provider = %+v, %v; want the fallback, no error", got, err)
 	}
 
-	ce.ThemeProvider = config.ThemeMatugen
-	got, err := ResolvePalette(fallback, s, ce)
+	s.ColorExtractor.ThemeProvider = config.ThemeProviderMatugen
+	got, err := ResolvePalette(fallback, s)
 	if err != nil || got.Primary != "#4090ff" {
 		t.Errorf("matugen dark = %+v, %v", got, err)
 	}
-	ce.Extractor.MatugenLight = true
-	if got, _ := ResolvePalette(fallback, s, ce); got.Primary != "#2060cc" {
+	s.ColorExtractor.MatugenLight = true
+	if got, _ := ResolvePalette(fallback, s); got.Primary != "#2060cc" {
 		t.Errorf("matugen-light = %s, want the light variant", got.Primary)
 	}
 	// A forced appearance overrides the provider's own light flag.
 	s.Appearance = config.AppearanceDark
-	if got, _ := ResolvePalette(fallback, s, ce); got.Primary != "#4090ff" {
+	if got, _ := ResolvePalette(fallback, s); got.Primary != "#4090ff" {
 		t.Errorf("forced dark over matugen-light = %s, want the dark variant", got.Primary)
 	}
 
 	light := config.DefaultsStyling()
 	light.Appearance = config.AppearanceLight
-	pywal := config.DefaultsColorExtractor()
-	pywal.ThemeProvider = config.ThemePywal
-	if got, _ := ResolvePalette(fallback, light, pywal); got.Bg != "#eaeaea" {
+	light.ColorExtractor.ThemeProvider = config.ThemeProviderPywal
+	if got, _ := ResolvePalette(fallback, light); got.Bg != "#eaeaea" {
 		t.Errorf("forced light pywal bg = %s, want the light ramp", got.Bg)
 	}
 
 	// No wallust file: the fallback, with the failure to log.
-	wallust := config.DefaultsColorExtractor()
-	wallust.ThemeProvider = config.ThemeWallust
-	got, err = ResolvePalette(fallback, config.DefaultsStyling(), wallust)
+	wallust := config.DefaultsStyling()
+	wallust.ColorExtractor.ThemeProvider = config.ThemeProviderWallust
+	got, err = ResolvePalette(fallback, wallust)
 	if !errors.Is(err, ErrPaletteNotFound) || got != fallback {
 		t.Errorf("missing wallust = %+v, %v; want the fallback and ErrPaletteNotFound", got, err)
 	}
@@ -216,9 +214,9 @@ func TestResolvePaletteWithoutCacheHome(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", "")
 	t.Setenv("HOME", "")
 	fallback := config.DefaultsStyling().ActivePalette()
-	ce := config.DefaultsColorExtractor()
-	ce.ThemeProvider = config.ThemePywal
-	if got, err := ResolvePalette(fallback, config.DefaultsStyling(), ce); err == nil || got != fallback {
+	s := config.DefaultsStyling()
+	s.ColorExtractor.ThemeProvider = config.ThemeProviderPywal
+	if got, err := ResolvePalette(fallback, s); err == nil || got != fallback {
 		t.Errorf("no cache home = %+v, %v; want the fallback and an error", got, err)
 	}
 }

@@ -21,8 +21,8 @@ func newSeparator(ctx ModuleContext) (Module, error) {
 	if !ok {
 		color = render.Color(0)
 	}
-	length := int(math.Round(cfg.Length.ResolvePx(styling.RemBase, ctx.Config.Bar.Scale)))
-	m := &separatorModule{paint: newSeparatorPaint(length, cfg.Size, color)}
+	length := int(math.Round(cfg.Length.ResolvePx(styling.RemBase, float64(ctx.Config.Bar.Scale))))
+	m := &separatorModule{paint: newSeparatorPaint(length, int(cfg.Size), color)}
 	return m, nil
 }
 

@@ -44,19 +44,19 @@ func TestHyprsunsetToggleFlipsTheFilterAndIcon(t *testing.T) {
 	cfg := sunsetConfig(false)
 	fake := &fakeSunset{clock: sunsetDay}
 	m := newHyprsunsetWith(newTestContext(t, cfg), fake.env(t))
-	if m.enabled || m.icon.Name() != cfg.Hyprsunset.IconOff.Name || m.label.Text() != "Off" {
+	if m.enabled || m.icon.Name() != cfg.Hyprsunset.IconOff || m.label.Text() != "Off" {
 		t.Fatalf("resting = enabled %v icon %q label %q", m.enabled, m.icon.Name(), m.label.Text())
 	}
-	m.RunAction(config.MustClickAction(":toggle"))
+	m.RunAction(config.ParseClickAction(":toggle"))
 	if !fake.running || !m.enabled || m.icon.Name() != "ld-moon-symbolic" || m.label.Text() != "On" {
 		t.Fatalf("after toggle = running %v enabled %v icon %q", fake.running, m.enabled, m.icon.Name())
 	}
-	m.RunAction(config.MustClickAction(":toggle"))
+	m.RunAction(config.ParseClickAction(":toggle"))
 	if fake.running || m.enabled {
 		t.Fatal("the second toggle did not stop the filter")
 	}
 	// Other actions do not toggle.
-	m.RunAction(config.MustClickAction("dropdown:hyprsunset"))
+	m.RunAction(config.ParseClickAction("dropdown:hyprsunset"))
 	if fake.starts != 1 {
 		t.Errorf("starts = %d, want only the one toggle", fake.starts)
 	}
@@ -147,7 +147,7 @@ func TestHyprsunsetStateAndLocation(t *testing.T) {
 		t.Errorf("applyState = %v %d", m.enabled, m.temp)
 	}
 	m.applyState(hyprsunset.State{}, false)
-	if m.enabled || m.temp != cfg.Hyprsunset.Temperature {
+	if m.enabled || m.temp != int(cfg.Hyprsunset.Temperature) {
 		t.Errorf("off = %v %d, want the configured temp", m.enabled, m.temp)
 	}
 	// A GeoClue fix replaces the configured coordinates: at 12:00 UTC

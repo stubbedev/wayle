@@ -38,7 +38,7 @@ type treemanModule struct {
 
 func newTreeman(ctx ModuleContext) (Module, error) {
 	m := &treemanModule{ctx: ctx, src: ctx.Treeman, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	m.icon = moduleIcon(ctx, ctx.Config.Treeman.Icon)
+	m.icon = moduleIcon(ctx, ctx.Config.Treeman.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
@@ -85,14 +85,14 @@ func (m *treemanModule) refresh() error {
 	m.label.SetText(text)
 	m.label.SetColor(treemanColor(cfg, status.WorstBucket(), m.ctx.Style.palette, m.ctx.Style.fg))
 	if setter := m.icon; setter != nil {
-		name := cfg.Icons[config.TreemanBucketStable].Name
+		name := cfg.Icons()[config.TreemanBucketStable].Name
 		switch status.WorstBucket() {
 		case treeman.BucketFailed:
-			name = cfg.Icons[config.TreemanBucketFailed].Name
+			name = cfg.Icons()[config.TreemanBucketFailed].Name
 		case treeman.BucketDown:
-			name = cfg.Icons[config.TreemanBucketDown].Name
+			name = cfg.Icons()[config.TreemanBucketDown].Name
 		case treeman.BucketUp:
-			name = cfg.Icons[config.TreemanBucketUp].Name
+			name = cfg.Icons()[config.TreemanBucketUp].Name
 		}
 		setter.SetThemeName(name)
 	}
@@ -111,11 +111,8 @@ func treemanColor(cfg config.TreemanConfig, bucket treeman.Bucket, palette *styl
 	case treeman.BucketUp:
 		name = config.TreemanBucketUp
 	}
-	color, ok := cfg.Colors[name]
-	if !ok {
-		return fallback
-	}
-	if resolved, ok := styling.ResolveColor(color, palette); ok {
+	_ = name
+	if resolved, ok := styling.ResolveColor(cfg.LabelColor, palette); ok && !cfg.LabelColor.IsAuto() {
 		return resolved
 	}
 	return fallback

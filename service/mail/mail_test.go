@@ -191,9 +191,10 @@ func TestNotifyOffStaysQuiet(t *testing.T) {
 func TestAccountsCountSeparatelyAndFallBackToACountOnlyNotification(t *testing.T) {
 	maildir := t.TempDir()
 	cfg := notifyConfig()
-	cfg.Accounts = []config.MailAccountConfig{
+	house := "house"
+	cfg.Accounts = []config.MailAccount{
 		{Name: "Work", Query: "folder:work", Provider: config.MailProviderGmail},
-		{Name: "Home", Query: "folder:home", Provider: config.MailProviderGeneric, Icon: "house"},
+		{Name: "Home", Query: "folder:home", Provider: config.MailProviderGeneric, Icon: &house},
 	}
 	nm := &fakeNotmuch{dbPath: maildir, counts: map[string]uint32{"folder:work": 2, "folder:home": 1}, newest: map[string][]Message{}}
 	notifier := &fakeNotifier{}

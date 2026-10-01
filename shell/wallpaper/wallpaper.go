@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/imagedecode"
 	"github.com/stubbedev/wayle/service/wallpaper"
+	"github.com/stubbedev/wayle/service/wallpaper/extract"
 )
 
 // frameInterval paces transition steps.
@@ -44,8 +45,8 @@ type Shell struct {
 // the name.
 func Start(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn, trans Transition) (*Shell, func(), error) {
 	svc := wallpaper.New(wallpaper.Options{
-		Extractor:      cfg.ColorExtractor.Extractor,
-		ThemingMonitor: cfg.ColorExtractor.ThemingMonitor,
+		Extractor:      extract.FromConfig(cfg.Styling.ColorExtractor),
+		ThemingMonitor: cfg.Styling.ColorExtractor.ThemingMonitor,
 		SharedCycle:    cfg.Wallpaper.CyclingSameImage,
 	})
 	release, err := wallpaper.Export(conn, svc)

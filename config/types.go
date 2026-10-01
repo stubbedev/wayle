@@ -2,83 +2,94 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 )
 
-// Location is the screen edge a bar docks to.
+// Location is the bar's screen edge.
+//
+// Bar position on screen.
 type Location string
 
 // Bar locations.
 const (
-	LocationTop    Location = "top"
+	// Top edge of the screen.
+	LocationTop Location = "top"
+	// Bottom edge of the screen.
 	LocationBottom Location = "bottom"
-	LocationLeft   Location = "left"
-	LocationRight  Location = "right"
+	// Left edge of the screen.
+	LocationLeft Location = "left"
+	// Right edge of the screen.
+	LocationRight Location = "right"
 )
 
-// IsVertical reports whether the bar docks to a side edge and lays its
-// sections out top to bottom (Location::is_vertical).
-func (l Location) IsVertical() bool { return l == LocationLeft || l == LocationRight }
+var _ = registerEnum(LocationTop, LocationBottom, LocationLeft, LocationRight)
 
-var validLocations = map[Location]bool{
-	LocationTop: true, LocationBottom: true,
-	LocationLeft: true, LocationRight: true,
-}
-
-// Layer is the layer-shell layer a surface is placed on, furthest back
-// to furthest front.
+// Layer is the layer-shell layer a surface is placed on.
+//
+// Layer-shell layer a window is placed on, from furthest back to furthest front.
 type Layer string
 
 // Layers.
 const (
+	// Below everything else, used for wallpapers and ambient surfaces.
 	LayerBackground Layer = "background"
-	LayerBottom     Layer = "bottom"
-	LayerTop        Layer = "top"
-	LayerOverlay    Layer = "overlay"
+	// Behind regular application windows.
+	LayerBottom Layer = "bottom"
+	// Above regular application windows.
+	LayerTop Layer = "top"
+	// Above everything, including fullscreen application windows.
+	LayerOverlay Layer = "overlay"
 )
 
-var validLayers = map[Layer]bool{
-	LayerBackground: true, LayerBottom: true,
-	LayerTop: true, LayerOverlay: true,
-}
+var _ = registerEnum(LayerBackground, LayerBottom, LayerTop, LayerOverlay)
 
-// RoundingLevel is the global corner-rounding preference. The radius
-// each level resolves to lives in styling.RoundingRadiusPx.
+// RoundingLevel is the corner-rounding preference; the radius each
+// level resolves to lives in styling.RoundingRadiusPx.
+//
+// Global rounding preference for UI components.
 type RoundingLevel string
 
 // Rounding levels.
 const (
+	// Sharp corners (no rounding).
 	RoundingNone RoundingLevel = "none"
-	RoundingSm   RoundingLevel = "sm"
-	RoundingMd   RoundingLevel = "md"
-	RoundingLg   RoundingLevel = "lg"
+	// Subtle rounding.
+	RoundingSm RoundingLevel = "sm"
+	// Moderate rounding (default).
+	RoundingMd RoundingLevel = "md"
+	// Pronounced rounding.
+	RoundingLg RoundingLevel = "lg"
+	// Pill shape (fully rounded ends).
 	RoundingFull RoundingLevel = "full"
 )
 
-var validRounding = map[RoundingLevel]bool{
-	RoundingNone: true, RoundingSm: true, RoundingMd: true,
-	RoundingLg: true, RoundingFull: true,
-}
+var _ = registerEnum(RoundingNone, RoundingSm, RoundingMd, RoundingLg, RoundingFull)
 
-// BorderLocation is the placement of a border: one edge, all edges, or
-// none.
+// BorderLocation is the placement of a border: one edge, all edges,
+// or none.
+//
+// Border placement for bar buttons.
 type BorderLocation string
 
 // Border locations.
 const (
-	BorderNone   BorderLocation = "none"
-	BorderTop    BorderLocation = "top"
+	// No border.
+	BorderNone BorderLocation = "none"
+	// Border on top edge only.
+	BorderTop BorderLocation = "top"
+	// Border on bottom edge only.
 	BorderBottom BorderLocation = "bottom"
-	BorderLeft   BorderLocation = "left"
-	BorderRight  BorderLocation = "right"
-	BorderAll    BorderLocation = "all"
+	// Border on left edge only.
+	BorderLeft BorderLocation = "left"
+	// Border on right edge only.
+	BorderRight BorderLocation = "right"
+	// Border on all edges.
+	BorderAll BorderLocation = "all"
 )
 
-var validBorderLocations = map[BorderLocation]bool{
-	BorderNone: true, BorderTop: true, BorderBottom: true,
-	BorderLeft: true, BorderRight: true, BorderAll: true,
-}
+var _ = registerEnum(BorderNone, BorderTop, BorderBottom, BorderLeft, BorderRight, BorderAll)
 
 // SizeUnit distinguishes a scale multiplier from absolute pixels.
 type SizeUnit int
@@ -90,55 +101,124 @@ const (
 	SizePixels
 )
 
+// sizePxMax is the largest absolute size (Size::px clamps to it).
+const sizePxMax = 10_000
+
 // Size is a wayle config size: a bare number is a multiplier, a string
-// like "4px" is absolute pixels.
+// like "4px" is absolute pixels
+// (crates/wayle-config/src/schemas/styling/types/validated/size.rs).
+// Like the Rust type it never fails to load: a negative multiplier
+// clamps to 0, pixels clamp to 0-10000, and an unparseable string
+// warns and falls back to the 1.0 multiplier.
 type Size struct {
-	Value float64
+	Value float32
 	Unit  SizeUnit
 }
+
+// Scale builds a multiplier size, clamped to non-negative.
+func Scale(v float32) Size { return Size{Value: max(v, 0), Unit: SizeMultiplier} }
+
+// Px builds an absolute size, clamped to 0-10000.
+func Px(v float32) Size { return Size{Value: min(max(v, 0), sizePxMax), Unit: SizePixels} }
 
 // ResolvePx converts the size to pixels: multipliers scale with
 // remBase and the surface scale factor, pixel values are taken
 // literally ignoring both. This is the Rust Size::resolve_px.
 func (s Size) ResolvePx(remBase, scale float64) float64 {
 	if s.Unit == SizePixels {
-		return s.Value
+		return float64(s.Value)
 	}
-	return s.Value * remBase * scale
+	return float64(s.Value) * remBase * scale
 }
 
 // IsZero reports whether the size carries no value.
 func (s Size) IsZero() bool { return s.Value == 0 }
 
-func (s *Size) unmarshal(value any, key string) error {
-	// TOML integers are numbers too (serde's f32 accepts them).
-	if i, ok := value.(int64); ok {
-		value = float64(i)
+// String is the config form: "1.5" or "24px".
+func (s Size) String() string {
+	v := strconv.FormatFloat(float64(s.Value), 'f', -1, 32)
+	if s.Unit == SizePixels {
+		return v + "px"
 	}
-	switch v := value.(type) {
+	return v
+}
+
+// ParseSize is Size::parse: "Npx" is pixels, a bare number a
+// multiplier; anything else is not a size.
+func ParseSize(raw string) (Size, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if px, ok := strings.CutSuffix(trimmed, "px"); ok {
+		v, err := strconv.ParseFloat(strings.TrimSpace(px), 32)
+		if err != nil {
+			return Size{}, false
+		}
+		return Px(float32(v)), true
+	}
+	v, err := strconv.ParseFloat(trimmed, 32)
+	if err != nil {
+		return Size{}, false
+	}
+	return Scale(float32(v)), true
+}
+
+// UnmarshalConfig implements Unmarshaler.
+func (s *Size) UnmarshalConfig(v any) error {
+	switch t := v.(type) {
 	case float64:
-		if v < 0 {
-			return fmt.Errorf("config: bar %s: negative size %v", key, v)
-		}
-		s.Value, s.Unit = v, SizeMultiplier
-		return nil
+		*s = Scale(float32(t))
+	case int64:
+		*s = Scale(float32(t))
 	case string:
-		// A bare number string is a scale, as Size::parse reads it.
-		if scale, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil && scale >= 0 {
-			s.Value, s.Unit = scale, SizeMultiplier
-			return nil
+		parsed, ok := ParseSize(t)
+		if !ok {
+			log.Printf("config: invalid size %q, falling back to scale 1.0", t)
+			parsed = Scale(1)
 		}
-		v = strings.TrimSpace(v)
-		if !strings.HasSuffix(v, "px") {
-			return fmt.Errorf("config: bar %s: invalid size %q (want a number or \"Npx\")", key, v)
-		}
-		px, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimSuffix(v, "px")), 64)
-		if err != nil || px < 0 {
-			return fmt.Errorf("config: bar %s: invalid size %q (want a number or \"Npx\")", key, v)
-		}
-		s.Value, s.Unit = px, SizePixels
-		return nil
+		*s = parsed
 	default:
-		return fmt.Errorf("config: bar %s: invalid size %v (want a number or \"Npx\")", key, value)
+		return errUntagged("RawSize")
+	}
+	return nil
+}
+
+// MarshalConfig implements Marshaler: a multiplier is a number, pixels
+// a string.
+func (s Size) MarshalConfig() any {
+	if s.Unit == SizePixels {
+		return s.String()
+	}
+	return s.Value
+}
+
+func (Size) configSchema(*schemaGen) Schema {
+	return Schema{
+		"description": "Size as a scale multiplier (number) or absolute pixels (e.g. \"24px\")",
+		"anyOf": []any{
+			Schema{"type": "number", "minimum": 0.0},
+			Schema{"type": "string", "pattern": `^[0-9]+(\.[0-9]+)?px$`},
+		},
 	}
 }
+
+// errUntagged is serde's failure for an untagged enum no variant took.
+func errUntagged(name string) error {
+	return fmt.Errorf("data did not match any variant of untagged enum %s", name)
+}
+
+// TimeFormat is ported from crates/wayle-config/src/schemas/modules/types.rs.
+//
+// Time display format.
+type TimeFormat string
+
+// TimeFormat values.
+const (
+	// 12-hour format with AM/PM (e.g., "6:30 AM").
+	TimeFormat12h TimeFormat = "12h"
+	// 24-hour format (e.g., "06:30").
+	TimeFormat24h TimeFormat = "24h"
+)
+
+var _ = registerEnum(TimeFormat12h, TimeFormat24h)
+
+// IsVertical reports whether a bar at the location runs top to bottom.
+func (l Location) IsVertical() bool { return l == LocationLeft || l == LocationRight }

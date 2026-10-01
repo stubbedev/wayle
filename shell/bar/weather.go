@@ -210,7 +210,7 @@ func (m *worldClockModule) apply(format string) {
 }
 
 func (m *worldClockModule) Root() widget.Widget {
-	return assembleModule(m.ctx, moduleIcon(m.ctx, m.ctx.Config.WorldClock.Icon), m.label)
+	return assembleModule(m.ctx, moduleIcon(m.ctx, m.ctx.Config.WorldClock.Icon()), m.label)
 }
 
 // Stop ends the render ticker.
@@ -233,7 +233,7 @@ func newWeather(ctx ModuleContext) (Module, error) {
 	m.cancel = cancel
 	m.refresh(runCtx)
 	go func() {
-		ticker := time.NewTicker(time.Duration(ctx.Config.Weather.RefreshS) * time.Second)
+		ticker := time.NewTicker(time.Duration(int(ctx.Config.Weather.RefreshIntervalSeconds)) * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
@@ -264,14 +264,14 @@ func (m *weatherModule) refresh(ctx context.Context) {
 	m.ctx.Invoke(func() {
 		text := ""
 		if cfg.LabelShow {
-			text = weatherFormatLabel(cfg.Format, current, cfg.Units == config.WeatherImperial)
+			text = weatherFormatLabel(cfg.Format, current, cfg.Units == config.TemperatureUnitImperial)
 		}
 		m.label.SetText(text)
 	})
 }
 
 func (m *weatherModule) Root() widget.Widget {
-	return assembleModule(m.ctx, moduleIcon(m.ctx, m.ctx.Config.Weather.Icon), m.label)
+	return assembleModule(m.ctx, moduleIcon(m.ctx, m.ctx.Config.Weather.Icon()), m.label)
 }
 
 // Stop ends the refresh loop.

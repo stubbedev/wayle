@@ -1,93 +1,78 @@
 package config
 
-import (
-	"errors"
-
-	"github.com/BurntSushi/toml"
-)
-
-// PowerConfig is the power module configuration: an icon button whose
-// :menu opens the session command list, whose bindings run them.
+// PowerConfig is ported from crates/wayle-config/src/schemas/modules/power/mod.rs.
+//
+// Shutdown, reboot, and logout menu.
 type PowerConfig struct {
-	Click ClickConfig
-	// Button carries the four bar-button keys the power schema declares
-	// (border-show, border-color, icon-color, icon-bg-color); the rest
-	// are fixed. Icon.Show/Color mirror it.
-	Button  ButtonConfig
-	Icon    IconConfig
-	Lock    string
-	Logout  string
-	Reboot  string
-	Shutoff string
-	Suspend string
+	// Icon name to display.
+	IconName string `cfg:"icon-name"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
+	// Action on left click. Default opens wayle's native power menu (`:menu`).
+	LeftClick ClickAction `cfg:"left-click"`
+	// Command run by the power menu's Lock button.
+	LockCommand string `cfg:"lock-command"`
+	// Command run by the power menu's Log out button.
+	LogoutCommand string `cfg:"logout-command"`
+	// Command run by the power menu's Suspend button.
+	SuspendCommand string `cfg:"suspend-command"`
+	// Command run by the power menu's Reboot button.
+	RebootCommand string `cfg:"reboot-command"`
+	// Command run by the power menu's Shut down button.
+	ShutdownCommand string `cfg:"shutdown-command"`
+	// Show the Lock button in the power menu.
+	ShowLock bool `cfg:"show-lock"`
+	// Show the Log out button in the power menu.
+	ShowLogout bool `cfg:"show-logout"`
+	// Show the Suspend button in the power menu.
+	ShowSuspend bool `cfg:"show-suspend"`
+	// Show the Reboot button in the power menu.
+	ShowReboot bool `cfg:"show-reboot"`
+	// Show the Shut down button in the power menu.
+	ShowShutdown bool `cfg:"show-shutdown"`
 }
 
 // DefaultsPower returns the schema defaults.
 func DefaultsPower() PowerConfig {
 	return PowerConfig{
-		Click:   DefaultsClick(map[string]string{"left-click": ":menu"}),
-		Button:  powerButton(),
-		Icon:    DefaultsIcon(true, "ld-power-symbolic"),
-		Lock:    "loginctl lock-session",
-		Logout:  "loginctl terminate-session $XDG_SESSION_ID",
-		Reboot:  "systemctl reboot",
-		Shutoff: "systemctl poweroff",
-		Suspend: "systemctl suspend",
+		IconName:        "ld-power-symbolic",
+		BorderShow:      false,
+		BorderColor:     mustColor("red"),
+		IconColor:       mustColor("auto"),
+		IconBgColor:     mustColor("red"),
+		RightClick:      ClickAction{},
+		MiddleClick:     ClickAction{},
+		ScrollUp:        ClickAction{},
+		ScrollDown:      ClickAction{},
+		LeftClick:       ParseClickAction(":menu"),
+		LockCommand:     "loginctl lock-session",
+		LogoutCommand:   "loginctl terminate-session $XDG_SESSION_ID",
+		SuspendCommand:  "systemctl suspend",
+		RebootCommand:   "systemctl reboot",
+		ShutdownCommand: "systemctl poweroff",
+		ShowLock:        true,
+		ShowLogout:      true,
+		ShowSuspend:     true,
+		ShowReboot:      true,
+		ShowShutdown:    true,
 	}
 }
 
-// powerButton is the power module's button: the label color, button
-// background, and show flags are fixed in the Rust module (an icon-only
-// button), so only border and icon colors are configurable.
-func powerButton() ButtonConfig {
-	return DefaultsButton(buttonColors("auto", "fg-default", "red", "bg-surface-elevated", "red"), TokenRed, false, 0)
-}
-
-// applyPower overlays [modules.power].
-func applyPower(md toml.MetaData, prim toml.Primitive) (PowerConfig, error) {
-	cfg := DefaultsPower()
-	var doc struct {
-		IconName *string `toml:"icon-name"`
-		Lock     *string `toml:"lock-command"`
-		Logout   *string `toml:"logout-command"`
-		Reboot   *string `toml:"reboot-command"`
-		Shutoff  *string `toml:"shutdown-command"`
-		Suspend  *string `toml:"suspend-command"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.IconName != nil {
-		cfg.Icon.Name = *doc.IconName
-	}
-	if doc.Lock != nil {
-		cfg.Lock = *doc.Lock
-	}
-	if doc.Logout != nil {
-		cfg.Logout = *doc.Logout
-	}
-	if doc.Reboot != nil {
-		cfg.Reboot = *doc.Reboot
-	}
-	if doc.Shutoff != nil {
-		cfg.Shutoff = *doc.Shutoff
-	}
-	if doc.Suspend != nil {
-		cfg.Suspend = *doc.Suspend
-	}
-	if cfg.Lock == "" && cfg.Logout == "" && cfg.Reboot == "" && cfg.Shutoff == "" && cfg.Suspend == "" {
-		return cfg, errors.New("power: every command is empty")
-	}
-	button, err := applyButton(md, prim, cfg.Button, KeyBorderShow|KeyBorderColor|KeyIconColor|KeyIconBgColor)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Button = button
-	button.mirrorIcon(&cfg.Icon)
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c PowerConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }

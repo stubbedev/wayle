@@ -1,173 +1,156 @@
 package config
 
-import (
-	"fmt"
+// CavaConfig is ported from crates/wayle-config/src/schemas/modules/cava/mod.rs.
+//
+// Audio frequency bars visualising the output stream.
+type CavaConfig struct {
+	// Number of frequency bars.
+	Bars BarCount `cfg:"bars"`
+	// Visualization update rate in frames per second.
+	Framerate Framerate `cfg:"framerate"`
+	// Stereo channel visualization (splits bars between left and right).
+	Stereo bool `cfg:"stereo"`
+	// Noise reduction filter strength.
+	NoiseReduction NormalizedF64 `cfg:"noise-reduction"`
+	// Monstercat-style smoothing across adjacent bars (0.0 = off).
+	Monstercat float64 `cfg:"monstercat"`
+	// Wave-style smoothing (0 = off).
+	Waves uint32 `cfg:"waves"`
+	// Low frequency cutoff in Hz.
+	LowCutoff FrequencyHz `cfg:"low-cutoff"`
+	// High frequency cutoff in Hz.
+	HighCutoff FrequencyHz `cfg:"high-cutoff"`
+	// Audio capture backend.
+	Input CavaInput `cfg:"input"`
+	// Audio source identifier ("auto" for automatic selection).
+	Source string `cfg:"source"`
+	// Visualization rendering style.
+	Style CavaStyle `cfg:"style"`
+	// Bar growth direction.
+	Direction CavaDirection `cfg:"direction"`
+	// Bar color.
+	Color ColorValue `cfg:"color"`
+	// Module background color.
+	ButtonBgColor ColorValue `cfg:"button-bg-color"`
+	// Width of each frequency bar in pixels.
+	BarWidth uint32 `cfg:"bar-width"`
+	// Gap between frequency bars in pixels.
+	BarGap uint32 `cfg:"bar-gap"`
+	// Padding at the ends of the visualizer. Accepts a scale multiplier or
+	// pixels (e.g. `"8px"`).
+	InternalPadding Size `cfg:"internal-padding"`
+	// Display border around the visualizer.
+	BorderShow bool `cfg:"border-show"`
+	// Border color.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Action on left click.
+	LeftClick ClickAction `cfg:"left-click"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
+}
 
-	"github.com/BurntSushi/toml"
-)
+// DefaultsCava returns the schema defaults.
+func DefaultsCava() CavaConfig {
+	return CavaConfig{
+		Bars:            20,
+		Framerate:       60,
+		Stereo:          false,
+		NoiseReduction:  0.65,
+		Monstercat:      0,
+		Waves:           0,
+		LowCutoff:       50,
+		HighCutoff:      17000,
+		Input:           CavaInputPipeWire,
+		Source:          "auto",
+		Style:           CavaStyleBars,
+		Direction:       CavaDirectionNormal,
+		Color:           mustColor("accent"),
+		ButtonBgColor:   mustColor("bg-surface-elevated"),
+		BarWidth:        6,
+		BarGap:          1,
+		InternalPadding: Size{Value: 0.5, Unit: SizeMultiplier},
+		BorderShow:      false,
+		BorderColor:     mustColor("border-accent"),
+		LeftClick:       ClickAction{},
+		RightClick:      ClickAction{},
+		MiddleClick:     ClickAction{},
+		ScrollUp:        ClickAction{},
+		ScrollDown:      ClickAction{},
+	}
+}
 
-// CavaStyle selects the visualizer rendering.
+// Clicks returns the five input bindings.
+func (c CavaConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
+}
+
+// CavaStyle is ported from crates/wayle-config/src/schemas/modules/cava/types.rs.
+//
+// Visualization rendering style.
 type CavaStyle string
 
-// Visualizer styles. Wave is not ported to the Go shell yet.
+// CavaStyle values.
 const (
-	CavaStyleBars  CavaStyle = "bars"
-	CavaStyleWave  CavaStyle = "wave"
+	// Rectangular frequency bars.
+	CavaStyleBars CavaStyle = "bars"
+	// Smooth curve connecting bar peaks.
+	CavaStyleWave CavaStyle = "wave"
+	// Bars with floating peak indicators that decay over time.
 	CavaStylePeaks CavaStyle = "peaks"
 )
 
-var validCavaStyles = map[CavaStyle]bool{
-	CavaStyleBars: true, CavaStyleWave: true, CavaStylePeaks: true,
-}
+var _ = registerEnum(CavaStyleBars, CavaStyleWave, CavaStylePeaks)
 
-// CavaDirection selects bar growth.
+// CavaDirection is ported from crates/wayle-config/src/schemas/modules/cava/types.rs.
+//
+// Bar growth direction relative to the bar's attached screen edge.
 type CavaDirection string
 
-// Growth directions.
+// CavaDirection values.
 const (
-	CavaNormal  CavaDirection = "normal"
-	CavaReverse CavaDirection = "reverse"
-	CavaMirror  CavaDirection = "mirror"
+	// Bars grow away from the attached edge.
+	CavaDirectionNormal CavaDirection = "normal"
+	// Bars grow toward the attached edge.
+	CavaDirectionReverse CavaDirection = "reverse"
+	// Bars grow symmetrically from center.
+	CavaDirectionMirror CavaDirection = "mirror"
 )
 
-var validCavaDirections = map[CavaDirection]bool{
-	CavaNormal: true, CavaReverse: true, CavaMirror: true,
-}
+var _ = registerEnum(CavaDirectionNormal, CavaDirectionReverse, CavaDirectionMirror)
 
-// CavaConfig is the cava module configuration.
-type CavaConfig struct {
-	Click ClickConfig
-	// Container is the bar_container key set: border-show,
-	// border-color, and button-bg-color.
-	Container      ContainerConfig
-	Bars           int
-	BarWidth       int
-	BarGap         int
-	Color          ColorValue
-	Direction      CavaDirection
-	Style          CavaStyle
-	Framerate      int
-	LowCutoff      int
-	HighCutoff     int
-	NoiseReduction float64
-	Monstercat     float64
-	InternalPad    Size
-	Source         string
-}
+// CavaInput is ported from crates/wayle-config/src/schemas/modules/cava/types.rs.
+//
+// Audio capture backend.
+type CavaInput string
 
-// DefaultsCava returns the schema defaults for the cava module.
-func DefaultsCava() CavaConfig {
-	return CavaConfig{
-		Click:          DefaultsClick(nil),
-		Container:      DefaultsContainer("bg-surface-elevated", "border-accent"),
-		Bars:           20,
-		BarWidth:       6,
-		BarGap:         1,
-		Color:          mustColor("accent"),
-		Direction:      CavaNormal,
-		Style:          CavaStyleBars,
-		Framerate:      60,
-		LowCutoff:      50,
-		HighCutoff:     17000,
-		NoiseReduction: 0.65,
-		Monstercat:     0.0,
-		InternalPad:    Size{Value: 0.5, Unit: SizeMultiplier},
-		Source:         "auto",
-	}
-}
+// CavaInput values.
+const (
+	// PipeWire multimedia server.
+	CavaInputPipeWire CavaInput = "pipe-wire"
+	// PulseAudio sound server.
+	CavaInputPulse CavaInput = "pulse"
+	// Advanced Linux Sound Architecture.
+	CavaInputAlsa CavaInput = "alsa"
+	// JACK Audio Connection Kit.
+	CavaInputJack CavaInput = "jack"
+	// Named pipe (FIFO) input.
+	CavaInputFifo CavaInput = "fifo"
+	// PortAudio cross-platform library.
+	CavaInputPortAudio CavaInput = "port-audio"
+	// sndio audio subsystem (BSD).
+	CavaInputSndio CavaInput = "sndio"
+	// Open Sound System (legacy).
+	CavaInputOss CavaInput = "oss"
+	// Shared memory input.
+	CavaInputShmem CavaInput = "shmem"
+	// Windows audio capture (WASAPI).
+	CavaInputWinscap CavaInput = "winscap"
+)
 
-// applyCava overlays the [modules.cava] table onto the defaults.
-func applyCava(md toml.MetaData, prim toml.Primitive) (CavaConfig, error) {
-	cfg := DefaultsCava()
-	var doc struct {
-		Bars           *int      `toml:"bars"`
-		BarWidth       *int      `toml:"bar-width"`
-		BarGap         *int      `toml:"bar-gap"`
-		Color          string    `toml:"color"`
-		Direction      string    `toml:"direction"`
-		Style          string    `toml:"style"`
-		Framerate      *int      `toml:"framerate"`
-		LowCutoff      *int      `toml:"low-cutoff"`
-		HighCutoff     *int      `toml:"high-cutoff"`
-		NoiseReduction *float64  `toml:"noise-reduction"`
-		Monstercat     *float64  `toml:"monstercat"`
-		InternalPad    tomlValue `toml:"internal-padding"`
-		Source         *string   `toml:"source"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.Bars != nil {
-		cfg.Bars = *doc.Bars
-	}
-	if doc.BarWidth != nil {
-		cfg.BarWidth = *doc.BarWidth
-	}
-	if doc.BarGap != nil {
-		cfg.BarGap = *doc.BarGap
-	}
-	if doc.Color != "" {
-		cv, err := ParseColorValue(doc.Color)
-		if err != nil {
-			return cfg, fmt.Errorf("cava: color: %w", err)
-		}
-		cfg.Color = cv
-	}
-	if doc.Direction != "" {
-		cfg.Direction = CavaDirection(doc.Direction)
-	}
-	if doc.Style != "" {
-		cfg.Style = CavaStyle(doc.Style)
-	}
-	if doc.Framerate != nil {
-		cfg.Framerate = *doc.Framerate
-	}
-	if doc.LowCutoff != nil {
-		cfg.LowCutoff = *doc.LowCutoff
-	}
-	if doc.HighCutoff != nil {
-		cfg.HighCutoff = *doc.HighCutoff
-	}
-	if doc.NoiseReduction != nil {
-		cfg.NoiseReduction = *doc.NoiseReduction
-	}
-	if doc.Monstercat != nil {
-		cfg.Monstercat = *doc.Monstercat
-	}
-	if doc.InternalPad.value != nil {
-		if err := cfg.InternalPad.unmarshal(doc.InternalPad.value, "internal-padding"); err != nil {
-			return cfg, err
-		}
-	}
-	if doc.Source != nil {
-		cfg.Source = *doc.Source
-	}
-
-	switch {
-	case cfg.Bars < 1 || cfg.Bars > 256:
-		return cfg, fmt.Errorf("cava: bars %d outside 1-256", cfg.Bars)
-	case cfg.BarWidth < 1 || cfg.BarGap < 0:
-		return cfg, fmt.Errorf("cava: bar-width %d / bar-gap %d must be positive / non-negative", cfg.BarWidth, cfg.BarGap)
-	case cfg.Framerate < 1 || cfg.Framerate > 360:
-		return cfg, fmt.Errorf("cava: framerate %d outside 1-360", cfg.Framerate)
-	case cfg.NoiseReduction < 0 || cfg.NoiseReduction > 1:
-		return cfg, fmt.Errorf("cava: noise-reduction %v outside 0-1", cfg.NoiseReduction)
-	case cfg.Monstercat < 0:
-		return cfg, fmt.Errorf("cava: monstercat %v must not be negative", cfg.Monstercat)
-	case !validCavaStyles[cfg.Style]:
-		return cfg, fmt.Errorf("cava: invalid style %q (want bars|wave|peaks)", cfg.Style)
-	case !validCavaDirections[cfg.Direction]:
-		return cfg, fmt.Errorf("cava: invalid direction %q (want normal|reverse|mirror)", cfg.Direction)
-	}
-	container, err := applyContainer(md, prim, cfg.Container)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Container = container
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
-}
+var _ = registerEnum(CavaInputPipeWire, CavaInputPulse, CavaInputAlsa, CavaInputJack, CavaInputFifo, CavaInputPortAudio, CavaInputSndio, CavaInputOss, CavaInputShmem, CavaInputWinscap)

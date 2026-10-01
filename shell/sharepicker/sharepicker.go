@@ -279,7 +279,7 @@ func (p *Picker) windowsPage(toplevels []sharepreview.Toplevel) widget.Widget {
 		return p.placeholder("No windows available")
 	}
 	spacing := int(p.cfg.WindowsSpacing.ResolvePx(config.SharePickerWindowsSpacingBaseRem*styling.RemBase, 1))
-	cols := gridColumns(len(toplevels), p.cfg.WindowsMinPerRow, p.cfg.WindowsMaxPerRow)
+	cols := gridColumns(len(toplevels), int(p.cfg.WindowsMinPerRow), int(p.cfg.WindowsMaxPerRow))
 	page := widget.NewBox(widget.Column, spacing, 0)
 	page.AddClass("share-picker-page")
 	var row *widget.Box
@@ -316,7 +316,7 @@ func (p *Picker) windowCard(tl sharepreview.Toplevel) widget.Widget {
 	card.SetTooltip(tl.Title + "\n" + tl.Class)
 	payload := windowPayload(tl)
 	card.OnClick = func() { p.selectPayload(payload) }
-	p.loadPreview(preview, body, func() (*image.RGBA, error) { return windowThumb(tl, p.cfg.ResizeSize) })
+	p.loadPreview(preview, body, func() (*image.RGBA, error) { return windowThumb(tl, int(p.cfg.ResizeSize)) })
 	return card
 }
 
@@ -405,7 +405,7 @@ func (p *Picker) outputCard(o outputInfo) widget.Widget {
 	card.AddClass("share-picker-card-button")
 	payload := "screen:" + o.name
 	card.OnClick = func() { p.selectPayload(payload) }
-	p.loadPreview(preview, body, func() (*image.RGBA, error) { return outputThumb(o.name, p.cfg.ResizeSize) })
+	p.loadPreview(preview, body, func() (*image.RGBA, error) { return outputThumb(o.name, int(p.cfg.ResizeSize)) })
 	return card
 }
 

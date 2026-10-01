@@ -145,12 +145,16 @@ func (s *Service) Wallpaper(monitor string) (string, bool) {
 	return st.Wallpaper, ok && st.Wallpaper != ""
 }
 
-// FitModeOf is a monitor's fit mode; false when it is unknown.
+// FitModeOf is a monitor's fit mode; Fill and false when it is
+// unknown.
 func (s *Service) FitModeOf(monitor string) (FitMode, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	st, ok := s.monitors[monitor]
-	return st.FitMode, ok
+	if !ok {
+		return FitFill, false
+	}
+	return st.FitMode, true
 }
 
 // CyclingConfig snapshots the active cycling config; nil when stopped.
@@ -408,7 +412,7 @@ func (s *Service) RegisterMonitor(monitor string) {
 		if _, ok := m[monitor]; ok {
 			return
 		}
-		st := MonitorState{CycleIndex: s.startingIndexLocked(m)}
+		st := MonitorState{FitMode: FitFill, CycleIndex: s.startingIndexLocked(m)}
 		if s.cycling != nil {
 			st.Wallpaper, _ = s.cycling.ImageAt(st.CycleIndex)
 		}

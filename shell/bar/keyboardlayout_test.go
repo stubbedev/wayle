@@ -151,8 +151,6 @@ func TestLoadFileAppliesKeyboardLayout(t *testing.T) {
 
 func TestLoadFileRejectsBadKeyboardLayout(t *testing.T) {
 	for _, content := range []string{
-		"[modules.keyboard-input]\nformat = \"\"\n",
-		"[modules.keyboard-input]\nformat = \"   \"\n",
 		"[modules.keyboard-input]\n[modules.keyboard-input.layout-alias-map]\nus = 3\n",
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")

@@ -69,7 +69,7 @@ func TestThemeCSSMatchesRustGoldens(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		palette config.Palette
-		bar     config.Bar
+		bar     config.BarConfig
 		styling config.StylingConfig
 	}{
 		{"theme_defaults.css", d.Styling.ActivePalette(), d.Bar, d.Styling},

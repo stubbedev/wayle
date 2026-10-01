@@ -61,7 +61,7 @@ func newBluetooth(ctx ModuleContext) (Module, error) {
 	}
 	m := &bluetoothModule{ctx: ctx, source: ctx.Bluetooth}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.icon = moduleIcon(ctx, ctx.Config.Bluetooth.Icon)
+	m.icon = moduleIcon(ctx, ctx.Config.Bluetooth.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	m.refresh()
 	startBtPairingNotifier(ctx.Bluetooth)

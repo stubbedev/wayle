@@ -45,7 +45,7 @@ func newVolume(ctx ModuleContext) (Module, error) {
 	}
 	m := &volumeModule{ctx: ctx, source: ctx.Pulse}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.icon = moduleIcon(ctx, ctx.Config.Volume.Icon)
+	m.icon = moduleIcon(ctx, ctx.Config.Volume.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err

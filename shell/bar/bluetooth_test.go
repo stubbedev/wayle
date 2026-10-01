@@ -78,7 +78,7 @@ func TestBluetoothStateIcon(t *testing.T) {
 	source := newFakeBluetooth(btState("Headset"))
 	m := &bluetoothModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
 	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
-	m.icon = moduleIcon(m.ctx, cfg.Bluetooth.Icon)
+	m.icon = moduleIcon(m.ctx, cfg.Bluetooth.Icon())
 	if m.icon == nil {
 		t.Fatal("the bluetooth icon defaults on")
 	}
@@ -115,7 +115,7 @@ func TestMicrophoneStateIcon(t *testing.T) {
 	source := &fakePulseSource{dev: pulse.Device{Volume: pct(40)}}
 	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
 	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
-	m.icon = moduleIcon(m.ctx, cfg.Microphone.Icon)
+	m.icon = moduleIcon(m.ctx, cfg.Microphone.Icon())
 	if m.icon == nil {
 		t.Fatal("the microphone icon defaults on")
 	}
@@ -124,7 +124,7 @@ func TestMicrophoneStateIcon(t *testing.T) {
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := icon.Name(); got != cfg.Microphone.Icon.Name {
+	if got := icon.Name(); got != cfg.Microphone.Icon().Name {
 		t.Errorf("active icon = %q", got)
 	}
 	source.dev.Muted = true

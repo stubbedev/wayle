@@ -1,86 +1,72 @@
 package config
 
-import (
-	"github.com/BurntSushi/toml"
-)
-
-// Schema icon defaults (BluetoothConfig's state icon keys).
-const (
-	defaultBtConnectedIcon    = "ld-bluetooth-connected-symbolic"
-	defaultBtDisabledIcon     = "ld-bluetooth-off-symbolic"
-	defaultBtDisconnectedIcon = "ld-bluetooth-symbolic"
-	defaultBtSearchingIcon    = "ld-bluetooth-searching-symbolic"
-)
-
-// BluetoothConfig is the bluetooth module config.
+// BluetoothConfig is ported from crates/wayle-config/src/schemas/modules/bluetooth/mod.rs.
+//
+// Bluetooth connection status with a dropdown for pairing and managing devices.
 type BluetoothConfig struct {
-	Click ClickConfig
-	// Button is the bar-button key set; LabelShow and Icon.Show/Color
-	// mirror its label-show, icon-show, and icon-color.
-	Button    ButtonConfig
-	LabelShow bool
-	Icon      IconConfig
-	// State icons: absent or powered-off, searching, and the plain
-	// paired states.
-	ConnectedIcon    string
-	DisabledIcon     string
-	DisconnectedIcon string
-	SearchingIcon    string
+	// Icon when Bluetooth is disabled or unavailable.
+	DisabledIcon string `cfg:"disabled-icon"`
+	// Icon when Bluetooth is on but no devices connected.
+	DisconnectedIcon string `cfg:"disconnected-icon"`
+	// Icon when devices are connected.
+	ConnectedIcon string `cfg:"connected-icon"`
+	// Icon when scanning for devices.
+	SearchingIcon string `cfg:"searching-icon"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Display module icon.
+	IconShow bool `cfg:"icon-show"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Display connection label (device name or count).
+	LabelShow bool `cfg:"label-show"`
+	// Label text color token.
+	LabelColor ColorValue `cfg:"label-color"`
+	// Max label characters before truncation with ellipsis. Set to 0 to disable.
+	LabelMaxLength uint32 `cfg:"label-max-length"`
+	// Button background color token.
+	ButtonBgColor ColorValue `cfg:"button-bg-color"`
+	// Action on left click.
+	LeftClick ClickAction `cfg:"left-click"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
 }
 
 // DefaultsBluetooth returns the schema defaults.
 func DefaultsBluetooth() BluetoothConfig {
 	return BluetoothConfig{
-		Button:           DefaultsButton(buttonColors("auto", "blue", "blue", "bg-surface-elevated", "blue"), TokenBlue, true, 15),
+		DisabledIcon:     "ld-bluetooth-off-symbolic",
+		DisconnectedIcon: "ld-bluetooth-symbolic",
+		ConnectedIcon:    "ld-bluetooth-connected-symbolic",
+		SearchingIcon:    "ld-bluetooth-searching-symbolic",
+		BorderShow:       false,
+		BorderColor:      mustColor("blue"),
+		IconShow:         true,
+		IconColor:        mustColor("auto"),
+		IconBgColor:      mustColor("blue"),
 		LabelShow:        true,
-		Icon:             DefaultsIcon(true, defaultBtDisconnectedIcon),
-		ConnectedIcon:    defaultBtConnectedIcon,
-		DisabledIcon:     defaultBtDisabledIcon,
-		DisconnectedIcon: defaultBtDisconnectedIcon,
-		SearchingIcon:    defaultBtSearchingIcon,
+		LabelColor:       mustColor("blue"),
+		LabelMaxLength:   15,
+		ButtonBgColor:    mustColor("bg-surface-elevated"),
+		LeftClick:        ParseClickAction("dropdown:bluetooth"),
+		RightClick:       ClickAction{},
+		MiddleClick:      ClickAction{},
+		ScrollUp:         ClickAction{},
+		ScrollDown:       ClickAction{},
 	}
 }
 
-// applyBluetooth overlays [modules.bluetooth].
-func applyBluetooth(md toml.MetaData, prim toml.Primitive) (BluetoothConfig, error) {
-	cfg := DefaultsBluetooth()
-	var doc struct {
-		IconName         *string `toml:"icon-name"`
-		ConnectedIcon    *string `toml:"connected-icon"`
-		DisabledIcon     *string `toml:"disabled-icon"`
-		DisconnectedIcon *string `toml:"disconnected-icon"`
-		SearchingIcon    *string `toml:"searching-icon"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.IconName != nil {
-		cfg.Icon.Name = *doc.IconName
-	}
-	for _, set := range []struct {
-		raw  *string
-		icon *string
-	}{
-		{doc.ConnectedIcon, &cfg.ConnectedIcon},
-		{doc.DisabledIcon, &cfg.DisabledIcon},
-		{doc.DisconnectedIcon, &cfg.DisconnectedIcon},
-		{doc.SearchingIcon, &cfg.SearchingIcon},
-	} {
-		if set.raw != nil {
-			*set.icon = *set.raw
-		}
-	}
-	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Button = button
-	button.mirrorLabel(&cfg.LabelShow, nil)
-	button.mirrorIcon(&cfg.Icon)
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c BluetoothConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }

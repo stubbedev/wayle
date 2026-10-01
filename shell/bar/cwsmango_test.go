@@ -99,7 +99,7 @@ func TestMangoHideEmptyAndMinTagCount(t *testing.T) {
 	} {
 		fakeMangoSocket(t, monitors, "[]")
 		cfg := config.Defaults()
-		cfg.MangoWorkspaces.HideEmpty, cfg.MangoWorkspaces.MinTagCount = tc.hide, tc.min
+		cfg.MangoWorkspaces.HideEmpty, cfg.MangoWorkspaces.MinTagCount = tc.hide, uint8(tc.min)
 		m := newTestMango(t, cfg, "DP-1")
 		if got := tagIndices(m); !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("hide=%v min=%d: tags %v, want %v", tc.hide, tc.min, got, tc.want)
@@ -129,9 +129,9 @@ func TestMangoTagButtonsAndClients(t *testing.T) {
 		`{"id":2,"title":"c","appid":"kitty","monitor":"DP-1","tags":[1],"is_urgent":false,"is_focused":false}]`
 	fakeMangoSocket(t, monitors, clients)
 	cfg := config.Defaults()
-	cfg.MangoWorkspaces.Shared.AppIconsShow = true
-	cfg.MangoWorkspaces.Shared.AppIconsDedupe = false
-	cfg.MangoWorkspaces.Shared.WorkspaceMap = map[string]config.NamedWorkspaceStyle{"3": {Label: "web", LabelSet: true}}
+	cfg.MangoWorkspaces.AppIconsShow = true
+	cfg.MangoWorkspaces.AppIconsDedupe = false
+	cfg.MangoWorkspaces.TagMap = map[string]config.WorkspaceStyle{"3": {Label: new("web")}}
 	m := newTestMango(t, cfg, "DP-1")
 	if len(m.models) != 2 {
 		t.Fatalf("models = %+v", m.models)
@@ -164,7 +164,7 @@ func TestMangoClicksDispatch(t *testing.T) {
 	monitors := `[{"name":"DP-1","active":true,"tags":` + nineTags(1, 1) + `,"active_tags":[1],"active_client":{"id":null},"keymode":"","keyboardlayout":""}]`
 	dispatched := fakeMangoSocket(t, monitors, "[]")
 	cfg := config.Defaults()
-	cfg.MangoWorkspaces.Shared.Click.MiddleClick = config.ParseWorkspaceClickAction("focus:last")
+	cfg.MangoWorkspaces.MiddleClick = config.ParseWorkspaceClickAction("focus:last")
 	m := newTestMango(t, cfg, "DP-1")
 	b := m.root.buttons()[0]
 	expect := func(want string) {
@@ -212,7 +212,7 @@ func TestMangoShowRules(t *testing.T) {
 
 func TestMangoOverrideTargetsTagClass(t *testing.T) {
 	red, _ := config.ParseColorValue("#ff0000")
-	m := map[string]config.NamedWorkspaceStyle{"4": {Color: red, ColorSet: true}}
+	m := map[string]config.WorkspaceStyle{"4": {Color: &red}}
 	if c, ok := cwsOverrideColor([]string{"tag-4"}, m); !ok || c != red {
 		t.Errorf("tag-4 override = %v %v", c, ok)
 	}

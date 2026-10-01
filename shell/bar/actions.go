@@ -103,7 +103,7 @@ func stepBrightness(ctx ModuleContext, delta float64) {
 	if ctx.Brightness == nil {
 		return
 	}
-	min := float64(ctx.Config.Brightness.MinBright)
+	min := float64(ctx.Config.Brightness.MinBrightness)
 	if min < 0 {
 		min = 0
 	}

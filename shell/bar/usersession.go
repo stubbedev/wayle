@@ -27,14 +27,14 @@ type sessionButton struct {
 // from the dashboard's dropdown-*-command keys.
 func sessionButtonFor(action config.SessionAction, cfg config.DashboardConfig) sessionButton {
 	switch action {
-	case config.SessionLock:
-		return sessionButton{"ld-lock-symbolic", "Lock", cfg.LockCommand}
-	case config.SessionLogout:
-		return sessionButton{"ld-log-out-symbolic", "Log Out", cfg.LogoutCommand}
-	case config.SessionReboot:
-		return sessionButton{"ld-refresh-cw-symbolic", "Reboot", cfg.RebootCommand}
+	case config.SessionActionLock:
+		return sessionButton{"ld-lock-symbolic", "Lock", cfg.DropdownLockCommand}
+	case config.SessionActionLogOut:
+		return sessionButton{"ld-log-out-symbolic", "Log Out", cfg.DropdownLogoutCommand}
+	case config.SessionActionReboot:
+		return sessionButton{"ld-refresh-cw-symbolic", "Reboot", cfg.DropdownRebootCommand}
 	default:
-		return sessionButton{"ld-power-symbolic", "Power Off", cfg.PowerOffCommand}
+		return sessionButton{"ld-power-symbolic", "Power Off", cfg.DropdownPoweroffCommand}
 	}
 }
 
@@ -109,7 +109,7 @@ func userSessionSection(ctx ModuleContext) widget.Widget {
 
 	actions := widget.NewBox(widget.Row, 4, 0)
 	actions.AddClass("session-actions")
-	for _, action := range cfg.SessionActions {
+	for _, action := range cfg.UserSession.Actions {
 		spec := sessionButtonFor(action, cfg)
 		glyph := widget.NewThemeIcon(spec.icon, int(px))
 		glyph.SetTint(ctx.Style.fg)

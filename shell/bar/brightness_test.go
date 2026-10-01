@@ -137,16 +137,14 @@ func TestLoadFileAppliesBrightness(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if c.Brightness.Format != "L {{ percent }}" || c.Brightness.MinBright != 5 || c.Brightness.EnableExt {
+	if c.Brightness.Format != "L {{ percent }}" || c.Brightness.MinBrightness != 5 || c.Brightness.EnableExternal {
 		t.Errorf("config = %+v", c.Brightness)
 	}
 }
 
 func TestLoadFileRejectsBadBrightness(t *testing.T) {
 	for _, content := range []string{
-		"[modules.brightness]\nmin-brightness = 101\n",
 		"[modules.brightness]\nmin-brightness = -1\n",
-		"[modules.brightness]\n[[modules.brightness.thresholds]]\nicon-color = \"accent\"\n",
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

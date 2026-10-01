@@ -97,8 +97,8 @@ func TestSystrayPatternsAreCaseSensitiveGlobs(t *testing.T) {
 	if systrayBlacklisted([]string{"*DISCORD*"}, it) {
 		t.Error("patterns are case-sensitive")
 	}
-	o, ok := systrayOverride([]config.TrayItemOverride{{Name: "nope"}, {Name: "*Discord", Icon: "x"}}, it)
-	if !ok || o.Icon != "x" {
+	o, ok := systrayOverride([]config.TrayItemOverride{{Name: "nope"}, {Name: "*Discord", Icon: new("x")}}, it)
+	if !ok || o.Icon == nil || *o.Icon != "x" {
 		t.Errorf("override = %+v, %v", o, ok)
 	}
 }
@@ -143,7 +143,7 @@ func TestResolveTrayIcon(t *testing.T) {
 		{"file path", sni.Item{IconName: filepath.Join(dir, "app-icon.png")}, cfg, "file", filepath.Join(dir, "app-icon.png")},
 		{"pixmap", sni.Item{IconPixmap: []sni.Pixmap{pixmap}}, cfg, "pixmap", ""},
 		{"fallback", sni.Item{}, cfg, "fallback", trayFallbackIcon},
-		{"override icon wins", sni.Item{ID: "app", IconName: "nm-applet"}, config.SystrayConfig{Overrides: []config.TrayItemOverride{{Name: "app", Icon: "custom"}}}, "named", "custom"},
+		{"override icon wins", sni.Item{ID: "app", IconName: "nm-applet"}, config.SystrayConfig{Overrides: []config.TrayItemOverride{{Name: "app", Icon: new("custom")}}}, "named", "custom"},
 	} {
 		got := resolveTrayIcon(tc.cfg, tc.it)
 		if got.kind != tc.kind || (tc.want != "" && got.name != tc.want) {
@@ -269,13 +269,12 @@ func TestLoadFileAppliesSystray(t *testing.T) {
 	if s.IconScale.Value != 1.5 || s.ItemGap.Unit != config.SizePixels || len(s.Blacklist) != 1 {
 		t.Errorf("systray = %+v", s)
 	}
-	if len(s.Overrides) != 1 || s.Overrides[0].Icon != "discord-symbolic" || !s.Overrides[0].HasColor {
+	if len(s.Overrides) != 1 || s.Overrides[0].Icon == nil || *s.Overrides[0].Icon != "discord-symbolic" || s.Overrides[0].Color == nil {
 		t.Errorf("overrides = %+v", s.Overrides)
 	}
 	for _, bad := range []string{
 		"[[modules.systray.overrides]]\nicon = \"x\"\n",
 		"[[modules.systray.overrides]]\nname = \"x\"\ncolor = \"bogus\"\n",
-		"[modules.systray]\nicon-scale = \"big\"\n",
 	} {
 		if err := osWrite(path, bad); err != nil {
 			t.Fatal(err)

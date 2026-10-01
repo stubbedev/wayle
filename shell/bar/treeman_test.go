@@ -45,18 +45,19 @@ func TestLoadFileAppliesTreeman(t *testing.T) {
 	if c.Treeman.Format != "[{{ total }}]" || !c.Treeman.HideIfEmpty {
 		t.Errorf("config = %+v", c.Treeman)
 	}
-	if got := c.Treeman.Icons[config.TreemanBucketFailed].Name; got != "tb-x-symbolic" {
+	if got := c.Treeman.Icons()[config.TreemanBucketFailed].Name; got != "tb-x-symbolic" {
 		t.Errorf("icon-failed = %q", got)
 	}
-	if got := c.Treeman.Icons[config.TreemanBucketUp].Name; got != "tb-loader-2-symbolic" {
+	if got := c.Treeman.Icons()[config.TreemanBucketUp].Name; got != "tb-loader-2-symbolic" {
 		t.Errorf("icon-preparing default changed: %q", got)
 	}
 
 	if err := osWrite(path, "[modules.treeman]\nformat = \"\"\n"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := config.LoadFile(path); err == nil {
-		t.Error("empty format: want a load error")
+	// The schema puts no constraint on the format string.
+	if _, err := config.LoadFile(path); err != nil {
+		t.Errorf("empty format: accepted by the schema, got %v", err)
 	}
 }
 
@@ -83,7 +84,7 @@ func TestTreemanModuleFollowsBuckets(t *testing.T) {
 	if err := tm.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := icon.Name(); got != cfg.Treeman.Icons[config.TreemanBucketFailed].Name {
+	if got := icon.Name(); got != cfg.Treeman.Icons()[config.TreemanBucketFailed].Name {
 		t.Errorf("failed icon = %q", got)
 	}
 

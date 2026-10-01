@@ -1,100 +1,117 @@
 package config
 
-import (
-	"github.com/BurntSushi/toml"
-)
-
-// BatteryConfig is the battery module config.
+// BatteryConfig is ported from crates/wayle-config/src/schemas/modules/battery/mod.rs.
+//
+// Battery level, charging state, and a dropdown with power-profile controls.
+//
+// ::: warning
+//
+// This module uses `upower` (D-Bus) for battery information. Ensure `upower` daemon is running and exposes a battery device (verify with `upower --battery` or `upower --dump`).
+//
+// :::
 type BatteryConfig struct {
-	Click ClickConfig
-	// Button is the bar-button key set; LabelShow and Icon.Show/Color
-	// mirror its label-show, icon-show, and icon-color.
-	Button       ButtonConfig
-	Format       string
-	LabelShow    bool
-	Icon         IconConfig
-	LevelIcons   []string
-	AlertIcon    string
-	ChargingIcon string
-	Thresholds   []ThresholdEntry
-}
-
-// Schema icon defaults (BatteryConfig's level-icons etc.).
-const (
-	defaultAlertIcon    = "md-battery_android_alert-symbolic"
-	defaultChargingIcon = "md-battery_android_frame_bolt-symbolic"
-)
-
-// DefaultBatteryLevelIcons is the schema's level-icons list, empty to
-// full.
-func DefaultBatteryLevelIcons() []string {
-	return []string{
-		"md-battery_android_0-symbolic",
-		"md-battery_android_frame_1-symbolic",
-		"md-battery_android_frame_2-symbolic",
-		"md-battery_android_frame_3-symbolic",
-		"md-battery_android_frame_4-symbolic",
-		"md-battery_android_frame_5-symbolic",
-		"md-battery_android_frame_6-symbolic",
-		"md-battery_android_frame_full-symbolic",
-	}
+	// Icons for battery levels from empty to full.
+	//
+	// The percentage is divided evenly among icons. With 5 icons:
+	// 0-20% uses icons\[0\], 21-40% uses icons\[1\], etc.
+	LevelIcons []string `cfg:"level-icons"`
+	// Icon shown when battery is charging.
+	ChargingIcon string `cfg:"charging-icon"`
+	// Icon shown when battery is not present or in an error state.
+	AlertIcon string `cfg:"alert-icon"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Display module icon.
+	IconShow bool `cfg:"icon-show"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Display percentage label.
+	LabelShow bool `cfg:"label-show"`
+	// Label text color token.
+	LabelColor ColorValue `cfg:"label-color"`
+	// Format string for the label.
+	//
+	// ## Placeholders
+	//
+	// - `{{ percent }}` - Battery level (0-100)
+	//
+	// ## Examples
+	//
+	// - `"{{ percent }}%"` - "45%"
+	Format string `cfg:"format"`
+	// Max label characters before truncation with ellipsis. Set to 0 to disable.
+	LabelMaxLength uint32 `cfg:"label-max-length"`
+	// Button background color token.
+	ButtonBgColor ColorValue `cfg:"button-bg-color"`
+	// Action on left click.
+	LeftClick ClickAction `cfg:"left-click"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
+	// Dynamic color thresholds based on battery percentage.
+	//
+	// Entries are checked in order; the last matching entry wins for each
+	// color slot. Use `below` for low-value warnings (e.g., low battery).
+	//
+	// ## Example
+	//
+	// ```toml
+	// [[modules.battery.thresholds]]
+	// below = 40
+	// icon-color = "status-warning"
+	//
+	// [[modules.battery.thresholds]]
+	// below = 20
+	// icon-color = "status-error"
+	// label-color = "status-error"
+	// ```
+	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }
 
 // DefaultsBattery returns the schema defaults.
 func DefaultsBattery() BatteryConfig {
 	return BatteryConfig{
-		Click:        DefaultsClick(map[string]string{"left-click": "dropdown:battery"}),
-		Button:       DefaultsButton(buttonColors("auto", "yellow", "yellow", "bg-surface-elevated", "yellow"), TokenYellow, true, 0),
-		Format:       "{{ percent }}%",
-		LabelShow:    true,
-		Icon:         DefaultsIcon(true, defaultAlertIcon),
-		LevelIcons:   DefaultBatteryLevelIcons(),
-		AlertIcon:    defaultAlertIcon,
-		ChargingIcon: defaultChargingIcon,
+		LevelIcons: []string{
+			"md-battery_android_0-symbolic",
+			"md-battery_android_frame_1-symbolic",
+			"md-battery_android_frame_2-symbolic",
+			"md-battery_android_frame_3-symbolic",
+			"md-battery_android_frame_4-symbolic",
+			"md-battery_android_frame_5-symbolic",
+			"md-battery_android_frame_6-symbolic",
+			"md-battery_android_frame_full-symbolic",
+		},
+		ChargingIcon:   "md-battery_android_frame_bolt-symbolic",
+		AlertIcon:      "md-battery_android_alert-symbolic",
+		BorderShow:     false,
+		BorderColor:    mustColor("yellow"),
+		IconShow:       true,
+		IconColor:      mustColor("auto"),
+		IconBgColor:    mustColor("yellow"),
+		LabelShow:      true,
+		LabelColor:     mustColor("yellow"),
+		Format:         "{{ percent }}%",
+		LabelMaxLength: 0,
+		ButtonBgColor:  mustColor("bg-surface-elevated"),
+		LeftClick:      ParseClickAction("dropdown:battery"),
+		RightClick:     ClickAction{},
+		MiddleClick:    ClickAction{},
+		ScrollUp:       ClickAction{},
+		ScrollDown:     ClickAction{},
+		Thresholds:     []ThresholdEntry{},
 	}
 }
 
-// applyBattery overlays [modules.battery].
-func applyBattery(md toml.MetaData, prim toml.Primitive) (BatteryConfig, error) {
-	cfg := DefaultsBattery()
-	var doc struct {
-		Format       *string           `toml:"format"`
-		IconName     *string           `toml:"icon-name"`
-		LevelIcons   *[]string         `toml:"level-icons"`
-		AlertIcon    *string           `toml:"alert-icon"`
-		ChargingIcon *string           `toml:"charging-icon"`
-		Thresholds   *[]ThresholdEntry `toml:"thresholds"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.Format != nil {
-		cfg.Format = *doc.Format
-	}
-	if doc.IconName != nil {
-		cfg.Icon.Name = *doc.IconName
-	}
-	if doc.LevelIcons != nil {
-		cfg.LevelIcons = *doc.LevelIcons
-	}
-	if doc.AlertIcon != nil {
-		cfg.AlertIcon = *doc.AlertIcon
-	}
-	if doc.ChargingIcon != nil {
-		cfg.ChargingIcon = *doc.ChargingIcon
-	}
-	setIf(&cfg.Thresholds, doc.Thresholds)
-	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Button = button
-	button.mirrorLabel(&cfg.LabelShow, nil)
-	button.mirrorIcon(&cfg.Icon)
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c BatteryConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }

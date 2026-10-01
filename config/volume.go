@@ -1,84 +1,122 @@
 package config
 
-import (
-	"github.com/BurntSushi/toml"
-)
+// AppIconSource is ported from crates/wayle-config/src/schemas/modules/volume/mod.rs.
+//
+// Icon source for app volume entries in the dropdown.
+type AppIconSource string
 
-// Schema icon defaults (VolumeConfig's level-icons/icon-muted).
+// AppIconSource values.
 const (
-	defaultVolumeMutedIcon = "ld-volume-x-symbolic"
+	// Wayle's curated symbolic icons matched by app name.
+	AppIconSourceMapped AppIconSource = "mapped"
+	// Native application icons reported by PulseAudio.
+	AppIconSourceNative AppIconSource = "native"
 )
 
-// DefaultVolumeLevelIcons is the schema's level-icons list, low to
-// maximum.
-func DefaultVolumeLevelIcons() []string {
-	return []string{"ld-volume-symbolic", "ld-volume-1-symbolic", "ld-volume-2-symbolic"}
-}
+var _ = registerEnum(AppIconSourceMapped, AppIconSourceNative)
 
-// VolumeConfig is the volume module config.
+// VolumeConfig is ported from crates/wayle-config/src/schemas/modules/volume/mod.rs.
+//
+// Output volume control with a dropdown for device and app volumes.
 type VolumeConfig struct {
-	Click ClickConfig
-	// Button is the bar-button key set; LabelShow and Icon.Show/Color
-	// mirror its label-show, icon-show, and icon-color.
-	Button     ButtonConfig
-	Format     string
-	LabelShow  bool
-	Icon       IconConfig
-	LevelIcons []string
-	IconMuted  string
-	Thresholds []ThresholdEntry
+	// Icons for volume levels from low to maximum.
+	//
+	// The percentage is divided evenly among icons. With 3 icons:
+	// 1-33% uses icons\[0\], 34-66% uses icons\[1\], 67-100% uses icons\[2\].
+	LevelIcons []string `cfg:"level-icons"`
+	// Icon shown when audio output is muted.
+	IconMuted string `cfg:"icon-muted"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Display module icon.
+	IconShow bool `cfg:"icon-show"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Display percentage label.
+	LabelShow bool `cfg:"label-show"`
+	// Label text color token.
+	LabelColor ColorValue `cfg:"label-color"`
+	// Format string for the label.
+	//
+	// ## Placeholders
+	//
+	// - `{{ percent }}` - Volume (0-100)
+	//
+	// ## Examples
+	//
+	// - `"{{ percent }}%"` - "45%"
+	Format string `cfg:"format"`
+	// Max label characters before truncation with ellipsis. Set to 0 to disable.
+	LabelMaxLength uint32 `cfg:"label-max-length"`
+	// Button background color token.
+	ButtonBgColor ColorValue `cfg:"button-bg-color"`
+	// Action on left click. Default opens the audio dropdown.
+	LeftClick ClickAction `cfg:"left-click"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click. Default toggles mute.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
+	// Icon source for app volume entries in the audio dropdown.
+	DropdownAppIcons AppIconSource `cfg:"dropdown-app-icons"`
+	// Dynamic color thresholds based on volume percentage.
+	//
+	// Entries are checked in order; the last matching entry wins for each
+	// color slot. Use `above` for high-value warnings (e.g., boosted volume).
+	//
+	// ## Example
+	//
+	// ```toml
+	// [[modules.volume.thresholds]]
+	// above = 100
+	// icon-color = "status-warning"
+	// label-color = "status-warning"
+	//
+	// [[modules.volume.thresholds]]
+	// above = 130
+	// icon-color = "status-error"
+	// label-color = "status-error"
+	// ```
+	Thresholds []ThresholdEntry `cfg:"thresholds"`
 }
 
 // DefaultsVolume returns the schema defaults.
 func DefaultsVolume() VolumeConfig {
 	return VolumeConfig{
-		Click:      DefaultsClick(map[string]string{"left-click": "dropdown:audio", "middle-click": "wayle audio output-mute"}),
-		Button:     DefaultsButton(buttonColors("auto", "red", "red", "bg-surface-elevated", "red"), TokenRed, true, 0),
-		Format:     "{{ percent }}%",
-		LabelShow:  true,
-		Icon:       DefaultsIcon(true, "ld-volume-2-symbolic"),
-		LevelIcons: DefaultVolumeLevelIcons(),
-		IconMuted:  defaultVolumeMutedIcon,
+		LevelIcons: []string{
+			"ld-volume-symbolic",
+			"ld-volume-1-symbolic",
+			"ld-volume-2-symbolic",
+		},
+		IconMuted:        "ld-volume-x-symbolic",
+		BorderShow:       false,
+		BorderColor:      mustColor("red"),
+		IconShow:         true,
+		IconColor:        mustColor("auto"),
+		IconBgColor:      mustColor("red"),
+		LabelShow:        true,
+		LabelColor:       mustColor("red"),
+		Format:           "{{ percent }}%",
+		LabelMaxLength:   0,
+		ButtonBgColor:    mustColor("bg-surface-elevated"),
+		LeftClick:        ParseClickAction("dropdown:audio"),
+		RightClick:       ClickAction{},
+		MiddleClick:      ParseClickAction("wayle audio output-mute"),
+		ScrollUp:         ClickAction{},
+		ScrollDown:       ClickAction{},
+		DropdownAppIcons: AppIconSourceMapped,
+		Thresholds:       []ThresholdEntry{},
 	}
 }
 
-// applyVolume overlays [modules.volume].
-func applyVolume(md toml.MetaData, prim toml.Primitive) (VolumeConfig, error) {
-	cfg := DefaultsVolume()
-	var doc struct {
-		Format     *string           `toml:"format"`
-		IconName   *string           `toml:"icon-name"`
-		LevelIcons *[]string         `toml:"level-icons"`
-		IconMuted  *string           `toml:"icon-muted"`
-		Thresholds *[]ThresholdEntry `toml:"thresholds"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.Format != nil {
-		cfg.Format = *doc.Format
-	}
-	if doc.IconName != nil {
-		cfg.Icon.Name = *doc.IconName
-	}
-	if doc.LevelIcons != nil {
-		cfg.LevelIcons = *doc.LevelIcons
-	}
-	if doc.IconMuted != nil {
-		cfg.IconMuted = *doc.IconMuted
-	}
-	setIf(&cfg.Thresholds, doc.Thresholds)
-	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Button = button
-	button.mirrorLabel(&cfg.LabelShow, nil)
-	button.mirrorIcon(&cfg.Icon)
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+// Clicks returns the five input bindings.
+func (c VolumeConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }

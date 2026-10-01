@@ -108,9 +108,9 @@ func newHyprsunset(ctx ModuleContext) (Module, error) {
 // schedule, and resolves the location.
 func newHyprsunsetWith(ctx ModuleContext, env sunsetEnv) *hyprsunsetModule {
 	cfg := ctx.Config.Hyprsunset
-	m := &hyprsunsetModule{ctx: ctx, env: env, temp: cfg.Temperature, gamma: cfg.Gamma}
+	m := &hyprsunsetModule{ctx: ctx, env: env, temp: int(cfg.Temperature), gamma: int(cfg.Gamma)}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.icon = moduleIcon(ctx, cfg.IconOff)
+	m.icon = moduleIcon(ctx, cfg.IconOffView())
 	m.root = assembleModule(ctx, m.icon, m.label)
 
 	// The filter dies with the shell, so a manual toggle is replayed
@@ -183,13 +183,13 @@ func (m *hyprsunsetModule) render() {
 	cfg := m.ctx.Config.Hyprsunset
 	text := ""
 	if cfg.LabelShow {
-		text = hyprsunsetLabel(cfg.Format, m.enabled, m.temp, m.gamma, cfg.Temperature, cfg.Gamma)
+		text = hyprsunsetLabel(cfg.Format, m.enabled, m.temp, m.gamma, int(cfg.Temperature), int(cfg.Gamma))
 	}
 	m.label.SetText(text)
 	if m.icon != nil {
-		icon := cfg.IconOff
+		icon := cfg.IconOffView()
 		if m.enabled {
-			icon = cfg.IconOn
+			icon = cfg.IconOnView()
 		}
 		m.icon.SetThemeName(icon.Name)
 	}
@@ -199,7 +199,7 @@ func (m *hyprsunsetModule) render() {
 // silent socket means off (with the configured values shown).
 func (m *hyprsunsetModule) applyState(st hyprsunset.State, running bool) {
 	cfg := m.ctx.Config.Hyprsunset
-	temp, gamma := cfg.Temperature, cfg.Gamma
+	temp, gamma := int(cfg.Temperature), int(cfg.Gamma)
 	if running {
 		temp, gamma = st.Temp, st.Gamma
 	}
@@ -286,11 +286,11 @@ func (m *hyprsunsetModule) toggle() {
 // startFilter spawns the filter at the configured values.
 func (m *hyprsunsetModule) startFilter() {
 	cfg := m.ctx.Config.Hyprsunset
-	if err := m.env.start(cfg.Temperature, cfg.Gamma); err != nil {
+	if err := m.env.start(int(cfg.Temperature), int(cfg.Gamma)); err != nil {
 		log.Printf("hyprsunset: start: %v", err)
 		return
 	}
-	m.enabled, m.temp, m.gamma = true, cfg.Temperature, cfg.Gamma
+	m.enabled, m.temp, m.gamma = true, int(cfg.Temperature), int(cfg.Gamma)
 	m.render()
 }
 
@@ -300,7 +300,7 @@ func (m *hyprsunsetModule) stopFilter() {
 		log.Printf("hyprsunset: stop: %v", err)
 	}
 	cfg := m.ctx.Config.Hyprsunset
-	m.enabled, m.temp, m.gamma = false, cfg.Temperature, cfg.Gamma
+	m.enabled, m.temp, m.gamma = false, int(cfg.Temperature), int(cfg.Gamma)
 	m.render()
 }
 

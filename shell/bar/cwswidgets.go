@@ -37,7 +37,7 @@ func newCwsContainer(m *cwsView) *cwsContainer {
 	if base, ok := styling.ResolveColor(m.cfg.ContainerBgColor, palette); ok {
 		opacity := 100
 		if m.ctx.Config != nil {
-			opacity = m.ctx.Config.Bar.ButtonBGOpacity
+			opacity = int(m.ctx.Config.Bar.ButtonBGOpacity)
 		}
 		c.bg = styling.ColorMix(base, transparentColor, opacity)
 	}
@@ -45,7 +45,7 @@ func newCwsContainer(m *cwsView) *cwsContainer {
 	c.radius = int(math.Round(float64(m.buttonRadius()) * 1.2))
 	if m.cfg.BorderShow && m.ctx.Config != nil {
 		loc := m.ctx.Config.Bar.ButtonBorderLocation
-		c.borders = borderWidths{}.fromLocation(loc, m.ctx.Config.Bar.ButtonBorderWidth)
+		c.borders = borderWidths{}.fromLocation(loc, int(m.ctx.Config.Bar.ButtonBorderWidth))
 		if loc != config.BorderNone {
 			c.AddClass("border-" + string(loc))
 		}

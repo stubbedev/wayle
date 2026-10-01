@@ -23,7 +23,7 @@ func testFont(t *testing.T) render.Font {
 func TestAnchors(t *testing.T) {
 	// Corners anchor two edges, edges three.
 	for _, tc := range []struct {
-		position string
+		position config.OsdPosition
 		ok       bool
 	}{
 		{config.OsdTopLeft, true},
@@ -46,7 +46,7 @@ func TestAnchors(t *testing.T) {
 
 func TestMarginsFor(t *testing.T) {
 	cfg := config.DefaultsOsd()
-	cfg.Margin = 1
+	cfg.Margin = config.Px(16)
 	// The bottom position insets the bottom edge only.
 	m := marginsFor(cfg)
 	if m.Bottom != 16 || m.Top != 0 || m.Left != 0 || m.Right != 0 {
@@ -112,7 +112,7 @@ func TestDisabledOsdNeverShows(t *testing.T) {
 
 func TestApplyToast(t *testing.T) {
 	cfg := config.DefaultsOsd()
-	cfg.Presets = []config.ToastPreset{{ID: "screenshot", Label: "Captured", Icon: "ld-camera-symbolic"}}
+	cfg.Presets = []config.ToastPreset{{ID: "screenshot", Label: new("Captured"), Icon: new("ld-camera-symbolic")}}
 	o := New(nil, cfg, testFont(t), nil)
 
 	// A plain label toast without a percentage shows no progress bar.

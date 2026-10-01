@@ -1,17 +1,79 @@
 // Package config loads wayle's user configuration: the same files the
-// Rust shell reads, with the same discovery order, key names, defaults,
-// and failure behavior. It carries only the sections the Go shell
-// consumes so far; unknown keys and sections are ignored, while known
-// keys with bad values are load errors.
+// Rust shell reads, with the same discovery order, imports, key names,
+// defaults, layering (defaults < config file < runtime overrides), and
+// failure behavior. The schema is declared once on the Go types
+// through `cfg` tags (see fields.go); loading, the runtime layer, the
+// CLI's get/set/reset/default, and the JSON Schema all derive from it.
 package config
+
+//go:generate go run ./internal/schemadoc/cmd
 
 import (
 	"errors"
-	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 )
+
+// Config is the loaded user configuration.
+//
+// Main configuration structure for Wayle.
+//
+// Represents the complete configuration schema that can be loaded
+// from TOML files. All fields have sensible defaults.
+type Config struct {
+	// TOML files to import and merge before this config.
+	//
+	// Paths are relative to the config file.
+	// Imported values are overridden by values in this file.
+	//
+	// ```toml
+	// imports = ["themes.toml", "modules/clock.toml"]
+	// ```
+	Imports []string `cfg:"imports,nolayer"`
+	// General Wayle settings.
+	General GeneralConfig `cfg:"general"`
+	// Bar layout and module placement.
+	Bar BarConfig `cfg:"bar"`
+	// Dropdown foldout panel sizing.
+	Dropdowns DropdownsConfig `cfg:"dropdowns"`
+	// Styling configuration (theme, fonts, scale).
+	Styling StylingConfig `cfg:"styling"`
+	// Module-specific configurations.
+	ModulesConfig `cfg:"modules"`
+	// On-screen display settings.
+	Osd OsdConfig `cfg:"osd"`
+	// Lock screen settings.
+	Lock LockConfig `cfg:"lock"`
+	// Greeter (display manager) settings.
+	Greeter GreeterConfig `cfg:"greeter"`
+	// Screen-share picker settings.
+	SharePicker SharePickerConfig `cfg:"share-picker"`
+	// Application launcher (rofi replacement) settings.
+	Launcher LauncherConfig `cfg:"launcher"`
+	// Animation settings.
+	Animations AnimationsConfig `cfg:"animations"`
+	// Wallpaper service settings.
+	Wallpaper WallpaperConfig `cfg:"wallpaper"`
+}
+
+// Defaults returns the schema defaults for every section.
+func Defaults() *Config {
+	return &Config{
+		Imports:       []string{},
+		General:       DefaultsGeneral(),
+		Bar:           DefaultsBar(),
+		Dropdowns:     DropdownsConfig{},
+		Styling:       DefaultsStyling(),
+		ModulesConfig: DefaultsModules(),
+		Osd:           DefaultsOsd(),
+		Lock:          DefaultsLock(),
+		Greeter:       DefaultsGreeter(),
+		SharePicker:   DefaultsSharePicker(),
+		Launcher:      DefaultsLauncher(),
+		Animations:    DefaultsAnimations(),
+		Wallpaper:     DefaultsWallpaper(),
+	}
+}
 
 // Dir returns the wayle configuration directory:
 // $XDG_CONFIG_HOME/wayle, or ~/.config/wayle when XDG_CONFIG_HOME is
@@ -41,33 +103,20 @@ func DiscoverMain(dir string) string {
 	return filepath.Join(dir, "config.toml")
 }
 
-// Load reads the user's config from the platform location. The error
-// carries the reason the file could not be applied; the returned
-// config is always usable (defaults, or defaults overlaid by whatever
-// applied before the failure), so callers log the error and continue —
-// the Rust shell's `using defaults, config.toml failed` behavior.
-func Load() (*Config, error) {
-	dir, err := Dir()
-	if err != nil {
-		return nil, err
-	}
-	return LoadFile(DiscoverMain(dir))
-}
-
-// LoadFile parses one main config file. A missing file is the
-// fresh-install case: defaults, no error. Anything unreadable or
-// invalid is returned as the error alongside the fallback defaults.
+// LoadFile loads one main config file with its imports onto the
+// defaults. A file-level failure (unreadable, unparseable, a broken
+// import) returns the defaults with that error — the Rust shell's
+// "using defaults, config.toml failed". A bad value in one field keeps
+// that field's default and applies the rest; those field errors are
+// returned joined, as diagnostics.
 func LoadFile(path string) (*Config, error) {
-	cfg := Defaults()
-	data, err := os.ReadFile(path) //nolint:gosec // the path is resolved by DiscoverMain, never user input
-	if errors.Is(err, fs.ErrNotExist) {
-		return cfg, nil
-	}
+	tree, err := loadTree(path)
 	if err != nil {
-		return cfg, fmt.Errorf("config: read %s: %w", path, err)
+		return Defaults(), err
 	}
-	if err := cfg.applyTOML(data); err != nil {
-		return cfg, fmt.Errorf("config: %s: %w", path, err)
-	}
-	return cfg, nil
+	cfg := Defaults()
+	var diags []error
+	apply := &layerApply{kind: configLayer, sink: func(d Diagnostic) { diags = append(diags, d) }}
+	_ = apply.applyContainer(valueOf(cfg), tree, "")
+	return cfg, errors.Join(diags...)
 }

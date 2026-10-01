@@ -66,7 +66,7 @@ type barStyle struct {
 // and colors through the token table.
 func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 	bar := cfg.Bar
-	scale := bar.Scale
+	scale := float64(bar.Scale)
 	resolve := func(cv config.ColorValue) render.Color {
 		color, ok := styling.ResolveColor(cv, palette)
 		if !ok {
@@ -81,26 +81,16 @@ func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 	labelSize := bar.ButtonLabelSize
 	var labelPx float64
 	if labelSize.Unit == config.SizePixels {
-		labelPx = labelSize.Value
+		labelPx = float64(labelSize.Value)
 	} else {
-		labelPx = buttonLabelBaseRem * styling.RemBase * scale * labelSize.Value
+		labelPx = buttonLabelBaseRem * styling.RemBase * scale * float64(labelSize.Value)
 	}
 
 	// The dropdown buttons' hover and active shades deepen the group
 	// background at the button bg opacity.
 	buttonBase := resolve(bar.ButtonGroupBackground)
-	if bar.ButtonBGColor.Kind == config.ColorCustom {
-		buttonBase = resolve(bar.ButtonBGColor)
-	}
-	buttonBg := styling.ColorMix(buttonBase, transparentColor, bar.ButtonBGOpacity)
-	hoverBase := buttonBase
-	if bar.ButtonHoverBGColor.Kind == config.ColorCustom {
-		hoverBase = resolve(bar.ButtonHoverBGColor)
-	}
-	activeBase := hoverBase
-	if bar.ButtonActiveBGColor.Kind == config.ColorCustom {
-		activeBase = resolve(bar.ButtonActiveBGColor)
-	}
+	buttonBg := styling.ColorMix(buttonBase, transparentColor, int(bar.ButtonBGOpacity))
+	hoverBase, activeBase := buttonBase, buttonBase
 
 	return barStyle{
 		palette:        palette,

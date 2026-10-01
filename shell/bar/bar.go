@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -40,16 +41,23 @@ import (
 // and falls back to defaults — the Rust shell's behavior — rather than
 // refusing to start.
 func Run() error {
-	cfg, err := config.Load()
+	svc, err := config.Open()
 	if err != nil {
-		log.Printf("wayle: using defaults, config failed:\n%v", err)
+		log.Printf("wayle: config: %v", err)
 	}
-	return RunWith(cfg)
+	if svc == nil {
+		return RunWith(config.Defaults())
+	}
+	defer svc.Close()
+	return run(svc.Config(), svc)
 }
 
 // RunWith shows the bar from a prepared config: one layer surface per
 // output the layout gives a visible bar, then the gelm loop.
-func RunWith(cfg *config.Config) error {
+func RunWith(cfg *config.Config) error { return run(cfg, nil) }
+
+// run shows the bar; with a service it follows config reloads.
+func run(cfg *config.Config, svc *config.Service) error {
 	sess, err := app.Connect()
 	if err != nil {
 		return fmt.Errorf("bar: connect: %w", err)
@@ -98,7 +106,7 @@ func RunWith(cfg *config.Config) error {
 		defer func() { _ = battery.Close() }()
 		baseCtx.Battery = battery
 	}
-	backlights := brightness.NewSystem(cfg.Brightness.EnableExt)
+	backlights := brightness.NewSystem(cfg.Brightness.EnableExternal)
 	defer func() { _ = backlights.Close() }()
 	baseCtx.Brightness = backlights
 	audio := connectAudio()
@@ -137,7 +145,7 @@ func RunWith(cfg *config.Config) error {
 	// bus; other senders deliver through it.
 	notifSvc := notifications.NewService()
 	baseCtx.Notifications = notifSvc
-	recState := recorder.NewState(recorder.WfRecorder{}, time.Duration(cfg.Recorder.StartDelayMS)*time.Millisecond)
+	recState := recorder.NewState(recorder.WfRecorder{}, time.Duration(cfg.Recorder.StartDelayMs)*time.Millisecond)
 	baseCtx.Recorder = recState
 	sniStore := sni.NewStore()
 	baseCtx.SNI = sniStore
@@ -205,15 +213,17 @@ func RunWith(cfg *config.Config) error {
 		}()
 	}
 	osdSrv := osd.New(application, cfg.Osd, font, palette)
-	dropdowns := newDropdownRegistry(application, cfg, font, &style, baseCtx)
-	baseCtx.Dropdowns = dropdowns
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
-	// openBar builds one output's bar layer; `wayle panel show` reopens
-	// a hidden bar through it.
-	openBar := func(output *app.Output, layout config.BarLayout) (*app.LayerWindow, error) {
-		ctx := baseCtx
+	// rt is what the bars are built from; a config reload swaps it and
+	// rebuilds them.
+	rt := &barRuntime{ctx: baseCtx, style: style}
+	rt.mount(application, cfg, font)
+	// openBar builds one output's bar layer; `wayle panel show` and a
+	// reload reopen bars through it.
+	openBar := func(output *app.Output, layout config.BarLayout) (barLayer, error) {
+		ctx := rt.ctx
 		ctx.Connector = output.Name
 		ctx.Attachers = &[]interface{ Attach(app.Host) }{}
 		lc, err := layerConfigFor(ctx, layout, output.Name, logicalWidth(output.ModeW, output.Scale))
@@ -228,31 +238,51 @@ func RunWith(cfg *config.Config) error {
 		for _, a := range *ctx.Attachers {
 			a.Attach(layer)
 		}
-		dropdowns.attachHost(output.Name, layer)
+		rt.ctx.Dropdowns.attachHost(output.Name, layer)
 		return layer, nil
 	}
-	bars := newBarSet(func(o *app.Output, l config.BarLayout) (barLayer, error) { return openBar(o, l) })
+	bars := newBarSet(openBar)
 	for _, output := range outputs {
-		layout, ok := FindLayout(cfg.Bar.Layout, output.Name)
-		if !ok || !layout.Show {
-			continue
-		}
-		layer, err := openBar(output, layout)
-		if err != nil {
-			return err
+		layout, show := barLayoutFor(cfg, output.Name)
+		var layer barLayer
+		if show {
+			if layer, err = openBar(output, layout); err != nil {
+				return err
+			}
 		}
 		bars.add(output, layout, layer)
 		osdSrv.AttachOutput(output.Name, output)
 	}
 	// Notification popups render on one monitor, bar or not.
+	var popupHost *popups.Popups
 	if cfg.Notification.Enabled {
 		if output := popups.Output(outputs, cfg.Notification.PopupMonitor); output != nil {
-			p := popups.New(application, notifSvc, cfg.Notification, font, palette, output)
-			go p.Run()
+			popupHost = popups.New(application, notifSvc, cfg.Notification, font, palette, output)
+			go popupHost.Run()
 		}
 	}
+	current := &atomic.Pointer[config.Config]{}
+	current.Store(cfg)
+	if svc != nil {
+		// A reload rebuilds the bars from the new snapshot (the Rust
+		// modules re-render from their property watches) and hands the
+		// OSD and popups their new sections.
+		cancel := svc.Subscribe(func(_, next *config.Config) {
+			application.Invoke(func() {
+				current.Store(next)
+				rt.style = computeStyle(next, palette)
+				rt.mount(application, next, font)
+				bars.reload(func(connector string) (config.BarLayout, bool) { return barLayoutFor(next, connector) })
+				osdSrv.SetConfig(next.Osd)
+				if popupHost != nil {
+					popupHost.SetConfig(next.Notification)
+				}
+			})
+		})
+		defer cancel()
+	}
 	if cfg.Osd.Enabled {
-		go watchOsd(cfg, baseCtx, osdSrv)
+		go watchOsd(current.Load, baseCtx, osdSrv)
 	}
 	// The ext-session-lock screen and its triggers (logind, and `wayle
 	// lock` through Shell1).
@@ -315,13 +345,13 @@ func microphoneOsdIcon(cfg config.MicrophoneConfig, dev pulse.Device) string {
 	if dev.Muted {
 		return cfg.IconMuted
 	}
-	return cfg.Icon.Name
+	return cfg.Icon().Name
 }
 
 // watchOsd follows the pulse and brightness subscriptions and flashes
 // the OSD on their changes, deduplicating repeats like osd/watchers.rs's
 // last_volume/last_brightness tracking.
-func watchOsd(cfg *config.Config, ctx ModuleContext, server *osd.Osd) {
+func watchOsd(current func() *config.Config, ctx ModuleContext, server *osd.Osd) {
 	bctx := context.Background()
 	var lastVolume, lastInput float64
 	var lastMuted, lastInputMuted bool
@@ -338,7 +368,7 @@ func watchOsd(cfg *config.Config, ctx ModuleContext, server *osd.Osd) {
 				lastVolume, lastMuted = level, sink.Muted
 				server.Show(osd.Event{
 					Kind:  "volume",
-					Icon:  volumeIconName(cfg.Volume, sink),
+					Icon:  volumeIconName(current().Volume, sink),
 					Label: "Output",
 					Value: sink.Volume.AveragePercentage(),
 					Muted: sink.Muted,
@@ -351,7 +381,7 @@ func watchOsd(cfg *config.Config, ctx ModuleContext, server *osd.Osd) {
 				lastInput, lastInputMuted = level, source.Muted
 				server.Show(osd.Event{
 					Kind:  "input-volume",
-					Icon:  microphoneOsdIcon(cfg.Microphone, source),
+					Icon:  microphoneOsdIcon(current().Microphone, source),
 					Label: "Input",
 					Value: source.Volume.AveragePercentage(),
 					Muted: source.Muted,
@@ -454,7 +484,7 @@ func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) (wi
 	root := widget.NewBox(axis, 0, 0)
 	root.SetElement("window")
 	root.AddClass(rootClasses(connector, cfg)...)
-	root.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.ColorExtractor.ThemeProvider)))
+	root.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling.ColorExtractor.ThemeProvider)))
 	if ctx.Theme != nil {
 		ctx.Theme.attach(root)
 	}
@@ -530,4 +560,29 @@ func applyPalette(palette *styling.Palette) {
 		OnAccent:  palette.Surface,
 		Border:    border,
 	})
+}
+
+// barRuntime is the state a mount generation of bars is built from:
+// the module context (with its dropdown registry) and the style.
+type barRuntime struct {
+	ctx   ModuleContext
+	style barStyle
+}
+
+// mount starts a generation for cfg: the previous one is retired, the
+// dropdowns are rebuilt, and the context carries the new snapshot.
+func (r *barRuntime) mount(application *app.Application, cfg *config.Config, font render.Font) {
+	if r.ctx.gen != nil {
+		r.ctx.gen.retired.Store(true)
+	}
+	r.ctx.Config = cfg
+	r.ctx.Style = &r.style
+	r.ctx.gen = &mountGen{}
+	r.ctx.Dropdowns = newDropdownRegistry(application, cfg, font, &r.style, r.ctx)
+}
+
+// barLayoutFor is the output's layout and whether it shows a bar.
+func barLayoutFor(cfg *config.Config, connector string) (config.BarLayout, bool) {
+	layout, ok := FindLayout(cfg.Bar.Layout, connector)
+	return layout, ok && layout.Show
 }

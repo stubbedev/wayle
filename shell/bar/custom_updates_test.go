@@ -13,7 +13,7 @@ import (
 func TestCustomUpdatesDispatch(t *testing.T) {
 	cfg := config.Defaults()
 	// A custom module with no command: it exists purely for pushes.
-	def := config.CustomModuleConfig{ID: "pushed", LabelShow: true, Format: "{{ text }}"}
+	def := config.CustomModuleDefinition{Id: "pushed", LabelShow: true, Format: "{{ text }}"}
 	cfg.Custom = append(cfg.Custom, def)
 	ctx := newTestContext(t, cfg)
 	ctx.CustomUpdates = newCustomUpdates()
@@ -30,7 +30,7 @@ func TestCustomUpdatesDispatch(t *testing.T) {
 	}
 	// Plain output replaces the whole label through {{ output }}.
 	def2 := def
-	def2.ID = "raw"
+	def2.Id = "raw"
 	def2.Format = "{{ output }}"
 	m2 := &customModule{ctx: ctx, def: def2}
 	m2.label = newTestLabel(t, ctx)

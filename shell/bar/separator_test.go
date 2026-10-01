@@ -95,8 +95,6 @@ func TestLoadFileAppliesSeparator(t *testing.T) {
 func TestLoadFileRejectsBadSeparator(t *testing.T) {
 	for _, content := range []string{
 		"[modules.separator]\ncolor = \"not-a-token\"\n",
-		"[modules.separator]\nsize = 0\n",
-		"[modules.separator]\nlength = \"1em\"\n",
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

@@ -27,7 +27,7 @@ func sysinfoLabel(format string, percent float64) string {
 type pollModule struct {
 	buttonRef
 	ctx    ModuleContext
-	cfg    config.SysinfoConfig
+	cfg    pollConfig
 	label  *widget.Label
 	icon   *widget.Icon
 	root   widget.Widget
@@ -35,17 +35,26 @@ type pollModule struct {
 	cancel context.CancelFunc
 }
 
-func newPollModule(ctx ModuleContext, cfg config.SysinfoConfig, read func() (float64, error)) (*pollModule, error) {
+// pollConfig is the keys the cpu, ram, and storage sections share.
+type pollConfig struct {
+	format     string
+	labelShow  bool
+	thresholds []config.ThresholdEntry
+	icon       config.IconConfig
+	pollMs     uint64
+}
+
+func newPollModule(ctx ModuleContext, cfg pollConfig, read func() (float64, error)) (*pollModule, error) {
 	if ctx.App == nil {
 		return nil, errors.New("poll: requires the application loop")
 	}
 	m := &pollModule{ctx: ctx, cfg: cfg, read: read}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.icon = moduleIcon(ctx, cfg.Icon)
+	m.icon = moduleIcon(ctx, cfg.icon)
 	m.root = assembleModule(ctx, m.icon, m.label)
 	runCtx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
-	if cfg.PollMs > 0 {
+	if cfg.pollMs > 0 {
 		go func() {
 			timer := time.NewTimer(0)
 			defer timer.Stop()
@@ -58,7 +67,7 @@ func newPollModule(ctx ModuleContext, cfg config.SysinfoConfig, read func() (flo
 				if percent, err := m.read(); err == nil {
 					m.ctx.Invoke(func() { m.render(percent) })
 				}
-				timer.Reset(time.Duration(cfg.PollMs) * time.Millisecond)
+				timer.Reset(time.Duration(cfg.pollMs) * time.Millisecond)
 			}
 		}()
 	} else if percent, err := read(); err == nil {
@@ -81,11 +90,11 @@ func (m *pollModule) Stop() {
 // percent, then the threshold colors over the defaults.
 func (m *pollModule) render(percent float64) {
 	text := ""
-	if m.cfg.LabelShow {
-		text = sysinfoLabel(m.cfg.Format, percent)
+	if m.cfg.labelShow {
+		text = sysinfoLabel(m.cfg.format, percent)
 	}
 	m.label.SetText(text)
-	m.thresholds(percent, m.cfg.Thresholds)
+	m.thresholds(percent, m.cfg.thresholds)
 }
 
 // newCpu builds the cpu module: usage percent from /proc/stat deltas.
@@ -106,7 +115,8 @@ func newCpu(ctx ModuleContext) (Module, error) {
 		prev = sample
 		return percent, nil
 	}
-	return newPollModule(ctx, ctx.Config.CPU, read)
+	c := ctx.Config.CPU
+	return newPollModule(ctx, pollConfig{c.Format, c.LabelShow, c.Thresholds, c.Icon(), c.PollIntervalMs}, read)
 }
 
 // newRam builds the ram module: used/total from /proc/meminfo.
@@ -118,13 +128,15 @@ func newRam(ctx ModuleContext) (Module, error) {
 		}
 		return mem.UsagePercent(), nil
 	}
-	return newPollModule(ctx, ctx.Config.RAM, read)
+	c := ctx.Config.RAM
+	return newPollModule(ctx, pollConfig{c.Format, c.LabelShow, c.Thresholds, c.Icon(), c.PollIntervalMs}, read)
 }
 
 // newStorage builds the storage module: used/total on one mount point.
 func newStorage(ctx ModuleContext) (Module, error) {
-	path := ctx.Config.Storage.Path
-	return newPollModule(ctx, ctx.Config.Storage, func() (float64, error) {
-		return sysinfo.ReadStoragePercent(path)
+	c := ctx.Config.Storage
+	paths := c.MountPoint.Paths
+	return newPollModule(ctx, pollConfig{c.Format, c.LabelShow, c.Thresholds, c.Icon(), c.PollIntervalMs}, func() (float64, error) {
+		return sysinfo.ReadStoragePercent(paths)
 	})
 }

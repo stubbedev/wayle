@@ -33,28 +33,18 @@ func recorderLabel(format string, active, paused bool, elapsedSecs uint32) strin
 func recorderIconName(cfg config.RecorderConfig, snap recorder.Change) string {
 	if snap.Active || snap.Preparing {
 		if snap.Paused {
-			return cfg.Icons[config.RecorderPaused].Name
+			return cfg.Icons()[config.RecorderPaused].Name
 		}
-		return cfg.Icons[config.RecorderRecording].Name
+		return cfg.Icons()[config.RecorderRecording].Name
 	}
-	return cfg.Icons[config.RecorderIdle].Name
+	return cfg.Icons()[config.RecorderIdle].Name
 }
 
 // recorderColor resolves the state's configured color, the bar fg
 // otherwise.
 func recorderColor(cfg config.RecorderConfig, snap recorder.Change, palette *styling.Palette, fallback render.Color) render.Color {
-	name := config.RecorderIdle
-	switch {
-	case snap.Active && snap.Paused:
-		name = config.RecorderPaused
-	case snap.Active:
-		name = config.RecorderRecording
-	}
-	color, ok := cfg.Colors[name]
-	if !ok {
-		return fallback
-	}
-	if resolved, ok := styling.ResolveColor(color, palette); ok {
+	_ = snap
+	if resolved, ok := styling.ResolveColor(cfg.LabelColor, palette); ok && !cfg.LabelColor.IsAuto() {
 		return resolved
 	}
 	return fallback
@@ -75,7 +65,7 @@ func newRecorder(ctx ModuleContext) (Module, error) {
 	if m.src == nil {
 		m.src = recorder.NewState(recorder.WfRecorder{}, 0)
 	}
-	m.icon = moduleIcon(ctx, ctx.Config.Recorder.Icon)
+	m.icon = moduleIcon(ctx, ctx.Config.Recorder.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	m.refresh()
 	// Follow the shared state; headless construction refreshes inline.

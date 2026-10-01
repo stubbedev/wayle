@@ -45,7 +45,7 @@ func scaleOr1(size config.Size) string {
 // theme_css; here the caller passes the result of ResolvePalette, so the
 // provider failure surfaces as an error to log instead of a hidden log
 // line. The output is the full ":root { ... }" rule.
-func ThemeCSS(p config.Palette, general config.GeneralConfig, bar config.Bar, s config.StylingConfig) string {
+func ThemeCSS(p config.Palette, general config.GeneralConfig, bar config.BarConfig, s config.StylingConfig) string {
 	global := s.Rounding.CSSValues()
 	barValues := bar.Rounding.BarCSSValues()
 	buttonValues := bar.ButtonRounding.BarElementCSSValues()

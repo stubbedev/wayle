@@ -21,7 +21,7 @@ func newSwayWorkspaces(ctx ModuleContext) (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newCwsModule(ctx, "sway", cwsWorkspaces, ctx.Config.SwayWorkspaces, &swayBackend{conn: conn})
+	return newCwsModule(ctx, "sway", cwsWorkspaces, ctx.Config.SwayWorkspaces.View(), &swayBackend{conn: conn})
 }
 
 // newNiriWorkspaces is the niri-workspaces factory.
@@ -33,7 +33,7 @@ func newNiriWorkspaces(ctx ModuleContext) (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newCwsModule(ctx, "niri", cwsWorkspaces, ctx.Config.NiriWorkspaces, &niriBackend{conn: conn})
+	return newCwsModule(ctx, "niri", cwsWorkspaces, ctx.Config.NiriWorkspaces.View(), &niriBackend{conn: conn})
 }
 
 // swayBackend maps sway's GET_WORKSPACES/GET_TREE onto the shared
@@ -189,8 +189,8 @@ func newMangoWorkspaces(ctx ModuleContext) (Module, error) {
 		return nil, err
 	}
 	cfg := ctx.Config.MangoWorkspaces
-	backend := &mangoBackend{watch: w, connector: ctx.Connector, hideEmpty: cfg.HideEmpty, minTagCount: cfg.MinTagCount}
-	return newCwsModule(ctx, "mango", cwsTags, cfg.Shared, backend)
+	backend := &mangoBackend{watch: w, connector: ctx.Connector, hideEmpty: cfg.HideEmpty, minTagCount: int(cfg.MinTagCount)}
+	return newCwsModule(ctx, "mango", cwsTags, cfg.View(), backend)
 }
 
 // mangoBackend selects one monitor's tags (rebuild_tags): the bar's

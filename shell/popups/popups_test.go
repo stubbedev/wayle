@@ -71,7 +71,7 @@ func TestSyncCapsAtMaxVisible(t *testing.T) {
 
 func TestSyncHonorsStackingOrder(t *testing.T) {
 	cfg := config.DefaultsNotification()
-	cfg.PopupStacking = "oldest-first"
+	cfg.PopupStackingOrder = config.StackingOrderOldestFirst
 	p, svc := newTestPopups(t, cfg)
 	a := svc.Notify("app", 0, "", "First", "", nil, 0)
 	b := svc.Notify("app", 0, "", "Second", "", nil, 0)
@@ -84,7 +84,7 @@ func TestSyncHonorsStackingOrder(t *testing.T) {
 		t.Errorf("oldest-first order = %v, want [%d %d]", got, a, b)
 	}
 	// Newest-first (the default) prepends: the newest sits on top.
-	p.cfg.PopupStacking = "newest-first"
+	p.cfg.PopupStackingOrder = config.StackingOrderNewestFirst
 	p.mu.Lock()
 	got = p.stackOrder()
 	p.mu.Unlock()
@@ -95,7 +95,7 @@ func TestSyncHonorsStackingOrder(t *testing.T) {
 
 func TestHoverPausesTheCountdown(t *testing.T) {
 	cfg := config.DefaultsNotification()
-	cfg.PopupDurationMS = 40
+	cfg.PopupDuration = 40
 	p, svc := newTestPopups(t, cfg)
 	id := svc.Notify("app", 0, "", "Hover", "", nil, -1)
 	p.sync()
@@ -123,7 +123,7 @@ func TestHoverPausesTheCountdown(t *testing.T) {
 func TestHoverPauseOffLeavesTheCardBare(t *testing.T) {
 	cfg := config.DefaultsNotification()
 	cfg.PopupHoverPause = false
-	cfg.PopupDurationMS = 30
+	cfg.PopupDuration = 30
 	p, svc := newTestPopups(t, cfg)
 	id := svc.Notify("app", 0, "", "Bare", "", nil, -1)
 	p.sync()
@@ -138,23 +138,23 @@ func TestHoverPauseOffLeavesTheCardBare(t *testing.T) {
 func TestOutputPicksTheMonitor(t *testing.T) {
 	dp, hdmi := &app.Output{Name: "DP-1"}, &app.Output{Name: "HDMI-A-1"}
 	outs := []*app.Output{dp, hdmi}
-	if got := Output(outs, "primary"); got != dp {
+	if got := Output(outs, config.PopupMonitor{}); got != dp {
 		t.Errorf("primary = %v, want the first output", got)
 	}
-	if got := Output(outs, "HDMI-A-1"); got != hdmi {
+	if got := Output(outs, config.PopupOnConnector("HDMI-A-1")); got != hdmi {
 		t.Errorf("connector = %v, want HDMI-A-1", got)
 	}
-	if got := Output(outs, "DP-9"); got != dp {
+	if got := Output(outs, config.PopupOnConnector("DP-9")); got != dp {
 		t.Errorf("missing connector = %v, want the primary fallback", got)
 	}
-	if got := Output(nil, "primary"); got != nil {
+	if got := Output(nil, config.PopupMonitor{}); got != nil {
 		t.Errorf("no outputs = %v, want nil", got)
 	}
 }
 
 func TestZeroPopupDurationSticks(t *testing.T) {
 	cfg := config.DefaultsNotification()
-	cfg.PopupDurationMS = 0
+	cfg.PopupDuration = 0
 	p, svc := newTestPopups(t, cfg)
 	svc.Notify("app", 0, "", "Sticky", "", nil, 0)
 	p.sync()
@@ -174,13 +174,39 @@ func TestPopupIconFallback(t *testing.T) {
 	}
 }
 
-func TestAnchorsCornersOnly(t *testing.T) {
-	// Popups accept the corners and sides; the pure top/bottom edges
-	// are not in the schema's popup-position set (config-side check).
-	if _, ok := popupsAnchorOK(config.OsdTopRight); !ok {
-		t.Error("top-right rejected")
+func TestPopupAnchors(t *testing.T) {
+	// notification_popup/methods.rs apply_position: corners take both
+	// edges, the centered positions one.
+	for pos, want := range map[config.PopupPosition]app.Anchor{
+		config.PopupPositionTopRight:     app.AnchorTop | app.AnchorRight,
+		config.PopupPositionBottomLeft:   app.AnchorBottom | app.AnchorLeft,
+		config.PopupPositionTopCenter:    app.AnchorTop,
+		config.PopupPositionBottomCenter: app.AnchorBottom,
+		config.PopupPositionCenterLeft:   app.AnchorLeft,
+		config.PopupPositionCenterRight:  app.AnchorRight,
+	} {
+		if got := popupAnchors(pos); got != want {
+			t.Errorf("%s anchors = %v, want %v", pos, got, want)
+		}
 	}
-	if _, ok := popupsAnchorOK(config.OsdTop); ok {
-		t.Error("top accepted")
+	if got := popupAnchors("sideways"); got != app.AnchorTop|app.AnchorRight {
+		t.Errorf("an unknown position = %v, want the top-right default", got)
+	}
+}
+
+func TestSetConfigRebuildsTheStackWithTheNewLimits(t *testing.T) {
+	cfg := config.DefaultsNotification()
+	p, svc := newTestPopups(t, cfg)
+	for range 3 {
+		svc.Notify("app", 0, "", "hi", "", nil, 0)
+	}
+	p.sync()
+	if got := p.Visible(); got != 3 {
+		t.Fatalf("visible = %d, want 3 under the default limit", got)
+	}
+	cfg.PopupMaxVisible = 1
+	p.SetConfig(cfg)
+	if got := p.Visible(); got != 1 {
+		t.Errorf("after a reload with popup-max-visible = 1: visible = %d", got)
 	}
 }

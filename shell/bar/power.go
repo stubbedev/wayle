@@ -17,7 +17,7 @@ type powerModule struct {
 
 func newPower(ctx ModuleContext) (Module, error) {
 	cfg := ctx.Config.Power
-	ic := moduleIcon(ctx, cfg.Icon)
+	ic := moduleIcon(ctx, cfg.Icon())
 	if ic == nil {
 		return nil, errors.New("power: icon-show is off and there is nothing to render")
 	}

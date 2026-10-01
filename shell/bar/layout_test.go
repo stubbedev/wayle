@@ -40,7 +40,7 @@ func TestFindLayoutUnmatchedMonitorGetsNoBar(t *testing.T) {
 
 func TestFindLayoutInheritsEmptySectionsFromExtends(t *testing.T) {
 	layouts := []config.BarLayout{
-		{Monitor: "DP-1", Extends: "*", Left: []config.BarItem{{Module: "battery"}}},
+		{Monitor: "DP-1", Extends: new("*"), Left: []config.BarItem{{Module: "battery"}}},
 		{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}, Right: []config.BarItem{{Module: "power"}}},
 	}
 	layout, ok := FindLayout(layouts, "DP-1")
@@ -60,7 +60,7 @@ func TestFindLayoutInheritsEmptySectionsFromExtends(t *testing.T) {
 
 func TestFindLayoutExtendsKeepsOwnNonEmptySections(t *testing.T) {
 	layouts := []config.BarLayout{
-		{Monitor: "DP-1", Extends: "*", Left: []config.BarItem{{Module: "battery"}}, Right: []config.BarItem{{Module: "volume"}}},
+		{Monitor: "DP-1", Extends: new("*"), Left: []config.BarItem{{Module: "battery"}}, Right: []config.BarItem{{Module: "volume"}}},
 		{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}, Right: []config.BarItem{{Module: "power"}}},
 	}
 	layout, _ := FindLayout(layouts, "DP-1")
@@ -71,8 +71,8 @@ func TestFindLayoutExtendsKeepsOwnNonEmptySections(t *testing.T) {
 
 func TestFindLayoutCircularExtendsTerminates(t *testing.T) {
 	layouts := []config.BarLayout{
-		{Monitor: "DP-1", Extends: "DP-2", Left: []config.BarItem{{Module: "battery"}}},
-		{Monitor: "DP-2", Extends: "DP-1", Center: []config.BarItem{{Module: "clock"}}},
+		{Monitor: "DP-1", Extends: new("DP-2"), Left: []config.BarItem{{Module: "battery"}}},
+		{Monitor: "DP-2", Extends: new("DP-1"), Center: []config.BarItem{{Module: "clock"}}},
 	}
 	layout, ok := FindLayout(layouts, "DP-1")
 	if !ok {
@@ -87,7 +87,7 @@ func TestFindLayoutCircularExtendsTerminates(t *testing.T) {
 }
 
 func TestFindLayoutMissingExtendsParentIsASkip(t *testing.T) {
-	layouts := []config.BarLayout{{Monitor: "DP-1", Extends: "ghost", Left: []config.BarItem{{Module: "battery"}}}}
+	layouts := []config.BarLayout{{Monitor: "DP-1", Extends: new("ghost"), Left: []config.BarItem{{Module: "battery"}}}}
 	layout, ok := FindLayout(layouts, "DP-1")
 	if !ok {
 		t.Fatal("missing extends parent: want a layout, got none")

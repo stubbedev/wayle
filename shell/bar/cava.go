@@ -39,13 +39,13 @@ type spectrum struct {
 // newSpectrum builds the painter for one resolved cava config.
 func newSpectrum(cfg config.CavaConfig, color render.Color, scale float64) *spectrum {
 	height := int(math.Round(spectrumHeightRem * styling.RemBase * scale))
-	pad := int(math.Round(cfg.InternalPad.ResolvePx(styling.RemBase, scale)))
+	pad := int(math.Round(cfg.InternalPadding.ResolvePx(styling.RemBase, scale)))
 	return &spectrum{
 		bars:   make([]float64, cfg.Bars),
 		peaks:  make([]float64, cfg.Bars),
 		color:  color,
-		width:  cfg.BarWidth,
-		gap:    cfg.BarGap,
+		width:  int(cfg.BarWidth),
+		gap:    int(cfg.BarGap),
 		pad:    pad,
 		dir:    cfg.Direction,
 		peaked: cfg.Style == config.CavaStylePeaks,
@@ -98,9 +98,9 @@ func (s *spectrum) Paint(cv *render.Canvas) {
 		x := innerX + i*(s.width+s.gap)
 		var y int
 		switch s.dir {
-		case config.CavaReverse:
+		case config.CavaDirectionReverse:
 			y = innerY
-		case config.CavaMirror:
+		case config.CavaDirectionMirror:
 			y = innerY + (innerH-h)/2
 		default:
 			y = innerY + innerH - h
@@ -111,9 +111,9 @@ func (s *spectrum) Paint(cv *render.Canvas) {
 			ph := max(min(int(math.Round(p*float64(innerH))), innerH), 1)
 			var py int
 			switch s.dir {
-			case config.CavaReverse:
+			case config.CavaDirectionReverse:
 				py = innerY + ph - 1
-			case config.CavaMirror:
+			case config.CavaDirectionMirror:
 				py = innerY + (innerH-ph)/2 + ph - 1
 			default:
 				py = innerY + innerH - ph
@@ -139,11 +139,11 @@ func newCava(ctx ModuleContext) (Module, error) {
 	if cfg.Style == config.CavaStyleWave {
 		return nil, errors.New("cava: the wave style is not ported to the Go shell yet")
 	}
-	plan, err := analyzer.NewPlan(cfg.Bars, cavaRate, cfg.NoiseReduction, true, cfg.LowCutoff, cfg.HighCutoff)
+	plan, err := analyzer.NewPlan(int(cfg.Bars), cavaRate, float64(cfg.NoiseReduction), true, int(cfg.LowCutoff), int(cfg.HighCutoff))
 	if err != nil {
 		return nil, err
 	}
-	paint := newSpectrum(cfg, resolveModuleColor(ctx, cfg.Color), ctx.Config.Bar.Scale)
+	paint := newSpectrum(cfg, resolveModuleColor(ctx, cfg.Color), float64(ctx.Config.Bar.Scale))
 	module := &cavaModule{paint: paint, plan: plan}
 	if ctx.App == nil {
 		return module, nil

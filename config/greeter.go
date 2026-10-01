@@ -2,76 +2,56 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
-
-	"github.com/BurntSushi/toml"
 )
 
-// GreeterConfig is the [greeter] section (wayle-config's
-// GreeterConfig): the pre-login screen wayle-greeter renders for
-// greetd, read from the system config.
+// GreeterConfig is the [greeter] section
+// (crates/wayle-config/src/schemas/greeter/mod.rs).
+//
+// Greeter (display manager): the pre-login screen `wayle-greeter` renders as
+// a greetd greeter.
+//
+// The greeter reads the system config (`/etc/wayle/config.toml`), so these
+// settings take effect there — copy or symlink your user config if you want
+// the login screen to follow it.
 type GreeterConfig struct {
-	Background Background
-	Clock      ClockFormats
-	// ShowUserList shows clickable avatars for the login users.
-	ShowUserList bool
-	// ShowPowerButtons shows shutdown and reboot at the bottom.
-	ShowPowerButtons bool
-	// CursorTheme is the Xcursor theme; "" is the system default.
-	CursorTheme string
-	// CursorSize is the logical cursor size.
-	CursorSize uint32
-	// CursorThemeExplicit and CursorSizeExplicit record that a config
-	// layer set the key: explicit values beat cursor auto-detection,
-	// schema defaults do not (the Rust ConfigProperty config/runtime
-	// layers).
-	CursorThemeExplicit bool
-	CursorSizeExplicit  bool
+	// Background is background-mode, background-image, and
+	// background-color.
+	Background Background `cfg:",inline"`
+	// Show a clock above the login form.
+	ShowClock bool `cfg:"show-clock"`
+	// `strftime` format for the greeter time.
+	ClockFormat StrftimeFormat `cfg:"clock-format"`
+	// `strftime` format for the greeter date.
+	DateFormat StrftimeFormat `cfg:"date-format"`
+	// Show clickable avatars for the machine's login users.
+	ShowUserList bool `cfg:"show-user-list"`
+	// Show the shutdown/reboot buttons at the bottom of the screen.
+	ShowPowerButtons bool `cfg:"show-power-buttons"`
+	// Xcursor theme used on the login screen (empty = system default).
+	CursorTheme string `cfg:"cursor-theme"`
+	// Logical cursor size on the login screen. Scaled automatically per
+	// display, so HiDPI outputs get a matching high-resolution cursor.
+	CursorSize uint32 `cfg:"cursor-size"`
+	// CursorThemeExplicit and CursorSizeExplicit record that a layer
+	// set the key: explicit values beat cursor auto-detection, schema
+	// defaults do not (ConfigProperty's config/runtime source).
+	CursorThemeExplicit bool `cfg:"-"`
+	CursorSizeExplicit  bool `cfg:"-"`
 }
 
-// DefaultsGreeter returns the schema defaults: a black fill, the
-// clock, the user list, the power buttons, and a 24px system cursor.
+// DefaultsGreeter returns the schema defaults.
 func DefaultsGreeter() GreeterConfig {
 	return GreeterConfig{
-		Background:       Background{Mode: BackgroundColor, Color: mustHex("#000000")},
-		Clock:            defaultClockFormats(),
+		Background:       defaultBackground(),
+		ShowClock:        true,
+		ClockFormat:      mustStrftime("%H:%M"),
+		DateFormat:       mustStrftime("%A, %B %-d"),
 		ShowUserList:     true,
 		ShowPowerButtons: true,
 		CursorSize:       24,
 	}
-}
-
-// applyGreeter overlays [greeter] onto base, key by key, so a later
-// layer (runtime.toml) only replaces what it sets.
-func applyGreeter(md toml.MetaData, prim toml.Primitive, base GreeterConfig) (GreeterConfig, error) {
-	cfg := base
-	var doc struct {
-		screenDoc
-		ShowUserList     *bool   `toml:"show-user-list"`
-		ShowPowerButtons *bool   `toml:"show-power-buttons"`
-		CursorTheme      *string `toml:"cursor-theme"`
-		CursorSize       *uint32 `toml:"cursor-size"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return base, fmt.Errorf("greeter: %w", err)
-	}
-	if err := doc.apply("greeter", &cfg.Background, &cfg.Clock); err != nil {
-		return base, err
-	}
-	setIf(&cfg.ShowUserList, doc.ShowUserList)
-	setIf(&cfg.ShowPowerButtons, doc.ShowPowerButtons)
-	if doc.CursorTheme != nil {
-		cfg.CursorTheme = *doc.CursorTheme
-		cfg.CursorThemeExplicit = true
-	}
-	if doc.CursorSize != nil {
-		cfg.CursorSize = *doc.CursorSize
-		cfg.CursorSizeExplicit = true
-	}
-	return cfg, nil
 }
 
 // GreeterConfigPath is the system config the greeter reads when no
@@ -85,67 +65,33 @@ func RuntimeOverlayPath(configPath string) string {
 	return filepath.Join(filepath.Dir(configPath), "runtime.toml")
 }
 
-// LoadGreeter loads the greeter's config (wayle-greeter's config::load):
-// the file at path over the defaults, then the [greeter] table of the
-// sibling runtime.toml over that, key by key. Failures come back as a
-// joined error beside a usable config — the greeter logs them and
+// LoadGreeter is wayle-greeter's config::load: the file at path with
+// its imports on the config layer, the sibling runtime.toml on the
+// runtime layer. A file that fails to load leaves its layer out (the
+// errors come back joined beside a usable config), so the greeter
 // always renders.
-func LoadGreeter(path string) (*Config, error) {
-	cfg, err := LoadFile(path)
+func LoadGreeter(path string, sink DiagnosticSink) (*Config, error) {
 	var errs []error
+	configTree, err := loadTree(path)
+	if err != nil {
+		errs = append(errs, err)
+		configTree = nil
+	}
+	runtimeTree, err := readRuntime(RuntimeOverlayPath(path))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		errs = append(errs, err)
+	}
+	cfg, _, err := build(configTree, runtimeTree, nil, sink)
 	if err != nil {
 		errs = append(errs, err)
 	}
-	if err := cfg.applyGreeterOverlay(RuntimeOverlayPath(path)); err != nil {
-		errs = append(errs, err)
+	for _, tree := range []any{configTree, runtimeTree} {
+		if hasPath(tree, "greeter.cursor-theme") {
+			cfg.Greeter.CursorThemeExplicit = true
+		}
+		if hasPath(tree, "greeter.cursor-size") {
+			cfg.Greeter.CursorSizeExplicit = true
+		}
 	}
 	return cfg, errors.Join(errs...)
-}
-
-// applyGreeterOverlay overlays runtime.toml's [greeter] table; a
-// missing file is no overlay, not an error.
-func (c *Config) applyGreeterOverlay(path string) error {
-	data, err := os.ReadFile(path) //nolint:gosec // the overlay sits beside the config the operator named
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("config: read %s: %w", path, err)
-	}
-	var doc struct {
-		Greeter *toml.Primitive `toml:"greeter"`
-	}
-	md, err := toml.Decode(string(data), &doc)
-	if err != nil {
-		return fmt.Errorf("config: %s: %w", path, err)
-	}
-	if doc.Greeter == nil {
-		return nil
-	}
-	g, err := applyGreeter(md, *doc.Greeter, c.Greeter)
-	if err != nil {
-		return fmt.Errorf("config: %s: %w", path, err)
-	}
-	c.Greeter = g
-	return nil
-}
-
-// applyScreens overlays the [lock] and [greeter] sections that are
-// present.
-func (c *Config) applyScreens(md toml.MetaData, lock, greeter *toml.Primitive) error {
-	if lock != nil {
-		l, err := applyLock(md, *lock, c.Lock)
-		if err != nil {
-			return err
-		}
-		c.Lock = l
-	}
-	if greeter != nil {
-		g, err := applyGreeter(md, *greeter, c.Greeter)
-		if err != nil {
-			return err
-		}
-		c.Greeter = g
-	}
-	return nil
 }

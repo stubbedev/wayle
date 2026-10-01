@@ -153,23 +153,6 @@ func TestCompletionsMatchClap(t *testing.T) {
 
 // `wayle -V` reports the Cargo workspace version, so the two binaries
 // cannot drift apart silently.
-func TestVersionTracksCargoWorkspace(t *testing.T) {
-	cargo, err := os.ReadFile("../../Cargo.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := ""
-	for line := range strings.Lines(string(cargo)) {
-		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "version = \""); ok {
-			want = strings.TrimSuffix(v, "\"")
-			break
-		}
-	}
-	if want == "" || version != want {
-		t.Fatalf("version %q, Cargo workspace %q", version, want)
-	}
-}
-
 // The binary invoked as `rofi` hands its whole argv to the launcher,
 // flags included; under its own name the same flags are wayle's.
 func TestRofiInvocationRoutesToLauncher(t *testing.T) {

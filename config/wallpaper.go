@@ -1,53 +1,62 @@
 package config
 
 import (
-	"fmt"
 	"log"
+	"math"
+	"reflect"
 	"slices"
-
-	"github.com/BurntSushi/toml"
-
-	"github.com/stubbedev/wayle/service/wallpaper"
 )
-
-// cyclingIntervalMin is CyclingInterval's floor, in minutes.
-const cyclingIntervalMin = 1
 
 // WallpaperConfig is the [wallpaper] section
 // (crates/wayle-config/src/schemas/wallpaper): what each monitor shows
 // and how. Resolution order: a cycling directory, else the single
 // Wallpaper image; Monitors entries apply on top.
+//
+// Wallpaper rendering, cycling, and per-monitor overrides.
 type WallpaperConfig struct {
-	// Wallpaper is one image for every monitor; empty uses cycling
-	// and/or the per-monitor entries.
-	Wallpaper string
-	// FitMode is the global scaling, overridden per monitor.
-	FitMode wallpaper.FitMode
-	// CyclingDirectory enables cycling when set; it takes precedence
-	// over Wallpaper.
-	CyclingDirectory string
-	CyclingMode      wallpaper.CyclingMode
-	// CyclingIntervalMins is at least 1.
-	CyclingIntervalMins uint64
-	// CyclingSameImage shows one shuffle image on every monitor.
-	CyclingSameImage bool
-	Monitors         []MonitorWallpaperConfig
-}
-
-// MonitorWallpaperConfig is one [[wallpaper.monitors]] entry, keyed by
-// connector name.
-type MonitorWallpaperConfig struct {
-	Name      string
-	FitMode   wallpaper.FitMode
-	Wallpaper string
+	// A single image file to use as the wallpaper on all monitors. Leave empty
+	// to use cycling and/or per-monitor overrides instead.
+	Wallpaper string `cfg:"wallpaper"`
+	// How the wallpaper is scaled to the screen. Per-monitor entries in
+	// `[[wallpaper.monitors]]` override this.
+	FitMode FitMode `cfg:"fit-mode"`
+	// Directory of images to cycle through. Set it to enable cycling; leave
+	// empty to disable. Takes precedence over the single `wallpaper` image.
+	CyclingDirectory string `cfg:"cycling-directory"`
+	// Wallpaper cycling order.
+	CyclingMode CyclingMode `cfg:"cycling-mode"`
+	// Time between wallpaper changes in minutes.
+	CyclingIntervalMins CyclingInterval `cfg:"cycling-interval-mins"`
+	// Show the same cycling wallpaper on all monitors. Only affects shuffle
+	// mode since sequential already displays the same image.
+	CyclingSameImage bool `cfg:"cycling-same-image"`
+	// Per-monitor wallpaper and fit mode settings. Each entry targets a
+	// monitor by connector name. See [`MonitorWallpaperConfig`] for the
+	// available fields.
+	//
+	// ## Example
+	//
+	// ```toml
+	// [[wallpaper.monitors]]
+	// name = "DP-1"
+	// wallpaper = "/home/me/pictures/wall-primary.png"
+	// fit-mode = "fill"
+	//
+	// [[wallpaper.monitors]]
+	// name = "HDMI-1"
+	// wallpaper = "/home/me/pictures/wall-secondary.png"
+	// fit-mode = "fit"
+	// ```
+	Monitors []MonitorWallpaperConfig `cfg:"monitors"`
 }
 
 // DefaultsWallpaper returns the schema defaults.
 func DefaultsWallpaper() WallpaperConfig {
 	return WallpaperConfig{
-		FitMode:             wallpaper.FitFill,
-		CyclingMode:         wallpaper.Sequential,
-		CyclingIntervalMins: 15,
+		FitMode:             FitFill,
+		CyclingMode:         CyclingSequential,
+		CyclingIntervalMins: CyclingIntervalDefault,
+		Monitors:            []MonitorWallpaperConfig{},
 	}
 }
 
@@ -60,90 +69,100 @@ func (w WallpaperConfig) Monitor(name string) (MonitorWallpaperConfig, bool) {
 	return w.Monitors[i], true
 }
 
-// exactEnum parses a serde lowercase enum value: exact spelling only,
-// though the parser itself may be case-insensitive for D-Bus.
-func exactEnum[T fmt.Stringer](key, value string, parse func(string) (T, error)) (T, error) {
-	v, err := parse(value)
-	if err == nil && v.String() != value {
-		err = fmt.Errorf("unknown variant %q", value)
-	}
-	if err != nil {
-		var zero T
-		return zero, fmt.Errorf("wallpaper: %s: %w", key, err)
-	}
-	return v, nil
+// MonitorWallpaperConfig is one [[wallpaper.monitors]] entry, keyed by
+// connector name.
+//
+// Per-monitor wallpaper configuration.
+type MonitorWallpaperConfig struct {
+	// Monitor name (e.g., "HDMI-1", "DP-1").
+	Name string `cfg:"name,required"`
+	// Image scaling mode for this monitor.
+	FitMode FitMode `cfg:"fit-mode,default"`
+	// Wallpaper image path for this monitor.
+	Wallpaper string `cfg:"wallpaper,default"`
 }
 
-// applyWallpaper overlays [wallpaper].
-func applyWallpaper(md toml.MetaData, prim toml.Primitive) (WallpaperConfig, error) {
-	cfg := DefaultsWallpaper()
-	var doc struct {
-		Wallpaper        *string `toml:"wallpaper"`
-		FitMode          *string `toml:"fit-mode"`
-		CyclingDirectory *string `toml:"cycling-directory"`
-		CyclingMode      *string `toml:"cycling-mode"`
-		CyclingInterval  *int64  `toml:"cycling-interval-mins"`
-		CyclingSameImage *bool   `toml:"cycling-same-image"`
-		Monitors         []struct {
-			Name      *string `toml:"name"`
-			FitMode   *string `toml:"fit-mode"`
-			Wallpaper *string `toml:"wallpaper"`
-		} `toml:"monitors"`
+func (MonitorWallpaperConfig) noStructDefault() {}
+
+// FitMode is how an image is scaled to its monitor (types/fit_mode.rs).
+//
+// Image scaling mode.
+type FitMode string
+
+// Fit modes; Fill is the default.
+const (
+	// Scale to cover entire display, cropping excess.
+	FitFill FitMode = "fill"
+	// Scale to fit within display, letterboxing if needed.
+	FitFit FitMode = "fit"
+	// Display at original size, centered.
+	FitCenter FitMode = "center"
+	// Stretch to exactly fill, ignoring aspect ratio.
+	FitStretch FitMode = "stretch"
+)
+
+var _ = registerEnum(FitFill, FitFit, FitCenter, FitStretch)
+
+// FitModes is every fit mode, in schema order.
+var FitModes = []FitMode{FitFill, FitFit, FitCenter, FitStretch}
+
+// CyclingMode is the order images cycle in (types/cycling.rs).
+//
+// Wallpaper cycling order.
+type CyclingMode string
+
+// Cycling modes; Sequential is the default.
+const (
+	// Alphabetical order.
+	CyclingSequential CyclingMode = "sequential"
+	// Random order.
+	CyclingShuffle CyclingMode = "shuffle"
+)
+
+var _ = registerEnum(CyclingSequential, CyclingShuffle)
+
+// CyclingModes is every cycling mode, in schema order.
+var CyclingModes = []CyclingMode{CyclingSequential, CyclingShuffle}
+
+// CyclingInterval is the cycling period in minutes, at least 1
+// (types/cycling.rs CyclingInterval).
+//
+// Cycling interval in minutes, minimum 1.
+type CyclingInterval uint64
+
+// The interval's floor and default.
+const (
+	CyclingIntervalMin     CyclingInterval = 1
+	CyclingIntervalDefault CyclingInterval = 15
+)
+
+// UnmarshalConfig implements Unmarshaler: below the floor clamps with
+// the Rust warning rather than failing.
+func (c *CyclingInterval) UnmarshalConfig(v any) error {
+	n, err := decodeClamped[uint64](v, 0, math.MaxUint64, "cycling interval")
+	if err != nil {
+		return err
 	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
+	if CyclingInterval(n) < CyclingIntervalMin {
+		log.Printf("config: cycling interval %d below minimum (%d), clamped", n, CyclingIntervalMin)
+		n = uint64(CyclingIntervalMin)
 	}
-	if doc.Wallpaper != nil {
-		cfg.Wallpaper = *doc.Wallpaper
-	}
-	if doc.FitMode != nil {
-		fit, err := exactEnum("fit-mode", *doc.FitMode, wallpaper.ParseFitMode)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.FitMode = fit
-	}
-	if doc.CyclingDirectory != nil {
-		cfg.CyclingDirectory = *doc.CyclingDirectory
-	}
-	if doc.CyclingMode != nil {
-		mode, err := exactEnum("cycling-mode", *doc.CyclingMode, wallpaper.ParseCyclingMode)
-		if err != nil {
-			return cfg, err
-		}
-		cfg.CyclingMode = mode
-	}
-	if doc.CyclingInterval != nil {
-		mins := *doc.CyclingInterval
-		if mins < 0 {
-			return cfg, fmt.Errorf("wallpaper: cycling-interval-mins: invalid value %d, expected u64", mins)
-		}
-		if mins < cyclingIntervalMin {
-			// CyclingInterval clamps with a warning rather than failing.
-			log.Printf("config: cycling interval %d below minimum (%d), clamped", mins, cyclingIntervalMin)
-			mins = cyclingIntervalMin
-		}
-		cfg.CyclingIntervalMins = uint64(mins)
-	}
-	if doc.CyclingSameImage != nil {
-		cfg.CyclingSameImage = *doc.CyclingSameImage
-	}
-	for i, m := range doc.Monitors {
-		if m.Name == nil {
-			return cfg, fmt.Errorf("wallpaper: monitors[%d]: missing field `name`", i)
-		}
-		entry := MonitorWallpaperConfig{Name: *m.Name, FitMode: wallpaper.FitFill}
-		if m.FitMode != nil {
-			fit, err := exactEnum("monitors.fit-mode", *m.FitMode, wallpaper.ParseFitMode)
-			if err != nil {
-				return cfg, err
-			}
-			entry.FitMode = fit
-		}
-		if m.Wallpaper != nil {
-			entry.Wallpaper = *m.Wallpaper
-		}
-		cfg.Monitors = append(cfg.Monitors, entry)
-	}
-	return cfg, nil
+	*c = CyclingInterval(n)
+	return nil
 }
+
+// MarshalConfig implements Marshaler.
+func (c CyclingInterval) MarshalConfig() any { return int64(c) }
+
+func (CyclingInterval) configSchema(*schemaGen) Schema {
+	return rangedSchema(reflect.TypeFor[CyclingInterval](), int64(CyclingIntervalMin), nil)
+}
+
+// setDefaults is the entry's serde field defaults: fit-mode is Fill.
+func (m *MonitorWallpaperConfig) setDefaults() { m.FitMode = FitFill }
+
+// String is the config spelling.
+func (m FitMode) String() string { return string(m) }
+
+// String is the config spelling.
+func (m CyclingMode) String() string { return string(m) }

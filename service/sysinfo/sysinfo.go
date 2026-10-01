@@ -163,20 +163,28 @@ func GiB(bytes uint64) string {
 	return strconv.FormatFloat(float64(bytes)/gib, 'f', 1, 64)
 }
 
-// ReadStoragePercent reports one mount point's used percent through
-// statfs.
-func ReadStoragePercent(path string) (float64, error) {
-	if path == "" {
-		path = "/"
+// ReadStoragePercent reports the used percent of the mount points
+// together (storage helpers.rs aggregate_storage): used and total sum
+// across them through statfs. Paths that cannot be read are skipped;
+// none readable is an error.
+func ReadStoragePercent(paths []string) (float64, error) {
+	var used, total uint64
+	var errs []error
+	for _, path := range paths {
+		var stat unix.Statfs_t
+		if err := unix.Statfs(path, &stat); err != nil {
+			errs = append(errs, fmt.Errorf("sysinfo: statfs %s: %w", path, err))
+			continue
+		}
+		size := stat.Blocks * uint64(stat.Bsize)
+		total += size
+		used += size - stat.Bfree*uint64(stat.Bsize)
 	}
-	var stat unix.Statfs_t
-	if err := unix.Statfs(path, &stat); err != nil {
-		return 0, fmt.Errorf("sysinfo: statfs %s: %w", path, err)
+	if len(errs) == len(paths) {
+		return 0, errors.Join(append(errs, errors.New("sysinfo: no readable mount point"))...)
 	}
-	total := stat.Blocks * uint64(stat.Bsize)
-	free := stat.Bfree * uint64(stat.Bsize)
 	if total == 0 {
 		return 0, nil
 	}
-	return float64(total-free) / float64(total) * 100, nil
+	return float64(used) / float64(total) * 100, nil
 }

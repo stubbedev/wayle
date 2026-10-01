@@ -91,7 +91,7 @@ func newBarButtonShell(ctx ModuleContext) *barButton {
 	b := &barButton{cfg: ctx.Config}
 	if ctx.Config != nil {
 		b.vertical = ctx.Config.Bar.Location.IsVertical()
-		b.button = config.DefaultsButton(config.ButtonColors{}, config.TokenFgDefault, true, 0)
+		b.button = config.ButtonConfig{IconShow: true, LabelShow: true, AutoIconColor: config.TokenFgDefault}
 	}
 	axis := widget.Row
 	if b.vertical {
@@ -151,7 +151,7 @@ func (b *barButton) refresh() {
 		return
 	}
 	b.SetClasses(b.classes()...)
-	b.SetInlineStyle(inlineDecls(styling.ButtonCSS(b.button, b.cfg.Bar, b.cfg.ColorExtractor.ThemeProvider, b.thresholds)))
+	b.SetInlineStyle(inlineDecls(styling.ButtonCSS(b.button, b.cfg.Bar, b.cfg.Styling.ColorExtractor.ThemeProvider, b.thresholds)))
 	b.syncVisibility()
 }
 

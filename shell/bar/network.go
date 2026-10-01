@@ -96,7 +96,7 @@ func newNetwork(ctx ModuleContext) (Module, error) {
 	}
 	m := &networkModule{ctx: ctx, source: ctx.Network}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.icon = moduleIcon(ctx, ctx.Config.Network.Icon)
+	m.icon = moduleIcon(ctx, ctx.Config.Network.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err

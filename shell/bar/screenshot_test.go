@@ -33,7 +33,7 @@ func TestScreenshotBindingRunsInProcess(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	var got []string
 	ctx.Screenshot = func(mode, target string) { got = append(got, mode+"|"+target) }
-	runClickAction(ctx, ctx.Config.Screenshot.Click.RightClick)
+	runClickAction(ctx, ctx.Config.Screenshot.Clicks().RightClick)
 	runShellBuiltin(ctx, "wayle screenshot output HDMI-A-1")
 	if len(got) != 2 || got[0] != "output|" || got[1] != "output|HDMI-A-1" {
 		t.Fatalf("triggered %v", got)
@@ -66,7 +66,7 @@ func TestScreenshotModule(t *testing.T) {
 	if got := btn.label.Text(); got != "Cap…" {
 		t.Fatalf("label %q, want Cap…", got)
 	}
-	cfg.Screenshot.Icon.Show, cfg.Screenshot.LabelShow = false, false
+	cfg.Screenshot.IconShow, cfg.Screenshot.LabelShow = false, false
 	if _, err := newScreenshot(newTestContext(t, cfg)); err == nil {
 		t.Fatal("a module with nothing to show was built")
 	}

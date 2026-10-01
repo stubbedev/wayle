@@ -61,15 +61,16 @@ func TestLoadFileAppliesKeybindMode(t *testing.T) {
 	if c.KeybindMode.Format != "[{plugin}] {{ mode }}" || !c.KeybindMode.AutoHide {
 		t.Errorf("config = %+v", c.KeybindMode)
 	}
-	if c.KeybindMode.Icon.Name != "ld-layers-symbolic" {
-		t.Errorf("icon = %+v", c.KeybindMode.Icon)
+	if c.KeybindMode.Icon().Name != "ld-layers-symbolic" {
+		t.Errorf("icon = %+v", c.KeybindMode.Icon())
 	}
 
 	if err := osWrite(path, "[modules.keybind-mode]\nformat = \"\"\n"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := config.LoadFile(path); err == nil {
-		t.Error("empty format: want a load error")
+	// The schema puts no constraint on the format string.
+	if _, err := config.LoadFile(path); err != nil {
+		t.Errorf("empty format: accepted by the schema, got %v", err)
 	}
 }
 

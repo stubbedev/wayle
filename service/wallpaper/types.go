@@ -8,70 +8,46 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/stubbedev/wayle/config"
 )
 
 // FitMode is how an image is scaled to its monitor
-// (types/fit_mode.rs).
-type FitMode uint8
+// (types/fit_mode.rs): the [wallpaper] schema enum.
+type FitMode = config.FitMode
 
 // Fit modes; Fill is the default.
 const (
-	// FitFill scales to cover the display, cropping the excess.
-	FitFill FitMode = iota
-	// FitFit scales to fit within the display, letterboxing.
-	FitFit
-	// FitCenter shows the image at its original size, centered.
-	FitCenter
-	// FitStretch stretches to exactly fill, ignoring aspect ratio.
-	FitStretch
+	FitFill    = config.FitFill
+	FitFit     = config.FitFit
+	FitCenter  = config.FitCenter
+	FitStretch = config.FitStretch
 )
-
-var fitModes = []string{"fill", "fit", "center", "stretch"}
-
-// String is the mode's lowercase name.
-func (m FitMode) String() string {
-	if int(m) < len(fitModes) {
-		return fitModes[m]
-	}
-	return fmt.Sprintf("FitMode(%d)", uint8(m))
-}
 
 // ParseFitMode reads a mode case-insensitively, as FitMode::from_str
 // does for the D-Bus interface.
 func ParseFitMode(s string) (FitMode, error) {
-	if i := slices.Index(fitModes, strings.ToLower(s)); i >= 0 {
-		return FitMode(i), nil
+	if i := slices.Index(config.FitModes, FitMode(strings.ToLower(s))); i >= 0 {
+		return config.FitModes[i], nil
 	}
-	return 0, fmt.Errorf("Invalid fit mode: %s", s) //nolint:staticcheck // the Rust message, verbatim
+	return "", fmt.Errorf("Invalid fit mode: %s", s) //nolint:staticcheck // the Rust message, verbatim
 }
 
 // CyclingMode is the order images cycle in (types/cycling.rs).
-type CyclingMode uint8
+type CyclingMode = config.CyclingMode
 
 // Cycling modes; Sequential is the default.
 const (
-	// Sequential cycles in sorted path order.
-	Sequential CyclingMode = iota
-	// Shuffle cycles in a random order.
-	Shuffle
+	Sequential = config.CyclingSequential
+	Shuffle    = config.CyclingShuffle
 )
-
-var cyclingModes = []string{"sequential", "shuffle"}
-
-// String is the mode's lowercase name.
-func (m CyclingMode) String() string {
-	if int(m) < len(cyclingModes) {
-		return cyclingModes[m]
-	}
-	return fmt.Sprintf("CyclingMode(%d)", uint8(m))
-}
 
 // ParseCyclingMode reads a mode case-insensitively (CyclingMode::from_str).
 func ParseCyclingMode(s string) (CyclingMode, error) {
-	if i := slices.Index(cyclingModes, strings.ToLower(s)); i >= 0 {
-		return CyclingMode(i), nil
+	if i := slices.Index(config.CyclingModes, CyclingMode(strings.ToLower(s))); i >= 0 {
+		return config.CyclingModes[i], nil
 	}
-	return 0, fmt.Errorf("Invalid cycling mode: %s", s) //nolint:staticcheck // the Rust message, verbatim
+	return "", fmt.Errorf("Invalid cycling mode: %s", s) //nolint:staticcheck // the Rust message, verbatim
 }
 
 // MonitorState is one monitor's wallpaper, scaling, and cycle position

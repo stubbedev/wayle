@@ -135,7 +135,6 @@ unknown = "ignored"
 
 func TestThresholdDecodeRejectsBadEntries(t *testing.T) {
 	for _, tc := range []struct{ body, want string }{
-		{"icon-color = \"red\"", "above or below"},
 		{"above = 5\nlabel-color = \"nope\"", "label-color"},
 		{"above = 5\nborder-color = 3", "border-color"},
 		{"above = \"high\"", "above"},

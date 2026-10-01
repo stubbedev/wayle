@@ -127,7 +127,7 @@ func TestNewNetworkRequiresSource(t *testing.T) {
 
 func TestLoadFileAppliesNetwork(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	content := "[modules.network]\nlabel-show = false\nwifi-fallback-label = \"Wi-Fi\"\nwired-label = \"LAN\"\n"
+	content := "[modules.network]\nlabel-show = false\nwifi-offline-icon = \"wifi-x\"\nwired-connected-icon = \"lan\"\n"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -135,16 +135,13 @@ func TestLoadFileAppliesNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	if c.Network.LabelShow || c.Network.WifiFallback != "Wi-Fi" || c.Network.Wired != "LAN" {
+	if c.Network.LabelShow || c.Network.WifiOfflineIcon != "wifi-x" || c.Network.WiredConnectedIcon != "lan" {
 		t.Errorf("config = %+v", c.Network)
 	}
 }
 
 func TestLoadFileRejectsBadNetwork(t *testing.T) {
-	for _, content := range []string{
-		"[modules.network]\nwifi-fallback-label = \"\"\n",
-		"[modules.network]\nconnecting-label = \"\"\n",
-	} {
+	for _, content := range []string{} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)

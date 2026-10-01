@@ -43,15 +43,8 @@ func idleInhibitLabel(format string, active bool, durationMins uint32, remaining
 // idleInhibitColor resolves the state's configured color, the bar fg
 // otherwise.
 func idleInhibitColor(cfg config.IdleInhibitConfig, active bool, palette *styling.Palette, fallback render.Color) render.Color {
-	name := config.IdleInhibitInactive
-	if active {
-		name = config.IdleInhibitActive
-	}
-	color, ok := cfg.Colors[name]
-	if !ok {
-		return fallback
-	}
-	if resolved, ok := styling.ResolveColor(color, palette); ok {
+	_ = active
+	if resolved, ok := styling.ResolveColor(cfg.LabelColor, palette); ok && !cfg.LabelColor.IsAuto() {
 		return resolved
 	}
 	return fallback
@@ -75,7 +68,7 @@ func newIdleInhibit(ctx ModuleContext) (Module, error) {
 		state = idleinhibit.NewState(ctx.Config.IdleInhibit.StartupDuration)
 	}
 	m := &idleInhibitModule{ctx: ctx, state: state, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	m.icon = moduleIcon(ctx, ctx.Config.IdleInhibit.Icons[config.IdleInhibitInactive])
+	m.icon = moduleIcon(ctx, ctx.Config.IdleInhibit.Icons()[config.IdleInhibitInactive])
 	m.root = assembleModule(ctx, m.icon, m.label)
 	m.render()
 	// Follow the shared state: every flip re-syncs the inhibitor and
@@ -134,9 +127,9 @@ func (m *idleInhibitModule) render() {
 	m.label.SetText(text)
 	m.label.SetColor(idleInhibitColor(cfg, snap.Active, m.ctx.Style.palette, m.ctx.Style.fg))
 	if setter := m.icon; setter != nil {
-		icon := cfg.Icons[config.IdleInhibitInactive]
+		icon := cfg.Icons()[config.IdleInhibitInactive]
 		if snap.Active {
-			icon = cfg.Icons[config.IdleInhibitActive]
+			icon = cfg.Icons()[config.IdleInhibitActive]
 		}
 		setter.SetThemeName(icon.Name)
 	}

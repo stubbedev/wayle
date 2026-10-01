@@ -10,12 +10,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/BurntSushi/toml"
-
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/cli"
 	"github.com/stubbedev/wayle/internal/launcheripc"
 	"github.com/stubbedev/wayle/internal/shlex"
+	"github.com/stubbedev/wayle/internal/version"
 	"github.com/stubbedev/wayle/service/launcher"
 )
 
@@ -103,20 +102,26 @@ func runLauncherLocal(local launcherLocal, stdout io.Writer) error {
 	case localHelp:
 		fmt.Fprintln(stdout, launcherHelp)
 	case localVersion:
-		fmt.Fprintf(stdout, "wayle launcher %s\n", version)
+		fmt.Fprintf(stdout, "wayle launcher %s\n", version.Version)
 	case localDumpTheme:
 		fmt.Fprintln(stdout, launcherDumpTheme)
 	case localDumpConfig:
-		cfg, err := config.Load()
-		if cfg == nil {
-			return fmt.Errorf("failed to load config: %w", err)
+		svc, err := loadUserConfig()
+		if err != nil {
+			return err
 		}
-		return toml.NewEncoder(stdout).Encode(launcherTOML(cfg.Launcher))
+		v, err := svc.GetByPath("launcher")
+		if err != nil {
+			return fmt.Errorf("failed to read [launcher]: %w", err)
+		}
+		_, err = fmt.Fprintln(stdout, config.FormatGetValue(v))
+		return err
 	case localListKeybindings:
-		cfg, err := config.Load()
-		if cfg == nil {
-			return fmt.Errorf("failed to load config: %w", err)
+		svc, err := loadUserConfig()
+		if err != nil {
+			return err
 		}
+		cfg := svc.Config()
 		for _, b := range launcher.EffectiveKeybindings(cfg.Launcher.Keybindings) {
 			fmt.Fprintf(stdout, "kb-%s: %s\n", b.Action, b.Keys)
 		}
@@ -281,112 +286,6 @@ func printLauncherResult(w io.Writer, format string, selected []launcheripc.Sele
 			fmt.Fprintln(w, filter)
 		}
 	}
-}
-
-// launcherTOMLDoc is [launcher] as -dump-config prints it: the
-// effective values under their config keys, in schema order.
-type launcherTOMLDoc struct {
-	Location       string            `toml:"location"`
-	Width          any               `toml:"width"`
-	Lines          uint32            `toml:"lines"`
-	Monitor        string            `toml:"monitor"`
-	Modes          []string          `toml:"modes"`
-	Cycle          bool              `toml:"cycle"`
-	Matching       string            `toml:"matching"`
-	Tokenize       bool              `toml:"tokenize"`
-	NegateChar     string            `toml:"negate-char"`
-	NormalizeMatch bool              `toml:"normalize-match"`
-	Sort           bool              `toml:"sort"`
-	SortingMethod  string            `toml:"sorting-method"`
-	Case           string            `toml:"case"`
-	Terminal       string            `toml:"terminal"`
-	ShowIcons      bool              `toml:"show-icons"`
-	IconTheme      string            `toml:"icon-theme"`
-	SidebarMode    bool              `toml:"sidebar-mode"`
-	AutoSelect     bool              `toml:"auto-select"`
-	HoverSelect    bool              `toml:"hover-select"`
-	FixedNumLines  bool              `toml:"fixed-num-lines"`
-	Font           string            `toml:"font"`
-	PreviewCmd     string            `toml:"preview-cmd"`
-	DisplayNames   map[string]string `toml:"display-names"`
-	Scripts        map[string]string `toml:"scripts"`
-	Keybindings    map[string]string `toml:"keybindings"`
-	MouseBindings  map[string]string `toml:"mouse-bindings"`
-	Styles         map[string]string `toml:"styles"`
-	History        struct {
-		Enable  bool   `toml:"enable"`
-		MaxSize uint32 `toml:"max-size"`
-	} `toml:"history"`
-	Drun struct {
-		Categories        []string `toml:"categories"`
-		ExcludeCategories []string `toml:"exclude-categories"`
-		MatchFields       []string `toml:"match-fields"`
-		DisplayFormat     string   `toml:"display-format"`
-		ShowActions       bool     `toml:"show-actions"`
-		URLLauncher       string   `toml:"url-launcher"`
-	} `toml:"drun"`
-	Run struct {
-		RunCommand   string `toml:"run-command"`
-		ShellCommand string `toml:"shell-command"`
-		ListCommand  string `toml:"list-command"`
-	} `toml:"run"`
-	Window struct {
-		Format        string   `toml:"format"`
-		MatchFields   []string `toml:"match-fields"`
-		HideActive    bool     `toml:"hide-active"`
-		CloseOnDelete bool     `toml:"close-on-delete"`
-	} `toml:"window"`
-	SSH struct {
-		Client          string `toml:"client"`
-		Command         string `toml:"command"`
-		ParseHosts      bool   `toml:"parse-hosts"`
-		ParseKnownHosts bool   `toml:"parse-known-hosts"`
-	} `toml:"ssh"`
-	Filebrowser struct {
-		Directory        string `toml:"directory"`
-		SortingMethod    string `toml:"sorting-method"`
-		DirectoriesFirst bool   `toml:"directories-first"`
-		ShowHidden       bool   `toml:"show-hidden"`
-		Command          string `toml:"command"`
-	} `toml:"filebrowser"`
-	Combi struct {
-		Modes         []string `toml:"modes"`
-		DisplayFormat string   `toml:"display-format"`
-	} `toml:"combi"`
-}
-
-func stringsOf[T ~string](in []T) []string {
-	out := make([]string, len(in))
-	for i, v := range in {
-		out[i] = string(v)
-	}
-	return out
-}
-
-func launcherTOML(l config.LauncherConfig) launcherTOMLDoc {
-	var d launcherTOMLDoc
-	d.Location, d.Lines, d.Monitor, d.Modes, d.Cycle = string(l.Location), l.Lines, l.Monitor, l.Modes, l.Cycle
-	d.Width = l.Width.Value
-	if l.Width.Unit == config.SizePixels {
-		d.Width = strconv.FormatFloat(l.Width.Value, 'f', -1, 64) + "px"
-	}
-	d.Matching, d.Tokenize, d.NegateChar, d.NormalizeMatch = string(l.Matching), l.Tokenize, l.NegateChar, l.NormalizeMatch
-	d.Sort, d.SortingMethod, d.Case, d.Terminal = l.Sort, string(l.SortingMethod), string(l.Case), l.Terminal
-	d.ShowIcons, d.IconTheme, d.SidebarMode, d.AutoSelect = l.ShowIcons, l.IconTheme, l.SidebarMode, l.AutoSelect
-	d.HoverSelect, d.FixedNumLines, d.Font, d.PreviewCmd = l.HoverSelect, l.FixedNumLines, l.Font, l.PreviewCmd
-	d.DisplayNames, d.Scripts, d.Keybindings, d.MouseBindings, d.Styles = l.DisplayNames, l.Scripts, l.Keybindings, l.MouseBindings, l.Styles
-	d.History.Enable, d.History.MaxSize = l.History.Enable, l.History.MaxSize
-	d.Drun.Categories, d.Drun.ExcludeCategories = l.Drun.Categories, l.Drun.ExcludeCategories
-	d.Drun.MatchFields, d.Drun.DisplayFormat = stringsOf(l.Drun.MatchFields), l.Drun.DisplayFormat
-	d.Drun.ShowActions, d.Drun.URLLauncher = l.Drun.ShowActions, l.Drun.URLLauncher
-	d.Run.RunCommand, d.Run.ShellCommand, d.Run.ListCommand = l.Run.RunCommand, l.Run.ShellCommand, l.Run.ListCommand
-	d.Window.Format, d.Window.MatchFields = l.Window.Format, stringsOf(l.Window.MatchFields)
-	d.Window.HideActive, d.Window.CloseOnDelete = l.Window.HideActive, l.Window.CloseOnDelete
-	d.SSH.Client, d.SSH.Command, d.SSH.ParseHosts, d.SSH.ParseKnownHosts = l.SSH.Client, l.SSH.Command, l.SSH.ParseHosts, l.SSH.ParseKnownHosts
-	d.Filebrowser.Directory, d.Filebrowser.SortingMethod = l.Filebrowser.Directory, string(l.Filebrowser.SortingMethod)
-	d.Filebrowser.DirectoriesFirst, d.Filebrowser.ShowHidden, d.Filebrowser.Command = l.Filebrowser.DirectoriesFirst, l.Filebrowser.ShowHidden, l.Filebrowser.Command
-	d.Combi.Modes, d.Combi.DisplayFormat = l.Combi.Modes, l.Combi.DisplayFormat
-	return d
 }
 
 // launcherCommand is app.rs's Launcher: every argument, flags

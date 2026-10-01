@@ -1,15 +1,16 @@
 package config
 
 import (
-	"fmt"
 	"strconv"
+	"strings"
 )
 
 // ClickAction is one module input binding, parsed from the schema's
 // ClickAction strings (crates/wayle-config/src/click_action.rs):
 // "dropdown:<name>", "brightness:<delta>" or "brightness:toggle", an
 // empty string for no action, and anything else runs as a shell
-// command.
+// command. Like the Rust type every string parses: a brightness delta
+// that is not an i32 is no action.
 type ClickAction struct {
 	Kind       ClickKind
 	Dropdown   string
@@ -29,32 +30,25 @@ const (
 	ClickBrightnessToggle
 )
 
-// ParseClickAction parses one schema string.
-func ParseClickAction(s string) (ClickAction, error) {
+// ParseClickAction parses one schema string (ClickAction::from_str).
+func ParseClickAction(s string) ClickAction {
 	if s == "" {
-		return ClickAction{Kind: ClickNone}, nil
+		return ClickAction{Kind: ClickNone}
 	}
-	if rest, ok := cutPrefix(s, "brightness:"); ok {
+	if rest, ok := strings.CutPrefix(s, "brightness:"); ok {
 		if rest == "toggle" {
-			return ClickAction{Kind: ClickBrightnessToggle}, nil
+			return ClickAction{Kind: ClickBrightnessToggle}
 		}
-		var delta int32
-		if _, err := fmt.Sscan(rest, &delta); err != nil {
-			return ClickAction{}, fmt.Errorf("click action %q: bad brightness delta", s)
+		delta, err := strconv.ParseInt(rest, 10, 32)
+		if err != nil {
+			return ClickAction{Kind: ClickNone}
 		}
-		return ClickAction{Kind: ClickBrightness, Brightness: delta}, nil
+		return ClickAction{Kind: ClickBrightness, Brightness: int32(delta)}
 	}
-	if rest, ok := cutPrefix(s, "dropdown:"); ok {
-		return ClickAction{Kind: ClickDropdown, Dropdown: rest}, nil
+	if name, ok := strings.CutPrefix(s, "dropdown:"); ok {
+		return ClickAction{Kind: ClickDropdown, Dropdown: name}
 	}
-	return ClickAction{Kind: ClickShell, Command: s}, nil
-}
-
-func cutPrefix(s, prefix string) (string, bool) {
-	if len(s) >= len(prefix) && s[:len(prefix)] == prefix {
-		return s[len(prefix):], true
-	}
-	return s, false
+	return ClickAction{Kind: ClickShell, Command: s}
 }
 
 // String serializes back to the schema form.
@@ -72,12 +66,29 @@ func (a ClickAction) String() string {
 	return ""
 }
 
-// MustClickAction parses a compile-time default; defaults are static
-// strings, a parse failure is a programmer error.
-func MustClickAction(s string) ClickAction {
-	action, err := ParseClickAction(s)
-	if err != nil {
-		panic(err)
+// UnmarshalConfig implements Unmarshaler.
+func (a *ClickAction) UnmarshalConfig(v any) error {
+	s, ok := v.(string)
+	if !ok {
+		return invalidType(v, "a string")
 	}
-	return action
+	*a = ParseClickAction(s)
+	return nil
+}
+
+// MarshalConfig implements Marshaler.
+func (a ClickAction) MarshalConfig() any { return a.String() }
+
+func (ClickAction) configSchema(*schemaGen) Schema { return Schema{"type": "string"} }
+
+// ClickConfig is a module's five input bindings as one value, the view
+// the bar's input routing takes; each module config declares the five
+// keys itself (their docs differ per module) and exposes them through
+// a Clicks method.
+type ClickConfig struct {
+	LeftClick   ClickAction
+	RightClick  ClickAction
+	MiddleClick ClickAction
+	ScrollUp    ClickAction
+	ScrollDown  ClickAction
 }

@@ -1,934 +1,323 @@
 package config
 
-import (
-	"errors"
-	"fmt"
+// BarConfig is the [bar] section
+// (crates/wayle-config/src/schemas/bar/mod.rs).
+//
+// Bar chrome: per-monitor layout, spacing, colors, and button styling.
+type BarConfig struct {
+	// Per-monitor bar layouts. Each entry targets a monitor by connector name
+	// (e.g., `"DP-1"`) or `"*"` for all monitors. See [`BarLayout`] for the
+	// full shape, including layout inheritance via `extends`.
+	//
+	// ## Example
+	//
+	// ```toml
+	// [[bar.layout]]
+	// monitor = "*"
+	// left = ["dashboard"]
+	// center = ["clock"]
+	// right = ["battery", "network", "volume", "systray"]
+	//
+	// [[bar.layout]]
+	// monitor = "HDMI-1"
+	// extends = "*"
+	// right = ["volume", "systray"]
+	// ```
+	Layout []BarLayout `cfg:"layout"`
+	// Bar-specific scale multiplier for spacing, radius, and other bar elements.
+	Scale ScaleFactor `cfg:"scale"`
+	// Gap between bar and its attached screen edge.
+	//
+	// - **Orientation**: Distance from top (horizontal bar) or left (vertical bar)
+	InsetEdge Size `cfg:"inset-edge"`
+	// Gap at the bar's ends.
+	//
+	// - **Orientation**: Left/right (horizontal bar), top/bottom (vertical bar)
+	InsetEnds Size `cfg:"inset-ends"`
+	// Internal spacing along bar thickness.
+	//
+	// - **Orientation**: Top/bottom (horizontal bar), left/right (vertical bar)
+	Padding Size `cfg:"padding"`
+	// Internal spacing at bar ends.
+	//
+	// - **Orientation**: Left/right (horizontal bar), top/bottom (vertical bar)
+	PaddingEnds Size `cfg:"padding-ends"`
+	// Gap between modules and groups on the bar.
+	ModuleGap Size `cfg:"module-gap"`
+	// Bar position on screen edge.
+	Location Location `cfg:"location"`
+	// Reserve screen space for the bar.
+	//
+	// When disabled, windows may overlap the bar and the bar draws over them.
+	Exclusive bool `cfg:"exclusive"`
+	// Layer-shell layer the bar is placed on.
+	Layer Layer `cfg:"layer"`
+	// Bar background color.
+	BG ColorValue `cfg:"bg"`
+	// Bar background opacity (0-100).
+	BackgroundOpacity Percentage `cfg:"background-opacity"`
+	// Border placement for bar.
+	BorderLocation BorderLocation `cfg:"border-location"`
+	// Border width for bar (pixels).
+	BorderWidth uint8 `cfg:"border-width"`
+	// Border color for the bar.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Corner rounding level for the bar.
+	Rounding RoundingLevel `cfg:"rounding"`
+	// Shadow style for the bar.
+	Shadow ShadowPreset `cfg:"shadow"`
+	// Visual style variant for bar buttons.
+	ButtonVariant BarButtonVariant `cfg:"button-variant"`
+	// Button opacity (0-100).
+	ButtonOpacity Percentage `cfg:"button-opacity"`
+	// Button background opacity (0-100).
+	ButtonBGOpacity Percentage `cfg:"button-bg-opacity"`
+	// Button icon size. Accepts a scale multiplier or pixels (e.g. `"24px"`).
+	ButtonIconSize Size `cfg:"button-icon-size"`
+	// Button icon container padding. Only applies to `block-prefix` and `icon-square` variants.
+	// Accepts a scale multiplier or pixels (e.g. `"8px"`).
+	ButtonIconPadding Size `cfg:"button-icon-padding"`
+	// Button label text size. Accepts a scale multiplier or pixels (e.g. `"16px"`).
+	ButtonLabelSize Size `cfg:"button-label-size"`
+	// Button label font weight.
+	ButtonLabelWeight FontWeightClass `cfg:"button-label-weight"`
+	// Button label container padding. Accepts a scale multiplier or pixels (e.g. `"8px"`).
+	ButtonLabelPadding Size `cfg:"button-label-padding"`
+	// Corner rounding level for the buttons in the bar.
+	ButtonRounding RoundingLevel `cfg:"button-rounding"`
+	// Gap between button icon and label. Accepts a scale multiplier or pixels (e.g. `"4px"`).
+	ButtonGap Size `cfg:"button-gap"`
+	// Icon position relative to label in bar buttons.
+	ButtonIconPosition IconPosition `cfg:"button-icon-position"`
+	// Border placement for bar buttons.
+	ButtonBorderLocation BorderLocation `cfg:"button-border-location"`
+	// Border width for bar buttons (pixels).
+	ButtonBorderWidth uint8 `cfg:"button-border-width"`
+	// Border placement for button groups.
+	ButtonGroupBorderLocation BorderLocation `cfg:"button-group-border-location"`
+	// Border width for button groups (pixels).
+	ButtonGroupBorderWidth uint8 `cfg:"button-group-border-width"`
+	// Internal padding for button groups.
+	ButtonGroupPadding Size `cfg:"button-group-padding"`
+	// Gap between modules within a group.
+	ButtonGroupModuleGap Size `cfg:"button-group-module-gap"`
+	// Background color for button groups.
+	ButtonGroupBackground ColorValue `cfg:"button-group-background"`
+	// Button group opacity (0-100).
+	ButtonGroupOpacity Percentage `cfg:"button-group-opacity"`
+	// Border color for button groups.
+	ButtonGroupBorderColor ColorValue `cfg:"button-group-border-color"`
+	// Corner rounding level for button groups.
+	ButtonGroupRounding RoundingLevel `cfg:"button-group-rounding"`
+	// Enable dropdown panel shadow.
+	DropdownShadow bool `cfg:"dropdown-shadow"`
+	// Dropdown panel opacity (0-100).
+	DropdownOpacity Percentage `cfg:"dropdown-opacity"`
+	// Close dropdown when clicking outside it.
+	DropdownAutohide bool `cfg:"dropdown-autohide"`
+	// Freeze the bar button label while its dropdown is open.
+	//
+	// Prevents the button from resizing mid-interaction, which keeps the
+	// dropdown anchored in place.
+	DropdownFreezeLabel bool `cfg:"dropdown-freeze-label"`
+}
 
-	"github.com/BurntSushi/toml"
+// DefaultsBar returns the schema defaults.
+func DefaultsBar() BarConfig {
+	return BarConfig{
+		Layout:                    []BarLayout{DefaultBarLayout()},
+		Scale:                     1,
+		InsetEdge:                 Scale(0),
+		InsetEnds:                 Scale(0),
+		Padding:                   Scale(0.35),
+		PaddingEnds:               Scale(0.5),
+		ModuleGap:                 Scale(0.5),
+		Location:                  LocationTop,
+		Exclusive:                 true,
+		Layer:                     LayerTop,
+		BG:                        mustColor("bg-surface"),
+		BackgroundOpacity:         100,
+		BorderLocation:            BorderNone,
+		BorderWidth:               1,
+		BorderColor:               mustColor("border-accent"),
+		Rounding:                  RoundingNone,
+		Shadow:                    ShadowNone,
+		ButtonVariant:             ButtonBlockPrefix,
+		ButtonOpacity:             100,
+		ButtonBGOpacity:           100,
+		ButtonIconSize:            Scale(1),
+		ButtonIconPadding:         Scale(1),
+		ButtonLabelSize:           Scale(1),
+		ButtonLabelWeight:         WeightSemibold,
+		ButtonLabelPadding:        Scale(1),
+		ButtonRounding:            RoundingSm,
+		ButtonGap:                 Scale(1),
+		ButtonIconPosition:        IconStart,
+		ButtonBorderLocation:      BorderAll,
+		ButtonBorderWidth:         1,
+		ButtonGroupBorderLocation: BorderNone,
+		ButtonGroupBorderWidth:    1,
+		ButtonGroupPadding:        Scale(0),
+		ButtonGroupModuleGap:      Scale(0.25),
+		ButtonGroupBackground:     mustColor("bg-elevated"),
+		ButtonGroupOpacity:        100,
+		ButtonGroupBorderColor:    mustColor("border-accent"),
+		ButtonGroupRounding:       RoundingSm,
+		DropdownShadow:            true,
+		DropdownOpacity:           100,
+		DropdownAutohide:          true,
+		DropdownFreezeLabel:       true,
+	}
+}
+
+// BarLayout is the bar layout for one monitor
+// (crates/wayle-config/src/schemas/bar/types/mod.rs). Keys a layout
+// entry omits take BarLayout's own defaults (#[serde(default)] with the
+// default layout's sections), so only an explicitly empty section
+// inherits through `extends` — the Rust behavior.
+type BarLayout struct {
+	// Monitor connector name (e.g., `"DP-1"`) or `"*"` for all monitors.
+	Monitor string `cfg:"monitor"`
+	// Inherit from another layout by its monitor value (e.g., `"*"`).
+	Extends *string `cfg:"extends"`
+	// Whether the bar is visible on this monitor.
+	Show bool `cfg:"show"`
+	// Modules in the left section.
+	Left []BarItem `cfg:"left"`
+	// Modules in the center section.
+	Center []BarItem `cfg:"center"`
+	// Modules in the right section.
+	Right []BarItem `cfg:"right"`
+}
+
+// DefaultBarLayout is BarLayout::default(): every monitor, media left,
+// clock centered, the status modules right.
+func DefaultBarLayout() BarLayout {
+	return BarLayout{
+		Monitor: "*",
+		Show:    true,
+		Left:    []BarItem{{Module: ModuleMedia}},
+		Center:  []BarItem{{Module: ModuleClock}},
+		Right: []BarItem{
+			{Module: ModuleBattery},
+			{Module: ModuleBluetooth},
+			{Module: ModuleNetwork},
+			{Module: ModuleMicrophone},
+			{Module: ModuleVolume},
+		},
+	}
+}
+
+func (l *BarLayout) setDefaults() { *l = DefaultBarLayout() }
+
+// ExtendsName is the parent layout's monitor value, "" when unset.
+func (l BarLayout) ExtendsName() (string, bool) {
+	if l.Extends == nil {
+		return "", false
+	}
+	return *l.Extends, true
+}
+
+func (BarLayout) configDescription() string {
+	return "Layout configuration for a bar on a specific monitor.\n\n## Examples\n\n```toml\n# Single modules\n[[bar.layout]]\nmonitor = \"*\"\nleft = [\"dashboard\"]\ncenter = [\"clock\"]\nright = [\"systray\"]\n\n# Module with custom CSS class for per-instance styling\n[[bar.layout]]\nmonitor = \"DP-1\"\nleft = [{ module = \"clock\", class = \"primary-clock\" }, \"clock\"]\ncenter = [\"media\"]\n\n# Grouped modules (share a visual container, CSS-targetable by name)\n[[bar.layout]]\nmonitor = \"DP-2\"\nleft = [{ name = \"status\", modules = [\"battery\", \"network\"] }]\n\n# Groups can also contain classed modules\n[[bar.layout]]\nmonitor = \"DP-3\"\nleft = [{ name = \"clocks\", modules = [\n  { module = \"clock\", class = \"local\" },\n  { module = \"world-clock\", class = \"remote\" }\n]}]\n\n# Inherit from another layout\n[[bar.layout]]\nmonitor = \"*\"\nleft = [\"dashboard\"]\ncenter = [\"clock\"]\nright = [\"systray\"]\n\n[[bar.layout]]\nmonitor = \"HDMI-1\"\nextends = \"*\"\nright = [\"volume\", \"systray\"]  # Override just this section\n\n# Hide bar on a specific monitor\n[[bar.layout]]\nmonitor = \"HDMI-2\"\nshow = false\n```"
+}
+
+// BarButtonVariant is the bar button structure.
+//
+// Visual style variants for bar buttons.
+type BarButtonVariant string
+
+// Button variants.
+const (
+	// Icon + label, minimal background.
+	ButtonBasic BarButtonVariant = "basic"
+	// Icon in colored pill container that blends into button edge.
+	ButtonBlockPrefix BarButtonVariant = "block-prefix"
+	// Button background with colored icon container inside.
+	ButtonIconSquare BarButtonVariant = "icon-square"
 )
 
-// Bar is the bar chrome: per-monitor layout, spacing, and placement.
-// The fields carry the BarConfig keys the Go shell consumes; the button
-// styling keys follow with the bar button component.
-type Bar struct {
-	Location          Location
-	Layer             Layer
-	Exclusive         bool
-	BG                ColorValue
-	BackgroundOpacity int
-	BorderColor       ColorValue
-	BorderLocation    BorderLocation
-	BorderWidth       int
-	// ButtonLabelSize is the module label font size: a multiplier of
-	// the 1.04rem button-label base, or absolute pixels.
-	ButtonLabelSize Size
-	ModuleGap       Size
-	Padding         Size
-	PaddingEnds     Size
-	InsetEdge       Size
-	InsetEnds       Size
-	Rounding        RoundingLevel
-	Scale           float64
-	Layout          []BarLayout
+var _ = registerEnum(ButtonBasic, ButtonBlockPrefix, ButtonIconSquare)
 
-	// Button group container styling.
-	ButtonGroupModuleGap      Size
-	ButtonGroupPadding        Size
-	ButtonGroupBackground     ColorValue
-	ButtonGroupOpacity        int
-	ButtonGroupBorderColor    ColorValue
-	ButtonGroupBorderLocation BorderLocation
-	ButtonGroupBorderWidth    int
-	ButtonGroupRounding       RoundingLevel
-	// ButtonRounding is the element radius of module buttons and
-	// workspace buttons (--bar-button-rounding-element).
-	ButtonRounding RoundingLevel
-	// ButtonBorderLocation/Width place the border of bordered button
-	// chrome (the workspace containers' border-show).
-	ButtonBorderLocation BorderLocation
-	ButtonBorderWidth    int
+// IconPosition places a button's icon.
+//
+// Icon position within bar buttons.
+type IconPosition string
 
-	// Per-button chrome. The colors default to the group background
-	// (ColorAuto); hover and active deepen the base.
-	ButtonBGColor       ColorValue
-	ButtonBGOpacity     int
-	ButtonHoverBGColor  ColorValue
-	ButtonActiveBGColor ColorValue
-	ButtonIconPadding   Size
-	ButtonLabelPadding  Size
+// Icon positions.
+const (
+	// Icon before label (left for horizontal, top for vertical bars).
+	IconStart IconPosition = "start"
+	// Icon after label (right for horizontal, bottom for vertical bars).
+	IconEnd IconPosition = "end"
+)
 
-	// The styling keys the CSS generation reads (BarConfig in
-	// crates/wayle-config/src/schemas/bar/mod.rs).
-	Shadow        ShadowPreset
-	ButtonVariant BarButtonVariant
-	// ButtonOpacity is 0-100.
-	ButtonOpacity      int
-	ButtonIconSize     Size
-	ButtonLabelWeight  FontWeightClass
-	ButtonGap          Size
-	ButtonIconPosition IconPosition
-	DropdownShadow     bool
-	// DropdownOpacity is 0-100.
-	DropdownOpacity int
+var _ = registerEnum(IconStart, IconEnd)
+
+// ShadowPreset is the bar shadow style
+// (crates/wayle-config/src/schemas/bar/types/shadow.rs).
+//
+// Shadow style for the bar.
+type ShadowPreset string
+
+// Shadow presets.
+const (
+	// No shadow.
+	ShadowNone ShadowPreset = "none"
+	// Directional shadow opposite the anchor edge.
+	ShadowDrop ShadowPreset = "drop"
+	// All-around shadow.
+	ShadowFloating ShadowPreset = "floating"
+)
+
+var _ = registerEnum(ShadowNone, ShadowDrop, ShadowFloating)
+
+// MarginPx is the layer margin the shadow needs to render unclipped.
+func (s ShadowPreset) MarginPx() uint32 {
+	if s == ShadowNone {
+		return 0
+	}
+	return 4
 }
 
-// BarLayout is the bar layout for one monitor. Monitor is a connector
-// name ("DP-1") or "*" for every monitor without an exact entry;
-// Extends inherits the unset sections of another layout by its monitor
-// value.
-type BarLayout struct {
-	Monitor string
-	Extends string
-	Show    bool
-	Left    []BarItem
-	Center  []BarItem
-	Right   []BarItem
+// CSSShadow is the box-shadow value for the bar's location.
+func (s ShadowPreset) CSSShadow(loc Location) string {
+	switch s {
+	case ShadowDrop:
+		switch loc {
+		case LocationBottom:
+			return "0 -1px 2px 1px rgba(0, 0, 0, 0.25)"
+		case LocationLeft:
+			return "1px 0 2px 1px rgba(0, 0, 0, 0.25)"
+		case LocationRight:
+			return "-1px 0 2px 1px rgba(0, 0, 0, 0.25)"
+		}
+		return "0 1px 2px 1px rgba(0, 0, 0, 0.25)"
+	case ShadowFloating:
+		return "0 1px 2px 1px rgba(0, 0, 0, 0.25)"
+	}
+	return "none"
 }
 
-// ClockConfig is the clock module configuration; the format is strftime.
-type ClockConfig struct {
-	Click ClickConfig
-	// Button is the clock's bar-button key set.
-	Button ButtonConfig
-	Format string
-}
+// FontWeightClass is a typography weight
+// (crates/wayle-config/src/schemas/styling/types/typography.rs).
+//
+// Font weight class for typography.
+//
+// Maps to CSS classes like `.weight-normal`, `.weight-bold`, etc.
+// Uses the existing `--weight-*` tokens defined in SCSS.
+type FontWeightClass string
 
-// GeneralConfig is the cross-shell general section.
-type GeneralConfig struct {
-	FontSans string
-	FontMono string
-}
+// Font weights.
+const (
+	// Normal weight (--weight-normal: 400).
+	WeightNormal FontWeightClass = "normal"
+	// Medium weight (--weight-medium: 500).
+	WeightMedium FontWeightClass = "medium"
+	// Semi-bold weight (--weight-semibold: 600).
+	WeightSemibold FontWeightClass = "semibold"
+	// Bold weight (--weight-bold: 700).
+	WeightBold FontWeightClass = "bold"
+)
 
-// Config is the loaded user configuration.
-type Config struct {
-	Bar                Bar
-	Clock              ClockConfig
-	Battery            BatteryConfig
-	Brightness         BrightnessConfig
-	Volume             VolumeConfig
-	Media              MediaConfig
-	Network            NetworkConfig
-	Microphone         MicrophoneConfig
-	Bluetooth          BluetoothConfig
-	KeyboardInput      KeyboardInputConfig
-	WindowTitle        WindowTitleConfig
-	CPU                CPUConfig
-	RAM                RAMConfig
-	Storage            StorageConfig
-	Weather            WeatherConfig
-	WorldClock         WorldClockConfig
-	Netstat            NetstatConfig
-	Mail               MailConfig
-	Power              PowerConfig
-	Dashboard          DashboardConfig
-	KeybindMode        KeybindModeConfig
-	PowerProfiles      PowerProfilesConfig
-	Hyprsunset         HyprsunsetConfig
-	IdleInhibit        IdleInhibitConfig
-	Treeman            TreemanConfig
-	Notification       NotificationConfig
-	Recorder           RecorderConfig
-	Systray            SystrayConfig
-	Osd                OsdConfig
-	Custom             []CustomModuleConfig
-	Cava               CavaConfig
-	Separator          SeparatorConfig
-	HyprlandWorkspaces HyprlandWorkspacesConfig
-	SwayWorkspaces     CompositorWorkspacesConfig
-	NiriWorkspaces     CompositorWorkspacesConfig
-	MangoWorkspaces    MangoWorkspacesConfig
-	Screenshot         ScreenshotConfig
-	SharePicker        SharePickerConfig
-	General            GeneralConfig
-	Wallpaper          WallpaperConfig
-	ColorExtractor     ColorExtractorConfig
-	Styling            StylingConfig
-	Lock               LockConfig
-	Greeter            GreeterConfig
-	Launcher           LauncherConfig
-}
-
-// Defaults returns the schema defaults for every modeled section.
-func Defaults() *Config {
-	return &Config{
-		Bar: Bar{
-			Location:                  LocationTop,
-			Layer:                     LayerTop,
-			Exclusive:                 true,
-			BG:                        mustColor("bg-surface"),
-			BackgroundOpacity:         100,
-			BorderColor:               mustColor("border-accent"),
-			BorderLocation:            BorderNone,
-			BorderWidth:               1,
-			ButtonLabelSize:           Size{Value: 1.0, Unit: SizeMultiplier},
-			ModuleGap:                 Size{Value: 0.5, Unit: SizeMultiplier},
-			Padding:                   Size{Value: 0.35, Unit: SizeMultiplier},
-			PaddingEnds:               Size{Value: 0.5, Unit: SizeMultiplier},
-			InsetEdge:                 Size{Value: 0, Unit: SizeMultiplier},
-			InsetEnds:                 Size{Value: 0, Unit: SizeMultiplier},
-			Rounding:                  RoundingNone,
-			Scale:                     1.0,
-			ButtonGroupModuleGap:      Size{Value: 0.25, Unit: SizeMultiplier},
-			ButtonGroupPadding:        Size{Value: 0.0, Unit: SizeMultiplier},
-			ButtonGroupBackground:     mustColor("bg-elevated"),
-			ButtonGroupOpacity:        100,
-			ButtonBGOpacity:           100,
-			ButtonGroupBorderColor:    mustColor("border-accent"),
-			ButtonGroupBorderLocation: BorderNone,
-			ButtonGroupBorderWidth:    1,
-			ButtonGroupRounding:       RoundingSm,
-			ButtonRounding:            RoundingSm,
-			ButtonBorderLocation:      BorderAll,
-			ButtonBorderWidth:         1,
-			ButtonIconPadding:         Size{Value: 1.0, Unit: SizeMultiplier},
-			ButtonLabelPadding:        Size{Value: 1.0, Unit: SizeMultiplier},
-			Shadow:                    ShadowNone,
-			ButtonVariant:             ButtonVariantBlockPrefix,
-			ButtonOpacity:             100,
-			ButtonIconSize:            Size{Value: 1.0, Unit: SizeMultiplier},
-			ButtonLabelWeight:         WeightSemibold,
-			ButtonGap:                 Size{Value: 1.0, Unit: SizeMultiplier},
-			ButtonIconPosition:        IconStart,
-			DropdownShadow:            true,
-			DropdownOpacity:           100,
-		},
-		Clock: ClockConfig{
-			Click:  DefaultsClick(map[string]string{"left-click": "dropdown:calendar", "right-click": "dropdown:weather"}),
-			Button: DefaultsButton(buttonColors("auto", "accent", "accent", "bg-surface-elevated", "border-accent"), TokenAccent, true, 0),
-			Format: "%a %b %d %I:%M %p",
-		},
-		Cava:               DefaultsCava(),
-		Battery:            DefaultsBattery(),
-		Brightness:         DefaultsBrightness(),
-		Volume:             DefaultsVolume(),
-		Media:              DefaultsMedia(),
-		Network:            DefaultsNetwork(),
-		Microphone:         DefaultsMicrophone(),
-		Bluetooth:          DefaultsBluetooth(),
-		KeyboardInput:      DefaultsKeyboardInput(),
-		WindowTitle:        DefaultsWindowTitle(),
-		CPU:                DefaultsSysinfoCpu(),
-		RAM:                DefaultsSysinfoRam(),
-		Storage:            DefaultsSysinfoStorage(),
-		Weather:            DefaultsWeather(),
-		WorldClock:         DefaultsWorldClock(),
-		Netstat:            DefaultsNetstat(),
-		Mail:               DefaultsMail(),
-		Power:              DefaultsPower(),
-		Dashboard:          DefaultsDashboard(),
-		KeybindMode:        DefaultsKeybindMode(),
-		PowerProfiles:      DefaultsPowerProfiles(),
-		Hyprsunset:         DefaultsHyprsunset(),
-		IdleInhibit:        DefaultsIdleInhibit(),
-		Treeman:            DefaultsTreeman(),
-		Notification:       DefaultsNotification(),
-		Screenshot:         DefaultsScreenshot(),
-		SharePicker:        DefaultsSharePicker(),
-		Recorder:           DefaultsRecorder(),
-		Systray:            DefaultsSystray(),
-		Osd:                DefaultsOsd(),
-		Separator:          DefaultsSeparator(),
-		HyprlandWorkspaces: DefaultsHyprlandWorkspaces(),
-		SwayWorkspaces:     DefaultsSwayWorkspaces(),
-		NiriWorkspaces:     DefaultsNiriWorkspaces(),
-		MangoWorkspaces:    DefaultsMangoWorkspaces(),
-		Wallpaper:          DefaultsWallpaper(),
-		ColorExtractor:     DefaultsColorExtractor(),
-		Lock:               DefaultsLock(),
-		Greeter:            DefaultsGreeter(),
-		Launcher:           DefaultsLauncher(),
-		General: GeneralConfig{
-			FontSans: "Inter",
-			FontMono: "JetBrains Mono",
-		},
-		Styling: DefaultsStyling(),
-	}
-}
-
-// mustColor panics only on a typo in these literal defaults; user
-// config never flows through it.
-func mustColor(s string) ColorValue {
-	cv, err := ParseColorValue(s)
-	if err != nil {
-		panic(err)
-	}
-	return cv
-}
-
-// fileDoc mirrors the top-level TOML document. Sections the Go shell
-// does not model yet (osd, launcher, modules beyond the clock, ...) are
-// ignored here exactly as serde ignores unknown fields in Rust.
-type fileDoc struct {
-	Bar         *toml.Primitive `toml:"bar"`
-	SharePicker *toml.Primitive `toml:"share-picker"`
-	Osd         *toml.Primitive `toml:"osd"`
-	Modules     *struct {
-		Clock              *toml.Primitive `toml:"clock"`
-		Cava               *toml.Primitive `toml:"cava"`
-		Battery            *toml.Primitive `toml:"battery"`
-		Brightness         *toml.Primitive `toml:"brightness"`
-		Volume             *toml.Primitive `toml:"volume"`
-		Media              *toml.Primitive `toml:"media"`
-		Network            *toml.Primitive `toml:"network"`
-		Microphone         *toml.Primitive `toml:"microphone"`
-		Bluetooth          *toml.Primitive `toml:"bluetooth"`
-		KeyboardLayout     *toml.Primitive `toml:"keyboard-input"`
-		WindowTitle        *toml.Primitive `toml:"window-title"`
-		CPU                *toml.Primitive `toml:"cpu"`
-		RAM                *toml.Primitive `toml:"ram"`
-		Storage            *toml.Primitive `toml:"storage"`
-		Weather            *toml.Primitive `toml:"weather"`
-		WorldClock         *toml.Primitive `toml:"world-clock"`
-		Netstat            *toml.Primitive `toml:"netstat"`
-		Mail               *toml.Primitive `toml:"mail"`
-		Power              *toml.Primitive `toml:"power"`
-		Dashboard          *toml.Primitive `toml:"dashboard"`
-		KeybindMode        *toml.Primitive `toml:"keybind-mode"`
-		PowerProfiles      *toml.Primitive `toml:"power-profiles"`
-		Hyprsunset         *toml.Primitive `toml:"hyprsunset"`
-		IdleInhibit        *toml.Primitive `toml:"idle-inhibit"`
-		Treeman            *toml.Primitive `toml:"treeman"`
-		Notifications      *toml.Primitive `toml:"notifications"`
-		Screenshot         *toml.Primitive `toml:"screenshot"`
-		Recorder           *toml.Primitive `toml:"recorder"`
-		Systray            *toml.Primitive `toml:"systray"`
-		Custom             *[]customDoc    `toml:"custom"`
-		Separator          *toml.Primitive `toml:"separator"`
-		HyprlandWorkspaces *toml.Primitive `toml:"hyprland-workspaces"`
-		SwayWorkspaces     *toml.Primitive `toml:"sway-workspaces"`
-		NiriWorkspaces     *toml.Primitive `toml:"niri-workspaces"`
-		MangoWorkspaces    *toml.Primitive `toml:"mango-workspaces"`
-	} `toml:"modules"`
-	General   *toml.Primitive `toml:"general"`
-	Wallpaper *toml.Primitive `toml:"wallpaper"`
-	Styling   *toml.Primitive `toml:"styling"`
-	Lock      *toml.Primitive `toml:"lock"`
-	Greeter   *toml.Primitive `toml:"greeter"`
-	Launcher  *toml.Primitive `toml:"launcher"`
-}
-
-// barDoc mirrors the [bar] table; the leaf values defer through
-// tomlValue where the schema allows number|string unions, and layout is
-// handled by BarItem's UnmarshalTOML through the slice element decode.
-type barDoc struct {
-	Location                  string      `toml:"location"`
-	Layer                     string      `toml:"layer"`
-	Exclusive                 *bool       `toml:"exclusive"`
-	BG                        string      `toml:"bg"`
-	BackgroundOpacity         *int        `toml:"background-opacity"`
-	BorderColor               string      `toml:"border-color"`
-	BorderLocation            string      `toml:"border-location"`
-	BorderWidth               *int        `toml:"border-width"`
-	ButtonLabelSize           tomlValue   `toml:"button-label-size"`
-	ModuleGap                 tomlValue   `toml:"module-gap"`
-	ButtonGroupModuleGap      tomlValue   `toml:"button-group-module-gap"`
-	ButtonGroupPadding        tomlValue   `toml:"button-group-padding"`
-	ButtonGroupBackground     string      `toml:"button-group-background"`
-	ButtonGroupOpacity        *int        `toml:"button-group-opacity"`
-	ButtonGroupBorderColor    string      `toml:"button-group-border-color"`
-	ButtonGroupBorderLocation string      `toml:"button-group-border-location"`
-	ButtonGroupBorderWidth    *int        `toml:"button-group-border-width"`
-	ButtonGroupRounding       string      `toml:"button-group-rounding"`
-	ButtonRounding            string      `toml:"button-rounding"`
-	ButtonBorderLocation      string      `toml:"button-border-location"`
-	ButtonBorderWidth         *int        `toml:"button-border-width"`
-	ButtonBGColor             string      `toml:"button-bg-color"`
-	ButtonBGOpacity           *int        `toml:"button-bg-opacity"`
-	ButtonHoverBGColor        string      `toml:"button-hover-bg-color"`
-	ButtonActiveBGColor       string      `toml:"button-active-bg-color"`
-	ButtonIconPadding         tomlValue   `toml:"button-icon-padding"`
-	ButtonLabelPadding        tomlValue   `toml:"button-label-padding"`
-	Padding                   tomlValue   `toml:"padding"`
-	PaddingEnds               tomlValue   `toml:"padding-ends"`
-	InsetEdge                 tomlValue   `toml:"inset-edge"`
-	InsetEnds                 tomlValue   `toml:"inset-ends"`
-	Rounding                  string      `toml:"rounding"`
-	Scale                     *float64    `toml:"scale"`
-	Layout                    []BarLayout `toml:"layout"`
-
-	Shadow             *ShadowPreset     `toml:"shadow"`
-	ButtonVariant      *BarButtonVariant `toml:"button-variant"`
-	ButtonOpacity      *int              `toml:"button-opacity"`
-	ButtonIconSize     tomlValue         `toml:"button-icon-size"`
-	ButtonLabelWeight  *FontWeightClass  `toml:"button-label-weight"`
-	ButtonGap          tomlValue         `toml:"button-gap"`
-	ButtonIconPosition *IconPosition     `toml:"button-icon-position"`
-	DropdownShadow     *bool             `toml:"dropdown-shadow"`
-	DropdownOpacity    *int              `toml:"dropdown-opacity"`
-}
-
-type generalDoc struct {
-	FontSans string `toml:"font-sans"`
-	FontMono string `toml:"font-mono"`
-}
-
-// tomlValue defers a leaf's decode so Size can accept number|string.
-type tomlValue struct {
-	value any
-}
-
-func (t *tomlValue) UnmarshalTOML(value any) error {
-	t.value = value
-	return nil
-}
-
-// applyTOML overlays a config.toml document onto the defaults. Every
-// failure is a load error; the receiver keeps the pre-failure state.
-func (c *Config) applyTOML(data []byte) error {
-	var doc fileDoc
-	md, err := toml.Decode(string(data), &doc)
-	if err != nil {
-		return err
-	}
-	if doc.Bar != nil {
-		bar := barDoc{}
-		if err := md.PrimitiveDecode(*doc.Bar, &bar); err != nil {
-			return err
-		}
-		applied, err := bar.toBar()
-		if err != nil {
-			return err
-		}
-		c.Bar = applied
-	}
-	if doc.Modules != nil && doc.Modules.Clock != nil {
-		clock := struct {
-			Format *string `toml:"format"`
-		}{}
-		if err := md.PrimitiveDecode(*doc.Modules.Clock, &clock); err != nil {
-			return err
-		}
-		clicks, err := applyClicks(md, *doc.Modules.Clock, c.Clock.Click)
-		if err != nil {
-			return err
-		}
-		button, err := applyButton(md, *doc.Modules.Clock, c.Clock.Button, AllButtonKeys)
-		if err != nil {
-			return err
-		}
-		c.Clock.Click = clicks
-		c.Clock.Button = button
-		setIf(&c.Clock.Format, clock.Format)
-	}
-	if doc.Modules != nil && doc.Modules.CPU != nil {
-		cpu, err := applyCpu(md, *doc.Modules.CPU)
-		if err != nil {
-			return err
-		}
-		c.CPU = cpu
-	}
-	if doc.Modules != nil && doc.Modules.RAM != nil {
-		ram, err := applyRam(md, *doc.Modules.RAM)
-		if err != nil {
-			return err
-		}
-		c.RAM = ram
-	}
-	if doc.Modules != nil && doc.Modules.Weather != nil {
-		w, err := applyWeather(md, *doc.Modules.Weather)
-		if err != nil {
-			return err
-		}
-		c.Weather = w
-	}
-	if doc.Wallpaper != nil {
-		w, err := applyWallpaper(md, *doc.Wallpaper)
-		if err != nil {
-			return err
-		}
-		c.Wallpaper = w
-	}
-	if doc.Styling != nil {
-		ce, err := applyColorExtractor(md, *doc.Styling)
-		if err != nil {
-			return err
-		}
-		c.ColorExtractor = ce
-		s, err := applyStyling(md, *doc.Styling)
-		if err != nil {
-			return err
-		}
-		c.Styling = s
-	}
-	if doc.Launcher != nil {
-		l, err := applyLauncher(md, *doc.Launcher)
-		if err != nil {
-			return err
-		}
-		c.Launcher = l
-	}
-	if doc.Osd != nil {
-		o, err := applyOsd(md, *doc.Osd)
-		if err != nil {
-			return err
-		}
-		c.Osd = o
-	}
-	if doc.Modules != nil && doc.Modules.Systray != nil {
-		st, err := applySystray(md, *doc.Modules.Systray)
-		if err != nil {
-			return err
-		}
-		c.Systray = st
-	}
-	if doc.Modules != nil && doc.Modules.Screenshot != nil {
-		s, err := applyScreenshot(md, *doc.Modules.Screenshot)
-		if err != nil {
-			return err
-		}
-		c.Screenshot = s
-	}
-	if doc.SharePicker != nil {
-		sp, err := applySharePicker(md, *doc.SharePicker)
-		if err != nil {
-			return err
-		}
-		c.SharePicker = sp
-	}
-	if doc.Modules != nil && doc.Modules.Recorder != nil {
-		r, err := applyRecorder(md, *doc.Modules.Recorder)
-		if err != nil {
-			return err
-		}
-		c.Recorder = r
-	}
-	if doc.Modules != nil && doc.Modules.Notifications != nil {
-		n, err := applyNotification(md, *doc.Modules.Notifications)
-		if err != nil {
-			return err
-		}
-		c.Notification = n
-	}
-	if doc.Modules != nil && doc.Modules.Treeman != nil {
-		tm, err := applyTreeman(md, *doc.Modules.Treeman)
-		if err != nil {
-			return err
-		}
-		c.Treeman = tm
-	}
-	if doc.Modules != nil && doc.Modules.IdleInhibit != nil {
-		ii, err := applyIdleInhibit(md, *doc.Modules.IdleInhibit)
-		if err != nil {
-			return err
-		}
-		c.IdleInhibit = ii
-	}
-	if doc.Modules != nil && doc.Modules.Hyprsunset != nil {
-		hs, err := applyHyprsunset(md, *doc.Modules.Hyprsunset)
-		if err != nil {
-			return err
-		}
-		c.Hyprsunset = hs
-	}
-	if doc.Modules != nil && doc.Modules.PowerProfiles != nil {
-		pp, err := applyPowerProfiles(md, *doc.Modules.PowerProfiles)
-		if err != nil {
-			return err
-		}
-		c.PowerProfiles = pp
-	}
-	if doc.Modules != nil && doc.Modules.KeybindMode != nil {
-		km, err := applyKeybindMode(md, *doc.Modules.KeybindMode)
-		if err != nil {
-			return err
-		}
-		c.KeybindMode = km
-	}
-	if doc.Modules != nil && doc.Modules.Power != nil {
-		pw, err := applyPower(md, *doc.Modules.Power)
-		if err != nil {
-			return err
-		}
-		c.Power = pw
-	}
-	if doc.Modules != nil && doc.Modules.Dashboard != nil {
-		db, err := applyDashboard(md, *doc.Modules.Dashboard)
-		if err != nil {
-			return err
-		}
-		c.Dashboard = db
-	}
-	if doc.Modules != nil && doc.Modules.Mail != nil {
-		ml, err := applyMail(md, *doc.Modules.Mail)
-		if err != nil {
-			return err
-		}
-		c.Mail = ml
-	}
-	if doc.Modules != nil && doc.Modules.Netstat != nil {
-		ns, err := applyNetstat(md, *doc.Modules.Netstat)
-		if err != nil {
-			return err
-		}
-		c.Netstat = ns
-	}
-	if doc.Modules != nil && doc.Modules.WorldClock != nil {
-		wc, err := applyWorldClock(md, *doc.Modules.WorldClock)
-		if err != nil {
-			return err
-		}
-		c.WorldClock = wc
-	}
-	if doc.Modules != nil && doc.Modules.Storage != nil {
-		st, err := applyStorage(md, *doc.Modules.Storage)
-		if err != nil {
-			return err
-		}
-		c.Storage = st
-	}
-	if doc.Modules != nil && doc.Modules.WindowTitle != nil {
-		wt, err := applyWindowTitle(md, *doc.Modules.WindowTitle)
-		if err != nil {
-			return err
-		}
-		c.WindowTitle = wt
-	}
-	if doc.Modules != nil && doc.Modules.KeyboardLayout != nil {
-		ki, err := applyKeyboardInput(md, *doc.Modules.KeyboardLayout)
-		if err != nil {
-			return err
-		}
-		c.KeyboardInput = ki
-	}
-	if doc.Modules != nil && doc.Modules.Custom != nil {
-		defs, err := applyCustomDefinitions(*doc.Modules.Custom)
-		if err != nil {
-			return err
-		}
-		c.Custom = defs
-	}
-	if doc.Modules != nil && doc.Modules.Bluetooth != nil {
-		bt, err := applyBluetooth(md, *doc.Modules.Bluetooth)
-		if err != nil {
-			return err
-		}
-		c.Bluetooth = bt
-	}
-	if doc.Modules != nil && doc.Modules.Microphone != nil {
-		mic, err := applyMicrophone(md, *doc.Modules.Microphone)
-		if err != nil {
-			return err
-		}
-		c.Microphone = mic
-	}
-	if doc.Modules != nil && doc.Modules.Network != nil {
-		net, err := applyNetwork(md, *doc.Modules.Network)
-		if err != nil {
-			return err
-		}
-		c.Network = net
-	}
-	if doc.Modules != nil && doc.Modules.Media != nil {
-		med, err := applyMedia(md, *doc.Modules.Media)
-		if err != nil {
-			return err
-		}
-		c.Media = med
-	}
-	if doc.Modules != nil && doc.Modules.Volume != nil {
-		vol, err := applyVolume(md, *doc.Modules.Volume)
-		if err != nil {
-			return err
-		}
-		c.Volume = vol
-	}
-	if doc.Modules != nil && doc.Modules.Brightness != nil {
-		br, err := applyBrightness(md, *doc.Modules.Brightness)
-		if err != nil {
-			return err
-		}
-		c.Brightness = br
-	}
-	if doc.Modules != nil && doc.Modules.Cava != nil {
-		cava, err := applyCava(md, *doc.Modules.Cava)
-		if err != nil {
-			return err
-		}
-		c.Cava = cava
-	}
-	if doc.Modules != nil && doc.Modules.Battery != nil {
-		b, err := applyBattery(md, *doc.Modules.Battery)
-		if err != nil {
-			return err
-		}
-		c.Battery = b
-	}
-	if doc.Modules != nil && doc.Modules.Separator != nil {
-		sep, err := applySeparator(md, *doc.Modules.Separator)
-		if err != nil {
-			return err
-		}
-		c.Separator = sep
-	}
-	if doc.Modules != nil && doc.Modules.SwayWorkspaces != nil {
-		sw, err := applyCompositorWorkspaces(md, *doc.Modules.SwayWorkspaces, "sway-workspaces", DefaultsSwayWorkspaces())
-		if err != nil {
-			return err
-		}
-		c.SwayWorkspaces = sw
-	}
-	if doc.Modules != nil && doc.Modules.NiriWorkspaces != nil {
-		nw, err := applyCompositorWorkspaces(md, *doc.Modules.NiriWorkspaces, "niri-workspaces", DefaultsNiriWorkspaces())
-		if err != nil {
-			return err
-		}
-		c.NiriWorkspaces = nw
-	}
-	if doc.Modules != nil && doc.Modules.MangoWorkspaces != nil {
-		mw, err := applyMangoWorkspaces(md, *doc.Modules.MangoWorkspaces)
-		if err != nil {
-			return err
-		}
-		c.MangoWorkspaces = mw
-	}
-	if doc.Modules != nil && doc.Modules.HyprlandWorkspaces != nil {
-		hw, err := applyHyprlandWorkspaces(md, *doc.Modules.HyprlandWorkspaces)
-		if err != nil {
-			return err
-		}
-		c.HyprlandWorkspaces = hw
-	}
-	if doc.General != nil {
-		general := generalDoc{}
-		if err := md.PrimitiveDecode(*doc.General, &general); err != nil {
-			return err
-		}
-		c.General = GeneralConfig(general)
-	}
-	return c.applyScreens(md, doc.Lock, doc.Greeter)
-}
-
-func (b barDoc) toBar() (Bar, error) {
-	bar := Defaults().Bar
-	if b.Location != "" {
-		bar.Location = Location(b.Location)
-	}
-	if b.Layer != "" {
-		bar.Layer = Layer(b.Layer)
-	}
-	setIf(&bar.Exclusive, b.Exclusive)
-	setIf(&bar.Shadow, b.Shadow)
-	setIf(&bar.ButtonVariant, b.ButtonVariant)
-	setIf(&bar.ButtonLabelWeight, b.ButtonLabelWeight)
-	setIf(&bar.ButtonIconPosition, b.ButtonIconPosition)
-	setIf(&bar.DropdownShadow, b.DropdownShadow)
-	for _, pct := range []struct {
-		raw *int
-		dst *int
-		key string
-	}{
-		{b.ButtonOpacity, &bar.ButtonOpacity, "button-opacity"},
-		{b.ButtonBGOpacity, &bar.ButtonBGOpacity, "button-bg-opacity"},
-		{b.DropdownOpacity, &bar.DropdownOpacity, "dropdown-opacity"},
-	} {
-		if pct.raw == nil {
-			continue
-		}
-		if *pct.raw < 0 || *pct.raw > 100 {
-			return Bar{}, fmt.Errorf("bar: %s %d outside 0-100", pct.key, *pct.raw)
-		}
-		*pct.dst = *pct.raw
-	}
-	if b.BG != "" {
-		cv, err := ParseColorValue(b.BG)
-		if err != nil {
-			return Bar{}, fmt.Errorf("bar: bg: %w", err)
-		}
-		bar.BG = cv
-	}
-	if b.BorderColor != "" {
-		cv, err := ParseColorValue(b.BorderColor)
-		if err != nil {
-			return Bar{}, fmt.Errorf("bar: border-color: %w", err)
-		}
-		bar.BorderColor = cv
-	}
-	if b.BorderLocation != "" {
-		bar.BorderLocation = BorderLocation(b.BorderLocation)
-	}
-	if b.BorderWidth != nil {
-		if *b.BorderWidth < 0 || *b.BorderWidth > 255 {
-			return Bar{}, fmt.Errorf("bar: border-width %d outside 0-255", *b.BorderWidth)
-		}
-		bar.BorderWidth = *b.BorderWidth
-	}
-	if b.ButtonLabelSize.value != nil {
-		if err := bar.ButtonLabelSize.unmarshal(b.ButtonLabelSize.value, "button-label-size"); err != nil {
-			return Bar{}, err
-		}
-	}
-	if b.ModuleGap.value != nil {
-		if err := bar.ModuleGap.unmarshal(b.ModuleGap.value, "module-gap"); err != nil {
-			return Bar{}, err
-		}
-	}
-	if b.Padding.value != nil {
-		if err := bar.Padding.unmarshal(b.Padding.value, "padding"); err != nil {
-			return Bar{}, err
-		}
-	}
-	if b.PaddingEnds.value != nil {
-		if err := bar.PaddingEnds.unmarshal(b.PaddingEnds.value, "padding-ends"); err != nil {
-			return Bar{}, err
-		}
-	}
-	if b.InsetEdge.value != nil {
-		if err := bar.InsetEdge.unmarshal(b.InsetEdge.value, "inset-edge"); err != nil {
-			return Bar{}, err
-		}
-	}
-	if b.InsetEnds.value != nil {
-		if err := bar.InsetEnds.unmarshal(b.InsetEnds.value, "inset-ends"); err != nil {
-			return Bar{}, err
-		}
-	}
-	if b.ButtonGroupModuleGap.value != nil {
-		if err := bar.ButtonGroupModuleGap.unmarshal(b.ButtonGroupModuleGap.value, "button-group-module-gap"); err != nil {
-			return Bar{}, err
-		}
-	}
-	if b.ButtonGroupPadding.value != nil {
-		if err := bar.ButtonGroupPadding.unmarshal(b.ButtonGroupPadding.value, "button-group-padding"); err != nil {
-			return Bar{}, err
-		}
-	}
-	if b.ButtonGroupBackground != "" {
-		cv, err := ParseColorValue(b.ButtonGroupBackground)
-		if err != nil {
-			return Bar{}, fmt.Errorf("bar: button-group-background: %w", err)
-		}
-		bar.ButtonGroupBackground = cv
-	}
-	if b.ButtonGroupOpacity != nil {
-		bar.ButtonGroupOpacity = *b.ButtonGroupOpacity
-	}
-	if b.ButtonGroupBorderColor != "" {
-		cv, err := ParseColorValue(b.ButtonGroupBorderColor)
-		if err != nil {
-			return Bar{}, fmt.Errorf("bar: button-group-border-color: %w", err)
-		}
-		bar.ButtonGroupBorderColor = cv
-	}
-	if b.ButtonGroupBorderLocation != "" {
-		bar.ButtonGroupBorderLocation = BorderLocation(b.ButtonGroupBorderLocation)
-	}
-	if b.ButtonGroupBorderWidth != nil {
-		if *b.ButtonGroupBorderWidth < 0 || *b.ButtonGroupBorderWidth > 255 {
-			return Bar{}, fmt.Errorf("bar: button-group-border-width %d outside 0-255", *b.ButtonGroupBorderWidth)
-		}
-		bar.ButtonGroupBorderWidth = *b.ButtonGroupBorderWidth
-	}
-	if b.ButtonGroupRounding != "" {
-		bar.ButtonGroupRounding = RoundingLevel(b.ButtonGroupRounding)
-	}
-	if b.ButtonRounding != "" {
-		bar.ButtonRounding = RoundingLevel(b.ButtonRounding)
-	}
-	if b.ButtonBorderLocation != "" {
-		bar.ButtonBorderLocation = BorderLocation(b.ButtonBorderLocation)
-	}
-	if b.ButtonBorderWidth != nil {
-		if *b.ButtonBorderWidth < 0 || *b.ButtonBorderWidth > 255 {
-			return Bar{}, fmt.Errorf("bar: button-border-width %d outside 0-255", *b.ButtonBorderWidth)
-		}
-		bar.ButtonBorderWidth = *b.ButtonBorderWidth
-	}
-	if b.ButtonBGColor != "" {
-		cv, err := ParseColorValue(b.ButtonBGColor)
-		if err != nil {
-			return Bar{}, fmt.Errorf("bar: button-bg-color: %w", err)
-		}
-		bar.ButtonBGColor = cv
-	}
-	if b.ButtonHoverBGColor != "" {
-		cv, err := ParseColorValue(b.ButtonHoverBGColor)
-		if err != nil {
-			return Bar{}, fmt.Errorf("bar: button-hover-bg-color: %w", err)
-		}
-		bar.ButtonHoverBGColor = cv
-	}
-	if b.ButtonActiveBGColor != "" {
-		cv, err := ParseColorValue(b.ButtonActiveBGColor)
-		if err != nil {
-			return Bar{}, fmt.Errorf("bar: button-active-bg-color: %w", err)
-		}
-		bar.ButtonActiveBGColor = cv
-	}
-	for _, set := range []struct {
-		raw  tomlValue
-		dest *Size
-		name string
-	}{
-		{b.ButtonIconPadding, &bar.ButtonIconPadding, "button-icon-padding"},
-		{b.ButtonLabelPadding, &bar.ButtonLabelPadding, "button-label-padding"},
-		{b.ButtonIconSize, &bar.ButtonIconSize, "button-icon-size"},
-		{b.ButtonGap, &bar.ButtonGap, "button-gap"},
-	} {
-		if set.raw.value == nil {
-			continue
-		}
-		if err := set.dest.unmarshal(set.raw.value, set.name); err != nil {
-			return Bar{}, err
-		}
-	}
-	if b.Rounding != "" {
-		bar.Rounding = RoundingLevel(b.Rounding)
-	}
-	if b.BackgroundOpacity != nil {
-		bar.BackgroundOpacity = *b.BackgroundOpacity
-	}
-	if b.Scale != nil {
-		bar.Scale = *b.Scale
-	}
-	bar.Layout = b.Layout
-
-	if !validLocations[bar.Location] {
-		return Bar{}, fmt.Errorf("bar: invalid location %q (want top|bottom|left|right)", bar.Location)
-	}
-	if !validLayers[bar.Layer] {
-		return Bar{}, fmt.Errorf("bar: invalid layer %q (want background|bottom|top|overlay)", bar.Layer)
-	}
-	if !validRounding[bar.Rounding] {
-		return Bar{}, fmt.Errorf("bar: invalid rounding %q (want none|sm|md|lg|full)", bar.Rounding)
-	}
-	if !validBorderLocations[bar.BorderLocation] {
-		return Bar{}, fmt.Errorf("bar: invalid border-location %q (want none|top|bottom|left|right|all)", bar.BorderLocation)
-	}
-	if !validBorderLocations[bar.ButtonGroupBorderLocation] {
-		return Bar{}, fmt.Errorf("bar: invalid button-group-border-location %q (want none|top|bottom|left|right|all)", bar.ButtonGroupBorderLocation)
-	}
-	if !validRounding[bar.ButtonGroupRounding] {
-		return Bar{}, fmt.Errorf("bar: invalid button-group-rounding %q (want none|sm|md|lg|full)", bar.ButtonGroupRounding)
-	}
-	if !validBorderLocations[bar.ButtonBorderLocation] {
-		return Bar{}, fmt.Errorf("bar: invalid button-border-location %q (want none|top|bottom|left|right|all)", bar.ButtonBorderLocation)
-	}
-	if !validRounding[bar.ButtonRounding] {
-		return Bar{}, fmt.Errorf("bar: invalid button-rounding %q (want none|sm|md|lg|full)", bar.ButtonRounding)
-	}
-	if bar.ButtonGroupOpacity < 0 || bar.ButtonGroupOpacity > 100 {
-		return Bar{}, fmt.Errorf("bar: button-group-opacity %d outside 0-100", bar.ButtonGroupOpacity)
-	}
-	if bar.BackgroundOpacity < 0 || bar.BackgroundOpacity > 100 {
-		return Bar{}, fmt.Errorf("bar: background-opacity %d outside 0-100", bar.BackgroundOpacity)
-	}
-	if bar.Scale < 0.25 || bar.Scale > 3.0 {
-		return Bar{}, fmt.Errorf("bar: scale %v outside 0.25-3.0", bar.Scale)
-	}
-	for i := range bar.Layout {
-		if err := validateLayout(&bar.Layout[i]); err != nil {
-			return Bar{}, err
-		}
-	}
-	return bar, nil
-}
-
-func validateLayout(l *BarLayout) error {
-	if l.Monitor == "" {
-		return errors.New("bar: layout entry missing monitor")
-	}
-	if l.Extends == l.Monitor {
-		return fmt.Errorf("bar: layout %q extends itself", l.Monitor)
-	}
-	return nil
-}
+var _ = registerEnum(WeightNormal, WeightMedium, WeightSemibold, WeightBold)

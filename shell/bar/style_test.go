@@ -15,7 +15,7 @@ import (
 	"github.com/stubbedev/wayle/styling"
 )
 
-func testStyle(t *testing.T, mutate func(b *config.Bar)) barStyle {
+func testStyle(t *testing.T, mutate func(b *config.BarConfig)) barStyle {
 	t.Helper()
 	cfg := config.Defaults()
 	if mutate != nil {
@@ -36,7 +36,7 @@ func TestComputeStyleDefaults(t *testing.T) {
 	if s.labelPx != 1.04*styling.RemBase {
 		t.Errorf("label px = %v, want the 1.04rem base at multiplier 1.0", s.labelPx)
 	}
-	if px := testStyle(t, func(b *config.Bar) { b.ButtonLabelSize = config.Size{Value: 20, Unit: config.SizePixels} }).labelPx; px != 20 {
+	if px := testStyle(t, func(b *config.BarConfig) { b.ButtonLabelSize = config.Size{Value: 20, Unit: config.SizePixels} }).labelPx; px != 20 {
 		t.Errorf("pixel label size = %v, want literal 20", px)
 	}
 }

@@ -36,7 +36,7 @@ func newPowerProfiles(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("power-profiles: no power-profiles-daemon available")
 	}
 	m := &powerProfilesModule{ctx: ctx, src: ctx.PowerProfiles, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	m.icon = moduleIcon(ctx, ctx.Config.PowerProfiles.Icons[config.ProfileBalanced])
+	m.icon = moduleIcon(ctx, ctx.Config.PowerProfiles.Icons()[config.ProfileBalanced])
 	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (m *powerProfilesModule) refresh() error {
 	m.label.SetColor(m.profileColor(snap.Active))
 	if setter := m.icon; setter != nil {
 		setter.SetTint(m.profileColor(snap.Active))
-		setter.SetThemeName(cfg.Icons[snap.Active].Name)
+		setter.SetThemeName(cfg.Icons()[snap.Active].Name)
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func (m *powerProfilesModule) refresh() error {
 // profileColor resolves the active profile's configured color, the
 // bar fg otherwise.
 func (m *powerProfilesModule) profileColor(profile string) render.Color {
-	color, ok := m.ctx.Config.PowerProfiles.Colors[profile]
+	color, ok := m.ctx.Config.PowerProfiles.Colors()[profile]
 	if !ok {
 		return m.ctx.Style.fg
 	}

@@ -40,7 +40,7 @@ func newKeybindMode(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("keybind-mode: the compositor is not Hyprland")
 	}
 	m := &keybindModeModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	m.icon = moduleIcon(ctx, ctx.Config.KeybindMode.Icon)
+	m.icon = moduleIcon(ctx, ctx.Config.KeybindMode.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	events, err := ctx.Hyprland.Events(context.Background())
 	if err != nil {

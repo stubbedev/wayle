@@ -45,7 +45,7 @@ type card struct {
 // New builds the popup host over one output. The service's popup
 // countdowns take the configured popup-duration.
 func New(application *app.Application, svc *notifications.Service, cfg config.NotificationConfig, font render.Font, pal *styling.Palette, out *app.Output) *Popups {
-	svc.SetPopupDuration(time.Duration(cfg.PopupDurationMS) * time.Millisecond)
+	svc.SetPopupDuration(time.Duration(cfg.PopupDuration) * time.Millisecond)
 	return &Popups{
 		app:   application,
 		svc:   svc,
@@ -55,6 +55,23 @@ func New(application *app.Application, svc *notifications.Service, cfg config.No
 		out:   out,
 		cards: make(map[uint32]*card),
 	}
+}
+
+// SetConfig applies a reloaded [modules.notifications] section on the
+// loop goroutine: the surface closes and the stack rebuilds at the new
+// position, gap, limits, and hover behavior.
+func (p *Popups) SetConfig(cfg config.NotificationConfig) {
+	p.svc.SetPopupDuration(time.Duration(cfg.PopupDuration) * time.Millisecond)
+	p.mu.Lock()
+	p.cfg = cfg
+	win := p.win
+	p.win, p.root = nil, nil
+	p.cards = make(map[uint32]*card)
+	p.mu.Unlock()
+	if win != nil {
+		win.Close()
+	}
+	p.sync()
 }
 
 // Run follows the service's feed until the process exits; each change
@@ -74,8 +91,8 @@ func (p *Popups) Run() {
 // needs the application.
 func (p *Popups) sync() {
 	visible := p.svc.Popups()
-	if len(visible) > p.cfg.PopupMaxVisible {
-		visible = visible[:p.cfg.PopupMaxVisible]
+	if len(visible) > int(p.cfg.PopupMaxVisible) {
+		visible = visible[:int(p.cfg.PopupMaxVisible)]
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -167,7 +184,7 @@ func (p *Popups) layoutLocked() {
 // each new card (the service's newest-first list as is), oldest-first
 // appends it (the list reversed) — insert_new_cards's use_prepend.
 func (p *Popups) stackOrder() []uint32 {
-	if p.cfg.PopupStacking != "oldest-first" {
+	if p.cfg.PopupStackingOrder != config.StackingOrderOldestFirst {
 		return p.order
 	}
 	ids := make([]uint32, len(p.order))
@@ -180,11 +197,11 @@ func (p *Popups) stackOrder() []uint32 {
 // ensureWindow maps the popup surface at the configured position.
 func (p *Popups) ensureWindow() (*app.LayerWindow, *widget.Box, error) {
 	bg, _ := p.pal.Token(config.TokenBgSurface)
-	root := widget.NewBox(widget.Column, int(p.cfg.PopupGap*16), 8)
+	root := widget.NewBox(widget.Column, int(p.cfg.PopupGap.ResolvePx(popupGapBasePx, 1)), 8)
 	win, err := p.app.NewLayer(app.LayerConfig{
 		Output:        p.out,
 		Layer:         app.LayerOverlay,
-		Anchor:        popupsAnchors(p.cfg.PopupPosition),
+		Anchor:        popupAnchors(p.cfg.PopupPosition),
 		Width:         380,
 		ExclusiveZone: -1,
 		Namespace:     "wayle-popups",
@@ -198,13 +215,13 @@ func (p *Popups) ensureWindow() (*app.LayerWindow, *widget.Box, error) {
 // connector name its output, falling back to the first when the
 // connector is not connected (layer_shell.rs apply_monitor_by_connector).
 // Nil only when there are no outputs.
-func Output(outputs []*app.Output, monitor string) *app.Output {
+func Output(outputs []*app.Output, monitor config.PopupMonitor) *app.Output {
 	if len(outputs) == 0 {
 		return nil
 	}
-	if monitor != "primary" {
+	if !monitor.IsPrimary() {
 		for _, out := range outputs {
-			if out.Name == monitor {
+			if out.Name == monitor.Connector() {
 				return out
 			}
 		}
@@ -212,31 +229,29 @@ func Output(outputs []*app.Output, monitor string) *app.Output {
 	return outputs[0]
 }
 
-// popupsAnchors maps the position onto anchors; both edges of the
-// cross axis so the window hugs the corner.
-func popupsAnchors(position string) app.Anchor {
-	anchor, _ := popupsAnchorOK(position)
-	return anchor
-}
-
-func popupsAnchorOK(position string) (app.Anchor, bool) {
-	// Reuse the OSD's corner/edge table; popups accept the corners and
-	// the left/right sides (the schema's popup-position set).
+// popupAnchors maps the position onto layer-shell anchors
+// (notification_popup/methods.rs apply_position): corners take both
+// edges, centered positions only the one edge.
+func popupAnchors(position config.PopupPosition) app.Anchor {
 	switch position {
-	case config.OsdTopLeft, config.OsdTopRight, config.OsdBottomLeft, config.OsdBottomRight, config.OsdLeft, config.OsdRight:
-		anchor, ok := popupCornerAnchors[position]
-		return anchor, ok
+	case config.PopupPositionTopLeft:
+		return app.AnchorTop | app.AnchorLeft
+	case config.PopupPositionTopCenter:
+		return app.AnchorTop
+	case config.PopupPositionTopRight:
+		return app.AnchorTop | app.AnchorRight
+	case config.PopupPositionBottomLeft:
+		return app.AnchorBottom | app.AnchorLeft
+	case config.PopupPositionBottomCenter:
+		return app.AnchorBottom
+	case config.PopupPositionBottomRight:
+		return app.AnchorBottom | app.AnchorRight
+	case config.PopupPositionCenterLeft:
+		return app.AnchorLeft
+	case config.PopupPositionCenterRight:
+		return app.AnchorRight
 	}
-	return 0, false
-}
-
-var popupCornerAnchors = map[string]app.Anchor{
-	config.OsdTopLeft:     app.AnchorTop | app.AnchorLeft,
-	config.OsdTopRight:    app.AnchorTop | app.AnchorRight,
-	config.OsdBottomLeft:  app.AnchorBottom | app.AnchorLeft,
-	config.OsdBottomRight: app.AnchorBottom | app.AnchorRight,
-	config.OsdLeft:        app.AnchorLeft | app.AnchorTop | app.AnchorBottom,
-	config.OsdRight:       app.AnchorRight | app.AnchorTop | app.AnchorBottom,
+	return app.AnchorTop | app.AnchorRight
 }
 
 // notifPopupIcon picks the card's glyph: the sender's app icon when
@@ -254,3 +269,6 @@ func (p *Popups) Visible() int {
 	defer p.mu.Unlock()
 	return len(p.cards)
 }
+
+// popupGapBasePx is the gap a popup-gap multiplier scales (8px).
+const popupGapBasePx = 8

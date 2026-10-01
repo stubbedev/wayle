@@ -1,90 +1,48 @@
 package config
 
-import (
-	"fmt"
-
-	"github.com/BurntSushi/toml"
-)
-
-// Appearance is the light/dark mode: auto follows each provider and the
-// configured palette, light and dark force the mode
-// (crates/wayle-config/src/schemas/styling/types/color.rs).
-type Appearance string
-
-// Appearance modes.
-const (
-	AppearanceAuto  Appearance = "auto"
-	AppearanceLight Appearance = "light"
-	AppearanceDark  Appearance = "dark"
-)
-
-// UnmarshalText decodes and validates an appearance mode.
-func (a *Appearance) UnmarshalText(text []byte) error {
-	v, err := parseEnum(text, "appearance", AppearanceAuto, AppearanceLight, AppearanceDark)
-	if err != nil {
-		return err
-	}
-	*a = v
-	return nil
-}
-
-// ForcedLight is the forced mode: (true, true) for light, (false, true)
-// for dark, and ok false for auto (Appearance::forced_light).
-func (a Appearance) ForcedLight() (light, ok bool) {
-	switch a {
-	case AppearanceLight:
-		return true, true
-	case AppearanceDark:
-		return false, true
-	}
-	return false, false
-}
-
-// PaletteConfig is the [styling.palette] section: the ten palette
-// colors of the active theme (crates/wayle-config/src/schemas/styling/
-// palette.rs).
-type PaletteConfig struct {
-	Bg, Surface, Elevated HexColor
-	Fg, FgMuted           HexColor
-	Primary               HexColor
-	Red, Yellow           HexColor
-	Green, Blue           HexColor
-}
-
-// StylingConfig is the theme half of the [styling] section: the
-// dropdown/popover scale and rounding, the appearance mode, the palette,
-// and its base theme (crates/wayle-config/src/schemas/styling/mod.rs).
-// The provider and the extractor keys of the same section live in
-// ColorExtractorConfig.
+// StylingConfig is the [styling] section
+// (crates/wayle-config/src/schemas/styling/mod.rs).
+//
+// Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet.
 type StylingConfig struct {
-	// Scale multiplies dropdowns, popovers, and dialogs (0.25-3.0).
-	Scale float64
-	// Rounding is the corner rounding of dropdowns, popovers, dialogs.
-	Rounding   RoundingLevel
-	Appearance Appearance
-	Palette    PaletteConfig
-	// PaletteBaseTheme is the active theme preset's name, the base the
-	// palette was edited from; it picks the light/dark variant a forced
-	// appearance swaps to.
-	PaletteBaseTheme string
+	// Scale multiplier for dropdowns, popovers, and dialogs.
+	Scale ScaleFactor `cfg:"scale"`
+	// Corner rounding for dropdowns, popovers, and dialogs.
+	Rounding RoundingLevel `cfg:"rounding"`
+	// Light/dark appearance mode. `Auto` follows each provider / the configured
+	// palette; `Light`/`Dark` force the mode (static palettes swap to their
+	// built-in light/dark variant when one exists).
+	Appearance Appearance `cfg:"appearance"`
+	// ColorExtractor is theme-provider, theming-monitor, and the
+	// matugen-/wallust-/pywal- keys.
+	ColorExtractor ColorExtractorConfig `cfg:",inline"`
+	// Active color palette.
+	Palette PaletteConfig `cfg:"palette"`
+	// Currently active theme preset name, and/or the base for the
+	// palette when the palette has been modified. Persisted backing
+	// state for the theme selector; not a labeled setting of its own.
+	PaletteBaseTheme string `cfg:"palette_base_theme"`
+	// Available is the discovered themes, populated at runtime from
+	// the built-ins and themes/ (never read from a config file).
+	Available []ThemeEntry `cfg:"-"`
 }
 
-// DefaultsStyling returns the schema defaults: the wayle theme.
+// DefaultsStyling returns the schema defaults.
 func DefaultsStyling() StylingConfig {
 	return StylingConfig{
-		Scale:      1.01,
-		Rounding:   RoundingSm,
-		Appearance: AppearanceAuto,
-		Palette:    paletteConfigOf(wayleTheme),
+		Scale:          1.01,
+		Rounding:       RoundingSm,
+		Appearance:     AppearanceAuto,
+		ColorExtractor: DefaultsColorExtractor(),
+		Palette:        paletteConfigOf(wayleTheme),
 	}
 }
 
-// ActivePalette assembles the palette from the color fields under the
-// configured appearance: when light or dark is forced and the base theme
-// has a built-in variant for that mode, the variant's palette is
-// returned instead. Non-destructive — PaletteBaseTheme is unchanged, so
-// auto restores the configured colors. This is StylingConfig::palette
-// (the Go field of that name holds the colors).
+// ActivePalette is the palette the static (wayle) provider renders:
+// the configured [styling.palette], or — when the appearance forces
+// light or dark and palette-base-theme names a built-in family with
+// that variant — the variant's palette (theme_provider.rs
+// resolve_static_palette).
 func (s StylingConfig) ActivePalette() Palette {
 	base := Palette{
 		Bg: s.Palette.Bg.String(), Surface: s.Palette.Surface.String(), Elevated: s.Palette.Elevated.String(),
@@ -104,58 +62,83 @@ func (s StylingConfig) ActivePalette() Palette {
 	return base
 }
 
-type paletteDoc struct {
-	Bg       *HexColor `toml:"bg"`
-	Surface  *HexColor `toml:"surface"`
-	Elevated *HexColor `toml:"elevated"`
-	Fg       *HexColor `toml:"fg"`
-	FgMuted  *HexColor `toml:"fg-muted"`
-	Primary  *HexColor `toml:"primary"`
-	Red      *HexColor `toml:"red"`
-	Yellow   *HexColor `toml:"yellow"`
-	Green    *HexColor `toml:"green"`
-	Blue     *HexColor `toml:"blue"`
+// PaletteConfig is the [styling.palette] table (styling/palette.rs).
+//
+// Color palette configuration for the active theme.
+type PaletteConfig struct {
+	// Base background color (darkest).
+	Bg HexColor `cfg:"bg"`
+	// Card and sidebar background.
+	Surface HexColor `cfg:"surface"`
+	// Raised element background.
+	Elevated HexColor `cfg:"elevated"`
+	// Primary text color.
+	Fg HexColor `cfg:"fg"`
+	// Secondary text color.
+	FgMuted HexColor `cfg:"fg-muted"`
+	// Accent color for interactive elements.
+	Primary HexColor `cfg:"primary"`
+	// Red semantic color.
+	Red HexColor `cfg:"red"`
+	// Yellow semantic color.
+	Yellow HexColor `cfg:"yellow"`
+	// Green semantic color.
+	Green HexColor `cfg:"green"`
+	// Blue semantic color.
+	Blue HexColor `cfg:"blue"`
 }
 
-// applyStyling overlays the theme keys of [styling] onto the defaults.
-// scale clamps out-of-range values with a warning, as ScaleFactor
-// deserializes (and as ColorExtractorConfig treats its ranged keys); a
-// bad rounding, appearance, or palette color is a load error.
-func applyStyling(md toml.MetaData, prim toml.Primitive) (StylingConfig, error) {
-	cfg := DefaultsStyling()
-	var doc struct {
-		Scale            *float64    `toml:"scale"`
-		Rounding         *string     `toml:"rounding"`
-		Appearance       *Appearance `toml:"appearance"`
-		Palette          *paletteDoc `toml:"palette"`
-		PaletteBaseTheme *string     `toml:"palette-base-theme"`
+// Appearance is the light/dark mode (styling/types/color.rs).
+//
+// Light/dark appearance mode.
+//
+// `Auto` keeps each provider's own light setting and the configured static
+// palette as-is. `Light`/`Dark` force the mode: dynamic providers switch their
+// light flag, and the static palette swaps to its built-in light/dark variant
+// when one exists.
+type Appearance string
+
+// Appearance modes.
+const (
+	// Follow each provider's own setting / the configured palette.
+	AppearanceAuto Appearance = "auto"
+	// Force the light variant.
+	AppearanceLight Appearance = "light"
+	// Force the dark variant.
+	AppearanceDark Appearance = "dark"
+)
+
+var _ = registerEnum(AppearanceAuto, AppearanceLight, AppearanceDark)
+
+// ForcedLight reports whether the mode forces light (true) or dark
+// (false); ok is false for Auto.
+func (a Appearance) ForcedLight() (light, ok bool) {
+	switch a {
+	case AppearanceLight:
+		return true, true
+	case AppearanceDark:
+		return false, true
 	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, fmt.Errorf("styling: %w", err)
-	}
-	if doc.Scale != nil {
-		cfg.Scale = clampWarn("scale", *doc.Scale, 0.25, 3.0)
-	}
-	if doc.Rounding != nil {
-		level := RoundingLevel(*doc.Rounding)
-		if !validRounding[level] {
-			return cfg, fmt.Errorf("styling: invalid rounding %q (want none|sm|md|lg|full)", *doc.Rounding)
-		}
-		cfg.Rounding = level
-	}
-	setIf(&cfg.Appearance, doc.Appearance)
-	setIf(&cfg.PaletteBaseTheme, doc.PaletteBaseTheme)
-	if p := doc.Palette; p != nil {
-		setIf(&cfg.Palette.Bg, p.Bg)
-		setIf(&cfg.Palette.Surface, p.Surface)
-		setIf(&cfg.Palette.Elevated, p.Elevated)
-		setIf(&cfg.Palette.Fg, p.Fg)
-		setIf(&cfg.Palette.FgMuted, p.FgMuted)
-		setIf(&cfg.Palette.Primary, p.Primary)
-		setIf(&cfg.Palette.Red, p.Red)
-		setIf(&cfg.Palette.Yellow, p.Yellow)
-		setIf(&cfg.Palette.Green, p.Green)
-		setIf(&cfg.Palette.Blue, p.Blue)
-	}
-	return cfg, nil
+	return false, false
 }
+
+// ThemeProvider is where palette values come from (styling/types/color.rs).
+//
+// Source of color palette values.
+//
+// Dynamic providers (Matugen, Pywal, Wallust) inject palette tokens at runtime.
+type ThemeProvider string
+
+// Theme providers; Wayle is the default.
+const (
+	// Static theming using Wayle's built-in palettes.
+	ThemeProviderWayle ThemeProvider = "wayle"
+	// Dynamic theming via Matugen.
+	ThemeProviderMatugen ThemeProvider = "matugen"
+	// Dynamic theming via Pywal.
+	ThemeProviderPywal ThemeProvider = "pywal"
+	// Dynamic theming via Wallust.
+	ThemeProviderWallust ThemeProvider = "wallust"
+)
+
+var _ = registerEnum(ThemeProviderWayle, ThemeProviderMatugen, ThemeProviderPywal, ThemeProviderWallust)

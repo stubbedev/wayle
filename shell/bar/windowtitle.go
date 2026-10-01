@@ -69,7 +69,7 @@ func (m *windowTitleModule) render() {
 	if cfg.LabelShow {
 		text = windowTitleLabel(cfg.Format, m.title, m.appID)
 		if cfg.LabelMaxLength > 0 {
-			text = truncateLabel(text, cfg.LabelMaxLength)
+			text = truncateLabel(text, int(cfg.LabelMaxLength))
 		}
 	}
 	m.label.SetText(text)

@@ -148,7 +148,7 @@ func hyprMonitorWorkspaces(barMonitor string, rules map[int]string) []int {
 }
 
 // hyprDisplayID is compute_display_id with relative_workspace_number.
-func hyprDisplayID(id int, numbering config.WorkspacesNumbering, barMonitor string, monitorWorkspaces []int) int {
+func hyprDisplayID(id int, numbering config.Numbering, barMonitor string, monitorWorkspaces []int) int {
 	if numbering != config.NumberingRelative || id <= 0 || barMonitor == "" || len(monitorWorkspaces) == 0 {
 		return id
 	}
@@ -288,7 +288,7 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 	}
 	hcfg := ctx.Config.HyprlandWorkspaces
 	m := &hyprlandWorkspaces{
-		ctx: ctx, cfg: hcfg.Shared, flavor: cwsHyprland, otherMonitor: hcfg.ActiveOnOtherMonitorColor,
+		ctx: ctx, cfg: hcfg.View(), flavor: cwsHyprland, otherMonitor: hcfg.ActiveOnOtherMonitorColor,
 		hcfg:   hcfg,
 		conn:   ctx.Hyprland,
 		urgent: map[string]bool{},
@@ -416,7 +416,7 @@ func (m *hyprlandWorkspaces) filter() hyprFilter {
 	return hyprFilter{
 		showSpecial:     m.hcfg.ShowSpecial,
 		monitorSpecific: m.cfg.MonitorSpecific,
-		minCount:        m.hcfg.MinWorkspace,
+		minCount:        int(m.hcfg.MinWorkspaceCount),
 		activeID:        m.activeID,
 		barMonitor:      m.ctx.Connector,
 		ignore:          m.cfg.WorkspaceIgnore,
@@ -455,11 +455,11 @@ func (m *hyprlandWorkspaces) render() {
 			},
 		}
 		style, styled := m.cfg.WorkspaceMap[strconv.Itoa(ws.id)]
-		if styled {
-			model.icon = style.Icon
+		if styled && style.Icon != nil {
+			model.icon = *style.Icon
 		}
-		if styled && style.LabelSet {
-			model.label = style.Label
+		if styled && style.Label != nil {
+			model.label = *style.Label
 		} else {
 			display := hyprDisplayID(ws.id, m.hcfg.Numbering, m.ctx.Connector, monitorWorkspaces)
 			model.label = hyprLabel(display, ws.id, ws.name, m.hcfg.LabelUseName)
@@ -602,7 +602,7 @@ func (m *hyprlandWorkspaces) applyActiveChange(id int, tracked bool) bool {
 // placeholder set may change with the active id, so min-workspace-count
 // re-filters; otherwise only the states move.
 func (m *hyprlandWorkspaces) syncAfterActiveChange() {
-	if m.hcfg.MinWorkspace > 0 {
+	if int(m.hcfg.MinWorkspaceCount) > 0 {
 		m.rebuild()
 		return
 	}

@@ -5,101 +5,12 @@ package config
 // shadow.rs) and crates/wayle-config/src/schemas/styling/types
 // (rounding.rs, typography.rs).
 
-// ShadowPreset is the bar's shadow style.
-type ShadowPreset string
-
-// Shadow presets.
-const (
-	ShadowNone     ShadowPreset = "none"
-	ShadowDrop     ShadowPreset = "drop"
-	ShadowFloating ShadowPreset = "floating"
-)
-
-// UnmarshalText decodes and validates a shadow preset.
-func (s *ShadowPreset) UnmarshalText(text []byte) error {
-	v, err := parseEnum(text, "shadow", ShadowNone, ShadowDrop, ShadowFloating)
-	if err != nil {
-		return err
-	}
-	*s = v
-	return nil
-}
-
-// MarginPx is the margin the shadow needs to render unclipped.
-func (s ShadowPreset) MarginPx() int {
-	if s == ShadowDrop || s == ShadowFloating {
-		return 4
-	}
-	return 0
-}
-
-// CSSShadow is the box-shadow value for a bar docked at location: a
-// drop shadow falls away from the anchor edge, floating always below.
-func (s ShadowPreset) CSSShadow(location Location) string {
-	switch s {
-	case ShadowDrop:
-		switch location {
-		case LocationBottom:
-			return "0 -1px 2px 1px rgba(0, 0, 0, 0.25)"
-		case LocationLeft:
-			return "1px 0 2px 1px rgba(0, 0, 0, 0.25)"
-		case LocationRight:
-			return "-1px 0 2px 1px rgba(0, 0, 0, 0.25)"
-		default: // top
-			return "0 1px 2px 1px rgba(0, 0, 0, 0.25)"
-		}
-	case ShadowFloating:
-		return "0 1px 2px 1px rgba(0, 0, 0, 0.25)"
-	default:
-		return "none"
-	}
-}
-
 // OppositeMargin is the margin on the edge opposite the anchor, where
 // the shadow extends.
-func (s ShadowPreset) OppositeMargin() int { return s.MarginPx() }
-
-// BarButtonVariant is the module button chrome.
-type BarButtonVariant string
-
-// Button variants.
-const (
-	ButtonVariantBasic       BarButtonVariant = "basic"
-	ButtonVariantBlockPrefix BarButtonVariant = "block-prefix"
-	ButtonVariantIconSquare  BarButtonVariant = "icon-square"
-)
-
-// UnmarshalText decodes and validates a button variant.
-func (v *BarButtonVariant) UnmarshalText(text []byte) error {
-	parsed, err := parseEnum(text, "button-variant", ButtonVariantBasic, ButtonVariantBlockPrefix, ButtonVariantIconSquare)
-	if err != nil {
-		return err
-	}
-	*v = parsed
-	return nil
-}
+func (s ShadowPreset) OppositeMargin() uint32 { return s.MarginPx() }
 
 // CSSClass is the variant's class on the button ("block-prefix").
 func (v BarButtonVariant) CSSClass() string { return string(v) }
-
-// IconPosition places a button's icon relative to its label.
-type IconPosition string
-
-// Icon positions.
-const (
-	IconStart IconPosition = "start"
-	IconEnd   IconPosition = "end"
-)
-
-// UnmarshalText decodes and validates an icon position.
-func (p *IconPosition) UnmarshalText(text []byte) error {
-	v, err := parseEnum(text, "button-icon-position", IconStart, IconEnd)
-	if err != nil {
-		return err
-	}
-	*p = v
-	return nil
-}
 
 // CSSClass is the class the position adds: "icon-end" for end, none
 // (ok false) for the default start.
@@ -108,28 +19,6 @@ func (p IconPosition) CSSClass() (string, bool) {
 		return "icon-end", true
 	}
 	return "", false
-}
-
-// FontWeightClass is a typography weight backed by the --weight-*
-// tokens.
-type FontWeightClass string
-
-// Font weights.
-const (
-	WeightNormal   FontWeightClass = "normal"
-	WeightMedium   FontWeightClass = "medium"
-	WeightSemibold FontWeightClass = "semibold"
-	WeightBold     FontWeightClass = "bold"
-)
-
-// UnmarshalText decodes and validates a font weight.
-func (w *FontWeightClass) UnmarshalText(text []byte) error {
-	v, err := parseEnum(text, "font weight", WeightNormal, WeightMedium, WeightSemibold, WeightBold)
-	if err != nil {
-		return err
-	}
-	*w = v
-	return nil
 }
 
 // CSSClass is the weight class ("weight-medium").
@@ -205,11 +94,11 @@ func (r RoundingLevel) scopedCSSValues(prefix string) RoundingCSSValues {
 // ScaleValue is the multiplier of a scale size; ok is false for pixels
 // (Size::scale_value).
 func (s Size) ScaleValue() (float64, bool) {
-	return s.Value, s.Unit == SizeMultiplier
+	return float64(s.Value), s.Unit == SizeMultiplier
 }
 
 // PxValue is the length of a pixel size; ok is false for a multiplier
 // (Size::px_value).
 func (s Size) PxValue() (float64, bool) {
-	return s.Value, s.Unit == SizePixels
+	return float64(s.Value), s.Unit == SizePixels
 }

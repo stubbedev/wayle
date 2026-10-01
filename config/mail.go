@@ -1,187 +1,227 @@
 package config
 
-import (
-	"errors"
-	"fmt"
-
-	"github.com/BurntSushi/toml"
-)
-
-// MailProvider is an account's mail host; it picks the account's
-// default icon (schemas/modules/mail/account.rs MailProvider).
+// MailProvider is ported from crates/wayle-config/src/schemas/modules/mail/account.rs.
+//
+// Mail provider, used to pick a default brand icon for an account.
 type MailProvider string
 
-// Mail providers.
+// MailProvider values.
 const (
-	MailProviderGeneric  MailProvider = "generic"
-	MailProviderGmail    MailProvider = "gmail"
-	MailProviderOutlook  MailProvider = "outlook"
-	MailProviderIcloud   MailProvider = "icloud"
-	MailProviderProton   MailProvider = "proton"
+	// Generic mailbox; uses the plain mail glyph.
+	MailProviderGeneric MailProvider = "generic"
+	// Gmail.
+	MailProviderGmail MailProvider = "gmail"
+	// Microsoft Outlook.
+	MailProviderOutlook MailProvider = "outlook"
+	// Apple iCloud Mail.
+	MailProviderIcloud MailProvider = "icloud"
+	// Proton Mail.
+	MailProviderProton MailProvider = "proton"
+	// Fastmail.
 	MailProviderFastmail MailProvider = "fastmail"
-	MailProviderYahoo    MailProvider = "yahoo"
+	// Yahoo Mail.
+	MailProviderYahoo MailProvider = "yahoo"
 )
 
-var mailProviderIcons = map[MailProvider]string{
-	MailProviderGeneric:  "ld-mail-symbolic",
-	MailProviderGmail:    "si-gmail-symbolic",
-	MailProviderOutlook:  "si-microsoftoutlook-symbolic",
-	MailProviderIcloud:   "si-icloud-symbolic",
-	MailProviderProton:   "si-protonmail-symbolic",
-	MailProviderFastmail: "si-fastmail-symbolic",
-	MailProviderYahoo:    "si-yahoo-symbolic",
+var _ = registerEnum(MailProviderGeneric, MailProviderGmail, MailProviderOutlook, MailProviderIcloud, MailProviderProton, MailProviderFastmail, MailProviderYahoo)
+
+// MailAccount is ported from crates/wayle-config/src/schemas/modules/mail/account.rs.
+//
+// One mail account in the `[modules.mail]` per-account breakdown.
+//
+// Each account has its own notmuch query; the dropdown shows the per-account
+// unread counts and the bar shows their sum.
+//
+// ## Example
+//
+// ```toml
+// [[modules.mail.accounts]]
+// name = "Work"
+// query = "folder:work/INBOX and tag:unread"
+// provider = "gmail"
+// ```
+type MailAccount struct {
+	// Display name shown in the dropdown.
+	Name string `cfg:"name,required"`
+	// notmuch query whose match count is this account's unread total.
+	Query string `cfg:"query,required"`
+	// Provider, selecting the default brand icon.
+	Provider MailProvider `cfg:"provider,default"`
+	// Optional icon override. Empty uses the provider's default icon.
+	Icon *string `cfg:"icon,default"`
 }
 
-// DefaultIcon is the provider's brand icon (default_icon).
-func (p MailProvider) DefaultIcon() string { return mailProviderIcons[p] }
-
-// MailAccountConfig is one [[modules.mail.accounts]] entry: a notmuch
-// query whose match count is the account's unread count.
-type MailAccountConfig struct {
-	Name     string
-	Query    string
-	Provider MailProvider
-	Icon     string
-}
-
-// ResolvedIcon is the account's icon: its own when set, else the
-// provider's (MailAccount::resolved_icon).
-func (a MailAccountConfig) ResolvedIcon() string {
-	if a.Icon != "" {
-		return a.Icon
+// DefaultsMailAccount returns the schema defaults.
+func DefaultsMailAccount() MailAccount {
+	return MailAccount{
+		Provider: MailProviderGeneric,
 	}
-	return a.Provider.DefaultIcon()
 }
 
-// MailConfig is the mail module configuration.
+// MailConfig is ported from crates/wayle-config/src/schemas/modules/mail/mod.rs.
+//
+// Unread mail count, backed by a notmuch query.
+//
+// Runs `notmuch count <query>` and re-queries whenever the maildir changes
+// (event-driven via an inotify watch on the notmuch database path). Hidden
+// while the count is zero when `hide-when-zero` is set.
 type MailConfig struct {
-	Click    ClickConfig
-	Accounts []MailAccountConfig
-	Query    string
-	Format   string
-	// Button is the bar-button key set; LabelShow mirrors its
-	// label-show.
-	Button       ButtonConfig
-	LabelShow    bool
-	HideWhenZero bool
-	// Notify fires a desktop notification per newly-arrived message.
-	Notify bool
-	// NotifySummary and NotifyBody template that notification with
-	// {{ sender }}, {{ subject }}, {{ count }} and {{ new }}.
-	NotifySummary string
-	NotifyBody    string
-	// IconName is the module icon, and the notification icon when no
-	// accounts are configured.
-	IconName string
+	// Format string for the label.
+	//
+	// ## Placeholders
+	//
+	// - `{{ count }}` - Number of messages matching the query
+	//
+	// ## Examples
+	//
+	// - `"{{ count }}"` - "3"
+	Format string `cfg:"format"`
+	// notmuch search query whose match count is shown.
+	//
+	// Any query `notmuch count` accepts, e.g. `tag:unread`,
+	// `tag:unread and tag:inbox`, `folder:work and tag:unread`.
+	//
+	// Ignored when `accounts` is non-empty — the bar count is then the sum of
+	// the per-account queries.
+	Query string `cfg:"query"`
+	// Per-account unread breakdown shown in the mail dropdown. Each account
+	// has its own notmuch query and a provider (for its icon). When set, the
+	// bar count/label is the sum across accounts and `query` is ignored.
+	Accounts []MailAccount `cfg:"accounts"`
+	// Hide the module entirely while the count is zero.
+	HideWhenZero bool `cfg:"hide-when-zero"`
+	// Fire a desktop notification when the unread count
+	// rises — i.e. new mail arrives. One notification per newly-arrived
+	// message (capped per burst), showing its sender and subject. With
+	// `accounts` configured, each notification uses that account's provider
+	// icon; otherwise the module icon is used.
+	Notify bool `cfg:"notify"`
+	// Notification summary when new mail arrives.
+	//
+	// ## Placeholders
+	//
+	// - `{{ sender }}` - Message sender (name or address)
+	// - `{{ subject }}` - Message subject
+	// - `{{ count }}` - Total messages matching the query
+	// - `{{ new }}` - How many arrived since the last count
+	NotifySummary string `cfg:"notify-summary"`
+	// Notification body when new mail arrives. Same placeholders as
+	// `notify-summary`.
+	NotifyBody string `cfg:"notify-body"`
+	// Module icon.
+	IconName string `cfg:"icon-name"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Display module icon.
+	IconShow bool `cfg:"icon-show"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Display label.
+	LabelShow bool `cfg:"label-show"`
+	// Label text color token.
+	LabelColor ColorValue `cfg:"label-color"`
+	// Max label characters before truncation with ellipsis. Set to 0 to disable.
+	LabelMaxLength uint32 `cfg:"label-max-length"`
+	// Button background color token.
+	ButtonBgColor ColorValue `cfg:"button-bg-color"`
+	// Action on left click. Defaults to opening the per-account dropdown; set
+	// to empty for no action, or a shell command (e.g. your mail client).
+	LeftClick ClickAction `cfg:"left-click"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
 }
 
 // DefaultsMail returns the schema defaults.
 func DefaultsMail() MailConfig {
 	return MailConfig{
-		Query:         "tag:unread",
-		Format:        "{{ count }}",
-		LabelShow:     true,
-		HideWhenZero:  true,
-		NotifySummary: "{{ sender }}",
-		NotifyBody:    "{{ subject }}",
-		IconName:      "ld-mail-symbolic",
-		Button:        DefaultsButton(buttonColors("auto", "auto", "bg-surface-elevated", "bg-surface-elevated", "blue"), TokenBlue, true, 0),
+		Format:         "{{ count }}",
+		Query:          "tag:unread",
+		Accounts:       []MailAccount{},
+		HideWhenZero:   true,
+		Notify:         false,
+		NotifySummary:  "{{ sender }}",
+		NotifyBody:     "{{ subject }}",
+		IconName:       "ld-mail-symbolic",
+		BorderShow:     false,
+		BorderColor:    mustColor("blue"),
+		IconShow:       true,
+		IconColor:      mustColor("auto"),
+		IconBgColor:    mustColor("bg-surface-elevated"),
+		LabelShow:      true,
+		LabelColor:     mustColor("auto"),
+		LabelMaxLength: 0,
+		ButtonBgColor:  mustColor("bg-surface-elevated"),
+		LeftClick:      ParseClickAction("dropdown:mail"),
+		RightClick:     ClickAction{},
+		MiddleClick:    ClickAction{},
+		ScrollUp:       ClickAction{},
+		ScrollDown:     ClickAction{},
 	}
 }
 
-type mailDoc struct {
-	Name     *string `toml:"name"`
-	Query    *string `toml:"query"`
-	Provider *string `toml:"provider"`
-	Icon     *string `toml:"icon"`
+// Clicks returns the five input bindings.
+func (c MailConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
 }
 
-// applyMail overlays [modules.mail], including the accounts array.
-func applyMail(md toml.MetaData, prim toml.Primitive) (MailConfig, error) {
-	cfg := DefaultsMail()
-	var doc struct {
-		Accounts      *[]mailDoc `toml:"accounts"`
-		Query         *string    `toml:"query"`
-		Format        *string    `toml:"format"`
-		HideWhenZero  *bool      `toml:"hide-when-zero"`
-		Notify        *bool      `toml:"notify"`
-		NotifySummary *string    `toml:"notify-summary"`
-		NotifyBody    *string    `toml:"notify-body"`
-		IconName      *string    `toml:"icon-name"`
+func (a *MailAccount) setDefaults() { *a = DefaultsMailAccount() }
+
+func (MailAccount) noStructDefault() {}
+
+// DefaultIcon is the provider's brand icon (MailProvider::default_icon).
+func (p MailProvider) DefaultIcon() string {
+	switch p {
+	case MailProviderGmail:
+		return "si-gmail-symbolic"
+	case MailProviderOutlook:
+		return "si-microsoftoutlook-symbolic"
+	case MailProviderIcloud:
+		return "si-icloud-symbolic"
+	case MailProviderProton:
+		return "si-protonmail-symbolic"
+	case MailProviderFastmail:
+		return "si-fastmail-symbolic"
+	case MailProviderYahoo:
+		return "si-yahoo-symbolic"
 	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.Query != nil {
-		cfg.Query = *doc.Query
-	}
-	if doc.Format != nil {
-		cfg.Format = *doc.Format
-	}
-	if doc.HideWhenZero != nil {
-		cfg.HideWhenZero = *doc.HideWhenZero
-	}
-	if doc.Notify != nil {
-		cfg.Notify = *doc.Notify
-	}
-	if doc.NotifySummary != nil {
-		cfg.NotifySummary = *doc.NotifySummary
-	}
-	if doc.NotifyBody != nil {
-		cfg.NotifyBody = *doc.NotifyBody
-	}
-	if doc.IconName != nil {
-		cfg.IconName = *doc.IconName
-	}
-	if doc.Accounts != nil {
-		cfg.Accounts = make([]MailAccountConfig, 0, len(*doc.Accounts))
-		for _, account := range *doc.Accounts {
-			out, err := mailAccount(account)
-			if err != nil {
-				return cfg, err
-			}
-			cfg.Accounts = append(cfg.Accounts, out)
-		}
-	}
-	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Button = button
-	button.mirrorLabel(&cfg.LabelShow, nil)
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+	return "ld-mail-symbolic"
 }
 
-// mailAccount validates one accounts entry: name and query are
-// required, and the provider must be one the schema knows.
-func mailAccount(doc mailDoc) (MailAccountConfig, error) {
-	out := MailAccountConfig{Provider: MailProviderGeneric}
-	if doc.Name != nil {
-		out.Name = *doc.Name
+// SimpleIconsSlug is the Simple Icons slug that installs the provider's
+// brand icon; false for the generic provider (simple_icons_slug).
+func (p MailProvider) SimpleIconsSlug() (string, bool) {
+	switch p {
+	case MailProviderGmail:
+		return "gmail", true
+	case MailProviderOutlook:
+		return "microsoftoutlook", true
+	case MailProviderIcloud:
+		return "icloud", true
+	case MailProviderProton:
+		return "protonmail", true
+	case MailProviderFastmail:
+		return "fastmail", true
+	case MailProviderYahoo:
+		return "yahoo", true
 	}
-	if doc.Query != nil {
-		out.Query = *doc.Query
+	return "", false
+}
+
+// ResolvedIcon is the account's icon: its own when set and non-empty,
+// else the provider's (MailAccount::resolved_icon).
+func (a MailAccount) ResolvedIcon() string {
+	if a.Icon != nil && *a.Icon != "" {
+		return *a.Icon
 	}
-	if doc.Icon != nil {
-		out.Icon = *doc.Icon
-	}
-	if out.Name == "" {
-		return out, errors.New("mail: account name is required")
-	}
-	if out.Query == "" {
-		return out, errors.New("mail: account " + out.Name + " query is required")
-	}
-	if doc.Provider != nil {
-		provider := MailProvider(*doc.Provider)
-		if _, ok := mailProviderIcons[provider]; !ok {
-			return out, fmt.Errorf("mail: account %s: invalid provider %q (want generic|gmail|outlook|icloud|proton|fastmail|yahoo)", out.Name, *doc.Provider)
-		}
-		out.Provider = provider
-	}
-	return out, nil
+	return a.Provider.DefaultIcon()
 }

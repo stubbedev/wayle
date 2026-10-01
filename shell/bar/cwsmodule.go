@@ -202,7 +202,7 @@ func (m *cwsView) scale() float64 {
 	if m.ctx.Config == nil || m.ctx.Config.Bar.Scale <= 0 {
 		return 1
 	}
-	return m.ctx.Config.Bar.Scale
+	return float64(m.ctx.Config.Bar.Scale)
 }
 
 // labelPx is label-size resolved against LABEL_BASE_REM.
@@ -219,9 +219,9 @@ func (m *cwsView) iconPx() int {
 // bar scale, pixels are literal.
 func (m *cwsView) iconGapPx() int {
 	if m.cfg.IconGap.Unit == config.SizePixels {
-		return int(math.Round(m.cfg.IconGap.Value))
+		return int(math.Round(float64(m.cfg.IconGap.Value)))
 	}
-	return int(math.Round(m.cfg.IconGap.Value * styling.RemBase))
+	return int(math.Round(float64(m.cfg.IconGap.Value) * styling.RemBase))
 }
 
 // paddingPx is workspace-padding at a 1 rem base.

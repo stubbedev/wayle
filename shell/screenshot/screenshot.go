@@ -108,7 +108,7 @@ func (h *Host) save(img *image.RGBA) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // the user's pictures directory
 		return "", fmt.Errorf("cannot create %s: %w", dir, err)
 	}
-	path := filepath.Join(dir, cfg.FilenameFormat.Format(h.clock()))
+	path := filepath.Join(dir, cfg.FilenameFormat.Layout().Format(h.clock()))
 	if err := savePNG(img, path); err != nil {
 		return "", err
 	}

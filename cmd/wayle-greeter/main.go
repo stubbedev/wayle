@@ -30,7 +30,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	cfg, err := config.LoadGreeter(opts.ConfigPath)
+	cfg, err := config.LoadGreeter(opts.ConfigPath, config.StderrDiagnostics)
 	if err != nil {
 		log.Printf("greeter: config load failed; using defaults: %v", err)
 	}

@@ -1,92 +1,113 @@
 package config
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
 // CssToken names a design token a ColorValue can reference; the values
 // are the config strings ("bg-surface", "border-accent", ...). The
-// palette-side resolution lives in the styling package.
+// palette-side resolution lives in the styling package; the numeric mix
+// percentages each token resolves through live in styling/tokens.go,
+// ported from crates/wayle-styling/scss/tokens
+// (crates/wayle-config/src/schemas/styling/types/color.rs CssToken).
 type CssToken string
 
-// The styling tokens, grouped as in the schema. The numeric mix
-// percentages each token resolves through live in styling/tokens.go,
-// ported from crates/wayle-styling/scss/tokens.
+// The styling tokens, grouped as in the schema.
 //
 //nolint:gosec // these are CSS token names, not credentials
 const (
-	TokenBgBase            CssToken = "bg-base"
-	TokenBgSurface         CssToken = "bg-surface"
+	// `--bg-base` - Application background.
+	TokenBgBase CssToken = "bg-base"
+	// `--bg-surface` - Elevated surfaces.
+	TokenBgSurface CssToken = "bg-surface"
+	// `--bg-surface-elevated` - Subtle elevation from surface (buttons on surface).
 	TokenBgSurfaceElevated CssToken = "bg-surface-elevated"
-	TokenBgElevated        CssToken = "bg-elevated"
-	TokenBgOverlay         CssToken = "bg-overlay"
-	TokenBgHover           CssToken = "bg-hover"
-	TokenBgActive          CssToken = "bg-active"
-	TokenBgSelected        CssToken = "bg-selected"
-
-	TokenFgDefault  CssToken = "fg-default"
-	TokenFgMuted    CssToken = "fg-muted"
-	TokenFgSubtle   CssToken = "fg-subtle"
+	// `--bg-elevated` - Higher elevation surfaces.
+	TokenBgElevated CssToken = "bg-elevated"
+	// `--bg-overlay` - Popovers, dialogs.
+	TokenBgOverlay CssToken = "bg-overlay"
+	// `--bg-hover` - Hover state background.
+	TokenBgHover CssToken = "bg-hover"
+	// `--bg-active` - Active/pressed state background.
+	TokenBgActive CssToken = "bg-active"
+	// `--bg-selected` - Selected item background.
+	TokenBgSelected CssToken = "bg-selected"
+	// `--fg-default` - Primary text color.
+	TokenFgDefault CssToken = "fg-default"
+	// `--fg-muted` - Secondary text color.
+	TokenFgMuted CssToken = "fg-muted"
+	// `--fg-subtle` - Tertiary/hint text color.
+	TokenFgSubtle CssToken = "fg-subtle"
+	// `--fg-on-accent` - Text color on accent backgrounds.
 	TokenFgOnAccent CssToken = "fg-on-accent"
-
-	TokenAccent       CssToken = "accent"
+	// `--accent` - Primary accent color.
+	TokenAccent CssToken = "accent"
+	// `--accent-subtle` - Subtle accent background.
 	TokenAccentSubtle CssToken = "accent-subtle"
-	TokenAccentHover  CssToken = "accent-hover"
-
-	TokenStatusError         CssToken = "status-error"
-	TokenStatusWarning       CssToken = "status-warning"
-	TokenStatusSuccess       CssToken = "status-success"
-	TokenStatusInfo          CssToken = "status-info"
-	TokenStatusErrorSubtle   CssToken = "status-error-subtle"
+	// `--accent-hover` - Accent hover state.
+	TokenAccentHover CssToken = "accent-hover"
+	// `--status-error` - Error state color.
+	TokenStatusError CssToken = "status-error"
+	// `--status-warning` - Warning state color.
+	TokenStatusWarning CssToken = "status-warning"
+	// `--status-success` - Success state color.
+	TokenStatusSuccess CssToken = "status-success"
+	// `--status-info` - Info state color.
+	TokenStatusInfo CssToken = "status-info"
+	// `--status-error-subtle` - Subtle error background.
+	TokenStatusErrorSubtle CssToken = "status-error-subtle"
+	// `--status-warning-subtle` - Subtle warning background.
 	TokenStatusWarningSubtle CssToken = "status-warning-subtle"
+	// `--status-success-subtle` - Subtle success background.
 	TokenStatusSuccessSubtle CssToken = "status-success-subtle"
-	TokenStatusInfoSubtle    CssToken = "status-info-subtle"
-	TokenStatusErrorHover    CssToken = "status-error-hover"
-
-	TokenRed    CssToken = "red"
+	// `--status-info-subtle` - Subtle info background.
+	TokenStatusInfoSubtle CssToken = "status-info-subtle"
+	// `--status-error-hover` - Error hover state.
+	TokenStatusErrorHover CssToken = "status-error-hover"
+	// `--red` - Red color for stylistic/decorative use.
+	TokenRed CssToken = "red"
+	// `--yellow` - Yellow color for stylistic/decorative use.
 	TokenYellow CssToken = "yellow"
-	TokenGreen  CssToken = "green"
-	TokenBlue   CssToken = "blue"
-
-	TokenBorderSubtle  CssToken = "border-subtle"
+	// `--green` - Green color for stylistic/decorative use.
+	TokenGreen CssToken = "green"
+	// `--blue` - Blue color for stylistic/decorative use.
+	TokenBlue CssToken = "blue"
+	// `--border-subtle` - Subtle border color.
+	TokenBorderSubtle CssToken = "border-subtle"
+	// `--border-default` - Default border color.
 	TokenBorderDefault CssToken = "border-default"
-	TokenBorderStrong  CssToken = "border-strong"
-	TokenBorderAccent  CssToken = "border-accent"
-	TokenBorderError   CssToken = "border-error"
+	// `--border-strong` - Strong border color.
+	TokenBorderStrong CssToken = "border-strong"
+	// `--border-accent` - Accent-colored border.
+	TokenBorderAccent CssToken = "border-accent"
+	// `--border-error` - Error state border.
+	TokenBorderError CssToken = "border-error"
 )
 
-var validTokens = map[CssToken]bool{}
-
-func init() {
-	for _, t := range []CssToken{
-		TokenBgBase, TokenBgSurface, TokenBgSurfaceElevated, TokenBgElevated,
-		TokenBgOverlay, TokenBgHover, TokenBgActive, TokenBgSelected,
-		TokenFgDefault, TokenFgMuted, TokenFgSubtle, TokenFgOnAccent,
-		TokenAccent, TokenAccentSubtle, TokenAccentHover,
-		TokenStatusError, TokenStatusWarning, TokenStatusSuccess, TokenStatusInfo,
-		TokenStatusErrorSubtle, TokenStatusWarningSubtle, TokenStatusSuccessSubtle,
-		TokenStatusInfoSubtle, TokenStatusErrorHover,
-		TokenRed, TokenYellow, TokenGreen, TokenBlue,
-		TokenBorderSubtle, TokenBorderDefault, TokenBorderStrong,
-		TokenBorderAccent, TokenBorderError,
-	} {
-		validTokens[t] = true
-	}
-}
+var _ = registerEnum(
+	TokenBgBase, TokenBgSurface, TokenBgSurfaceElevated, TokenBgElevated,
+	TokenBgOverlay, TokenBgHover, TokenBgActive, TokenBgSelected,
+	TokenFgDefault, TokenFgMuted, TokenFgSubtle, TokenFgOnAccent,
+	TokenAccent, TokenAccentSubtle, TokenAccentHover,
+	TokenStatusError, TokenStatusWarning, TokenStatusSuccess, TokenStatusInfo,
+	TokenStatusErrorSubtle, TokenStatusWarningSubtle, TokenStatusSuccessSubtle,
+	TokenStatusInfoSubtle, TokenStatusErrorHover,
+	TokenRed, TokenYellow, TokenGreen, TokenBlue,
+	TokenBorderSubtle, TokenBorderDefault, TokenBorderStrong,
+	TokenBorderAccent, TokenBorderError,
+)
 
 // ColorKind distinguishes the ColorValue variants.
 type ColorKind uint8
 
-// ColorValue kinds, mirroring the Rust enum: a token reference that
-// follows the theme, a fixed hex color, fully transparent, or the
-// context-aware Auto that defers to its consumer (resolved as the
-// accent).
+// ColorValue kinds, mirroring the Rust enum: the context-aware Auto
+// that defers to its consumer (resolved as the accent), a token
+// reference that follows the theme, a fixed hex color, or fully
+// transparent. Auto is the zero kind, so a zero ColorValue defers
+// rather than naming an empty token.
 const (
-	ColorToken ColorKind = iota
+	ColorAuto ColorKind = iota
+	ColorToken
 	ColorCustom
 	ColorTransparent
-	ColorAuto
 )
 
 // ColorValue is the config color union: "bg-surface" | "#414868" |
@@ -100,9 +121,22 @@ type ColorValue struct {
 // IsAuto reports whether the value defers to its consumer.
 func (c ColorValue) IsAuto() bool { return c.Kind == ColorAuto }
 
+// String is the config form.
+func (c ColorValue) String() string {
+	switch c.Kind {
+	case ColorCustom:
+		return c.Hex
+	case ColorTransparent:
+		return "transparent"
+	case ColorAuto:
+		return "auto"
+	}
+	return string(c.Token)
+}
+
 // ParseColorValue decodes one config color string. Unknown token names
-// and malformed hex are errors — a mistyped color fails at load instead
-// of silently rendering the wrong thing.
+// and malformed hex are errors, with the Rust messages
+// (InvalidCssToken, InvalidHexColor).
 func ParseColorValue(s string) (ColorValue, error) {
 	switch s {
 	case "transparent":
@@ -110,30 +144,66 @@ func ParseColorValue(s string) (ColorValue, error) {
 	case "auto":
 		return ColorValue{Kind: ColorAuto}, nil
 	}
-	if strings.HasPrefix(s, "#") {
+	if len(s) > 0 && s[0] == '#' {
 		hex, err := ParseHexColor(s)
 		if err != nil {
 			return ColorValue{}, err
 		}
 		return ColorValue{Kind: ColorCustom, Hex: hex.String()}, nil
 	}
-	token := CssToken(s)
-	if !validTokens[token] {
-		return ColorValue{}, fmt.Errorf("config: unknown color %q (want a token name, #hex, \"transparent\", or \"auto\")", s)
+	if _, err := decodeEnum(enumVariants(cssTokenType), s); err != nil {
+		return ColorValue{}, fmt.Errorf("unknown CSS token: '%s' (see documentation for valid values)", s)
 	}
-	return ColorValue{Kind: ColorToken, Token: token}, nil
+	return ColorValue{Kind: ColorToken, Token: CssToken(s)}, nil
 }
 
-// UnmarshalText decodes a TOML color string through ParseColorValue, so
-// module tables can decode `icon-color = "red"` straight into a
-// ColorValue field and a bad color is a load error.
-func (c *ColorValue) UnmarshalText(text []byte) error {
-	cv, err := ParseColorValue(string(text))
+// UnmarshalConfig implements Unmarshaler.
+func (c *ColorValue) UnmarshalConfig(v any) error {
+	s, ok := v.(string)
+	if !ok {
+		return invalidType(v, "a string")
+	}
+	parsed, err := ParseColorValue(s)
 	if err != nil {
 		return err
 	}
-	*c = cv
+	*c = parsed
 	return nil
+}
+
+// MarshalConfig implements Marshaler.
+func (c ColorValue) MarshalConfig() any { return c.String() }
+
+var cssTokenType = typeOf[CssToken]()
+
+func (ColorValue) configSchema(*schemaGen) Schema {
+	variants := enumVariants(cssTokenType)
+	tokens := make([]any, len(variants))
+	for i, v := range variants {
+		entry := Schema{"const": v, "type": "string"}
+		if doc := schemaDocs["CssToken="+v]; doc != "" {
+			entry["description"] = doc
+		}
+		tokens[i] = entry
+	}
+	return Schema{
+		"description": "CSS token, hex color (#rgb, #rgba, #rrggbb, or #rrggbbaa), 'transparent', or 'auto'",
+		"anyOf": []any{
+			Schema{"oneOf": tokens},
+			Schema{"enum": []any{"transparent", "auto"}},
+			Schema{"type": "string", "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"},
+		},
+	}
+}
+
+// mustColor panics only on a typo in literal defaults; user config
+// never flows through it.
+func mustColor(s string) ColorValue {
+	cv, err := ParseColorValue(s)
+	if err != nil {
+		panic(err)
+	}
+	return cv
 }
 
 // CSSVar is the token's CSS variable reference, "var(--accent)": the

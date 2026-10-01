@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -25,9 +26,9 @@ func newScreenshot(ctx ModuleContext) (Module, error) {
 		if resolved, ok := styling.ResolveColor(cfg.LabelColor, ctx.Style.palette); ok {
 			color = resolved
 		}
-		label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, truncateLabel(cfg.Label, cfg.LabelMaxLength), color)
+		label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, truncateLabel(cfg.Label, int(cfg.LabelMaxLength)), color)
 	}
-	icon := moduleIcon(ctx, cfg.Icon)
+	icon := moduleIcon(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor))
 	switch {
 	case icon == nil && label == nil:
 		return nil, errors.New("screenshot: neither the icon nor a label is shown")

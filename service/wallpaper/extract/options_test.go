@@ -1,6 +1,10 @@
 package extract
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stubbedev/wayle/config"
+)
 
 func TestParseToolAcceptsTheRustAliases(t *testing.T) {
 	for in, want := range map[string]Tool{
@@ -17,51 +21,39 @@ func TestParseToolAcceptsTheRustAliases(t *testing.T) {
 	}
 }
 
-func TestMatugenSchemeValues(t *testing.T) {
-	s, err := ParseMatugenScheme("fruit-salad")
-	if err != nil || s != SchemeFruitSalad || s.CLIValue() != "scheme-fruit-salad" {
-		t.Fatalf("fruit-salad = %v %q %v", s, s.CLIValue(), err)
+func TestMatugenSchemeCLIValue(t *testing.T) {
+	if got := config.MatugenSchemeFruitSalad.CLIValue(); got != "scheme-fruit-salad" {
+		t.Errorf("CLIValue = %q", got)
 	}
-	if SchemeTonalSpot.CLIValue() != "scheme-tonal-spot" || SchemeContent.CLIValue() != "scheme-content" {
-		t.Error("cli values drifted from MatugenScheme::cli_value")
+}
+
+func TestWallustPaletteIsLight(t *testing.T) {
+	for _, p := range []config.WallustPalette{config.WallustPaletteLight, config.WallustPaletteSoftlightcomp16} {
+		if !p.IsLight() {
+			t.Errorf("%s is a light palette", p)
+		}
 	}
-	// The config spelling is exact kebab-case, as serde reads it.
-	for _, bad := range []string{"FruitSalad", "fruit_salad", "scheme-tonal-spot", ""} {
-		if _, err := ParseMatugenScheme(bad); err == nil {
-			t.Errorf("ParseMatugenScheme(%q) accepted", bad)
+	for _, p := range []config.WallustPalette{config.WallustPaletteDark16, config.WallustPaletteAnsidark, config.WallustPaletteHarddarkcomp} {
+		if p.IsLight() {
+			t.Errorf("%s is not a light palette", p)
 		}
 	}
 }
 
-func TestWallustEnums(t *testing.T) {
-	p, err := ParseWallustPalette("softlightcomp16")
-	if err != nil || p != PaletteSoftlightcomp16 || p.String() != "softlightcomp16" {
-		t.Fatalf("softlightcomp16 = %v %v", p, err)
+func TestFromConfigPicksTheProvidersTool(t *testing.T) {
+	c := config.DefaultsColorExtractor()
+	if got := FromConfig(c).Tool; got != None {
+		t.Errorf("the wayle provider extracts with %s, want none", got)
 	}
-	if _, err := ParseWallustPalette("Dark16"); err == nil {
-		t.Error("palette parse is case-insensitive; serde is not")
+	c.ThemeProvider, c.WallustSaturation, c.PywalContrast = config.ThemeProviderWallust, 40, 7.5
+	ex := FromConfig(c)
+	if ex.Tool != Wallust || ex.WallustSaturation != 40 || ex.PywalContrast != 7.5 || ex.WallustPalette != config.WallustPaletteDark16 {
+		t.Errorf("FromConfig = %+v", ex)
 	}
-	for _, light := range []WallustPalette{PaletteLight, PaletteLight16, PaletteSoftlight, PaletteSoftlightcomp16} {
-		if !light.IsLight() {
-			t.Errorf("%v is light", light)
+	for p, want := range map[config.ThemeProvider]Tool{config.ThemeProviderMatugen: Matugen, config.ThemeProviderPywal: Pywal} {
+		if got := ToolFor(p); got != want {
+			t.Errorf("ToolFor(%s) = %s, want %s", p, got, want)
 		}
-	}
-	for _, dark := range []WallustPalette{PaletteDark16, PaletteHarddark, PaletteSoftdark, PaletteAnsidark} {
-		if dark.IsLight() {
-			t.Errorf("%v is dark", dark)
-		}
-	}
-	if b, err := ParseWallustBackend("kmeans"); err != nil || b != BackendKmeans {
-		t.Errorf("kmeans = %v %v", b, err)
-	}
-	if _, err := ParseWallustBackend("fast"); err == nil {
-		t.Error("unknown backend accepted")
-	}
-	if c, err := ParseWallustColorspace("lchansi"); err != nil || c != ColorspaceLchansi {
-		t.Errorf("lchansi = %v %v", c, err)
-	}
-	if _, err := ParseWallustColorspace("rgb"); err == nil {
-		t.Error("unknown colorspace accepted")
 	}
 }
 

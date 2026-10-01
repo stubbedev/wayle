@@ -72,7 +72,7 @@ func newBattery(ctx ModuleContext) (Module, error) {
 	}
 	m := &battery{ctx: ctx, source: ctx.Battery}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	m.icon = moduleIcon(ctx, ctx.Config.Battery.Icon)
+	m.icon = moduleIcon(ctx, ctx.Config.Battery.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err

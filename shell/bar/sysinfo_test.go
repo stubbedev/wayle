@@ -35,9 +35,10 @@ func TestSysinfoThresholdColors(t *testing.T) {
 	style := computeStyle(cfg, styling.Default())
 	cfg.CPU.Thresholds = []config.ThresholdEntry{{Above: ptrF(90), LabelColor: &cv, IconColor: &cv}}
 	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style}
-	m := &pollModule{ctx: ctx, cfg: cfg.CPU}
+	c := cfg.CPU
+	m := &pollModule{ctx: ctx, cfg: pollConfig{c.Format, c.LabelShow, c.Thresholds, c.Icon(), c.PollIntervalMs}}
 	m.label = widget.NewLabel(ctx.Font, style.labelPx, "", style.fg)
-	m.icon = moduleIcon(ctx, cfg.CPU.Icon)
+	m.icon = moduleIcon(ctx, cfg.CPU.Icon())
 	btn := newBarButton(ctx, m.icon, m.label)
 	m.setButton(btn)
 

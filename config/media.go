@@ -1,36 +1,154 @@
 package config
 
 import (
-	"fmt"
-	"sort"
-
-	"github.com/BurntSushi/toml"
+	"slices"
+	"strings"
 )
 
-// MediaIconType is the media module's icon mode (MediaIconType).
+// MediaConfig is ported from crates/wayle-config/src/schemas/modules/media/mod.rs.
+//
+// Now-playing title and playback controls for the active MPRIS player.
+type MediaConfig struct {
+	// Icon display mode.
+	IconType MediaIconType `cfg:"icon-type"`
+	// Custom player-to-icon mappings for application-mapped mode.
+	//
+	// Keys are glob patterns matching MPRIS bus names, values are icon names
+	// from the installed icon set. These override built-in mappings when
+	// matched.
+	//
+	// ## Example
+	//
+	// ```toml
+	// [modules.media.player-icons]
+	// "*spotify*" = "si-spotify-symbolic"
+	// "*firefox*" = "ld-globe-symbolic"
+	// "*.mpv" = "ld-play-circle-symbolic"
+	// ```
+	PlayerIcons map[string]string `cfg:"player-icons"`
+	// Player bus name patterns to exclude from discovery. Requires a restart
+	// to take effect.
+	//
+	// ## Example
+	//
+	// ```toml
+	// [modules.media]
+	// players-ignored = ["*chromium*", "*discord*"]
+	// ```
+	PlayersIgnored []string `cfg:"players-ignored"`
+	// Preferred player priority order as glob patterns matching bus names.
+	//
+	// When no player is manually selected, this determines which player
+	// becomes active. Patterns are checked in order; first match wins.
+	// If no pattern matches, the first playing player is selected.
+	//
+	// ## Example
+	//
+	// ```toml
+	// [modules.media]
+	// player-priority = ["*spotify*", "*firefox*"]
+	// ```
+	PlayerPriority []string `cfg:"player-priority"`
+	// Format string for the label.
+	//
+	// ## Placeholders
+	//
+	// - `{{ title }}` - Track title
+	// - `{{ artist }}` - Artist name(s)
+	// - `{{ album }}` - Album name
+	// - `{{ status }}` - Playback status text (Playing, Paused, Stopped)
+	// - `{{ status_icon }}` - Playback status icon character
+	//
+	// ## Examples
+	//
+	// - `"{{ title }} - {{ artist }}"` - "Bohemian Rhapsody - Queen"
+	// - `"{{ status_icon }} {{ title }}"` - "▶ Bohemian Rhapsody"
+	// - `"{{ artist }}: {{ title }} ({{ album }})"` - "Queen: Bohemian Rhapsody (A Night at the Opera)"
+	Format string `cfg:"format"`
+	// Symbolic icon name for default mode.
+	IconName string `cfg:"icon-name"`
+	// Icon shown for spinning-disc mode.
+	SpinningDiscIcon string `cfg:"spinning-disc-icon"`
+	// Display border around button.
+	BorderShow bool `cfg:"border-show"`
+	// Border color token.
+	BorderColor ColorValue `cfg:"border-color"`
+	// Display module icon.
+	IconShow bool `cfg:"icon-show"`
+	// Icon foreground color. Auto selects based on variant for contrast.
+	IconColor ColorValue `cfg:"icon-color"`
+	// Icon container background color token.
+	IconBgColor ColorValue `cfg:"icon-bg-color"`
+	// Display text label.
+	LabelShow bool `cfg:"label-show"`
+	// Label text color token.
+	LabelColor ColorValue `cfg:"label-color"`
+	// Max label characters before truncation with ellipsis. Set to 0 to disable.
+	LabelMaxLength uint32 `cfg:"label-max-length"`
+	// Button background color token.
+	ButtonBgColor ColorValue `cfg:"button-bg-color"`
+	// Action on left click.
+	LeftClick ClickAction `cfg:"left-click"`
+	// Action on right click.
+	RightClick ClickAction `cfg:"right-click"`
+	// Action on middle click.
+	MiddleClick ClickAction `cfg:"middle-click"`
+	// Action on scroll up.
+	ScrollUp ClickAction `cfg:"scroll-up"`
+	// Action on scroll down.
+	ScrollDown ClickAction `cfg:"scroll-down"`
+}
+
+// DefaultsMedia returns the schema defaults.
+func DefaultsMedia() MediaConfig {
+	return MediaConfig{
+		IconType:         MediaIconTypeApplicationMapped,
+		PlayerIcons:      map[string]string{},
+		PlayersIgnored:   []string{},
+		PlayerPriority:   []string{},
+		Format:           "{{ title }} - {{ artist }}",
+		IconName:         "ld-music-symbolic",
+		SpinningDiscIcon: "ld-disc-3-symbolic",
+		BorderShow:       false,
+		BorderColor:      mustColor("blue"),
+		IconShow:         true,
+		IconColor:        mustColor("auto"),
+		IconBgColor:      mustColor("blue"),
+		LabelShow:        true,
+		LabelColor:       mustColor("blue"),
+		LabelMaxLength:   35,
+		ButtonBgColor:    mustColor("bg-surface-elevated"),
+		LeftClick:        ParseClickAction("dropdown:media"),
+		RightClick:       ClickAction{},
+		MiddleClick:      ClickAction{},
+		ScrollUp:         ClickAction{},
+		ScrollDown:       ClickAction{},
+	}
+}
+
+// Clicks returns the five input bindings.
+func (c MediaConfig) Clicks() ClickConfig {
+	return ClickConfig{c.LeftClick, c.RightClick, c.MiddleClick, c.ScrollUp, c.ScrollDown}
+}
+
+// MediaIconType is ported from crates/wayle-config/src/schemas/modules/media/mod.rs.
+//
+// Icon display mode for the media module.
 type MediaIconType string
 
-// Media icon modes, by their config spelling.
+// MediaIconType values.
 const (
-	// MediaIconDefault is the static icon-name.
-	MediaIconDefault MediaIconType = "default"
-	// MediaIconApplication is the player's desktop-entry icon.
-	MediaIconApplication MediaIconType = "application"
-	// MediaIconSpinningDisc is spinning-disc-icon, turning while playing.
-	MediaIconSpinningDisc MediaIconType = "spinning-disc"
-	// MediaIconApplicationMapped maps the bus name through player-icons
-	// and the built-in table.
-	MediaIconApplicationMapped MediaIconType = "application-mapped"
+	// Static icon from icon-name field.
+	MediaIconTypeDefault MediaIconType = "default"
+	// Dynamic icon from media player's desktop entry, falling back to icon-name.
+	MediaIconTypeApplication MediaIconType = "application"
+	// Spinning disc icon that animates during playback. Uses slightly more CPU.
+	MediaIconTypeSpinningDisc MediaIconType = "spinning-disc"
+	// Maps player to icon via glob patterns, with built-in mappings for common players.
+	MediaIconTypeApplicationMapped MediaIconType = "application-mapped"
 )
 
-// ParseMediaIconType reads icon-type; unknown spellings are errors.
-func ParseMediaIconType(raw string) (MediaIconType, error) {
-	switch t := MediaIconType(raw); t {
-	case MediaIconDefault, MediaIconApplication, MediaIconSpinningDisc, MediaIconApplicationMapped:
-		return t, nil
-	}
-	return "", fmt.Errorf("unknown icon-type %q (want default, application, spinning-disc, or application-mapped)", raw)
-}
+var _ = registerEnum(MediaIconTypeDefault, MediaIconTypeApplication, MediaIconTypeSpinningDisc, MediaIconTypeApplicationMapped)
 
 // IconMapping is one glob pattern -> icon pair.
 type IconMapping struct {
@@ -61,98 +179,13 @@ var MediaBuiltinIcons = []IconMapping{
 	{"*helium*", "si-heliumbrowser-symbolic"},
 }
 
-// MediaConfig is [modules.media] (schemas/modules/media/mod.rs).
-type MediaConfig struct {
-	Click ClickConfig
-	// Button is the bar-button key set; LabelShow and LabelMaxLength
-	// mirror its label-show and label-max-length.
-	Button    ButtonConfig
-	Format    string
-	LabelShow bool
-	// LabelMaxLength truncates the label with an ellipsis; 0 disables.
-	LabelMaxLength int
-	// Icon carries icon-show, icon-name (the default-mode glyph and
-	// every mode's fallback), and icon-color.
-	Icon             IconConfig
-	IconType         MediaIconType
-	SpinningDiscIcon string
-	// PlayerIcons are the user's player-icons, sorted by pattern (the
-	// BTreeMap order the Rust lookup walks).
-	PlayerIcons []IconMapping
-	// PlayersIgnored are bus-name substrings kept out of discovery.
-	PlayersIgnored []string
-	// PlayerPriority are bus-name globs, most preferred first.
-	PlayerPriority []string
-}
-
-// DefaultsMedia returns the schema defaults.
-func DefaultsMedia() MediaConfig {
-	return MediaConfig{
-		Click:            DefaultsClick(map[string]string{"left-click": "dropdown:media"}),
-		Button:           DefaultsButton(buttonColors("auto", "blue", "blue", "bg-surface-elevated", "blue"), TokenBlue, true, 35),
-		Format:           "{{ title }} - {{ artist }}",
-		LabelShow:        true,
-		LabelMaxLength:   35,
-		Icon:             DefaultsIcon(true, "ld-music-symbolic"),
-		IconType:         MediaIconApplicationMapped,
-		SpinningDiscIcon: "ld-disc-3-symbolic",
+// PlayerIconMappings is player-icons in pattern order, the BTreeMap
+// order the Rust lookup walks.
+func (c MediaConfig) PlayerIconMappings() []IconMapping {
+	out := make([]IconMapping, 0, len(c.PlayerIcons))
+	for pattern, icon := range c.PlayerIcons {
+		out = append(out, IconMapping{Pattern: pattern, Icon: icon})
 	}
-}
-
-// applyMedia overlays [modules.media].
-func applyMedia(md toml.MetaData, prim toml.Primitive) (MediaConfig, error) {
-	cfg := DefaultsMedia()
-	var doc struct {
-		Format           *string            `toml:"format"`
-		IconName         *string            `toml:"icon-name"`
-		IconType         *string            `toml:"icon-type"`
-		SpinningDiscIcon *string            `toml:"spinning-disc-icon"`
-		PlayerIcons      *map[string]string `toml:"player-icons"`
-		PlayersIgnored   *[]string          `toml:"players-ignored"`
-		PlayerPriority   *[]string          `toml:"player-priority"`
-	}
-	if err := md.PrimitiveDecode(prim, &doc); err != nil {
-		return cfg, err
-	}
-	if doc.Format != nil {
-		cfg.Format = *doc.Format
-	}
-	if doc.IconName != nil {
-		cfg.Icon.Name = *doc.IconName
-	}
-	if doc.IconType != nil {
-		t, err := ParseMediaIconType(*doc.IconType)
-		if err != nil {
-			return cfg, fmt.Errorf("media: %w", err)
-		}
-		cfg.IconType = t
-	}
-	if doc.SpinningDiscIcon != nil {
-		cfg.SpinningDiscIcon = *doc.SpinningDiscIcon
-	}
-	if doc.PlayerIcons != nil {
-		for pattern, icon := range *doc.PlayerIcons {
-			cfg.PlayerIcons = append(cfg.PlayerIcons, IconMapping{Pattern: pattern, Icon: icon})
-		}
-		sort.Slice(cfg.PlayerIcons, func(i, j int) bool { return cfg.PlayerIcons[i].Pattern < cfg.PlayerIcons[j].Pattern })
-	}
-	if doc.PlayersIgnored != nil {
-		cfg.PlayersIgnored = *doc.PlayersIgnored
-	}
-	if doc.PlayerPriority != nil {
-		cfg.PlayerPriority = *doc.PlayerPriority
-	}
-	button, err := applyButton(md, prim, cfg.Button, AllButtonKeys)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Button = button
-	button.mirrorLabel(&cfg.LabelShow, &cfg.LabelMaxLength)
-	button.mirrorIcon(&cfg.Icon)
-	clicks, err := applyClicks(md, prim, cfg.Click)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.Click = clicks
-	return cfg, nil
+	slices.SortFunc(out, func(a, b IconMapping) int { return strings.Compare(a.Pattern, b.Pattern) })
+	return out
 }

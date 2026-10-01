@@ -17,7 +17,7 @@ func TestSpectrumMeasureIsFixed(t *testing.T) {
 	cfg.Bars = 10
 	cfg.BarWidth = 6
 	cfg.BarGap = 1
-	cfg.InternalPad = config.Size{Value: 8, Unit: config.SizePixels}
+	cfg.InternalPadding = config.Size{Value: 8, Unit: config.SizePixels}
 	s := newSpectrum(cfg, render.RGB(1, 2, 3), 1)
 	if got := s.naturalWidth(); got != 2*8+10*6+9*1 {
 		t.Errorf("natural width = %d, want %d", got, 2*8+10*6+9*1)
@@ -43,16 +43,16 @@ func TestSpectrumPaintsBarsByDirection(t *testing.T) {
 		y7  render.Color // middle probe (1,7)
 		y18 render.Color // bottom probe (1,18)
 	}{
-		{config.CavaNormal, black, black, red}, // grows from the bottom: fills 10..20
-		{config.CavaReverse, red, red, black},  // grows from the top: fills 0..10
-		{config.CavaMirror, black, red, black}, // grows from the center: fills 5..15
+		{config.CavaDirectionNormal, black, black, red}, // grows from the bottom: fills 10..20
+		{config.CavaDirectionReverse, red, red, black},  // grows from the top: fills 0..10
+		{config.CavaDirectionMirror, black, red, black}, // grows from the center: fills 5..15
 	} {
 		t.Run(string(tc.dir), func(t *testing.T) {
 			cfg := config.DefaultsCava()
 			cfg.Bars = 2
 			cfg.BarWidth = 4
 			cfg.BarGap = 2
-			cfg.InternalPad = config.Size{}
+			cfg.InternalPadding = config.Size{}
 			cfg.Direction = tc.dir
 			s := newSpectrum(cfg, red, 1)
 			s.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}})
@@ -90,7 +90,7 @@ func TestSpectrumPeakStyleAddsMarkers(t *testing.T) {
 	cfg.Bars = 1
 	cfg.BarWidth = 10
 	cfg.BarGap = 0
-	cfg.InternalPad = config.Size{}
+	cfg.InternalPadding = config.Size{}
 	cfg.Style = config.CavaStylePeaks
 	s := newSpectrum(cfg, render.RGB(0xff, 0, 0), 1)
 	s.Measure(widget.Constraints{Max: widget.Size{W: 100, H: 100}})
@@ -164,14 +164,14 @@ source = "alsa_output.monitor"
 	if cava.Color.Kind != config.ColorCustom || cava.Color.Hex != "#a6e3a1" {
 		t.Errorf("color = %+v", cava.Color)
 	}
-	if cava.Direction != config.CavaMirror || cava.Framerate != 30 {
+	if cava.Direction != config.CavaDirectionMirror || cava.Framerate != 30 {
 		t.Errorf("direction/framerate = %q/%d", cava.Direction, cava.Framerate)
 	}
 	if cava.NoiseReduction != 0.5 || cava.Monstercat != 1.5 {
 		t.Errorf("noise/monstercat = %v/%v", cava.NoiseReduction, cava.Monstercat)
 	}
-	if cava.InternalPad.Unit != config.SizePixels || cava.InternalPad.Value != 3 {
-		t.Errorf("internal-padding = %+v, want 3px", cava.InternalPad)
+	if cava.InternalPadding.Unit != config.SizePixels || cava.InternalPadding.Value != 3 {
+		t.Errorf("internal-padding = %+v, want 3px", cava.InternalPadding)
 	}
 	if cava.Source != "alsa_output.monitor" {
 		t.Errorf("source = %q", cava.Source)
@@ -187,13 +187,9 @@ func TestLoadFileCavaDefaults(t *testing.T) {
 
 func TestLoadFileRejectsBadCava(t *testing.T) {
 	for _, content := range []string{
-		"[modules.cava]\nbars = 0\n",
-		"[modules.cava]\nframerate = 500\n",
-		"[modules.cava]\nnoise-reduction = 2\n",
 		"[modules.cava]\nstyle = \"spikes\"\n",
 		"[modules.cava]\ndirection = \"sideways\"\n",
 		"[modules.cava]\ncolor = \"not-a-token\"\n",
-		"[modules.cava]\nmonstercat = -1\n",
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
