@@ -513,10 +513,17 @@ func (w *watcher) RegisterStatusNotifierItem(sender dbus.Sender, service string)
 	return nil
 }
 
-// register records an item, announces it, and tracks it.
+// register records an item, announces it, and tracks it. A bus name
+// alone and that name at the default path are one item: the orphan
+// scan registers the bare name while the item itself may register
+// name/StatusNotifierItem, and either order must leave one entry.
 func (w *watcher) register(service string) {
+	bus, path := ParseAddress(service)
 	w.mu.Lock()
-	if slices.Contains(w.items, service) {
+	if slices.ContainsFunc(w.items, func(s string) bool {
+		b, p := ParseAddress(s)
+		return b == bus && p == path
+	}) {
 		w.mu.Unlock()
 		return
 	}

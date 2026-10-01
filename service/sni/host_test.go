@@ -2,6 +2,7 @@ package sni
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -163,8 +164,8 @@ func TestHostAsWatcherTracksItemsAndMenus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RefreshMenu: %v", err)
 	}
-	if len(item.menu.shown) != 1 || item.menu.shown[0] != 0 {
-		t.Errorf("AboutToShow calls = %v, want the root", item.menu.shown)
+	if len(item.menu.shownCalls()) != 1 || item.menu.shownCalls()[0] != 0 {
+		t.Errorf("AboutToShow calls = %v, want the root", item.menu.shownCalls())
 	}
 	if len(menu.Children) != 4 {
 		t.Fatalf("root children = %d, want 4", len(menu.Children))
@@ -184,9 +185,7 @@ func TestHostAsWatcherTracksItemsAndMenus(t *testing.T) {
 	}
 	deadline := time.Now().Add(time.Second)
 	for {
-		item.menu.mu.Lock()
-		n := len(item.menu.clicked)
-		item.menu.mu.Unlock()
+		n := len(item.menu.clickedCalls())
 		if n == 1 || time.Now().After(deadline) {
 			if n != 1 {
 				t.Error("the clicked event never arrived")
@@ -249,4 +248,51 @@ func TestHostAgainstAnExternalWatcher(t *testing.T) {
 	item := startItem(t, bus, "shared")
 	item.register(t)
 	waitItems(t, store, func(i []Item) bool { return len(i) == 1 && i[0].ID == "shared" })
+}
+
+// A bare bus name and that name at the default path are one item: the
+// orphan scan's bare registration racing the item's own path-form one
+// must not list it twice, in either order.
+func TestWatcherRegistersTheDefaultPathOnce(t *testing.T) {
+	bus := dbustest.Start(t)
+	store := NewStore()
+	host, err := NewHostOn(bus.Conn(t), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Close()
+	a := startItem(t, bus, "a")
+	a.register(t) // name/StatusNotifierItem
+	waitItems(t, store, func(i []Item) bool { return len(i) == 1 })
+	host.watcher.register(a.conn.Names()[0]) // the scan's bare name
+	b := startItem(t, bus, "b")
+	host.watcher.register(b.conn.Names()[0]) // bare first
+	b.register(t)                            // then the path form
+	waitItems(t, store, func(i []Item) bool { return len(i) == 2 })
+	var regs []string
+	if err := a.conn.Object(WatcherName, WatcherPath).Call(PropsIface+".Get", 0, WatcherIface, "RegisteredStatusNotifierItems").Store(&regs); err != nil || len(regs) != 2 {
+		t.Errorf("registered = %v, %v; want one entry per item", regs, err)
+	}
+	// A different path on the same name is a second item.
+	host.watcher.register(a.conn.Names()[0] + "/Other")
+	host.watcher.mu.Lock()
+	n := len(host.watcher.items)
+	host.watcher.mu.Unlock()
+	if n != 3 {
+		t.Errorf("items = %d, want a third for the other path", n)
+	}
+}
+
+// shownCalls and clickedCalls read the menu's call log under its lock:
+// the bus handlers write it on another goroutine.
+func (m *fakeMenu) shownCalls() []int32 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.shown)
+}
+
+func (m *fakeMenu) clickedCalls() []int32 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.clicked)
 }
