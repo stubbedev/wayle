@@ -6,7 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/gelm/widget"
+
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/mail"
 )
 
@@ -102,5 +105,29 @@ func TestLoadFileAppliesMailAccounts(t *testing.T) {
 		if _, err := config.LoadFile(path); err == nil {
 			t.Errorf("%q: want a load error", bad)
 		}
+	}
+}
+
+func TestMailDropdownRowsAndEmptyState(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := newTestContext(t, cfg)
+	v := mailDropdown(ctx).(*mailView)
+	if len(v.list.Children()) != 1 {
+		t.Fatalf("no service: %d rows, want the empty text", len(v.list.Children()))
+	}
+	if l, ok := v.list.Children()[0].(*widget.Label); !ok || l.Text() != i18n.T("dropdown-mail-empty") {
+		t.Errorf("empty = %#v", v.list.Children()[0])
+	}
+	mc := cfg.Mail
+	mc.Accounts = []config.MailAccount{{Name: "Work", Query: "tag:work"}, {Name: "Home", Query: "tag:home"}}
+	ctx.Mail = seededMail(t, mc, 0)
+	v = mailDropdown(ctx).(*mailView)
+	if got := len(v.list.Children()); got != 2 {
+		t.Fatalf("rows = %d, want one per account", got)
+	}
+	row := v.list.Children()[0].(*widget.Box)
+	count := row.Children()[2].(*widget.Label)
+	if count.Text() != "0" || !count.HasClass("dim") {
+		t.Errorf("zero count = %q dim %v", count.Text(), count.HasClass("dim"))
 	}
 }

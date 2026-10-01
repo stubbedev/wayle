@@ -7,7 +7,6 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/mail"
 	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/recorder"
 )
@@ -147,22 +146,4 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 		bucket(status.Down, "dropdown-treeman-bucket-down"),
 		bucket(status.Failed, "dropdown-treeman-bucket-failed"),
 	})
-}
-
-// mailDropdown is the mail card: one count per configured account.
-func mailDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 6, 14)
-	var accounts []mail.AccountUnread
-	if ctx.Mail != nil {
-		accounts = ctx.Mail.State().Accounts
-	}
-	if len(accounts) == 0 {
-		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-mail-empty"), mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	for _, account := range accounts {
-		col.Append(widget.NewLabel(font, px, account.Name+": "+strconv.FormatUint(uint64(account.Count), 10), ctx.Style.fg), false)
-	}
-	return col
 }
