@@ -124,15 +124,15 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ### Cross-cutting
 
-- [ ] a live compositor session smoke test
+- [x] a live compositor session smoke test (headless sway: start, three
+      config reloads incl. a side bar and a bad value, no fatal exits)
 - [ ] packaging (nix package, systemd unit, portal files) still points
       at the Rust binaries
 - [ ] drop the go.mod replace once gelm tags a release
 - [ ] `go test -race ./shell/bar` reports races in the idle-inhibit and
       keybind-mode tests; the gate runs without -race
-- [ ] bar module goroutines (service subscriptions, tickers) outlive a
-      closed bar (panel hide, reload); a reload only retires their
-      Invoke/Every work. Give modules a lifetime and unsubscribe
+- [x] module lifetime: each bar is a mount generation; `follow` and
+      `ModuleContext.Life` end subscriptions and tickers with it
 
 ## gelm gaps and the shortcuts they force
 
