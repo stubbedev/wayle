@@ -158,8 +158,8 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       the power menu; the wallpaper crossfades); the portal surfaces get
       theirs as they are ported. [animations]' CSS overrides reach the
       stylesheet
-- [x] dropdown page stacks switch as Rust's do: audio and treeman slide
-      at interaction-duration, network slides and weather crossfades at
+- [x] dropdown page stacks switch as Rust's do: audio, media and treeman
+      slide at interaction-duration, network slides and weather crossfades at
       GTK's 200ms, the network hover swaps crossfade at 150ms
 - [ ] the card's animated height between pages of different heights
       (dropdown_resize::animate_height), and the bluetooth row's hover

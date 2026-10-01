@@ -97,9 +97,14 @@ type mediaView struct {
 	src mpris.Source
 
 	*widget.Box
-	player *widget.Box
-	empty  *widget.Box
-	mode   string
+	// pages slides between the main page (the player or the empty
+	// state, in main) and the source picker (sources).
+	pages   *widget.Stack
+	main    *widget.Box
+	sources *widget.Box
+	player  *widget.Box
+	empty   *widget.Box
+	mode    string
 
 	identity   *widget.Label
 	sourceIcon *widget.Icon
@@ -135,6 +140,13 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 	v := &mediaView{ctx: ctx, src: ctx.Media, stop: make(chan struct{})}
 	v.Box = widget.NewBox(widget.Column, 0, 14)
 	v.AddClass("media-dropdown")
+	v.main = widget.NewBox(widget.Column, 0, 0)
+	v.sources = widget.NewBox(widget.Column, 0, 0)
+	v.pages = widget.NewStack()
+	pageSlide(v.pages, ctx.Config)
+	v.pages.Add("main", v.main)
+	v.pages.Add("sources", v.sources)
+	v.Append(v.pages, true)
 	v.empty = mediaEmptyState(ctx)
 	v.buildPlayer(font, px)
 	v.refresh()
@@ -263,8 +275,9 @@ func (v *mediaView) show(mode string, w widget.Widget) {
 		return
 	}
 	v.mode = mode
-	v.Clear()
-	v.Append(w, false)
+	v.main.Clear()
+	v.main.Append(w, false)
+	v.pages.Show("main")
 }
 
 // refresh repaints from the active player (PlayerChanged plus the
@@ -387,8 +400,9 @@ func (v *mediaView) buildPicker() {
 		}
 		col.Append(b, false)
 	}
-	v.Clear()
-	v.Append(col, false)
+	v.sources.Clear()
+	v.sources.Append(col, false)
+	v.pages.Show("sources")
 }
 
 // follow keeps the view current while open: service ticks refresh,

@@ -345,14 +345,17 @@ func TestMediaDropdownTransport(t *testing.T) {
 
 	// The picker switches the active player and returns to the view.
 	v.showPicker()
-	if v.mode != "picker" {
-		t.Fatal("source button did not open the picker")
+	if v.mode != "picker" || v.pages.Visible() != "sources" || !v.pages.Switching() {
+		t.Fatalf("the picker: mode %q, page %q, sliding %v; want the sources page sliding in", v.mode, v.pages.Visible(), v.pages.Switching())
 	}
 	source.SetActive("org.mpris.MediaPlayer2.mpv")
 	v.mode = ""
 	v.refresh()
 	if v.title.Text() != mediaUnknownTitle {
 		t.Errorf("after switching = %q, want mpv's placeholder title", v.title.Text())
+	}
+	if v.pages.Visible() != "main" {
+		t.Errorf("after picking, page %q, want back on main", v.pages.Visible())
 	}
 
 	// No player: the empty state.
