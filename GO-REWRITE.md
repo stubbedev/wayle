@@ -77,9 +77,7 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ### Parked work (local branches)
 
-- [ ] `collect/launcher` (tip commit): the launcher views
-      (`shell/launcher`, `internal/pango`); unfinished, 113 unused
-      symbols.
+- [x] `collect/launcher`: superseded by the landed launcher surface
 - [ ] `collect/icons`: `wayle icons` with a usvg/skia-path port for
       icon transforms; unfinished, fails lint.
 
