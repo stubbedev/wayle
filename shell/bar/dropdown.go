@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/shell/reveal"
 )
 
 // dropdownRegistry maps the `dropdown:<name>` actions to content
@@ -26,6 +27,8 @@ type dropdownRegistry struct {
 
 	mu      sync.Mutex
 	openPop map[string]*app.Popover
+	// openRev is the revealer around each open popover's card.
+	openRev map[string]*widget.Revealer
 }
 
 // dropdownCloser is live dropdown content (a service subscription) that
@@ -93,6 +96,7 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 		hosts:    make(map[string]app.Host),
 		builders: dropdownBuilders(),
 		openPop:  make(map[string]*app.Popover),
+		openRev:  make(map[string]*widget.Revealer),
 	}
 }
 
@@ -110,6 +114,7 @@ func (r *dropdownRegistry) detachHost(connector string) {
 	r.mu.Lock()
 	delete(r.hosts, connector)
 	delete(r.openPop, connector)
+	delete(r.openRev, connector)
 	r.mu.Unlock()
 }
 
@@ -130,9 +135,11 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	// A popover that already went away (click-away, Esc) no longer
 	// counts as open: the next click opens instead of toggling off.
 	if prev := r.openPop[connector]; prev != nil && !prev.Closed() {
+		rev := r.openRev[connector]
 		delete(r.openPop, connector)
+		delete(r.openRev, connector)
 		r.mu.Unlock()
-		prev.Dismiss()
+		dismissAnimated(prev, rev, r.cfg.Animations)
 		return nil
 	}
 	host := r.hosts[connector]
@@ -166,6 +173,10 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if closer, ok := content.(dropdownCloser); ok {
 		cfg.OnClosed = closer.dropdownClosed
 	}
+	// The card enters through the dropdown transition (animate_in).
+	rev := widget.NewRevealer(content)
+	rev.SetGenieEdge(dropdownGenieEdge(r.cfg.Bar.Location))
+	cfg.Content = rev
 	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
 		if cfg.OnClosed != nil {
@@ -176,10 +187,36 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if d, ok := content.(dropdownAttacher); ok {
 		d.attachPopover(pop)
 	}
+	reveal.Show(rev, r.cfg.Animations, config.AnimDropdown)
 	r.mu.Lock()
 	r.openPop[connector] = pop
+	r.openRev[connector] = rev
 	r.mu.Unlock()
 	return nil
+}
+
+// dismissAnimated is animate_out: the card plays its exit, then the
+// popover goes. Only this programmatic close animates; a click-away or
+// Esc closes at once, the compositor's grab having no exit hook.
+func dismissAnimated(pop interface{ Dismiss() }, rev *widget.Revealer, anims config.AnimationsConfig) {
+	if rev == nil {
+		pop.Dismiss()
+		return
+	}
+	reveal.Hide(rev, anims, config.AnimDropdown, pop.Dismiss)
+}
+
+// dropdownGenieEdge is the edge a genie collapses toward: the bar's.
+func dropdownGenieEdge(location config.Location) widget.Edge {
+	switch location {
+	case config.LocationBottom:
+		return widget.EdgeBottom
+	case config.LocationLeft:
+		return widget.EdgeLeft
+	case config.LocationRight:
+		return widget.EdgeRight
+	}
+	return widget.EdgeTop
 }
 
 // setConfig hands dropdowns opened from now on a new snapshot, for a

@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/shell/reveal"
 )
 
 var _ = render.Color(0)
@@ -130,5 +131,52 @@ func TestDropdownScrollIsVerticalOnly(t *testing.T) {
 	}
 	if bare := dropdownScroll(widget.NewBox(widget.Column, 0, 0), ""); len(bare.Classes()) != 0 {
 		t.Errorf("an empty class was added: %v", bare.Classes())
+	}
+}
+
+type fakeDismisser struct{ dismissed int }
+
+func (f *fakeDismisser) Dismiss() { f.dismissed++ }
+
+// TestDropdownDismissPlaysTheExit pins animate_out: a programmatic
+// close keeps the popover through the card's exit and dismisses it
+// when that lands; disabled animations dismiss at once.
+func TestDropdownDismissPlaysTheExit(t *testing.T) {
+	anims := config.DefaultsAnimations()
+	rev := widget.NewRevealer(widget.NewBox(widget.Row, 0, 0))
+	reveal.Show(rev, anims, config.AnimDropdown)
+	rev.Finish()
+	pop := &fakeDismisser{}
+	dismissAnimated(pop, rev, anims)
+	if pop.dismissed != 0 || rev.Revealed() {
+		t.Fatalf("mid-exit: %d dismisses, revealed %v", pop.dismissed, rev.Revealed())
+	}
+	rev.Finish()
+	if pop.dismissed != 1 {
+		t.Errorf("after the exit: %d dismisses, want 1", pop.dismissed)
+	}
+
+	anims.Enabled = false
+	rev = widget.NewRevealer(widget.NewBox(widget.Row, 0, 0))
+	reveal.Show(rev, anims, config.AnimDropdown)
+	pop = &fakeDismisser{}
+	dismissAnimated(pop, rev, anims)
+	if pop.dismissed != 1 {
+		t.Errorf("animations off: %d dismisses, want 1 at once", pop.dismissed)
+	}
+	dismissAnimated(pop, nil, anims)
+	if pop.dismissed != 2 {
+		t.Error("a popover without a revealer was not dismissed")
+	}
+}
+
+func TestDropdownGenieEdgeIsTheBars(t *testing.T) {
+	for loc, want := range map[config.Location]widget.Edge{
+		config.LocationTop: widget.EdgeTop, config.LocationBottom: widget.EdgeBottom,
+		config.LocationLeft: widget.EdgeLeft, config.LocationRight: widget.EdgeRight,
+	} {
+		if got := dropdownGenieEdge(loc); got != want {
+			t.Errorf("%s: %v, want %v", loc, got, want)
+		}
 	}
 }
