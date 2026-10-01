@@ -1,13 +1,13 @@
 package bar
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/recorder"
+	"github.com/stubbedev/wayle/service/recorder/recordertest"
 )
 
 func TestRecorderLabel(t *testing.T) {
@@ -69,7 +69,7 @@ func TestLoadFileAppliesRecorder(t *testing.T) {
 func TestRecorderModuleFollowsState(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	ctx.Recorder = recorder.NewState(fakeRecorderEngine{}, 0)
+	ctx.Recorder = recorder.NewState(&recordertest.Engine{}, func() config.RecorderConfig { return cfg.Recorder }, recorder.Hooks{})
 
 	module, err := Create("recorder", ctx)
 	if err != nil {
@@ -86,23 +86,8 @@ func TestRecorderModuleFollowsState(t *testing.T) {
 	waitForText(t, label, "-")
 }
 
-// fakeRecorderEngine hands out live handles the state machine can
-// drive.
-type fakeRecorderEngine struct{}
-
-func (fakeRecorderEngine) Start(context.Context, recorder.Options) (recorder.Handle, error) {
-	return fakeRecorderHandle{}, nil
-}
-
-type fakeRecorderHandle struct{ stop chan struct{} }
-
-func (fakeRecorderHandle) Pause()  {}
-func (fakeRecorderHandle) Resume() {}
-
-func (h fakeRecorderHandle) Stop() {
-	if h.stop != nil {
-		close(h.stop)
+func TestRecorderModuleRequiresService(t *testing.T) {
+	if _, err := Create("recorder", newTestContext(t, config.Defaults())); err == nil {
+		t.Error("no recorder service: want an error")
 	}
 }
-
-func (fakeRecorderHandle) Done() <-chan error { return make(chan error) }

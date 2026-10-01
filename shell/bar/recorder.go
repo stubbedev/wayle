@@ -1,6 +1,8 @@
 package bar
 
 import (
+	"errors"
+
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
@@ -61,10 +63,10 @@ type recorderModule struct {
 }
 
 func newRecorder(ctx ModuleContext) (Module, error) {
-	m := &recorderModule{ctx: ctx, src: ctx.Recorder, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	if m.src == nil {
-		m.src = recorder.NewState(recorder.WfRecorder{}, 0)
+	if ctx.Recorder == nil {
+		return nil, errors.New("recorder: no recorder service available")
 	}
+	m := &recorderModule{ctx: ctx, src: ctx.Recorder, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.icon = moduleIcon(ctx, ctx.Config.Recorder.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
 	m.refresh()

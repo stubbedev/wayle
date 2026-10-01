@@ -1,15 +1,15 @@
 package main
 
 import (
-	"context"
 	"strings"
-	"sync"
 	"testing"
 
+	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/recorder"
+	"github.com/stubbedev/wayle/service/recorder/recordertest"
 )
 
 type step struct {
@@ -93,26 +93,12 @@ func TestNotifyCommands(t *testing.T) {
 	}
 }
 
-// recEngine is a recorder backend that runs until stopped.
-type recEngine struct{}
-
-type recHandle struct {
-	once sync.Once
-	done chan error
-}
-
-func (recEngine) Start(context.Context, recorder.Options) (recorder.Handle, error) {
-	return &recHandle{done: make(chan error)}, nil
-}
-func (h *recHandle) Pause()             {}
-func (h *recHandle) Resume()            {}
-func (h *recHandle) Stop()              { h.once.Do(func() { close(h.done) }) }
-func (h *recHandle) Done() <-chan error { return h.done }
-
 func TestRecorderCommands(t *testing.T) {
 	dbustest.Session(t)
 	runSteps(t, []step{{[]string{"recorder", "status"}, "Error: Recorder service not running. Start wayle shell first.\n"}})
-	state := recorder.NewState(recEngine{}, 0)
+	cfg := config.Defaults().Recorder
+	cfg.OutputDirectory, cfg.StartDelayMs = t.TempDir(), 0
+	state := recorder.NewState(&recordertest.Engine{}, func() config.RecorderConfig { return cfg }, recorder.Hooks{})
 	release, err := recorder.NewDaemon(state).Export(dbustest.SessionConn(t))
 	if err != nil {
 		t.Fatal(err)

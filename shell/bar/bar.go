@@ -15,6 +15,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/desktopnotify"
 	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
@@ -66,6 +67,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 	defer sess.Close()
 
 	application := app.NewApplication(sess)
+	// current is the live config snapshot the long-lived services read.
+	current := &atomic.Pointer[config.Config]{}
+	current.Store(cfg)
+	// osdRef is the OSD once it exists; the recorder toasts through it.
+	osdRef := &atomic.Pointer[osd.Osd]{}
 	// Programmatic copies (the screenshot host) and the ctrl+c/v keys
 	// share one clipboard.
 	if application.Clipboard() == nil {
@@ -144,8 +150,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// bus; other senders deliver through it.
 	notifSvc := startNotifications(cfg.Notification)
 	baseCtx.Notifications = notifSvc
-	recState := recorder.NewState(recorder.WfRecorder{}, time.Duration(cfg.Recorder.StartDelayMs)*time.Millisecond)
-	baseCtx.Recorder = recState
 	sniStore := sni.NewStore()
 	baseCtx.SNI = sniStore
 	if conn, err := dbus.ConnectSessionBus(); err == nil {
@@ -158,6 +162,16 @@ func run(cfg *config.Config, svc *config.Service) error {
 				defer func() { _ = server.Release() }()
 			}
 		}
+		// The recorder captures through the ScreenCast portal on this
+		// bus and reports through the OSD and desktop notifications.
+		recState := recorder.NewState(recorder.GstEngine{Conn: conn},
+			func() config.RecorderConfig { return current.Load().Recorder },
+			recorder.Hooks{Toast: func(label, icon string, ms uint32) {
+				if o := osdRef.Load(); o != nil {
+					_ = o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon, DurationMS: &ms})
+				}
+			}, Notify: desktopnotify.Notify})
+		baseCtx.Recorder = recState
 		if release, err := recorder.NewDaemon(recState).Export(conn); err == nil {
 			defer release()
 		} else {
@@ -203,6 +217,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, sess)
 	defer stopWallpaper()
 	osdSrv := osd.New(application, cfg.Osd, font, palette)
+	osdRef.Store(osdSrv)
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
@@ -231,8 +246,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 		return barWindow{layer, ctx.gen}, nil
 	}
 	bars := newBarSet(openBar)
-	current := &atomic.Pointer[config.Config]{}
-	current.Store(cfg)
 	// plugOutput gives a named output its bar and OSD face; startup
 	// outputs and hotplugged ones (once their connector name is known)
 	// take the same path, the Rust SyncMonitors. A bar that cannot open

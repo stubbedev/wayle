@@ -157,10 +157,25 @@
               sway # headless compositor for the wayle-go test gate (gelm parity)
               dbus # dbus-daemon for the private test buses (internal/dbustest)
 
+              # libgstreamer for the recorder's purego binding and the
+              # plugins its tests run pipelines through (videotestsrc,
+              # matroskamux, fakesink).
+              gst_all_1.gstreamer
+              gst_all_1.gst-plugins-base
+              gst_all_1.gst-plugins-good
+
               inter # config default font-sans
               jetbrains-mono # config default font-mono
               nerd-fonts.jetbrains-mono # the user config's font-sans/font-mono
             ];
+
+            # The recorder dlopens libgstreamer and finds its plugins here.
+            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.gst_all_1.gstreamer pkgs.glib ];
+            GST_PLUGIN_SYSTEM_PATH_1_0 = pkgs.lib.makeSearchPath "lib/gstreamer-1.0" (with pkgs.gst_all_1; [
+              gstreamer
+              gst-plugins-base
+              gst-plugins-good
+            ]);
 
             shellHook =
               let

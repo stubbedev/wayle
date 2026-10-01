@@ -8,6 +8,8 @@ import (
 	"unsafe"
 
 	"github.com/ebitengine/purego"
+
+	"github.com/stubbedev/wayle/internal/clib"
 )
 
 // The libpam binding: dlopen through purego, so the binary stays
@@ -16,20 +18,8 @@ import (
 // freed slot, so the callback is created once and routes to the live
 // transaction by the appdata key).
 
-// libpamCandidates is where libpam is looked up, in order: the soname
-// through the loader's own search path (LD_LIBRARY_PATH, ld.so.cache),
-// then the NixOS system profile — whose loader has no FHS default
-// path — and the common distro locations.
-var libpamCandidates = []string{
-	"libpam.so.0",
-	"/run/current-system/sw/lib/libpam.so.0",
-	"/usr/lib/libpam.so.0",
-	"/usr/lib64/libpam.so.0",
-	"/lib/x86_64-linux-gnu/libpam.so.0",
-	"/usr/lib/x86_64-linux-gnu/libpam.so.0",
-	"/lib/aarch64-linux-gnu/libpam.so.0",
-	"/usr/lib/aarch64-linux-gnu/libpam.so.0",
-}
+// libpamCandidates is where libpam is looked up.
+var libpamCandidates = clib.SystemCandidates("libpam.so.0")
 
 // libcCandidates holds the C heap allocator PAM frees our responses
 // with: responses must be malloc'd memory.
@@ -80,24 +70,12 @@ func loadLibpam() (*libpam, error) {
 	return lib, errLib
 }
 
-func dlopenFirst(candidates []string) (uintptr, error) {
-	var errs []string
-	for _, name := range candidates {
-		h, err := purego.Dlopen(name, purego.RTLD_NOW|purego.RTLD_GLOBAL)
-		if err == nil {
-			return h, nil
-		}
-		errs = append(errs, err.Error())
-	}
-	return 0, errors.New(strings.Join(errs, "; "))
-}
-
 func bindLibpam() (*libpam, error) {
-	pam, err := dlopenFirst(libpamCandidates)
+	pam, err := clib.Open(libpamCandidates)
 	if err != nil {
 		return nil, fmt.Errorf("load libpam: %w", err)
 	}
-	libc, err := dlopenFirst(libcCandidates)
+	libc, err := clib.Open(libcCandidates)
 	if err != nil {
 		return nil, fmt.Errorf("load libc: %w", err)
 	}
@@ -141,7 +119,7 @@ func pamConverseTrampoline(num int32, msg, resp unsafe.Pointer, appdata uintptr)
 	ptrs := unsafe.Slice((**cPamMessage)(msg), num) //nolint:gosec // audited: PAM passes num_msg message pointers
 	msgs := make([]pamMessage, num)
 	for i, p := range ptrs {
-		msgs[i] = pamMessage{style: p.style, text: goString(p.msg)}
+		msgs[i] = pamMessage{style: p.style, text: clib.GoString(p.msg)}
 	}
 	replies, code := converse(msgs)
 	if code != pamSuccess {
@@ -174,18 +152,6 @@ func pamConverseTrampoline(num int32, msg, resp unsafe.Pointer, appdata uintptr)
 	}
 	*(*unsafe.Pointer)(resp) = arr
 	return pamSuccess
-}
-
-// goString copies a NUL-terminated C string.
-func goString(p *byte) string {
-	if p == nil {
-		return ""
-	}
-	n := 0
-	for *(*byte)(unsafe.Add(unsafe.Pointer(p), n)) != 0 { //nolint:gosec // audited: scans a NUL-terminated C string
-		n++
-	}
-	return string(unsafe.Slice(p, n)) //nolint:gosec // audited: n bytes precede the NUL
 }
 
 // systemPAM is the production pamLib: libpam through purego. confdir,
