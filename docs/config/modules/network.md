@@ -33,11 +33,22 @@ right = ["network"]
 | `icon-show` | bool | `true` | Display module icon. |
 | `label-show` | bool | `true` | Display connection label (SSID for WiFi, "Wired" for ethernet). |
 | `label-max-length` | u32 | `15` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
+| `vpn-connected-icon` | string | `"ld-lock-symbolic"` | Icon when a VPN is connected. |
+| `vpn-connecting-icon` | string | `"ld-refresh-cw-symbolic"` | Icon while a VPN connection is in flight. |
+| `vpn-disconnected-icon` | string | `"ld-unplug-symbolic"` | Icon when a VPN is configured but disconnected. |
+| `vpn-show` | [`VpnShow`](/config/types#vpn-show) | `"auto"` | When the VPN state replaces the wifi/wired icon. |
 
 ::: details More about `wifi-signal-icons`
 
 The signal percentage maps to icons: 0-25% uses icons\[0\], 26-50% uses
 icons\[1\], etc.
+
+:::
+
+::: details More about `vpn-show`
+
+`auto` shows it only once NetworkManager holds a VPN profile, so adding
+the key changes nothing on a machine with no VPN.
 
 :::
 
@@ -87,6 +98,10 @@ label-show = true
 label-color = "accent"
 label-max-length = 15
 button-bg-color = "bg-surface-elevated"
+vpn-connected-icon = "ld-lock-symbolic"
+vpn-connecting-icon = "ld-refresh-cw-symbolic"
+vpn-disconnected-icon = "ld-unplug-symbolic"
+vpn-show = "auto"
 left-click = "dropdown:network"
 right-click = ""
 middle-click = ""

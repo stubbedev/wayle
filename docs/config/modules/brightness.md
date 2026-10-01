@@ -27,6 +27,8 @@ right = ["brightness"]
 | `label-show` | bool | `true` | Display percentage label. |
 | `format` | string | `"{{ percent }}%"` | Format string for the label. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
+| `min-brightness` | u32 | `1` | Lower bound (percent) for the native brightness-adjust action. |
+| `enable-external` | bool | `true` | Discover and control external monitors over DDC/CI (I²C). |
 | `thresholds` | array of [`ThresholdEntry`](/config/types#threshold-entry) | `[]` | Dynamic color thresholds based on brightness percentage. |
 
 ::: details More about `level-icons`
@@ -45,6 +47,23 @@ The percentage is divided evenly among icons. With 3 icons:
 #### Examples
 
 - `"{{ percent }}%"` - "65%"
+
+:::
+
+::: details More about `min-brightness`
+
+Scrolling or clicking down never drops below this, so a dimmer cannot
+reach a fully dark screen by accident. Use the brightness-toggle action
+to intentionally blackout to 0%.
+
+:::
+
+::: details More about `enable-external`
+
+External monitors appear as extra sliders in the brightness panel.
+Requires the `i2c-dev` kernel module and read/write access to
+`/dev/i2c-*` (usually membership in the `i2c` group). Disable to skip
+the slow DDC scan if you only have an internal panel.
 
 :::
 
@@ -81,8 +100,8 @@ label-color = "status-warning"
 | `left-click` | [`ClickAction`](/config/types#click-action) | `"dropdown:brightness"` | Action on left click. Default opens the brightness dropdown. |
 | `right-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on right click. |
 | `middle-click` | [`ClickAction`](/config/types#click-action) | `""` | Action on middle click. |
-| `scroll-up` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll up. |
-| `scroll-down` | [`ClickAction`](/config/types#click-action) | `""` | Action on scroll down. |
+| `scroll-up` | [`ClickAction`](/config/types#click-action) | `"brightness:5"` | Action on scroll up. Default raises brightness by 5%. |
+| `scroll-down` | [`ClickAction`](/config/types#click-action) | `"brightness:-5"` | Action on scroll down. Default lowers brightness by 5%, floored at `min-brightness`. |
 
 ## Default configuration
 
@@ -102,12 +121,14 @@ label-show = true
 label-color = "yellow"
 format = "{{ percent }}%"
 label-max-length = 0
+min-brightness = 1
+enable-external = true
 button-bg-color = "bg-surface-elevated"
 left-click = "dropdown:brightness"
 right-click = ""
 middle-click = ""
-scroll-up = ""
-scroll-down = ""
+scroll-up = "brightness:5"
+scroll-down = "brightness:-5"
 thresholds = []
 ```
 

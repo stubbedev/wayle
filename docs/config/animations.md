@@ -24,9 +24,16 @@ Enter/exit and change animations for transient surfaces.
 | `ui-duration` | u32 | `250` | Base duration in ms for general UI micro-transitions (hover, focus, and color fades) driven by the CSS `--duration-*` token family. Fast, normal, and slow speeds are derived from this. `enabled = false` zeroes them for an instant UI. |
 | `indicators` | bool | `true` | Run looping status indicators: spinners, network/bluetooth scan animations, the recording pulse, and the clock blink. Disable (or set `enabled = false`) for a fully static UI. |
 | `notifications` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for notification popup cards. |
-| `osd` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the OSD (volume/brightness/toggle). |
-| `toast` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for toasts (`wayle toast`). |
+| `osd` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the OSD (volume/brightness/toggle/toast). |
 | `dropdown` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for bar widget dropdown foldouts. |
+| `share-picker` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the screen-share picker overlay. |
+| `wallpaper` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the wallpaper crossfade between images. |
+| `power` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the power menu overlay. |
+| `dialog` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for portal dialogs (access/account/app-chooser/ launcher-install prompts). |
+| `file-chooser` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the portal file-chooser surface. |
+| `print` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the portal print surface. |
+| `lock` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the lock screen reveal. |
+| `launcher` | [`SurfaceAnimation`](/config/types#surface-animation) | `{...}` | Per-surface override for the application launcher. |
 
 ## Default configuration
 

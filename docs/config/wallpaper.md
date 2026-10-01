@@ -13,22 +13,14 @@ Wallpaper rendering, cycling, and per-monitor overrides.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `engine-enabled` | bool | `true` | Enable the awww wallpaper engine. Disable to use an external wallpaper tool while keeping color extraction and theming. |
-
-## Transitions
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `transition-type` | [`TransitionType`](/config/types#transition-type) | `"simple"` | Transition animation type. |
-| `transition-duration` | [`TransitionDuration`](/config/types#transition-duration) | `0.7` | Transition animation duration in seconds. |
-| `transition-fps` | [`TransitionFps`](/config/types#transition-fps) | `60` | Transition animation frame rate. |
+| `wallpaper` | string | `""` | A single image file to use as the wallpaper on all monitors. Leave empty to use cycling and/or per-monitor overrides instead. |
+| `fit-mode` | [`FitMode`](/config/types#fit-mode) | `"fill"` | How the wallpaper is scaled to the screen. Per-monitor entries in `[[wallpaper.monitors]]` override this. |
 
 ## Cycling
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `cycling-enabled` | bool | `false` | Enable automatic wallpaper cycling. |
-| `cycling-directory` | string | `""` | Directory containing wallpaper images for cycling. |
+| `cycling-directory` | string | `""` | Directory of images to cycle through. Set it to enable cycling; leave empty to disable. Takes precedence over the single `wallpaper` image. |
 | `cycling-mode` | [`CyclingMode`](/config/types#cycling-mode) | `"sequential"` | Wallpaper cycling order. |
 | `cycling-interval-mins` | [`CyclingInterval`](/config/types#cycling-interval) | `15` | Time between wallpaper changes in minutes. |
 | `cycling-same-image` | bool | `false` | Show the same cycling wallpaper on all monitors. Only affects shuffle mode since sequential already displays the same image. |
@@ -61,11 +53,8 @@ fit-mode = "fit"
 
 ```toml
 [wallpaper]
-engine-enabled = true
-transition-type = "simple"
-transition-duration = 0.699999988079071
-transition-fps = 60
-cycling-enabled = false
+wallpaper = ""
+fit-mode = "fill"
 cycling-directory = ""
 cycling-mode = "sequential"
 cycling-interval-mins = 15

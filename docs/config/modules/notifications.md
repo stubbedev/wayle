@@ -38,7 +38,7 @@ right = ["notifications"]
 | `popup-hover-pause` | bool | `true` | Pause popup auto-dismiss timer on hover. |
 | `popup-margin-x` | [`Size`](/config/types#size) | `0` | Horizontal margin from screen edges. Accepts a scale multiplier or pixels (e.g. `"12px"`). |
 | `popup-margin-y` | [`Size`](/config/types#size) | `0` | Vertical margin from screen edges. Accepts a scale multiplier or pixels (e.g. `"12px"`). |
-| `popup-gap` | [`Size`](/config/types#size) | `8` | Gap between stacked popups. Accepts a scale multiplier or pixels (e.g. `"8px"`). |
+| `popup-gap` | [`Size`](/config/types#size) | `1` | Gap between stacked popups: a multiplier of the default 8px (`1.0` = default) or absolute pixels. |
 | `popup-monitor` | [`PopupMonitor`](/config/types#popup-monitor) | `"primary"` | Target monitor: "primary" or a connector name like "DP-1". |
 | `popup-layer` | [`Layer`](/config/types#layer) | `"overlay"` | Layer-shell layer popup notifications are placed on. |
 | `popup-close-behavior` | [`PopupCloseBehavior`](/config/types#popup-close-behavior) | `"dismiss"` | What happens when the close button on a popup is clicked. |
@@ -151,7 +151,7 @@ popup-duration = 5000
 popup-hover-pause = true
 popup-margin-x = 0.0
 popup-margin-y = 0.0
-popup-gap = 8.0
+popup-gap = 1.0
 popup-monitor = "primary"
 popup-layer = "overlay"
 popup-close-behavior = "dismiss"

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/cli"
+	"github.com/stubbedev/wayle/internal/configdocs"
 )
 
 // configCommand is wayle/src/cli/config/commands.rs.
@@ -77,7 +78,19 @@ func configCommand() *cli.Command {
 					{ID: "out", Long: "out", Value: cli.Path, Defaults: []string{"docs/config"}, Help: "Output directory for the generated pages"},
 					{ID: "only", Long: "only", Value: cli.String, Help: "Regenerate only the named module"},
 				},
-				Run: notPorted("config docs"),
+				Run: func(m *cli.Matches) error {
+					out, _ := cli.Value[string](m, "out")
+					if only, ok := cli.Value[string](m, "only"); ok {
+						if err := configdocs.GenerateOne(out, only); err != nil {
+							return fmt.Errorf("cannot generate `%s`: %w", only, err)
+						}
+						return nil
+					}
+					if err := configdocs.Generate(out); err != nil {
+						return fmt.Errorf("cannot generate docs: %w", err)
+					}
+					return nil
+				},
 			},
 		},
 	}

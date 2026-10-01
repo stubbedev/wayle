@@ -26,6 +26,7 @@ the built-in default (scaled by the global scale).
 | `media` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Media dropdown panel size. |
 | `network` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Network dropdown panel size. |
 | `notification` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Notification dropdown panel size. |
+| `treeman` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Treeman dropdown panel size. |
 | `weather` | [`DropdownSize`](/config/types#dropdown-size) | `{...}` | Weather dropdown panel size. |
 
 

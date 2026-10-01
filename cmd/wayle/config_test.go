@@ -103,3 +103,27 @@ func TestConfigSchemaAndDefault(t *testing.T) {
 		t.Error("default --stdout differs from the written example")
 	}
 }
+
+func TestConfigDocsWritesThePages(t *testing.T) {
+	configDir(t)
+	out := filepath.Join(t.TempDir(), "docs")
+	if _, err := runConfigOut(t, "docs", "--out", out); err != nil {
+		t.Fatal(err)
+	}
+	for _, page := range []string{"index.md", "types.md", "bar.md", "modules/clock.md", "modules/custom.md"} {
+		if _, err := os.Stat(filepath.Join(out, page)); err != nil {
+			t.Errorf("%s not written: %v", page, err)
+		}
+	}
+	only := filepath.Join(t.TempDir(), "only")
+	if _, err := runConfigOut(t, "docs", "--out", only, "--only", "clock"); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := os.ReadDir(only)
+	if _, err := os.Stat(filepath.Join(only, "modules", "clock.md")); err != nil || len(entries) != 1 {
+		t.Errorf("--only clock wrote %v", entries)
+	}
+	if _, err := runConfigOut(t, "docs", "--out", only, "--only", "nope"); err == nil || !strings.Contains(err.Error(), "module `nope` not registered") {
+		t.Errorf("an unknown module = %v", err)
+	}
+}

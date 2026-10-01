@@ -29,7 +29,7 @@ right = ["mail"]
 | `query` | string | `"tag:unread"` | notmuch search query whose match count is shown. |
 | `accounts` | array of [`MailAccount`](/config/types#mail-account) | `[]` | Per-account unread breakdown shown in the mail dropdown. Each account has its own notmuch query and a provider (for its icon). When set, the bar count/label is the sum across accounts and `query` is ignored. |
 | `hide-when-zero` | bool | `true` | Hide the module entirely while the count is zero. |
-| `notify` | bool | `false` | Fire a desktop notification (via `notify-send`) when the unread count rises — i.e. new mail arrives. One notification per newly-arrived message (capped per burst), showing its sender and subject. With `accounts` configured, each notification uses that account's provider icon; otherwise the module icon is used. |
+| `notify` | bool | `false` | Fire a desktop notification when the unread count rises — i.e. new mail arrives. One notification per newly-arrived message (capped per burst), showing its sender and subject. With `accounts` configured, each notification uses that account's provider icon; otherwise the module icon is used. |
 | `notify-summary` | string | `"{{ sender }}"` | Notification summary when new mail arrives. |
 | `notify-body` | string | `"{{ subject }}"` | Notification body when new mail arrives. Same placeholders as `notify-summary`. |
 | `icon-name` | string | `"ld-mail-symbolic"` | Module icon. |

@@ -32,15 +32,16 @@ right = ["recorder"]
 | `microphone` | bool | `false` | Capture the microphone in the recording. |
 | `microphone-device` | string | `""` | Microphone PipeWire/PulseAudio source name. Empty uses the default source. |
 | `system-audio` | bool | `true` | Capture desktop (system) audio in the recording. |
-| `separate-audio-tracks` | bool | `true` | Keep microphone and system audio as separate, individually editable tracks instead of mixing them into one. |
-| `framerate` | u32 | `30` | Capture framerate in frames per second. |
+| `framerate` | u32 | `60` | Capture framerate in frames per second. |
 | `webcam-enabled` | bool | `false` | Overlay a webcam picture-in-picture frame into the recording. |
 | `webcam-device` | string | `""` | Webcam V4L2 device path. Empty auto-selects the first camera. |
-| `webcam-position` | [`WebcamPosition`](/config/types#webcam-position) | `"bottom-right"` | Corner the webcam frame is anchored to. |
+| `webcam-x` | [`Percentage`](/config/types#percentage) | `100` | Webcam frame horizontal position, as a percentage of the free horizontal space (0 = flush left, 100 = flush right). Stored relative so it stays correct across monitors of different resolutions. |
+| `webcam-y` | [`Percentage`](/config/types#percentage) | `100` | Webcam frame vertical position, as a percentage of the free vertical space (0 = flush top, 100 = flush bottom). Stored relative so it stays correct across monitors of different resolutions. |
 | `webcam-size` | [`Percentage`](/config/types#percentage) | `20` | Webcam frame width as a percentage of the recording width. |
 | `output-directory` | string | `""` | Output directory for recordings. Empty uses the XDG Videos directory. |
-| `output-format` | [`RecorderFormat`](/config/types#recorder-format) | `"mp4"` | Container format / codec preset. |
+| `output-format` | [`RecorderFormat`](/config/types#recorder-format) | `"mkv"` | Container format / codec preset. |
 | `show-cursor` | bool | `true` | Draw the mouse cursor in the recording. |
+| `start-delay-ms` | u32 | `1400` | Delay between choosing the capture source and the recording actually starting, in milliseconds. Gives on-screen UI (the start toast) time to clear so it isn't captured in the video. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
 | `label-show` | bool | `true` | Display label. |
@@ -86,15 +87,16 @@ format = "{{ elapsed }}"
 microphone = false
 microphone-device = ""
 system-audio = true
-separate-audio-tracks = true
-framerate = 30
+framerate = 60
 webcam-enabled = false
 webcam-device = ""
-webcam-position = "bottom-right"
+webcam-x = 100
+webcam-y = 100
 webcam-size = 20
 output-directory = ""
-output-format = "mp4"
+output-format = "mkv"
 show-cursor = true
+start-delay-ms = 1400
 border-show = false
 border-color = "red"
 icon-show = true

@@ -130,7 +130,7 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ### Config
 
-- [ ] `wayle config docs` (the VitePress page generator)
+- [x] `wayle config docs` (the VitePress page generator; byte-identical to the Rust pages)
 - [x] hot reload beyond the bar/OSD/popups: wallpaper (wallpaper.Shell
       SetConfig) and the lock (read live, as the Rust lock does)
 - [x] the launcher's hot reload: every session reads the live config

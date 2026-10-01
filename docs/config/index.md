@@ -21,11 +21,14 @@ Editor intellisense via JSON Schema. Install [Tombi](https://marketplace.visuals
 | [`bar`](/config/bar) | Bar chrome: per-monitor layout, spacing, colors, and button styling. |
 | [`dropdowns`](/config/dropdowns) | Per-dropdown foldout panel sizing. |
 | [`general`](/config/general) | Shell-wide settings that don't belong to any specific module. |
+| [`greeter`](/config/greeter) | Greeter (display manager): the pre-login screen `wayle-greeter` renders as |
+| [`launcher`](/config/launcher) | Application launcher / dmenu (rofi replacement). |
+| [`lock`](/config/lock) | Lock screen: a secure session lock rendered by Wayle via `ext-session-lock-v1`. |
 | [`mail-account`](/config/mail-account) | One mail account in the `[modules.mail]` per-account breakdown. |
 | [`osd`](/config/osd) | On-screen display overlay for transient events like volume and brightness. |
+| [`share-picker`](/config/share-picker) | Screen-share picker shown by xdg-desktop-portal when an app requests a |
 | [`styling`](/config/styling) | Theme, palette, and rounding tokens applied shell-wide. Changes recompile the stylesheet. |
 | [`toast-preset`](/config/toast-preset) | A reusable toast preset, triggerable by id with `wayle toast --preset <id>`. |
-| [`toasts`](/config/toasts) | Toast overlays shown via `wayle toast`. |
 | [`wallpaper`](/config/wallpaper) | Wallpaper rendering, cycling, and per-monitor overrides. |
 
 ## Bar modules
@@ -60,9 +63,12 @@ Modules appear inside `[[bar.layout]]` arrays. Each row links to the full refere
 | [`power-profiles`](/config/modules/power-profiles) | Power profile indicator and switcher (power-profiles-daemon). |
 | [`ram`](/config/modules/ram) | Memory and swap usage. |
 | [`recorder`](/config/modules/recorder) | Native screen recorder backed by a GStreamer pipeline. |
+| [`screenshot`](/config/modules/screenshot) | Screenshot capture button. |
 | [`separator`](/config/modules/separator) | A vertical rule between bar modules. |
 | [`storage`](/config/modules/storage) | Disk usage for a mount point. |
+| [`sway-workspaces`](/config/modules/sway-workspaces) | sway workspace indicators with click-to-switch. |
 | [`systray`](/config/modules/systray) | System tray icons via the StatusNotifierItem protocol. |
+| [`treeman`](/config/modules/treeman) | treeman worktree health across all registered repos, in a dropdown. |
 | [`volume`](/config/modules/volume) | Output volume control with a dropdown for device and app volumes. |
 | [`weather`](/config/modules/weather) | Current conditions with hourly and daily forecasts in a dropdown. |
 | [`window-title`](/config/modules/window-title) | Active window title with optional app-icon prefix. |

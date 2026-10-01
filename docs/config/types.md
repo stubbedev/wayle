@@ -37,7 +37,9 @@ notifications). Driven per frame by the custom revealer
 | `"swing-left"` | Slide in from / out to the left edge with a rotating swing. |
 | `"swing-right"` | Slide in from / out to the right edge with a rotating swing. |
 | `"bounce"` | Scale in from a shrunken state with an elastic overshoot, then settle. |
-| `"genie"` | Suck in toward / out to the surface's anchored edge (macOS "genie" minimize, approximated with an affine scale-and-slide). Auto-orients to the edge the surface sits on. |
+| `"genie"` | Suck in toward / out to the surface's anchored edge (macOS "genie"
+minimize, approximated with an affine scale-and-slide). Auto-orients to
+the edge the surface sits on. |
 | `"zoom"` | Scale in smoothly from the center with no overshoot. |
 | `"rotate"` | Spin in: rotate into place while scaling up and fading in. |
 | `"flip"` | Card flip: open out from a vertical edge (horizontal scale through zero). |
@@ -61,7 +63,9 @@ notifications). Driven per frame by the custom revealer
 | `"swing-left"` | Slide in from / out to the left edge with a rotating swing. |
 | `"swing-right"` | Slide in from / out to the right edge with a rotating swing. |
 | `"bounce"` | Scale in from a shrunken state with an elastic overshoot, then settle. |
-| `"genie"` | Suck in toward / out to the surface's anchored edge (macOS "genie" minimize, approximated with an affine scale-and-slide). Auto-orients to the edge the surface sits on. |
+| `"genie"` | Suck in toward / out to the surface's anchored edge (macOS "genie"
+minimize, approximated with an affine scale-and-slide). Auto-orients to
+the edge the surface sits on. |
 | `"zoom"` | Scale in smoothly from the center with no overshoot. |
 | `"rotate"` | Spin in: rotate into place while scaling up and fading in. |
 | `"flip"` | Card flip: open out from a vertical edge (horizontal scale through zero). |
@@ -215,7 +219,7 @@ show = false
 
 Bar module name. Built-in modules or custom modules with a `custom-<id>` pattern.
 
-One of: `"battery"`, `"bluetooth"`, `"brightness"`, `"cava"`, `"clock"`, `"cpu"`, `"dashboard"`, `"hyprland-workspaces"`, `"hyprsunset"`, `"idle-inhibit"`, `"keybind-mode"`, `"keyboard-input"`, `"mail"`, `"media"`, `"mango-workspaces"`, `"microphone"`, `"netstat"`, `"network"`, `"niri-workspaces"`, `"notifications"`, `"power"`, `"power-profiles"`, `"ram"`, `"recorder"`, `"separator"`, `"storage"`, `"systray"`, `"updates"`, `"volume"`, `"weather"`, `"window-title"`, `"world-clock"`.
+One of: `"battery"`, `"bluetooth"`, `"brightness"`, `"cava"`, `"clock"`, `"cpu"`, `"dashboard"`, `"hyprland-workspaces"`, `"hyprsunset"`, `"idle-inhibit"`, `"keybind-mode"`, `"keyboard-input"`, `"mail"`, `"media"`, `"mango-workspaces"`, `"microphone"`, `"netstat"`, `"network"`, `"niri-workspaces"`, `"notifications"`, `"power"`, `"power-profiles"`, `"ram"`, `"recorder"`, `"screenshot"`, `"separator"`, `"storage"`, `"sway-workspaces"`, `"systray"`, `"treeman"`, `"updates"`, `"volume"`, `"weather"`, `"window-title"`, `"world-clock"`.
 
 String matching `^custom-[a-z0-9-]+$`.
 
@@ -393,6 +397,17 @@ Image scaling mode.
 | `"center"` | Display at original size, centered. |
 | `"stretch"` | Stretch to exactly fill, ignoring aspect ratio. |
 
+## FitMode2 {#fit-mode2}
+
+Image scaling mode.
+
+| Value | Meaning |
+|---|---|
+| `"fill"` | Scale to cover entire display, cropping excess. |
+| `"fit"` | Scale to fit within display, letterboxing if needed. |
+| `"center"` | Display at original size, centered. |
+| `"stretch"` | Stretch to exactly fill, ignoring aspect ratio. |
+
 ## FontWeightClass {#font-weight-class}
 
 Font weight class for typography.
@@ -462,6 +477,164 @@ What identifies each workspace's label.
 | `"name-only"` | Show only the name; unnamed workspaces show nothing. |
 | `"index-and-name"` | Show both, joined as `"1: web"`. Unnamed workspaces show the index alone. |
 
+## LauncherCase {#launcher-case}
+
+Case handling (collapses rofi `-case-sensitive`/`-case-smart`).
+
+| Value | Meaning |
+|---|---|
+| `"insensitive"` | Always case-insensitive. |
+| `"smart"` | Sensitive only when the query contains an uppercase char. |
+| `"sensitive"` | Always case-sensitive. |
+
+## LauncherCombiConfig {#launcher-combi-config}
+
+combi mode settings.
+
+| Field | Description |
+|---|---|
+| `modes` | Modes merged into the combined list. |
+| `display-format` | Row template (`{mode}`, `{text}`). |
+
+## LauncherDrunConfig {#launcher-drun-config}
+
+drun (application) mode settings.
+
+| Field | Description |
+|---|---|
+| `categories` | Only show apps within these categories (empty = all). |
+| `exclude-categories` | Hide apps within these categories. |
+| `match-fields` | Desktop-entry fields fed to the matcher. |
+| `display-format` | Row template: `{name}`, `{generic}`, `{exec}`, `{categories}`, |
+| `show-actions` | Expose desktop-file actions as extra rows. |
+| `url-launcher` | Command opening `Type=Link` entries. |
+
+## LauncherDrunField {#launcher-drun-field}
+
+Desktop-entry fields searched by drun (rofi `-drun-match-fields`).
+
+| Value | Meaning |
+|---|---|
+| `"name"` | Localized Name. |
+| `"generic"` | GenericName. |
+| `"exec"` | Exec command line. |
+| `"categories"` | Categories list. |
+| `"comment"` | Comment. |
+| `"keywords"` | Keywords list. |
+
+## LauncherFileSort {#launcher-file-sort}
+
+File sorting in the file browser (rofi filebrowser `sorting-method`).
+
+| Value | Meaning |
+|---|---|
+| `"name"` | By file name. |
+| `"mtime"` | By modification time. |
+| `"atime"` | By access time. |
+| `"ctime"` | By creation time. |
+
+## LauncherFilebrowserConfig {#launcher-filebrowser-config}
+
+file browser mode settings.
+
+| Field | Description |
+|---|---|
+| `directory` | Start directory ("" = home). |
+| `sorting-method` | File ordering. |
+| `directories-first` | List directories before files. |
+| `show-hidden` | Show hidden files. |
+| `command` | Command opening the picked file ("" = xdg-open). |
+
+## LauncherHistoryConfig {#launcher-history-config}
+
+Launch history / frecency settings.
+
+| Field | Description |
+|---|---|
+| `enable` | Record launches and rank frequently used entries first. |
+| `max-size` | Maximum remembered entries per mode. |
+
+## LauncherLocation {#launcher-location}
+
+Launcher surface position (rofi `-location` 0-8 grid).
+
+| Value | Meaning |
+|---|---|
+| `"center"` | Centered (rofi location 0). |
+| `"north-west"` | Top-left (1). |
+| `"north"` | Top edge (2). |
+| `"north-east"` | Top-right (3). |
+| `"east"` | Right edge (4). |
+| `"south-east"` | Bottom-right (5). |
+| `"south"` | Bottom edge (6). |
+| `"south-west"` | Bottom-left (7). |
+| `"west"` | Left edge (8). |
+
+## LauncherMatching {#launcher-matching}
+
+Matching method (rofi `-matching`).
+
+| Value | Meaning |
+|---|---|
+| `"normal"` | Tokenized substring matching. |
+| `"regex"` | Regular expression. |
+| `"glob"` | Glob patterns per token. |
+| `"fuzzy"` | fzf-style fuzzy matching. |
+| `"prefix"` | Tokenized prefix matching. |
+
+## LauncherRunConfig {#launcher-run-config}
+
+run (command) mode settings.
+
+| Field | Description |
+|---|---|
+| `run-command` | Plain accept template (`{cmd}`). |
+| `shell-command` | Run-in-terminal template (`{terminal}`, `{cmd}`). |
+| `list-command` | Extra command whose stdout lines add entries. |
+
+## LauncherSorting {#launcher-sorting}
+
+Result sorting method (rofi `-sorting-method`).
+
+| Value | Meaning |
+|---|---|
+| `"levenshtein"` | Levenshtein distance to the query (rofi "normal"). |
+| `"fzf"` | fzf match-quality score. |
+
+## LauncherSshConfig {#launcher-ssh-config}
+
+ssh mode settings.
+
+| Field | Description |
+|---|---|
+| `client` | SSH client binary. |
+| `command` | Connect template (`{terminal}`, `{ssh-client}`, `{host}`). |
+| `parse-hosts` | Include hosts from `/etc/hosts`. |
+| `parse-known-hosts` | Include hosts from `~/.ssh/known_hosts`. |
+
+## LauncherWindowConfig {#launcher-window-config}
+
+window switcher mode settings.
+
+| Field | Description |
+|---|---|
+| `format` | Row template: `{w}` workspace, `{c}` class, `{t}` title, `{n}` name, |
+| `match-fields` | Window fields fed to the matcher. |
+| `hide-active` | Hide the currently focused window from the list. |
+| `close-on-delete` | Shift-delete closes the selected window. |
+
+## LauncherWindowField {#launcher-window-field}
+
+Window fields searched by window mode (rofi `-window-match-fields`).
+
+| Value | Meaning |
+|---|---|
+| `"title"` | Window title. |
+| `"class"` | Application class/app-id. |
+| `"name"` | Window name. |
+| `"role"` | Window role. |
+| `"desktop"` | Workspace/desktop name. |
+
 ## Layer {#layer}
 
 Layer-shell layer a window is placed on, from furthest back to furthest front.
@@ -483,6 +656,16 @@ Bar position on screen.
 | `"bottom"` | Bottom edge of the screen. |
 | `"left"` | Left edge of the screen. |
 | `"right"` | Right edge of the screen. |
+
+## LockBackground {#lock-background}
+
+How the lock screen background is rendered.
+
+| Value | Meaning |
+|---|---|
+| `"color"` | Solid color fill (`background-color`). |
+| `"image"` | A specific image file (`background-image`). |
+| `"wallpaper"` | Reuse the current desktop wallpaper. |
 
 ## MailAccount {#mail-account}
 
@@ -755,6 +938,16 @@ Shadow style for the bar.
 | `"drop"` | Directional shadow opposite the anchor edge. |
 | `"floating"` | All-around shadow. |
 
+## SharePickerPage {#share-picker-page}
+
+Page shown when the screen-share picker opens.
+
+| Value | Meaning |
+|---|---|
+| `"windows"` | Per-window previews. |
+| `"outputs"` | Per-output (monitor) previews. |
+| `"region"` | Region selection via an external tool (e.g. `slurp`). |
+
 ## SignedNormalizedF64 {#signed-normalized-f64}
 
 Floating-point value clamped to -1.0 to 1.0.
@@ -882,21 +1075,21 @@ Time display format.
 
 A reusable toast preset, triggerable by id with `wayle toast --preset <id>`.
 
-A preset captures a toast's text, icon, optional progress bar, duration, and
-CSS class so it can be fired by name. Any field can still be overridden per
-invocation on the command line (or over the widget socket).
+A preset captures a toast's text and icon so it can be fired by name. The
+label/icon can still be overridden per invocation, and runtime-only fields
+(`--percentage`, `--duration`, `--class`) are supplied at invoke time, not
+stored on the preset. Duration always follows the OSD config.
 
 ### Example
 
 ```toml
-[[toasts.presets]]
+[[osd.presets]]
 id = "saved"
 label = "Saved"
 icon = "ld-check-symbolic"
-duration-ms = 1500
-class = "success"
 
 # Fire it: wayle toast --preset saved
+# With a progress bar: wayle toast --preset saved --percentage 80
 ```
 
 | Field | Description |
@@ -904,46 +1097,6 @@ class = "success"
 | `id` | Unique identifier. Trigger with `wayle toast --preset <id>`. |
 | `label` | Toast text. An explicit label on the command line overrides this. |
 | `icon` | Symbolic icon name shown beside the text. |
-| `percentage` | Progress percentage (0-100). When set, renders a progress bar instead |
-| `duration-ms` | Auto-dismiss duration in milliseconds. Unset falls back to the toast |
-| `class` | Extra CSS class applied to the toast for custom styling. |
-
-## TransitionDuration {#transition-duration}
-
-Transition duration in seconds, clamped to >= 0.
-
-Number `>= 0.0`.
-
-Serialises as `float`.
-
-## TransitionFps {#transition-fps}
-
-Transition frame rate clamped to 1-360 fps.
-
-Number in `[1, 360]`.
-
-Serialises as `uint32`.
-
-## TransitionType {#transition-type}
-
-Transition animation type.
-
-| Value | Meaning |
-|---|---|
-| `"none"` | Instant change with no animation. |
-| `"simple"` | Basic crossfade. |
-| `"fade"` | Fade with bezier-controlled easing. |
-| `"left"` | Wipe from left edge to right. |
-| `"right"` | Wipe from right edge to left. |
-| `"top"` | Wipe from top edge to bottom. |
-| `"bottom"` | Wipe from bottom edge to top. |
-| `"wipe"` | Wipe at configurable angle. |
-| `"wave"` | Wavy wipe effect. |
-| `"grow"` | Growing circle from a position. |
-| `"center"` | Growing circle from center. |
-| `"outer"` | Shrinking circle from edges inward. |
-| `"any"` | Growing circle from random position. |
-| `"random"` | Randomly selects from all transition types. |
 
 ## TrayItemOverride {#tray-item-override}
 
@@ -993,6 +1146,16 @@ actions = [ "lock", "log-out", "reboot", "power-off" ]
 | Field | Description |
 |---|---|
 | `actions` | Session actions to show on dashboard |
+
+## VpnShow {#vpn-show}
+
+Whether the VPN indicator is part of the network module.
+
+| Value | Meaning |
+|---|---|
+| `"auto"` | Show the VPN state only once NetworkManager holds a VPN profile. |
+| `"always"` | Always overlay the VPN state on the network icon. |
+| `"never"` | Never show it; the dropdown still lists VPNs. |
 
 ## WallustBackend {#wallust-backend}
 
@@ -1057,17 +1220,6 @@ Weather data provider selection.
 | `"open-meteo"` | Open-Meteo (no API key required). |
 | `"visual-crossing"` | Visual Crossing (requires API key). |
 | `"weather-api"` | WeatherAPI.com (requires API key). |
-
-## WebcamPosition {#webcam-position}
-
-Corner the webcam picture-in-picture frame is anchored to in the recording.
-
-| Value | Meaning |
-|---|---|
-| `"top-left"` | Top-left corner. |
-| `"top-right"` | Top-right corner. |
-| `"bottom-left"` | Bottom-left corner. |
-| `"bottom-right"` | Bottom-right corner. |
 
 ## WeekStart {#week-start}
 

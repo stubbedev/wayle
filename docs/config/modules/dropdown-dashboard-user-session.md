@@ -32,7 +32,7 @@ right = ["user-session"]
 ## Default configuration
 
 ```toml
-[modules.dashboard.user-session]
+[modules.dropdown-dashboard-user-session]
 actions = [
     "lock",
     "log-out",

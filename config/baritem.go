@@ -117,10 +117,10 @@ func (BarItem) configSchema(g *schemaGen) Schema {
 			return Schema{
 				"description": "A module with an associated CSS class for custom styling.",
 				"type":        "object",
-				"properties": Schema{
+				"properties": withOrder(Schema{
 					"module": withDescription(g.subschema(typeOf[BarModule]()), "The module type."),
 					"class":  Schema{"type": "string", "description": "CSS class added to the module's GTK widget."},
-				},
+				}, "module", "class"),
 				"required": []any{"module", "class"},
 			}
 		})
@@ -136,10 +136,10 @@ func (BarItem) configSchema(g *schemaGen) Schema {
 		return Schema{
 			"description": "Named group of modules. The name becomes a CSS ID selector.",
 			"type":        "object",
-			"properties": Schema{
+			"properties": withOrder(Schema{
 				"name":    Schema{"type": "string", "description": "Unique name for CSS targeting (becomes `#name` selector)."},
 				"modules": Schema{"type": "array", "items": moduleRef, "description": "Modules contained in this group."},
-			},
+			}, "name", "modules"),
 			"required": []any{"name", "modules"},
 		}
 	})

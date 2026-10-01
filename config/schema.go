@@ -307,7 +307,9 @@ func (g *schemaGen) structSchema(t reflect.Type) Schema {
 	}
 	props := Schema{}
 	var required []any
+	order := make([]string, 0, len(fieldsOf(t)))
 	for _, f := range fieldsOf(t) {
+		order = append(order, f.key)
 		var prop Schema
 		switch {
 		case f.nolayer || !container:
@@ -329,7 +331,7 @@ func (g *schemaGen) structSchema(t reflect.Type) Schema {
 		}
 		props[f.key] = prop
 	}
-	s := Schema{"type": "object", "properties": props}
+	s := Schema{"type": "object", "properties": withOrder(props, order...)}
 	if len(required) > 0 {
 		s["required"] = required
 	}
@@ -426,7 +428,9 @@ func writeJSON(b *strings.Builder, v any) {
 	case map[string]any:
 		keys := make([]string, 0, len(t))
 		for k := range t {
-			keys = append(keys, k)
+			if k != propsOrderKey {
+				keys = append(keys, k)
+			}
 		}
 		sort.Strings(keys)
 		b.WriteByte('{')
@@ -496,4 +500,31 @@ func writeJSONString(b *strings.Builder, s string) {
 		}
 	}
 	b.WriteByte('"')
+}
+
+// propsOrderKey records a properties map's declaration order inside the
+// map (the order schemars keeps with preserve_order, which the docs
+// pages follow). The JSON writer never emits it.
+const propsOrderKey = "\x00order"
+
+// withOrder records keys as props' declaration order.
+func withOrder(props Schema, keys ...string) Schema {
+	props[propsOrderKey] = keys
+	return props
+}
+
+// PropertyOrder is a properties map's keys in declaration order; the
+// keys sorted for a map built without one.
+func PropertyOrder(props Schema) []string {
+	if keys, ok := props[propsOrderKey].([]string); ok {
+		return keys
+	}
+	keys := make([]string, 0, len(props))
+	for k := range props {
+		if k != propsOrderKey {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
 }

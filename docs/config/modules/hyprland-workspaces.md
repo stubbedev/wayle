@@ -50,6 +50,11 @@ right = ["hyprland-workspaces"]
 | `active-on-other-monitor-color` | [`ColorValue`](/config/types#color-value) | `"accent"` | Active on other minitor indicator color. |
 | `workspace-map` | [`WorkspaceMap`](/config/types#workspace-map) | `{}` | Per-workspace icon and color overrides. |
 | `app-icon-map` | map of string | `{}` | Application icon mapping with glob pattern support. |
+| `left-click` | [`WorkspaceClickAction`](/config/types#workspace-click-action) | `"focus:this"` | Action on left-clicking a workspace. Default focuses it. |
+| `middle-click` | [`WorkspaceClickAction`](/config/types#workspace-click-action) | `""` | Action on middle-clicking a workspace. |
+| `right-click` | [`WorkspaceClickAction`](/config/types#workspace-click-action) | `""` | Action on right-clicking a workspace. |
+| `scroll-up` | [`WorkspaceClickAction`](/config/types#workspace-click-action) | `"focus:previous"` | Action on scrolling up over the module. Default focuses the previous workspace. |
+| `scroll-down` | [`WorkspaceClickAction`](/config/types#workspace-click-action) | `"focus:next"` | Action on scrolling down over the module. Default focuses the next workspace. |
 
 ::: details More about `min-workspace-count`
 
@@ -270,6 +275,11 @@ container-bg-color = "bg-surface-elevated"
 border-show = false
 border-color = "border-default"
 active-on-other-monitor-color = "accent"
+left-click = "focus:this"
+middle-click = ""
+right-click = ""
+scroll-up = "focus:previous"
+scroll-down = "focus:next"
 
 [modules.hyprland-workspaces.workspace-map]
 
