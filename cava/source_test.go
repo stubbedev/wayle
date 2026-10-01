@@ -53,7 +53,7 @@ func drainUntil(t *testing.T, src *Source, n int) []float64 {
 
 func TestSourceRecordsTheMonitorAsRawInt16Mono(t *testing.T) {
 	srv, svc := audioServer(t)
-	src, err := NewSource(svc, "auto", 1024)
+	src, err := NewSource(svc, "auto", 1, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestSourceRecordsTheMonitorAsRawInt16Mono(t *testing.T) {
 }
 
 func TestSourceDiscardsTheBacklogOnOverflow(t *testing.T) {
-	src := &Source{capacity: 4}
+	src := &Source{capacity: 4, channels: 1}
 	src.accumulate([]byte{1, 0, 2, 0, 3, 0})
 	// Two more would make five: cava drops the stale three.
 	src.accumulate([]byte{4, 0, 5, 0})
@@ -101,16 +101,25 @@ func TestSourceDiscardsTheBacklogOnOverflow(t *testing.T) {
 
 func TestNewSourceRejectsBadArguments(t *testing.T) {
 	_, svc := audioServer(t)
-	if _, err := NewSource(nil, "auto", 16); err == nil {
+	if _, err := NewSource(nil, "auto", 1, 16); err == nil {
 		t.Error("nil capturer: want an error")
 	}
-	if _, err := NewSource(svc, "auto", 0); err == nil {
+	if _, err := NewSource(svc, "auto", 1, 0); err == nil {
 		t.Error("zero capacity: want an error")
 	}
-	if _, err := NewSource(svc, "bad\x00name", 16); err == nil {
+	if _, err := NewSource(svc, "auto", 3, 16); err == nil {
+		t.Error("three channels: want an error")
+	}
+	if s, err := NewSource(svc, "auto", 2, 5); err != nil || s.capacity != 4 {
+		t.Errorf("a stereo capacity of 5 = %v, %v; want 4, whole frames", s, err)
+	}
+	if _, err := NewSource(svc, "auto", 2, 1); err == nil {
+		t.Error("a capacity below one stereo frame: want an error")
+	}
+	if _, err := NewSource(svc, "bad\x00name", 1, 16); err == nil {
 		t.Error("NUL in the source name: want an error")
 	}
-	named, err := NewSource(svc, "speakers", 16)
+	named, err := NewSource(svc, "speakers", 1, 16)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,5 +129,39 @@ func TestNewSourceRejectsBadArguments(t *testing.T) {
 	defer named.Stop()
 	if err := named.Start(); err == nil {
 		t.Error("second Start: want an error")
+	}
+}
+
+func TestSourceRecordsStereoInterleaved(t *testing.T) {
+	srv, svc := audioServer(t)
+	src, err := NewSource(svc, "auto", 2, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := src.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer src.Stop()
+	rec := srv.WaitRecords(t, 1)[0]
+	if rec.SampleSpec.Channels != 2 {
+		t.Errorf("spec = %+v, want stereo", rec.SampleSpec)
+	}
+	time.Sleep(20 * time.Millisecond)
+	// Two frames (left 1, right -1; left 2, right -2) and a dangling
+	// half frame, which is no sample pair and is dropped.
+	rec.Push([]byte{0x01, 0x00, 0xff, 0xff, 0x02, 0x00, 0xfe, 0xff, 0x07, 0x00})
+	got := drainUntil(t, src, 4)
+	if len(got) != 4 || got[0] != 1 || got[1] != -1 || got[2] != 2 || got[3] != -2 {
+		t.Errorf("samples = %v, want 1 -1 2 -2", got)
+	}
+}
+
+func TestStereoOverflowKeepsFramesPaired(t *testing.T) {
+	src := &Source{capacity: 4, channels: 2}
+	// Three frames into room for two: the newest two frames stay, left
+	// before right.
+	src.accumulate([]byte{1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0})
+	if got := src.Drained(); len(got) != 4 || got[0] != 3 || got[1] != 4 || got[3] != 6 {
+		t.Errorf("oversized stereo chunk = %v, want 3 4 5 6", got)
 	}
 }

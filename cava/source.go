@@ -21,7 +21,8 @@ type Capturer interface {
 	Capture(target pulse.CaptureTarget, spec pulse.CaptureSpec, onData func([]byte)) (*pulse.Capture, error)
 }
 
-// Source records the configured PulseAudio source as 16-bit mono PCM
+// Source records the configured PulseAudio source as 16-bit PCM, mono
+// or interleaved stereo,
 // on the shell's native client, the counterpart of libcava's pulse
 // input: samples are handed over as raw int16 values, and a pending
 // buffer that would overflow is discarded whole, as cava's input
@@ -29,6 +30,7 @@ type Capturer interface {
 type Source struct {
 	capturer Capturer
 	target   pulse.CaptureTarget
+	channels int
 	capacity int
 
 	capture *pulse.Capture
@@ -39,13 +41,17 @@ type Source struct {
 
 // NewSource records source ("auto" or empty: the default sink's
 // monitor, following default changes; otherwise a device by name, a
-// sink recording its monitor). capacity is the analyzer's input size.
-func NewSource(capturer Capturer, source string, capacity int) (*Source, error) {
+// sink recording its monitor). channels is 1 or 2, capacity the
+// analyzer's input size in interleaved samples.
+func NewSource(capturer Capturer, source string, channels, capacity int) (*Source, error) {
 	if capturer == nil {
 		return nil, errors.New("cava: no audio server connection")
 	}
-	if capacity <= 0 {
-		return nil, errors.New("cava: non-positive input capacity")
+	if channels < 1 || channels > 2 {
+		return nil, errors.New("cava: the capture is mono or stereo")
+	}
+	if capacity < channels {
+		return nil, errors.New("cava: input capacity below one frame")
 	}
 	target := pulse.CaptureDefaultMonitor()
 	if source != "" && source != "auto" {
@@ -55,7 +61,7 @@ func NewSource(capturer Capturer, source string, capacity int) (*Source, error) 
 		}
 		target = named
 	}
-	return &Source{capturer: capturer, target: target, capacity: capacity}, nil
+	return &Source{capturer: capturer, target: target, channels: channels, capacity: capacity - capacity%channels}, nil
 }
 
 // Start opens the record stream.
@@ -66,7 +72,7 @@ func (s *Source) Start() error {
 	capture, err := s.capturer.Capture(s.target, pulse.CaptureSpec{
 		Name:           "cava",
 		Rate:           sampleRate,
-		Channels:       1,
+		Channels:       uint8(s.channels),
 		FragmentFrames: fragmentFrames,
 	}, s.accumulate)
 	if err != nil {
@@ -76,9 +82,11 @@ func (s *Source) Start() error {
 	return nil
 }
 
-// accumulate converts one chunk of s16le frames.
+// accumulate converts one chunk of s16le frames; a backlog trimmed to
+// capacity drops whole frames, so stereo stays left-right paired.
 func (s *Source) accumulate(data []byte) {
-	n := len(data) / 2
+	frame := 2 * s.channels
+	n := len(data) / frame * s.channels
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.pend)+n > s.capacity {

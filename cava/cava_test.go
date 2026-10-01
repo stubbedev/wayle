@@ -21,7 +21,7 @@ func TestNewPlanValidations(t *testing.T) {
 		{"too many bars", 3000, 44100, 50, 17000, 0.65, "bars"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewPlan(tc.bars, tc.rate, tc.noise, true, tc.low, tc.high)
+			_, err := NewPlan(tc.bars, tc.rate, 1, tc.noise, true, tc.low, tc.high)
 			if tc.wantErr == "" {
 				if err != nil {
 					t.Fatalf("want success, got %v", err)
@@ -34,7 +34,7 @@ func TestNewPlanValidations(t *testing.T) {
 }
 
 func TestPlanBandTable(t *testing.T) {
-	plan, err := NewPlan(20, 44100, 0.65, true, 50, 17000)
+	plan, err := NewPlan(20, 44100, 1, 0.65, true, 50, 17000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func sine(n int, hz, rate float64) []float64 {
 }
 
 func TestExecuteFindsEnergyInTheRightBand(t *testing.T) {
-	plan, err := NewPlan(20, 44100, 0, true, 50, 17000)
+	plan, err := NewPlan(20, 44100, 1, 0, true, 50, 17000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestExecuteFindsEnergyInTheRightBand(t *testing.T) {
 }
 
 func TestExecuteSilenceStaysFlat(t *testing.T) {
-	plan, err := NewPlan(10, 44100, 0.65, true, 50, 17000)
+	plan, err := NewPlan(10, 44100, 1, 0.65, true, 50, 17000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestExecuteSilenceStaysFlat(t *testing.T) {
 }
 
 func TestExecuteAutosensClampsToOne(t *testing.T) {
-	plan, err := NewPlan(10, 44100, 0.65, true, 50, 17000)
+	plan, err := NewPlan(10, 44100, 1, 0.65, true, 50, 17000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestExecuteAutosensClampsToOne(t *testing.T) {
 }
 
 func TestNoiseReductionFallsOffAfterSilence(t *testing.T) {
-	plan, err := NewPlan(10, 44100, 0.65, true, 50, 17000)
+	plan, err := NewPlan(10, 44100, 1, 0.65, true, 50, 17000)
 	if err != nil {
 		t.Fatal(err)
 	}

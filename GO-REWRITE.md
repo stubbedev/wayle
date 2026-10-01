@@ -109,8 +109,13 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] cpu/ram/storage: frequencies, temperatures, and byte columns
 - [ ] systray: nested submenu popups (gelm has no popup-in-popup),
       live accelerators, popovers that grow with their content
-- [ ] cava: the wave style and the stereo split (error at creation),
-      the `stereo`/`waves`/`input` keys
+- [x] cava: the wave style and the stereo split, held frame for frame
+      to the vendored cavacore.c (cava/testdata/oracle.c fixtures);
+      `waves` and `monstercat` change nothing in either shell (only
+      libcava's output stage reads them, which Rust never runs)
+- [ ] cava inputs beyond pipe-wire and pulse (alsa, jack, fifo, oss,
+      sndio, portaudio, shmem): libcava's backends; the Go shell errors
+      at creation
 - [x] network dialogs: secret prompt, wifi password, wifi list, the VPN
       rows and the VPN editor (typed and raw fields, WireGuard key
       generation and wg-quick import through the portal, inline delete

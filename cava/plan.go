@@ -20,6 +20,7 @@ import (
 // goroutine.
 type Plan struct {
 	bars           int
+	channels       int
 	rate           int
 	lowCutoff      int
 	highCutoff     int
@@ -53,13 +54,16 @@ type Plan struct {
 
 const bassCutoffHz = 100.0
 
-// NewPlan initializes the analyzer: bars over [lowCutoff, highCutoff]
-// Hz at the given sample rate, one channel. noiseReduction is cava's
+// NewPlan initializes the analyzer: bars per channel over [lowCutoff,
+// highCutoff] Hz at the given sample rate, for one channel or two
+// (stereo, the samples interleaved). noiseReduction is cava's
 // 0..1 filter strength and autosens enables the feedback that keeps
 // bars in 0..1. The validations mirror cava_init's; each failure is an
 // error naming the bad value.
-func NewPlan(bars, rate int, noiseReduction float64, autosens bool, lowCutoff, highCutoff int) (*Plan, error) {
+func NewPlan(bars, rate, channels int, noiseReduction float64, autosens bool, lowCutoff, highCutoff int) (*Plan, error) {
 	switch {
+	case channels < 1 || channels > 2:
+		return nil, fmt.Errorf("cava: %d channels, only 1 and 2 are supported", channels)
 	case rate < 1 || rate > 384000:
 		return nil, fmt.Errorf("cava: illegal sample rate %d", rate)
 	case bars < 1:
@@ -94,6 +98,7 @@ func NewPlan(bars, rate int, noiseReduction float64, autosens bool, lowCutoff, h
 	bassSize := fftSize * 2
 	p := &Plan{
 		bars:           bars,
+		channels:       channels,
 		rate:           rate,
 		lowCutoff:      lowCutoff,
 		highCutoff:     highCutoff,
@@ -106,15 +111,15 @@ func NewPlan(bars, rate int, noiseReduction float64, autosens bool, lowCutoff, h
 		multiplier:     hann(fftSize),
 		fftBass:        fourier.NewFFT(bassSize),
 		fft:            fourier.NewFFT(fftSize),
-		inputBuffer:    make([]float64, bassSize),
+		inputBuffer:    make([]float64, bassSize*channels),
 		sens:           1.0,
 		sensInit:       true,
 		framerate:      75.0,
 		frameSkip:      1,
-		fall:           make([]float64, bars),
-		mem:            make([]float64, bars),
-		peak:           make([]float64, bars),
-		prev:           make([]float64, bars),
+		fall:           make([]float64, bars*channels),
+		mem:            make([]float64, bars*channels),
+		peak:           make([]float64, bars*channels),
+		prev:           make([]float64, bars*channels),
 		noiseReduction: noiseReduction,
 		autosens:       autosens,
 	}
