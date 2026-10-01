@@ -58,13 +58,14 @@ func (s *pressSlider) SetPressed(on bool) {
 	}
 }
 
-// newDebouncedSlider builds the slider over [min, max]; with a font the
+// newDebouncedSlider builds a 0-100 slider (every wayle slider is a
+// percentage); with a font the
 // value label shows (format, default "{:.0}%"). invoke runs the
 // trailing commit on the loop.
-func newDebouncedSlider(min, max, value float64, font render.Font, px float64, color render.Color, invoke func(func())) *debouncedSlider {
+func newDebouncedSlider(value float64, font render.Font, px float64, color render.Color, invoke func(func())) *debouncedSlider {
 	d := &debouncedSlider{Box: widget.NewBox(widget.Row, 8, 0), invoke: invoke, now: time.Now}
 	d.format = func(v float64) string { return strconv.FormatFloat(v, 'f', 0, 64) + "%" }
-	d.knob = &pressSlider{Slider: widget.NewSlider(min, max, 0, value), owner: d}
+	d.knob = &pressSlider{Slider: widget.NewSlider(0, 100, 0, value), owner: d}
 	d.knob.OnChanged = d.changed
 	d.Append(d.knob, true)
 	if font != nil {

@@ -13,7 +13,6 @@ import (
 
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/pulse"
-	"github.com/stubbedev/wayle/service/sysinfo"
 	"github.com/stubbedev/wayle/service/upower"
 )
 
@@ -237,53 +236,6 @@ func batteryTimeDisplay(dev upower.Device) string {
 			i18n.Str("minutes", fmt.Sprintf("%02d", minutes)))
 	}
 	return i18n.T(id, i18n.Str("duration", duration))
-}
-
-// dashboardDropdown is the dashboard card: the clock hero, the date,
-// and the system stats section (battery, CPU, memory), with the
-// user-session card at the bottom. The weather section joins the
-// weather cache port; the severity colors wait for the status-token
-// pass.
-func dashboardDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 8, 16)
-	now := time.Now()
-	col.Append(widget.NewLabel(font, px*2.2, now.Format("15:04"), ctx.Style.fg), false)
-	col.Append(widget.NewLabel(font, px, now.Format("Monday, January 2"), mutedFg(ctx.Style.palette)), false)
-	if stats := dashboardStats(ctx, font, px); stats != nil {
-		col.Append(stats, false)
-	}
-	col.Append(userSessionSection(ctx), false)
-	return col
-}
-
-// dashboardCPU is the dashboard's CPU reader, kept across opens.
-var dashboardCPU = &sysinfo.CPUReader{Sensor: "auto"}
-
-// dashboardStats builds the system stats lines; nil when nothing reads.
-func dashboardStats(ctx ModuleContext, font render.Font, px float64) widget.Widget {
-	var lines []string
-	if ctx.Battery != nil {
-		if dev, err := ctx.Battery.Read(context.Background()); err == nil {
-			lines = append(lines, i18n.T("dropdown-dashboard-battery")+": "+batteryLabel("{{ percent }}%", dev.Percentage, dev.Present()))
-		}
-	}
-	// Usage is a delta: the reader keeps the counters between opens (the
-	// first open shows the since-boot average, as sysinfo's first refresh).
-	if cpu, err := dashboardCPU.Read(); err == nil {
-		lines = append(lines, i18n.T("dropdown-dashboard-cpu")+": "+pad2(cpu.UsagePercent)+"%")
-	}
-	if mem, err := sysinfo.ReadMemory(); err == nil {
-		lines = append(lines, i18n.T("dropdown-dashboard-ram")+": "+strconv.FormatFloat(mem.UsagePercent(), 'f', 0, 64)+"%")
-	}
-	if len(lines) == 0 {
-		return nil
-	}
-	col := widget.NewBox(widget.Column, 4, 0)
-	for _, line := range lines {
-		col.Append(widget.NewLabel(font, px, line, ctx.Style.fg), false)
-	}
-	return col
 }
 
 // dropdownRow builds one tappable menu row.

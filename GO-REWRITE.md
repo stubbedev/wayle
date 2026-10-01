@@ -85,8 +85,8 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ### Bar
 
-- [ ] dashboard dropdown sections: quick actions, controls, media, the
-      info row
+- [x] dashboard dropdown: quick actions, volume, now playing, battery,
+      network, system rings, user session
 - [ ] notification popup cards: close and action buttons, the default
       action, the urgency bar, popup layer/margins/shadow keys
 - [x] format strings render through internal/jinja (minijinja-checked)

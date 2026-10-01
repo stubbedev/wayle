@@ -210,7 +210,7 @@ func (v *mediaView) buildPlayer(font render.Font, px float64) {
 	}
 
 	// The seek bar is a DebouncedSlider without its value label.
-	v.seek = newDebouncedSlider(0, 100, 0, nil, 0, 0, v.ctx.Invoke)
+	v.seek = newDebouncedSlider(0, nil, 0, 0, v.ctx.Invoke)
 	v.seek.AddClass("media-seek-slider")
 	v.seek.onCommit = v.seekTo
 	v.player.Append(v.seek, false)
@@ -322,6 +322,13 @@ func (v *mediaView) setArt(url string) {
 		return
 	}
 	v.artURL = url
+	_, px := dropdownFont(v.ctx)
+	v.art.SetChild(mediaArt(v.ctx, url, "ld-disc-3-symbolic", int(px*3)))
+}
+
+// mediaArt is a player's cover: the art at a file or http(s) URL scaled
+// to cover, else the placeholder glyph.
+func mediaArt(ctx ModuleContext, url, placeholder string, px int) widget.Widget {
 	var img *widget.Image
 	switch {
 	case strings.HasPrefix(url, "file://"):
@@ -330,14 +337,12 @@ func (v *mediaView) setArt(url string) {
 		img = widget.NewURLImage(url)
 	}
 	if img == nil {
-		_, px := dropdownFont(v.ctx)
-		placeholder := widget.NewThemeIcon("ld-disc-3-symbolic", int(px*3))
-		placeholder.SetTint(mutedFg(v.ctx.Style.palette))
-		v.art.SetChild(placeholder)
-		return
+		glyph := widget.NewThemeIcon(placeholder, px)
+		glyph.SetTint(mutedFg(ctx.Style.palette))
+		return glyph
 	}
 	img.SetScale(widget.ImageCover)
-	v.art.SetChild(img)
+	return img
 }
 
 // setPosition applies a position read.

@@ -11,7 +11,7 @@ func newTestSlider(t *testing.T) (*debouncedSlider, *[]float64, *time.Time) {
 	clock := time.Unix(1000, 0)
 	commits := &[]float64{}
 	// The headless Invoke stands in for the loop, as in a module.
-	d := newDebouncedSlider(0, 100, 50, testFont(t), 12, 0, ModuleContext{}.Invoke)
+	d := newDebouncedSlider(50, testFont(t), 12, 0, ModuleContext{}.Invoke)
 	d.now = func() time.Time { return clock }
 	d.onCommit = func(v float64) { *commits = append(*commits, v) }
 	return d, commits, &clock
