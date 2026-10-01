@@ -116,7 +116,8 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       generation and wg-quick import through the portal, inline delete
       confirm; a profile whose plugin is gone opens raw and keeps its type)
 - [ ] bluetooth: the pairing notifier without a placed module
-- [ ] brightness dropdown: friendly names for DDC monitors
+- [x] brightness dropdown: friendly names for DDC monitors (the Rust
+      friendly_device_name; neither reads EDID model names)
 - [x] weather: the three providers, retrying poll service, condition
       icons, the full dropdown; `[dropdowns.*]` sizes for every dropdown
 
