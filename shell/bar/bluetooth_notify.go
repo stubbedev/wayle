@@ -68,8 +68,8 @@ type btPairingNotifier struct {
 // btNotifiers keeps one notifier per source across the bar's outputs.
 var btNotifiers sync.Map
 
-// startBtPairingNotifier starts the source's notifier once; the bar's
-// bluetooth modules call it.
+// startBtPairingNotifier starts the source's notifier once; the bar
+// runtime calls it with the BlueZ source, placed module or not.
 func startBtPairingNotifier(src bluetooth.Source) {
 	if _, loaded := btNotifiers.LoadOrStore(src, struct{}{}); loaded {
 		return

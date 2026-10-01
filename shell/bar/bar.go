@@ -125,6 +125,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 	if bt, err := bluetooth.NewSystem(); err == nil {
 		defer func() { _ = bt.Close() }()
 		baseCtx.Bluetooth = bt
+		// Every Rust bar warms all its dropdowns, so the bluetooth
+		// dropdown's pairing watcher runs whether or not a bluetooth
+		// module is placed: a request still reaches the user.
+		startBtPairingNotifier(bt)
 	}
 	if nm, err := network.NewSystem(); err == nil {
 		defer func() { _ = nm.Close() }()
