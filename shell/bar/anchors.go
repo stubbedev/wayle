@@ -23,18 +23,3 @@ func AnchorsFor(location config.Location) app.Anchor {
 	}
 	return 0
 }
-
-// LayerFor maps the config layer onto the layer-shell stack layer.
-func LayerFor(layer config.Layer) app.Layer {
-	switch layer {
-	case config.LayerBackground:
-		return app.LayerBackground
-	case config.LayerBottom:
-		return app.LayerBottom
-	case config.LayerTop:
-		return app.LayerTop
-	case config.LayerOverlay:
-		return app.LayerOverlay
-	}
-	return app.LayerTop
-}

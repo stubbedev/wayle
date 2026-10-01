@@ -30,28 +30,6 @@ func TestAnchorsForUnknownIsZero(t *testing.T) {
 	}
 }
 
-func TestLayerForEachConfigLayer(t *testing.T) {
-	for _, tc := range []struct {
-		layer config.Layer
-		want  app.Layer
-	}{
-		{config.LayerBackground, app.LayerBackground},
-		{config.LayerBottom, app.LayerBottom},
-		{config.LayerTop, app.LayerTop},
-		{config.LayerOverlay, app.LayerOverlay},
-	} {
-		if got := LayerFor(tc.layer); got != tc.want {
-			t.Errorf("LayerFor(%q) = %d, want %d", tc.layer, got, tc.want)
-		}
-	}
-}
-
-func TestLayerForUnknownFallsBackToTop(t *testing.T) {
-	if got := LayerFor("middle"); got != app.LayerTop {
-		t.Errorf("LayerFor(middle) = %d, want LayerTop", got)
-	}
-}
-
 func TestExclusiveZoneReservesBarHeightOnlyWhenSet(t *testing.T) {
 	if got := exclusiveZone(true, 32); got != 32 {
 		t.Errorf("exclusiveZone(true, 32) = %d, want 32", got)

@@ -3,7 +3,6 @@ package bar
 import (
 	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 // notification_item/methods.rs, watchers.rs).
 const (
 	notifMaxVisibleItems = 3
-	notifActionsPerRow   = 3
 	notifIconPx          = 32
 	notifTimeTick        = 30 * time.Second
 )
@@ -56,15 +54,7 @@ func groupByApp(notifs []*notifications.Notification) []notifGroupData {
 }
 
 // notifTimeLabel is time_to_string.
-func notifTimeLabel(age notifyui.Age) string {
-	switch {
-	case age.JustNow():
-		return i18n.T("notification-dropdown-time-just-now")
-	case age.Hours > 0:
-		return i18n.T("notification-dropdown-time-hours-ago", i18n.Str("hours", strconv.FormatInt(age.Hours, 10)))
-	}
-	return i18n.T("notification-dropdown-time-minutes-ago", i18n.Str("minutes", strconv.FormatInt(age.Minutes, 10)))
-}
+func notifTimeLabel(age notifyui.Age) string { return notifyui.TimeLabel(age, "notification-dropdown") }
 
 // notificationView is the notification dropdown: the header (bell or
 // muted bell, clear all), the do-not-disturb row, and the app groups or
@@ -413,7 +403,7 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 	icon := notifyui.ResolveIcon(v.ctx.Config.Notification.IconSource, n)
 	glyph := notifyui.NewIcon(icon, notifIconPx, fg)
 	glyph.AddClass("notification-dropdown-item-icon")
-	if icon.File != "" || !isSymbolic(icon.Name) {
+	if notifyui.IsFileIcon(icon) {
 		glyph.AddClass("file-icon")
 	}
 	main.Append(glyph, false)
@@ -444,11 +434,13 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 	}
 	main.Append(content, true)
 
+	// A default action makes the row open on a click anywhere the
+	// dismiss button does not take (setup_default_action's gesture).
 	if _, ok := n.DefaultAction(); ok {
-		it.Append(dropdownButton(v.ctx, main, "notification-dropdown-item-default", it.invokeDefault), false)
-	} else {
-		it.Append(main, false)
+		main.AddClass("notification-dropdown-item-default")
+		main.SetOnClickWithin(it.invokeDefault)
 	}
+	it.Append(main, false)
 	if actions := it.actionRows(); actions != nil {
 		it.Append(actions, false)
 	}
@@ -456,23 +448,16 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 	return it
 }
 
-func isSymbolic(name string) bool { return strings.HasSuffix(name, "-symbolic") }
-
 // actionRows is build_action_buttons; nil without visible actions.
 func (it *notifItem) actionRows() widget.Widget {
-	var visible []notifications.Action
-	for _, a := range it.n.Actions {
-		if a.ID != notifications.DefaultActionID {
-			visible = append(visible, a)
-		}
-	}
+	visible := notifyui.VisibleActions(it.n)
 	if len(visible) == 0 {
 		return nil
 	}
 	v := it.view
 	box := widget.NewBox(widget.Column, 4, 0)
 	box.AddClass("notification-dropdown-item-actions")
-	for chunk := range slices.Chunk(visible, notifActionsPerRow) {
+	for chunk := range slices.Chunk(visible, notifyui.ActionsPerRow) {
 		row := widget.NewBox(widget.Row, 4, 0)
 		row.AddClass("notification-dropdown-item-action-row")
 		for _, a := range chunk {

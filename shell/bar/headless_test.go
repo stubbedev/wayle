@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 )
 
@@ -49,4 +50,30 @@ func TestHeadlessInvokeRunsInlineUntilRetired(t *testing.T) {
 	if ran {
 		t.Fatal("headless Invoke ran work for a retired generation")
 	}
+}
+
+// findByClass walks a tree for the first widget carrying class.
+func findByClass(w widget.Widget, class string) widget.Widget {
+	if c, ok := w.(interface{ HasClass(string) bool }); ok && c.HasClass(class) {
+		return w
+	}
+	if box, ok := w.(interface{ Children() []widget.Widget }); ok {
+		for _, kid := range box.Children() {
+			if hit := findByClass(kid, class); hit != nil {
+				return hit
+			}
+		}
+	}
+	return nil
+}
+
+// routeClick presses and releases at the center of w through a router
+// over root, which must already be arranged.
+func routeClick(root widget.Widget, w widget.Widget) {
+	b := w.(interface{ Bounds() render.Rect }).Bounds()
+	p := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
+	r := &widget.Router{Root: root}
+	r.Move(p)
+	r.Press(widget.BTNLeft, p)
+	r.Release(widget.BTNLeft, p)
 }

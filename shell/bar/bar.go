@@ -32,6 +32,7 @@ import (
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/service/weather"
+	"github.com/stubbedev/wayle/shell/layering"
 	"github.com/stubbedev/wayle/shell/lock"
 	"github.com/stubbedev/wayle/shell/osd"
 	"github.com/stubbedev/wayle/shell/popups"
@@ -279,7 +280,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	var popupHost *popups.Popups
 	if notifSvc != nil {
 		if output := popups.Output(outputs, cfg.Notification.PopupMonitor); output != nil {
-			popupHost = popups.New(application, notifSvc, cfg.Notification, font, palette, output)
+			popupHost = popups.New(application, notifSvc, cfg, font, palette, theme.sheet, output)
 			go popupHost.Run()
 		}
 	}
@@ -316,7 +317,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 					wall.SetConfig(next)
 				}
 				if popupHost != nil {
-					popupHost.SetConfig(next.Notification)
+					popupHost.SetConfig(next)
 				}
 			})
 		})
@@ -524,7 +525,7 @@ func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string
 		height = uint32(thickness)
 	}
 	return &app.LayerConfig{
-		Layer:         LayerFor(ctx.Config.Bar.Layer),
+		Layer:         layering.For(ctx.Config.General, ctx.Config.Bar.Layer),
 		Anchor:        AnchorsFor(ctx.Config.Bar.Location),
 		Width:         width,
 		Height:        height,

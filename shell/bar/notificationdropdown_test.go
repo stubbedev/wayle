@@ -1,10 +1,12 @@
 package bar
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -135,9 +137,9 @@ func TestNotificationDropdownGroups(t *testing.T) {
 
 	// The chat item: a default action row and one visible action.
 	item := chatGroup.items[0]
-	main := item.Children()[0].(*widget.Button)
+	main := item.Children()[0].(*widget.Box)
 	if !main.HasClass("notification-dropdown-item-default") {
-		t.Error("the default action did not make the row a button")
+		t.Error("the default action did not mark the row")
 	}
 	actions := item.Children()[1].(*widget.Box)
 	if rows := actions.Children(); len(rows) != 1 || len(rows[0].(*widget.Box).Children()) != 1 {
@@ -145,7 +147,9 @@ func TestNotificationDropdownGroups(t *testing.T) {
 	}
 	pop := &fakePopover{}
 	v.attachPopover(pop)
-	main.OnClick()
+	item.Measure(widget.Constraints{Max: widget.Size{W: 360, H: 400}})
+	item.Arrange(render.Rect{W: 360, H: 400})
+	routeClick(item, findByClass(main, "notification-dropdown-item-title"))
 	if pop.dismissed != 1 {
 		t.Error("the default action did not close the dropdown")
 	}
@@ -232,5 +236,35 @@ func TestPanelBoxForwardsThePopover(t *testing.T) {
 	unset.attachPopover(late)
 	if late.focused != entry {
 		t.Error("the pending focus was lost")
+	}
+}
+
+// TestNotificationItemDismissInsideADefaultActionRow pins the row's
+// click split: the dismiss button inside a row with a default action
+// dismisses, without invoking the action or closing the dropdown.
+// Regression: the row was a button, a hit leaf, so its dismiss button
+// could never be clicked.
+func TestNotificationItemDismissInsideADefaultActionRow(t *testing.T) {
+	svc := newNotifTestService(t)
+	svc.Notify("chat", 0, "", "Ping", "", []string{"default", "Open"}, 0)
+	var invoked []string
+	svc.SetEmitter(func(member string, args ...any) {
+		if strings.HasSuffix(member, ".ActionInvoked") {
+			invoked = append(invoked, member)
+		}
+	})
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Notifications = svc
+	v := notificationDropdown(ctx).(*notificationView)
+	defer v.dropdownClosed()
+	pop := &fakePopover{}
+	v.attachPopover(pop)
+	item := v.groups[0].items[0]
+	item.Measure(widget.Constraints{Max: widget.Size{W: 360, H: 400}})
+	item.Arrange(render.Rect{W: 360, H: 400})
+	routeClick(item, findByClass(item, "notification-dropdown-item-dismiss"))
+	waitHeadless(t, "the dismissal", func() bool { return len(svc.Notifications()) == 0 })
+	if pop.dismissed != 0 || len(invoked) != 0 {
+		t.Errorf("dismiss closed the dropdown (%d) or invoked %v", pop.dismissed, invoked)
 	}
 }

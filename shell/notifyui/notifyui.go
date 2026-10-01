@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/appicons"
 	"github.com/stubbedev/wayle/service/notifications"
 )
@@ -157,4 +159,40 @@ func NewIcon(icon Icon, size int, tint render.Color) *widget.Icon {
 		w.SetTint(tint)
 	}
 	return w
+}
+
+// IsFileIcon reports whether an icon draws as a picture rather than a
+// recolored glyph (an image, or a theme name that is not -symbolic):
+// the card's icon box takes the file-icon class for it.
+func IsFileIcon(icon Icon) bool {
+	return icon.File != "" || !strings.HasSuffix(icon.Name, "-symbolic")
+}
+
+// VisibleActions are the actions a card draws as buttons: all but the
+// default one, which the card itself invokes on a click.
+func VisibleActions(n *notifications.Notification) []notifications.Action {
+	var out []notifications.Action
+	for _, a := range n.Actions {
+		if a.ID != notifications.DefaultActionID {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// ActionsPerRow is how many action buttons share a row (MAX_PER_ROW).
+const ActionsPerRow = 3
+
+// TimeLabel is time_to_string / format_time_label in a surface's own
+// strings: domain is "notification-popup" or "notification-dropdown",
+// whose -time-just-now, -time-minutes-ago and -time-hours-ago messages
+// it reads.
+func TimeLabel(age Age, domain string) string {
+	switch {
+	case age.JustNow():
+		return i18n.T(domain + "-time-just-now")
+	case age.Hours > 0:
+		return i18n.T(domain+"-time-hours-ago", i18n.Str("hours", strconv.FormatInt(age.Hours, 10)))
+	}
+	return i18n.T(domain+"-time-minutes-ago", i18n.Str("minutes", strconv.FormatInt(age.Minutes, 10)))
 }
