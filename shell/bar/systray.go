@@ -263,9 +263,10 @@ type systrayModule struct {
 	root    *widget.Box
 
 	// The open menu: its item key, popover, and stack.
-	menuKey   string
-	menuPop   *app.Popover
-	menuStack *widget.MenuStack
+	menuKey string
+	menuPop *app.MenuPopover
+	// menuItems are the rows last built, kept headless (no popover).
+	menuItems []widget.MenuItem
 }
 
 func newSystray(ctx ModuleContext) (Module, error) {
@@ -448,16 +449,20 @@ func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
 		return
 	}
 	font, px := dropdownFont(m.ctx)
-	stack := widget.NewMenuStack(font, px, m.menuRows(e.item, menu.Children)...)
+	rows := m.menuRows(e.item, menu.Children)
 	if m.ctx.App == nil || m.host == nil {
-		m.menuKey, m.menuStack = key, stack
+		m.menuKey, m.menuItems = key, rows
 		return
 	}
 	m.closeMenu()
 	feed, stop := m.tray.WatchMenu(key)
-	pop, err := m.ctx.App.OpenPopover(m.host, app.PopoverConfig{
+	// Submenus open as their own popovers beside their rows, as the
+	// Rust tray's PopoverMenu with the NESTED flag does.
+	pop, err := m.ctx.App.OpenMenuPopover(m.host, app.MenuPopoverConfig{
 		Anchor:   e.button,
-		Content:  stack,
+		Face:     font,
+		SizePx:   px,
+		Items:    rows,
 		Serial:   m.ctx.App.LastPressSerial(m.host),
 		OnClosed: stop,
 	})
@@ -466,8 +471,7 @@ func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
 		log.Printf("systray: %s menu: %v", e.item.ID, err)
 		return
 	}
-	stack.OnDismiss = pop.Dismiss
-	m.menuKey, m.menuPop, m.menuStack = key, pop, stack
+	m.menuKey, m.menuPop, m.menuItems = key, pop, rows
 	it := e.item
 	go func() {
 		for range feed {
@@ -478,8 +482,8 @@ func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
 				continue
 			}
 			m.ctx.Invoke(func() {
-				if m.menuStack == stack {
-					stack.SetItems(m.menuRows(it, fresh.Children)...)
+				if m.menuPop == pop {
+					pop.SetItems(m.menuRows(it, fresh.Children)...)
 				}
 			})
 		}
@@ -491,7 +495,7 @@ func (m *systrayModule) closeMenu() {
 	if m.menuPop != nil {
 		m.menuPop.Dismiss()
 	}
-	m.menuKey, m.menuPop, m.menuStack = "", nil, nil
+	m.menuKey, m.menuPop, m.menuItems = "", nil, nil
 }
 
 // menuRows is the gtk4 adapter's build_model: invisible rows drop,

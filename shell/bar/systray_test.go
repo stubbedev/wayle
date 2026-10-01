@@ -229,10 +229,10 @@ func TestSystrayRightClickFallsBackWithoutAMenu(t *testing.T) {
 	if calls := waitTray(t, tray, 1); len(calls) != 1 || calls[0] != "context-menu bare" {
 		t.Errorf("calls = %v, want the context-menu fallback", calls)
 	}
-	// A real menu builds the stack (headless: no popover).
+	// A real menu builds its rows (headless: no popover).
 	m.showMenu(it.Key(), sni.MenuItem{Children: []sni.MenuItem{{ID: 1, Label: "Open", Visible: true, Enabled: true}}}, nil)
-	if m.menuStack == nil || m.menuKey != it.Key() {
-		t.Error("a published menu built no stack")
+	if len(m.menuItems) != 1 || m.menuKey != it.Key() {
+		t.Error("a published menu built no rows")
 	}
 }
 

@@ -107,8 +107,9 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] the custom module: icon-map/icon-names, color-map, class-format,
       tooltips, on-action, restart policies
 - [x] cpu/ram/storage: frequencies, temperatures, and byte columns
-- [ ] systray: nested submenu popups (gelm has no popup-in-popup),
-      live accelerators, popovers that grow with their content
+- [x] systray: nested submenu popups (gelm OpenMenuPopover, the NESTED
+      PopoverMenu)
+- [ ] systray: live accelerators, popovers that grow with their content
 - [x] cava: the wave style and the stereo split, held frame for frame
       to the vendored cavacore.c (cava/testdata/oracle.c fixtures);
       `waves` and `monstercat` change nothing in either shell (only
@@ -168,11 +169,10 @@ capability. Remedy it in gelm, then delete the workaround in wayle.
 | gelm lacks | wayle workaround (where) | remedy in gelm |
 | --- | --- | --- |
 | a public animation API and a revealer (tweens live in `internal/anim`) | no enter/exit animations anywhere in the Go shell | export the tween/easing API and add a Revealer (slide/crossfade) widget |
-| popups inside popups | tray submenus slide in place | nested popup surfaces |
 | an fd/file watcher on the event loop | inotify goroutines + Invoke (internal/fswatch) | optional: `app.WatchFD` |
 | `LayerConfig.Output = nil` (documented as "compositor chooses") panics in the Wayland binding | callers always pass an output | send a null output |
 
-Closed in gelm since the inventory: popovers driven by the application loop (focused Entry input, loop-driven repaint, layer get_popup, rect-anchored placement, clicks and the wheel inside them), GTK-style give-way layout (a column shrinks its expanding Scroll; Scroll.VerticalOnly and SetMaxContentHeight), the CSS engine (var(), calc(),
+Closed in gelm since the inventory: nested popovers (OpenMenuPopover), filled paths (Canvas.FillPath), popovers driven by the application loop (focused Entry input, loop-driven repaint, layer get_popup, rect-anchored placement, clicks and the wheel inside them), GTK-style give-way layout (a column shrinks its expanding Scroll; Scroll.VerticalOnly and SetMaxContentHeight), the CSS engine (var(), calc(),
 color-mix(), :not(), structural selectors, the box model, per-side
 padding and borders, rounded rings, gradients, box shadows), raw-pixel
 icons, ext-session-lock, the capture protocols and dmabuf import,
