@@ -87,9 +87,14 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 - [x] dashboard dropdown: quick actions, volume, now playing, battery,
       network, system rings, user session
-- [ ] the other dropdowns are thin stand-ins for the Rust ones: audio
-      (device lists, app volumes), battery, brightness, calendar, mail,
-      notification, recorder, treeman, and network (the largest)
+- [x] calendar, mail, brightness, battery (with power profiles and
+      the charge limit), audio (default devices, app volumes, device
+      pickers), and notification dropdowns, section by section
+- [ ] the dropdowns still thin stand-ins: recorder, treeman, and
+      network (the largest)
+- [ ] notification history persistence (persistence.rs keeps the
+      history in SQLite across restarts; the Go service holds it in
+      memory) and the sound hints
 - [ ] notification popup cards: close and action buttons, the default
       action, the urgency bar, popup layer/margins/shadow keys
 - [x] format strings render through internal/jinja (minijinja-checked)
