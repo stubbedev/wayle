@@ -90,8 +90,10 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] calendar, mail, brightness, battery (with power profiles and
       the charge limit), audio (default devices, app volumes, device
       pickers), and notification dropdowns, section by section
-- [ ] the dropdowns still thin stand-ins: recorder, treeman, and
-      network (the largest)
+- [x] recorder: the Rust engine (ScreenCast portal, in-process
+      GStreamer through purego) and its dropdown
+- [ ] the dropdowns still thin stand-ins: treeman and network (the
+      largest)
 - [ ] notification history persistence (persistence.rs keeps the
       history in SQLite across restarts; the Go service holds it in
       memory) and the sound hints
@@ -138,7 +140,9 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] a live compositor session smoke test (headless sway: start, three
       config reloads incl. a side bar and a bad value, no fatal exits)
 - [ ] packaging (nix package, systemd unit, portal files) still points
-      at the Rust binaries
+      at the Rust binaries; the Go binary dlopens libgstreamer (and its
+      plugins via GST_PLUGIN_SYSTEM_PATH_1_0) for the recorder, so the
+      package must wrap both, as nix/package.nix does for Rust
 - [ ] drop the go.mod replace once gelm tags a release
 - [x] module lifetime: each bar is a mount generation; `follow` and
       `ModuleContext.Life` end subscriptions and tickers with it
