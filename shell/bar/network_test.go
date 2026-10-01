@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stubbedev/gelm/widget"
@@ -37,14 +38,24 @@ func TestSignalIndexBucketsLikeRust(t *testing.T) {
 	}
 }
 
-// fakeNetworkSource is a scripted network.Source.
+// fakeNetworkSource is a scripted network.Source, safe across a follow
+// goroutine and the test.
 type fakeNetworkSource struct {
+	mu    sync.Mutex
 	snap  network.Snapshot
 	ticks chan struct{}
 }
 
 func (f *fakeNetworkSource) Read(context.Context) (network.Snapshot, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	return f.snap, nil
+}
+
+func (f *fakeNetworkSource) setSnap(s network.Snapshot) {
+	f.mu.Lock()
+	f.snap = s
+	f.mu.Unlock()
 }
 
 func (f *fakeNetworkSource) Subscribe(context.Context) (<-chan struct{}, func(), error) {

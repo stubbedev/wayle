@@ -113,3 +113,12 @@ func TestDropdownGravityOpensAwayFromTheEdge(t *testing.T) {
 		}
 	}
 }
+
+// fakePopover records what dropdown content asked of its popover.
+type fakePopover struct {
+	dismissed int
+	focused   widget.Widget
+}
+
+func (f *fakePopover) Dismiss()                 { f.dismissed++ }
+func (f *fakePopover) SetFocus(w widget.Widget) { f.focused = w }

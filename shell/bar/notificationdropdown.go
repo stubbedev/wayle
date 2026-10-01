@@ -75,7 +75,7 @@ type notificationView struct {
 	font render.Font
 	px   float64
 	now  func() time.Time
-	popdownHook
+	popoverHook
 
 	*widget.Box
 	headerIcon, emptyIcon *widget.Icon

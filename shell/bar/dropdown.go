@@ -32,21 +32,50 @@ type dropdownRegistry struct {
 // releases what it holds when its popover goes away.
 type dropdownCloser interface{ dropdownClosed() }
 
-// dropdownDismisser is content that closes its own popover (GTK's
-// popdown); the registry hands it the dismiss once the popover is up.
-type dropdownDismisser interface{ setDismiss(dismiss func()) }
+// popoverHandle is what open dropdown content may do to its popover:
+// close it (GTK's popdown) and move its keyboard focus (grab_focus).
+// *app.Popover implements it.
+type popoverHandle interface {
+	Dismiss()
+	SetFocus(w widget.Widget)
+}
 
-// popdownHook is the dropdownDismisser half content embeds: popdown closes
-// the popover, a no-op until (and unless) one is open.
-type popdownHook struct{ dismiss func() }
+// dropdownAttacher is content that acts on its own popover; the
+// registry hands it the handle once the popover is up.
+type dropdownAttacher interface{ attachPopover(h popoverHandle) }
 
-func (p *popdownHook) setDismiss(dismiss func()) { p.dismiss = dismiss }
+// popoverHook is the dropdownAttacher half content embeds. popdown is a
+// no-op until a popover is open; a focus asked for while the content is
+// still being built (a form shown before the popover exists) is kept and
+// applied once it attaches.
+type popoverHook struct {
+	h       popoverHandle
+	pending widget.Widget
+}
+
+func (p *popoverHook) attachPopover(h popoverHandle) {
+	p.h = h
+	if p.pending != nil {
+		h.SetFocus(p.pending)
+		p.pending = nil
+	}
+}
 
 // popdown closes the hosting popover.
-func (p *popdownHook) popdown() {
-	if p.dismiss != nil {
-		p.dismiss()
+func (p *popoverHook) popdown() {
+	if p.h != nil {
+		p.h.Dismiss()
 	}
+}
+
+// focus moves keyboard focus to w inside the hosting popover, or once
+// it opens.
+func (p *popoverHook) focus(w widget.Widget) {
+	if p.h == nil {
+		p.pending = w
+		return
+	}
+	p.h.SetFocus(w)
 }
 
 func newDropdownRegistry(application *app.Application, cfg *config.Config, font render.Font, style *barStyle, base ModuleContext) *dropdownRegistry {
@@ -144,8 +173,8 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 		}
 		return err
 	}
-	if d, ok := content.(dropdownDismisser); ok {
-		d.setDismiss(pop.Dismiss)
+	if d, ok := content.(dropdownAttacher); ok {
+		d.attachPopover(pop)
 	}
 	r.mu.Lock()
 	r.openPop[connector] = pop

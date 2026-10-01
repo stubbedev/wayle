@@ -143,10 +143,10 @@ func TestNotificationDropdownGroups(t *testing.T) {
 	if rows := actions.Children(); len(rows) != 1 || len(rows[0].(*widget.Box).Children()) != 1 {
 		t.Errorf("action rows = %v, want one row with Reply", rows)
 	}
-	dismissed := false
-	v.setDismiss(func() { dismissed = true })
+	pop := &fakePopover{}
+	v.attachPopover(pop)
 	main.OnClick()
-	if !dismissed {
+	if pop.dismissed != 1 {
 		t.Error("the default action did not close the dropdown")
 	}
 	waitHeadless(t, "the chat group gone", func() bool { return len(v.groups) == 1 })
@@ -211,17 +211,26 @@ func TestNotificationItemBodyIconAndUrgency(t *testing.T) {
 	}
 }
 
-// The sized panel forwards the popover's dismiss to content that
-// closes itself, and ignores content that does not.
-func TestPanelBoxForwardsDismiss(t *testing.T) {
+// The sized panel forwards the popover handle to content that acts on
+// its popover, and ignores content that does not.
+func TestPanelBoxForwardsThePopover(t *testing.T) {
 	inner := &notificationView{Box: widget.NewBox(widget.Column, 0, 0)}
-	called := false
-	newPanelBox(10, 10, inner).setDismiss(func() { called = true })
+	pop := &fakePopover{}
+	newPanelBox(10, 10, inner).attachPopover(pop)
 	inner.popdown()
-	if !called {
-		t.Error("the panel did not forward the dismiss")
+	entry := widget.NewEntry(testFont(t), 12, 0)
+	inner.focus(entry)
+	if pop.dismissed != 1 || pop.focused != entry {
+		t.Errorf("forwarded: dismissed %d focused %v", pop.dismissed, pop.focused)
 	}
-	newPanelBox(10, 10, widget.NewBox(widget.Column, 0, 0)).setDismiss(func() { t.Error("plain content was handed a dismiss") })
-	var unset popdownHook
+	newPanelBox(10, 10, widget.NewBox(widget.Column, 0, 0)).attachPopover(pop) // ignored
+	var unset popoverHook
 	unset.popdown() // no popover yet: a no-op
+	// A focus asked for before the popover exists lands on attach.
+	unset.focus(entry)
+	late := &fakePopover{}
+	unset.attachPopover(late)
+	if late.focused != entry {
+		t.Error("the pending focus was lost")
+	}
 }
