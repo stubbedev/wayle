@@ -122,3 +122,13 @@ type fakePopover struct {
 
 func (f *fakePopover) Dismiss()                 { f.dismissed++ }
 func (f *fakePopover) SetFocus(w widget.Widget) { f.focused = w }
+
+func TestDropdownScrollIsVerticalOnly(t *testing.T) {
+	s := dropdownScroll(widget.NewBox(widget.Column, 0, 0), "picker-body")
+	if !s.VerticalOnly || !s.HasClass("picker-body") {
+		t.Error("a dropdown scroll must scroll vertically only, with its class")
+	}
+	if bare := dropdownScroll(widget.NewBox(widget.Column, 0, 0), ""); len(bare.Classes()) != 0 {
+		t.Errorf("an empty class was added: %v", bare.Classes())
+	}
+}

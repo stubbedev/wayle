@@ -104,7 +104,7 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 		i18n.T("dropdown-brightness-empty-title"), i18n.T("dropdown-brightness-empty-description"))
 	empty.AddClass("brightness-empty")
 	v.body = widget.NewStack()
-	v.body.Add("devices", widget.NewScroll(v.list))
+	v.body.Add("devices", dropdownScroll(v.list, ""))
 	v.body.Add("empty", empty)
 	v.Append(v.body, true)
 	v.apply(v.read(context.Background()))

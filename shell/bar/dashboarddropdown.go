@@ -59,7 +59,7 @@ func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(v.infoRow(), false)
 	content.Append(v.systemStats(), false)
 	content.Append(userSessionSection(ctx), false)
-	v.Append(widget.NewScroll(content), true)
+	v.Append(dropdownScroll(content, ""), true)
 	for _, refresh := range v.refreshers {
 		refresh()
 	}

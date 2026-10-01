@@ -117,8 +117,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	v.emptyIcon = emptyIcon
 	v.list = widget.NewBox(widget.Column, 8, 0)
 	v.list.AddClass("notification-dropdown-groups")
-	scroll := widget.NewScroll(v.list)
-	scroll.AddClass("notification-dropdown-scroll")
+	scroll := dropdownScroll(v.list, "notification-dropdown-scroll")
 	v.body = widget.NewStack()
 	v.body.AddClass("notification-dropdown-content")
 	v.body.Add("empty", empty)

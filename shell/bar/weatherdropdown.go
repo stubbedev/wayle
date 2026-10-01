@@ -176,7 +176,7 @@ func weatherDropdown(ctx ModuleContext) widget.Widget {
 	v.pages.Add("loading", v.loadingPage())
 	v.pages.Add("error", v.errorPage())
 	v.loaded = widget.NewBox(widget.Column, 14, 0)
-	v.pages.Add("loaded", widget.NewScroll(v.loaded))
+	v.pages.Add("loaded", dropdownScroll(v.loaded, ""))
 	v.Append(v.pages, true)
 	v.refresh()
 	v.follow()

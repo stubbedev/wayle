@@ -38,7 +38,7 @@ func mailDropdown(ctx ModuleContext) widget.Widget {
 	v.Append(dropdownHeader(ctx, font, px, "ld-mail-symbolic", i18n.T("dropdown-mail-title")), false)
 	v.list = widget.NewBox(widget.Column, 4, 0)
 	v.list.AddClass("mail-dropdown-list")
-	v.Append(widget.NewScroll(v.list), true)
+	v.Append(dropdownScroll(v.list, ""), true)
 	v.rebuild()
 	v.follow()
 	return v

@@ -102,8 +102,7 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.pages.Add("list", v.list)
 	v.pages.Add("detail", v.details)
 	v.pages.Add("confirm", v.confirm)
-	scroll := widget.NewScroll(v.pages)
-	scroll.AddClass("treeman-scroll")
+	scroll := dropdownScroll(v.pages, "treeman-scroll")
 	v.Append(scroll, true)
 
 	v.apply(v.read(context.Background()))

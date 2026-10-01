@@ -37,6 +37,7 @@ type netState struct {
 	known   map[string]bool
 	request secrets.Request
 	asking  bool
+	vpns    []network.VPN
 }
 
 // netProgress is ConnectionProgress: the network being joined, its
@@ -62,7 +63,9 @@ type networkView struct {
 	syncing     bool
 	active      *netActive
 	secret      *netSecretForm
-	vpnSlot     *widget.Box
+	vpns        *netVPNs
+	vpnForm     *netVPNForm
+	body        *widget.Stack
 	availLabel  *widget.Label
 	password    *netPasswordForm
 	listCard    *widget.Box
@@ -108,6 +111,12 @@ type secretAgent interface {
 type netDeps struct {
 	wifiCtl wifiControl
 	agent   secretAgent
+	vpn     vpnControl
+	// vpnKinds lists the kinds the VPN editor offers
+	// (network.AvailableKinds).
+	vpnKinds func() []network.VPNKind
+	// openFile is the file chooser a wg-quick import goes through.
+	openFile fileOpener
 	// changes are the extra feeds a re-read follows (saved profiles,
 	// the agent, the VPNs).
 	changes []func(context.Context) <-chan struct{}
@@ -115,7 +124,7 @@ type netDeps struct {
 
 // networkDeps wires the dropdown to the live network service.
 func networkDeps(n *network.Service) netDeps {
-	var d netDeps
+	d := netDeps{vpnKinds: network.AvailableKinds, openFile: openFileOnSessionBus}
 	if n == nil {
 		return d
 	}
@@ -130,6 +139,7 @@ func networkDeps(n *network.Service) netDeps {
 		d.changes = append(d.changes, n.Settings.Changes)
 	}
 	if n.VPN != nil {
+		d.vpn = n.VPN
 		d.changes = append(d.changes, n.VPN.Changes)
 	}
 	return d
@@ -163,8 +173,8 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.Append(v.secret, false)
 
 	browse := widget.NewBox(widget.Column, 10, 0)
-	v.vpnSlot = widget.NewBox(widget.Column, 0, 0)
-	browse.Append(v.vpnSlot, false)
+	v.vpns = newNetVPNs(v)
+	browse.Append(v.vpns, false)
 	v.availLabel = v.sectionLabel(i18n.T("dropdown-network-available"))
 	browse.Append(v.availLabel, false)
 	v.password = newNetPasswordForm(v)
@@ -172,7 +182,7 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.list = widget.NewBox(widget.Column, 2, 0)
 	v.listCard = widget.NewBox(widget.Column, 0, 6)
 	v.listCard.AddClass("card", "network-list")
-	v.listCard.Append(widget.NewScroll(v.list), true)
+	v.listCard.Append(dropdownScroll(v.list, ""), true)
 	browse.Append(v.listCard, true)
 	v.noNetworks = emptyState(ctx, font, px, "cm-wireless-disabled-symbolic",
 		i18n.T("dropdown-network-no-networks-title"), i18n.T("dropdown-network-no-networks-description"))
@@ -180,7 +190,14 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 		i18n.T("dropdown-network-no-adapter-title"), i18n.T("dropdown-network-no-adapter-description"))
 	browse.Append(v.noNetworks, false)
 	browse.Append(v.noAdapter, false)
-	v.Append(browse, true)
+	// Two pages rather than a form hiding the lists in place: the editor
+	// is somewhere you go, and coming back is one button. The stack is
+	// as tall as its taller page, so switching never resizes the popover.
+	v.vpnForm = newNetVPNForm(v)
+	v.body = widget.NewStack()
+	v.body.Add(netPageBrowse, browse)
+	v.body.Add(netPageEdit, v.vpnForm)
+	v.Append(v.body, true)
 
 	v.apply(v.read(context.Background()))
 	v.scanIfEmpty()
@@ -212,6 +229,9 @@ func (v *networkView) read(ctx context.Context) netState {
 	if v.agent != nil {
 		s.request, s.asking = v.agent.Request()
 	}
+	if v.vpn != nil {
+		s.vpns = v.vpn.Entries()
+	}
 	return s
 }
 
@@ -240,10 +260,7 @@ func (v *networkView) apply(s netState) {
 	}
 	v.active.apply(s.snap, v.progress)
 	v.secret.apply(s.request, s.asking)
-	v.vpnSlot.Clear()
-	if vpns := vpnSection(v.ctx, v.font, v.px); vpns != nil {
-		v.vpnSlot.Append(vpns, false)
-	}
+	v.vpns.apply(s.vpns)
 	if !s.snap.WifiEnabled && wifiAvail {
 		v.cache = nil
 	}
@@ -624,6 +641,25 @@ func (v *networkView) ghostText(text, class string, onClick func()) *widget.Butt
 	return dropdownButton(v.ctx, widget.NewLabel(v.font, v.px*0.85, text, v.ctx.Style.fg), class, onClick)
 }
 
+// primaryText is a PrimaryButton: the accent-filled action of a form.
+func (v *networkView) primaryText(text, class string, onClick func()) *widget.Button {
+	b := v.ghostText(text, class, onClick)
+	b.BgExplicit = true
+	b.Bg = tokenColor(v.ctx.Style.palette, config.TokenAccent)
+	b.BgHover = tokenColor(v.ctx.Style.palette, config.TokenAccentHover)
+	return b
+}
+
+// errorLabel is a form's error line: wrapped, in the error color,
+// hidden until there is something to say.
+func (v *networkView) errorLabel() *widget.Label {
+	l := widget.NewLabel(v.font, v.px*0.8, "", tokenColor(v.ctx.Style.palette, config.TokenStatusError))
+	l.AddClass("network-password-error")
+	l.SetWrap(true)
+	l.SetVisible(false)
+	return l
+}
+
 // apply is the cards' #[watch]es over the snapshot and the progress.
 func (a *netActive) apply(s network.Snapshot, p netProgress) {
 	pal := a.v.ctx.Style.palette
@@ -785,18 +821,13 @@ func newNetPasswordForm(v *networkView) *netPasswordForm {
 	f.secret.entry.SetPlaceholder(i18n.T("dropdown-network-password-placeholder"))
 	f.secret.entry.OnActivate = func(string) { f.connect() }
 	f.Append(f.secret, false)
-	f.errLabel = widget.NewLabel(v.font, v.px*0.8, "", tokenColor(v.ctx.Style.palette, config.TokenStatusError))
-	f.errLabel.AddClass("network-password-error")
+	f.errLabel = v.errorLabel()
 	f.Append(f.errLabel, false)
 	actions := widget.NewBox(widget.Row, 6, 0)
 	actions.AddClass("network-password-actions")
 	actions.Append(widget.NewSpacer(0, 0), true)
 	actions.Append(v.ghostText(i18n.T("dropdown-network-cancel"), "network-password-cancel", f.cancel), false)
-	connect := v.ghostText(i18n.T("dropdown-network-connect"), "network-password-connect", f.connect)
-	connect.BgExplicit = true
-	connect.Bg = tokenColor(v.ctx.Style.palette, config.TokenAccent)
-	connect.BgHover = tokenColor(v.ctx.Style.palette, config.TokenAccentHover)
-	actions.Append(connect, false)
+	actions.Append(v.primaryText(i18n.T("dropdown-network-connect"), "network-password-connect", f.connect), false)
 	f.Append(actions, false)
 	f.SetVisible(false)
 	return f
@@ -873,11 +904,7 @@ func newNetSecretForm(v *networkView) *netSecretForm {
 	actions.AddClass("network-password-actions")
 	actions.Append(widget.NewSpacer(0, 0), true)
 	actions.Append(v.ghostText(i18n.T("dropdown-network-cancel"), "network-password-cancel", f.cancel), false)
-	submit := v.ghostText(i18n.T("dropdown-network-secret-submit"), "network-password-connect", f.submit)
-	submit.BgExplicit = true
-	submit.Bg = tokenColor(v.ctx.Style.palette, config.TokenAccent)
-	submit.BgHover = tokenColor(v.ctx.Style.palette, config.TokenAccentHover)
-	actions.Append(submit, false)
+	actions.Append(v.primaryText(i18n.T("dropdown-network-secret-submit"), "network-password-connect", f.submit), false)
 	f.Append(actions, false)
 	f.SetVisible(false)
 	return f

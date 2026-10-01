@@ -532,8 +532,7 @@ func newAppVolumes(v *audioView) *appVolumes {
 	a := &appVolumes{view: v, Stack: widget.NewStack()}
 	a.list = widget.NewBox(widget.Column, 8, 0)
 	a.list.AddClass("audio-app-list")
-	scroll := widget.NewScroll(a.list)
-	scroll.AddClass("app-volumes-scroll")
+	scroll := dropdownScroll(a.list, "app-volumes-scroll")
 	a.Add("apps", scroll)
 	a.Add("empty", emptyState(v.ctx, v.font, v.px, "ld-volume-x-symbolic", i18n.T("dropdown-audio-no-apps"), ""))
 	return a
@@ -676,8 +675,7 @@ func newDevicePicker(v *audioView, kind audioKind, title string) *devicePicker {
 	p.Append(header, false)
 	p.list = widget.NewBox(widget.Column, 4, 0)
 	p.list.AddClass("audio-device-list")
-	scroll := widget.NewScroll(p.list)
-	scroll.AddClass("picker-body")
+	scroll := dropdownScroll(p.list, "picker-body")
 	p.Append(scroll, true)
 	return p
 }

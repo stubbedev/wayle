@@ -107,8 +107,10 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       live accelerators, popovers that grow with their content
 - [ ] cava: the wave style and the stereo split (error at creation),
       the `stereo`/`waves`/`input` keys
-- [ ] network dialogs: secret prompt, wifi password, wifi list, VPN
-      add/edit
+- [x] network dialogs: secret prompt, wifi password, wifi list, the VPN
+      rows and the VPN editor (typed and raw fields, WireGuard key
+      generation and wg-quick import through the portal, inline delete
+      confirm; a profile whose plugin is gone opens raw and keeps its type)
 - [ ] bluetooth: the pairing notifier without a placed module
 - [ ] brightness dropdown: friendly names for DDC monitors
 - [x] weather: the three providers, retrying poll service, condition
@@ -159,7 +161,7 @@ capability. Remedy it in gelm, then delete the workaround in wayle.
 | an fd/file watcher on the event loop | inotify goroutines + Invoke (internal/fswatch) | optional: `app.WatchFD` |
 | `LayerConfig.Output = nil` (documented as "compositor chooses") panics in the Wayland binding | callers always pass an output | send a null output |
 
-Closed in gelm since the inventory: popovers driven by the application loop (focused Entry input, loop-driven repaint, layer get_popup, rect-anchored placement), the CSS engine (var(), calc(),
+Closed in gelm since the inventory: popovers driven by the application loop (focused Entry input, loop-driven repaint, layer get_popup, rect-anchored placement, clicks and the wheel inside them), GTK-style give-way layout (a column shrinks its expanding Scroll; Scroll.VerticalOnly and SetMaxContentHeight), the CSS engine (var(), calc(),
 color-mix(), :not(), structural selectors, the box model, per-side
 padding and borders, rounded rings, gradients, box shadows), raw-pixel
 icons, ext-session-lock, the capture protocols and dmabuf import,

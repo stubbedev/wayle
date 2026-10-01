@@ -108,3 +108,16 @@ func dropdownButton(ctx ModuleContext, child widget.Widget, class string, onClic
 	b.OnClick = onClick
 	return b
 }
+
+// dropdownScroll is a dropdown's ScrolledWindow: vertical only, as
+// every Rust dropdown sets hscrollbar-policy never, so its content is
+// the dropdown's width and wrapping or ellipsized text fits it. class
+// is the scroll's style class, "" for none.
+func dropdownScroll(child widget.Widget, class string) *widget.Scroll {
+	s := widget.NewScroll(child)
+	s.VerticalOnly = true
+	if class != "" {
+		s.AddClass(class)
+	}
+	return s
+}

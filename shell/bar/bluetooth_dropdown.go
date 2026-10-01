@@ -171,8 +171,7 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 		"dropdown-bluetooth-no-adapter-title", "dropdown-bluetooth-no-adapter-description")
 	col.Append(d.emptyNoAdapter, false)
 
-	scroll := widget.NewScroll(col)
-	scroll.AddClass("bluetooth-scroll")
+	scroll := dropdownScroll(col, "bluetooth-scroll")
 	frame := widget.NewBox(widget.Column, 0, 0)
 	frame.AddClass("dropdown", "bluetooth-dropdown")
 	frame.Append(header, false)
