@@ -42,6 +42,7 @@ func (f *fakeNM) exportWifi() {
 			"DeviceType":       {Value: uint32(deviceWifi)},
 			"State":            {Value: uint32(DeviceDisconnected), Emit: prop.EmitTrue},
 			"ActiveConnection": {Value: rootPath, Emit: prop.EmitTrue},
+			"Ip4Config":        {Value: rootPath, Emit: prop.EmitTrue},
 		},
 		wirelessIface: {
 			"LastScan":          {Value: int64(0), Emit: prop.EmitTrue},
@@ -96,4 +97,43 @@ func (x fakeWireless) RequestScan(map[string]dbus.Variant) *dbus.Error {
 	x.w.mu.Unlock()
 	x.w.props.SetMust(wirelessIface, "LastScan", int64(n))
 	return nil
+}
+
+const fakeWiredPath = dbus.ObjectPath("/org/freedesktop/NetworkManager/Devices/2")
+
+// exportIP4 puts an IP4Config object carrying addr on the bus.
+func (f *fakeNM) exportIP4(path dbus.ObjectPath, addr string) {
+	_, err := prop.Export(f.conn, path, prop.Map{ip4ConfigIface: {
+		"AddressData": {Value: []map[string]dbus.Variant{
+			{"address": dbus.MakeVariant(addr), "prefix": dbus.MakeVariant(uint32(24))},
+		}},
+	}})
+	must(f.t, err)
+}
+
+// exportWired adds an activated ethernet device at speed Mb/s with addr.
+func (f *fakeNM) exportWired(speed uint32, addr string) {
+	cfg := dbus.ObjectPath("/org/freedesktop/NetworkManager/IP4Config/2")
+	f.exportIP4(cfg, addr)
+	_, err := prop.Export(f.conn, fakeWiredPath, prop.Map{
+		deviceIface: {
+			"DeviceType": {Value: uint32(deviceEthernet)},
+			"State":      {Value: uint32(deviceStateActivated)},
+			"Ip4Config":  {Value: cfg},
+		},
+		wiredIface: {"Speed": {Value: speed}},
+	})
+	must(f.t, err)
+	f.mu.Lock()
+	f.wired = true
+	f.mu.Unlock()
+}
+
+// associate makes ap the wifi's active access point with addr, activated.
+func (w *fakeWifi) associate(ap dbus.ObjectPath, addr string) {
+	cfg := dbus.ObjectPath("/org/freedesktop/NetworkManager/IP4Config/1")
+	w.f.exportIP4(cfg, addr)
+	w.props.SetMust(wirelessIface, "ActiveAccessPoint", ap)
+	w.props.SetMust(deviceIface, "Ip4Config", cfg)
+	w.deviceState(DeviceState(deviceStateActivated), 0)
 }

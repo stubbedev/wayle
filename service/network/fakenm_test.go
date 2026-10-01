@@ -38,6 +38,7 @@ type fakeNM struct {
 
 	manager *prop.Properties
 	wifi    *fakeWifi
+	wired   bool
 }
 
 type registration struct {
@@ -274,10 +275,16 @@ func (m fakeManager) DeactivateConnection(active dbus.ObjectPath) *dbus.Error {
 }
 
 func (m fakeManager) GetDevices() ([]dbus.ObjectPath, *dbus.Error) {
-	if m.f.wifi == nil {
-		return nil, nil
+	var devices []dbus.ObjectPath
+	if m.f.wifi != nil {
+		devices = append(devices, fakeWifiPath)
 	}
-	return []dbus.ObjectPath{fakeWifiPath}, nil
+	m.f.mu.Lock()
+	defer m.f.mu.Unlock()
+	if m.f.wired {
+		devices = append(devices, fakeWiredPath)
+	}
+	return devices, nil
 }
 
 func (m fakeManager) AddAndActivateConnection(dict ConnectionDict, device, specific dbus.ObjectPath) (dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {

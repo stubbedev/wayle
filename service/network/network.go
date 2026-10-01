@@ -21,6 +21,9 @@ const (
 	properties  = "org.freedesktop.DBus.Properties"
 	deviceIface = "org.freedesktop.NetworkManager.Device"
 	apIface     = "org.freedesktop.NetworkManager.AccessPoint"
+	// wiredIface and ip4ConfigIface carry the link speed and addresses.
+	wiredIface     = "org.freedesktop.NetworkManager.Device.Wired"
+	ip4ConfigIface = "org.freedesktop.NetworkManager.IP4Config"
 )
 
 // Device types (NM_DEVICE_TYPE_*).
@@ -50,9 +53,17 @@ type Snapshot struct {
 	WifiStrength   uint8
 	WifiConnected  bool
 	WifiConnecting bool
+	// WifiFrequency is the active access point's frequency in MHz and
+	// WifiIP4 the device's first IPv4 address, when connected.
+	WifiFrequency uint32
+	WifiIP4       string
 	// WiredConnected reports an activated ethernet device.
 	WiredConnected  bool
 	WiredConnecting bool
+	// WiredSpeed is the link speed in Mb/s and WiredIP4 the first IPv4
+	// address, when connected.
+	WiredSpeed uint32
+	WiredIP4   string
 }
 
 // Source is the module's seam.
@@ -116,6 +127,8 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 			switch {
 			case state == deviceStateActivated:
 				snap.WiredConnected = true
+				_ = dev.CallWithContext(ctx, properties+".Get", 0, wiredIface, "Speed").Store(&snap.WiredSpeed)
+				snap.WiredIP4 = s.ip4(ctx, dev)
 			case state >= 10 && state < 100: // preparing..configuring
 				snap.WiredConnecting = true
 			}
@@ -127,7 +140,9 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 				continue
 			}
 			var ap dbus.ObjectPath
-			if err := dev.CallWithContext(ctx, properties+".Get", 0, deviceIface, "ActiveAccessPoint").Store(&ap); err != nil || ap == "/" {
+			// ActiveAccessPoint is a Device.Wireless property, not a
+			// Device one.
+			if err := dev.CallWithContext(ctx, properties+".Get", 0, wirelessIface, "ActiveAccessPoint").Store(&ap); err != nil || ap == "/" {
 				continue
 			}
 			apObj := s.conn.Object(nmName, ap)
@@ -137,6 +152,8 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 				continue
 			}
 			_ = apObj.CallWithContext(ctx, properties+".Get", 0, apIface, "Strength").Store(&strength)
+			_ = apObj.CallWithContext(ctx, properties+".Get", 0, apIface, "Frequency").Store(&snap.WifiFrequency)
+			snap.WifiIP4 = s.ip4(ctx, dev)
 			snap.WifiConnected = true
 			snap.WifiSSID = strings.TrimRight(string(ssidBytes), "\x00")
 			snap.WifiStrength = strength
@@ -213,3 +230,22 @@ func SignalIndex(strength uint8, numIcons int) int {
 }
 
 var _ = time.Second
+
+// ip4 is a device's first IPv4 address (Ip4Config's AddressData), ""
+// when it has none.
+func (s *System) ip4(ctx context.Context, dev dbus.BusObject) string {
+	var cfg dbus.ObjectPath
+	if err := dev.CallWithContext(ctx, properties+".Get", 0, deviceIface, "Ip4Config").Store(&cfg); err != nil || cfg == "/" || cfg == "" {
+		return ""
+	}
+	var data []map[string]dbus.Variant
+	if err := s.conn.Object(nmName, cfg).CallWithContext(ctx, properties+".Get", 0, ip4ConfigIface, "AddressData").Store(&data); err != nil {
+		return ""
+	}
+	for _, entry := range data {
+		if addr, ok := entry["address"].Value().(string); ok && addr != "" {
+			return addr
+		}
+	}
+	return ""
+}
