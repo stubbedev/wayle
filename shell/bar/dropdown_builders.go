@@ -127,39 +127,6 @@ func audioDeviceRow(ctx ModuleContext, font render.Font, px float64, title strin
 	return col
 }
 
-// brightnessDropdown is the backlight card: a slider per backlight
-// device, writing through the service's clamped Set.
-func brightnessDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 10, 14)
-	if ctx.Brightness == nil {
-		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-brightness-empty-title"), mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	bctx := context.Background()
-	devices, err := ctx.Brightness.Devices(bctx)
-	if err != nil || len(devices) == 0 {
-		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-brightness-empty-title"), mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	for _, dev := range devices {
-		percent := dev.Percentage()
-		row := widget.NewBox(widget.Row, 8, 0)
-		row.Append(widget.NewThemeIcon(brightnessOsdIcon(percent), int(px)), false)
-		row.Append(widget.NewLabel(font, px, dev.Name, ctx.Style.fg), true)
-		col.Append(row, false)
-		slider := widget.NewSlider(0, 100, 1, percent)
-		name := dev.Name
-		slider.OnChanged = func(v float64) {
-			if err := ctx.Brightness.Set(bctx, name, v); err != nil {
-				log.Printf("brightness %s: %v", name, err)
-			}
-		}
-		col.Append(slider, false)
-	}
-	return col
-}
-
 // batteryDropdown is the battery card: percentage, state, and the
 // time-to-empty when the daemon reports one.
 func batteryDropdown(ctx ModuleContext) widget.Widget {

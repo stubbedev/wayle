@@ -145,14 +145,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 // mediaEmptyState is the EmptyState template with the media strings.
 func mediaEmptyState(ctx ModuleContext) *widget.Box {
 	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 6, 14)
-	col.AddClass("empty-state")
-	icon := widget.NewThemeIcon("ld-play-symbolic", int(px*2))
-	icon.SetTint(mutedFg(ctx.Style.palette))
-	col.Append(icon, false)
-	col.Append(widget.NewLabel(font, px*1.1, mediaNoPlayerTitle, ctx.Style.fg), false)
-	col.Append(widget.NewLabel(font, px*0.9, mediaNoPlayerText, mutedFg(ctx.Style.palette)), false)
-	return col
+	return emptyState(ctx, font, px, "ld-play-symbolic", mediaNoPlayerTitle, mediaNoPlayerText)
 }
 
 // controlButton builds one transport button around a tinted glyph.

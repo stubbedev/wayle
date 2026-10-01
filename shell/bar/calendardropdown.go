@@ -122,11 +122,7 @@ func calendarDropdown(ctx ModuleContext) widget.Widget {
 	v := &calendarView{ctx: ctx, font: font, px: px, stop: make(chan struct{}), now: time.Now}
 	v.Box = widget.NewBox(widget.Column, 12, 14)
 	v.AddClass("dropdown", "calendar-dropdown")
-	header := widget.NewBox(widget.Row, 8, 0)
-	header.AddClass("dropdown-header")
-	header.Append(v.icon("tb-calendar-time-symbolic", 1.2, ctx.Style.fg), false)
-	header.Append(v.label(i18n.T("dropdown-calendar-title"), 1.1, ctx.Style.fg), true)
-	v.Append(header, false)
+	v.Append(dropdownHeader(ctx, font, px, "tb-calendar-time-symbolic", i18n.T("dropdown-calendar-title")), false)
 	v.Append(v.hero(), false)
 	v.Append(v.calendar(), false)
 	v.tick()

@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stubbedev/gelm/widget"
@@ -51,21 +53,49 @@ func TestAveragePercentage(t *testing.T) {
 	}
 }
 
-// fakeBrightnessSource is a scripted brightness.Source.
+// fakeBrightnessSource is a scripted brightness.Source, safe across
+// the follow goroutine and the test.
 type fakeBrightnessSource struct {
+	mu      sync.Mutex
 	devices []brightness.Device
 	ticks   chan struct{}
+	sets    []brightnessSet
+}
+
+// brightnessSet is one recorded Set call.
+type brightnessSet struct {
+	name    string
+	percent float64
 }
 
 func (f *fakeBrightnessSource) Devices(context.Context) ([]brightness.Device, error) {
-	return f.devices, nil
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.devices), nil
+}
+
+func (f *fakeBrightnessSource) setDevices(devices []brightness.Device) {
+	f.mu.Lock()
+	f.devices = devices
+	f.mu.Unlock()
 }
 
 func (f *fakeBrightnessSource) Subscribe(context.Context) (<-chan struct{}, func(), error) {
 	return f.ticks, func() {}, nil
 }
 
-func (f *fakeBrightnessSource) Set(context.Context, string, float64) error { return nil }
+func (f *fakeBrightnessSource) Set(_ context.Context, name string, percent float64) error {
+	f.mu.Lock()
+	f.sets = append(f.sets, brightnessSet{name, percent})
+	f.mu.Unlock()
+	return nil
+}
+
+func (f *fakeBrightnessSource) recorded() []brightnessSet {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.sets)
+}
 
 func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 	cfg := config.Defaults()
@@ -101,7 +131,7 @@ func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 		t.Errorf("the threshold colored the button at 50%%: %q", btn.InlineStyle())
 	}
 
-	source.devices = []brightness.Device{{Brightness: 9000, Max: 10000}}
+	source.setDevices([]brightness.Device{{Brightness: 9000, Max: 10000}})
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +214,7 @@ func TestBrightnessModuleIconFollowsTheLevel(t *testing.T) {
 	if m.icon == nil || m.icon.Name() != "high" {
 		t.Fatalf("icon at 90%% = %v, want high", m.icon)
 	}
-	source.devices = nil
+	source.setDevices(nil)
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}

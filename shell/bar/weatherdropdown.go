@@ -206,17 +206,12 @@ func (v *weatherView) label(text string, scale float64, color render.Color) *wid
 
 // header is the DropdownHeader: the title and the refresh action.
 func (v *weatherView) header() widget.Widget {
-	row := widget.NewBox(widget.Row, 8, 0)
-	row.AddClass("dropdown-header")
-	row.Append(v.icon("ld-sun-symbolic", 1.2, config.TokenFgDefault), false)
-	row.Append(v.label(i18n.T("dropdown-weather-title"), 1.1, v.ctx.Style.fg), true)
 	refresh := widget.NewButton(v.icon("tb-refresh-symbolic", 1, config.TokenFgMuted), 6, 6)
 	refresh.AddClass("ghost-icon-button")
 	refresh.BgHover = v.ctx.Style.buttonBgHover
 	refresh.BgPressed = v.ctx.Style.buttonBgActive
 	refresh.OnClick = v.svc.Refresh
-	row.Append(refresh, false)
-	return row
+	return dropdownHeader(v.ctx, v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-title"), refresh)
 }
 
 func (v *weatherView) loadingPage() widget.Widget {

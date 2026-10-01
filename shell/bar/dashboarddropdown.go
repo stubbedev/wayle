@@ -107,17 +107,12 @@ func (v *dashboardView) card(iconName, title string, extra ...widget.Widget) *wi
 
 // header is the DropdownHeader with the open-settings action.
 func (v *dashboardView) header() widget.Widget {
-	row := widget.NewBox(widget.Row, 8, 0)
-	row.AddClass("dropdown-header")
-	row.Append(v.icon("ld-layout-dashboard-symbolic", 1.2, v.ctx.Style.fg), false)
-	row.Append(v.label(i18n.T("dropdown-dashboard-title"), 1.1, v.ctx.Style.fg), true)
 	settings := v.button(v.icon("ld-settings-symbolic", 1, v.tint(config.TokenFgMuted)), "dashboard-settings-btn", func() {
 		// spawn_settings_app; the popover closes on the click.
 		spawnCommand("wayle-settings")
 	})
 	settings.SetTooltip(i18n.T("dropdown-dashboard-open-settings"))
-	row.Append(settings, false)
-	return row
+	return dropdownHeader(v.ctx, v.font, v.px, "ld-layout-dashboard-symbolic", i18n.T("dropdown-dashboard-title"), settings)
 }
 
 // quickActionsState is what the quick actions cannot read back from a
@@ -418,11 +413,7 @@ func (v *dashboardView) media() widget.Widget {
 	player.Append(compact, false)
 	player.Append(progress, false)
 
-	empty := widget.NewBox(widget.Column, 4, 8)
-	empty.AddClass("empty-state")
-	empty.Append(v.icon("ld-music-symbolic", 1.6, v.tint(config.TokenFgSubtle)), false)
-	empty.Append(v.label(i18n.T("dropdown-dashboard-no-media-title"), 1, v.ctx.Style.fg), false)
-	empty.Append(v.label(i18n.T("dropdown-dashboard-no-media-description"), 0.85, v.tint(config.TokenFgMuted)), false)
+	empty := emptyState(v.ctx, v.font, v.px, "ld-music-symbolic", i18n.T("dropdown-dashboard-no-media-title"), i18n.T("dropdown-dashboard-no-media-description"))
 	body := widget.NewStack()
 	body.Add("player", player)
 	body.Add("empty", empty)
