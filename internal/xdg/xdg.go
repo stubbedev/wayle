@@ -19,3 +19,16 @@ func StateDir() (string, bool) {
 	}
 	return filepath.Join(home, ".local/state/wayle"), true
 }
+
+// CacheDir is wayle's cache directory, $XDG_CACHE_HOME/wayle or
+// ~/.cache/wayle; false when neither variable is set.
+func CacheDir() (string, bool) {
+	if dir := os.Getenv("XDG_CACHE_HOME"); dir != "" {
+		return filepath.Join(dir, "wayle"), true
+	}
+	home := os.Getenv("HOME")
+	if home == "" {
+		return "", false
+	}
+	return filepath.Join(home, ".cache/wayle"), true
+}

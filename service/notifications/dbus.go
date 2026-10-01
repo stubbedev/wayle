@@ -56,7 +56,7 @@ func (s *Server) Release() error {
 
 // Notify handles the spec's Notify call.
 func (s *Server) Notify(appName string, replacesID uint32, appIcon, summary, body string, actions []string, hints map[string]dbus.Variant, expireTimeout int32) (uint32, *dbus.Error) {
-	return s.svc.Notify(appName, replacesID, appIcon, summary, body, actions, expireTimeout), nil
+	return s.svc.NotifyHints(appName, replacesID, appIcon, summary, body, actions, hints, expireTimeout), nil
 }
 
 // CloseNotification handles the spec's CloseNotification call; an

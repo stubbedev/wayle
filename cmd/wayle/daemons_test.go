@@ -81,7 +81,7 @@ func TestNotifyCommands(t *testing.T) {
 	id := svc.Notify("mail", 0, "", "New message", "Hello there", nil, -1)
 	svc.Notify("chat", 0, "", "Ping", "", nil, -1)
 	runSteps(t, []step{
-		{[]string{"notify", "list"}, "Notifications:\n  [1] mail: New message\n      Hello there\n  [2] chat: Ping\n"},
+		{[]string{"notify", "list"}, "Notifications:\n  [2] chat: Ping\n  [1] mail: New message\n      Hello there\n"},
 		{[]string{"notify", "status"}, "Notifications: 2\nActive popups: 2\nDo Not Disturb: disabled\nPopup duration: 5000ms\n"},
 		{[]string{"notify", "dnd"}, "Do Not Disturb: enabled\n"},
 		{[]string{"notify", "dismiss", "1"}, "Dismissed notification 1\n"},

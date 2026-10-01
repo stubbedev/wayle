@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/godbus/dbus/v5"
+
 	"github.com/stubbedev/wayle/internal/feed"
 	"github.com/stubbedev/wayle/internal/glob"
 	"github.com/stubbedev/wayle/internal/xdg"
@@ -58,12 +60,32 @@ type Notification struct {
 	AppIcon string
 	Summary string
 	Body    string
-	Actions []string
+	// Actions are the parsed action pairs, the default one included.
+	Actions []Action
 	Expires time.Time // zero: never
 	// ExpireMS is the sender's expire_timeout: negative is the server
 	// default, zero never expires, positive is milliseconds.
 	ExpireMS int32
 	Added    time.Time
+	Urgency  Urgency
+	// ImagePath is the image-path hint, or the cached PNG of inline
+	// image data.
+	ImagePath    string
+	DesktopEntry string
+	// Transient notifications skip the history; resident ones stay
+	// after an action is invoked.
+	Transient bool
+	Resident  bool
+}
+
+// DefaultAction is the "default" action, when the sender offered one.
+func (n *Notification) DefaultAction() (Action, bool) {
+	for _, a := range n.Actions {
+		if a.ID == DefaultActionID {
+			return a, true
+		}
+	}
+	return Action{}, false
 }
 
 // Expired reports whether the expiry elapsed at now.
@@ -125,6 +147,8 @@ type Service struct {
 	events        *feed.Feed[Event]
 	owners        map[uint32]string
 	emit          func(signal string, args ...any)
+	// cacheImage turns inline image data into a file path.
+	cacheImage func(imageData) (string, bool)
 }
 
 // NewService restores the DND flag from the state dir.
@@ -137,6 +161,7 @@ func NewService() *Service {
 		dnd:           loadDND(),
 		removeExpired: true,
 		owners:        make(map[uint32]string),
+		cacheImage:    cacheImage,
 		events:        feed.New[Event](32),
 	}
 }
@@ -235,42 +260,55 @@ func (s *Service) SetBlocklist(patterns []string) {
 	s.mu.Unlock()
 }
 
-// Notify receives a notification (the D-Bus Notify call). A blocked
-// app name consumes the notification and still returns an id.
+// Notify receives a notification without hints; see NotifyHints.
 func (s *Service) Notify(appName string, replacesID uint32, appIcon, summary, body string, actions []string, expireTimeout int32) uint32 {
+	return s.NotifyHints(appName, replacesID, appIcon, summary, body, actions, nil, expireTimeout)
+}
+
+// NotifyHints receives a notification (the D-Bus Notify call). An app
+// may only replace an id it owns; any other replaces_id gets a new id
+// (resolve_id). A blocked app name consumes the notification and still
+// returns an id. A transient notification pops up but skips the
+// history (handle_notification_added); the history is newest first.
+func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summary, body string, actions []string, rawHints map[string]dbus.Variant, expireTimeout int32) uint32 {
+	h := decodeHints(rawHints, s.cacheImage)
 	s.mu.Lock()
-	if replacesID == 0 {
+	id := replacesID
+	if id == 0 || s.owners[id] != appName {
 		s.next++
-		replacesID = s.next
-	} else {
-		s.removeHistoryLocked(replacesID)
-		if replacesID > s.next {
-			s.next = replacesID
-		}
+		id = s.next
 	}
 	for _, pattern := range s.block {
 		if globMatch(pattern, appName) {
 			s.mu.Unlock()
-			return replacesID
+			return id
 		}
 	}
+	s.removeHistoryLocked(id)
 	n := &Notification{
-		ID:       replacesID,
-		AppName:  appName,
-		AppIcon:  appIcon,
-		Summary:  summary,
-		Body:     body,
-		Actions:  actions,
-		ExpireMS: expireTimeout,
-		Added:    time.Now(),
+		ID:           id,
+		AppName:      appName,
+		AppIcon:      appIcon,
+		Summary:      summary,
+		Body:         body,
+		Actions:      ParseActions(actions),
+		ExpireMS:     expireTimeout,
+		Added:        time.Now(),
+		Urgency:      h.urgency,
+		ImagePath:    h.imagePath,
+		DesktopEntry: h.desktopEntry,
+		Transient:    h.transient,
+		Resident:     h.resident,
 	}
 	if expireTimeout > 0 {
 		n.Expires = n.Added.Add(time.Duration(expireTimeout) * time.Millisecond)
-		if s.removeExpired {
+	}
+	if !n.Transient {
+		s.all = append([]*Notification{n}, s.all...)
+		if !n.Expires.IsZero() && s.removeExpired {
 			s.startExpiryLocked(n)
 		}
 	}
-	s.all = append(s.all, n)
 	s.owners[n.ID] = appName
 	s.addPopupLocked(n)
 	s.mu.Unlock()
@@ -341,10 +379,13 @@ func (s *Service) DismissAll() {
 	}
 }
 
-// InvokeAction emits ActionInvoked and closes the notification.
+// InvokeAction emits ActionInvoked and, unless the notification is
+// resident, closes it with the closed reason (Notification::invoke).
 func (s *Service) InvokeAction(id uint32, key string) {
 	s.mu.Lock()
 	_, ok := s.owners[id]
+	n := s.findLocked(id)
+	resident := n != nil && n.Resident
 	emit := s.emit
 	s.mu.Unlock()
 	if !ok {
@@ -353,7 +394,9 @@ func (s *Service) InvokeAction(id uint32, key string) {
 	if emit != nil {
 		emit(Interface+".ActionInvoked", id, key)
 	}
-	s.Close(id, Dismissed)
+	if !resident {
+		s.Close(id, ClosedCall)
+	}
 	s.notify(Event{Kind: EventAction, ID: id})
 }
 
@@ -521,4 +564,17 @@ func saveDND(on bool) {
 // String renders the summary for logs and tests.
 func (n *Notification) String() string {
 	return fmt.Sprintf("%d %s: %s", n.ID, n.AppName, n.Summary)
+}
+
+// findLocked is the stored or popped-up notification with id, or nil.
+// The caller holds mu.
+func (s *Service) findLocked(id uint32) *Notification {
+	for _, list := range [][]*Notification{s.all, s.popups} {
+		for _, n := range list {
+			if n.ID == id {
+				return n
+			}
+		}
+	}
+	return nil
 }
