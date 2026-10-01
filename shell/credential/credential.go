@@ -60,6 +60,9 @@ type Options struct {
 type Prompt struct {
 	// Root is the full-surface layer holding the centered card.
 	Root widget.Widget
+	// Reveal is Root as a revealer: the card's reveal animation, hidden
+	// until the screen shows it (CredentialBox::reveal).
+	Reveal *widget.Revealer
 	// Username is the visible username entry; nil without
 	// WithUsername.
 	Username *widget.Entry
@@ -111,7 +114,8 @@ func Build(o Options, onSubmit func(string)) *Prompt {
 	}
 	column.Append(withGap(p.Error, errorGap), false)
 
-	p.Root = Center(NewPanel(column, cardPadding, cardRadius, cardColor))
+	p.Reveal = widget.NewRevealer(Center(NewPanel(column, cardPadding, cardRadius, cardColor)))
+	p.Root = p.Reveal
 	return p
 }
 

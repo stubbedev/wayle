@@ -180,6 +180,10 @@ func TestLockCoversOutputsAndReportsTheHint(t *testing.T) {
 		if !f.prompt.Entry.Enabled() || f.prompt.Error.Visible() || f.scrim.On() {
 			t.Error("a fresh surface must take input with no message and no blackout")
 		}
+		if !f.prompt.Reveal.Revealed() || f.prompt.Reveal.Transition() != widget.RevealFade {
+			t.Errorf("the card: revealed %v, transition %v; want it entering with the lock transition",
+				f.prompt.Reveal.Revealed(), f.prompt.Reveal.Transition())
+		}
 	})
 	for _, s := range h.locker.surfaces {
 		if s.Focus == nil || s.Background.A() != 255 {

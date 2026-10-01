@@ -24,6 +24,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/auth"
 	"github.com/stubbedev/wayle/shell/credential"
+	"github.com/stubbedev/wayle/shell/reveal"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -97,6 +98,7 @@ type face struct {
 // loop; auth events and signals cross into it through Loop.Invoke.
 type Screen struct {
 	cfg       config.LockConfig
+	anims     config.AnimationsConfig
 	wallpaper string
 	fonts     credential.Fonts
 	pal       *styling.Palette
@@ -133,7 +135,7 @@ type Screen struct {
 
 // New builds the screen over its collaborators.
 func New(cfg *config.Config, fonts credential.Fonts, pal *styling.Palette, d Deps) *Screen {
-	return &Screen{cfg: cfg.Lock, wallpaper: cfg.Wallpaper.Wallpaper, fonts: fonts, pal: pal, d: d}
+	return &Screen{cfg: cfg.Lock, anims: cfg.Animations, wallpaper: cfg.Wallpaper.Wallpaper, fonts: fonts, pal: pal, d: d}
 }
 
 // SetConfig applies a reloaded config, as the Rust lock reads its keys
@@ -142,7 +144,7 @@ func New(cfg *config.Config, fonts credential.Fonts, pal *styling.Palette, d Dep
 // and the next lock builds its surfaces and background from it. Loop
 // goroutine.
 func (s *Screen) SetConfig(cfg *config.Config) {
-	s.cfg, s.wallpaper = cfg.Lock, cfg.Wallpaper.Wallpaper
+	s.cfg, s.anims, s.wallpaper = cfg.Lock, cfg.Animations, cfg.Wallpaper.Wallpaper
 }
 
 // Locked reports whether a lock is pending or held.
@@ -215,6 +217,8 @@ func (s *Screen) buildFace(*app.Output) app.LockSurface {
 	f.prompt.SetMessage(s.message)
 	f.prompt.Entry.SetEnabled(s.inputOn)
 	f.scrim.SetOn(s.blanked)
+	// The background is opaque at once; the card reveals over it.
+	reveal.Show(f.prompt.Reveal, s.anims, config.AnimLock)
 	s.faces = append(s.faces, f)
 	root := widget.NewOverlay().
 		Append(credential.Background(s.bg, credential.HexFill(s.cfg.Background.Color))).
