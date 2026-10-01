@@ -35,6 +35,14 @@ func (s *Session) Reply(f ServerFrame) {
 	s.once.Do(func() { s.reply <- f })
 }
 
+// NewSession builds a session and the channel its terminal frame comes
+// out of (one frame; a Release sends the zero frame). The server opens
+// every session through it; a surface under test opens them directly.
+func NewSession(id uint64, options SessionOptions, replace bool, rows <-chan []string) (*Session, <-chan ServerFrame) {
+	reply := make(chan ServerFrame, 1)
+	return &Session{ID: id, Options: options, Replace: replace, Rows: rows, reply: reply}, reply
+}
+
 // Release ends the session without a frame: the client is gone, so
 // there is nobody to answer.
 func (s *Session) Release() { s.Reply(ServerFrame{}) }
@@ -127,8 +135,7 @@ func (s *Server) serve(conn net.Conn) {
 		options = *open.Options
 	}
 	rows := make(chan []string, 16)
-	reply := make(chan ServerFrame, 1)
-	sess := &Session{ID: s.ids.Add(1), Options: options, Replace: open.Replace, Rows: rows, reply: reply}
+	sess, reply := NewSession(s.ids.Add(1), options, open.Replace, rows)
 	s.handler.Open(sess)
 	writeFrame(conn, ServerFrame{Type: FrameOpened})
 	s.pump(sess, reader, rows, reply, conn)

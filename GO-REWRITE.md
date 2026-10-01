@@ -133,11 +133,15 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [ ] `wayle config docs` (the VitePress page generator)
 - [x] hot reload beyond the bar/OSD/popups: wallpaper (wallpaper.Shell
       SetConfig) and the lock (read live, as the Rust lock does)
-- [ ] the launcher's hot reload, with the launcher views
+- [x] the launcher's hot reload: every session reads the live config
 
 ### Shell surfaces
 
-- [ ] launcher views (`collect/launcher`)
+- [x] launcher views: the surface on the launcher socket (dmenu and
+      every mode, filtering, keys and pointer bindings, multi-select,
+      -dump, -e dialogs, hooks, -select/-selected-row/-auto-select,
+      sidebar tabs, -width/-location/-lines, session -font/-style CSS),
+      styled by the shell stylesheet's launcher rules
 - [ ] greeter screen (WIP in `greeter/`)
 - [ ] portal dialogs: file chooser, color picker, print, share picker
       (`wayle portal share-picker` should call `sharepicker.NewClient`)
@@ -171,7 +175,6 @@ capability. Remedy it in gelm, then delete the workaround in wayle.
 | --- | --- | --- |
 | a public animation API and a revealer (tweens live in `internal/anim`) | no enter/exit animations anywhere in the Go shell | export the tween/easing API and add a Revealer (slide/crossfade) widget |
 | an fd/file watcher on the event loop | inotify goroutines + Invoke (internal/fswatch) | optional: `app.WatchFD` |
-| `LayerConfig.Output = nil` (documented as "compositor chooses") panics in the Wayland binding | callers always pass an output | send a null output |
 
 Closed in gelm since the inventory: nested popovers (OpenMenuPopover), filled paths (Canvas.FillPath), popovers driven by the application loop (focused Entry input, loop-driven repaint, layer get_popup, rect-anchored placement, clicks and the wheel inside them), GTK-style give-way layout (a column shrinks its expanding Scroll; Scroll.VerticalOnly and SetMaxContentHeight), the CSS engine (var(), calc(),
 color-mix(), :not(), structural selectors, the box model, per-side
@@ -200,6 +203,10 @@ data-control, Button.BgExplicit, menu row icons and MenuStack.
 
 ## Known deviations from the Rust shell
 
+- The launcher's message line shows its markup's text, wrapped (gelm's
+  wrapping label is plain); a Super+ key binding does not parse (gelm
+  tracks no Super modifier); the surface opens and closes without its
+  enter/exit animation.
 - Workspace modules re-query the compositor on each relevant event
   instead of folding events into a local state; the rendered result is
   the same.

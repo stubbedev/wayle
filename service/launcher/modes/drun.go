@@ -2,12 +2,12 @@ package modes
 
 import (
 	"context"
-	"html"
 	"log"
 	"slices"
 	"strings"
 
 	"github.com/stubbedev/wayle/internal/desktopentry"
+	"github.com/stubbedev/wayle/internal/pango"
 	"github.com/stubbedev/wayle/internal/shlex"
 	"github.com/stubbedev/wayle/service/launcher"
 )
@@ -242,11 +242,6 @@ func (d *Drun) collectApps() []drunRow {
 	return rows
 }
 
-// markupEscape is glib::markup_escape_text.
-func markupEscape(s string) string {
-	return strings.ReplaceAll(html.EscapeString(s), "&#34;", "&quot;")
-}
-
 func appItem(app desktopentry.App, action string, cfg DrunConfig) launcher.Item {
 	name := app.DisplayName()
 	if action != "" {
@@ -255,8 +250,8 @@ func appItem(app desktopentry.App, action string, cfg DrunConfig) launcher.Item 
 	generic, exec, categories, comment := app.GenericName(), app.Exec(), app.Categories(), app.Comment()
 	keywords := strings.Join(app.Keywords(), " ")
 	display := launcher.Render(cfg.DisplayFormat, launcher.Values(map[string]string{
-		"name": markupEscape(name), "generic": markupEscape(generic), "exec": markupEscape(exec),
-		"categories": markupEscape(categories), "comment": markupEscape(comment),
+		"name": pango.Escape(name), "generic": pango.Escape(generic), "exec": pango.Escape(exec),
+		"categories": pango.Escape(categories), "comment": pango.Escape(comment),
 	}))
 	item := launcher.Item{
 		Display: display,
@@ -306,7 +301,7 @@ func (d *Drun) collectLinks() []drunRow {
 	var rows []drunRow
 	for _, l := range desktopentry.Links(d.dirs) {
 		item := launcher.Item{
-			Display:   launcher.Render(d.cfg.DisplayFormat, launcher.Values(map[string]string{"name": markupEscape(l.Name)})),
+			Display:   launcher.Render(d.cfg.DisplayFormat, launcher.Values(map[string]string{"name": pango.Escape(l.Name)})),
 			MatchText: l.Name + " " + l.URL,
 			Flags:     launcher.FlagMarkup,
 		}

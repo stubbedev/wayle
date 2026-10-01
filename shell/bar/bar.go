@@ -367,6 +367,8 @@ func run(cfg *config.Config, svc *config.Service) error {
 		application.Invoke(lockScreen.Lock)
 		return true
 	})()
+	// The launcher surface serves `wayle launcher` sessions.
+	defer startLauncher(application, sess.Outputs, current.Load, rt.ctx, theme, font, palette)()
 	// The widget socket carries out-of-process pushes (`wayle toast`).
 	widgetSrv := widgetipc.NewServer()
 	if stop, err := widgetSrv.Listen(); err == nil {
