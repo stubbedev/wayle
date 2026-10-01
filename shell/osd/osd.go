@@ -138,10 +138,14 @@ func New(application *app.Application, cfg config.OsdConfig, font render.Font, p
 // duration, creating missing faces. Calling Show again re-arms the
 // timer (the Rust reset behavior).
 func (o *Osd) Show(ev Event) {
-	if o.app == nil || !o.cfg.Enabled {
+	if o.app == nil {
 		return
 	}
 	o.mu.Lock()
+	if !o.cfg.Enabled {
+		o.mu.Unlock()
+		return
+	}
 	o.current = ev
 	for name, out := range o.outputs {
 		if f, err := o.ensure(name, out); err == nil {

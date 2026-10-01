@@ -135,7 +135,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	baseCtx.Treeman = treeman.New("treeman")
 	// The notification service owns the well-known name on the session
 	// bus; other senders deliver through it.
-	notifSvc := notifications.NewService()
+	notifSvc := startNotifications(cfg.Notification)
 	baseCtx.Notifications = notifSvc
 	recState := recorder.NewState(recorder.WfRecorder{}, time.Duration(cfg.Recorder.StartDelayMs)*time.Millisecond)
 	baseCtx.Recorder = recState
@@ -143,11 +143,13 @@ func run(cfg *config.Config, svc *config.Service) error {
 	baseCtx.SNI = sniStore
 	if conn, err := dbus.ConnectSessionBus(); err == nil {
 		defer func() { _ = conn.Close() }()
-		server, err := notifications.Serve(conn, notifSvc)
-		if err != nil {
-			log.Printf("notifications: daemon: %v", err)
-		} else {
-			defer func() { _ = server.Release() }()
+		if notifSvc != nil {
+			server, err := notifications.Serve(conn, notifSvc)
+			if err != nil {
+				log.Printf("notifications: daemon: %v", err)
+			} else {
+				defer func() { _ = server.Release() }()
+			}
 		}
 		if release, err := recorder.NewDaemon(recState).Export(conn); err == nil {
 			defer release()
@@ -235,7 +237,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	// Notification popups render on one monitor, bar or not.
 	var popupHost *popups.Popups
-	if cfg.Notification.Enabled {
+	if notifSvc != nil {
 		if output := popups.Output(outputs, cfg.Notification.PopupMonitor); output != nil {
 			popupHost = popups.New(application, notifSvc, cfg.Notification, font, palette, output)
 			go popupHost.Run()
@@ -263,6 +265,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 				theme.setConfig(next)
 				restyle(next)
 				osdSrv.SetConfig(next.Osd)
+				applyNotificationConfig(notifSvc, next.Notification)
+				if wall != nil {
+					wall.SetConfig(next)
+				}
 				if popupHost != nil {
 					popupHost.SetConfig(next.Notification)
 				}
@@ -284,9 +290,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 			}
 		}()
 	}
-	if cfg.Osd.Enabled {
-		go watchOsd(current.Load, baseCtx, osdSrv)
-	}
+	// The OSD watcher runs whether or not the OSD is enabled: the OSD
+	// drops events while disabled, so a reload can turn it on or off
+	// (the Rust OsdEnabledChanged).
+	go watchOsd(current.Load, baseCtx, osdSrv)
 	// The ext-session-lock screen and its triggers (logind, and `wayle
 	// lock` through Shell1).
 	lockScreen, stopLock := lock.Start(application, cfg, lock.Fonts(cfg.General.FontSans, font), palette)
