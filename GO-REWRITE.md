@@ -89,7 +89,10 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       info row
 - [ ] notification popup cards: close and action buttons, the default
       action, the urgency bar, popup layer/margins/shadow keys
-- [ ] the brightness icon and the custom module's dynamic icon
+- [ ] the custom module: icon-map/icon-names, color-map, class-format,
+      tooltips (helpers.rs resolve_*)
+- [ ] format strings render through a minijinja-compatible engine
+      (filters, dot access, conditionals), not plain substitution
 - [ ] systray: nested submenu popups (gelm has no popup-in-popup),
       live accelerators, popovers that grow with their content
 - [ ] cava: the wave style and the stereo split (error at creation),

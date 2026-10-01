@@ -8,20 +8,31 @@ import (
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/brightness"
 )
 
-// brightnessLabel renders the module format; the only variable is
-// "percent", the battery module's template semantics.
-func brightnessLabel(format string, percent float64, present bool) string {
-	if !present {
-		return "N/A"
-	}
+// brightnessNoDevice is NO_DEVICE_LABEL.
+const brightnessNoDevice = "--%"
+
+// brightnessLabel is helpers.rs's format_label: the one variable is
+// the rounded percent.
+func brightnessLabel(format string, percent float64) string {
 	return replaceTemplateVar(format, "percent", strconv.Itoa(int(math.Round(percent))))
 }
 
-// averagePercentage is helpers.rs's average across devices; nil when
-// no device reports (absent battery-style N/A).
+// brightnessIcon is select_icon: level-icons split 0-100% into equal
+// bands, the last one closing at 100%; no icons is "".
+func brightnessIcon(levels []string, percent float64) string {
+	if len(levels) == 0 {
+		return ""
+	}
+	i := int(math.Floor(percent / 100 * float64(len(levels))))
+	return levels[max(0, min(i, len(levels)-1))]
+}
+
+// averagePercentage is helpers.rs's average across devices; false when
+// there is none.
 func averagePercentage(devices []brightness.Device) (float64, bool) {
 	if len(devices) == 0 {
 		return 0, false
@@ -33,61 +44,64 @@ func averagePercentage(devices []brightness.Device) (float64, bool) {
 	return sum / float64(len(devices)), true
 }
 
-// brightness is the module: the mean percentage label across backlights,
-// refreshed on sysfs changes.
+// brightnessModule is the bar button: the mean percentage across
+// backlights with its level icon, refreshed on sysfs changes.
 type brightnessModule struct {
 	buttonRef
 	ctx    ModuleContext
 	source brightness.Source
 	label  *widget.Label
+	icon   *widget.Icon
+	root   widget.Widget
 }
 
 func newBrightness(ctx ModuleContext) (Module, error) {
-	if ctx.App == nil {
-		return nil, errors.New("brightness: requires the application loop")
-	}
 	if ctx.Brightness == nil {
 		return nil, errors.New("brightness: no backlight source available")
 	}
-	m := &brightnessModule{ctx: ctx, source: ctx.Brightness}
-	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	cfg := ctx.Config.Brightness
+	m := &brightnessModule{ctx: ctx, source: ctx.Brightness, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m.icon = moduleIcon(ctx, config.IconWith(cfg.IconShow, brightnessIcon(cfg.LevelIcons, 0), cfg.IconColor))
+	m.root = assembleModule(ctx, m.icon, m.label)
 	if err := m.refresh(); err != nil {
 		return nil, err
+	}
+	if ctx.App == nil {
+		return m, nil
 	}
 	ticks, stop, err := ctx.Brightness.Subscribe(ctx.Life())
 	if err != nil {
 		return nil, err
 	}
-	go func() {
-		for range ticks {
-			m.ctx.Invoke(func() { _ = m.refresh() })
-		}
-		stop()
-	}()
+	follow(ctx, ticks, stop, func(struct{}) { _ = m.refresh() })
 	return m, nil
 }
 
-// refresh re-reads and restyles the label.
+// refresh is refresh_display: the label and icon for the mean level
+// and its threshold colors, or "--%" and the first icon without a
+// device.
 func (m *brightnessModule) refresh() error {
 	devices, err := m.source.Devices(context.Background())
 	if err != nil {
 		return err
 	}
 	cfg := m.ctx.Config.Brightness
-	label := ""
-	if percent, ok := averagePercentage(devices); ok {
-		if cfg.LabelShow {
-			label = brightnessLabel(cfg.Format, percent, true)
-		}
-		m.thresholds(percent, cfg.Thresholds)
-	} else {
-		if cfg.LabelShow {
-			label = brightnessLabel(cfg.Format, 0, false)
-		}
-		m.thresholds(0, nil)
+	percent, ok := averagePercentage(devices)
+	if !ok {
+		m.label.SetText(brightnessNoDevice)
+		m.setIcon(brightnessIcon(cfg.LevelIcons, 0))
+		return nil
 	}
-	m.label.SetText(label)
+	m.label.SetText(brightnessLabel(cfg.Format, percent))
+	m.setIcon(brightnessIcon(cfg.LevelIcons, percent))
+	m.thresholds(percent, cfg.Thresholds)
 	return nil
 }
 
-func (m *brightnessModule) Root() widget.Widget { return m.label }
+func (m *brightnessModule) setIcon(name string) {
+	if m.icon != nil && name != "" {
+		m.icon.SetThemeName(name)
+	}
+}
+
+func (m *brightnessModule) Root() widget.Widget { return m.root }

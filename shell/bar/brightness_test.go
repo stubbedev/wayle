@@ -15,14 +15,26 @@ import (
 )
 
 func TestBrightnessLabel(t *testing.T) {
-	if got := brightnessLabel("{{ percent }}%", 42.6, true); got != "43%" {
+	if got := brightnessLabel("{{ percent }}%", 42.6); got != "43%" {
 		t.Errorf("= %q, want 43%%", got)
 	}
-	if got := brightnessLabel("{{ percent }}", 0, true); got != "0" {
+	if got := brightnessLabel("{{ percent }}", 0); got != "0" {
 		t.Errorf("= %q, want 0", got)
 	}
-	if got := brightnessLabel("{{ percent }}%", 0, false); got != "N/A" {
-		t.Errorf("no devices = %q, want N/A", got)
+}
+
+func TestBrightnessIconBands(t *testing.T) {
+	levels := []string{"low", "mid", "high"}
+	for _, tc := range []struct {
+		percent float64
+		want    string
+	}{{0, "low"}, {33, "low"}, {34, "mid"}, {66, "mid"}, {67, "high"}, {100, "high"}, {150, "high"}, {-5, "low"}} {
+		if got := brightnessIcon(levels, tc.percent); got != tc.want {
+			t.Errorf("%v%% = %q, want %q", tc.percent, got, tc.want)
+		}
+	}
+	if got := brightnessIcon(nil, 50); got != "" {
+		t.Errorf("no icons = %q", got)
 	}
 }
 
@@ -101,7 +113,7 @@ func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 	}
 }
 
-func TestBrightnessNoDevicesShowsNA(t *testing.T) {
+func TestBrightnessNoDevicesShowsDashes(t *testing.T) {
 	cfg := config.Defaults()
 	source := &fakeBrightnessSource{ticks: make(chan struct{}, 1)}
 	style := computeStyle(cfg, styling.Default())
@@ -113,8 +125,8 @@ func TestBrightnessNoDevicesShowsNA(t *testing.T) {
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := m.label.Text(); got != "N/A" {
-		t.Errorf("label = %q, want N/A", got)
+	if got := m.label.Text(); got != "--%" {
+		t.Errorf("label = %q, want --%%", got)
 	}
 }
 
@@ -153,5 +165,30 @@ func TestLoadFileRejectsBadBrightness(t *testing.T) {
 		if _, err := config.LoadFile(path); err == nil {
 			t.Errorf("%q: want a load error, got nil", content)
 		}
+	}
+}
+
+// The module's icon is the level icon for the mean brightness; without
+// a device it is the first one.
+func TestBrightnessModuleIconFollowsTheLevel(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Brightness.LevelIcons = []string{"low", "high"}
+	ctx := newTestContext(t, cfg)
+	source := &fakeBrightnessSource{devices: []brightness.Device{{Brightness: 9000, Max: 10000}}}
+	ctx.Brightness = source
+	module, err := Create("brightness", ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := module.(*brightnessModule)
+	if m.icon == nil || m.icon.Name() != "high" {
+		t.Fatalf("icon at 90%% = %v, want high", m.icon)
+	}
+	source.devices = nil
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if m.icon.Name() != "low" || m.label.Text() != "--%" {
+		t.Errorf("no device: icon %q label %q", m.icon.Name(), m.label.Text())
 	}
 }
