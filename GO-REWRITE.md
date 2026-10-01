@@ -90,16 +90,17 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [ ] notification popup cards: close and action buttons, the default
       action, the urgency bar, popup layer/margins/shadow keys
 - [ ] label-max-length and label-color on the remaining modules; the
-      brightness icon and the custom/weather dynamic icons
+      brightness icon and the custom module's dynamic icon
 - [ ] systray: nested submenu popups (gelm has no popup-in-popup),
       live accelerators, popovers that grow with their content
 - [ ] cava: the wave style and the stereo split (error at creation),
       the `stereo`/`waves`/`input` keys
 - [ ] network dialogs: secret prompt, wifi password, wifi list, VPN
       add/edit (gelm: focused Entry inside a popover, popover repaint)
-- [ ] bluetooth: the pairing notifier without a placed module,
-      `[dropdowns.bluetooth]` sizes
+- [ ] bluetooth: the pairing notifier without a placed module
 - [ ] brightness dropdown: friendly names for DDC monitors
+- [x] weather: the three providers, retrying poll service, condition
+      icons, the full dropdown; `[dropdowns.*]` sizes for every dropdown
 
 ### Config
 
@@ -188,5 +189,8 @@ data-control, Button.BgExplicit, menu row icons and MenuStack.
   Failed, and passkey entry sends a passkey (Rust sent it as a PIN).
 - openconnect keeps cookies set on a redirect (Rust drops them, which
   breaks Juniper/Pulse gateways).
+- The weather dropdown's refresh and retry refetch with the current
+  settings; Rust re-sets the location as a city, so coordinates were
+  geocoded as a place name on retry.
 - Screenshot frames decode by their real pixel format (24- and 10-bit
   included) and honor y-invert; Rust assumed XRGB.

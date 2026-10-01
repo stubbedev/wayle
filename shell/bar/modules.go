@@ -28,6 +28,7 @@ import (
 	"github.com/stubbedev/wayle/service/sni"
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
+	"github.com/stubbedev/wayle/service/weather"
 )
 
 // ModuleContext carries what a module needs at construction time: the
@@ -55,6 +56,7 @@ type ModuleContext struct {
 	Recorder      *recorder.State
 	Mail          *mail.Service
 	SNI           *sni.Store
+	Weather       *weather.Service
 	// Clipboard is the session clipboard history, nil when the
 	// compositor has no data-control protocol (the launcher's
 	// clipboard mode reads it).

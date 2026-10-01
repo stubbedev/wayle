@@ -10,7 +10,6 @@ import (
 	"github.com/stubbedev/wayle/service/mail"
 	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/recorder"
-	"github.com/stubbedev/wayle/service/weather"
 )
 
 // dropdownRows builds a titled stack of status lines.
@@ -164,52 +163,6 @@ func mailDropdown(ctx ModuleContext) widget.Widget {
 	}
 	for _, account := range accounts {
 		col.Append(widget.NewLabel(font, px, account.Name+": "+strconv.FormatUint(uint64(account.Count), 10), ctx.Style.fg), false)
-	}
-	return col
-}
-
-// weatherDropdownClient resolves the weather client for the panel;
-// nil when no location is configured.
-func weatherDropdownClient(ctx ModuleContext) *weather.Client {
-	if ctx.Config.Weather.Location == "" {
-		return nil
-	}
-	return weather.NewClient()
-}
-
-// weatherDropdown is the weather card: the current conditions for the
-// configured location.
-func weatherDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 6, 14)
-	client := weatherDropdownClient(ctx)
-	if client == nil {
-		col.Append(widget.NewLabel(font, px, "No location configured", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	lat, lon, err := client.Geocode(context.Background(), ctx.Config.Weather.Location)
-	if err != nil {
-		col.Append(widget.NewLabel(font, px, "Geocode failed", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	current, err := client.FetchForecast(context.Background(), lat, lon)
-	if err != nil {
-		col.Append(widget.NewLabel(font, px, "Forecast failed", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	col.Append(widget.NewLabel(font, px*1.6, strconv.FormatFloat(current.TempC, 'f', 0, 64)+"°C "+weatherConditionLabel(current.Condition), ctx.Style.fg), false)
-	lines := []string{
-		"Feels like " + strconv.FormatFloat(current.FeelsLikeC, 'f', 0, 64) + "°C",
-		i18n.T("dropdown-weather-humidity") + " " + strconv.Itoa(current.Humidity) + "%",
-	}
-	if current.HasHigh {
-		lines = append(lines, "High "+strconv.FormatFloat(current.HighC, 'f', 0, 64)+"°")
-	}
-	if current.HasLow {
-		lines = append(lines, "Low "+strconv.FormatFloat(current.LowC, 'f', 0, 64)+"°")
-	}
-	for _, line := range lines {
-		col.Append(widget.NewLabel(font, px, line, mutedFg(ctx.Style.palette)), false)
 	}
 	return col
 }

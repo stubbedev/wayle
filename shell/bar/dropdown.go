@@ -92,6 +92,11 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if content == nil {
 		return fmt.Errorf("dropdown %q has no content", name)
 	}
+	// The panel takes its [dropdowns.<name>] size (or the built-in base
+	// at the global scale).
+	if w, h, ok := dropdownDims(name, r.cfg); ok {
+		content = newPanelBox(w, h, content)
+	}
 	cfg := app.PopoverConfig{
 		Anchor:  bound,
 		Content: content,

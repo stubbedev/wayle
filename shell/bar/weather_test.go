@@ -65,35 +65,34 @@ func TestWorldClockDefaultsMatchSchema(t *testing.T) {
 }
 
 func TestWeatherFormatLabel(t *testing.T) {
-	current := weather.Current{
-		TempC:      18.4,
-		FeelsLikeC: 17.9,
-		Condition:  weather.CondLightRain,
-		Humidity:   62,
-		WindKmh:    12.3,
-		WindDir:    90,
-		HighC:      21.5,
-		HasHigh:    true,
-		LowC:       12.25,
-		HasLow:     true,
+	w := &weather.Weather{
+		Current: weather.Current{
+			Temperature:   18.4,
+			FeelsLike:     17.9,
+			Condition:     weather.CondLightRain,
+			Humidity:      62,
+			WindSpeed:     12.3,
+			WindDirection: 90,
+		},
+		Daily: []weather.Daily{{TempHigh: 21.6, TempLow: 12.25}},
 	}
 	// The default format: rounded temp plus the unit symbol.
-	if got := weatherFormatLabel("{{ temp }}{{ temp_unit }}", current, false); got != "18°C" {
+	if got := weatherFormatLabel("{{ temp }}{{ temp_unit }}", w, false); got != "18°C" {
 		t.Errorf("= %q, want 18°C", got)
 	}
 	// The full placeholder set.
-	got := weatherFormatLabel("{{ condition }} {{ feels_like }}° {{ humidity }} {{ wind_speed }} {{ wind_dir }} {{ high }}/{{ low }}", current, false)
+	got := weatherFormatLabel("{{ condition }} {{ feels_like }}° {{ humidity }} {{ wind_speed }} {{ wind_dir }} {{ high }}/{{ low }}", w, false)
 	want := i18n.T("weather-light-rain") + " 18° 62% 12 km/h E 22/12"
 	if got != want {
 		t.Errorf("= %q, want %q", got, want)
 	}
 	// Imperial converts temps and wind.
-	if got := weatherFormatLabel("{{ temp }}{{ temp_unit }} {{ wind_speed }}", current, true); got != "65°F 8 mph" {
+	if got := weatherFormatLabel("{{ temp }}{{ temp_unit }} {{ wind_speed }}", w, true); got != "65°F 8 mph" {
 		t.Errorf("imperial = %q", got)
 	}
-	// Missing daily highs render empty.
-	current.HasHigh = false
-	if got := weatherFormatLabel("[{{ high }}]", current, false); got != "[]" {
+	// Without a daily forecast the high and low render empty.
+	w.Daily = nil
+	if got := weatherFormatLabel("[{{ high }}]", w, false); got != "[]" {
 		t.Errorf("no high = %q", got)
 	}
 }

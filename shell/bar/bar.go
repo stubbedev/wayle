@@ -30,6 +30,7 @@ import (
 	"github.com/stubbedev/wayle/service/sni"
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
+	"github.com/stubbedev/wayle/service/weather"
 	"github.com/stubbedev/wayle/shell/lock"
 	"github.com/stubbedev/wayle/shell/osd"
 	"github.com/stubbedev/wayle/shell/popups"
@@ -133,6 +134,12 @@ func run(cfg *config.Config, svc *config.Service) error {
 	inhibitState := idleinhibit.NewState(cfg.IdleInhibit.StartupDuration)
 	baseCtx.IdleInhibit = inhibitState
 	baseCtx.Treeman = treeman.New("treeman")
+	// The weather service polls for the whole session (bootstrap/weather.rs);
+	// after its first fetch it only polls while a module or dropdown
+	// follows it.
+	weatherSvc := weather.New(weatherSettings(cfg.Weather))
+	defer weatherSvc.Close()
+	baseCtx.Weather = weatherSvc
 	// The notification service owns the well-known name on the session
 	// bus; other senders deliver through it.
 	notifSvc := startNotifications(cfg.Notification)
@@ -266,6 +273,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 				restyle(next)
 				osdSrv.SetConfig(next.Osd)
 				applyNotificationConfig(notifSvc, next.Notification)
+				weatherSvc.Configure(weatherSettings(next.Weather))
 				if wall != nil {
 					wall.SetConfig(next)
 				}
@@ -275,6 +283,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 			})
 		})
 		defer cancel()
+		// A secrets reload re-resolves the weather API keys
+		// (spawn_secrets_reload_watcher).
+		defer svc.SubscribeSecrets(func() { weatherSvc.Configure(weatherSettings(current.Load().Weather)) })()
 	}
 	// A fresh color extraction re-resolves the provider palette and
 	// recompiles the bundle, the Rust shell's theme hot-apply.
