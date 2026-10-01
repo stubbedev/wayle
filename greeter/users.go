@@ -44,7 +44,7 @@ func LoadUsers() []User {
 // by lowercased display name.
 func parsePasswd(text string) []User {
 	var users []User
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		f := strings.Split(line, ":")
 		if len(f) != 7 {
 			continue

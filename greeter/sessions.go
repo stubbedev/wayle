@@ -89,7 +89,7 @@ func applyKind(s Session, kind SessionKind) Session {
 func parseDesktop(text, id string) (Session, bool) {
 	var name, exec string
 	haveName, haveExec, hidden, inEntry := false, false, false, false
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "[") {
 			inEntry = line == "[Desktop Entry]"
@@ -134,7 +134,7 @@ func parseDesktop(text, id string) (Session, bool) {
 // full desktop-entry quoting is not handled (as in session.rs).
 func parseExec(exec string) []string {
 	var out []string
-	for _, tok := range strings.Fields(exec) {
+	for tok := range strings.FieldsSeq(exec) {
 		if len(tok) == 2 && tok[0] == '%' {
 			continue
 		}

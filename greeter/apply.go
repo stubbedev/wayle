@@ -32,19 +32,20 @@ var allowedKeys = map[string]bool{
 func RunApplyConfig(args []string, stdout, stderr io.Writer) int {
 	configPath := config.GreeterConfigPath
 	staged := ""
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
+	for rest := args; len(rest) > 0; {
+		arg := rest[0]
+		rest = rest[1:]
+		switch arg {
 		case "--config":
-			if i+1 >= len(args) {
+			if len(rest) == 0 {
 				return applyFail(stderr, "--config requires a path")
 			}
-			i++
-			configPath = args[i]
+			configPath, rest = rest[0], rest[1:]
 		default:
 			if staged != "" {
 				return applyFail(stderr, "unexpected extra argument")
 			}
-			staged = args[i]
+			staged = arg
 		}
 	}
 	if staged == "" {

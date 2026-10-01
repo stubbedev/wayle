@@ -113,7 +113,7 @@ func (s *screen) applyDebugOps(spec string, after func(time.Duration, func())) {
 	if spec == "" {
 		return
 	}
-	for _, op := range strings.Split(spec, ",") {
+	for op := range strings.SplitSeq(spec, ",") {
 		if op == "popup" {
 			after(time.Second, s.drop.Open)
 			continue
@@ -132,4 +132,3 @@ func (s *screen) applyDebugOps(spec string, after func(time.Duration, func())) {
 		})
 	}
 }
-

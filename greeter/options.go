@@ -136,5 +136,3 @@ func SaveLast(path, value string) error {
 	}
 	return os.WriteFile(path, []byte(value), 0o644) //nolint:gosec // a session id and a username, not secret
 }
-
-

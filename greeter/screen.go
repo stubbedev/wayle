@@ -429,4 +429,3 @@ func (s *screen) setCapsLock(on bool) {
 
 // decodeImage reads any image the credential loader supports.
 func decodeImage(path string) (image.Image, error) { return credential.LoadImage(path, 0) }
-

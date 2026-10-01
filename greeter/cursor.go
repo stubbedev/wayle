@@ -164,7 +164,7 @@ func RecordCursor() error {
 // parseRecorded reads the theme=/size= record.
 func parseRecorded(text string) Cursor {
 	var c Cursor
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		key, value, ok := strings.Cut(line, "=")
 		if !ok {
 			continue
@@ -226,7 +226,7 @@ func hyprlandFile(path, home string, depth int) Cursor {
 func parseHyprland(text string) (Cursor, []string) {
 	var c Cursor
 	var sources []string
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line, _, _ = strings.Cut(line, "#")
 		key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
 		if !ok {
@@ -269,7 +269,7 @@ func parseHyprland(text string) (Cursor, []string) {
 // parseNiri scans niri's KDL for xcursor-theme and xcursor-size.
 func parseNiri(text string) Cursor {
 	var c Cursor
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line, _, _ = strings.Cut(line, "//")
 		line = strings.TrimSpace(line)
 		if rest, ok := strings.CutPrefix(line, "xcursor-theme"); ok {
@@ -286,7 +286,7 @@ func parseNiri(text string) Cursor {
 // parseSway reads `seat <name> xcursor_theme <theme> [size]`.
 func parseSway(text string) Cursor {
 	var c Cursor
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line, _, _ = strings.Cut(line, "#")
 		tok := strings.Fields(line)
 		if len(tok) < 4 || tok[0] != "seat" || tok[2] != "xcursor_theme" {
@@ -305,7 +305,7 @@ func parseSway(text string) Cursor {
 // parseGTKSettings reads gtk-cursor-theme-name/-size.
 func parseGTKSettings(text string) Cursor {
 	var c Cursor
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		key, value, ok := strings.Cut(line, "=")
 		if !ok {
 			continue
@@ -328,7 +328,7 @@ func parseGTKSettings(text string) Cursor {
 // parseIndexTheme reads the Inherits= of ~/.icons/default/index.theme
 // (theme only).
 func parseIndexTheme(text string) Cursor {
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		key, value, ok := strings.Cut(line, "=")
 		if !ok || strings.TrimSpace(key) != "Inherits" {
 			continue

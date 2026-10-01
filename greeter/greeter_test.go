@@ -25,8 +25,10 @@ func TestParseOptions(t *testing.T) {
 		t.Errorf("default dirs: %v %v", o.SessionDirs, o.XSessionDirs)
 	}
 
-	o, err = ParseOptions([]string{"--config", "/tmp/c.toml", "--env", "XDG_SESSION_TYPE=wayland",
-		"--sessions", "/a", "--sessions", "/b", "--xsessions", "/x", "--state", "/run/g/last", "--", "sway"})
+	o, err = ParseOptions([]string{
+		"--config", "/tmp/c.toml", "--env", "XDG_SESSION_TYPE=wayland",
+		"--sessions", "/a", "--sessions", "/b", "--xsessions", "/x", "--state", "/run/g/last", "--", "sway",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
