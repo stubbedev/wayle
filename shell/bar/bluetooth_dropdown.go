@@ -385,7 +385,8 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		}
 		row.statusShown = s.connected || s.paired || pending != 0
 		row.status = status
-		row.box.Append(status, false)
+		statusPage := widget.NewBox(widget.Row, 0, 0)
+		statusPage.Append(status, false)
 
 		actions := widget.NewBox(widget.Row, 4, 0)
 		actions.AddClass("bluetooth-device-actions")
@@ -404,7 +405,14 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		actions.Append(toggle, false)
 		actions.Append(forget, false)
 		row.actions = actions
-		row.box.Append(actions, false)
+		// The hover stack crossfades between them (HOVER_TRANSITION_MS),
+		// as wide as the wider page so hovering never shifts the row.
+		row.slot = widget.NewStack()
+		row.slot.AddClass("bluetooth-hover-stack")
+		row.slot.SetTransition(widget.StackCrossfade, hoverTransition)
+		row.slot.Add(btSlotStatus, statusPage)
+		row.slot.Add(btSlotActions, actions)
+		row.box.Append(row.slot, false)
 		row.syncSlot()
 	}
 	return row

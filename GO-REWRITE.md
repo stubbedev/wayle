@@ -162,9 +162,10 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] dropdown page stacks switch as Rust's do: audio, media and treeman
       slide at interaction-duration, network slides and weather crossfades at
       GTK's 200ms, the network hover swaps crossfade at 150ms
+- [x] the bluetooth row's hover swap is a crossfading stack, as wide as
+      its wider page
 - [ ] the card's animated height between pages of different heights
-      (dropdown_resize::animate_height), and the bluetooth row's hover
-      swap as a crossfading stack
+      (dropdown_resize::animate_height)
 
 ### Binaries
 

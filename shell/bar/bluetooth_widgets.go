@@ -89,7 +89,8 @@ type btDeviceRow struct {
 	// hoverBg paints under an available row while hovered
 	// (.bluetooth-device.available:hover).
 	hoverBg render.Color
-	// status and actions share the trailing slot (the hover stack).
+	// status and actions are the hover stack's two pages.
+	slot   *widget.Stack
 	status *widget.Label
 	// statusShown is status_visible: connected, paired, or pending.
 	statusShown bool
@@ -120,10 +121,19 @@ func (r *btDeviceRow) syncSlot() {
 	if r.actions == nil {
 		return
 	}
-	showActions := r.hoverSwaps && r.hovered() && !r.pending
-	r.actions.SetVisible(showActions)
-	r.status.SetVisible(!showActions && r.statusShown)
+	r.status.SetVisible(r.statusShown)
+	if r.hoverSwaps && r.hovered() && !r.pending {
+		r.slot.Show(btSlotActions)
+	} else {
+		r.slot.Show(btSlotStatus)
+	}
 }
+
+// The hover stack's pages.
+const (
+	btSlotStatus  = "status"
+	btSlotActions = "actions"
+)
 
 // ClickAt implements widget.Clicker.
 func (r *btDeviceRow) ClickAt(widget.Point) {
@@ -161,7 +171,7 @@ func (r *btDeviceRow) HitTest(p widget.Point) widget.Widget {
 	if !r.Bounds().Contains(p.X, p.Y) {
 		return nil
 	}
-	if r.actions != nil && widget.IsVisible(r.actions) {
+	if r.actions != nil && r.slot.Visible() == btSlotActions {
 		if hit := r.actions.HitTest(p); hit != nil {
 			return hit
 		}

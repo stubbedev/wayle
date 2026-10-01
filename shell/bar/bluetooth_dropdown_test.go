@@ -267,23 +267,23 @@ func TestBtDropdownDisconnectAndForget(t *testing.T) {
 func TestBtDeviceRowHoverSwapsStatusForActions(t *testing.T) {
 	d, _ := newTestBtDropdown(t, btWorld())
 	row := rowNamed(t, d, "Headset")
-	if visible(row.actions) || !visible(row.status) {
+	if row.slot.Visible() != btSlotStatus || !visible(row.status) {
 		t.Fatal("at rest the row shows its status")
 	}
 	row.SetHovered(true)
-	if !visible(row.actions) || visible(row.status) {
-		t.Fatal("hovered, the row shows its actions")
+	if row.slot.Visible() != btSlotActions || !row.slot.Switching() {
+		t.Fatal("hovered, the row crossfades to its actions")
 	}
 	toggle := row.actions.Children()[0].(*btActionButton)
 	// Moving onto a button keeps the actions (the router unhovers the
 	// row, then hovers the button).
 	row.SetHovered(false)
 	toggle.SetHovered(true)
-	if !visible(row.actions) {
+	if row.slot.Visible() != btSlotActions {
 		t.Error("moving onto an action hid the actions")
 	}
 	toggle.SetHovered(false)
-	if visible(row.actions) || !visible(row.status) {
+	if row.slot.Visible() != btSlotStatus || !visible(row.status) {
 		t.Error("leaving the row keeps the actions")
 	}
 	// Hovering an available row never swaps.
