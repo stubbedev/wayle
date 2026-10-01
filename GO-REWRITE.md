@@ -10,7 +10,7 @@ launcher → lock screen → settings.
 
 | Go package | Ports | Notes |
 | --- | --- | --- |
-| `config` | wayle-config | Same files, discovery order, keys, defaults, and failure behavior: a bad value is a load error and the shell falls back to defaults. Per-section `applyX` functions; the reflected rewrite (YAML, imports, runtime layer, schema) is parked on `collect/config`. |
+| `config` | wayle-config | One cfg-tag reflection layer derives loading, the runtime layer, `wayle config`, and the JSON Schema; schema_test holds every def to schema/wayle-config.schema.json. Same discovery, imports, YAML, and failure behavior as Rust: a bad value is a per-field diagnostic that keeps that field's default. |
 | `strftime` | chrono strftime formatting | Format strings are validated at load; an unsupported specifier is an error, not garbage at runtime. |
 | `styling` | wayle-styling | theme_css, the palette color math, the matugen/pywal/wallust providers, the user stylesheet (`internal/scss` compiles its SCSS subset), and the embedded compiled Rust stylesheet bundle (`just go-css` refreshes it). |
 | `shell/*` | wayle-shell | bar, osd, popups, lock, credential (the lock/greeter prompt), screenshot, regionoverlay, colorpicker, sharepicker, wallpaper. |
@@ -37,11 +37,10 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ## Status
 
-- [x] config: paths, discovery, every bar module section the Go shell
-      renders, `[styling]` (theme table, bar styling keys, the
-      bar-button key set), `[wallpaper]` with the extractor keys,
-      `[lock]`, `[greeter]`, `[launcher]`, `[share-picker]`,
-      `[modules.screenshot]`; one `setIf(dst, src)` overlay helper
+- [x] config: every root section of the Rust schema at its keys and
+      defaults (oracle-tested), YAML and imports, the runtime layer
+      (runtime.toml), hot reload (bars rebuild, OSD and popups take
+      their sections), `wayle config get/set/reset/schema/default`
 - [x] i18n: the Fluent runtime, locale negotiation, both embedded
       domains; bar labels, dropdowns, and the OSD brightness label
 - [x] styling: theme_css with Rust goldens, providers, the user
@@ -78,11 +77,6 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ### Parked work (local branches)
 
-- [ ] `collect/config`: the reflected config rewrite (one cfg-tag
-      reflection layer for loading, the runtime layer, and JSON Schema;
-      YAML and imports; `[animations]`, `[dropdowns]`; hot reload) plus
-      the `wayle config` CLI. Written against the old base, so it must
-      be re-ported onto the current per-section config, not merged.
 - [ ] `collect/launcher` (tip commit): the launcher views
       (`shell/launcher`, `internal/pango`); unfinished, 113 unused
       symbols.
@@ -109,8 +103,9 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ### Config
 
-- [ ] YAML, the runtime override layer, hot reload, `[animations]`,
-      `[dropdowns]`, `wayle config` (all on `collect/config`)
+- [ ] `wayle config docs` (the VitePress page generator)
+- [ ] hot reload beyond the bar/OSD/popups: wallpaper, lock,
+      launcher, and the other watchers the Rust services run
 
 ### Shell surfaces
 
@@ -135,8 +130,9 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [ ] drop the go.mod replace once gelm tags a release
 - [ ] `go test -race ./shell/bar` reports races in the idle-inhibit and
       keybind-mode tests; the gate runs without -race
-- [ ] a zero `config.ColorValue` is a token with no name and renders
-      `var(--)`; make the zero value unrepresentable or auto
+- [ ] bar module goroutines (service subscriptions, tickers) outlive a
+      closed bar (panel hide, reload); a reload only retires their
+      Invoke/Every work. Give modules a lifetime and unsubscribe
 
 ## gelm gaps and the shortcuts they force
 
@@ -196,5 +192,3 @@ data-control, Button.BgExplicit, menu row icons and MenuStack.
   breaks Juniper/Pulse gateways).
 - Screenshot frames decode by their real pixel format (24- and 10-bit
   included) and honor y-invert; Rust assumed XRGB.
-- YAML configs are discovered but not parsed until `collect/config`
-  lands; a `config.yaml` falls back to defaults with a load error.
