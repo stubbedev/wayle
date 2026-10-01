@@ -118,9 +118,9 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       to the vendored cavacore.c (cava/testdata/oracle.c fixtures);
       `waves` and `monstercat` change nothing in either shell (only
       libcava's output stage reads them, which Rust never runs)
-- [ ] cava inputs beyond pipe-wire and pulse (alsa, jack, fifo, oss,
-      sndio, portaudio, shmem): libcava's backends; the Go shell errors
-      at creation
+- [x] cava inputs: fifo and shmem (squeezelite) join pipe-wire and pulse,
+      the set the Rust libcava build compiles in; the rest fail the module
+      with the reason (Rust exits the shell over them)
 - [x] network dialogs: secret prompt, wifi password, wifi list, the VPN
       rows and the VPN editor (typed and raw fields, WireGuard key
       generation and wg-quick import through the portal, inline delete

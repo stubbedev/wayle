@@ -85,7 +85,7 @@ func TestSourceRecordsTheMonitorAsRawInt16Mono(t *testing.T) {
 }
 
 func TestSourceDiscardsTheBacklogOnOverflow(t *testing.T) {
-	src := &Source{capacity: 4, channels: 1}
+	src := &Source{channels: 1, samples: newSamples(1, 4)}
 	src.accumulate([]byte{1, 0, 2, 0, 3, 0})
 	// Two more would make five: cava drops the stale three.
 	src.accumulate([]byte{4, 0, 5, 0})
@@ -110,7 +110,7 @@ func TestNewSourceRejectsBadArguments(t *testing.T) {
 	if _, err := NewSource(svc, "auto", 3, 16); err == nil {
 		t.Error("three channels: want an error")
 	}
-	if s, err := NewSource(svc, "auto", 2, 5); err != nil || s.capacity != 4 {
+	if s, err := NewSource(svc, "auto", 2, 5); err != nil || s.samples.capacity != 4 {
 		t.Errorf("a stereo capacity of 5 = %v, %v; want 4, whole frames", s, err)
 	}
 	if _, err := NewSource(svc, "auto", 2, 1); err == nil {
@@ -157,7 +157,7 @@ func TestSourceRecordsStereoInterleaved(t *testing.T) {
 }
 
 func TestStereoOverflowKeepsFramesPaired(t *testing.T) {
-	src := &Source{capacity: 4, channels: 2}
+	src := &Source{channels: 2, samples: newSamples(2, 4)}
 	// Three frames into room for two: the newest two frames stay, left
 	// before right.
 	src.accumulate([]byte{1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0})

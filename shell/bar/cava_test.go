@@ -1,14 +1,17 @@
 package bar
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
+	analyzer "github.com/stubbedev/wayle/cava"
 	"github.com/stubbedev/wayle/config"
 )
 
@@ -210,7 +213,9 @@ func TestNewCavaBuildsEveryStyleAndStereo(t *testing.T) {
 func TestNewCavaRejectsAnUnsupportedInput(t *testing.T) {
 	for input, ok := range map[config.CavaInput]bool{
 		config.CavaInputPipeWire: true, config.CavaInputPulse: true,
-		config.CavaInputAlsa: false, config.CavaInputJack: false, config.CavaInputFifo: false,
+		config.CavaInputFifo: true, config.CavaInputShmem: true,
+		config.CavaInputAlsa: false, config.CavaInputJack: false, config.CavaInputOss: false,
+		config.CavaInputSndio: false, config.CavaInputPortAudio: false, config.CavaInputWinscap: false,
 	} {
 		cfg := config.Defaults()
 		cfg.Cava.Input = input
@@ -289,5 +294,66 @@ func TestLoadFileRejectsBadCava(t *testing.T) {
 		if _, err := config.LoadFile(path); err == nil {
 			t.Errorf("%q: want a load error, got nil", strings.TrimSpace(content))
 		}
+	}
+}
+
+// TestCavaInputPicksTheCapture pins the input dispatch: fifo and
+// shmem read their source path, the rest record through pulse, which
+// they need.
+func TestCavaInputPicksTheCapture(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	cfg := config.DefaultsCava()
+	cfg.Input, cfg.Source = config.CavaInputFifo, "/tmp/cava.fifo"
+	if in, err := cavaInput(ctx, cfg, 1, 4096); err != nil {
+		t.Errorf("fifo: %v", err)
+	} else if _, ok := in.(*analyzer.FifoInput); !ok {
+		t.Errorf("fifo built %T", in)
+	}
+	cfg.Input = config.CavaInputShmem
+	if in, err := cavaInput(ctx, cfg, 1, 4096); err != nil {
+		t.Errorf("shmem: %v", err)
+	} else if _, ok := in.(*analyzer.ShmemInput); !ok {
+		t.Errorf("shmem built %T", in)
+	}
+	cfg.Input = config.CavaInputPipeWire
+	ctx.Pulse = nil
+	if _, err := cavaInput(ctx, cfg, 1, 4096); err == nil {
+		t.Error("pipe-wire without an audio connection built a capture")
+	}
+}
+
+type fakeCavaInput struct{ stopped chan struct{} }
+
+func (f *fakeCavaInput) Start() error       { return nil }
+func (f *fakeCavaInput) Drained() []float64 { return nil }
+func (f *fakeCavaInput) Stop()              { close(f.stopped) }
+
+// TestCavaModuleEndsWithItsGeneration pins the lifetime: the frame
+// ticker runs while the bar generation lives and, once it retires,
+// the ticker and the capture stop on the loop.
+func TestCavaModuleEndsWithItsGeneration(t *testing.T) {
+	plan, err := analyzer.NewPlan(10, 44100, 1, 0.77, true, 50, 10000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := &fakeCavaInput{stopped: make(chan struct{})}
+	m := &cavaModule{paint: newSpectrum(config.DefaultsCava(), 10, 0, 1, false), plan: plan, source: in}
+	life, retire := context.WithCancel(context.Background())
+	ticking := true
+	var invoked int
+	m.follow(life, time.Second/60,
+		func(time.Duration, func()) func() { return func() { ticking = false } },
+		func(fn func()) { invoked++; fn() })
+	if !ticking {
+		t.Fatal("the ticker stopped before the generation retired")
+	}
+	retire()
+	select {
+	case <-in.stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the capture outlived its generation")
+	}
+	if ticking || invoked != 1 {
+		t.Errorf("after retiring: ticking %v, %d invokes; want stopped on the loop once", ticking, invoked)
 	}
 }

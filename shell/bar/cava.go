@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -265,7 +266,7 @@ func (s *spectrum) HitTest(widget.Point) widget.Widget { return nil }
 type cavaModule struct {
 	paint  *spectrum
 	plan   *analyzer.Plan
-	source *analyzer.Source
+	source analyzer.Input
 }
 
 // cavaBars is the bar count and channel count the service runs with:
@@ -283,17 +284,38 @@ func cavaBars(cfg config.CavaConfig) (bars, channels int) {
 	return bars, channels
 }
 
-// cavaInputSupported reports the inputs the Go shell captures: PipeWire
-// and PulseAudio, both through the PulseAudio protocol (pipewire-pulse
-// on a PipeWire system). libcava's others have no capture here.
+// cavaInputSupported reports the inputs the Go shell captures, the set
+// the Rust shell's libcava is built with: PipeWire and PulseAudio (both
+// through the PulseAudio protocol, pipewire-pulse on a PipeWire
+// system), a FIFO and squeezelite's shared memory. libcava's others
+// are compiled out there, and selecting one exits the Rust shell; here
+// the module fails to load with the reason.
 func cavaInputSupported(input config.CavaInput) bool {
-	return input == config.CavaInputPipeWire || input == config.CavaInputPulse
+	switch input {
+	case config.CavaInputPipeWire, config.CavaInputPulse, config.CavaInputFifo, config.CavaInputShmem:
+		return true
+	}
+	return false
+}
+
+// cavaInput builds the configured capture.
+func cavaInput(ctx ModuleContext, cfg config.CavaConfig, channels, capacity int) (analyzer.Input, error) {
+	switch cfg.Input {
+	case config.CavaInputFifo:
+		return analyzer.NewFifoInput(cfg.Source, channels, capacity)
+	case config.CavaInputShmem:
+		return analyzer.NewShmemInput(cfg.Source, channels, capacity)
+	}
+	if ctx.Pulse == nil {
+		return nil, errCavaNoAudio
+	}
+	return analyzer.NewSource(ctx.Pulse, cfg.Source, channels, capacity)
 }
 
 func newCava(ctx ModuleContext) (Module, error) {
 	cfg := ctx.Config.Cava
 	if !cavaInputSupported(cfg.Input) {
-		return nil, fmt.Errorf("cava: the %q input is not supported by the Go shell (pipe-wire and pulse are)", cfg.Input)
+		return nil, fmt.Errorf("cava: the %q input is not built in (pipe-wire, pulse, fifo and shmem are)", cfg.Input)
 	}
 	// monstercat and waves are passed to libcava's config by the Rust
 	// service but only its output stage (never run there) reads them,
@@ -309,10 +331,7 @@ func newCava(ctx ModuleContext) (Module, error) {
 	if ctx.App == nil {
 		return module, nil
 	}
-	if ctx.Pulse == nil {
-		return nil, errCavaNoAudio
-	}
-	source, err := analyzer.NewSource(ctx.Pulse, cfg.Source, channels, plan.InputSize())
+	source, err := cavaInput(ctx, cfg, channels, plan.InputSize())
 	if err != nil {
 		return nil, err
 	}
@@ -320,8 +339,22 @@ func newCava(ctx ModuleContext) (Module, error) {
 		return nil, err
 	}
 	module.source = source
-	ctx.App.Every(time.Second/time.Duration(cfg.Framerate), module.tick)
+	module.follow(ctx.Life(), time.Second/time.Duration(cfg.Framerate), ctx.App.Every, ctx.App.Invoke)
 	return module, nil
+}
+
+// follow ticks the analyzer every frame until life ends - the module's
+// bar generation, which a reload retires - then stops the ticker and
+// the capture on the loop.
+func (m *cavaModule) follow(life context.Context, frame time.Duration, every func(time.Duration, func()) func(), invoke func(func())) {
+	stopTick := every(frame, m.tick)
+	go func() {
+		<-life.Done()
+		invoke(func() {
+			stopTick()
+			m.source.Stop()
+		})
+	}()
 }
 
 var errCavaNoAudio = errors.New("cava: no audio server connection")
