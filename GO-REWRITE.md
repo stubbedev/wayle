@@ -174,11 +174,13 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 - [x] a live compositor session smoke test (headless sway: start, three
       config reloads incl. a side bar and a bad value, no fatal exits)
-- [ ] packaging (nix package, systemd unit, portal files) still points
-      at the Rust binaries; the Go binary dlopens libgstreamer (and its
-      plugins via GST_PLUGIN_SYSTEM_PATH_1_0) for the recorder, so the
-      package must wrap both, as nix/package.nix does for Rust
-- [ ] drop the go.mod replace once gelm tags a release
+- [x] `nix build .#wayle-go`: the Go shell built with the pinned
+      toolchain, wrapped for its dlopens (libgstreamer, libglib, libpam)
+      and the GStreamer plugin path; the bundled icons and the unit ship
+      with it
+- [ ] the NixOS/home-manager modules, the portal files and the systemd
+      unit still point at the Rust package
+- [x] go.mod pins gelm by its pushed commit (no local replace)
 - [x] module lifetime: each bar is a mount generation; `follow` and
       `ModuleContext.Life` end subscriptions and tickers with it
 
@@ -225,8 +227,6 @@ data-control, Button.BgExplicit, menu row icons and MenuStack.
 - Workspace modules re-query the compositor on each relevant event
   instead of folding events into a local state; the rendered result is
   the same.
-- The `replace` directive in `go.mod` points at the local gelm checkout;
-  the require line tracks the latest pushed gelm commit wayle needs.
 - Audio setters return server errors instead of firing and forgetting;
   the default device is looked up by name on every read.
 - hyprsunset's solar math uses the correct longitude sign; Rust's

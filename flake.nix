@@ -32,6 +32,12 @@
         wayle = pkgs.callPackage ./nix/package.nix { craneLib = crane.mkLib pkgs; };
         default = wayle;
 
+        # The Go rewrite on gelm, built with the toolchain go.mod pins
+        # (`nix build .#wayle-go`).
+        wayle-go = pkgs.callPackage ./nix/package-go.nix {
+          buildGoModule = pkgs.buildGoModule.override { go = pkgs.go_1_27; };
+        };
+
         # The cached 591-crate dependency layer. Not useful to install — it
         # exists so CI can build and push it to the xilo cache as its own store
         # path, which is what lets a fresh machine (or a fresh CI runner) skip
