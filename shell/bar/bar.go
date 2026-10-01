@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/desktopnotify"
+	"github.com/stubbedev/wayle/internal/icons"
 	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
@@ -83,6 +84,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 	theme := newBarTheme(cfg)
 	theme.watchUserStyles(application)
 	widget.SetFaceResolver(fontResolver)
+	if registry, err := icons.NewRegistry(); err == nil {
+		defer initIcons(registry, gelmIcons)()
+	} else {
+		log.Printf("wayle: icon registry init failed: %v", err)
+	}
 	// rt is what the bars are built from; a config reload or a new
 	// palette re-derives it and rebuilds them.
 	rt := &barRuntime{theme: theme, palette: new(styling.Palette)}

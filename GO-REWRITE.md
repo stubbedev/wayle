@@ -78,8 +78,14 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 ### Parked work (local branches)
 
 - [x] `collect/launcher`: superseded by the landed launcher surface
-- [ ] `collect/icons`: `wayle icons` with a usvg/skia-path port for
-      icon transforms; unfinished, fails lint.
+- [x] `collect/icons`: `wayle icons` (every subcommand, replayed against
+      the Rust binary), the usvg/tiny-skia-path port behind the symbolic
+      transform (byte-identical to Rust over the four icon sets),
+      migration, the shell's icon registry (search path, live refresh),
+      and the mail provider icons
+- [ ] the icon SVG parser's error messages: XML is read by encoding/xml,
+      which accepts and rejects what roxmltree does over the corpus but
+      words the cause differently (port roxmltree)
 
 ### Bar
 

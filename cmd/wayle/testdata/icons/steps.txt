@@ -1,0 +1,17 @@
+list
+list -s cm
+sources
+import @ROOT@/input/mine.svg mine
+import @ROOT@/input/mine.svg
+import @ROOT@/input/dir
+import @ROOT@/input/empty
+import @ROOT@/input/missing.svg x
+import @ROOT@/input/mine.svg ../evil
+list
+list -s tb
+list -s zz
+remove cm-mine-symbolic nope-symbolic tb-kept-symbolic
+list
+export @ROOT@/exported
+sync --dry-run
+install nope x

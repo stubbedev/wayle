@@ -1,0 +1,10 @@
+[package]
+name = "symgold"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+usvg = "0.46"
+
+# Not a member of the wayle workspace: an oracle harness only.
+[workspace]

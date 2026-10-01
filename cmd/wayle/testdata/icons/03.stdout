@@ -1,0 +1,18 @@
+
+Available icon sources:
+
+  tabler           tb-    UI icons with outline/stroke style (home, settings, bell)
+                          https://tabler.io/icons
+
+  tabler-filled    tbf-   UI icons with solid/filled style (home, settings, bell)
+                          https://tabler.io/icons
+
+  simple-icons     si-    Brand and app logos (firefox, spotify, github)
+                          https://simpleicons.org
+
+  material         md-    Google Material Design icons
+                          https://fonts.google.com/icons
+
+  lucide           ld-    Alternative UI icons, Feather fork (home, settings, bell)
+                          https://lucide.dev/icons
+

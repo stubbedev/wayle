@@ -1,0 +1,1 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><style>.a{fill:none;stroke:#000;stroke-width:1.5px;stroke-linecap:round} #b { fill: red } path[id=c]{stroke:black;fill:none} g > .d { display:none }</style><path class="a" d="M2 2L14 14"/><path id="b" d="M2 14h4v-4z"/><path id="c" d="M8 2v4"/><g><path class="d" d="M0 0h16v16z"/></g></svg>

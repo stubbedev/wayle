@@ -1,0 +1,6 @@
+[modules.clock]
+icon-name = "tb-kept-symbolic"
+
+[modules.cpu]
+icon-name = "cm-gone-symbolic"
+format = "{{ percent }} si-github-symbolic md-home-symbolic"

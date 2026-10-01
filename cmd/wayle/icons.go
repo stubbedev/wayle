@@ -41,7 +41,7 @@ func iconsCommand() *cli.Command {
 		Name:  "icons",
 		About: "Icon management commands",
 		Subcommands: []*cli.Command{
-			{Name: "setup", About: "Install bundled icons required by Wayle components", Run: notPorted("icons setup")},
+			{Name: "setup", About: "Install bundled icons required by Wayle components", Run: iconsSetup},
 			{
 				Name:          "install",
 				About:         "Install icons from a CDN source",
@@ -50,7 +50,7 @@ func iconsCommand() *cli.Command {
 					{ID: "source", Required: true, Help: "Source name (run 'wayle icons sources' to see available sources)"},
 					{ID: "slugs", Required: true, Multiple: true, Help: "Icon slugs to install (e.g., home settings bell)"},
 				},
-				Run: notPorted("icons install"),
+				Run: iconsInstall,
 			},
 			{
 				Name:          "import",
@@ -60,7 +60,7 @@ func iconsCommand() *cli.Command {
 					{ID: "path", Required: true, Value: cli.Path, Help: "Path to SVG file or directory"},
 					{ID: "name", Help: "Icon name (required for single file, ignored for directory)"},
 				},
-				Run: notPorted("icons import"),
+				Run: iconsImport,
 			},
 			{
 				Name:  "remove",
@@ -68,9 +68,9 @@ func iconsCommand() *cli.Command {
 				Args: []*cli.Arg{
 					{ID: "names", Required: true, Multiple: true, Help: "Icon names to remove (e.g., tb-home-symbolic si-firefox-symbolic)"},
 				},
-				Run: notPorted("icons remove"),
+				Run: iconsRemove,
 			},
-			{Name: "sources", About: "List available icon sources", Run: notPorted("icons sources")},
+			{Name: "sources", About: "List available icon sources", Run: iconsSources},
 			{
 				Name:  "list",
 				About: "List installed icons",
@@ -78,16 +78,16 @@ func iconsCommand() *cli.Command {
 					{ID: "source", Short: 's', Long: "source", Value: cli.String, Help: "Filter by source prefix (e.g., tb, si, md)"},
 					{ID: "interactive", Short: 'i', Long: "interactive", Help: "Interactive fuzzy search (requires fzf)"},
 				},
-				Run: notPorted("icons list"),
+				Run: iconsList,
 			},
-			{Name: "open", About: "Open the icons directory in file manager", Run: notPorted("icons open")},
+			{Name: "open", About: "Open the icons directory in file manager", Run: iconsOpen},
 			{
 				Name:  "export",
 				About: "Export all installed icons to a directory",
 				Args: []*cli.Arg{
 					{ID: "destination", Required: true, Value: cli.Path, Help: "Destination directory for exported icons"},
 				},
-				Run: notPorted("icons export"),
+				Run: iconsExport,
 			},
 			{
 				Name:          "sync",
@@ -96,7 +96,7 @@ func iconsCommand() *cli.Command {
 				Args: []*cli.Arg{
 					{ID: "dry_run", Long: "dry-run", Help: "Preview what would be installed without making changes"},
 				},
-				Run: notPorted("icons sync"),
+				Run: iconsSync,
 			},
 		},
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/feed"
 	"github.com/stubbedev/wayle/internal/fswatch"
+	"github.com/stubbedev/wayle/internal/icons"
 )
 
 // Debounce coalesces a maildir-sync burst into one re-query.
@@ -244,27 +245,13 @@ func renderNotification(format string, m newMail) string {
 // registry (notification daemons do not search wayle's private icon
 // dir by name), else the bare name for system-themed icons.
 func notifyIconArg(icon string) string {
-	base, ok := iconRegistryPath()
-	if !ok {
+	registry, err := icons.NewRegistry()
+	if err != nil {
 		return icon
 	}
-	path := filepath.Join(base, "hicolor", "scalable", "actions", icon+".svg")
+	path := filepath.Join(registry.IconsDir(), icon+".svg")
 	if _, err := os.Stat(path); err != nil {
 		return icon
 	}
 	return path
-}
-
-// iconRegistryPath is wayle-icons' IconRegistry::default_path:
-// $XDG_DATA_HOME/wayle/icons, or ~/.local/share/wayle/icons.
-func iconRegistryPath() (string, bool) {
-	dataHome := os.Getenv("XDG_DATA_HOME")
-	if dataHome == "" {
-		home := os.Getenv("HOME")
-		if home == "" {
-			return "", false
-		}
-		dataHome = filepath.Join(home, ".local", "share")
-	}
-	return filepath.Join(dataHome, "wayle", "icons"), true
 }

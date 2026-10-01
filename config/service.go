@@ -180,6 +180,13 @@ func readRuntime(path string) (any, error) {
 	return tree, nil
 }
 
+// Value is the effective config as toml::Value::try_from serializes it,
+// in the parsed shape: map[string]any tables (canonical keys), []any
+// arrays, string, bool, int64 and float64 leaves.
+func (s *Service) Value() any {
+	return toPlain(encode(s.Config()))
+}
+
 // GetByPath returns the effective value at a dot path, as the config
 // serializes (canonical keys; f32 values widened to f64 the way
 // toml::Value::try_from widens them).

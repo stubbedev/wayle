@@ -1,0 +1,12 @@
+<svg width='16' height='16'
+     xmlns:gpa='https://www.gtk.org/grappa'
+     gpa:version='2'>
+  <path d='M2.00 2.00L14.00 2.00L14.00 14.00L2.00 14.00Z'
+stroke='none'
+fill='rgb(0,0,0)'
+gpa:fill='foreground'/>
+  <path d='M2.00 1.00L15.00 1.00L15.00 15.00L1.00 15.00L1.00 1.00ZM2.00 3.00L2.00 2.00L3.00 2.00L3.00 14.00L2.00 14.00L2.00 13.00L14.00 13.00L14.00 14.00L13.00 14.00L13.00 2.00L14.00 2.00L14.00 3.00L2.00 3.00Z'
+stroke='none'
+fill='rgb(0,0,0)'
+gpa:fill='foreground'/>
+</svg>
