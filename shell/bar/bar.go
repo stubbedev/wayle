@@ -75,22 +75,14 @@ func run(cfg *config.Config, svc *config.Service) error {
 	theme := newBarTheme(cfg)
 	theme.watchUserStyles(application)
 	widget.SetFaceResolver(fontResolver)
-	palette := theme.renderPalette()
-	applyPalette(palette)
-
-	style := computeStyle(cfg, palette)
-	// Bar modules leave their normal ink to the stylesheet
-	// (--bar-btn-label-color): a zero fg is "unset" to gelm, so only a
-	// module's deliberate state color stays programmatic.
-	moduleStyle := style
-	moduleStyle.fg = 0
-
-	face, err := app.Font(cfg.General.FontSans, style.labelPx)
-	if err != nil {
-		return fmt.Errorf("bar: font %q: %w", cfg.General.FontSans, err)
+	// rt is what the bars are built from; a config reload or a new
+	// palette re-derives it and rebuilds them.
+	rt := &barRuntime{theme: theme, palette: new(styling.Palette)}
+	if err := rt.derive(cfg); err != nil {
+		return err
 	}
-	font := app.FontFallback(face)
-	baseCtx := ModuleContext{Config: cfg, App: application, Font: font, Style: &moduleStyle, Theme: theme}
+	palette, style, font := rt.palette, rt.style, rt.font
+	baseCtx := ModuleContext{Config: cfg, App: application, Font: font, Style: &rt.moduleStyle, Theme: theme}
 	// The clipboard history starts with the shell rather than when the
 	// launcher first opens, so it covers the session; a compositor
 	// without data-control simply has none (bootstrap/mod.rs).
@@ -201,25 +193,12 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// outputs join once their connector name is known.
 	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, &sess.OnOutputIdentity, &sess.OnOutputRemoved)
 	defer stopWallpaper()
-	// A fresh color extraction re-resolves the provider palette and
-	// recompiles the bundle, the Rust shell's theme hot-apply.
-	if wall != nil {
-		ticks, stopTicks := wall.Service().Extracted()
-		defer stopTicks()
-		go func() {
-			for range ticks {
-				application.Invoke(theme.reload)
-			}
-		}()
-	}
 	osdSrv := osd.New(application, cfg.Osd, font, palette)
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
-	// rt is what the bars are built from; a config reload swaps it and
-	// rebuilds them.
-	rt := &barRuntime{ctx: baseCtx, style: style}
-	rt.mount(application, cfg, font)
+	rt.ctx = baseCtx
+	rt.mount(application, cfg)
 	// openBar builds one output's bar layer; `wayle panel show` and a
 	// reload reopen bars through it.
 	openBar := func(output *app.Output, layout config.BarLayout) (barLayer, error) {
@@ -264,16 +243,25 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	current := &atomic.Pointer[config.Config]{}
 	current.Store(cfg)
+	// restyle re-derives the palette, styles, and font from cfg and
+	// rebuilds the bars from them (the Rust modules re-render from their
+	// property watches, and the CSS watcher recompiles the bundle).
+	restyle := func(cfg *config.Config) {
+		if err := rt.derive(cfg); err != nil {
+			log.Printf("%v; keeping the previous font", err)
+		}
+		rt.mount(application, cfg)
+		bars.reload(func(connector string) (config.BarLayout, bool) { return barLayoutFor(cfg, connector) })
+	}
 	if svc != nil {
-		// A reload rebuilds the bars from the new snapshot (the Rust
-		// modules re-render from their property watches) and hands the
-		// OSD and popups their new sections.
+		// A reload recompiles the stylesheet for the new snapshot,
+		// rebuilds the bars, and hands the OSD and popups their new
+		// sections.
 		cancel := svc.Subscribe(func(_, next *config.Config) {
 			application.Invoke(func() {
 				current.Store(next)
-				rt.style = computeStyle(next, palette)
-				rt.mount(application, next, font)
-				bars.reload(func(connector string) (config.BarLayout, bool) { return barLayoutFor(next, connector) })
+				theme.setConfig(next)
+				restyle(next)
 				osdSrv.SetConfig(next.Osd)
 				if popupHost != nil {
 					popupHost.SetConfig(next.Notification)
@@ -281,6 +269,20 @@ func run(cfg *config.Config, svc *config.Service) error {
 			})
 		})
 		defer cancel()
+	}
+	// A fresh color extraction re-resolves the provider palette and
+	// recompiles the bundle, the Rust shell's theme hot-apply.
+	if wall != nil {
+		ticks, stopTicks := wall.Service().Extracted()
+		defer stopTicks()
+		go func() {
+			for range ticks {
+				application.Invoke(func() {
+					theme.reload()
+					restyle(current.Load())
+				})
+			}
+		}()
 	}
 	if cfg.Osd.Enabled {
 		go watchOsd(current.Load, baseCtx, osdSrv)
@@ -581,22 +583,51 @@ func applyPalette(palette *styling.Palette) {
 }
 
 // barRuntime is the state a mount generation of bars is built from:
-// the module context (with its dropdown registry) and the style.
+// the module context (with its dropdown registry), the theme, and what
+// derive resolves from a config snapshot.
 type barRuntime struct {
 	ctx   ModuleContext
-	style barStyle
+	theme *barTheme
+	// palette is the one resolved palette every Go-painted surface
+	// (OSD, popups, lock, capture) holds; derive updates it in place,
+	// on the loop.
+	palette *styling.Palette
+	// style is the dropdowns'; moduleStyle is the modules', which
+	// leave their normal ink to the stylesheet (--bar-btn-label-color):
+	// a zero fg is "unset" to gelm, so only a module's deliberate state
+	// color stays programmatic.
+	style, moduleStyle barStyle
+	font               render.Font
+}
+
+// derive resolves the palette, styles, and font for cfg from the
+// theme's compiled palette. A font that does not load is an error and
+// leaves the previous font in place.
+func (r *barRuntime) derive(cfg *config.Config) error {
+	*r.palette = *r.theme.renderPalette()
+	applyPalette(r.palette)
+	r.style = computeStyle(cfg, r.palette)
+	r.moduleStyle = r.style
+	r.moduleStyle.fg = 0
+	face, err := app.Font(cfg.General.FontSans, r.style.labelPx)
+	if err != nil {
+		return fmt.Errorf("bar: font %q: %w", cfg.General.FontSans, err)
+	}
+	r.font = app.FontFallback(face)
+	return nil
 }
 
 // mount starts a generation for cfg: the previous one is retired, the
 // dropdowns are rebuilt, and the context carries the new snapshot.
-func (r *barRuntime) mount(application *app.Application, cfg *config.Config, font render.Font) {
+func (r *barRuntime) mount(application *app.Application, cfg *config.Config) {
 	if r.ctx.gen != nil {
 		r.ctx.gen.retire()
 	}
 	r.ctx.Config = cfg
-	r.ctx.Style = &r.style
+	r.ctx.Font = r.font
+	r.ctx.Style = &r.moduleStyle
 	r.ctx.gen = newMountGen()
-	r.ctx.Dropdowns = newDropdownRegistry(application, cfg, font, &r.style, r.ctx)
+	r.ctx.Dropdowns = newDropdownRegistry(application, cfg, r.font, &r.style, r.ctx)
 }
 
 // barLayoutFor is the output's layout and whether it shows a bar.

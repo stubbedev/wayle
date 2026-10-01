@@ -73,6 +73,12 @@ func (t *barTheme) reload() {
 	t.sheet.Load(t.bundle())
 }
 
+// setConfig recompiles the bundle for a new config snapshot.
+func (t *barTheme) setConfig(cfg *config.Config) {
+	t.cfg = cfg
+	t.reload()
+}
+
 // renderPalette is the resolved palette as render colors, for the
 // surfaces the stylesheet does not reach (OSD, popups, dropdowns).
 func (t *barTheme) renderPalette() *styling.Palette {
