@@ -233,6 +233,16 @@ func TestBundleCarriesStaticThemeAndUserCSS(t *testing.T) {
 	if !strings.Contains(bundle, ":root {\n    --palette-bg: ") {
 		t.Error("the bundle lacks the theme :root block")
 	}
+	// The animation overrides follow the theme, before the user part.
+	anim := cfg.Animations.CSSOverrides()
+	if i, j := strings.Index(bundle, ":root {\n    --palette-bg: "), strings.Index(bundle, anim); j < 0 || j < i {
+		t.Error("the [animations] overrides are missing or precede the theme")
+	}
+	cfg.Animations.Indicators = false
+	if !strings.Contains(theme.bundle(), "--cfg-anim-spin: 0s;") {
+		t.Error("indicators off did not freeze the looping animations")
+	}
+	cfg.Animations.Indicators = true
 	// The scaffold was created, and a user rule lands last.
 	if _, err := os.Stat(filepath.Join(dir, "styles", "index.scss")); err != nil {
 		t.Fatalf("scaffold: %v", err)

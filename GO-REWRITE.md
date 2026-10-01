@@ -153,8 +153,13 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [ ] portal dialogs: file chooser, color picker, print, share picker
       (`wayle portal share-picker` should call `sharepicker.NewClient`)
 - [ ] the share-preview gbm dmabuf allocator and PipeWire producer
-- [ ] enter/exit animations for every transient surface (gelm has no
-      public animation API or revealer)
+- [x] enter/exit animations for every ported transient surface (OSD and
+      toasts, notification cards, dropdowns, the launcher, the lock card,
+      the power menu; the wallpaper crossfades); the portal surfaces get
+      theirs as they are ported. [animations]' CSS overrides reach the
+      stylesheet
+- [ ] in-dropdown interaction transitions: page crossfades between stack
+      pages and the animated page resize (interaction-duration)
 
 ### Binaries
 

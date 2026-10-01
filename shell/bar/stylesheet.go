@@ -48,9 +48,10 @@ func newBarTheme(cfg *config.Config) *barTheme {
 	return t
 }
 
-// bundle builds init_css_provider's CSS: static, theme, user
-// (bootstrap.rs), resolving the palette on the way. The animation
-// overrides of [animations] have no Go consumer yet and are omitted.
+// bundle builds init_css_provider's CSS (bootstrap.rs): static, theme,
+// the [animations] overrides (the --duration-* tokens and, with
+// indicators off, the frozen looping animations), then user styles,
+// resolving the palette on the way.
 func (t *barTheme) bundle() string {
 	palette, err := styling.ResolvePalette(t.cfg.Styling.ActivePalette(), t.cfg.Styling)
 	if err != nil {
@@ -64,7 +65,7 @@ func (t *barTheme) bundle() string {
 	} else {
 		log.Printf("styling: cannot resolve config dir; user styles disabled: %v", err)
 	}
-	return styling.StaticCSS + "\n" + theme + "\n\n" + user
+	return styling.StaticCSS + "\n" + theme + "\n" + t.cfg.Animations.CSSOverrides() + "\n" + user
 }
 
 // reload recompiles the bundle into the attached stylesheet: every bar
