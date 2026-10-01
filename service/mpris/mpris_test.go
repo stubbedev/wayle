@@ -213,7 +213,7 @@ func TestServiceFollowsPlayersOnABus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	feed := svc.Subscribe()
+	feed, _ := svc.Subscribe()
 
 	// Discovery skips the ignored player.
 	if got := svc.Players(); len(got) != 1 || got[0].BusName != vlcName {

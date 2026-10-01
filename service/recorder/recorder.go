@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/stubbedev/wayle/internal/feed"
 )
 
 // Status is the recorder's coarse state.
@@ -107,7 +109,7 @@ type State struct {
 	handle      Handle
 	engine      Engine
 	startDelay  time.Duration
-	changes     chan Change
+	changes     *feed.Feed[Change]
 	timerStop   chan struct{}
 	startCancel chan struct{}
 }
@@ -118,12 +120,14 @@ func NewState(engine Engine, startDelay time.Duration) *State {
 	return &State{
 		engine:     engine,
 		startDelay: startDelay,
-		changes:    make(chan Change, 8),
+		changes:    feed.New[Change](8),
 	}
 }
 
-// Changes ticks on every state flip and elapsed second.
-func (s *State) Changes() <-chan Change { return s.changes }
+// Changes delivers a snapshot on every state flip and elapsed second
+// to every subscriber (the module on each output, the daemon); stop
+// ends the feed.
+func (s *State) Changes() (<-chan Change, func()) { return s.changes.Subscribe() }
 
 // Snapshot reads the current state.
 func (s *State) Snapshot() Change {
@@ -139,14 +143,9 @@ func (s *State) Snapshot() Change {
 	}
 }
 
-// notify drops a change, coalescing when pending.
-func (s *State) notify() {
-	snap := s.Snapshot()
-	select {
-	case s.changes <- snap:
-	default:
-	}
-}
+// notify offers the snapshot to every subscriber, dropping it for a
+// full one.
+func (s *State) notify() { s.changes.Publish(s.Snapshot()) }
 
 // Toggle starts when idle, stops otherwise (state.rs's toggle).
 func (s *State) Toggle() { s.toggle() }

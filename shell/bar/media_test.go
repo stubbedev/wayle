@@ -52,7 +52,7 @@ func (f *fakeMediaSource) SetActive(bus string) error {
 	return mpris.ErrNoPlayer
 }
 
-func (f *fakeMediaSource) Subscribe() <-chan struct{} { return f.feed }
+func (f *fakeMediaSource) Subscribe() (<-chan struct{}, func()) { return f.feed, func() {} }
 
 func (f *fakeMediaSource) record(call string) error {
 	f.mu.Lock()

@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -161,47 +160,6 @@ func (n nm) getSettings(ctx context.Context, path dbus.ObjectPath) (ConnectionDi
 		return nil, err
 	}
 	return dict, nil
-}
-
-// feed is a coalescing change broadcast: every subscriber gets at most
-// one pending tick, so a slow reader sees "something changed" rather
-// than a backlog. The Go counterpart of watching a wayle_core
-// Property.
-type feed struct {
-	mu   sync.Mutex
-	subs map[chan struct{}]struct{}
-}
-
-// Subscribe returns a channel that ticks after each change until ctx
-// ends, when it closes.
-func (f *feed) Subscribe(ctx context.Context) <-chan struct{} {
-	ch := make(chan struct{}, 1)
-	f.mu.Lock()
-	if f.subs == nil {
-		f.subs = make(map[chan struct{}]struct{})
-	}
-	f.subs[ch] = struct{}{}
-	f.mu.Unlock()
-	go func() {
-		<-ctx.Done()
-		f.mu.Lock()
-		delete(f.subs, ch)
-		f.mu.Unlock()
-		close(ch)
-	}()
-	return ch
-}
-
-// notify ticks every subscriber, coalescing with a tick not yet read.
-func (f *feed) notify() {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for ch := range f.subs {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	}
 }
 
 // variantString reads a string variant, "" for anything else.

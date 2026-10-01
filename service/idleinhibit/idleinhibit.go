@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/stubbedev/wayle/internal/feed"
 )
 
 // D-Bus identity.
@@ -24,13 +26,13 @@ type State struct {
 	durationMins  uint32
 	remainingSecs int
 	timerStop     chan struct{}
-	changes       chan struct{}
+	changes       feed.Tick
 }
 
 // NewState starts with the given duration in minutes and inhibition
 // off.
 func NewState(durationMins uint32) *State {
-	return &State{durationMins: durationMins, changes: make(chan struct{}, 1)}
+	return &State{durationMins: durationMins}
 }
 
 // Active reports whether inhibition is on.
@@ -61,16 +63,13 @@ func (s *State) Indefinite() bool {
 	return s.active && s.durationMins == 0
 }
 
-// Changes ticks after every state flip or timer second.
-func (s *State) Changes() <-chan struct{} { return s.changes }
+// Changes ticks after every state flip or timer second; every
+// subscriber (the module on each output, the daemon) sees each one.
+// stop ends the feed.
+func (s *State) Changes() (<-chan struct{}, func()) { return s.changes.Subscribe() }
 
-// notify drops a change tick, coalescing when one is pending.
-func (s *State) notify() {
-	select {
-	case s.changes <- struct{}{}:
-	default:
-	}
-}
+// notify ticks every subscriber, coalescing when one is pending.
+func (s *State) notify() { feed.Notify(&s.changes) }
 
 // Enable turns inhibition on. With indefinite the run has no timer;
 // otherwise the stored duration (if any) counts down and auto-disables.

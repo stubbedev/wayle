@@ -54,7 +54,7 @@ func newBrightness(ctx ModuleContext) (Module, error) {
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
-	ticks, stop, err := ctx.Brightness.Subscribe(context.Background())
+	ticks, stop, err := ctx.Brightness.Subscribe(ctx.Life())
 	if err != nil {
 		return nil, err
 	}

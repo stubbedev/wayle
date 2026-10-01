@@ -9,6 +9,8 @@ import (
 	"sync"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/wayle/internal/feed"
 )
 
 // Profile is one saved NetworkManager connection, the fields of
@@ -35,7 +37,7 @@ type Settings struct {
 
 	mu       sync.Mutex
 	profiles []Profile
-	changes  feed
+	changes  feed.Tick
 }
 
 // newSettings reads every profile and starts following NM's
@@ -76,7 +78,7 @@ func (s *Settings) reload(ctx context.Context) error {
 	s.mu.Lock()
 	s.profiles = profiles
 	s.mu.Unlock()
-	s.changes.notify()
+	feed.Notify(&s.changes)
 	return nil
 }
 
@@ -152,7 +154,7 @@ func (s *Settings) handle(ctx context.Context, sig *dbus.Signal) {
 	default:
 		return
 	}
-	s.changes.notify()
+	feed.Notify(&s.changes)
 }
 
 func firstPath(sig *dbus.Signal) (dbus.ObjectPath, bool) {
@@ -171,7 +173,9 @@ func (s *Settings) Profiles() []Profile {
 }
 
 // Changes ticks whenever a profile is added, removed, or rewritten.
-func (s *Settings) Changes(ctx context.Context) <-chan struct{} { return s.changes.Subscribe(ctx) }
+func (s *Settings) Changes(ctx context.Context) <-chan struct{} {
+	return s.changes.SubscribeContext(ctx)
+}
 
 // byUUID finds the profile with this UUID.
 func (s *Settings) byUUID(uuid string) (Profile, bool) {

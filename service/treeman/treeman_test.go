@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stubbedev/wayle/internal/feed"
 )
 
 func TestWorstBucket(t *testing.T) {
@@ -121,5 +123,39 @@ func TestSubscribeTicksOnEvents(t *testing.T) {
 	case <-ticks:
 	case <-time.After(3 * time.Second):
 		t.Fatal("no event tick")
+	}
+}
+
+// Every subscriber sees every change (one bar per output), and Stop
+// returns and closes them all.
+func TestEverySubscriberTicksAndStopClosesThem(t *testing.T) {
+	t.Setenv("TREEMAN_SOCKET", filepath.Join(t.TempDir(), "absent.sock"))
+	s := New("true")
+	a, _, err := s.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, err := s.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	feed.Notify(&s.changes)
+	for name, ch := range map[string]<-chan struct{}{"first": a, "second": b} {
+		select {
+		case <-ch:
+		case <-time.After(time.Second):
+			t.Fatalf("the %s subscriber missed the tick", name)
+		}
+	}
+	done := make(chan struct{})
+	go func() { s.Stop(); s.Stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Stop deadlocked")
+	}
+	for _, ch := range []<-chan struct{}{a, b} {
+		for range ch { // drains the pending tick, ends on close
+		}
 	}
 }

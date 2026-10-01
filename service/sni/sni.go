@@ -6,6 +6,8 @@ package sni
 import (
 	"strings"
 	"sync"
+
+	"github.com/stubbedev/wayle/internal/feed"
 )
 
 // Category describes the kind of application behind an item.
@@ -104,37 +106,21 @@ type Store struct {
 	mu    sync.Mutex
 	items map[string]*Item
 	order []string
-	subs  []chan struct{}
+	ticks *feed.Tick
 }
 
 // NewStore builds an empty store.
 func NewStore() *Store {
-	return &Store{items: make(map[string]*Item)}
+	return &Store{items: make(map[string]*Item), ticks: feed.NewTick()}
 }
 
 // Subscribe returns a feed that ticks whenever the item set or an
 // item's snapshot changes. Every subscriber (one tray per output) sees
-// every change; feeds live as long as the store.
-func (s *Store) Subscribe() <-chan struct{} {
-	ch := make(chan struct{}, 1)
-	s.mu.Lock()
-	s.subs = append(s.subs, ch)
-	s.mu.Unlock()
-	return ch
-}
+// every change; stop ends the feed.
+func (s *Store) Subscribe() (<-chan struct{}, func()) { return s.ticks.Subscribe() }
 
 // tick signals every feed, coalescing pending ticks per feed.
-func (s *Store) tick() {
-	s.mu.Lock()
-	subs := s.subs
-	s.mu.Unlock()
-	for _, ch := range subs {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	}
-}
+func (s *Store) tick() { feed.Notify(s.ticks) }
 
 // Items snapshots the item list in registration order.
 func (s *Store) Items() []Item {

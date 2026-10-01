@@ -57,7 +57,7 @@ func TestParseAddress(t *testing.T) {
 
 func TestStoreOrderAndChanges(t *testing.T) {
 	s := NewStore()
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	a := &Item{Bus: ":1.1", Path: "/StatusNotifierItem", ID: "a"}
 	b := &Item{Bus: ":1.2", Path: "/StatusNotifierItem", ID: "b"}
 	s.Put(a)
@@ -98,7 +98,7 @@ func TestStoreOrderAndChanges(t *testing.T) {
 
 func TestStoreNoTickOnMiss(t *testing.T) {
 	s := NewStore()
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	// Drain the (empty) buffer without blocking: a remove of a missing
 	// item must not enqueue.
 	if s.Remove("gone", "/x") {

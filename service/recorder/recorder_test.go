@@ -45,6 +45,8 @@ func (e *fakeEngine) Start(context.Context, Options) (Handle, error) {
 
 func waitFor(t *testing.T, s *State, cond func(Change) bool) Change {
 	t.Helper()
+	changes, stop := s.Changes()
+	defer stop()
 	deadline := time.After(2 * time.Second)
 	for {
 		snap := s.Snapshot()
@@ -52,7 +54,7 @@ func waitFor(t *testing.T, s *State, cond func(Change) bool) Change {
 			return snap
 		}
 		select {
-		case <-s.Changes():
+		case <-changes:
 		case <-deadline:
 			t.Fatalf("state never matched: %+v", s.Snapshot())
 		}

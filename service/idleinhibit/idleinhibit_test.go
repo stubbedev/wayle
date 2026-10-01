@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-func waitChange(t *testing.T, s *State) {
+func waitChange(t *testing.T, ch <-chan struct{}) {
 	t.Helper()
 	select {
-	case <-s.Changes():
+	case <-ch:
 	case <-time.After(time.Second):
 		t.Fatal("no change tick within a second")
 	}
@@ -16,6 +16,8 @@ func waitChange(t *testing.T, s *State) {
 
 func TestStateEnableTimed(t *testing.T) {
 	s := NewState(2)
+	changes, stop := s.Changes()
+	defer stop()
 	if s.Active() || s.Indefinite() {
 		t.Fatal("a fresh state starts active")
 	}
@@ -26,7 +28,7 @@ func TestStateEnableTimed(t *testing.T) {
 	if got := s.Remaining(); got != 120 {
 		t.Errorf("remaining = %d, want 120", got)
 	}
-	waitChange(t, s)
+	waitChange(t, changes)
 
 	// The countdown runs and fires at zero, disabling the run: jump the
 	// remaining time to its last second (white-box: the field lives in

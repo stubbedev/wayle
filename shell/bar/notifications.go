@@ -50,16 +50,8 @@ func newNotification(ctx ModuleContext) (Module, error) {
 	// Follow the service's change feed (subscribed before returning, so
 	// no event after construction is missed). Headless construction
 	// refreshes inline.
-	feed := m.src.Subscribe()
-	go func() {
-		for range feed {
-			if ctx.App == nil {
-				m.refresh()
-				continue
-			}
-			m.ctx.Invoke(m.refresh)
-		}
-	}()
+	events, stop := m.src.Subscribe()
+	follow(m.ctx, events, stop, func(notifications.Event) { m.refresh() })
 	return m, nil
 }
 

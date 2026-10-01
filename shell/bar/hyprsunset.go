@@ -132,7 +132,7 @@ func newHyprsunsetWith(ctx ModuleContext, env sunsetEnv) *hyprsunsetModule {
 // and the GeoClue lookup (at start and every six hours while the
 // schedule is on).
 func (m *hyprsunsetModule) run() {
-	runCtx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(m.ctx.Life())
 	m.cancel = cancel
 	go func() {
 		poll := time.NewTicker(hyprsunsetStatePoll)

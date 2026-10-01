@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/stubbedev/wayle/internal/feed"
 )
 
 // Bucket is the coarse worktree state, mirroring treeman's bucket
@@ -101,10 +103,10 @@ type Source interface {
 type System struct {
 	binary string
 
-	mu      sync.Mutex
-	ticks   chan struct{}
-	stopped bool
-	stop    func()
+	changes feed.Tick
+	start   sync.Once
+	halt    sync.Once
+	stopped chan struct{}
 }
 
 // New builds the client for the given treeman binary.
@@ -112,7 +114,7 @@ func New(binary string) *System {
 	if binary == "" {
 		binary = "treeman"
 	}
-	return &System{binary: binary}
+	return &System{binary: binary, stopped: make(chan struct{})}
 }
 
 // Read runs `treeman status`; a missing binary or non-zero exit reads
@@ -133,45 +135,29 @@ func (s *System) Read(ctx context.Context) (*Status, error) {
 // whenever the event stream delivers (bursts collapse into one read
 // after a short debounce). The loop reconnects when the socket drops.
 func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.ticks != nil {
-		return s.ticks, func() {}, nil
-	}
-	s.ticks = make(chan struct{}, 1)
-	ticks := s.ticks
-	stopped := make(chan struct{})
-	s.stop = func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		if s.stopped {
-			return
+	s.start.Do(func() { go s.run() })
+	ticks, stop := s.changes.Subscribe()
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-s.stopped:
 		}
-		s.stopped = true
-		close(stopped)
-	}
-	go s.run(ticks, stopped)
-	return ticks, s.stop, nil
-}
-
-// notify drops a tick, coalescing pending ones.
-func notify(ticks chan struct{}) {
-	select {
-	case ticks <- struct{}{}:
-	default:
-	}
+		stop()
+	}()
+	return ticks, stop, nil
 }
 
 // run is the reconnect loop; the debounce mirrors the Rust service.
-func (s *System) run(ticks chan struct{}, stopped chan struct{}) {
-	notify(ticks)
+func (s *System) run() {
+	stopped := s.stopped
+	feed.Notify(&s.changes)
 	for {
 		select {
 		case <-stopped:
 			return
 		default:
 		}
-		if s.consume(ticks, stopped) {
+		if s.consume(stopped) {
 			return
 		}
 		select {
@@ -183,7 +169,7 @@ func (s *System) run(ticks chan struct{}, stopped chan struct{}) {
 }
 
 // consume drains one event connection; true return means stop.
-func (s *System) consume(ticks chan struct{}, stopped chan struct{}) bool {
+func (s *System) consume(stopped chan struct{}) bool {
 	path, ok := SocketPath()
 	if !ok {
 		time.Sleep(2 * time.Second)
@@ -210,14 +196,14 @@ func (s *System) consume(ticks chan struct{}, stopped chan struct{}) bool {
 		case _, ok := <-lines:
 			if !ok {
 				if dirty {
-					notify(ticks)
+					feed.Notify(&s.changes)
 				}
 				return false
 			}
 			dirty = true
 			debounce.Reset(300 * time.Millisecond)
 		case <-debounce.C:
-			notify(ticks)
+			feed.Notify(&s.changes)
 			dirty = false
 			debounce.Reset(time.Hour)
 			debounce.Stop()
@@ -225,11 +211,10 @@ func (s *System) consume(ticks chan struct{}, stopped chan struct{}) bool {
 	}
 }
 
-// Stop terminates the event loop.
+// Stop terminates the event loop and closes every subscriber.
 func (s *System) Stop() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.stop != nil {
-		s.stop()
-	}
+	s.halt.Do(func() {
+		close(s.stopped)
+		s.changes.Close()
+	})
 }

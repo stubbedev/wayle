@@ -60,7 +60,7 @@ func newNetstat(ctx ModuleContext) (Module, error) {
 	}
 	cfg := ctx.Config.Netstat
 	m := &netstatModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	runCtx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.cancel = cancel
 	if int(cfg.PollIntervalMs) > 0 {
 		go func() {

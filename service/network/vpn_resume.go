@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sync/atomic"
 	"time"
+
+	"github.com/stubbedev/wayle/internal/feed"
 )
 
 // This file brings tunnels back after a suspend (vpn/resume.rs).
@@ -134,7 +136,7 @@ func (r *restartResume) ownerChanged(ctx context.Context, wentAway, cameBack boo
 		}
 		s.watched = nil
 		s.mu.Unlock()
-		s.changes.notify()
+		feed.Notify(&s.changes)
 	}
 	if cameBack {
 		tunnels := r.owed
@@ -276,7 +278,7 @@ func (s *VPNService) restoreOne(ctx context.Context, uuid string) error {
 func (s *VPNService) networkBack(ctx context.Context) bool {
 	waitCtx, cancel := context.WithTimeout(ctx, s.timing.networkWait)
 	defer cancel()
-	changes := s.stateChanges.Subscribe(waitCtx)
+	changes := s.stateChanges.SubscribeContext(waitCtx)
 	state := s.nm.managerState(waitCtx)
 	for !isNetworkBack(state) {
 		if _, ok := <-changes; !ok {

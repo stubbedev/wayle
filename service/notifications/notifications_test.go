@@ -30,7 +30,7 @@ func newTestService(t *testing.T) *Service {
 
 func TestNotifyStoresAndEmits(t *testing.T) {
 	s := newTestService(t)
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	id := s.Notify("mail", 0, "", "New mail", "hello", nil, 0)
 	if id == 0 {
 		t.Fatal("ids start at one")
@@ -50,7 +50,7 @@ func TestNotifyStoresAndEmits(t *testing.T) {
 
 func TestReplacesID(t *testing.T) {
 	s := newTestService(t)
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	id := s.Notify("app", 0, "", "First", "", nil, 0)
 	collect(t, feed, 1)
 	again := s.Notify("app", id, "", "Second", "", nil, 0)
@@ -65,7 +65,7 @@ func TestReplacesID(t *testing.T) {
 
 func TestBlocklistConsumes(t *testing.T) {
 	s := newTestService(t)
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	s.SetBlocklist([]string{"noisy*"})
 	id := s.Notify("noisy-app", 0, "", "spam", "", nil, 0)
 	if id == 0 {
@@ -83,7 +83,7 @@ func TestBlocklistConsumes(t *testing.T) {
 
 func TestDNDSuppressesPopups(t *testing.T) {
 	s := newTestService(t)
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	s.Notify("app", 0, "", "ping", "", nil, 0)
 	<-feed
 	if len(s.Popups()) != 1 {
@@ -115,7 +115,7 @@ func TestDNDSuppressesPopups(t *testing.T) {
 
 func TestExpiryRemoves(t *testing.T) {
 	s := newTestService(t)
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	s.Notify("app", 0, "", "flash", "", nil, 30)
 	<-feed
 	deadline := time.Now().Add(2 * time.Second)
@@ -143,7 +143,7 @@ func TestExpiryRemoves(t *testing.T) {
 
 func TestZeroTimeoutNeverExpires(t *testing.T) {
 	s := newTestService(t)
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	s.Notify("app", 0, "", "sticky", "", nil, 0)
 	<-feed
 	time.Sleep(60 * time.Millisecond)
@@ -154,7 +154,7 @@ func TestZeroTimeoutNeverExpires(t *testing.T) {
 
 func TestDismissAll(t *testing.T) {
 	s := newTestService(t)
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	s.Notify("app", 0, "", "one", "", nil, 0)
 	s.Notify("app", 0, "", "two", "", nil, 0)
 	collect(t, feed, 2)
@@ -170,7 +170,7 @@ func TestDismissAll(t *testing.T) {
 
 func TestInvokeAction(t *testing.T) {
 	s := newTestService(t)
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	var signals []string
 	s.SetEmitter(func(signal string, _ ...any) { signals = append(signals, signal) })
 	id := s.Notify("app", 0, "", "hi", "", []string{"reply", "Reply"}, 0)

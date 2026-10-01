@@ -420,16 +420,17 @@ func (v *mediaView) buildPicker() {
 // and the position polls once a second (MPRIS signals no position
 // changes; the Rust player polls at position_poll_interval).
 func (v *mediaView) follow() {
-	feed := v.src.Subscribe()
+	ticks, unsubscribe := v.src.Subscribe()
 	v.pollPosition()
 	go func() {
+		defer unsubscribe()
 		ticker := time.NewTicker(mediaPositionPollEvery)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-v.stop:
 				return
-			case <-feed:
+			case <-ticks:
 				v.ctx.Invoke(v.refresh)
 			case <-ticker.C:
 				v.pollPosition()

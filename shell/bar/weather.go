@@ -182,7 +182,7 @@ func newWorldClock(ctx ModuleContext) (Module, error) {
 	cfg := ctx.Config.WorldClock
 	m := &worldClockModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.apply(cfg.Format)
-	runCtx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.stop = cancel
 	go func() {
 		ticker := time.NewTicker(time.Second)
@@ -229,7 +229,7 @@ func newWeather(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("weather: requires the application loop")
 	}
 	m := &weatherModule{ctx: ctx, client: weather.NewClient(), label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
-	runCtx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.cancel = cancel
 	m.refresh(runCtx)
 	go func() {

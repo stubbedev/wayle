@@ -280,16 +280,8 @@ func newSystray(ctx ModuleContext) (Module, error) {
 		root:    widget.NewBox(widget.Row, trayItemGap(ctx), 0),
 	}
 	m.root.AddClass("systray")
-	feed := ctx.SNI.Subscribe()
-	go func() {
-		for range feed {
-			if ctx.App == nil {
-				m.refresh()
-				continue
-			}
-			ctx.Invoke(m.refresh)
-		}
-	}()
+	ticks, stop := ctx.SNI.Subscribe()
+	follow(ctx, ticks, stop, func(struct{}) { m.refresh() })
 	m.refresh()
 	return m, nil
 }

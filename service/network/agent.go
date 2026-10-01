@@ -11,6 +11,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/wayle/internal/feed"
 	"github.com/stubbedev/wayle/service/network/openconnect"
 	"github.com/stubbedev/wayle/service/network/secrets"
 )
@@ -128,8 +129,8 @@ type Agent struct {
 	// request would hang until NM timed it out.
 	turn chan struct{}
 
-	changes  feed
-	failures feed
+	changes  feed.Tick
+	failures feed.Tick
 }
 
 type requestKey struct {
@@ -167,7 +168,7 @@ func (a *Agent) Request() (secrets.Request, bool) {
 }
 
 // Changes implements SecretPrompt.
-func (a *Agent) Changes(ctx context.Context) <-chan struct{} { return a.changes.Subscribe(ctx) }
+func (a *Agent) Changes(ctx context.Context) <-chan struct{} { return a.changes.SubscribeContext(ctx) }
 
 // Failure is the last sign-in failure, if one is standing.
 func (a *Agent) Failure() (AuthFailure, bool) {
@@ -180,13 +181,15 @@ func (a *Agent) Failure() (AuthFailure, bool) {
 }
 
 // Failures ticks when a failure is published or cleared.
-func (a *Agent) Failures(ctx context.Context) <-chan struct{} { return a.failures.Subscribe(ctx) }
+func (a *Agent) Failures(ctx context.Context) <-chan struct{} {
+	return a.failures.SubscribeContext(ctx)
+}
 
 func (a *Agent) setFailure(f *AuthFailure) {
 	a.mu.Lock()
 	a.failure = f
 	a.mu.Unlock()
-	a.failures.notify()
+	feed.Notify(&a.failures)
 }
 
 // Submit implements SecretPrompt.
@@ -202,7 +205,7 @@ func (a *Agent) answer(values map[string]string) {
 	a.responder = nil
 	a.request = nil
 	a.mu.Unlock()
-	a.changes.notify()
+	feed.Notify(&a.changes)
 	if responder != nil {
 		responder <- values
 	}
@@ -228,7 +231,7 @@ func (a *Agent) Prompt(ctx context.Context, req secrets.Request) (map[string]str
 	a.responder = responder
 	a.request = &shown
 	a.mu.Unlock()
-	a.changes.notify()
+	feed.Notify(&a.changes)
 	defer func() {
 		a.mu.Lock()
 		taken := a.responder != responder
@@ -238,7 +241,7 @@ func (a *Agent) Prompt(ctx context.Context, req secrets.Request) (map[string]str
 		}
 		a.mu.Unlock()
 		if !taken {
-			a.changes.notify()
+			feed.Notify(&a.changes)
 		}
 	}()
 

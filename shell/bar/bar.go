@@ -226,20 +226,21 @@ func run(cfg *config.Config, svc *config.Service) error {
 		ctx := rt.ctx
 		ctx.Connector = output.Name
 		ctx.Attachers = &[]interface{ Attach(app.Host) }{}
-		lc, err := layerConfigFor(ctx, layout, output.Name, logicalWidth(output.ModeW, output.Scale))
-		if err != nil {
-			return nil, err
-		}
+		// Each bar is its own generation: closing it (panel hide, a
+		// reload) ends its modules.
+		ctx.gen = newMountGen()
+		lc := layerConfigFor(ctx, layout, output.Name, logicalSize(output))
 		lc.Output = output
 		layer, err := application.NewLayer(*lc)
 		if err != nil {
+			ctx.gen.retire()
 			return nil, err
 		}
 		for _, a := range *ctx.Attachers {
 			a.Attach(layer)
 		}
 		rt.ctx.Dropdowns.attachHost(output.Name, layer)
-		return layer, nil
+		return barWindow{layer, ctx.gen}, nil
 	}
 	bars := newBarSet(openBar)
 	for _, output := range outputs {
@@ -437,29 +438,36 @@ func watchOsd(current func() *config.Config, ctx ModuleContext, server *osd.Osd)
 	select {}
 }
 
-// layerConfigFor measures the tree for one output and maps it onto a
-// layer surface config: anchors from the location, margins from the
-// insets, the exclusive zone from the bar height (the Rust shell's auto
-// exclusive zone), and the wayle-bar namespace. The caller pins the
-// output.
-func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string, width int) (*app.LayerConfig, error) {
-	root, err := buildRoot(ctx, layout, connector)
-	if err != nil {
-		return nil, err
-	}
+// layerConfigFor measures the tree for one output (its logical size)
+// and maps it onto a layer surface config: anchors from the location,
+// margins from the insets, the exclusive zone from the bar's thickness
+// (the Rust shell's auto exclusive zone), and the wayle-bar namespace.
+// The compositor stretches only the doubly anchored axis, so a top or
+// bottom bar sizes its height and a side bar its width. The caller pins
+// the output.
+func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string, output widget.Size) *app.LayerConfig {
+	root := buildRoot(ctx, layout, connector)
 	// The surface is transparent and carries no layer margins: the
 	// window's CSS margins (insets and the shadow margin) sit inside it
 	// and the stylesheet paints the bar, as GTK sizes a layer window by
 	// its margin box.
-	height := measureHeight(root, width)
+	vertical := ctx.Config.Bar.Location.IsVertical()
+	thickness := measureThickness(root, output, vertical)
+	var width, height uint32
+	if vertical {
+		width = uint32(thickness)
+	} else {
+		height = uint32(thickness)
+	}
 	return &app.LayerConfig{
 		Layer:         LayerFor(ctx.Config.Bar.Layer),
 		Anchor:        AnchorsFor(ctx.Config.Bar.Location),
-		Height:        uint32(height),
-		ExclusiveZone: exclusiveZone(ctx.Config.Bar.Exclusive, height),
+		Width:         width,
+		Height:        height,
+		ExclusiveZone: exclusiveZone(ctx.Config.Bar.Exclusive, thickness),
 		Namespace:     "wayle-bar-" + connector,
 		Root:          root,
-	}, nil
+	}
 }
 
 // buildRoot assembles one bar the way bar/mod.rs's view does, so the
@@ -475,7 +483,7 @@ func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string
 // border and background the bar chrome; the sections' margins carry the
 // padding (bar/_container.scss). Expanding fillers stand in for
 // GtkCenterBox's centering.
-func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) (widget.Widget, error) {
+func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) widget.Widget {
 	cfg := ctx.Config
 	axis := widget.Row
 	if cfg.Bar.Location.IsVertical() {
@@ -497,10 +505,7 @@ func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) (wi
 		{"bar-center", layout.Center},
 		{"bar-right", layout.Right},
 	} {
-		section, err := CreateAll(part.items, ctx)
-		if err != nil {
-			return nil, err
-		}
+		section := CreateAll(part.items, ctx)
 		section.AddClass("bar-section", part.class)
 		center.Append(section, false)
 		if i < 2 {
@@ -508,41 +513,54 @@ func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) (wi
 		}
 	}
 	root.Append(center, true)
-	return root, nil
+	return root
 }
 
-// measureHeight resolves the bar's content-driven height: the natural
-// height of the tree at the output's width. A priming arrange runs
+// measureThickness resolves the bar's content-driven thickness: the
+// natural height of the tree at the output's width, or for a side bar
+// the natural width at the output's height. A priming arrange runs
 // first: gelm links a widget to its container at arrange time, and the
 // bar stylesheet (attached to the root) reaches a widget only through
 // those links, so the unprimed tree would measure unstyled.
-func measureHeight(root widget.Widget, width int) int {
-	con := widget.Constraints{Max: widget.Size{W: width, H: 1 << 16}}
+func measureThickness(root widget.Widget, output widget.Size, vertical bool) int {
+	con := widget.Constraints{Max: widget.Size{W: output.W, H: 1 << 16}}
+	if vertical {
+		con = widget.Constraints{Max: widget.Size{W: 1 << 16, H: output.H}}
+	}
 	size := root.Measure(con)
-	root.Arrange(render.Rect{W: width, H: size.H})
+	if vertical {
+		root.Arrange(render.Rect{W: size.W, H: output.H})
+	} else {
+		root.Arrange(render.Rect{W: output.W, H: size.H})
+	}
 	// The links drop the children's measure caches but not the root's.
 	if inv, ok := root.(interface{ InvalidateLayout() }); ok {
 		inv.InvalidateLayout()
 	}
-	return root.Measure(con).H
+	size = root.Measure(con)
+	if vertical {
+		return size.W
+	}
+	return size.H
 }
 
 // exclusiveZone mirrors gtk4-layer-shell's auto exclusive zone: an
-// exclusive bar reserves its own height along the docked edge, a
+// exclusive bar reserves its own thickness along the docked edge, a
 // non-exclusive one reserves nothing.
-func exclusiveZone(exclusive bool, height int) int32 {
+func exclusiveZone(exclusive bool, thickness int) int32 {
 	if !exclusive {
 		return 0
 	}
-	return int32(height)
+	return int32(thickness)
 }
 
-// logicalWidth converts an output's current mode to logical pixels at
+// logicalSize converts an output's current mode to logical pixels at
 // the output's scale; the compositor's fractional-scale preference
 // overrides this live once the surface exists. Bar scale is a UI scale
 // for sizes, not a device scale, and never divides here.
-func logicalWidth(modeW, outputScale int) int {
-	return modeW / max(outputScale, 1)
+func logicalSize(output *app.Output) widget.Size {
+	scale := max(output.Scale, 1)
+	return widget.Size{W: output.ModeW / scale, H: output.ModeH / scale}
 }
 
 // applyPalette seeds gelm's widget theme from the wayle palette, so
@@ -573,11 +591,11 @@ type barRuntime struct {
 // dropdowns are rebuilt, and the context carries the new snapshot.
 func (r *barRuntime) mount(application *app.Application, cfg *config.Config, font render.Font) {
 	if r.ctx.gen != nil {
-		r.ctx.gen.retired.Store(true)
+		r.ctx.gen.retire()
 	}
 	r.ctx.Config = cfg
 	r.ctx.Style = &r.style
-	r.ctx.gen = &mountGen{}
+	r.ctx.gen = newMountGen()
 	r.ctx.Dropdowns = newDropdownRegistry(application, cfg, font, &r.style, r.ctx)
 }
 
@@ -585,4 +603,16 @@ func (r *barRuntime) mount(application *app.Application, cfg *config.Config, fon
 func barLayoutFor(cfg *config.Config, connector string) (config.BarLayout, bool) {
 	layout, ok := FindLayout(cfg.Bar.Layout, connector)
 	return layout, ok && layout.Show
+}
+
+// barWindow is an open bar: closing it closes the layer and ends the
+// generation its modules run in.
+type barWindow struct {
+	layer *app.LayerWindow
+	gen   *mountGen
+}
+
+func (w barWindow) Close() {
+	w.layer.Close()
+	w.gen.retire()
 }

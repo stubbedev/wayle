@@ -152,16 +152,8 @@ func newMedia(ctx ModuleContext) (Module, error) {
 	}
 	m := &mediaModule{ctx: ctx, source: ctx.Media, env: liveMediaIconEnv()}
 	m.build()
-	feed := ctx.Media.Subscribe()
-	go func() {
-		for range feed {
-			if ctx.App == nil {
-				m.refresh()
-				continue
-			}
-			ctx.Invoke(m.refresh)
-		}
-	}()
+	ticks, stop := ctx.Media.Subscribe()
+	follow(ctx, ticks, stop, func(struct{}) { m.refresh() })
 	return m, nil
 }
 

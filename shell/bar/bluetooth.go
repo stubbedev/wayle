@@ -67,12 +67,8 @@ func newBluetooth(ctx ModuleContext) (Module, error) {
 	startBtPairingNotifier(ctx.Bluetooth)
 	// The module lives as long as the bar; the subscription ends with
 	// the service.
-	ticks, _ := ctx.Bluetooth.Subscribe()
-	go func() {
-		for range ticks {
-			m.ctx.Invoke(m.refresh)
-		}
-	}()
+	ticks, stop := ctx.Bluetooth.Subscribe()
+	follow(m.ctx, ticks, stop, func(struct{}) { m.refresh() })
 	return m, nil
 }
 

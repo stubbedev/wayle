@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"errors"
 	"strings"
 
@@ -70,7 +69,7 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
-	events, err := ctx.Hyprland.Events(context.Background())
+	events, err := ctx.Hyprland.Events(ctx.Life())
 	if err != nil {
 		return nil, err
 	}

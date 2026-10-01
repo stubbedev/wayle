@@ -73,16 +73,8 @@ func newIdleInhibit(ctx ModuleContext) (Module, error) {
 	m.render()
 	// Follow the shared state: every flip re-syncs the inhibitor and
 	// re-renders.
-	go func() {
-		for range state.Changes() {
-			apply := m.syncInhibitor
-			if m.ctx.App != nil {
-				m.ctx.Invoke(apply)
-			} else {
-				apply()
-			}
-		}
-	}()
+	changes, stop := state.Changes()
+	follow(m.ctx, changes, stop, func(struct{}) { m.syncInhibitor() })
 	return m, nil
 }
 

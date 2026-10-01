@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/wayle/internal/feed"
 )
 
 // This file is VPN state and control with NetworkManager as the single
@@ -127,8 +129,8 @@ type VPNService struct {
 	watched map[dbus.ObjectPath]*vpnEntry
 	// managerState is NM's last reported State.
 	managerState State
-	changes      feed
-	stateChanges feed
+	changes      feed.Tick
+	stateChanges feed.Tick
 }
 
 // newVPNService builds the rows from NM's current profiles and starts
@@ -208,7 +210,9 @@ func (s *VPNService) Aggregate() VPNState {
 }
 
 // Changes ticks whenever a row or the list changes.
-func (s *VPNService) Changes(ctx context.Context) <-chan struct{} { return s.changes.Subscribe(ctx) }
+func (s *VPNService) Changes(ctx context.Context) <-chan struct{} {
+	return s.changes.SubscribeContext(ctx)
+}
 
 func foldStates(states []VPNState) VPNState {
 	result := VPNDisconnected
@@ -254,7 +258,7 @@ func (s *VPNService) update(e *vpnEntry, fn func(e *vpnEntry)) {
 	s.mu.Lock()
 	fn(e)
 	s.mu.Unlock()
-	s.changes.notify()
+	feed.Notify(&s.changes)
 }
 
 // Connect brings the tunnel up if it is not already. The connecting
@@ -434,7 +438,7 @@ func (s *VPNService) rebuild() {
 	}
 	s.entries = next
 	s.mu.Unlock()
-	s.changes.notify()
+	feed.Notify(&s.changes)
 }
 
 // resync reads every row's state straight off NM and records which
@@ -469,7 +473,7 @@ func (s *VPNService) resync(ctx context.Context) {
 		}
 	}
 	s.mu.Unlock()
-	s.changes.notify()
+	feed.Notify(&s.changes)
 }
 
 // stateChanged follows one active connection's StateChanged.
@@ -487,7 +491,7 @@ func (s *VPNService) stateChanged(path dbus.ObjectPath, state, reason uint32) {
 	e.state = next
 	e.detail = mergeDetail(e.detail, detail)
 	s.mu.Unlock()
-	s.changes.notify()
+	feed.Notify(&s.changes)
 }
 
 // applyFailure copies a sign-in failure onto its row. It lands before
@@ -506,7 +510,7 @@ func (s *VPNService) applyFailure() {
 	}
 	s.mu.Unlock()
 	if e != nil {
-		s.changes.notify()
+		feed.Notify(&s.changes)
 	}
 }
 
@@ -549,7 +553,7 @@ func (s *VPNService) signal(ctx context.Context, sig *dbus.Signal, sleep *sleepR
 				s.mu.Lock()
 				s.managerState = State(state)
 				s.mu.Unlock()
-				s.stateChanges.notify()
+				feed.Notify(&s.stateChanges)
 			}
 		}
 		if _, ok := changed["ActiveConnections"]; ok {

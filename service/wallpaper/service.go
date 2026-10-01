@@ -19,43 +19,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/wayle/internal/feed"
 	"github.com/stubbedev/wayle/service/wallpaper/extract"
 )
-
-// notifier fans a coalescing tick out to any number of subscribers:
-// each holds a one-slot channel, so a slow reader sees one pending
-// tick however many changes it missed (the watch-channel semantics of
-// wayle_core::Property).
-type notifier struct {
-	mu   sync.Mutex
-	subs map[chan struct{}]struct{}
-}
-
-func (n *notifier) subscribe() (<-chan struct{}, func()) {
-	ch := make(chan struct{}, 1)
-	n.mu.Lock()
-	if n.subs == nil {
-		n.subs = map[chan struct{}]struct{}{}
-	}
-	n.subs[ch] = struct{}{}
-	n.mu.Unlock()
-	return ch, func() {
-		n.mu.Lock()
-		delete(n.subs, ch)
-		n.mu.Unlock()
-	}
-}
-
-func (n *notifier) notify() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	for ch := range n.subs {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	}
-}
 
 // Options configure a Service (WallpaperServiceBuilder).
 type Options struct {
@@ -89,8 +55,8 @@ type Service struct {
 	extractMu     sync.Mutex
 	lastExtracted string
 
-	changes   notifier // monitors
-	extracted notifier // an extraction finished (or had nothing to do)
+	changes   feed.Tick // monitors
+	extracted feed.Tick // an extraction finished (or had nothing to do)
 
 	cycleKick   chan struct{} // cycling config changed: re-render, restart the timer
 	extractKick chan bool     // extract; true resets lastExtracted first
@@ -115,12 +81,12 @@ func New(opts Options) *Service {
 
 // Changes ticks whenever the per-monitor state changes; read Monitors
 // for the new value. The returned function unsubscribes.
-func (s *Service) Changes() (<-chan struct{}, func()) { return s.changes.subscribe() }
+func (s *Service) Changes() (<-chan struct{}, func()) { return s.changes.Subscribe() }
 
 // Extracted ticks after every color extraction pass, including passes
 // that found nothing new to extract (watch_extraction): theme providers
 // re-read the palette cache on it.
-func (s *Service) Extracted() (<-chan struct{}, func()) { return s.extracted.subscribe() }
+func (s *Service) Extracted() (<-chan struct{}, func()) { return s.extracted.Subscribe() }
 
 // Monitors snapshots the per-monitor state.
 func (s *Service) Monitors() map[string]MonitorState {
@@ -185,7 +151,7 @@ func (s *Service) updateMonitors(fn func(map[string]MonitorState)) {
 	}
 	s.mu.Unlock()
 	if changed {
-		s.changes.notify()
+		feed.Notify(&s.changes)
 		s.kickExtract(false)
 	}
 }
@@ -472,7 +438,7 @@ func (s *Service) ExtractColors(ctx context.Context) error {
 func (s *Service) extract(ctx context.Context, reset bool) error {
 	s.extractMu.Lock()
 	defer s.extractMu.Unlock()
-	defer s.extracted.notify()
+	defer feed.Notify(&s.extracted)
 	if reset {
 		s.lastExtracted = ""
 	}

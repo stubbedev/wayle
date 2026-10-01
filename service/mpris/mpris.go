@@ -15,6 +15,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/wayle/internal/feed"
 	"github.com/stubbedev/wayle/internal/glob"
 )
 
@@ -182,8 +183,8 @@ type Source interface {
 	// source picker); unknown names are ErrNoPlayer.
 	SetActive(busName string) error
 	// Subscribe returns a feed that ticks on every player-set, active,
-	// or snapshot change. Feeds live as long as the source.
-	Subscribe() <-chan struct{}
+	// or snapshot change; stop ends it.
+	Subscribe() (<-chan struct{}, func())
 	// PlayPause, Next, and Previous drive the transport.
 	PlayPause(ctx context.Context, busName string) error
 	Next(ctx context.Context, busName string) error
@@ -210,7 +211,7 @@ type Service struct {
 	// name, so a PropertiesChanged sender resolves to its player.
 	owners map[string]string
 	active string
-	subs   []chan struct{}
+	ticks  *feed.Tick
 	stop   chan struct{}
 }
 
@@ -239,6 +240,7 @@ func New(conn *dbus.Conn, ignored, priority []string) (*Service, error) {
 		priority: priority,
 		owners:   make(map[string]string),
 		stop:     make(chan struct{}),
+		ticks:    feed.NewTick(),
 	}
 	if err := conn.AddMatchSignal(dbus.WithMatchInterface(propsIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchObjectPath(ObjectPath)); err != nil {
 		return nil, fmt.Errorf("mpris: match PropertiesChanged: %w", err)
@@ -264,6 +266,7 @@ func New(conn *dbus.Conn, ignored, priority []string) (*Service, error) {
 // Close stops following the bus and drops the connection.
 func (s *Service) Close() error {
 	close(s.stop)
+	s.ticks.Close()
 	return s.conn.Close()
 }
 
@@ -444,26 +447,10 @@ func parsePlayer(name string, root, player map[string]dbus.Variant) Player {
 }
 
 // notify ticks every subscriber, coalescing per feed.
-func (s *Service) notify() {
-	s.mu.Lock()
-	subs := s.subs
-	s.mu.Unlock()
-	for _, ch := range subs {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	}
-}
+func (s *Service) notify() { feed.Notify(s.ticks) }
 
 // Subscribe implements Source.
-func (s *Service) Subscribe() <-chan struct{} {
-	ch := make(chan struct{}, 1)
-	s.mu.Lock()
-	s.subs = append(s.subs, ch)
-	s.mu.Unlock()
-	return ch
-}
+func (s *Service) Subscribe() (<-chan struct{}, func()) { return s.ticks.Subscribe() }
 
 // Players implements Source.
 func (s *Service) Players() []Player {

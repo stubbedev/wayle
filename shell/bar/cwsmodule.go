@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/stubbedev/gelm/app"
@@ -66,6 +67,7 @@ type cwsView struct {
 // cwsModule is the sway/niri/mango workspaces component: the container,
 // its buttons rebuilt from the latest snapshot, and the urgent blink.
 type cwsModule struct {
+	stopOnce sync.Once
 	cwsView
 	backend cwsBackend
 
@@ -99,15 +101,11 @@ func newCwsModule(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.C
 		return nil, err
 	}
 	m.stopEvents = stop
-	go func() {
-		for range ticks {
-			m.ctx.Invoke(func() {
-				if err := m.refresh(); err != nil {
-					log.Printf("%s-workspaces: %v", m.kind, err)
-				}
-			})
+	follow(m.ctx, ticks, func() { m.Stop() }, func(struct{}) {
+		if err := m.refresh(); err != nil {
+			log.Printf("%s-workspaces: %v", m.kind, err)
 		}
-	}()
+	})
 	return m, nil
 }
 
@@ -283,12 +281,14 @@ func (m *cwsModule) ownsChrome() {}
 
 // Stop releases the timer and the IPC.
 func (m *cwsModule) Stop() {
-	if m.blinkStop != nil {
-		m.blinkStop()
-		m.blinkStop = nil
-	}
-	if m.stopEvents != nil {
-		m.stopEvents()
-	}
-	m.backend.close()
+	m.stopOnce.Do(func() {
+		if m.blinkStop != nil {
+			m.blinkStop()
+			m.blinkStop = nil
+		}
+		if m.stopEvents != nil {
+			m.stopEvents()
+		}
+		m.backend.close()
+	})
 }

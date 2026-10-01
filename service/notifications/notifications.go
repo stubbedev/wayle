@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/wayle/internal/feed"
 	"github.com/stubbedev/wayle/internal/glob"
 	"github.com/stubbedev/wayle/internal/xdg"
 )
@@ -121,7 +122,7 @@ type Service struct {
 	dnd           bool
 	removeExpired bool
 	block         []string
-	subs          []chan Event
+	events        *feed.Feed[Event]
 	owners        map[uint32]string
 	emit          func(signal string, args ...any)
 }
@@ -136,6 +137,7 @@ func NewService() *Service {
 		dnd:           loadDND(),
 		removeExpired: true,
 		owners:        make(map[uint32]string),
+		events:        feed.New[Event](32),
 	}
 }
 
@@ -150,28 +152,12 @@ func (s *Service) SetEmitter(fn func(signal string, args ...any)) {
 // event (the bar modules on each output and the popup host all follow
 // the one service); a subscriber that falls behind drops events rather
 // than stalling the service, and re-reads the snapshot on the next.
-// Feeds live as long as the service.
-func (s *Service) Subscribe() <-chan Event {
-	ch := make(chan Event, 32)
-	s.mu.Lock()
-	s.subs = append(s.subs, ch)
-	s.mu.Unlock()
-	return ch
-}
+// stop ends the feed.
+func (s *Service) Subscribe() (<-chan Event, func()) { return s.events.Subscribe() }
 
 // notify fans an event out to every subscriber, dropping it for the
 // ones whose buffer is full.
-func (s *Service) notify(ev Event) {
-	s.mu.Lock()
-	subs := s.subs
-	s.mu.Unlock()
-	for _, ch := range subs {
-		select {
-		case ch <- ev:
-		default:
-		}
-	}
-}
+func (s *Service) notify(ev Event) { s.events.Publish(ev) }
 
 // Notifications snapshots the stored history.
 func (s *Service) Notifications() []*Notification {

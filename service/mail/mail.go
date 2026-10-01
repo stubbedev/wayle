@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/feed"
 	"github.com/stubbedev/wayle/internal/fswatch"
 )
 
@@ -71,7 +72,7 @@ type Service struct {
 
 	mu    sync.Mutex
 	state State
-	subs  map[chan struct{}]struct{}
+	ticks *feed.Tick
 }
 
 // New builds a service; Run starts it. A nil notifier disables
@@ -82,7 +83,7 @@ func New(cfg config.MailConfig, notmuch Notmuch, notifier Notifier) *Service {
 		notmuch:  notmuch,
 		notifier: notifier,
 		debounce: Debounce,
-		subs:     map[chan struct{}]struct{}{},
+		ticks:    feed.NewTick(),
 	}
 }
 
@@ -94,17 +95,7 @@ func (s *Service) State() State {
 }
 
 // Subscribe ticks after every publish; stop unregisters.
-func (s *Service) Subscribe() (<-chan struct{}, func()) {
-	ch := make(chan struct{}, 1)
-	s.mu.Lock()
-	s.subs[ch] = struct{}{}
-	s.mu.Unlock()
-	return ch, func() {
-		s.mu.Lock()
-		delete(s.subs, ch)
-		s.mu.Unlock()
-	}
-}
+func (s *Service) Subscribe() (<-chan struct{}, func()) { return s.ticks.Subscribe() }
 
 // Run seeds the counts without notifying (existing unread mail at
 // startup is not "new"), then re-queries after each settled burst of
@@ -205,14 +196,7 @@ func (s *Service) recompute(ctx context.Context, notify bool) {
 	}
 
 	// Subscribers hear about a pass once it is complete.
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for ch := range s.subs {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	}
+	feed.Notify(s.ticks)
 }
 
 // newMail is one arrived message rendered into a notification.

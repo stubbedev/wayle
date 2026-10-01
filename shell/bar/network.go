@@ -101,7 +101,7 @@ func newNetwork(ctx ModuleContext) (Module, error) {
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
-	ticks, stop, err := ctx.Network.Subscribe(context.Background())
+	ticks, stop, err := ctx.Network.Subscribe(ctx.Life())
 	if err != nil {
 		return nil, err
 	}

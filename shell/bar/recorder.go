@@ -69,19 +69,8 @@ func newRecorder(ctx ModuleContext) (Module, error) {
 	m.root = assembleModule(ctx, m.icon, m.label)
 	m.refresh()
 	// Follow the shared state; headless construction refreshes inline.
-	if ctx.App == nil {
-		go func() {
-			for range m.src.Changes() {
-				m.refresh()
-			}
-		}()
-		return m, nil
-	}
-	go func() {
-		for range m.src.Changes() {
-			m.ctx.Invoke(m.refresh)
-		}
-	}()
+	changes, stop := m.src.Changes()
+	follow(m.ctx, changes, stop, func(recorder.Change) { m.refresh() })
 	return m, nil
 }
 

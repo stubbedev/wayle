@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/wayle/internal/feed"
 )
 
 // Source is the UI's seam onto the service: the live state, change
@@ -114,7 +116,7 @@ type Service struct {
 	devices  []*Device
 	primary  dbus.ObjectPath
 	pairing  *pending
-	subs     map[chan struct{}]struct{}
+	ticks    *feed.Tick
 	discSubs map[chan DisconnectedEvent]dbus.ObjectPath
 }
 
@@ -140,7 +142,7 @@ func New(conn *dbus.Conn) (*Service, error) {
 		conn:     conn,
 		signals:  make(chan *dbus.Signal, 256),
 		done:     make(chan struct{}),
-		subs:     make(map[chan struct{}]struct{}),
+		ticks:    feed.NewTick(),
 		discSubs: make(map[chan DisconnectedEvent]dbus.ObjectPath),
 	}
 	if err := s.registerAgent(); err != nil {
@@ -183,11 +185,8 @@ func (s *Service) Close() error {
 	s.conn.RemoveSignal(s.signals)
 	s.wg.Wait()
 	s.withdraw(func(pending) agentAnswer { return canceled() })
+	s.ticks.Close()
 	s.mu.Lock()
-	for ch := range s.subs {
-		close(ch)
-	}
-	s.subs = map[chan struct{}]struct{}{}
 	for ch := range s.discSubs {
 		close(ch)
 	}
@@ -425,35 +424,10 @@ func (s *Service) State() State {
 
 // Subscribe ticks on every model or pairing change; the channel closes
 // on stop or Close.
-func (s *Service) Subscribe() (<-chan struct{}, func()) {
-	ch := make(chan struct{}, 1)
-	s.mu.Lock()
-	s.subs[ch] = struct{}{}
-	s.mu.Unlock()
-	var once sync.Once
-	return ch, func() {
-		once.Do(func() {
-			s.mu.Lock()
-			if _, ok := s.subs[ch]; ok {
-				delete(s.subs, ch)
-				close(ch)
-			}
-			s.mu.Unlock()
-		})
-	}
-}
+func (s *Service) Subscribe() (<-chan struct{}, func()) { return s.ticks.Subscribe() }
 
 // changed ticks every subscriber without blocking.
-func (s *Service) changed() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for ch := range s.subs {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	}
-}
+func (s *Service) changed() { feed.Notify(s.ticks) }
 
 // primaryRef resolves the primary adapter for a service-level
 // operation.

@@ -51,7 +51,7 @@ func newTreeman(ctx ModuleContext) (Module, error) {
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
-	ticks, stop, err := ctx.Treeman.Subscribe(context.Background())
+	ticks, stop, err := ctx.Treeman.Subscribe(ctx.Life())
 	if err != nil {
 		return nil, err
 	}

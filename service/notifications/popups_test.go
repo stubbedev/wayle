@@ -18,7 +18,7 @@ func waitPopups(s *Service, want int, within time.Duration) int {
 func TestPopupTimesOutButStaysInHistory(t *testing.T) {
 	s := newTestService(t)
 	s.SetPopupDuration(30 * time.Millisecond)
-	feed := s.Subscribe()
+	feed, _ := s.Subscribe()
 	s.Notify("app", 0, "", "one", "", nil, -1)
 	if got := waitPopups(s, 0, time.Second); got != 0 {
 		t.Fatalf("popups after the duration = %d, want 0", got)
@@ -168,7 +168,8 @@ func TestRemoveExpiredOffKeepsHistory(t *testing.T) {
 
 func TestEverySubscriberSeesEveryEvent(t *testing.T) {
 	s := newTestService(t)
-	a, b := s.Subscribe(), s.Subscribe()
+	a, _ := s.Subscribe()
+	b, _ := s.Subscribe()
 	s.Notify("app", 0, "", "one", "", nil, 0)
 	for name, feed := range map[string]<-chan Event{"a": a, "b": b} {
 		select {

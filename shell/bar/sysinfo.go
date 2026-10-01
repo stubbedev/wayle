@@ -52,7 +52,7 @@ func newPollModule(ctx ModuleContext, cfg pollConfig, read func() (float64, erro
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, cfg.icon)
 	m.root = assembleModule(ctx, m.icon, m.label)
-	runCtx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.cancel = cancel
 	if cfg.pollMs > 0 {
 		go func() {

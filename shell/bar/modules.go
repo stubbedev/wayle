@@ -1,7 +1,10 @@
 package bar
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -107,11 +110,77 @@ func (c ModuleContext) Every(d time.Duration, fn func()) {
 }
 
 // mountGen is one generation of mounted bars. A config reload retires
-// it before mounting the next, so the old modules' Invoke and Every
-// work stops touching their (closed) trees.
-type mountGen struct{ retired atomic.Bool }
+// it before mounting the next: the old modules' Invoke and Every work
+// stops touching their (closed) trees, and their followed
+// subscriptions end.
+type mountGen struct {
+	retired atomic.Bool
+	once    sync.Once
+	done    chan struct{}
+	life    context.Context
+	cancel  context.CancelFunc
+}
+
+func newMountGen() *mountGen {
+	life, cancel := context.WithCancel(context.Background())
+	return &mountGen{done: make(chan struct{}), life: life, cancel: cancel}
+}
+
+// Life is the module's lifetime: canceled when its generation
+// retires (a config reload), never for a context outside one. Module
+// loops and subscriptions run under it.
+func (c ModuleContext) Life() context.Context {
+	if c.gen == nil {
+		return context.Background()
+	}
+	return c.gen.life
+}
 
 func (g *mountGen) retiredNow() bool { return g != nil && g.retired.Load() }
+
+// retire ends the generation.
+func (g *mountGen) retire() {
+	g.once.Do(func() {
+		g.retired.Store(true)
+		close(g.done)
+		g.cancel()
+	})
+}
+
+// ended is closed once the generation retires; nil (never) for a
+// context outside any generation.
+func (g *mountGen) ended() <-chan struct{} {
+	if g == nil {
+		return nil
+	}
+	return g.done
+}
+
+// follow runs fn for every value from ch until the module's
+// generation retires or ch closes, then stops the subscription. fn
+// runs on the loop, or inline for a headless context.
+func follow[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
+	go func() {
+		if stop != nil {
+			defer stop()
+		}
+		for {
+			select {
+			case <-ctx.gen.ended():
+				return
+			case v, ok := <-ch:
+				if !ok {
+					return
+				}
+				if ctx.App == nil {
+					fn(v)
+					continue
+				}
+				ctx.Invoke(func() { fn(v) })
+			}
+		}
+	}()
+}
 
 // Module is one bar module: a live widget tree plus whatever timers
 // keep it current. The interface grows update/message plumbing as
@@ -181,7 +250,12 @@ func Create(name string, ctx ModuleContext) (Module, error) {
 // each module inside classed `module` plus its per-instance class. The
 // gaps between items and grouped modules are the stylesheet's margins
 // (bar/_layout.scss), not box spacing.
-func CreateAll(items []config.BarItem, ctx ModuleContext) (*widget.Box, error) {
+//
+// A module that cannot be built (its service is unavailable on this
+// system, its compositor is not running) is logged and left out, like
+// module_registry.rs require_service: one missing daemon never takes
+// the bar down.
+func CreateAll(items []config.BarItem, ctx ModuleContext) *widget.Box {
 	axis := widget.Row
 	if ctx.Config != nil && ctx.Config.Bar.Location.IsVertical() {
 		axis = widget.Column
@@ -198,12 +272,12 @@ func CreateAll(items []config.BarItem, ctx ModuleContext) (*widget.Box, error) {
 		}
 		for _, inner := range modules {
 			if err := appendModule(box, inner, ctx); err != nil {
-				return nil, err
+				log.Printf("bar: module %q will not appear: %v", inner.Module, err)
 			}
 		}
 		row.Append(box, false)
 	}
-	return row, nil
+	return row
 }
 
 func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error {

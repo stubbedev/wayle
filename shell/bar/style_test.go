@@ -78,11 +78,8 @@ func styledContext(t *testing.T, cfg *config.Config) ModuleContext {
 // returning the pixels and the measured height.
 func paintBar(t *testing.T, ctx ModuleContext, layout config.BarLayout, w int) ([]byte, int, widget.Widget) {
 	t.Helper()
-	root, err := buildRoot(ctx, layout, "DP-1")
-	if err != nil {
-		t.Fatalf("buildRoot: %v", err)
-	}
-	h := measureHeight(root, w)
+	root := buildRoot(ctx, layout, "DP-1")
+	h := measureThickness(root, widget.Size{W: w}, false)
 	root.Measure(widgetConstraintsMax(w, h))
 	root.Arrange(render.Rect{W: w, H: h})
 	widget.CollectDamage(root)
@@ -102,10 +99,7 @@ func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	cfg := config.Defaults()
 	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock", Class: "mine"}}}
 	ctx := newTestContext(t, cfg)
-	root, err := buildRoot(ctx, layout, "DP-1")
-	if err != nil {
-		t.Fatalf("buildRoot: %v", err)
-	}
+	root := buildRoot(ctx, layout, "DP-1")
 	for _, c := range []string{"bar", "top", "DP-1"} {
 		if !widget.HasClass(root, c) {
 			t.Errorf("root misses %q", c)
@@ -147,7 +141,7 @@ func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	}
 
 	cfg.Bar.InsetEdge = config.Size{Value: 4, Unit: config.SizePixels}
-	root, _ = buildRoot(newTestContext(t, cfg), layout, "DP-1")
+	root = buildRoot(newTestContext(t, cfg), layout, "DP-1")
 	if !widget.HasClass(root, "floating") {
 		t.Error("an inset bar is not floating")
 	}
@@ -158,10 +152,7 @@ func TestGroupsAreBarItemsWithModules(t *testing.T) {
 	layout := config.BarLayout{Monitor: "*", Left: []config.BarItem{{Group: &config.BarGroup{
 		Name: "g1", Modules: []config.BarItem{{Module: "clock"}, {Module: "clock"}},
 	}}}}
-	root, err := buildRoot(newTestContext(t, cfg), layout, "DP-1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := buildRoot(newTestContext(t, cfg), layout, "DP-1")
 	left := root.(*widget.Box).Children()[0].(*widget.Box).Children()[0].(*widget.Box)
 	group := left.Children()[0].(*widget.Box)
 	if !group.HasClass("bar-item") || !group.HasClass("bar-group") || group.ID() != "g1" {
@@ -225,10 +216,7 @@ func TestBarInsetsAreWindowMargins(t *testing.T) {
 	if got := pixelAt(data, 200, 100, 11); got != palette.Surface {
 		t.Errorf("below the margin = %#08x, want the bar", uint32(got))
 	}
-	lc, err := layerConfigFor(ctx, config.BarLayout{Monitor: "*"}, "DP-1", 200)
-	if err != nil {
-		t.Fatal(err)
-	}
+	lc := layerConfigFor(ctx, config.BarLayout{Monitor: "*"}, "DP-1", widget.Size{W: 200, H: 100})
 	if lc.Margin != (app.Margins{}) || lc.Height != uint32(h) {
 		t.Errorf("layer margins %+v height %d, want none and the full %d", lc.Margin, lc.Height, h)
 	}
@@ -288,5 +276,40 @@ func TestUserStylesStampFollowsEdits(t *testing.T) {
 	}
 	if userStylesStamp() == first {
 		t.Error("a new partial did not move the stamp")
+	}
+}
+
+// A side bar is anchored top and bottom, so the compositor stretches
+// its height and the bar sizes only its width; a top bar the other way
+// round. Setting the stretched axis, or leaving the free axis zero, is
+// a layer-shell protocol error.
+func TestLayerConfigSizesOnlyTheFreeAxis(t *testing.T) {
+	out := widget.Size{W: 1280, H: 800}
+	for _, tc := range []struct {
+		loc      config.Location
+		vertical bool
+	}{
+		{config.LocationTop, false},
+		{config.LocationBottom, false},
+		{config.LocationLeft, true},
+		{config.LocationRight, true},
+	} {
+		cfg := config.Defaults()
+		cfg.Bar.Location = tc.loc
+		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
+		lc := layerConfigFor(styledContext(t, cfg), layout, "DP-1", out)
+		thick, stretched := lc.Height, lc.Width
+		if tc.vertical {
+			thick, stretched = lc.Width, lc.Height
+		}
+		if thick == 0 || thick >= uint32(min(out.W, out.H)) {
+			t.Errorf("%s: free-axis size %d, want the content's thickness", tc.loc, thick)
+		}
+		if stretched != 0 {
+			t.Errorf("%s: stretched-axis size %d, want 0 (the compositor fills it)", tc.loc, stretched)
+		}
+		if lc.ExclusiveZone != int32(thick) {
+			t.Errorf("%s: exclusive zone %d, want the thickness %d", tc.loc, lc.ExclusiveZone, thick)
+		}
 	}
 }

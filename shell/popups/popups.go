@@ -77,7 +77,8 @@ func (p *Popups) SetConfig(cfg config.NotificationConfig) {
 // Run follows the service's feed until the process exits; each change
 // reconciles on the loop goroutine, which owns the widget tree.
 func (p *Popups) Run() {
-	for range p.svc.Subscribe() {
+	events, _ := p.svc.Subscribe()
+	for range events {
 		if p.app == nil {
 			p.sync()
 			continue

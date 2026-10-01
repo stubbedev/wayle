@@ -197,7 +197,7 @@ func newCustom(ctx ModuleContext, def config.CustomModuleDefinition) (Module, er
 	if ctx.CustomUpdates != nil {
 		ctx.CustomUpdates.register(m)
 	}
-	runCtx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.cancel = cancel
 	switch def.Mode {
 	case config.ExecutionModeWatch:

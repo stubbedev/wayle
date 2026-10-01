@@ -41,7 +41,7 @@ func newPowerProfiles(ctx ModuleContext) (Module, error) {
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
-	ticks, stop, err := ctx.PowerProfiles.Subscribe(context.Background())
+	ticks, stop, err := ctx.PowerProfiles.Subscribe(ctx.Life())
 	if err != nil {
 		return nil, err
 	}

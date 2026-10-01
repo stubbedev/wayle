@@ -314,7 +314,7 @@ func newHyprlandWorkspaces(ctx ModuleContext) (Module, error) {
 	if ctx.App == nil {
 		return m, nil
 	}
-	events, err := ctx.Hyprland.Events(context.Background())
+	events, err := ctx.Hyprland.Events(ctx.Life())
 	if err != nil {
 		return nil, fmt.Errorf("hyprland-workspaces: events: %w", err)
 	}

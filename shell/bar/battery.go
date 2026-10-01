@@ -124,21 +124,14 @@ func (m *battery) setIcon(cfg config.BatteryConfig, dev upower.Device) {
 
 // subscribe re-reads on every PropertiesChanged tick.
 func (m *battery) subscribe() error {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(m.ctx.Life())
 	ticks, stop, err := m.source.Subscribe(ctx)
 	if err != nil {
 		cancel()
 		return fmt.Errorf("battery: subscribe: %w", err)
 	}
 	m.cancel = cancel
-	go func() {
-		for range ticks {
-			m.ctx.Invoke(func() {
-				_ = m.refresh()
-			})
-		}
-		stop()
-	}()
+	follow(m.ctx, ticks, stop, func(struct{}) { _ = m.refresh() })
 	return nil
 }
 
