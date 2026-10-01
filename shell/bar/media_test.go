@@ -306,33 +306,42 @@ func TestMediaDropdownTransport(t *testing.T) {
 	v.playPause.OnClick()
 	v.next.OnClick()
 	v.loop.OnClick()
-	// A seek commits on release, at the percent of the length.
-	v.seek.SetPressed(true)
-	v.seek.SetValue(25)
-	v.seek.SetPressed(false)
-	calls := waitCalls(t, source, 4)
+	// A drag seeks at the percent of the length: the first move commits,
+	// and the release commits again (DebouncedSlider).
+	v.seek.knob.SetPressed(true)
+	v.seek.knob.SetValue(25)
+	v.seek.knob.SetPressed(false)
+	calls := waitCalls(t, source, 5)
 	want := map[string]bool{"play-pause " + bus: true, "next " + bus: true, "loop " + bus: true, "seek " + bus + " 15s": true}
+	seeks := 0
 	for _, c := range calls {
-		if !want[c] {
+		if c == "seek "+bus+" 15s" {
+			seeks++
+		}
+		if !want[c] && c != "seek "+bus+" 15s" {
 			t.Errorf("unexpected call %q", c)
 		}
 		delete(want, c)
+	}
+	if seeks != 2 {
+		t.Errorf("seeks = %d, want the move and the release", seeks)
 	}
 	if len(want) != 0 {
 		t.Errorf("missing calls %v (got %v)", want, calls)
 	}
 
-	// A position read moves the knob unless it is held.
+	// A position read moves the knob unless it is held (or just let go).
+	v.seek.now = func() time.Time { return time.Now().Add(time.Second) }
 	v.setPosition(45 * time.Second)
-	if v.seek.Value() != 75 || v.position.Text() != "0:45" {
-		t.Errorf("position = %v / %q, want 75 / 0:45", v.seek.Value(), v.position.Text())
+	if v.seek.value() != 75 || v.position.Text() != "0:45" {
+		t.Errorf("position = %v / %q, want 75 / 0:45", v.seek.value(), v.position.Text())
 	}
-	v.seek.SetPressed(true)
+	v.seek.knob.SetPressed(true)
 	v.setPosition(0)
-	if v.seek.Value() != 75 {
+	if v.seek.value() != 75 {
 		t.Error("a position read moved the held knob")
 	}
-	v.seek.SetPressed(false)
+	v.seek.knob.SetPressed(false)
 
 	// The picker switches the active player and returns to the view.
 	v.showPicker()

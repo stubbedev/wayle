@@ -89,34 +89,6 @@ func orUnknown(value, placeholder string) string {
 	return value
 }
 
-// seekSlider is the progress slider: it reports a seek once, when the
-// drag releases (the Rust DebouncedSlider's committed signal), and
-// ignores programmatic position updates while held.
-type seekSlider struct {
-	*widget.Slider
-	onCommit func(percent float64)
-}
-
-// HitTest makes the wrapper the input leaf, so the press protocol
-// reaches its SetPressed.
-func (s *seekSlider) HitTest(p widget.Point) widget.Widget { return s.HitLeaf(s, p) }
-
-// SetPressed commits the value on release.
-func (s *seekSlider) SetPressed(on bool) {
-	was := s.Pressed
-	s.Slider.SetPressed(on)
-	if was && !on && s.onCommit != nil {
-		s.onCommit(s.Value())
-	}
-}
-
-// setPosition moves the knob unless the user holds it.
-func (s *seekSlider) setPosition(percent float64) {
-	if !s.Pressed {
-		s.SetValue(percent)
-	}
-}
-
 // mediaView is the media dropdown (dropdowns/media): the player view
 // with transport controls, or the source picker, or the no-player
 // empty state. It follows the service while open and stops on Close.
@@ -136,7 +108,7 @@ type mediaView struct {
 	title      *widget.Label
 	artist     *widget.Label
 	album      *widget.Label
-	seek       *seekSlider
+	seek       *debouncedSlider
 	position   *widget.Label
 	length     *widget.Label
 	shuffle    *widget.Button
@@ -237,7 +209,8 @@ func (v *mediaView) buildPlayer(font render.Font, px float64) {
 		v.player.Append(l, false)
 	}
 
-	v.seek = &seekSlider{Slider: widget.NewSlider(0, 100, 0, 0)}
+	// The seek bar is a DebouncedSlider without its value label.
+	v.seek = newDebouncedSlider(0, 100, 0, nil, 0, 0, v.ctx.Invoke)
 	v.seek.AddClass("media-seek-slider")
 	v.seek.onCommit = v.seekTo
 	v.player.Append(v.seek, false)
@@ -373,7 +346,7 @@ func (v *mediaView) setPosition(pos time.Duration) {
 		return
 	}
 	v.position.SetText(formatMediaDuration(pos))
-	v.seek.setPosition(mediaProgress(pos, v.current.Length))
+	v.seek.set(mediaProgress(pos, v.current.Length))
 }
 
 // showPicker is ShowSourcePicker: the list of players.
