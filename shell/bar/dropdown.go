@@ -53,6 +53,15 @@ func (r *dropdownRegistry) attachHost(connector string, host app.Host) {
 	r.mu.Unlock()
 }
 
+// detachHost forgets an unplugged connector's layer and its open
+// popover.
+func (r *dropdownRegistry) detachHost(connector string) {
+	r.mu.Lock()
+	delete(r.hosts, connector)
+	delete(r.openPop, connector)
+	r.mu.Unlock()
+}
+
 // Names lists the registered dropdowns (tests).
 func (r *dropdownRegistry) Names() []string {
 	names := make([]string, 0, len(r.builders))

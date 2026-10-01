@@ -31,9 +31,15 @@ func TestReloadRecompilesTheThemeAndUpdatesTheSharedPalette(t *testing.T) {
 	}
 	shared := rt.palette
 	before := *shared
+	if rt.paletteStale() {
+		t.Fatal("a freshly derived palette is stale")
+	}
 
 	next := withBg(t, cfg, "#123456")
 	rt.theme.setConfig(next)
+	if !rt.paletteStale() {
+		t.Fatal("a recompiled theme with a new bg is not stale before derive")
+	}
 	if err := rt.derive(next); err != nil {
 		t.Fatal(err)
 	}

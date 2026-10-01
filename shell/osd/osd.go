@@ -159,12 +159,24 @@ func (o *Osd) Show(ev Event) {
 	o.mu.Unlock()
 }
 
-// AttachOutput adds an output to the fan-out. The bar calls it once
-// per output at startup.
+// AttachOutput adds an output to the fan-out: each output at startup
+// and each hotplugged one once its name is known.
 func (o *Osd) AttachOutput(name string, output *app.Output) {
 	o.mu.Lock()
 	o.outputs[name] = output
 	o.mu.Unlock()
+}
+
+// DetachOutput drops an unplugged output and closes its face.
+func (o *Osd) DetachOutput(name string) {
+	o.mu.Lock()
+	delete(o.outputs, name)
+	f := o.faces[name]
+	delete(o.faces, name)
+	o.mu.Unlock()
+	if f != nil {
+		f.win.Close()
+	}
 }
 
 // SetConfig applies a reloaded [osd] section: the next Show uses it,

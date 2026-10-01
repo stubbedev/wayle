@@ -2,6 +2,7 @@ package bar
 
 import (
 	"log"
+	"slices"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/app"
@@ -36,15 +37,6 @@ type barEntry struct {
 
 func newBarSet(open func(*app.Output, config.BarLayout) (barLayer, error)) *barSet {
 	return &barSet{open: open, bars: map[string]*barEntry{}}
-}
-
-// add registers an output; layer is its open bar, nil when the layout
-// gives it none.
-func (b *barSet) add(output *app.Output, layout config.BarLayout, layer barLayer) {
-	if _, ok := b.bars[output.Name]; !ok {
-		b.order = append(b.order, output.Name)
-	}
-	b.bars[output.Name] = &barEntry{output: output, layout: layout, shows: layer != nil, layer: layer}
 }
 
 // connectors names the outputs whose layout gives them a bar, in
@@ -138,4 +130,43 @@ func serveShellIPC(application *app.Application, bars *barSet, lock func() bool)
 		}
 		_ = conn.Close()
 	}
+}
+
+// plug registers a hotplugged output once its connector name is known
+// (SyncMonitors) and opens its bar when the layout shows one. An
+// output already registered under its name is left alone; one that
+// was renamed is moved.
+func (b *barSet) plug(output *app.Output, layout config.BarLayout, shows bool) {
+	for name, entry := range b.bars {
+		if entry.output == output && name != output.Name {
+			b.drop(name)
+		}
+	}
+	if entry, ok := b.bars[output.Name]; ok {
+		if entry.output == output {
+			return
+		}
+		b.drop(output.Name)
+	}
+	entry := &barEntry{output: output, layout: layout, shows: shows}
+	b.order = append(b.order, output.Name)
+	b.bars[output.Name] = entry
+	b.sync(output.Name, entry)
+}
+
+// unplug closes an unplugged output's bar and forgets it.
+func (b *barSet) unplug(output *app.Output) {
+	for name, entry := range b.bars {
+		if entry.output == output {
+			b.drop(name)
+		}
+	}
+}
+
+func (b *barSet) drop(name string) {
+	if entry := b.bars[name]; entry.layer != nil {
+		entry.layer.Close()
+	}
+	delete(b.bars, name)
+	b.order = slices.DeleteFunc(b.order, func(n string) bool { return n == name })
 }

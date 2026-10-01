@@ -200,7 +200,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	// Wallpapers render on their own Background layers; hotplugged
 	// outputs join once their connector name is known.
-	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, &sess.OnOutputIdentity, &sess.OnOutputRemoved)
+	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, sess)
 	defer stopWallpaper()
 	osdSrv := osd.New(application, cfg.Osd, font, palette)
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
@@ -231,17 +231,29 @@ func run(cfg *config.Config, svc *config.Service) error {
 		return barWindow{layer, ctx.gen}, nil
 	}
 	bars := newBarSet(openBar)
-	for _, output := range outputs {
-		layout, show := barLayoutFor(cfg, output.Name)
-		var layer barLayer
-		if show {
-			if layer, err = openBar(output, layout); err != nil {
-				return err
-			}
+	current := &atomic.Pointer[config.Config]{}
+	current.Store(cfg)
+	// plugOutput gives a named output its bar and OSD face; startup
+	// outputs and hotplugged ones (once their connector name is known)
+	// take the same path, the Rust SyncMonitors. A bar that cannot open
+	// is logged, not fatal.
+	plugOutput := func(output *app.Output) {
+		if output.Name == "" {
+			return
 		}
-		bars.add(output, layout, layer)
+		layout, show := barLayoutFor(current.Load(), output.Name)
+		bars.plug(output, layout, show)
 		osdSrv.AttachOutput(output.Name, output)
 	}
+	for _, output := range outputs {
+		plugOutput(output)
+	}
+	defer sess.WatchOutputIdentity(plugOutput)()
+	defer sess.WatchOutputs(nil, func(output *app.Output) {
+		bars.unplug(output)
+		osdSrv.DetachOutput(output.Name)
+		rt.ctx.Dropdowns.detachHost(output.Name)
+	})()
 	// Notification popups render on one monitor, bar or not.
 	var popupHost *popups.Popups
 	if notifSvc != nil {
@@ -250,8 +262,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 			go popupHost.Run()
 		}
 	}
-	current := &atomic.Pointer[config.Config]{}
-	current.Store(cfg)
 	// restyle re-derives the palette, styles, and font from cfg and
 	// rebuilds the bars from them (the Rust modules re-render from their
 	// property watches, and the CSS watcher recompiles the bundle).
@@ -295,8 +305,14 @@ func run(cfg *config.Config, svc *config.Service) error {
 		go func() {
 			for range ticks {
 				application.Invoke(func() {
+					// The bundle recompiles regardless (the Rust CSS
+					// watcher); the bars rebuild only for a new palette, so
+					// an extraction that changed nothing (a monitor plugged
+					// in) leaves them open.
 					theme.reload()
-					restyle(current.Load())
+					if rt.paletteStale() {
+						restyle(current.Load())
+					}
 				})
 			}
 		}()
@@ -634,6 +650,10 @@ func (r *barRuntime) derive(cfg *config.Config) error {
 	r.font = app.FontFallback(face)
 	return nil
 }
+
+// paletteStale reports whether the theme's compiled palette differs
+// from the one derive last resolved.
+func (r *barRuntime) paletteStale() bool { return *r.theme.renderPalette() != *r.palette }
 
 // mount starts a generation for cfg: the previous one is retired, the
 // dropdowns are rebuilt, and the context carries the new snapshot.

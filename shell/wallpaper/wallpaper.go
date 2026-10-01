@@ -86,13 +86,17 @@ func Start(application *app.Application, outputs []*app.Output, cfg *config.Conf
 	}, nil
 }
 
-// Launch is Start for the shell's run loop: it dials the session bus,
-// chains AddOutput/RemoveOutput onto the session's output hooks
-// (onIdentity is the session's OnOutputIdentity - an output is usable
-// once its connector name arrives - and onRemoved its OnOutputRemoved),
-// and logs instead of failing, since the shell runs on without a
-// wallpaper. The returned function stops everything.
-func Launch(application *app.Application, outputs []*app.Output, cfg *config.Config, onIdentity, onRemoved *func(*app.Output)) (*Shell, func()) {
+// OutputWatcher is the session's output hotplug feed: the identity of
+// a monitor once its connector name is known, and its removal.
+type OutputWatcher interface {
+	WatchOutputIdentity(fn func(*app.Output)) (stop func())
+	WatchOutputs(added, removed func(*app.Output)) (stop func())
+}
+
+// Launch is Start on the session bus, following hotplugged outputs
+// through watch. A failure is logged and leaves the shell without
+// wallpapers (nil).
+func Launch(application *app.Application, outputs []*app.Output, cfg *config.Config, watch OutputWatcher) (*Shell, func()) {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		log.Printf("wallpaper: cannot initialize wallpaper service: D-Bus connection failed: %v", err)
@@ -103,18 +107,13 @@ func Launch(application *app.Application, outputs []*app.Output, cfg *config.Con
 		log.Printf("wallpaper: cannot initialize wallpaper service: %v", err)
 		return nil, func() {}
 	}
-	chain := func(hook *func(*app.Output), fn func(*app.Output)) {
-		prev := *hook
-		*hook = func(o *app.Output) {
-			if prev != nil {
-				prev(o)
-			}
-			fn(o)
-		}
+	stopIdentity := watch.WatchOutputIdentity(s.AddOutput)
+	stopRemoved := watch.WatchOutputs(nil, s.RemoveOutput)
+	return s, func() {
+		stopIdentity()
+		stopRemoved()
+		stop()
 	}
-	chain(onIdentity, s.AddOutput)
-	chain(onRemoved, s.RemoveOutput)
-	return s, stop
 }
 
 // Service exposes the running service (theme providers subscribe to
