@@ -9,21 +9,6 @@ import (
 	"github.com/stubbedev/wayle/i18n"
 )
 
-// dropdownRows builds a titled stack of status lines.
-func dropdownStatus(ctx ModuleContext, title string, lines []string) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 4, 14)
-	col.Append(widget.NewLabel(font, px*1.2, title, ctx.Style.fg), false)
-	if len(lines) == 0 {
-		col.Append(widget.NewLabel(font, px, "Nothing to show", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	for _, line := range lines {
-		col.Append(widget.NewLabel(font, px, line, mutedFg(ctx.Style.palette)), false)
-	}
-	return col
-}
-
 // networkDropdown is the connectivity card: wifi, wired, and the
 // radio state, from one NM snapshot.
 func networkDropdown(ctx ModuleContext) widget.Widget {
@@ -61,30 +46,4 @@ func networkDropdown(ctx ModuleContext) widget.Widget {
 		col.Append(vpns, false)
 	}
 	return col
-}
-
-// treemanDropdown is the worktree health card: the bucket counts.
-func treemanDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 6, 14)
-	if ctx.Treeman == nil {
-		col.Append(widget.NewLabel(font, px, "No treeman", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	status, err := ctx.Treeman.Read(context.Background())
-	if err != nil || status == nil {
-		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-treeman-empty-title"), mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	// views.rs renders each bucket chip as "{count} {bucket}".
-	bucket := func(count uint32, id string) string {
-		return strconv.FormatUint(uint64(count), 10) + " " + i18n.T(id)
-	}
-	return dropdownStatus(ctx, i18n.T("dropdown-treeman-title"), []string{
-		"Total: " + strconv.FormatUint(uint64(status.Total), 10),
-		bucket(status.Stable, "dropdown-treeman-bucket-stable"),
-		bucket(status.Up, "dropdown-treeman-bucket-up"),
-		bucket(status.Down, "dropdown-treeman-bucket-down"),
-		bucket(status.Failed, "dropdown-treeman-bucket-failed"),
-	})
 }

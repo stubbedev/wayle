@@ -18,16 +18,25 @@ func dropdownHeader(ctx ModuleContext, font render.Font, px float64, icon, title
 // dropdownHeaderIcon is dropdownHeader that also hands back its icon,
 // for headers whose icon follows state.
 func dropdownHeaderIcon(ctx ModuleContext, font render.Font, px float64, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon) {
+	row, glyph, _ := dropdownHeaderParts(ctx, font, px, icon, title, actions...)
+	return row, glyph
+}
+
+// dropdownHeaderParts is dropdownHeader with its icon and title label,
+// for headers whose icon or title follows state.
+func dropdownHeaderParts(ctx ModuleContext, font render.Font, px float64, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon, *widget.Label) {
 	row := widget.NewBox(widget.Row, 8, 0)
 	row.AddClass("dropdown-header")
 	glyph := widget.NewThemeIcon(icon, int(px*1.2))
 	glyph.SetTint(ctx.Style.fg)
 	row.Append(glyph, false)
-	row.Append(widget.NewLabel(font, px*1.1, title, ctx.Style.fg), true)
+	label := widget.NewLabel(font, px*1.1, title, ctx.Style.fg)
+	label.SetEllipsize(widget.EllipsizeEnd)
+	row.Append(label, true)
 	for _, a := range actions {
 		row.Append(a, false)
 	}
-	return row, glyph
+	return row, glyph, label
 }
 
 // emptyState is the EmptyState template: a muted icon over the title

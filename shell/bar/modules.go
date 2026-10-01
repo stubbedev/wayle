@@ -61,6 +61,8 @@ type ModuleContext struct {
 	// ConfigService property set the dropdowns use); nil without a
 	// config service.
 	SetConfig func(path string, value any)
+	// Toast shows an OSD toast (the Rust ToastBus); nil without an OSD.
+	Toast func(label, icon string)
 	// Clipboard is the session clipboard history, nil when the
 	// compositor has no data-control protocol (the launcher's
 	// clipboard mode reads it).

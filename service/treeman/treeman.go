@@ -6,9 +6,11 @@ package treeman
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,18 +29,74 @@ const (
 	BucketFailed
 )
 
+// Worktree is one active worktree (model.rs's TreemanWorktree).
+type Worktree struct {
+	// Branch is the branch name ("-" when detached or unknown).
+	Branch string `json:"branch"`
+	Slug   string `json:"slug"`
+	// State is the fine lifecycle state (ready, preparing, error, …);
+	// Bucket the coarse one it maps to.
+	State  string `json:"state"`
+	Bucket string `json:"bucket"`
+	IsMain bool   `json:"is_main"`
+	// Path is the absolute worktree path.
+	Path string `json:"path"`
+}
+
 // Repo is one registered repo and its active worktrees.
 type Repo struct {
-	Repo      string `json:"repo"`
-	Total     uint32 `json:"total"`
-	Worktrees []struct {
-		Branch string `json:"branch"`
-		Slug   string `json:"slug"`
-		State  string `json:"state"`
-		Bucket string `json:"bucket"`
-		IsMain bool   `json:"is_main"`
-		Path   string `json:"path"`
-	} `json:"worktrees"`
+	Repo      string     `json:"repo"`
+	Total     uint32     `json:"total"`
+	Worktrees []Worktree `json:"worktrees"`
+}
+
+// ParseBucket is Bucket::parse: up, down, failed, anything else stable.
+func ParseBucket(s string) Bucket {
+	switch s {
+	case "up":
+		return BucketUp
+	case "down":
+		return BucketDown
+	case "failed":
+		return BucketFailed
+	}
+	return BucketStable
+}
+
+// FindWorktree is find_worktree: the worktree at path and its repo.
+func (s Status) FindWorktree(path string) (Repo, Worktree, bool) {
+	for _, r := range s.Repos {
+		for _, wt := range r.Worktrees {
+			if wt.Path == path {
+				return r, wt, true
+			}
+		}
+	}
+	return Repo{}, Worktree{}, false
+}
+
+// Action is a worktree mutation (service.rs's Action).
+type Action int
+
+// Actions.
+const (
+	// ActionPrepare re-runs the prepare pipeline.
+	ActionPrepare Action = iota
+	// ActionReset drops and re-seeds the branch-scoped databases.
+	ActionReset
+	// ActionTeardown removes the worktree entirely.
+	ActionTeardown
+)
+
+// Args are the treeman CLI arguments for the action on a worktree.
+func (a Action) Args(path string) []string {
+	switch a {
+	case ActionReset:
+		return []string{"db", "reset", path}
+	case ActionTeardown:
+		return []string{"worktree", "delete", path, "--yes"}
+	}
+	return []string{"prepare", "--worktree", path}
 }
 
 // Status is the aggregated worktree health across every registered
@@ -97,6 +155,10 @@ type Source interface {
 	// Subscribe ticks on daemon activity (debounced). The channel
 	// closes when the source stops; stop terminates the loop.
 	Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
+	// RunAction queues an action with the treeman daemon; the status
+	// subscription reports its progress. A failure carries the
+	// command's stderr.
+	RunAction(ctx context.Context, action Action, path string) error
 }
 
 // System is the real client. Zero-value usable through New.
@@ -217,4 +279,19 @@ func (s *System) Stop() {
 		close(s.stopped)
 		s.changes.Close()
 	})
+}
+
+// RunAction implements Source (run_action): the CLI's stderr is the
+// error on a non-zero exit.
+func (s *System) RunAction(ctx context.Context, action Action, path string) error {
+	var stderr strings.Builder
+	cmd := exec.CommandContext(ctx, s.binary, action.Args(path)...) //nolint:gosec // the binary name is the client's own
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return errors.New(msg)
+		}
+		return err
+	}
+	return nil
 }

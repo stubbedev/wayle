@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,5 +158,56 @@ func TestEverySubscriberTicksAndStopClosesThem(t *testing.T) {
 	for _, ch := range []<-chan struct{}{a, b} {
 		for range ch { // drains the pending tick, ends on close
 		}
+	}
+}
+
+func TestActionArgs(t *testing.T) {
+	for a, want := range map[Action]string{
+		ActionPrepare:  "prepare --worktree /w/x",
+		ActionReset:    "db reset /w/x",
+		ActionTeardown: "worktree delete /w/x --yes",
+	} {
+		if got := strings.Join(a.Args("/w/x"), " "); got != want {
+			t.Errorf("%v args = %q, want %q", a, got, want)
+		}
+	}
+}
+
+func TestRunActionReportsStderr(t *testing.T) {
+	dir := t.TempDir()
+	log := filepath.Join(dir, "args")
+	bin := filepath.Join(dir, "treeman")
+	script := "#!/bin/sh\necho \"$@\" > " + log + "\nif [ \"$1\" = db ]; then echo 'no such worktree' >&2; exit 3; fi\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := New(bin)
+	if err := s.RunAction(context.Background(), ActionPrepare, "/w/x"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(log); strings.TrimSpace(string(got)) != "prepare --worktree /w/x" {
+		t.Errorf("args = %q", got)
+	}
+	err := s.RunAction(context.Background(), ActionReset, "/w/x")
+	if err == nil || err.Error() != "no such worktree" {
+		t.Errorf("err = %v, want the stderr", err)
+	}
+	if err := New(filepath.Join(dir, "missing")).RunAction(context.Background(), ActionPrepare, "/w"); err == nil {
+		t.Error("a missing binary: want an error")
+	}
+}
+
+func TestParseBucketAndFindWorktree(t *testing.T) {
+	for s, want := range map[string]Bucket{"up": BucketUp, "down": BucketDown, "failed": BucketFailed, "stable": BucketStable, "?": BucketStable} {
+		if got := ParseBucket(s); got != want {
+			t.Errorf("ParseBucket(%q) = %v", s, got)
+		}
+	}
+	st := Status{Repos: []Repo{{Repo: "a", Worktrees: []Worktree{{Path: "/a/1"}}}, {Repo: "b", Worktrees: []Worktree{{Path: "/b/1", Branch: "x"}}}}}
+	if r, wt, ok := st.FindWorktree("/b/1"); !ok || r.Repo != "b" || wt.Branch != "x" {
+		t.Errorf("find = %v %v %v", r, wt, ok)
+	}
+	if _, _, ok := st.FindWorktree("/gone"); ok {
+		t.Error("found a missing worktree")
 	}
 }

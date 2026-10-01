@@ -93,6 +93,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 	if svc != nil {
 		baseCtx.SetConfig = configSetter(svc)
 	}
+	baseCtx.Toast = func(label, icon string) {
+		if o := osdRef.Load(); o != nil {
+			_ = o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon})
+		}
+	}
 	// The clipboard history starts with the shell rather than when the
 	// launcher first opens, so it covers the session; a compositor
 	// without data-control simply has none (bootstrap/mod.rs).

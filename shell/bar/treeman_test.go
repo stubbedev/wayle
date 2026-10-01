@@ -3,23 +3,58 @@ package bar
 import (
 	"context"
 	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/treeman"
 )
 
-// fakeTreeman is a scripted treeman.Source.
+// fakeTreeman is a scripted treeman.Source, safe across a follow
+// goroutine and the test.
 type fakeTreeman struct {
-	status *treeman.Status
+	mu        sync.Mutex
+	status    *treeman.Status
+	ticks     chan struct{}
+	actionErr error
+	actions   []string
 }
 
-func (f *fakeTreeman) Read(context.Context) (*treeman.Status, error) { return f.status, nil }
+func (f *fakeTreeman) Read(context.Context) (*treeman.Status, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.status, nil
+}
 
+func (f *fakeTreeman) setStatus(s *treeman.Status) {
+	f.mu.Lock()
+	f.status = s
+	f.mu.Unlock()
+}
+
+// Subscribe hands out ticks, or a closed channel when none is scripted.
 func (f *fakeTreeman) Subscribe(context.Context) (<-chan struct{}, func(), error) {
+	if f.ticks != nil {
+		return f.ticks, func() {}, nil
+	}
 	ticks := make(chan struct{}, 4)
 	close(ticks)
 	return ticks, func() {}, nil
+}
+
+func (f *fakeTreeman) RunAction(_ context.Context, a treeman.Action, path string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.actions = append(f.actions, strings.Join(a.Args(path), " "))
+	return f.actionErr
+}
+
+func (f *fakeTreeman) ran() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.actions)
 }
 
 func TestTreemanLabel(t *testing.T) {
