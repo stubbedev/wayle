@@ -2,17 +2,14 @@ package bar
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os/exec"
-	"strconv"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/pulse"
-	"github.com/stubbedev/wayle/service/upower"
 )
 
 // dropdownBuilders maps the Rust registry's names onto content
@@ -125,68 +122,6 @@ func audioDeviceRow(ctx ModuleContext, font render.Font, px float64, title strin
 	slider.OnChanged = func(v float64) { setVolume(v) }
 	col.Append(slider, false)
 	return col
-}
-
-// batteryDropdown is the battery card: percentage, state, and the
-// time-to-empty when the daemon reports one.
-func batteryDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 8, 14)
-	if ctx.Battery == nil {
-		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-battery-no-battery-title"), mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	dev, err := ctx.Battery.Read(context.Background())
-	if err != nil {
-		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-battery-no-battery-title"), mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	col.Append(widget.NewLabel(font, px*1.6, batteryLabel("{{ percent }}%", dev.Percentage, dev.Present()), ctx.Style.fg), false)
-	col.Append(widget.NewLabel(font, px, batteryStateLabel(dev.State), mutedFg(ctx.Style.palette)), false)
-	if text := batteryTimeDisplay(dev); text != "" {
-		col.Append(widget.NewLabel(font, px, text, mutedFg(ctx.Style.palette)), false)
-	}
-	return col
-}
-
-// batteryCharging is battery_section/methods.rs's is_charging.
-func batteryCharging(state upower.DeviceState) bool {
-	return state == upower.StateCharging || state == upower.StatePendingCharge
-}
-
-// batteryStateLabel is methods.rs's state_label. The critical state
-// keys off UPower's WarningLevel, which the Go service does not read
-// yet, so the label starts at charging.
-func batteryStateLabel(state upower.DeviceState) string {
-	switch {
-	case batteryCharging(state):
-		return i18n.T("dropdown-battery-charging")
-	case state == upower.StateFullyCharged:
-		return i18n.T("dropdown-battery-plugged-in")
-	default:
-		return i18n.T("dropdown-battery-on-battery")
-	}
-}
-
-// batteryTimeDisplay is methods.rs's time_display: the time until full
-// while charging, the time remaining otherwise, "" when unknown.
-func batteryTimeDisplay(dev upower.Device) string {
-	remaining, id := dev.TimeToEmpty, "dropdown-battery-time-remaining"
-	if batteryCharging(dev.State) {
-		remaining, id = dev.TimeToFull, "dropdown-battery-time-until-full"
-	}
-	seconds := int64(remaining.Seconds())
-	if seconds <= 0 {
-		return ""
-	}
-	hours, minutes := seconds/3600, (seconds%3600)/60
-	duration := i18n.T("dropdown-battery-duration-m", i18n.Str("minutes", strconv.FormatInt(minutes, 10)))
-	if hours > 0 {
-		duration = i18n.T("dropdown-battery-duration-hm",
-			i18n.Str("hours", strconv.FormatInt(hours, 10)),
-			i18n.Str("minutes", fmt.Sprintf("%02d", minutes)))
-	}
-	return i18n.T(id, i18n.Str("duration", duration))
 }
 
 // dropdownRow builds one tappable menu row.

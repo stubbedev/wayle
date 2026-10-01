@@ -124,7 +124,7 @@ func TestDashboardMediaAndBatterySections(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying})
-	ctx.Battery = newFakeBattery(upower.Device{Percentage: 8, State: upower.StateDischarging, TimeToEmpty: 20 * time.Minute})
+	ctx.Battery = newFakeBattery(upower.Device{Percentage: 8, State: upower.StateDischarging, IsPresent: true, TimeToEmpty: 20 * time.Minute})
 	v := dashboardDropdown(ctx).(*dashboardView)
 	texts := map[string]bool{}
 	walkTree(v, func(w widget.Widget) bool {

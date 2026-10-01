@@ -204,32 +204,9 @@ func (v *brightnessView) follow() {
 	if v.ctx.Brightness == nil {
 		return
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	ticks, stop, err := v.ctx.Brightness.Subscribe(ctx)
-	if err != nil {
-		cancel()
-		log.Printf("brightness: subscribe: %v", err)
-		return
-	}
+	life, cancel := context.WithCancel(context.Background())
 	v.cancel = cancel
-	go func() {
-		defer stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case _, ok := <-ticks:
-				if !ok {
-					return
-				}
-			}
-			devices := v.read(ctx)
-			if ctx.Err() != nil {
-				return
-			}
-			v.ctx.Invoke(func() { v.apply(devices) })
-		}
-	}()
+	followTicks(v.ctx, life, "brightness", v.ctx.Brightness.Subscribe, v.read, v.apply)
 }
 
 // dropdownClosed implements dropdownCloser.

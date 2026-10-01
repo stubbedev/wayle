@@ -46,27 +46,101 @@ func StateFromUint32(v uint32) DeviceState {
 	return StateUnknown
 }
 
-// Device is one battery snapshot.
+// WarningLevel mirrors UPower's warning level enum
+// (types.rs's WarningLevel/From<u32>).
+type WarningLevel uint8
+
+// Warning levels.
+const (
+	WarningUnknown     WarningLevel = iota
+	WarningNone                     // 1
+	WarningDischarging              // 2, UPSes only
+	WarningLow                      // 3
+	WarningCritical                 // 4
+	WarningAction                   // 5
+)
+
+// WarningFromUint32 maps UPower's wire value; anything else is Unknown.
+func WarningFromUint32(v uint32) WarningLevel {
+	if v >= 1 && v <= 5 {
+		return WarningLevel(v)
+	}
+	return WarningUnknown
+}
+
+// Low reports Low, Critical, or Action: the levels the dropdown flags
+// (helpers.rs's is_low_battery).
+func (w WarningLevel) Low() bool {
+	return w == WarningLow || w == WarningCritical || w == WarningAction
+}
+
+// Device is one battery snapshot: the org.freedesktop.UPower.Device
+// properties the bar and its dropdown read.
 type Device struct {
 	Percentage  float64
 	State       DeviceState
 	TimeToEmpty time.Duration // 0 when unknown
 	TimeToFull  time.Duration // 0 when unknown
+	// IsPresent is UPower's IsPresent: a battery is in its bay.
+	IsPresent bool
+	// EnergyRate is the charge or discharge rate in watts.
+	EnergyRate float64
+	// Energy and EnergyFull are watt-hours now and at full charge.
+	Energy     float64
+	EnergyFull float64
+	// Capacity is the health percentage (full against design); 0 when
+	// unknown.
+	Capacity     float64
+	WarningLevel WarningLevel
+	// ChargeEndThreshold is the charge limit percentage.
+	ChargeEndThreshold       uint32
+	ChargeThresholdSupported bool
+	ChargeThresholdEnabled   bool
 }
 
-// Present reports whether a battery is there at all.
-func (d Device) Present() bool { return d.State != StateUnknown || d.Percentage > 0 }
+// deviceFromProps decodes a GetAll reply. A property that is missing or
+// of the wrong type keeps its zero value: older UPower releases lack
+// the charge-threshold properties.
+func deviceFromProps(props map[string]dbus.Variant) Device {
+	var d Device
+	var state, warning uint32
+	var tte, ttf int64
+	read := func(name string, dst any) {
+		if v, ok := props[name]; ok {
+			_ = v.Store(dst)
+		}
+	}
+	read("Percentage", &d.Percentage)
+	read("State", &state)
+	read("TimeToEmpty", &tte)
+	read("TimeToFull", &ttf)
+	read("IsPresent", &d.IsPresent)
+	read("EnergyRate", &d.EnergyRate)
+	read("Energy", &d.Energy)
+	read("EnergyFull", &d.EnergyFull)
+	read("Capacity", &d.Capacity)
+	read("WarningLevel", &warning)
+	read("ChargeEndThreshold", &d.ChargeEndThreshold)
+	read("ChargeThresholdSupported", &d.ChargeThresholdSupported)
+	read("ChargeThresholdEnabled", &d.ChargeThresholdEnabled)
+	d.State = StateFromUint32(state)
+	d.WarningLevel = WarningFromUint32(warning)
+	d.TimeToEmpty = time.Duration(tte) * time.Second
+	d.TimeToFull = time.Duration(ttf) * time.Second
+	return d
+}
 
 // DisplayDevicePath is UPower's composite device across all batteries.
 const DisplayDevicePath = "/org/freedesktop/UPower/devices/DisplayDevice"
 
 const (
+	busName             = "org.freedesktop.UPower"
 	deviceInterface     = "org.freedesktop.UPower.Device"
 	propertiesInterface = "org.freedesktop.DBus.Properties"
 )
 
-// Source is the read/subscribe seam the bar module consumes; tests
-// swap in a fake.
+// Source is the seam the bar module and dropdown consume; tests swap
+// in a fake.
 type Source interface {
 	// Read returns the current device snapshot.
 	Read(ctx context.Context) (Device, error)
@@ -74,6 +148,9 @@ type Source interface {
 	// The returned stop function unsubscribes; the channel closes on
 	// ctx completion either way.
 	Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
+	// EnableChargeThreshold turns the charge limit on or off
+	// (Device::enable_charge_threshold).
+	EnableChargeThreshold(ctx context.Context, enabled bool) error
 }
 
 // System reads the real UPower on the system bus.
@@ -88,38 +165,35 @@ func NewSystem() (*System, error) {
 	if err != nil {
 		return nil, fmt.Errorf("upower: system bus: %w", err)
 	}
-	return &System{path: dbus.ObjectPath(DisplayDevicePath), conn: conn}, nil
+	return NewOn(conn), nil
+}
+
+// NewOn targets the DisplayDevice over an existing connection.
+func NewOn(conn *dbus.Conn) *System {
+	return &System{path: dbus.ObjectPath(DisplayDevicePath), conn: conn}
 }
 
 // Close drops the bus connection.
 func (s *System) Close() error { return s.conn.Close() }
 
-// Read fetches the DisplayDevice properties in one round trip each —
-// three property gets, the same calls the zbus proxy's cached
-// properties issue on first access.
+// Read fetches every DisplayDevice property in one GetAll.
 func (s *System) Read(ctx context.Context) (Device, error) {
-	obj := s.conn.Object("org.freedesktop.UPower", s.path)
-	var dev Device
-	var percentage float64
-	var state uint32
-	var tte, ttf int64
-	if err := obj.CallWithContext(ctx, propertiesInterface+".Get", 0, deviceInterface, "Percentage").Store(&percentage); err != nil {
-		return dev, fmt.Errorf("upower: Percentage: %w", err)
+	var props map[string]dbus.Variant
+	err := s.conn.Object(busName, s.path).
+		CallWithContext(ctx, propertiesInterface+".GetAll", 0, deviceInterface).Store(&props)
+	if err != nil {
+		return Device{}, fmt.Errorf("upower: GetAll: %w", err)
 	}
-	if err := obj.CallWithContext(ctx, propertiesInterface+".Get", 0, deviceInterface, "State").Store(&state); err != nil {
-		return dev, fmt.Errorf("upower: State: %w", err)
+	return deviceFromProps(props), nil
+}
+
+// EnableChargeThreshold calls the device's EnableChargeThreshold.
+func (s *System) EnableChargeThreshold(ctx context.Context, enabled bool) error {
+	call := s.conn.Object(busName, s.path).CallWithContext(ctx, deviceInterface+".EnableChargeThreshold", 0, enabled)
+	if call.Err != nil {
+		return fmt.Errorf("upower: EnableChargeThreshold: %w", call.Err)
 	}
-	// TimeToEmpty/TimeToFull are 0 while charging/discharging
-	// respectively; failures leave them unknown rather than fatal.
-	_ = obj.CallWithContext(ctx, propertiesInterface+".Get", 0, deviceInterface, "TimeToEmpty").Store(&tte)
-	_ = obj.CallWithContext(ctx, propertiesInterface+".Get", 0, deviceInterface, "TimeToFull").Store(&ttf)
-	dev = Device{
-		Percentage:  percentage,
-		State:       StateFromUint32(state),
-		TimeToEmpty: time.Duration(tte) * time.Second,
-		TimeToFull:  time.Duration(ttf) * time.Second,
-	}
-	return dev, nil
+	return nil
 }
 
 // Subscribe matches PropertiesChanged for the DisplayDevice and ticks

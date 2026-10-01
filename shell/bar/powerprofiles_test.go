@@ -3,29 +3,51 @@ package bar
 import (
 	"context"
 	"path/filepath"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 )
 
-// fakePPSource is the scripted power-profiles source.
+// fakePPSource is the scripted power-profiles source, safe across a
+// follow goroutine and the test. SetActive records the profile and, as
+// the daemon does, makes it active.
 type fakePPSource struct {
-	snap powerprofiles.Snapshot
-	set  []string
-	err  error
+	mu    sync.Mutex
+	snap  powerprofiles.Snapshot
+	set   []string
+	err   error
+	ticks chan struct{}
 }
 
 func (f *fakePPSource) Read(context.Context) (powerprofiles.Snapshot, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	return f.snap, f.err
 }
 
 func (f *fakePPSource) SetActive(_ context.Context, profile string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.set = append(f.set, profile)
+	f.snap.Active = profile
 	return nil
 }
 
+// sets are the SetActive arguments so far.
+func (f *fakePPSource) sets() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.set)
+}
+
+// Subscribe hands out ticks, or a closed channel when none is scripted.
 func (f *fakePPSource) Subscribe(context.Context) (<-chan struct{}, func(), error) {
+	if f.ticks != nil {
+		return f.ticks, func() {}, nil
+	}
 	ticks := make(chan struct{})
 	close(ticks)
 	return ticks, func() {}, nil
@@ -90,14 +112,14 @@ func TestPowerProfilesModuleCycles(t *testing.T) {
 	}
 	// The :cycle shell action is the module's own.
 	pp.RunAction(config.ParseClickAction(":cycle"))
-	if len(src.set) != 1 || src.set[0] != powerprofiles.ProfilePerformance {
-		t.Errorf("set = %v, want [performance]", src.set)
+	if len(src.sets()) != 1 || src.sets()[0] != powerprofiles.ProfilePerformance {
+		t.Errorf("set = %v, want [performance]", src.sets())
 	}
 	// A dropdown action falls through to the shared executor (a no-op
 	// log, not a profile write).
 	pp.RunAction(config.ParseClickAction("dropdown:power"))
-	if len(src.set) != 1 {
-		t.Errorf("dropdown action reached the daemon: %v", src.set)
+	if len(src.sets()) != 1 {
+		t.Errorf("dropdown action reached the daemon: %v", src.sets())
 	}
 }
 

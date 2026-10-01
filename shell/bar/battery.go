@@ -82,7 +82,7 @@ func (m *battery) refresh() error {
 	cfg := m.ctx.Config.Battery
 	label := ""
 	if cfg.LabelShow {
-		label = batteryLabel(cfg.Format, dev.Percentage, dev.Present())
+		label = batteryLabel(cfg.Format, dev.Percentage, dev.IsPresent)
 	}
 	m.thresholds(dev.Percentage, cfg.Thresholds)
 	m.label.SetText(label)
@@ -100,7 +100,7 @@ func (m *battery) setIcon(cfg config.BatteryConfig, dev upower.Device) {
 	}
 	var name string
 	switch {
-	case !dev.Present() || dev.State == upower.StateUnknown:
+	case !dev.IsPresent || dev.State == upower.StateUnknown:
 		name = cfg.AlertIcon
 	case dev.State == upower.StateCharging || dev.State == upower.StatePendingCharge:
 		name = cfg.ChargingIcon

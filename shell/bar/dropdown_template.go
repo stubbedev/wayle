@@ -1,6 +1,9 @@
 package bar
 
 import (
+	"context"
+	"log"
+
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 )
@@ -35,4 +38,40 @@ func emptyState(ctx ModuleContext, font render.Font, px float64, icon, title, de
 		col.Append(desc, false)
 	}
 	return col
+}
+
+// followTicks is a dropdown's watcher: on each tick from subscribe it
+// reads off the loop and applies the result on it, until life ends or
+// the tick channel closes. A failed subscribe logs and follows nothing.
+func followTicks[T any](
+	mc ModuleContext,
+	life context.Context,
+	what string,
+	subscribe func(context.Context) (<-chan struct{}, func(), error),
+	read func(context.Context) T,
+	apply func(T),
+) {
+	ticks, stop, err := subscribe(life)
+	if err != nil {
+		log.Printf("%s: subscribe: %v", what, err)
+		return
+	}
+	go func() {
+		defer stop()
+		for {
+			select {
+			case <-life.Done():
+				return
+			case _, ok := <-ticks:
+				if !ok {
+					return
+				}
+			}
+			value := read(life)
+			if life.Err() != nil {
+				return
+			}
+			mc.Invoke(func() { apply(value) })
+		}
+	}()
 }
