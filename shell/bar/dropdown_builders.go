@@ -6,7 +6,6 @@ import (
 	"log"
 	"os/exec"
 	"strconv"
-	"time"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
@@ -45,21 +44,6 @@ func dropdownFont(ctx ModuleContext) (render.Font, float64) {
 		return ctx.Font, ctx.Style.labelPx
 	}
 	return ctx.Font, 14
-}
-
-// calendarDropdown is the calendar card: the live clock hero above the
-// month grid (the Rust CalendarDropdown's two halves).
-func calendarDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 8, 14)
-	// The hero: HH:MM at display size.
-	now := time.Now()
-	hero := widget.NewLabel(font, px*2.6, now.Format("15:04"), ctx.Style.fg)
-	col.Append(hero, false)
-	// The month grid; gelm's calendar carries its own day names.
-	cal := widget.NewCalendar(font, px, now)
-	col.Append(cal, false)
-	return col
 }
 
 // powerDropdown is the session menu: one row per configured command,
