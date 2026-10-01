@@ -13,6 +13,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/notifications"
+	"github.com/stubbedev/wayle/shell/notifyui"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -121,7 +122,7 @@ func (p *Popups) addLocked(n *notifications.Notification) {
 	fg, _ := p.pal.Token(config.TokenFgDefault)
 	c := &card{
 		id:    n.ID,
-		icon:  widget.NewThemeIcon(notifPopupIcon(n), 20),
+		icon:  notifyui.NewIcon(notifyui.ResolveIcon(p.cfg.IconSource, n), 20, fg),
 		title: widget.NewLabel(p.font, 14, n.Summary, fg),
 		body:  widget.NewLabel(p.font, 12, n.Body, fg),
 	}
@@ -253,15 +254,6 @@ func popupAnchors(position config.PopupPosition) app.Anchor {
 		return app.AnchorRight
 	}
 	return app.AnchorTop | app.AnchorRight
-}
-
-// notifPopupIcon picks the card's glyph: the sender's app icon when
-// named, the bell otherwise.
-func notifPopupIcon(n *notifications.Notification) string {
-	if n.AppIcon != "" {
-		return n.AppIcon
-	}
-	return "ld-bell-symbolic"
 }
 
 // Visible reports the card count (tests).

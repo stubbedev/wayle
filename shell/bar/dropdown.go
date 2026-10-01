@@ -32,6 +32,23 @@ type dropdownRegistry struct {
 // releases what it holds when its popover goes away.
 type dropdownCloser interface{ dropdownClosed() }
 
+// dropdownDismisser is content that closes its own popover (GTK's
+// popdown); the registry hands it the dismiss once the popover is up.
+type dropdownDismisser interface{ setDismiss(dismiss func()) }
+
+// popdownHook is the dropdownDismisser half content embeds: popdown closes
+// the popover, a no-op until (and unless) one is open.
+type popdownHook struct{ dismiss func() }
+
+func (p *popdownHook) setDismiss(dismiss func()) { p.dismiss = dismiss }
+
+// popdown closes the hosting popover.
+func (p *popdownHook) popdown() {
+	if p.dismiss != nil {
+		p.dismiss()
+	}
+}
+
 func newDropdownRegistry(application *app.Application, cfg *config.Config, font render.Font, style *barStyle, base ModuleContext) *dropdownRegistry {
 	return &dropdownRegistry{
 		app:      application,
@@ -120,6 +137,9 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 			cfg.OnClosed()
 		}
 		return err
+	}
+	if d, ok := content.(dropdownDismisser); ok {
+		d.setDismiss(pop.Dismiss)
 	}
 	r.mu.Lock()
 	r.openPop[connector] = pop

@@ -7,7 +7,6 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/service/recorder"
 )
 
@@ -61,39 +60,6 @@ func networkDropdown(ctx ModuleContext) widget.Widget {
 	col.Append(widget.NewLabel(font, px, i18n.T("dropdown-network-ethernet")+": "+wired, ctx.Style.fg), false)
 	if vpns := vpnSection(ctx, font, px); vpns != nil {
 		col.Append(vpns, false)
-	}
-	return col
-}
-
-// notificationDropdown is the notification card: the DND toggle row
-// above the stored history, each row dismissable, with a clear-all.
-func notificationDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 6, 12)
-	svc := ctx.Notifications
-	if svc == nil {
-		col.Append(widget.NewLabel(font, px, "No notification service", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	dndLabel := i18n.T("notification-dropdown-dnd-label")
-	if svc.DND() {
-		dndLabel += " (on)"
-	}
-	col.Append(dropdownRow(ctx, font, px, dndLabel, "ld-bell-off-symbolic", func() { svc.ToggleDND() }), false)
-	notifs := svc.Notifications()
-	if len(notifs) == 0 {
-		col.Append(widget.NewLabel(font, px, i18n.T("notification-dropdown-empty-description"), mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	col.Append(dropdownRow(ctx, font, px, i18n.T("notification-dropdown-clear-all"), "ld-trash-2-symbolic", func() { svc.DismissAll() }), false)
-	for _, n := range notifs {
-		summary := n.Summary
-		if n.AppName != "" {
-			summary = n.AppName + ": " + n.Summary
-		}
-		col.Append(dropdownRow(ctx, font, px, summary, "ld-bell-symbolic", func() {
-			svc.Close(n.ID, notifications.Dismissed)
-		}), false)
 	}
 	return col
 }

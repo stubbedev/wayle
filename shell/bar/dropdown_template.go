@@ -11,6 +11,13 @@ import (
 // dropdownHeader is the DropdownHeader template: the icon, the title
 // (taking the free width), and any trailing actions.
 func dropdownHeader(ctx ModuleContext, font render.Font, px float64, icon, title string, actions ...widget.Widget) *widget.Box {
+	row, _ := dropdownHeaderIcon(ctx, font, px, icon, title, actions...)
+	return row
+}
+
+// dropdownHeaderIcon is dropdownHeader that also hands back its icon,
+// for headers whose icon follows state.
+func dropdownHeaderIcon(ctx ModuleContext, font render.Font, px float64, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon) {
 	row := widget.NewBox(widget.Row, 8, 0)
 	row.AddClass("dropdown-header")
 	glyph := widget.NewThemeIcon(icon, int(px*1.2))
@@ -20,12 +27,18 @@ func dropdownHeader(ctx ModuleContext, font render.Font, px float64, icon, title
 	for _, a := range actions {
 		row.Append(a, false)
 	}
-	return row
+	return row, glyph
 }
 
 // emptyState is the EmptyState template: a muted icon over the title
 // and the wrapped description. An empty description is omitted.
 func emptyState(ctx ModuleContext, font render.Font, px float64, icon, title, description string) *widget.Box {
+	col, _ := emptyStateIcon(ctx, font, px, icon, title, description)
+	return col
+}
+
+// emptyStateIcon is emptyState that also hands back its icon.
+func emptyStateIcon(ctx ModuleContext, font render.Font, px float64, icon, title, description string) (*widget.Box, *widget.Icon) {
 	col := widget.NewBox(widget.Column, 6, 14)
 	col.AddClass("empty-state")
 	glyph := widget.NewThemeIcon(icon, int(px*2))
@@ -37,7 +50,7 @@ func emptyState(ctx ModuleContext, font render.Font, px float64, icon, title, de
 		desc.SetWrap(true)
 		col.Append(desc, false)
 	}
-	return col
+	return col, glyph
 }
 
 // followTicks is a dropdown's watcher: on each tick from subscribe it

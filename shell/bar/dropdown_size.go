@@ -119,3 +119,11 @@ func (p *panelBox) dropdownClosed() {
 		c.dropdownClosed()
 	}
 }
+
+// setDismiss forwards the popover's dismiss to content that closes
+// itself.
+func (p *panelBox) setDismiss(dismiss func()) {
+	if d, ok := p.child.(dropdownDismisser); ok {
+		d.setDismiss(dismiss)
+	}
+}

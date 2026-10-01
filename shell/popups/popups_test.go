@@ -163,17 +163,6 @@ func TestZeroPopupDurationSticks(t *testing.T) {
 	}
 }
 
-func TestPopupIconFallback(t *testing.T) {
-	n := &notifications.Notification{AppName: "app"}
-	if got := notifPopupIcon(n); got != "ld-bell-symbolic" {
-		t.Errorf("fallback = %q", got)
-	}
-	n.AppIcon = "mail-send"
-	if got := notifPopupIcon(n); got != "mail-send" {
-		t.Errorf("app icon = %q", got)
-	}
-}
-
 func TestPopupAnchors(t *testing.T) {
 	// notification_popup/methods.rs apply_position: corners take both
 	// edges, the centered positions one.
