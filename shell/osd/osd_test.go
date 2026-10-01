@@ -104,7 +104,7 @@ func TestSetEvent(t *testing.T) {
 func TestDisabledOsdNeverShows(t *testing.T) {
 	cfg := config.DefaultsOsd()
 	cfg.Enabled = false
-	o := New(nil, cfg, config.GeneralConfig{}, testFont(t), nil)
+	o := New(nil, cfg, config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
 	o.Show(Event{Kind: "volume"})
 	if got := o.Current(); got.Kind != "" {
 		t.Errorf("disabled OSD recorded %q", got.Kind)
@@ -114,7 +114,7 @@ func TestDisabledOsdNeverShows(t *testing.T) {
 func TestApplyToast(t *testing.T) {
 	cfg := config.DefaultsOsd()
 	cfg.Presets = []config.ToastPreset{{ID: "screenshot", Label: new("Captured"), Icon: new("ld-camera-symbolic")}}
-	o := New(nil, cfg, config.GeneralConfig{}, testFont(t), nil)
+	o := New(nil, cfg, config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
 
 	// A plain label toast without a percentage shows no progress bar.
 	ev, err := o.applyToast(widgetipc.ToastRequest{Label: new("hello")})
@@ -161,18 +161,72 @@ func TestApplyToast(t *testing.T) {
 
 func TestOsdLayerFollowsConfigAndTearingMode(t *testing.T) {
 	cfg := config.DefaultsOsd()
-	o := New(nil, cfg, config.GeneralConfig{}, testFont(t), nil)
+	o := New(nil, cfg, config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
 	if o.layer() != app.LayerOverlay {
 		t.Errorf("default layer = %d, want overlay", o.layer())
 	}
 	cfg.Layer = config.LayerBottom
-	o.SetConfig(cfg, config.GeneralConfig{})
+	o.SetConfig(cfg, config.GeneralConfig{}, config.DefaultsAnimations())
 	if o.layer() != app.LayerBottom {
 		t.Errorf("osd.layer = bottom gave %d", o.layer())
 	}
 	cfg.Layer = config.LayerOverlay
-	o.SetConfig(cfg, config.GeneralConfig{TearingMode: true})
+	o.SetConfig(cfg, config.GeneralConfig{TearingMode: true}, config.DefaultsAnimations())
 	if o.layer() != app.LayerTop {
 		t.Errorf("overlay under tearing mode = %d, want top", o.layer())
+	}
+}
+
+func TestGenieEdgeFollowsPosition(t *testing.T) {
+	for pos, want := range map[config.OsdPosition]widget.Edge{
+		config.OsdTop: widget.EdgeTop, config.OsdTopLeft: widget.EdgeTop, config.OsdTopRight: widget.EdgeTop,
+		config.OsdBottom: widget.EdgeBottom, config.OsdBottomLeft: widget.EdgeBottom, config.OsdBottomRight: widget.EdgeBottom,
+		config.OsdLeft: widget.EdgeLeft, config.OsdRight: widget.EdgeRight,
+	} {
+		if got := genieEdge(pos); got != want {
+			t.Errorf("%s: %v, want %v", pos, got, want)
+		}
+	}
+}
+
+// TestDismissPlaysTheExit pins begin_dismiss/finish_hide: a face stays
+// up through its exit and closes once it lands; a face replaced
+// meanwhile is not closed by the old exit.
+func TestDismissPlaysTheExit(t *testing.T) {
+	o := New(nil, config.DefaultsOsd(), config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
+	f := &face{rev: widget.NewRevealer(newPlate(widget.NewBox(widget.Row, 0, 0), render.RGB(1, 2, 3)))}
+	f.rev.SetRevealed(true)
+	f.rev.Finish()
+	o.faces["DP-1"] = f
+	o.beginDismiss()
+	if o.faces["DP-1"] != f || f.rev.Revealed() {
+		t.Fatal("dismiss did not start the exit with the face kept up")
+	}
+	f.rev.Finish()
+	if _, ok := o.faces["DP-1"]; ok {
+		t.Error("the face outlived its exit")
+	}
+
+	g := &face{rev: widget.NewRevealer(widget.NewBox(widget.Row, 0, 0))}
+	g.rev.SetRevealed(true)
+	g.rev.Finish()
+	o.faces["DP-1"] = g
+	o.beginDismiss()
+	replacement := &face{rev: widget.NewRevealer(widget.NewBox(widget.Row, 0, 0))}
+	o.faces["DP-1"] = replacement
+	g.rev.Finish()
+	if o.faces["DP-1"] != replacement {
+		t.Error("an old exit closed the face that replaced it")
+	}
+}
+
+func TestPlatePaintsUnderItsContent(t *testing.T) {
+	p := newPlate(widget.NewBox(widget.Row, 0, 0), render.RGB(10, 20, 30))
+	p.Measure(widget.Constraints{Max: widget.Size{W: 4, H: 4}})
+	p.Arrange(render.Rect{W: 4, H: 4})
+	data := make([]byte, render.Stride(4)*4)
+	p.Paint(render.New(data, render.Stride(4), 4, 4))
+	if data[2] != 10 || data[1] != 20 || data[0] != 30 {
+		t.Errorf("plate pixel = %v, want the background", data[:4])
 	}
 }

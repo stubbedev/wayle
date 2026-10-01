@@ -6,6 +6,7 @@ package osd
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"strconv"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/shell/layering"
+	"github.com/stubbedev/wayle/shell/reveal"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -82,7 +84,10 @@ func marginsFor(cfg config.OsdConfig) app.Margins {
 // face is one output's OSD window: the layer surface and its widget
 // tree.
 type face struct {
-	win    *app.LayerWindow
+	win *app.LayerWindow
+	// rev plays the OSD's enter and exit; the plate inside it carries
+	// the background, so a fade takes the whole OSD.
+	rev    *widget.Revealer
 	icon   *widget.Icon
 	label  *widget.Label
 	slider *widget.Slider
@@ -121,6 +126,7 @@ type Osd struct {
 	app     *app.Application
 	cfg     config.OsdConfig
 	general config.GeneralConfig // tearing mode, for the layer
+	anims   config.AnimationsConfig
 	font    render.Font
 	pal     *styling.Palette
 
@@ -132,9 +138,9 @@ type Osd struct {
 }
 
 // New builds the OSD; general carries the tearing mode its layer
-// honors.
-func New(application *app.Application, cfg config.OsdConfig, general config.GeneralConfig, font render.Font, pal *styling.Palette) *Osd {
-	return &Osd{app: application, cfg: cfg, general: general, font: font, pal: pal, outputs: make(map[string]*app.Output), faces: make(map[string]*face)}
+// honors, anims its enter and exit.
+func New(application *app.Application, cfg config.OsdConfig, general config.GeneralConfig, anims config.AnimationsConfig, font render.Font, pal *styling.Palette) *Osd {
+	return &Osd{app: application, cfg: cfg, general: general, anims: anims, font: font, pal: pal, outputs: make(map[string]*app.Output), faces: make(map[string]*face)}
 }
 
 // Show flashes the event on every attached face for the dismiss
@@ -150,16 +156,25 @@ func (o *Osd) Show(ev Event) {
 		return
 	}
 	o.current = ev
+	var shown []*face
 	for name, out := range o.outputs {
 		if f, err := o.ensure(name, out); err == nil {
 			f.setEvent(ev)
+			shown = append(shown, f)
 		}
 	}
 	if o.timer != nil {
 		o.timer.Stop()
 	}
-	o.timer = time.AfterFunc(time.Duration(o.cfg.Duration)*time.Millisecond, o.dismiss)
+	o.timer = time.AfterFunc(time.Duration(o.cfg.Duration)*time.Millisecond, func() { o.app.Invoke(o.beginDismiss) })
+	anims := o.anims
 	o.mu.Unlock()
+	// A face mid-exit turns back; a new one enters.
+	o.app.Invoke(func() {
+		for _, f := range shown {
+			reveal.Show(f.rev, anims, config.AnimOsd)
+		}
+	})
 }
 
 // AttachOutput adds an output to the fan-out: each output at startup
@@ -185,14 +200,42 @@ func (o *Osd) DetachOutput(name string) {
 // SetConfig applies a reloaded [osd] section: the next Show uses it,
 // and faces on screen close so they reopen at the new position and
 // margin (the Rust OSD re-anchors on its config watchers).
-func (o *Osd) SetConfig(cfg config.OsdConfig, general config.GeneralConfig) {
+func (o *Osd) SetConfig(cfg config.OsdConfig, general config.GeneralConfig, anims config.AnimationsConfig) {
 	o.mu.Lock()
-	o.cfg, o.general = cfg, general
+	o.cfg, o.general, o.anims = cfg, general, anims
 	o.mu.Unlock()
 	o.dismiss()
 }
 
-// dismiss closes the windows; the next Show recreates them.
+// beginDismiss plays each face's exit, then closes it (begin_dismiss,
+// finish_hide); a Show during the exit turns the face back instead.
+// It runs on the loop.
+func (o *Osd) beginDismiss() {
+	o.mu.Lock()
+	faces := maps.Clone(o.faces)
+	o.timer = nil
+	anims := o.anims
+	o.mu.Unlock()
+	for name, f := range faces {
+		reveal.Hide(f.rev, anims, config.AnimOsd, func() { o.closeFace(name, f) })
+	}
+}
+
+// closeFace closes a face whose exit has played, unless it was replaced.
+func (o *Osd) closeFace(name string, f *face) {
+	o.mu.Lock()
+	if o.faces[name] != f {
+		o.mu.Unlock()
+		return
+	}
+	delete(o.faces, name)
+	o.mu.Unlock()
+	if f.win != nil { // a headless face (tests) has none
+		f.win.Close()
+	}
+}
+
+// dismiss closes the windows at once; the next Show recreates them.
 func (o *Osd) dismiss() {
 	o.mu.Lock()
 	faces := o.faces
@@ -226,6 +269,8 @@ func (o *Osd) ensure(outputName string, output *app.Output) (*face, error) {
 	row.Append(value, false)
 	pad := widget.NewBox(widget.Row, 0, 14)
 	pad.Append(row, false)
+	rev := widget.NewRevealer(newPlate(pad, bg))
+	rev.SetGenieEdge(genieEdge(o.cfg.Position))
 
 	win, err := o.app.NewLayer(app.LayerConfig{
 		Output:        output,
@@ -236,13 +281,12 @@ func (o *Osd) ensure(outputName string, output *app.Output) (*face, error) {
 		Height:        72,
 		ExclusiveZone: -1,
 		Namespace:     "wayle-osd",
-		Root:          pad,
-		Background:    bg,
+		Root:          rev,
 	})
 	if err != nil {
 		return nil, err
 	}
-	f := &face{win: win, icon: icon, label: label, slider: slider, value: value}
+	f := &face{win: win, rev: rev, icon: icon, label: label, slider: slider, value: value}
 	o.faces[outputName] = f
 	return f, nil
 }

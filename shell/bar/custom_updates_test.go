@@ -54,7 +54,7 @@ func TestToastApplyViaWidgetSocket(t *testing.T) {
 	// with neither label nor preset errors, which RunWith logs.
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	cfg := config.DefaultsOsd()
-	o := osd.New(nil, cfg, config.GeneralConfig{}, testFont(t), nil)
+	o := osd.New(nil, cfg, config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
 	if err := o.ShowToast(widgetipc.ToastRequest{}); err == nil {
 		t.Fatal("empty toast: want an error")
 	}
