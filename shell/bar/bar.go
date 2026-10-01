@@ -225,7 +225,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// outputs join once their connector name is known.
 	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, sess)
 	defer stopWallpaper()
-	osdSrv := osd.New(application, cfg.Osd, font, palette)
+	osdSrv := osd.New(application, cfg.Osd, cfg.General, font, palette)
 	osdRef.Store(osdSrv)
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
 	defer captureSvc.close()
@@ -310,7 +310,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 					rt.ctx.Config = next
 					rt.ctx.Dropdowns.setConfig(next)
 				}
-				osdSrv.SetConfig(next.Osd)
+				osdSrv.SetConfig(next.Osd, next.General)
 				applyNotificationConfig(notifSvc, next.Notification)
 				weatherSvc.Configure(weatherSettings(next.Weather))
 				if wall != nil {

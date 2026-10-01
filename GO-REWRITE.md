@@ -103,7 +103,6 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       tearing mode)
 - [ ] notification popup enter/exit animations (the Rust WayleRevealer
       with the notifications animation surface)
-- [ ] OSD: `osd.layer` and tearing mode (the window is always overlay)
 - [x] format strings render through internal/jinja (minijinja-checked)
 - [x] the custom module: icon-map/icon-names, color-map, class-format,
       tooltips, on-action, restart policies

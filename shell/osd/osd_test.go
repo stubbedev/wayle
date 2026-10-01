@@ -3,6 +3,7 @@ package osd
 import (
 	"testing"
 
+	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 	"golang.org/x/image/font/gofont/goregular"
@@ -103,7 +104,7 @@ func TestSetEvent(t *testing.T) {
 func TestDisabledOsdNeverShows(t *testing.T) {
 	cfg := config.DefaultsOsd()
 	cfg.Enabled = false
-	o := New(nil, cfg, testFont(t), nil)
+	o := New(nil, cfg, config.GeneralConfig{}, testFont(t), nil)
 	o.Show(Event{Kind: "volume"})
 	if got := o.Current(); got.Kind != "" {
 		t.Errorf("disabled OSD recorded %q", got.Kind)
@@ -113,7 +114,7 @@ func TestDisabledOsdNeverShows(t *testing.T) {
 func TestApplyToast(t *testing.T) {
 	cfg := config.DefaultsOsd()
 	cfg.Presets = []config.ToastPreset{{ID: "screenshot", Label: new("Captured"), Icon: new("ld-camera-symbolic")}}
-	o := New(nil, cfg, testFont(t), nil)
+	o := New(nil, cfg, config.GeneralConfig{}, testFont(t), nil)
 
 	// A plain label toast without a percentage shows no progress bar.
 	ev, err := o.applyToast(widgetipc.ToastRequest{Label: new("hello")})
@@ -155,5 +156,23 @@ func TestApplyToast(t *testing.T) {
 	ev, _ = o.applyToast(widgetipc.ToastRequest{Label: new("x"), Percentage: &pct})
 	if ev.Value != 100 {
 		t.Errorf("clamped value = %v", ev.Value)
+	}
+}
+
+func TestOsdLayerFollowsConfigAndTearingMode(t *testing.T) {
+	cfg := config.DefaultsOsd()
+	o := New(nil, cfg, config.GeneralConfig{}, testFont(t), nil)
+	if o.layer() != app.LayerOverlay {
+		t.Errorf("default layer = %d, want overlay", o.layer())
+	}
+	cfg.Layer = config.LayerBottom
+	o.SetConfig(cfg, config.GeneralConfig{})
+	if o.layer() != app.LayerBottom {
+		t.Errorf("osd.layer = bottom gave %d", o.layer())
+	}
+	cfg.Layer = config.LayerOverlay
+	o.SetConfig(cfg, config.GeneralConfig{TearingMode: true})
+	if o.layer() != app.LayerTop {
+		t.Errorf("overlay under tearing mode = %d, want top", o.layer())
 	}
 }

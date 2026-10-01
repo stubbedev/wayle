@@ -17,6 +17,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/widgetipc"
+	"github.com/stubbedev/wayle/shell/layering"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -117,10 +118,11 @@ func clamp01(v float64) float64 {
 // Windows are created on the first Show and closed on dismiss, so a
 // quiet session maps nothing.
 type Osd struct {
-	app  *app.Application
-	cfg  config.OsdConfig
-	font render.Font
-	pal  *styling.Palette
+	app     *app.Application
+	cfg     config.OsdConfig
+	general config.GeneralConfig // tearing mode, for the layer
+	font    render.Font
+	pal     *styling.Palette
 
 	mu      sync.Mutex
 	outputs map[string]*app.Output
@@ -129,9 +131,10 @@ type Osd struct {
 	current Event
 }
 
-// New builds the OSD.
-func New(application *app.Application, cfg config.OsdConfig, font render.Font, pal *styling.Palette) *Osd {
-	return &Osd{app: application, cfg: cfg, font: font, pal: pal, outputs: make(map[string]*app.Output), faces: make(map[string]*face)}
+// New builds the OSD; general carries the tearing mode its layer
+// honors.
+func New(application *app.Application, cfg config.OsdConfig, general config.GeneralConfig, font render.Font, pal *styling.Palette) *Osd {
+	return &Osd{app: application, cfg: cfg, general: general, font: font, pal: pal, outputs: make(map[string]*app.Output), faces: make(map[string]*face)}
 }
 
 // Show flashes the event on every attached face for the dismiss
@@ -182,9 +185,9 @@ func (o *Osd) DetachOutput(name string) {
 // SetConfig applies a reloaded [osd] section: the next Show uses it,
 // and faces on screen close so they reopen at the new position and
 // margin (the Rust OSD re-anchors on its config watchers).
-func (o *Osd) SetConfig(cfg config.OsdConfig) {
+func (o *Osd) SetConfig(cfg config.OsdConfig, general config.GeneralConfig) {
 	o.mu.Lock()
-	o.cfg = cfg
+	o.cfg, o.general = cfg, general
 	o.mu.Unlock()
 	o.dismiss()
 }
@@ -226,7 +229,7 @@ func (o *Osd) ensure(outputName string, output *app.Output) (*face, error) {
 
 	win, err := o.app.NewLayer(app.LayerConfig{
 		Output:        output,
-		Layer:         app.LayerOverlay,
+		Layer:         o.layer(),
 		Anchor:        anchor,
 		Margin:        marginsFor(o.cfg),
 		Width:         360,
@@ -304,3 +307,6 @@ func deref(s *string) string {
 	}
 	return *s
 }
+
+// layer is the configured osd.layer through tearing mode (apply_layer).
+func (o *Osd) layer() app.Layer { return layering.For(o.general, o.cfg.Layer) }
