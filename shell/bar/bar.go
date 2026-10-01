@@ -298,6 +298,8 @@ func run(cfg *config.Config, svc *config.Service) error {
 		rt.mount(application, cfg)
 		bars.reload(func(connector string) (config.BarLayout, bool) { return barLayoutFor(cfg, connector) })
 	}
+	// lockScreen starts below; a reload reaches it once it exists.
+	var lockScreen *lock.Screen
 	if svc != nil {
 		// A reload recompiles the stylesheet for the new snapshot,
 		// rebuilds the bars, and hands the OSD and popups their new
@@ -322,6 +324,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 				}
 				if popupHost != nil {
 					popupHost.SetConfig(next)
+				}
+				if lockScreen != nil {
+					lockScreen.SetConfig(next)
 				}
 			})
 		})
@@ -356,7 +361,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	go watchOsd(current.Load, baseCtx, osdSrv)
 	// The ext-session-lock screen and its triggers (logind, and `wayle
 	// lock` through Shell1).
-	lockScreen, stopLock := lock.Start(application, cfg, lock.Fonts(cfg.General.FontSans, font), palette)
+	lockScreen, stopLock := lock.Start(application, current.Load(), lock.Fonts(cfg.General.FontSans, font), palette)
 	defer stopLock()
 	defer serveShellIPC(application, bars, func() bool {
 		application.Invoke(lockScreen.Lock)

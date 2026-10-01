@@ -508,3 +508,26 @@ func TestFailureTextCount(t *testing.T) {
 		t.Errorf("%q", got)
 	}
 }
+
+// TestSetConfigAppliesAReload pins the live config: a reload that
+// disables the lock refuses the next request, and one that changes
+// the PAM service takes effect on the next lock, as the Rust lock
+// reads its keys at use.
+func TestSetConfigAppliesAReload(t *testing.T) {
+	h := newHarness(t, nil)
+	next := config.Defaults()
+	next.Lock.Enabled = false
+	h.s.SetConfig(next)
+	h.s.Lock()
+	if h.locker.active {
+		t.Fatal("a reload disabling [lock] still locked")
+	}
+	next = config.Defaults()
+	next.Lock.PamService = "wayle-reloaded"
+	h.s.SetConfig(next)
+	h.lock(t)
+	h.s.Submit("pw")
+	if c := h.conv(t); c.service != "wayle-reloaded" {
+		t.Errorf("PAM service = %q, want the reloaded one", c.service)
+	}
+}

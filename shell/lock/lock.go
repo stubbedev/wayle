@@ -136,6 +136,15 @@ func New(cfg *config.Config, fonts credential.Fonts, pal *styling.Palette, d Dep
 	return &Screen{cfg: cfg.Lock, wallpaper: cfg.Wallpaper.Wallpaper, fonts: fonts, pal: pal, d: d}
 }
 
+// SetConfig applies a reloaded config, as the Rust lock reads its keys
+// live: every later read (the grace period, the attempt limit, the
+// PAM service, the blank timeout, the clock formats) sees it at once,
+// and the next lock builds its surfaces and background from it. Loop
+// goroutine.
+func (s *Screen) SetConfig(cfg *config.Config) {
+	s.cfg, s.wallpaper = cfg.Lock, cfg.Wallpaper.Wallpaper
+}
+
 // Locked reports whether a lock is pending or held.
 func (s *Screen) Locked() bool { return s.d.Locker.Active() }
 
