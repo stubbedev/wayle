@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -267,6 +268,18 @@ type systrayModule struct {
 	menuPop *app.MenuPopover
 	// menuItems are the rows last built, kept headless (no popover).
 	menuItems []widget.MenuItem
+	// accels binds the open menu's shortcuts (nil: the application);
+	// accelKeys are the bindings made, undone on refresh and close.
+	accels    accelBinder
+	accelKeys []string
+}
+
+// accelBinder is the application accelerator table the tray menu's
+// shortcuts go into (app.Application).
+type accelBinder interface {
+	AddAction(name string, fn func())
+	AddAccel(keys, action string) error
+	RemoveAccel(keys string) error
 }
 
 func newSystray(ctx ModuleContext) (Module, error) {
@@ -452,6 +465,7 @@ func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
 	rows := m.menuRows(e.item, menu.Children)
 	if m.ctx.App == nil || m.host == nil {
 		m.menuKey, m.menuItems = key, rows
+		m.bindAccels(e.item, menu.Children)
 		return
 	}
 	m.closeMenu()
@@ -459,12 +473,15 @@ func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
 	// Submenus open as their own popovers beside their rows, as the
 	// Rust tray's PopoverMenu with the NESTED flag does.
 	pop, err := m.ctx.App.OpenMenuPopover(m.host, app.MenuPopoverConfig{
-		Anchor:   e.button,
-		Face:     font,
-		SizePx:   px,
-		Items:    rows,
-		Serial:   m.ctx.App.LastPressSerial(m.host),
-		OnClosed: stop,
+		Anchor: e.button,
+		Face:   font,
+		SizePx: px,
+		Items:  rows,
+		Serial: m.ctx.App.LastPressSerial(m.host),
+		OnClosed: func() {
+			stop()
+			m.unbindAccels()
+		},
 	})
 	if err != nil {
 		stop()
@@ -473,6 +490,7 @@ func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
 	}
 	m.menuKey, m.menuPop, m.menuItems = key, pop, rows
 	it := e.item
+	m.bindAccels(it, menu.Children)
 	go func() {
 		for range feed {
 			ctx, cancel := context.WithTimeout(context.Background(), trayCallTimeout)
@@ -484,6 +502,7 @@ func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
 			m.ctx.Invoke(func() {
 				if m.menuPop == pop {
 					pop.SetItems(m.menuRows(it, fresh.Children)...)
+					m.bindAccels(it, fresh.Children)
 				}
 			})
 		}
@@ -536,15 +555,94 @@ func (m *systrayModule) menuRows(it sni.Item, nodes []sni.MenuItem) []widget.Men
 		case sni.ToggleRadio:
 			row.Kind, row.Checked, row.Group = widget.ItemRadio, n.ToggleState == sni.ToggleChecked, "radio"
 		}
-		id := n.ID
-		row.OnClick = func() {
-			m.call("menu event", it.Key(), func(ctx context.Context, item sni.Item) error {
-				return m.tray.MenuClicked(ctx, item, id)
-			})
-		}
+		row.OnClick = m.clicker(it, n.ID)
 		rows = append(rows, row)
 	}
 	return rows
+}
+
+// clicker sends a leaf's clicked event, for its row and its shortcut.
+func (m *systrayModule) clicker(it sni.Item, id int32) func() {
+	return func() {
+		m.call("menu event", it.Key(), func(ctx context.Context, item sni.Item) error {
+			return m.tray.MenuClicked(ctx, item, id)
+		})
+	}
+}
+
+// binder is the accelerator table: the injected one, else the app's.
+func (m *systrayModule) binder() accelBinder {
+	if m.accels != nil {
+		return m.accels
+	}
+	if m.ctx.App != nil {
+		return m.ctx.App
+	}
+	return nil
+}
+
+// bindAccels is register_accelerators: every visible, enabled leaf with
+// a shortcut fires its clicked event on that key while the menu is
+// open. A rebuilt menu drops the previous bindings first; a key already
+// taken (or one gelm cannot express, a Super binding) is skipped.
+func (m *systrayModule) bindAccels(it sni.Item, nodes []sni.MenuItem) {
+	m.unbindAccels()
+	b := m.binder()
+	if b == nil {
+		return
+	}
+	var walk func([]sni.MenuItem)
+	walk = func(nodes []sni.MenuItem) {
+		for _, n := range nodes {
+			if !n.Visible || n.Separator {
+				continue
+			}
+			if len(n.Children) > 0 {
+				walk(n.Children)
+				continue
+			}
+			spec := trayAccelSpec(n.Shortcut)
+			if spec == "" || !n.Enabled {
+				continue
+			}
+			action := fmt.Sprintf("systray.%s.%d", it.Key(), n.ID)
+			b.AddAction(action, m.clicker(it, n.ID))
+			if err := b.AddAccel(spec, action); err != nil {
+				log.Printf("systray: %s shortcut %s: %v", it.ID, spec, err)
+				continue
+			}
+			m.accelKeys = append(m.accelKeys, spec)
+		}
+	}
+	walk(nodes)
+}
+
+// unbindAccels is clear_accelerators.
+func (m *systrayModule) unbindAccels() {
+	if b := m.binder(); b != nil {
+		for _, spec := range m.accelKeys {
+			_ = b.RemoveAccel(spec)
+		}
+	}
+	m.accelKeys = nil
+}
+
+// trayAccelSpec is to_gtk_accelerator: the first shortcut as a GTK
+// accelerator ("<Control><Shift>q"), modifiers outside Control, Shift,
+// Alt and Super dropped; empty without one.
+func trayAccelSpec(shortcut [][]string) string {
+	if len(shortcut) == 0 || len(shortcut[0]) == 0 {
+		return ""
+	}
+	keys := shortcut[0]
+	var b strings.Builder
+	for _, mod := range keys[:len(keys)-1] {
+		switch mod {
+		case "Control", "Shift", "Alt", "Super":
+			b.WriteString("<" + mod + ">")
+		}
+	}
+	return b.String() + keys[len(keys)-1]
 }
 
 // trayMenuIcon is a row's icon: icon-name from the theme, else the PNG

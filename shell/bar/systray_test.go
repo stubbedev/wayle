@@ -2,6 +2,7 @@ package bar
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -279,5 +281,97 @@ func TestLoadFileAppliesSystray(t *testing.T) {
 		if _, err := config.LoadFile(path); err == nil {
 			t.Errorf("%q: want a load error", bad)
 		}
+	}
+}
+
+// fakeAccels is an application accelerator table.
+type fakeAccels struct {
+	actions map[string]func()
+	bound   map[string]string // keys -> action
+	taken   map[string]bool
+}
+
+func newFakeAccels() *fakeAccels {
+	return &fakeAccels{actions: map[string]func(){}, bound: map[string]string{}, taken: map[string]bool{}}
+}
+
+func (f *fakeAccels) AddAction(name string, fn func()) { f.actions[name] = fn }
+
+func (f *fakeAccels) AddAccel(keys, action string) error {
+	if f.taken[keys] || f.bound[keys] != "" {
+		return errors.New("taken")
+	}
+	f.bound[keys] = action
+	return nil
+}
+
+func (f *fakeAccels) RemoveAccel(keys string) error {
+	if f.bound[keys] == "" {
+		return errors.New("not bound")
+	}
+	delete(f.bound, keys)
+	return nil
+}
+
+func (f *fakeAccels) press(keys string) bool {
+	a, ok := f.bound[keys]
+	if ok {
+		f.actions[a]()
+	}
+	return ok
+}
+
+// TestSystrayMenuShortcutsFire pins register_accelerators: an open
+// menu's enabled leaves fire their clicked event on their shortcut, a
+// disabled or hidden one does not, a rebuilt menu rebinds, and a taken
+// key is skipped without losing the rest.
+func TestSystrayMenuShortcutsFire(t *testing.T) {
+	cfg := config.Defaults()
+	it := &sni.Item{Bus: ":1.1", Path: "/StatusNotifierItem", ID: "app", MenuPath: "/MenuBar"}
+	m, tray, _ := newTrayForTest(t, cfg, it)
+	accels := newFakeAccels()
+	accels.taken["<Alt>x"] = true
+	m.accels = accels
+	menu := sni.MenuItem{Children: []sni.MenuItem{
+		{ID: 1, Label: "Open", Visible: true, Enabled: true, Shortcut: [][]string{{"Control", "o"}}},
+		{ID: 2, Label: "More", Visible: true, Enabled: true, Children: []sni.MenuItem{
+			{ID: 3, Label: "Quit", Visible: true, Enabled: true, Shortcut: [][]string{{"Control", "Shift", "q"}}},
+			{ID: 4, Label: "Off", Visible: true, Enabled: false, Shortcut: [][]string{{"Control", "d"}}},
+		}},
+		{ID: 5, Label: "Gone", Visible: false, Enabled: true, Shortcut: [][]string{{"Control", "g"}}},
+		{ID: 6, Label: "Taken", Visible: true, Enabled: true, Shortcut: [][]string{{"Alt", "x"}}},
+	}}
+	m.showMenu(it.Key(), menu, nil)
+	if !accels.press("<Control><Shift>q") {
+		t.Fatal("the nested Quit shortcut is not bound")
+	}
+	if calls := waitTray(t, tray, 1); len(calls) != 1 || calls[0] != "clicked app 3" {
+		t.Errorf("calls = %v, want the clicked event for id 3", calls)
+	}
+	for _, keys := range []string{"<Control>d", "<Control>g", "<Alt>x"} {
+		if _, ok := accels.bound[keys]; ok && keys != "<Alt>x" {
+			t.Errorf("%s bound: a disabled or hidden row took a shortcut", keys)
+		}
+	}
+	if accels.bound["<Control>o"] == "" {
+		t.Error("a taken key cost the other bindings")
+	}
+
+	// A rebuilt menu drops what it no longer has.
+	m.bindAccels(*it, menu.Children[:1])
+	if accels.bound["<Control><Shift>q"] != "" || accels.bound["<Control>o"] == "" {
+		t.Errorf("after the rebuild: %v", accels.bound)
+	}
+	m.unbindAccels()
+	if len(accels.bound) != 0 {
+		t.Errorf("after close: %v still bound", accels.bound)
+	}
+	for _, s := range [][]string{{"Control", "Shift", "q"}, {"Alt", "F5"}} {
+		if _, err := app.ParseAccel(trayAccelSpec([][]string{s})); err != nil {
+			t.Errorf("gelm cannot parse %q: %v", trayAccelSpec([][]string{s}), err)
+		}
+	}
+	if trayAccelSpec([][]string{{"Hyper", "Super", "F5"}}) != "<Super>F5" || trayAccelSpec(nil) != "" {
+		t.Error("trayAccelSpec: unknown modifiers drop, an empty shortcut is none")
 	}
 }
