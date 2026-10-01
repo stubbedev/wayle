@@ -3,86 +3,44 @@ package bar
 import (
 	"context"
 	"errors"
-	"strings"
+	"fmt"
+	"log"
 	"time"
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/strftime"
 )
 
-// worldClockRender is helpers.rs's format_world_clock: every
-// {{ tz('Zone', 'strftime') }} renders the current instant in that
-// zone; plain text passes through; a bad zone renders empty (the Rust
-// warns and formats to "").
+// worldClockRender is helpers.rs's format_world_clock: the format
+// renders as a template with tz(zone, strftime) formatting now in that
+// zone. An unknown zone fails the render, which shows as nothing
+// (format_world_clock(...).unwrap_or_default()).
 func worldClockRender(format string, now time.Time) string {
-	var out strings.Builder
-	rest := format
-	for {
-		start := strings.Index(rest, "{{")
-		if start < 0 {
-			out.WriteString(rest)
-			return out.String()
+	var env jinja.Env
+	env.AddFunction("tz", func(args []any, _ map[string]any) (any, error) {
+		if len(args) != 2 {
+			return nil, errors.New("tz takes a timezone and a format")
 		}
-		end := strings.Index(rest[start:], "}}")
-		if end < 0 {
-			out.WriteString(rest)
-			return out.String()
+		zone, _ := args[0].(string)
+		layout, _ := args[1].(string)
+		location, err := time.LoadLocation(zone)
+		if err != nil || zone == "" {
+			log.Printf("world-clock: invalid timezone identifier %q", zone)
+			return nil, fmt.Errorf("invalid timezone: %s", zone)
 		}
-		end += start
-		out.WriteString(rest[:start])
-		call := strings.TrimSpace(rest[start+2 : end])
-		if zoneID, layout, ok := parseTzCall(call); ok {
-			out.WriteString(renderTz(zoneID, layout, now))
+		formatted, err := strftime.Compile(layout)
+		if err != nil {
+			return "", nil
 		}
-		rest = rest[end+2:]
-	}
-}
-
-// parseTzCall reads tz('Zone', 'strftime'); anything else is not a
-// recognized call and renders as nothing.
-func parseTzCall(call string) (string, string, bool) {
-	const prefix = "tz("
-	if !strings.HasPrefix(call, prefix) || !strings.HasSuffix(call, ")") {
-		return "", "", false
-	}
-	inner := call[len(prefix) : len(call)-1]
-	zone, args, found := strings.Cut(inner, ",")
-	if !found {
-		return "", "", false
-	}
-	zoneID, ok := singleQuoted(zone)
-	if !ok {
-		return "", "", false
-	}
-	layout, ok := singleQuoted(args)
-	return zoneID, layout, ok
-}
-
-// singleQuoted extracts the '…' span of one argument.
-func singleQuoted(arg string) (string, bool) {
-	arg = strings.TrimSpace(arg)
-	if len(arg) < 2 || arg[0] != '\'' {
-		return "", false
-	}
-	end := strings.IndexByte(arg[1:], '\'')
-	if end < 0 {
-		return "", false
-	}
-	return arg[1 : 1+end], true
-}
-
-// renderTz formats now in the zone; an unknown zone renders empty.
-func renderTz(zoneID, layout string, now time.Time) string {
-	location, err := time.LoadLocation(zoneID)
+		return formatted.Format(now.In(location)), nil
+	})
+	out, err := env.Render(format, nil)
 	if err != nil {
 		return ""
 	}
-	formatted, err := strftime.Compile(layout)
-	if err != nil {
-		return ""
-	}
-	return formatted.Format(now.In(location))
+	return out
 }
 
 // worldClock is the module: the format re-renders every second.

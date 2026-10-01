@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"math"
-	"strconv"
 
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/brightness"
 )
 
@@ -18,7 +18,7 @@ const brightnessNoDevice = "--%"
 // brightnessLabel is helpers.rs's format_label: the one variable is
 // the rounded percent.
 func brightnessLabel(format string, percent float64) string {
-	return replaceTemplateVar(format, "percent", strconv.Itoa(int(math.Round(percent))))
+	return jinja.RenderOr(format, map[string]any{"percent": int64(math.Round(percent))})
 }
 
 // brightnessIcon is select_icon: level-icons split 0-100% into equal

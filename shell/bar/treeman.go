@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
@@ -12,15 +13,14 @@ import (
 	"github.com/stubbedev/wayle/styling"
 )
 
-// treemanLabel is helpers.rs's format_label: the bucket counts land
-// on their placeholders.
+// treemanLabel is helpers.rs's format_label: plain replacements of
+// the exact "{{ name }}" spellings, in order, not a template.
 func treemanLabel(format string, status *treeman.Status) string {
-	out := replaceTemplateVar(format, "total", treemanCount(status.Total))
-	out = replaceTemplateVar(out, "stable", treemanCount(status.Stable))
-	out = replaceTemplateVar(out, "up", treemanCount(status.Up))
-	out = replaceTemplateVar(out, "down", treemanCount(status.Down))
-	out = replaceTemplateVar(out, "failed", treemanCount(status.Failed))
-	return out
+	out := strings.ReplaceAll(format, "{{ total }}", treemanCount(status.Total))
+	out = strings.ReplaceAll(out, "{{ stable }}", treemanCount(status.Stable))
+	out = strings.ReplaceAll(out, "{{ up }}", treemanCount(status.Up))
+	out = strings.ReplaceAll(out, "{{ down }}", treemanCount(status.Down))
+	return strings.ReplaceAll(out, "{{ failed }}", treemanCount(status.Failed))
 }
 
 func treemanCount(v uint32) string { return strconv.FormatUint(uint64(v), 10) }

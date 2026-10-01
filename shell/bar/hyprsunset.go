@@ -11,6 +11,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/internal/xdg"
 	"github.com/stubbedev/wayle/service/hyprsunset"
 )
@@ -29,12 +30,10 @@ func hyprsunsetLabel(format string, enabled bool, temp, gamma, configTemp, confi
 	if enabled {
 		status, tempText, gammaText = i18n.T("bar-hyprsunset-on"), strconv.Itoa(temp), strconv.Itoa(gamma)
 	}
-	out := replaceTemplateVar(format, "status", status)
-	out = replaceTemplateVar(out, "temp", tempText)
-	out = replaceTemplateVar(out, "gamma", gammaText)
-	out = replaceTemplateVar(out, "config_temp", strconv.Itoa(configTemp))
-	out = replaceTemplateVar(out, "config_gamma", strconv.Itoa(configGamma))
-	return out
+	return jinja.RenderOr(format, map[string]any{
+		"status": status, "temp": tempText, "gamma": gammaText,
+		"config_temp": strconv.Itoa(configTemp), "config_gamma": strconv.Itoa(configGamma),
+	})
 }
 
 // sunsetEnv is everything the module touches outside itself; the shell

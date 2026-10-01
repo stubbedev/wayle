@@ -40,7 +40,7 @@ type barButton struct {
 	vertical   bool
 
 	binding config.ClickConfig
-	onRun   func(config.ClickAction)
+	onRun   func(action config.ClickAction, scroll bool)
 	// ownClasses are the classes refresh last applied; classes a module
 	// sets on its button (media-disc, the threshold states) are left
 	// alone.
@@ -106,7 +106,7 @@ func newBarButtonShell(ctx ModuleContext) *barButton {
 	b.toggle = &barToggle{Button: widget.NewButton(b.content, 0, 0), owner: b}
 	b.toggle.SetElement("button")
 	b.toggle.AddClass("toggle")
-	b.toggle.OnClick = func() { b.run(b.binding.LeftClick) }
+	b.toggle.OnClick = func() { b.run(b.binding.LeftClick, false) }
 	b.Box = widget.NewBox(widget.Row, 0, 0)
 	b.SetElement("menubutton")
 	b.Append(b.toggle, true)
@@ -130,7 +130,7 @@ func (b *barButton) placeContainers() {
 
 // configure applies a module's button config and bindings; appendModule
 // calls it once it knows which module the button belongs to.
-func (b *barButton) configure(button config.ButtonConfig, binding config.ClickConfig, onRun func(config.ClickAction)) {
+func (b *barButton) configure(button config.ButtonConfig, binding config.ClickConfig, onRun func(action config.ClickAction, scroll bool)) {
 	b.button, b.binding, b.onRun = button, binding, onRun
 	// label-max-length is BarButtonBehavior's label_max_chars: the
 	// label's width caps at that many characters and ellipsizes there.
@@ -212,11 +212,13 @@ func (b *barButton) Measure(con widget.Constraints) widget.Size {
 }
 
 // run dispatches one binding; unbound (ClickNone) actions do nothing.
-func (b *barButton) run(action config.ClickAction) {
+// run fires one binding; scroll marks the scroll-up/down ones (the custom
+// module debounces its on-action for those).
+func (b *barButton) run(action config.ClickAction, scroll bool) {
 	if action.Kind == config.ClickNone || b.onRun == nil {
 		return
 	}
-	b.onRun(action)
+	b.onRun(action, scroll)
 }
 
 // bound reports whether any of the five bindings is set.
@@ -241,9 +243,9 @@ func (t *barToggle) HitTest(p widget.Point) widget.Widget {
 func (t *barToggle) PointerButton(button uint32) {
 	switch button {
 	case widget.BTNMiddle:
-		t.owner.run(t.owner.binding.MiddleClick)
+		t.owner.run(t.owner.binding.MiddleClick, false)
 	case widget.BTNRight:
-		t.owner.run(t.owner.binding.RightClick)
+		t.owner.run(t.owner.binding.RightClick, false)
 	}
 }
 
@@ -258,9 +260,9 @@ func (t *barToggle) ScrollInput(dy int) bool {
 	}
 	switch {
 	case dy > 0:
-		t.owner.run(c.ScrollDown)
+		t.owner.run(c.ScrollDown, true)
 	case dy < 0:
-		t.owner.run(c.ScrollUp)
+		t.owner.run(c.ScrollUp, true)
 	default:
 		return false
 	}

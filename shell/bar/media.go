@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/desktopentry"
 	"github.com/stubbedev/wayle/internal/glob"
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/mpris"
 )
 
@@ -47,11 +48,10 @@ func mediaStatusGlyph(state mpris.PlaybackState) string {
 // mediaLabel is helpers.rs format_label: title, artist, album, status,
 // and status_icon.
 func mediaLabel(format string, p mpris.Player) string {
-	out := replaceTemplateVar(format, "title", p.Title)
-	out = replaceTemplateVar(out, "artist", p.Artist)
-	out = replaceTemplateVar(out, "album", p.Album)
-	out = replaceTemplateVar(out, "status", mediaStatusText(p.State))
-	return replaceTemplateVar(out, "status_icon", mediaStatusGlyph(p.State))
+	return jinja.RenderOr(format, map[string]any{
+		"title": p.Title, "artist": p.Artist, "album": p.Album,
+		"status": mediaStatusText(p.State), "status_icon": mediaStatusGlyph(p.State),
+	})
 }
 
 // mediaIconEnv is what the icon pick reads beyond the config: whether

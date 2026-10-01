@@ -5,14 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strconv"
-	"strings"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -24,16 +23,7 @@ func batteryLabel(format string, percentage float64, present bool) string {
 	if !present {
 		return i18n.T("bar-battery-unavailable")
 	}
-	percent := strconv.Itoa(int(math.Round(percentage)))
-	return replaceTemplateVar(format, "percent", percent)
-}
-
-// replaceTemplateVar substitutes {{ name }} and {{name}} occurrences.
-func replaceTemplateVar(format, name, value string) string {
-	for _, pattern := range []string{"{{ " + name + " }}", "{{" + name + "}}"} {
-		format = strings.ReplaceAll(format, pattern, value)
-	}
-	return format
+	return jinja.RenderOr(format, map[string]any{"percent": int64(math.Round(percentage))})
 }
 
 // thresholdColor returns the label-color override the thresholds

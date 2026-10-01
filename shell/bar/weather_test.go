@@ -30,16 +30,17 @@ func TestWorldClockRender(t *testing.T) {
 	if got := worldClockRender("plain", now); got != "plain" {
 		t.Errorf("= %q, want plain", got)
 	}
-	// A broken call renders empty, like the Rust template error path.
-	if got := worldClockRender("x{{ tz('Nope/Zone', '%H') }}y", now); got != "xy" {
-		t.Errorf("bad zone = %q, want xy", got)
+	// Any failure fails the whole render, which shows as nothing
+	// (unwrap_or_default): an unknown zone, a bad expression, a syntax
+	// error.
+	for _, bad := range []string{"x{{ tz('Nope/Zone', '%H') }}y", "x{{ not-a-call }}y", "a{{ b", "{{ tz('UTC') }}"} {
+		if got := worldClockRender(bad, now); got != "" {
+			t.Errorf("%q = %q, want nothing", bad, got)
+		}
 	}
-	if got := worldClockRender("x{{ not-a-call }}y", now); got != "xy" {
-		t.Errorf("unrecognized = %q, want xy", got)
-	}
-	// An unterminated brace keeps the text.
-	if got := worldClockRender("a{{ b", now); got != "a{{ b" {
-		t.Errorf("unterminated = %q", got)
+	// The format is a full template: filters apply to tz() results.
+	if got := worldClockRender("{{ tz('UTC', '%a') | upper }}", now); got != "TUE" {
+		t.Errorf("filtered = %q, want TUE", got)
 	}
 }
 

@@ -89,10 +89,10 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       info row
 - [ ] notification popup cards: close and action buttons, the default
       action, the urgency bar, popup layer/margins/shadow keys
-- [ ] the custom module: icon-map/icon-names, color-map, class-format,
-      tooltips (helpers.rs resolve_*)
-- [ ] format strings render through a minijinja-compatible engine
-      (filters, dot access, conditionals), not plain substitution
+- [x] format strings render through internal/jinja (minijinja-checked)
+- [x] the custom module: icon-map/icon-names, color-map, class-format,
+      tooltips, on-action, restart policies
+- [x] cpu/ram/storage: frequencies, temperatures, and byte columns
 - [ ] systray: nested submenu popups (gelm has no popup-in-popup),
       live accelerators, popovers that grow with their content
 - [ ] cava: the wave style and the stereo split (error at creation),
@@ -191,6 +191,9 @@ data-control, Button.BgExplicit, menu row icons and MenuStack.
   Failed, and passkey entry sends a passkey (Rust sent it as a PIN).
 - openconnect keeps cookies set on a redirect (Rust drops them, which
   breaks Juniper/Pulse gateways).
+- A config reload rebuilds a custom module and restarts its command;
+  the Rust module keeps a watch command running when only its look
+  changed. The last output carries over, so the label does not blank.
 - The weather dropdown's refresh and retry refetch with the current
   settings; Rust re-sets the location as a city, so coordinates were
   geocoded as a place name on retry.

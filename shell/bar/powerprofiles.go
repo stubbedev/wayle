@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
@@ -16,7 +17,8 @@ import (
 // powerProfilesLabel is helpers.rs's format_label: the only variable
 // is the active profile's name.
 func powerProfilesLabel(format, profile string) string {
-	return replaceTemplateVar(format, "profile", profile)
+	// A plain replacement, not a template (helpers.rs).
+	return strings.ReplaceAll(format, "{{ profile }}", profile)
 }
 
 // powerProfiles is the module: the active power profile, cycling on

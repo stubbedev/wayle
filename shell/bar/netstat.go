@@ -3,46 +3,24 @@ package bar
 import (
 	"context"
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/sysinfo"
 )
 
-// netstatLabel is helpers.rs's format_label: nine placeholders over
-// one interface's rates.
+// netstatLabel is helpers.rs's format_label over one interface's
+// rates (kib "{:.0}", mib "{:.1}", gib "{:.2}", and the bytesize display).
 func netstatLabel(format string, rate sysinfo.Rate) string {
-	out := replaceTemplateVar(format, "down_kib", byteKib(rate.RxPerSec))
-	out = replaceTemplateVar(out, "down_mib", byteMib(rate.RxPerSec))
-	out = replaceTemplateVar(out, "down_gib", byteGib(rate.RxPerSec))
-	out = replaceTemplateVar(out, "down_auto", sysinfo.AutoBytes(rate.RxPerSec))
-	out = replaceTemplateVar(out, "up_kib", byteKib(rate.TxPerSec))
-	out = replaceTemplateVar(out, "up_mib", byteMib(rate.TxPerSec))
-	out = replaceTemplateVar(out, "up_gib", byteGib(rate.TxPerSec))
-	out = replaceTemplateVar(out, "up_auto", sysinfo.AutoBytes(rate.TxPerSec))
-	out = replaceTemplateVar(out, "interface", rate.Interface)
-	return out
-}
-
-// byteKib is the bytesize crate's {:.0} KiB render.
-func byteKib(bytes uint64) string {
-	const kib = 1024
-	return strconv.FormatUint(bytes/kib, 10)
-}
-
-// byteMib is {:.1} MiB; byteGib is {:.2} GiB.
-func byteMib(bytes uint64) string {
-	return floatDiv(bytes, 1024*1024, 1)
-}
-
-func byteGib(bytes uint64) string {
-	return floatDiv(bytes, 1024*1024*1024, 2)
-}
-
-func floatDiv(bytes uint64, divisor float64, precision int) string {
-	return strconv.FormatFloat(float64(bytes)/divisor, 'f', precision, 64)
+	return jinja.RenderOr(format, map[string]any{
+		"down_kib": bytesIn(rate.RxPerSec, kib, 0), "down_mib": bytesIn(rate.RxPerSec, mib, 1),
+		"down_gib": bytesIn(rate.RxPerSec, gib, 2), "down_auto": sysinfo.AutoBytes(rate.RxPerSec),
+		"up_kib": bytesIn(rate.TxPerSec, kib, 0), "up_mib": bytesIn(rate.TxPerSec, mib, 1),
+		"up_gib": bytesIn(rate.TxPerSec, gib, 2), "up_auto": sysinfo.AutoBytes(rate.TxPerSec),
+		"interface": rate.Interface,
+	})
 }
 
 // netstat is the module: per-interface traffic rates.

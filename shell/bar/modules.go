@@ -321,18 +321,25 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 		handler = h
 	}
 	btn := asBarButton(ctx, root)
-	btn.configure(moduleButton(string(item.Module), ctx.Config), moduleBinding(string(item.Module), ctx.Config), func(action config.ClickAction) {
-		// Dropdown bindings anchor to this module's own button; the
-		// registry toggles the popover on the connector's host.
-		if action.Kind == config.ClickDropdown && ctx.Dropdowns != nil {
+	follower, _ := module.(interface {
+		followAction(action config.ClickAction, scroll bool)
+	})
+	btn.configure(moduleButton(string(item.Module), ctx.Config), moduleBinding(string(item.Module), ctx.Config), func(action config.ClickAction, scroll bool) {
+		switch {
+		case action.Kind == config.ClickDropdown && ctx.Dropdowns != nil:
+			// Dropdown bindings anchor to this module's own button; the
+			// registry toggles the popover on the connector's host.
 			_ = ctx.Dropdowns.open(ctx.Connector, action.Dropdown, btn)
-			return
-		}
-		if handler != nil {
+		case handler != nil:
 			handler.RunAction(action)
-			return
+		default:
+			runClickAction(ctx, action)
 		}
-		runClickAction(ctx, action)
+		// A module that reacts after the binding (the custom module's
+		// on-action) hears every one.
+		if follower != nil {
+			follower.followAction(action, scroll)
+		}
 	})
 	btn.AddClass(classes...)
 	if r, ok := module.(interface{ setButton(*barButton) }); ok {

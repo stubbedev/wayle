@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -109,22 +110,18 @@ func NetRate(name string, prev, now NetTotals, elapsed float64) (Rate, error) {
 	}, nil
 }
 
-// AutoBytes renders the bytesize crate's Display: 1000-based units,
-// one decimal, plain bytes below a kilobyte.
+// AutoBytes is bytesize 2's Display: IEC (1024-based) units with one
+// decimal, "KiB" through "EiB", plain bytes below a kibibyte. The unit
+// is picked from ln(size)/ln(1024), as its std build does.
 func AutoBytes(bytes uint64) string {
-	const unit = 1000
-	if bytes < unit {
+	const kib = 1024
+	if bytes < kib {
 		return strconv.FormatUint(bytes, 10) + " B"
 	}
-	value := float64(bytes)
-	suffix := ""
-	for _, suffix = range []string{"KB", "MB", "GB", "TB", "PB", "EB"} {
-		value /= unit
-		if value < unit {
-			break
-		}
-	}
-	return strconv.FormatFloat(value, 'f', 1, 64) + " " + suffix
+	size := float64(bytes)
+	exp := int(math.Log(size) / 6.931471805599453)
+	prefix := "KMGTPE"[exp-1]
+	return strconv.FormatFloat(size/math.Pow(kib, float64(exp)), 'f', 1, 64) + " " + string(prefix) + "iB"
 }
 
 // ReadNetDevTotals is an alternative reader over /proc/net/dev used by

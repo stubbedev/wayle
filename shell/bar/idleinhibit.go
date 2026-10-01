@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/idleinhibit"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -34,10 +35,7 @@ func idleInhibitLabel(format string, active bool, durationMins uint32, remaining
 	if durationMins != 0 {
 		duration = strconv.FormatUint(uint64(durationMins), 10)
 	}
-	out := replaceTemplateVar(format, "state", state)
-	out = replaceTemplateVar(out, "remaining", remaining)
-	out = replaceTemplateVar(out, "duration", duration)
-	return out
+	return jinja.RenderOr(format, map[string]any{"state": state, "remaining": remaining, "duration": duration})
 }
 
 // idleInhibitColor resolves the state's configured color, the bar fg

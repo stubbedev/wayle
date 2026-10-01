@@ -7,6 +7,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/hyprland"
 )
 
@@ -14,9 +15,7 @@ import (
 // title/app, falling back to the _bar.ftl "Desktop" when the render is
 // blank.
 func windowTitleLabel(format, title, appID string) string {
-	label := format
-	label = replaceTemplateVar(label, "title", title)
-	label = replaceTemplateVar(label, "app", appID)
+	label := jinja.RenderOr(format, map[string]any{"title": title, "app": appID})
 	if strings.TrimSpace(label) == "" {
 		return i18n.T("bar-window-title-empty")
 	}

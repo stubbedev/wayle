@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/hyprland"
 )
 
@@ -46,11 +47,7 @@ func keyboardLayoutLabel(layout, format string, aliasMap map[string]string) stri
 	if !ok {
 		alias = layout
 	}
-	format = strings.ReplaceAll(format, "{{ layout }}", layout)
-	format = strings.ReplaceAll(format, "{{layout}}", layout)
-	format = strings.ReplaceAll(format, "{{ alias }}", alias)
-	format = strings.ReplaceAll(format, "{{alias}}", alias)
-	return format
+	return jinja.RenderOr(format, map[string]any{"layout": layout, "alias": alias})
 }
 
 // keyboardLayout is the module: the main keyboard's active layout.

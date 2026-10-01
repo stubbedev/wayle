@@ -6,6 +6,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/hyprland"
 )
 
@@ -16,7 +17,7 @@ func keybindModeLabel(format, submap string) string {
 	if mode == "" {
 		mode = i18n.T("bar-keybind-mode-default")
 	}
-	return replaceTemplateVar(format, "mode", mode)
+	return jinja.RenderOr(format, map[string]any{"mode": mode})
 }
 
 // keybindModeVisible is helpers.rs's compute_visibility: auto-hide

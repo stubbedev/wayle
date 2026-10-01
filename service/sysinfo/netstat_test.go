@@ -89,11 +89,22 @@ func TestAutoBytes(t *testing.T) {
 		bytes uint64
 		want  string
 	}{
+		// bytesize 2.3.1's own output for these values.
+		{0, "0 B"},
 		{999, "999 B"},
-		{1000, "1.0 KB"},
-		{1536, "1.5 KB"},
-		{1500 * 1000, "1.5 MB"},
-		{2 * 1000 * 1000 * 1000, "2.0 GB"},
+		{1023, "1023 B"},
+		{1024, "1.0 KiB"},
+		{1536, "1.5 KiB"},
+		{1048575, "1024.0 KiB"},
+		{1048576, "1.0 MiB"},
+		{1073741824, "1.0 GiB"},
+		{1099511627776, "1.0 TiB"},
+		{1125899906842624, "1.0 PiB"},
+		{1152921504606846976, "1.0 EiB"},
+		{5000, "4.9 KiB"},
+		{123456789, "117.7 MiB"},
+		{999999999999, "931.3 GiB"},
+		{18446744073709551615, "16.0 EiB"},
 	} {
 		if got := AutoBytes(tc.bytes); got != tc.want {
 			t.Errorf("AutoBytes(%d) = %q, want %q", tc.bytes, got, tc.want)

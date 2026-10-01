@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/weather"
 )
 
@@ -138,16 +139,17 @@ func weatherFormatLabel(format string, w *weather.Weather, imperial bool) string
 	if len(w.Daily) > 0 {
 		high, low = weatherTemp(w.Daily[0].TempHigh, imperial), weatherTemp(w.Daily[0].TempLow, imperial)
 	}
-	out := replaceTemplateVar(format, "temp", weatherTemp(c.Temperature, imperial))
-	out = replaceTemplateVar(out, "temp_unit", weatherUnitSymbol(imperial))
-	out = replaceTemplateVar(out, "feels_like", weatherTemp(c.FeelsLike, imperial))
-	out = replaceTemplateVar(out, "condition", weatherConditionLabel(c.Condition))
-	out = replaceTemplateVar(out, "humidity", strconv.Itoa(int(c.Humidity))+"%")
-	out = replaceTemplateVar(out, "wind_speed", weatherSpeed(c.WindSpeed, imperial))
-	out = replaceTemplateVar(out, "wind_dir", c.WindDirection.Cardinal())
-	out = replaceTemplateVar(out, "high", high)
-	out = replaceTemplateVar(out, "low", low)
-	return out
+	return jinja.RenderOr(format, map[string]any{
+		"temp":       weatherTemp(c.Temperature, imperial),
+		"temp_unit":  weatherUnitSymbol(imperial),
+		"feels_like": weatherTemp(c.FeelsLike, imperial),
+		"condition":  weatherConditionLabel(c.Condition),
+		"humidity":   strconv.Itoa(int(c.Humidity)) + "%",
+		"wind_speed": weatherSpeed(c.WindSpeed, imperial),
+		"wind_dir":   c.WindDirection.Cardinal(),
+		"high":       high,
+		"low":        low,
+	})
 }
 
 // weatherSettings maps [modules.weather] onto the service, resolving

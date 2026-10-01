@@ -10,16 +10,16 @@ import (
 func TestNetstatLabelPlaceholders(t *testing.T) {
 	rate := sysinfo.Rate{
 		Interface: "wlan0",
-		RxPerSec:  1536,  // 1.5 KB, 2 KiB, 1.5 MiB/1024...
-		TxPerSec:  10240, // 10.0 KB, 10 KiB
+		RxPerSec:  1536,  // 1.5 KiB
+		TxPerSec:  10240, // 10.0 KiB
 	}
 	cfg := config.DefaultsNetstat()
-	if got := netstatLabel(cfg.Format, rate); got != "1.5 KB 10.2 KB" {
+	if got := netstatLabel(cfg.Format, rate); got != "1.5 KiB 10.0 KiB" {
 		t.Errorf("default = %q", got)
 	}
 	got := netstatLabel("{{ down_kib }}/{{ down_mib }}/{{ down_gib }} {{ interface }}", rate)
-	// KiB rounds down like {:.0}; MiB keeps one decimal.
-	if got != "1/0.0/0.00 wlan0" {
+	// "{:.0}" rounds 1.5 KiB to 2; MiB keeps one decimal.
+	if got != "2/0.0/0.00 wlan0" {
 		t.Errorf("kib/mib/gib = %q", got)
 	}
 	got = netstatLabel("{{ up_kib }} {{ up_mib }} {{ up_gib }}", rate)

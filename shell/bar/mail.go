@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/widget"
@@ -33,7 +34,8 @@ func mailLabel(format string, count uint32, hideWhenZero bool) string {
 	if hideWhenZero && count == 0 {
 		return ""
 	}
-	return replaceTemplateVar(format, "count", strconv.FormatUint(uint64(count), 10))
+	// A plain replacement, not a template (helpers.rs).
+	return strings.ReplaceAll(format, "{{ count }}", strconv.FormatUint(uint64(count), 10))
 }
 
 // mailModule is the module: the shared service's unread total.

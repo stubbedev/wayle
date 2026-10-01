@@ -257,6 +257,9 @@ func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	return col
 }
 
+// dashboardCPU is the dashboard's CPU reader, kept across opens.
+var dashboardCPU = &sysinfo.CPUReader{Sensor: "auto"}
+
 // dashboardStats builds the system stats lines; nil when nothing reads.
 func dashboardStats(ctx ModuleContext, font render.Font, px float64) widget.Widget {
 	var lines []string
@@ -265,13 +268,10 @@ func dashboardStats(ctx ModuleContext, font render.Font, px float64) widget.Widg
 			lines = append(lines, i18n.T("dropdown-dashboard-battery")+": "+batteryLabel("{{ percent }}%", dev.Percentage, dev.Present()))
 		}
 	}
-	if prev, err := sysinfo.ReadCpuSample(); err == nil {
-		// Usage is a delta; the panel takes a short window rather than
-		// holding state between opens.
-		time.Sleep(120 * time.Millisecond)
-		if next, err := sysinfo.ReadCpuSample(); err == nil {
-			lines = append(lines, i18n.T("dropdown-dashboard-cpu")+": "+strconv.FormatFloat(prev.Usage(next), 'f', 0, 64)+"%")
-		}
+	// Usage is a delta: the reader keeps the counters between opens (the
+	// first open shows the since-boot average, as sysinfo's first refresh).
+	if cpu, err := dashboardCPU.Read(); err == nil {
+		lines = append(lines, i18n.T("dropdown-dashboard-cpu")+": "+pad2(cpu.UsagePercent)+"%")
 	}
 	if mem, err := sysinfo.ReadMemory(); err == nil {
 		lines = append(lines, i18n.T("dropdown-dashboard-ram")+": "+strconv.FormatFloat(mem.UsagePercent(), 'f', 0, 64)+"%")

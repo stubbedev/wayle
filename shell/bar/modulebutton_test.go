@@ -79,7 +79,7 @@ func newWrappedModule(t *testing.T, binding config.ClickConfig) (*barButton, *re
 	ctx := newTestContext(t, cfg)
 	label := widget.NewLabel(testFont(t), 12, "x", 0xFF000000)
 	button := asBarButton(ctx, label)
-	button.configure(batteryButton(cfg), binding, func(action config.ClickAction) {
+	button.configure(batteryButton(cfg), binding, func(action config.ClickAction, _ bool) {
 		rec.actions = append(rec.actions, action)
 	})
 	return button, rec

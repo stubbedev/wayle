@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/recorder"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -25,8 +26,7 @@ func recorderLabel(format string, active, paused bool, elapsedSecs uint32) strin
 	if active {
 		elapsed = recorder.FormatElapsed(elapsedSecs)
 	}
-	out := replaceTemplateVar(format, "state", state)
-	return replaceTemplateVar(out, "elapsed", elapsed)
+	return jinja.RenderOr(format, map[string]any{"state": state, "elapsed": elapsed})
 }
 
 // recorderIconName is helpers.rs's select_icon over the state trio.
