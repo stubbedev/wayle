@@ -50,8 +50,9 @@ buildGoModule {
   inherit src;
 
   # The module cache's hash: every go.mod change (a gelm bump) changes
-  # it, and `nix build .#wayle-go` reports the new one.
-  vendorHash = "sha256-BGKyYFOE5dkZopyQ74gwXxXd1ci1cJbLYioD5GZtTX8=";
+  # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
+  # reported, the derivation being fixed-output).
+  vendorHash = "sha256-mLyizYSWJzqbXAHEMYP6nbiGLVf5ZMBjj4WxxXwxLWU=";
 
   subPackages = [ "cmd/wayle" ];
 

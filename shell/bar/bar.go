@@ -71,6 +71,10 @@ func run(cfg *config.Config, svc *config.Service) error {
 	defer sess.Close()
 
 	application := app.NewApplication(sess)
+	// Surfaces animate their content through [animations] (shell/reveal),
+	// as the Rust shell's revealers do; gelm's own surface fades would
+	// stack on top of them.
+	application.SetSurfaceMotion(false)
 	// current is the live config snapshot the long-lived services read.
 	current := &atomic.Pointer[config.Config]{}
 	current.Store(cfg)

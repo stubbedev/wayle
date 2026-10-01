@@ -112,7 +112,8 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] cpu/ram/storage: frequencies, temperatures, and byte columns
 - [x] systray: nested submenu popups (gelm OpenMenuPopover, the NESTED
       PopoverMenu)
-- [ ] systray: live accelerators, popovers that grow with their content
+- [x] systray: live accelerators (the menu's shortcuts fire while it is
+      open), popovers that grow with their content (gelm reposition)
 - [x] cava: the wave style and the stereo split, held frame for frame
       to the vendored cavacore.c (cava/testdata/oracle.c fixtures);
       `waves` and `monstercat` change nothing in either shell (only
