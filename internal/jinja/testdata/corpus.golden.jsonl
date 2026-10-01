@@ -1,0 +1,171 @@
+{"ok":"hello world"}
+{"ok":"|"}
+{"err":true}
+{"ok":"|"}
+{"ok":"22C"}
+{"ok":"|"}
+{"ok":"22"}
+{"ok":"1 3 |"}
+{"err":true}
+{"ok":"fallback"}
+{"ok":"actual"}
+{"err":true}
+{"ok":"none"}
+{"ok":"none"}
+{"ok":"05"}
+{"ok":"  3.1|ab    |+255|ff|0xff|377|3.141590e+00|3.14159|1E+20"}
+{"ok":" 42%"}
+{"ok":"1.0 and true"}
+{"err":true}
+{"ok":"ab"}
+{"ok":"002.2"}
+{"ok":"         a|b         |"}
+{"err":true}
+{"ok":"HELLO WORLD-FOO_BAR hello world-foo_bar Hello World-Foo_Bar Hello world-foo_bar"}
+{"ok":"22.0 22.5 0.30000000000000004 1000000000000000000000.0 0.00000015"}
+{"ok":"22.0 22"}
+{"err":true}
+{"ok":"7 9 4 5"}
+{"ok":"a1nonetrue"}
+{"ok":"ab ababab [1, 2] [1, 2, 1, 2]"}
+{"err":true}
+{"err":true}
+{"err":true}
+{"ok":"3.0 3.1 7 3.0 -3.0"}
+{"ok":"42 3 3 0 1"}
+{"ok":"2.5 3.0 0.0"}
+{"err":true}
+{"ok":"5 2.5"}
+{"ok":"a, b, 3 ab3 |"}
+{"ok":"3 5 2"}
+{"ok":"x|hi"}
+{"ok":"a+b+c"}
+{"ok":"4 6 a c |"}
+{"ok":"1 6 A |"}
+{"ok":"1,2,3 3,2,1 A,b,c"}
+{"ok":"3,2,1 cba"}
+{"ok":"6 3.5"}
+{"ok":"1,2,3 a,b"}
+{"ok":"a|b|c a|b||c a|b,c"}
+{"ok":"[[\"a\", 1], [\"b\", 2]] [[\"a\", 1], [\"b\", 2]]"}
+{"ok":"{\"a\": 1, \"b\": \"2\"} [1, 2] [\"x\", 1, none, true, 1.0]"}
+{"ok":"[[1, 2], [3]] [[1, 2], [3, 0]] [[1, 2], [3]]"}
+{"ok":"1,3 0,2 1,2,3"}
+{"ok":"a,b a"}
+{"ok":"3"}
+{"ok":"line\n    two"}
+{"ok":"5! true false"}
+{"err":true}
+{"ok":"mid"}
+{"ok":"no"}
+{"ok":"|b"}
+{"ok":"1:a,2:b,3:c"}
+{"ok":"02true2 11false2 "}
+{"ok":"empty"}
+{"ok":"a=1;b=2;"}
+{"ok":"ab"}
+{"ok":"[a][b]"}
+{"ok":"13"}
+{"ok":"1a 4b 7a "}
+{"ok":"10"}
+{"ok":"12"}
+{"ok":"[inner 2]"}
+{"ok":"|"}
+{"ok":"a  b"}
+{"ok":"a b c"}
+{"ok":"a\n  x\nb"}
+{"ok":"{{ not rendered }}"}
+{"ok":"line"}
+{"ok":"line\n"}
+{"ok":"yes |"}
+{"ok":"true false true true true false"}
+{"ok":"true false true true true true true"}
+{"ok":"true true true true"}
+{"ok":"true true true true false"}
+{"ok":"true true false true true"}
+{"ok":"true"}
+{"ok":"[2, 3, 4] [1, 2] [4, 3, 2, 1] el [3, 4]"}
+{"ok":"its a\tb aéb"}
+{"ok":"1 2 [1, 2]"}
+{"ok":"1"}
+{"ok":"1001"}
+{"ok":"65%"}
+{"ok":"18°C Rain"}
+{"ok":"full"}
+{"err":true}
+{"err":true}
+{"err":true}
+{"err":true}
+{"ok":"deep"}
+{"err":true}
+{"ok":"-3 false"}
+{"ok":"[1, \"a\"]"}
+{"ok":"|x"}
+{"err":true}
+{"ok":"none|0|0"}
+{"ok":"true false true false true true true"}
+{"ok":"3"}
+{"ok":"x-002.5"}
+{"err":true}
+{"ok":"1|none|3.0"}
+{"err":true}
+{"ok":"100000|1e+06|0.0001|1e-05|3.14|1.50000"}
+{"ok":"1.234568e+04|5e+00|5.e+00|5.000000E-01"}
+{"ok":" 5|-5|+2.50|3    |"}
+{"ok":"1.5|1e+20|0.1"}
+{"ok":" true|false|    1|00001|1    |"}
+{"ok":"0o10|0XFF|FF"}
+{"err":true}
+{"err":true}
+{"err":true}
+{"ok":"3.5 -4 1 2 1024 4.0 -4.0 -1.5 inf"}
+{"err":true}
+{"err":true}
+{"err":true}
+{"ok":"b,a a,b"}
+{"err":true}
+{"err":true}
+{"ok":"[[1, 2], [3, 0]] [[1, 2, 0], [3, 4, 0]]"}
+{"ok":"a\n\n  b|  a\n  b|a\n  \n  b"}
+{"ok":"1,-"}
+{"ok":"ba [[\"b\", 1], [\"a\", 2]] [[\"b\", 1], [\"a\", 2]]"}
+{"ok":"1 1.0"}
+{"err":true}
+{"ok":"[0, 1, 2] [1, 2] 5,3,1"}
+{"ok":"true true true true"}
+{"ok":"true true true false"}
+{"ok":"true true true false true false"}
+{"ok":"-1- -2- -3- "}
+{"ok":"|"}
+{"ok":"ok|"}
+{"ok":"hy"}
+{"ok":"spaced"}
+{"ok":"{\"nested\": [1, {\"k\": true}]}"}
+{"ok":"|c"}
+{"ok":"true true true"}
+{"ok":"1 4"}
+{"ok":"2 0"}
+{"ok":"x1.52"}
+{"ok":"y"}
+{"ok":"a\nb"}
+{"ok":"b"}
+{"ok":"{{ x }}"}
+{"ok":"012"}
+{"ok":"3 7 "}
+{"err":true}
+{"err":true}
+{"err":true}
+{"err":true}
+{"err":true}
+{"err":true}
+{"err":true}
+{"ok":"1.0 2.0 2.68 1200.0"}
+{"ok":"2.5 4.0 0.0"}
+{"ok":"2 3 2.0"}
+{"ok":"2.0"}
+{"ok":"É STRASSE école Éa Ébc Déf"}
+{"ok":"1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.0"}
+{"ok":"-0.0 123456789012.5"}
+{"ok":"false true true true"}
+{"ok":"aBÄ Ab"}
+{"ok":"Straße,STRASSE,a 2"}

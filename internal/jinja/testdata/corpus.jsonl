@@ -1,0 +1,171 @@
+{"t":"hello {{ name }}","c":{"name":"world"}}
+{"t":"{{ missing }}|","c":{}}
+{"t":"{{ missing.attr }}","c":{}}
+{"t":"{{ none_val.attr }}|","c":{"none_val":null}}
+{"t":"{{ data.temp }}C","c":{"data":{"temp":22}}}
+{"t":"{{ data.nope }}|","c":{"data":{"temp":22}}}
+{"t":"{{ data['temp'] }}","c":{"data":{"temp":22}}}
+{"t":"{{ items[0] }} {{ items[-1] }} {{ items[9] }}|","c":{"items":[1,2,3]}}
+{"t":"{{ items.1 }}","c":{"items":[1,2,3]}}
+{"t":"{{ missing | default('fallback') }}","c":{}}
+{"t":"{{ text | default('fallback') }}","c":{"text":"actual"}}
+{"t":"{{ empty | default('x') }}|{{ empty | default('x', true) }}|{{ empty | d('y', boolean=true) }}","c":{"empty":""}}
+{"t":"{{ none_val | default('x') }}","c":{"none_val":null}}
+{"t":"{{ none_val }}","c":{"none_val":null}}
+{"t":"{{ \"%02d\" | format(count) }}","c":{"count":5}}
+{"t":"{{ \"%5.1f|%-6s|%+d|%x|%#x|%o|%e|%g|%G\" | format(f, s, i, i, i, i, f, f, big) }}","c":{"f":3.14159,"s":"ab","i":255,"big":1e20}}
+{"t":"{{ \"%3d%%\" | format(p) }}","c":{"p":42}}
+{"t":"{{ \"%s and %s\" | format(a, b) }}","c":{"a":1.0,"b":true}}
+{"t":"{{ \"%d\" | format(f) }}","c":{"f":3.99}}
+{"t":"{{ \"%.2s\" | format('abcdef') }}","c":{}}
+{"t":"{{ \"%05.1f\" | format(2.25) }}","c":{}}
+{"t":"{{ \"%10s|%-10s|\" | format('a', 'b') }}","c":{}}
+{"t":"{{ \"%c%c\" | format(65, 'z') }}","c":{}}
+{"t":"{{ name | upper }} {{ name | lower }} {{ name | title }} {{ name | capitalize }}","c":{"name":"hELLO wORLD-foo_bar"}}
+{"t":"{{ 22.0 }} {{ 22.5 }} {{ 0.1 + 0.2 }} {{ 1e21 }} {{ 1.5e-7 }}","c":{}}
+{"t":"{{ f }} {{ i }}","c":{"f":22.0,"i":22}}
+{"t":"{{ 7 / 2 }} {{ 7 // 2 }} {{ -7 // 2 }} {{ 7 % 3 }} {{ -7 % 3 }} {{ 2 ** 10 }} {{ 2 ** -1 }} {{ 2.0 ** 2 }}","c":{}}
+{"t":"{{ 1 + 2 * 3 }} {{ (1 + 2) * 3 }} {{ -2 ** 2 }} {{ 10 - 2 - 3 }}","c":{}}
+{"t":"{{ 'a' ~ 1 ~ none ~ true }}","c":{}}
+{"t":"{{ 'a' + 'b' }} {{ 'ab' * 3 }} {{ [1] + [2] }} {{ [1, 2] * 2 }}","c":{}}
+{"t":"{{ 'a' + 1 }}","c":{}}
+{"t":"{{ 1 + 2 ~ 3 }}","c":{}}
+{"t":"{{ 1 ~ 2 + 3 }}","c":{}}
+{"t":"{{ x | round }} {{ x | round(1) }} {{ y | round }} {{ 2.5 | round }} {{ -2.5 | round }}","c":{"x":3.14159,"y":7}}
+{"t":"{{ s | int }} {{ f | int }} {{ '3.7' | int }} {{ none | int }} {{ true | int }}","c":{"s":"42","f":3.9}}
+{"t":"{{ '2.5' | float }} {{ 3 | float }} {{ none | float }}","c":{}}
+{"t":"{{ 'abc' | int }}","c":{}}
+{"t":"{{ -5 | abs }} {{ -2.5 | abs }}","c":{}}
+{"t":"{{ items | join(', ') }} {{ items | join }} {{ missing | join(',') }}|","c":{"items":["a","b",3]}}
+{"t":"{{ items | length }} {{ 'héllo' | length }} {{ m | count }}","c":{"items":[1,2,3],"m":{"a":1,"b":2}}}
+{"t":"{{ '  x  ' | trim }}|{{ 'xxhixx' | trim('x') }}","c":{}}
+{"t":"{{ 'a-b-c' | replace('-', '+') }}","c":{}}
+{"t":"{{ items | first }} {{ items | last }} {{ 'abc' | first }} {{ 'abc' | last }} {{ [] | first }}|","c":{"items":[4,5,6]}}
+{"t":"{{ items | min }} {{ items | max }} {{ ['b', 'A', 'c'] | min }} {{ [] | max }}|","c":{"items":[4,1,6]}}
+{"t":"{{ items | sort | join(',') }} {{ items | sort(reverse=true) | join(',') }} {{ ['b','A','c'] | sort | join(',') }}","c":{"items":[3,1,2]}}
+{"t":"{{ items | reverse | join(',') }} {{ 'abc' | reverse }}","c":{"items":[1,2,3]}}
+{"t":"{{ items | sum }} {{ [1.5, 2] | sum }}","c":{"items":[1,2,3]}}
+{"t":"{{ items | unique | join(',') }} {{ ['a','A','b'] | unique | join(',') }}","c":{"items":[1,2,1,3,2]}}
+{"t":"{{ 'a b  c' | split | join('|') }} {{ 'a,b,,c' | split(',') | join('|') }} {{ 'a,b,c' | split(',', 1) | join('|') }}","c":{}}
+{"t":"{{ m | items | list }} {{ m | dictsort }}","c":{"m":{"b":2,"a":1}}}
+{"t":"{{ m }} {{ items }} {{ ['x', 1, none, true, 1.0] }}","c":{"m":{"b":"2","a":1},"items":[1,2]}}
+{"t":"{{ items | batch(2) | list }} {{ items | batch(2, 0) | list }} {{ items | slice(2) | list }}","c":{"items":[1,2,3]}}
+{"t":"{{ items | select('odd') | join(',') }} {{ items | reject('odd') | join(',') }} {{ items | select | join(',') }}","c":{"items":[0,1,2,3]}}
+{"t":"{{ users | map(attribute='name') | join(',') }} {{ users | selectattr('active') | map(attribute='name') | join(',') }}","c":{"users":[{"name":"a","active":true},{"name":"b","active":false}]}}
+{"t":"{{ ['1','2'] | map('int') | sum }}","c":{}}
+{"t":"{{ 'line\\n  two' | indent(2) }}","c":{}}
+{"t":"{{ x | string ~ '!' }} {{ x | bool }} {{ '' | bool }}","c":{"x":5}}
+{"t":"{{ val | unknownfilter }}","c":{"val":1}}
+{"t":"{% if x > 5 %}big{% elif x > 2 %}mid{% else %}small{% endif %}","c":{"x":3}}
+{"t":"{% if missing %}yes{% else %}no{% endif %}","c":{}}
+{"t":"{% if x %}a{% endif %}|{% if not x %}b{% endif %}","c":{"x":0}}
+{"t":"{% for i in items %}{{ loop.index }}:{{ i }}{% if not loop.last %},{% endif %}{% endfor %}","c":{"items":["a","b","c"]}}
+{"t":"{% for i in items %}{{ loop.index0 }}{{ loop.revindex }}{{ loop.first }}{{ loop.length }} {% endfor %}","c":{"items":[1,2]}}
+{"t":"{% for i in [] %}x{% else %}empty{% endfor %}","c":{}}
+{"t":"{% for k, v in m | dictsort %}{{ k }}={{ v }};{% endfor %}","c":{"m":{"b":2,"a":1}}}
+{"t":"{% for k in m %}{{ k }}{% endfor %}","c":{"m":{"b":2,"a":1}}}
+{"t":"{% for c in 'ab' %}[{{ c }}]{% endfor %}","c":{}}
+{"t":"{% for i in range(5) if i is odd %}{{ i }}{% endfor %}","c":{}}
+{"t":"{% for i in range(1, 10, 3) %}{{ i }}{{ loop.cycle('a', 'b') }} {% endfor %}","c":{}}
+{"t":"{% set x = 5 %}{{ x * 2 }}","c":{}}
+{"t":"{% set a, b = [1, 2] %}{{ a }}{{ b }}","c":{}}
+{"t":"{% set x %}inner {{ 1 + 1 }}{% endset %}[{{ x }}]","c":{}}
+{"t":"{% for i in [1,2] %}{% set x = i %}{% endfor %}{{ x }}|","c":{}}
+{"t":"a {# comment #} b","c":{}}
+{"t":"a  {{- ' b ' -}}  c","c":{}}
+{"t":"a\n  {%- if true %}\n  x\n  {%- endif %}\nb","c":{}}
+{"t":"{% raw %}{{ not rendered }}{% endraw %}","c":{}}
+{"t":"line\n","c":{}}
+{"t":"line\n\n","c":{}}
+{"t":"{{ 'yes' if x else 'no' }} {{ 'yes' if y }}|","c":{"x":1,"y":0}}
+{"t":"{{ x is defined }} {{ missing is defined }} {{ missing is undefined }} {{ n is none }} {{ 6 is divisibleby 3 }} {{ 7 is divisibleby(3) }}","c":{"x":1,"n":null}}
+{"t":"{{ 3 is odd }} {{ 3 is even }} {{ 3 is number }} {{ 'a' is string }} {{ 3.0 is float }} {{ 3 is integer }} {{ true is boolean }}","c":{}}
+{"t":"{{ 'foo' is startingwith 'f' }} {{ 'foo' is endingwith('o') }} {{ 2 is in [1,2] }} {{ x is not none }}","c":{"x":1}}
+{"t":"{{ 'b' in 'abc' }} {{ 2 in [1,2] }} {{ 'k' in m }} {{ 'z' not in 'abc' }} {{ 1 in missing }}","c":{"m":{"k":1}}}
+{"t":"{{ 1 == 1.0 }} {{ 'a' < 'b' }} {{ 2 >= 3 }} {{ 1 != 2 }} {{ [1,2] == [1,2] }}","c":{}}
+{"t":"{{ 1 < 'a' }}","c":{}}
+{"t":"{{ items[1:] }} {{ items[:2] }} {{ items[::-1] }} {{ 'hello'[1:3] }} {{ items[-2:] }}","c":{"items":[1,2,3,4]}}
+{"t":"{{ 'it''s' }} {{ \"a\\tb\" }} {{ 'a\\u00e9b' }}","c":{}}
+{"t":"{{ {'a': 1}.a }} {{ [1, 2, 3][1] }} {{ (1, 2) }}","c":{}}
+{"t":"{{ dict(a=1).a }}","c":{}}
+{"t":"{{ 1_000 + 1 }}","c":{}}
+{"t":"{{ percent }}%","c":{"percent":65}}
+{"t":"{{ temp }}{{ temp_unit }} {{ condition }}","c":{"temp":"18","temp_unit":"°C","condition":"Rain"}}
+{"t":"{% if percent >= 90 %}full{% endif %}","c":{"percent":95}}
+{"t":"{{ title | truncate(5) }}","c":{"title":"abcdefgh"}}
+{"t":"{{ x }","c":{"x":1}}
+{"t":"{% if x %}unterminated","c":{"x":1}}
+{"t":"{% foo %}","c":{}}
+{"t":"{{ x.y.z }}","c":{"x":{"y":{"z":"deep"}}}}
+{"t":"{{ x.y.z }}|","c":{"x":{}}}
+{"t":"{{ -x }} {{ not x }}","c":{"x":3}}
+{"t":"{{ x ~ '' }}","c":{"x":[1,"a"]}}
+{"t":"{{ e | default(\"x\") }}|{{ e | default(\"x\", true) }}","c":{"e":""}}
+{"t":"{{ e | d(\"y\", boolean=true) }}","c":{"e":""}}
+{"t":"{{ x and 1 }}|{{ y or 0 }}|{{ z and 1 }}","c":{"x":null,"y":false,"z":0}}
+{"t":"{{ 1 < \"a\" }} {{ \"a\" < 1 }} {{ n < 1 }} {{ [1] < 2 }} {{ true < 2 }} {{ true < 0 }} {{ [1, 2] < [1, 3] }}","c":{"n":null}}
+{"t":"{{ \"%i\" | format(3) }}","c":{}}
+{"t":"{{ \"%(a)s-%(b)05.1f\" | format(m) }}","c":{"m":{"a":"x","b":2.5}}}
+{"t":"{{ \"%(a)s\" | format(1) }}","c":{}}
+{"t":"{{ \"%d\" | format(true) }}|{{ \"%s\" | format(none) }}|{{ \"%.1f\" | format(3) }}","c":{}}
+{"t":"{{ \"%x\" | format(3.0) }}","c":{}}
+{"t":"{{ \"%g|%g|%g|%g|%.3g|%#g\" | format(100000, 1000000, 0.0001, 0.00001, 3.14159, 1.5) }}","c":{}}
+{"t":"{{ \"%e|%.0e|%#.0e|%E\" | format(12345.678, 5, 5, 0.5) }}","c":{}}
+{"t":"{{ \"% d|% d|%+.2f|%-5d|\" | format(5, -5, 2.5, 3) }}","c":{}}
+{"t":"{{ \"%s|%s|%s\" | format(1.5, 100000000000000000000.0, 0.1) }}","c":{}}
+{"t":"{{ \"%5s|%-5s|%5d|%05d|%-05d|\" | format(true, false, true, true, true) }}","c":{}}
+{"t":"{{ \"%#o|%#X|%X\" | format(8, 255, 255) }}","c":{}}
+{"t":"{{ \"%f\" | format(nan_like) }}","c":{"nan_like":"x"}}
+{"t":"{{ \"%d %d\" | format(1) }}","c":{}}
+{"t":"{{ \"100%\" | format() }}","c":{}}
+{"t":"{{ 7 / 2 }} {{ -7 // 2 }} {{ 7 % 3 }} {{ -7 % 3 }} {{ 2 ** 10 }} {{ 2.0 ** 2 }} {{ -7.5 // 2 }} {{ -7.5 % 2 }} {{ 1 / 0 }}","c":{}}
+{"t":"{{ 2 ** -1 }}","c":{}}
+{"t":"{{ 1 // 0 }}","c":{}}
+{"t":"{{ items | sort(true) }}","c":{"items":[2,1]}}
+{"t":"{{ users | sort(attribute='age') | map(attribute='name') | join(',') }} {{ users | sort(attribute='age', reverse=true) | map(attribute='name') | join(',') }}","c":{"users":[{"name":"a","age":3},{"name":"b","age":1}]}}
+{"t":"{{ 'x' | replace('x') }}","c":{}}
+{"t":"{{ 'a' | upper(1) }}","c":{}}
+{"t":"{{ items | slice(2, 0) | list }} {{ [1,2,3,4] | slice(2, 0) | list }}","c":{"items":[1,2,3]}}
+{"t":"{{ 'a\\n\\nb\\n' | indent(2) }}|{{ 'a\\nb' | indent(2, true) }}|{{ 'a\\n\\nb' | indent(2, false, true) }}","c":{}}
+{"t":"{{ users | map(attribute='x', default='-') | join(',') }}","c":{"users":[{"x":1},{}]}}
+{"t":"{{ ['b','a'] | unique | join }} {{ m | dictsort(by='value') }} {{ m | dictsort(reverse=true) }}","c":{"m":{"a":2,"b":1}}}
+{"t":"{{ 3 | string | length }} {{ 1.0 | string }}","c":{}}
+{"t":"{{ x | first }}","c":{"x":5}}
+{"t":"{{ range(3) | list }} {{ range(1, 3) }} {{ range(5, 0, -2) | join(',') }}","c":{}}
+{"t":"{{ 'abc' is lower }} {{ 'ABC' is upper }} {{ 'join' is filter }} {{ 'odd' is test }}","c":{}}
+{"t":"{{ x is sequence }} {{ m is mapping }} {{ 's' is iterable }} {{ 3 is iterable }}","c":{"x":[1],"m":{}}}
+{"t":"{{ 1 is eq 1 }} {{ 1 is ne 2 }} {{ 2 is gt 1 }} {{ 2 is lt(1) }} {{ 2 is ge 2 }} {{ 2 is le 1 }}","c":{}}
+{"t":"{% for x in items %}{{ loop.previtem | default('-') }}{{ x }}{{ loop.nextitem | default('-') }} {% endfor %}","c":{"items":[1,2,3]}}
+{"t":"{{ a.b }}|","c":{"a":[1]}}
+{"t":"{{ a[0].b }}|","c":{"a":[{"b":"ok"}]}}
+{"t":"{{ s[0] }}{{ s[-1] }}","c":{"s":"hey"}}
+{"t":"{{ m['a b'] }}","c":{"m":{"a b":"spaced"}}}
+{"t":"{{ x }}","c":{"x":{"nested":[1,{"k":true}]}}}
+{"t":"{{ 'a' if false }}|{{ 'b' if false else 'c' if true }}","c":{}}
+{"t":"{{ not 1 == 2 }} {{ not (1 == 2) }} {{ 1 + 1 == 2 and true }}","c":{}}
+{"t":"{{ -1 | abs }} {{ -x | abs }}","c":{"x":4}}
+{"t":"{{ (1, 2) | length }} {{ () | length }}","c":{}}
+{"t":"{{ 'x' ~ 1.5 ~ 2 }}","c":{}}
+{"t":"  {%- if true -%}  y  {%- endif -%}  ","c":{}}
+{"t":"{{- 'a' }}\n{{ 'b' -}}\n","c":{}}
+{"t":"{# a -#}  b","c":{}}
+{"t":"{%- raw -%}  {{ x }}  {%- endraw -%}","c":{}}
+{"t":"{% set n = 3 %}{% for i in range(n) %}{{ i }}{% endfor %}","c":{}}
+{"t":"{% for a, b in [[1, 2], [3, 4]] %}{{ a + b }} {% endfor %}","c":{}}
+{"t":"{% for x in 5 %}{% endfor %}","c":{}}
+{"t":"{% if %}{% endif %}","c":{}}
+{"t":"{% endif %}","c":{}}
+{"t":"{{ }}","c":{}}
+{"t":"{{ 1 + }}","c":{}}
+{"t":"{{ 'unterminated }}","c":{}}
+{"t":"{{ '\\q' }}","c":{}}
+{"t":"{{ 0.5 | round }} {{ 1.5 | round }} {{ 2.675 | round(2) }} {{ 1234.5678 | round(-2) }}","c":{}}
+{"t":"{{ 10 | float / 4 }} {{ 9 // 2.0 }} {{ 5 % 2.5 }}","c":{}}
+{"t":"{{ true + true }} {{ true * 3 }} {{ 1 + 1.0 }}","c":{}}
+{"t":"{{ [1, 2, 3] | sum / 3 }}","c":{}}
+{"t":"{{ 'é' | upper }} {{ 'straße' | upper }} {{ 'ÉCOLE' | lower }} {{ 'éa' | capitalize }} {{ 'ébc déf' | title }}","c":{}}
+{"t":"{{ v }}","c":{"v":1e300}}
+{"t":"{{ v }} {{ w }}","c":{"v":-0.0,"w":123456789012.5}}
+{"t":"{{ 'abc1' is lower }} {{ 'ABC' is upper }} {{ '' is lower }} {{ 'éa' is lower }}","c":{}}
+{"t":"{{ ['B', 'a', 'Ä'] | sort | join }} {{ ['b', 'A'] | sort(case_sensitive=true) | join }}","c":{}}
+{"t":"{{ ['Straße', 'STRASSE', 'a', 'A'] | unique | join(',') }} {{ users | unique(attribute='n') | length }}","c":{"users":[{"n":"x"},{"n":"X"},{"n":"y"}]}}
