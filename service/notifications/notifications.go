@@ -6,8 +6,10 @@ package notifications
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -76,6 +78,10 @@ type Notification struct {
 	// after an action is invoked.
 	Transient bool
 	Resident  bool
+	// ReplacesID is the replaces_id the sender passed, and Hints the
+	// raw hints but the inline image pixels: what the store keeps.
+	ReplacesID uint32
+	Hints      map[string]dbus.Variant
 }
 
 // DefaultAction is the "default" action, when the sender offered one.
@@ -149,6 +155,8 @@ type Service struct {
 	emit          func(signal string, args ...any)
 	// cacheImage turns inline image data into a file path.
 	cacheImage func(imageData) (string, bool)
+	// store persists the history; nil keeps it in memory only.
+	store *Store
 }
 
 // NewService restores the DND flag from the state dir.
@@ -284,7 +292,7 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 			return id
 		}
 	}
-	s.removeHistoryLocked(id)
+	replaced := s.removeHistoryLocked(id)
 	n := &Notification{
 		ID:           id,
 		AppName:      appName,
@@ -299,6 +307,8 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 		DesktopEntry: h.desktopEntry,
 		Transient:    h.transient,
 		Resident:     h.resident,
+		ReplacesID:   replacesID,
+		Hints:        storedHints(rawHints),
 	}
 	if expireTimeout > 0 {
 		n.Expires = n.Added.Add(time.Duration(expireTimeout) * time.Millisecond)
@@ -311,7 +321,17 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 	}
 	s.owners[n.ID] = appName
 	s.addPopupLocked(n)
+	st := s.store
 	s.mu.Unlock()
+	switch {
+	case st == nil:
+	case !n.Transient:
+		storeErr("add", st.Add(n))
+	case replaced:
+		// A transient replacement takes the stored one's place in
+		// the history, so it leaves the store too.
+		storeErr("remove", st.Remove(id))
+	}
 	s.notify(Event{Kind: EventAdd, Notif: n})
 	return n.ID
 }
@@ -347,9 +367,13 @@ func (s *Service) Close(id uint32, reason ClosedReason) {
 		s.dropPopupLocked(id)
 	}
 	emit := s.emit
+	st := s.store
 	s.mu.Unlock()
 	if !removed {
 		return
+	}
+	if st != nil {
+		storeErr("remove", st.Remove(id))
 	}
 	if emit != nil {
 		emit(Interface+".NotificationClosed", id, uint32(reason))
@@ -370,8 +394,12 @@ func (s *Service) DismissAll() {
 		s.dropPopupLocked(id)
 	}
 	emit := s.emit
+	st := s.store
 	s.mu.Unlock()
 	for _, id := range ids {
+		if st != nil {
+			storeErr("remove", st.Remove(id))
+		}
 		if emit != nil {
 			emit(Interface+".NotificationClosed", id, uint32(Dismissed))
 		}
@@ -577,4 +605,52 @@ func (s *Service) findLocked(id uint32) *Notification {
 		}
 	}
 	return nil
+}
+
+// AttachStore persists the history in st and restores what it holds
+// (builder.rs's load_stored_notifications): the stored notifications
+// join the history newest first, their apps own their ids again, new
+// ids continue past the highest stored one, and pending expiries are
+// re-armed. Restored notifications do not pop up again.
+func (s *Service) AttachStore(st *Store) error {
+	s.mu.Lock()
+	removeExpired := s.removeExpired
+	s.mu.Unlock()
+	stored, err := st.Load(time.Now(), removeExpired)
+	if err != nil {
+		return fmt.Errorf("notifications: restoring the history: %w", err)
+	}
+	s.mu.Lock()
+	s.store = st
+	have := make(map[uint32]bool, len(s.all))
+	for _, n := range s.all {
+		have[n.ID] = true
+	}
+	for _, n := range stored {
+		s.next = max(s.next, n.ID)
+		if have[n.ID] {
+			continue
+		}
+		s.all = append(s.all, n)
+		if n.AppName != "" {
+			s.owners[n.ID] = n.AppName
+		}
+		if !n.Expires.IsZero() && removeExpired {
+			s.startExpiryLocked(n)
+		}
+	}
+	slices.SortStableFunc(s.all, func(a, b *Notification) int { return b.Added.Compare(a.Added) })
+	s.mu.Unlock()
+	if len(stored) > 0 {
+		s.notify(Event{Kind: EventAdd})
+	}
+	return nil
+}
+
+// storeErr logs a failed write: the in-memory history stays right, the
+// next restart misses the change (the Rust store ignores these too).
+func storeErr(op string, err error) {
+	if err != nil {
+		log.Printf("notifications: store %s: %v", op, err)
+	}
 }

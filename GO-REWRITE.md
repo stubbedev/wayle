@@ -92,11 +92,11 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       pickers), and notification dropdowns, section by section
 - [x] recorder: the Rust engine (ScreenCast portal, in-process
       GStreamer through purego) and its dropdown
-- [ ] the dropdowns still thin stand-ins: treeman and network (the
-      largest)
-- [ ] notification history persistence (persistence.rs keeps the
-      history in SQLite across restarts; the Go service holds it in
-      memory) and the sound hints
+- [x] the dropdowns still thin stand-ins: treeman and network
+- [x] notification history persistence: the Rust notifications.db,
+      schema and zvariant hint JSON, read and written both ways; the
+      raw hints ride on each notification (the sound, category and
+      position hints are decoded by Rust and consumed nowhere)
 - [x] notification popup cards: close and action buttons, the default
       action, the urgency bar, popup layer/margins/shadow keys (cards
       styled by the shell stylesheet; layers through shell/layering with
