@@ -102,7 +102,7 @@ func TestNetworkModuleDimsWhenOffline(t *testing.T) {
 	if got := offline.label.Text(); got != i18n.T("bar-network-disconnected") {
 		t.Errorf("label = %q", got)
 	}
-	muted, _ := styling.ResolveColor(config.ColorValue{Token: config.TokenFgMuted}, styling.Default())
+	muted, _ := styling.Default().Token(config.TokenFgMuted)
 	if offline.label.Color() != muted {
 		t.Errorf("offline color = %#08x, want fg-muted", offline.label.Color())
 	}

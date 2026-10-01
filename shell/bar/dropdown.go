@@ -50,6 +50,11 @@ func (p *popdownHook) popdown() {
 }
 
 func newDropdownRegistry(application *app.Application, cfg *config.Config, font render.Font, style *barStyle, base ModuleContext) *dropdownRegistry {
+	// Dropdown content paints its own colors (no stylesheet reaches a
+	// popover), so builders get the full style: the module style the
+	// bar hands its modules leaves fg to the stylesheet (zero), which
+	// would paint every default-colored dropdown label transparent.
+	base.Style = style
 	return &dropdownRegistry{
 		app:      application,
 		cfg:      cfg,
@@ -125,6 +130,7 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	}
 	cfg := app.PopoverConfig{
 		Anchor:  bound,
+		Gravity: dropdownGravity(r.cfg.Bar.Location),
 		Content: content,
 		Serial:  r.app.LastPressSerial(host),
 	}
@@ -152,4 +158,18 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 func (r *dropdownRegistry) setConfig(cfg *config.Config) {
 	r.cfg = cfg
 	r.ctx.Config = cfg
+}
+
+// dropdownGravity is detect_popover_position: dropdowns open away from
+// the bar's screen edge.
+func dropdownGravity(location config.Location) app.Gravity {
+	switch location {
+	case config.LocationBottom:
+		return app.GravityTop
+	case config.LocationLeft:
+		return app.GravityRight
+	case config.LocationRight:
+		return app.GravityLeft
+	}
+	return app.GravityBottom
 }

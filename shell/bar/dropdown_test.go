@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/neurlang/wayland/wl"
+	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
@@ -77,3 +78,38 @@ func (fakeHost) EnsureUsable() error      { return nil }
 func (fakeHost) Closed() bool             { return false }
 func (fakeHost) Size() (int, int)         { return 800, 32 }
 func (fakeHost) HostSurface() *wl.Surface { return nil }
+
+// Dropdown builders get the full style even when the bar's modules run
+// with fg left to the stylesheet (zero): a popover has no stylesheet, so
+// a zero fg would paint every default-colored dropdown label
+// transparent.
+func TestDropdownBuildersGetTheFullStyle(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := newTestContext(t, cfg)
+	full := *ctx.Style
+	module := full
+	module.fg = 0
+	ctx.Style = &module
+	r := newDropdownRegistry(nil, cfg, ctx.Font, &full, ctx)
+	if r.ctx.Style.fg == 0 || r.ctx.Style != &full {
+		t.Fatalf("builders see fg %08x, want the full style's %08x", uint32(r.ctx.Style.fg), uint32(full.fg))
+	}
+	v := calendarDropdown(r.ctx).(*calendarView)
+	if v.hours == nil {
+		t.Fatal("no hours label")
+	}
+	if ctx.Style.fg != 0 {
+		t.Error("the module context's style was changed")
+	}
+}
+
+func TestDropdownGravityOpensAwayFromTheEdge(t *testing.T) {
+	for loc, want := range map[config.Location]app.Gravity{
+		config.LocationTop: app.GravityBottom, config.LocationBottom: app.GravityTop,
+		config.LocationLeft: app.GravityRight, config.LocationRight: app.GravityLeft,
+	} {
+		if got := dropdownGravity(loc); got != want {
+			t.Errorf("dropdownGravity(%s) = %v, want %v", loc, got, want)
+		}
+	}
+}

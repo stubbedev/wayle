@@ -144,11 +144,6 @@ func weatherConditionToken(c weather.Condition) config.CssToken {
 	return config.TokenFgSubtle
 }
 
-func tokenColor(palette *styling.Palette, token config.CssToken) render.Color {
-	color, _ := styling.ResolveColor(config.ColorValue{Token: token}, palette)
-	return color
-}
-
 // weatherView is the weather dropdown (dropdowns/weather): a loading,
 // error, or loaded page following the service while open.
 type weatherView struct {

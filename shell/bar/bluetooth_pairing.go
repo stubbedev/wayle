@@ -24,10 +24,7 @@ func newBtPalette(ctx ModuleContext) btPalette {
 	if ctx.Style != nil && ctx.Style.palette != nil {
 		palette = ctx.Style.palette
 	}
-	token := func(t config.CssToken) render.Color {
-		c, _ := styling.ResolveColor(config.ColorValue{Token: t}, palette)
-		return c
-	}
+	token := func(t config.CssToken) render.Color { return tokenColor(palette, t) }
 	return btPalette{
 		fg:           token(config.TokenFgDefault),
 		muted:        token(config.TokenFgMuted),

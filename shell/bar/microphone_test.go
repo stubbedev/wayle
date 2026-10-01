@@ -48,7 +48,7 @@ func TestMicrophoneModuleDimsWhenMuted(t *testing.T) {
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	muted, _ := styling.ResolveColor(config.ColorValue{Token: config.TokenFgMuted}, styling.Default())
+	muted, _ := styling.Default().Token(config.TokenFgMuted)
 	if m.label.Color() != muted {
 		t.Errorf("muted color = %#08x, want fg-muted", m.label.Color())
 	}
