@@ -179,6 +179,11 @@ type batteryView struct {
 	profilesUnavailable *widget.Box
 	activeProfile       string
 
+	// device and profiles read the two services; a write's re-read goes
+	// through them too, so it can never land after a newer change.
+	device   *refresher[batteryRead]
+	profiles *refresher[*powerprofiles.Snapshot]
+
 	once   sync.Once
 	cancel context.CancelFunc
 }
@@ -417,8 +422,9 @@ func (v *batteryView) chargeToggled(enabled bool) {
 		if err := src.EnableChargeThreshold(ctx, enabled); err != nil {
 			log.Printf("battery: charge threshold toggle: %v", err)
 		}
-		dev, ok := v.readDevice(ctx)
-		v.ctx.Invoke(func() { v.applyDevice(dev, ok) })
+		if v.device != nil {
+			v.device.request()
+		}
 	}()
 }
 
@@ -480,8 +486,9 @@ func (v *batteryView) selectProfile(name string) {
 		if err := src.SetActive(ctx, name); err != nil {
 			log.Printf("battery: power profile switch: %v", err)
 		}
-		snap := v.readProfiles(ctx)
-		v.ctx.Invoke(func() { v.applyProfiles(snap) })
+		if v.profiles != nil {
+			v.profiles.request()
+		}
 	}()
 }
 
@@ -490,7 +497,7 @@ func (v *batteryView) follow() {
 	life, cancel := context.WithCancel(context.Background())
 	v.cancel = cancel
 	if src := v.ctx.Battery; src != nil {
-		followTicks(v.ctx, life, "battery", src.Subscribe,
+		v.device = followTicks(v.ctx, life, "battery", src.Subscribe,
 			func(ctx context.Context) batteryRead {
 				dev, ok := v.readDevice(ctx)
 				return batteryRead{dev, ok}
@@ -498,7 +505,7 @@ func (v *batteryView) follow() {
 			func(r batteryRead) { v.applyDevice(r.dev, r.ok) })
 	}
 	if src := v.ctx.PowerProfiles; src != nil {
-		followTicks(v.ctx, life, "power profiles", src.Subscribe, v.readProfiles, v.applyProfiles)
+		v.profiles = followTicks(v.ctx, life, "power profiles", src.Subscribe, v.readProfiles, v.applyProfiles)
 	}
 }
 

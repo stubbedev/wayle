@@ -81,6 +81,10 @@ type networkView struct {
 
 	netDeps
 
+	// reads is the view's one reader: NetworkManager ticks, the other
+	// feeds, and every re-read after a write go through it.
+	reads *refresher[netState]
+
 	once   sync.Once
 	life   context.Context
 	cancel context.CancelFunc
@@ -154,6 +158,7 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v := &networkView{ctx: ctx, font: font, px: px, netDeps: deps}
 	life, cancel := context.WithCancel(context.Background()) //nolint:gosec // dropdownClosed cancels it
 	v.life, v.cancel = life, cancel
+	v.reads = newRefresher(ctx, life, v.read, v.apply)
 	v.Box = widget.NewBox(widget.Column, 10, 14)
 	v.AddClass("dropdown", "network-dropdown")
 
@@ -461,18 +466,18 @@ func (v *networkView) startScan() {
 	v.apply(v.cur)
 	go func() {
 		w.ScanAndWait(v.life, netScanTimeout)
-		state := v.read(v.life)
-		v.ctx.Invoke(func() { v.scanDone(state) })
+		v.reads.requestThen(v.scanDone)
 	}()
 }
 
-// scanDone is ScanComplete: a pending stale click connects if its
-// network came back, else reports it not found.
-func (v *networkView) scanDone(s netState) {
+// scanDone is ScanComplete, after the read that followed the scan was
+// applied: a pending stale click connects if its network came back,
+// else reports it not found.
+func (v *networkView) scanDone() {
 	if v.state == netScanning {
 		v.state = netNormal
 	}
-	v.apply(s)
+	v.apply(v.cur)
 	if v.pendingSSID == "" {
 		return
 	}
@@ -499,13 +504,8 @@ func (v *networkView) forget(ssid string) {
 	}()
 }
 
-// refresh re-reads off the loop and applies.
-func (v *networkView) refresh() {
-	go func() {
-		s := v.read(v.life)
-		v.ctx.Invoke(func() { v.apply(s) })
-	}()
-}
+// refresh re-reads off the loop and applies, through the view's reader.
+func (v *networkView) refresh() { v.reads.request() }
 
 // wifiToggled is toggle_wifi.
 func (v *networkView) wifiToggled(on bool) {
@@ -529,14 +529,13 @@ func (v *networkView) wifiToggled(on bool) {
 // until the dropdown closes.
 func (v *networkView) follow() {
 	if v.ctx.Network != nil {
-		followTicks(v.ctx, v.life, "network", v.ctx.Network.Subscribe, v.read, v.apply)
+		followInto(v.life, "network", v.ctx.Network.Subscribe, v.reads)
 	}
 	for _, feed := range v.changes {
 		ch := feed(v.life)
 		go func() {
 			for range ch {
-				s := v.read(v.life)
-				v.ctx.Invoke(func() { v.apply(s) })
+				v.reads.request()
 			}
 		}()
 	}

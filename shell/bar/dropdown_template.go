@@ -3,6 +3,7 @@ package bar
 import (
 	"context"
 	"log"
+	"sync"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
@@ -62,9 +63,84 @@ func emptyStateIcon(ctx ModuleContext, font render.Font, px float64, icon, title
 	return col, glyph
 }
 
-// followTicks is a dropdown's watcher: on each tick from subscribe it
-// reads off the loop and applies the result on it, until life ends or
-// the tick channel closes. A failed subscribe logs and follows nothing.
+// refresher is a view's reader: every refresh of the view goes through
+// it, reads run off the loop one at a time, and requests made while a
+// read runs coalesce into one more read after it. Results apply on the
+// loop in the order their reads started, so a read that started before
+// a newer one can never land last and undo the newer state, and the
+// state applied last is never older than the last request.
+type refresher[T any] struct {
+	mc    ModuleContext
+	life  context.Context
+	read  func(context.Context) T
+	apply func(T)
+
+	mu      sync.Mutex
+	running bool
+	again   bool
+	// thens run on the loop after the apply of the next read to start.
+	thens []func()
+}
+
+func newRefresher[T any](mc ModuleContext, life context.Context, read func(context.Context) T, apply func(T)) *refresher[T] {
+	return &refresher[T]{mc: mc, life: life, read: read, apply: apply}
+}
+
+// request asks for a fresh read; safe from any goroutine.
+func (r *refresher[T]) request() { r.requestThen(nil) }
+
+// requestThen asks for a fresh read and runs then on the loop once it
+// has been applied (nil: nothing).
+func (r *refresher[T]) requestThen(then func()) {
+	r.mu.Lock()
+	if then != nil {
+		r.thens = append(r.thens, then)
+	}
+	if r.running {
+		r.again = true
+		r.mu.Unlock()
+		return
+	}
+	r.running = true
+	r.mu.Unlock()
+	go r.loop()
+}
+
+func (r *refresher[T]) loop() {
+	for {
+		r.mu.Lock()
+		thens := r.thens
+		r.thens = nil
+		r.mu.Unlock()
+		value := r.read(r.life)
+		if r.life.Err() != nil {
+			r.mu.Lock()
+			r.running, r.again = false, false
+			r.mu.Unlock()
+			return
+		}
+		r.mc.Invoke(func() {
+			r.apply(value)
+			for _, fn := range thens {
+				fn()
+			}
+		})
+		r.mu.Lock()
+		if !r.again {
+			r.running = false
+			r.mu.Unlock()
+			return
+		}
+		r.again = false
+		r.mu.Unlock()
+	}
+}
+
+// followTicks is a dropdown's watcher: each tick from subscribe asks
+// the view's refresher for a read, until life ends or the tick channel
+// closes. It returns the refresher, which the view's own refreshes
+// (after a write) go through too. A failed subscribe logs and follows
+// nothing; the refresher still serves the view's requests.
 func followTicks[T any](
 	mc ModuleContext,
 	life context.Context,
@@ -72,7 +148,15 @@ func followTicks[T any](
 	subscribe func(context.Context) (<-chan struct{}, func(), error),
 	read func(context.Context) T,
 	apply func(T),
-) {
+) *refresher[T] {
+	r := newRefresher(mc, life, read, apply)
+	followInto(life, what, subscribe, r)
+	return r
+}
+
+// followInto feeds subscribe's ticks into an existing refresher, for a
+// view that follows several sources with one reader.
+func followInto[T any](life context.Context, what string, subscribe func(context.Context) (<-chan struct{}, func(), error), r *refresher[T]) {
 	ticks, stop, err := subscribe(life)
 	if err != nil {
 		log.Printf("%s: subscribe: %v", what, err)
@@ -89,11 +173,7 @@ func followTicks[T any](
 					return
 				}
 			}
-			value := read(life)
-			if life.Err() != nil {
-				return
-			}
-			mc.Invoke(func() { apply(value) })
+			r.request()
 		}
 	}()
 }
