@@ -82,12 +82,7 @@ func (v *dashboardView) label(text string, scale float64, color render.Color) *w
 }
 
 func (v *dashboardView) button(child widget.Widget, class string, onClick func()) *widget.Button {
-	b := widget.NewButton(child, 6, 8)
-	b.AddClass(class)
-	b.BgHover = v.ctx.Style.buttonBgHover
-	b.BgPressed = v.ctx.Style.buttonBgActive
-	b.OnClick = onClick
-	return b
+	return dropdownButton(v.ctx, child, class, onClick)
 }
 
 // card is the "card dashboard-card" shell with its titled header.

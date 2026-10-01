@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"log"
 	"os/exec"
 
@@ -9,7 +8,6 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/pulse"
 )
 
 // dropdownBuilders maps the Rust registry's names onto content
@@ -85,45 +83,6 @@ func spawnCommand(command string) {
 // audioDropdown is the audio card: the output and input rows, each a
 // device label, a mute toggle, and a volume slider wired to the pulse
 // service's setters.
-func audioDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 10, 14)
-	if ctx.Pulse == nil {
-		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-audio-no-devices-title"), mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	bctx := context.Background()
-	if sink, err := ctx.Pulse.DefaultSink(bctx); err == nil {
-		col.Append(audioDeviceRow(ctx, font, px, i18n.T("dropdown-audio-output"), sink.Device,
-			func(v float64) { _ = ctx.Pulse.SetVolume(bctx, v) },
-			func(m bool) { _ = ctx.Pulse.SetMuted(bctx, m) }), false)
-	}
-	if source, err := ctx.Pulse.DefaultSource(bctx); err == nil {
-		col.Append(audioDeviceRow(ctx, font, px, i18n.T("dropdown-audio-input"), source.Device,
-			func(float64) {},
-			func(m bool) { _ = ctx.Pulse.SetSourceMuted(bctx, m) }), false)
-	}
-	return col
-}
-
-// audioDeviceRow builds one device's row: name + mute toggle + slider.
-func audioDeviceRow(ctx ModuleContext, font render.Font, px float64, title string, dev pulse.Device, setVolume func(float64), setMuted func(bool)) widget.Widget {
-	col := widget.NewBox(widget.Column, 4, 0)
-	row := widget.NewBox(widget.Row, 8, 0)
-	row.Append(widget.NewThemeIcon(volumeIconName(ctx.Config.Volume, dev), int(px)), false)
-	row.Append(widget.NewLabel(font, px, title, ctx.Style.fg), true)
-	muteIcon := widget.NewThemeIcon("ld-volume-x-symbolic", int(px))
-	muteIcon.SetTint(mutedFg(ctx.Style.palette))
-	muteButton := widget.NewButton(muteIcon, 2, 4)
-	muteButton.OnClick = func() { setMuted(!dev.Muted) }
-	row.Append(muteButton, false)
-	col.Append(row, false)
-	slider := widget.NewSlider(0, 100, 1, dev.Volume.AveragePercentage())
-	slider.OnChanged = func(v float64) { setVolume(v) }
-	col.Append(slider, false)
-	return col
-}
-
 // dropdownRow builds one tappable menu row.
 func dropdownRow(ctx ModuleContext, font render.Font, px float64, title, iconName string, onRun func()) widget.Widget {
 	icon := widget.NewThemeIcon(iconName, int(px))

@@ -327,12 +327,8 @@ func (v *batteryView) profileSection() widget.Widget {
 		content.Append(icon, false)
 		content.Append(widget.NewLabel(v.font, v.px*0.9, i18n.T(p.label), v.ctx.Style.fg), false)
 		content.Append(widget.NewSpacer(0, 0), true)
-		b := widget.NewButton(content, 6, 8)
-		b.AddClass("profile-seg-btn")
-		b.BgHover = v.ctx.Style.buttonBgHover
-		b.BgPressed = v.ctx.Style.buttonBgActive
 		name := p.name
-		b.OnClick = func() { v.selectProfile(name) }
+		b := dropdownButton(v.ctx, content, "profile-seg-btn", func() { v.selectProfile(name) })
 		v.profileButtons[name] = b
 		seg.Append(b, true)
 	}

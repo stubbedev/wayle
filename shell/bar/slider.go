@@ -25,7 +25,10 @@ type debouncedSlider struct {
 	format func(float64) string
 	invoke func(func())
 
-	onCommit     func(float64)
+	onCommit func(float64)
+	// onValue sees every value change, the user's and set's alike
+	// (the value-changed notify a #[watch] reads).
+	onValue      func(float64)
 	programmatic bool
 	dragging     bool
 	dragEnded    time.Time
@@ -81,6 +84,9 @@ func newDebouncedSlider(value float64, font render.Font, px float64, color rende
 func (d *debouncedSlider) changed(v float64) {
 	if d.label != nil {
 		d.label.SetText(d.format(v))
+	}
+	if d.onValue != nil {
+		d.onValue(v)
 	}
 	if d.programmatic {
 		return

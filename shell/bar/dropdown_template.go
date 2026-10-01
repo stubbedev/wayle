@@ -75,3 +75,14 @@ func followTicks[T any](
 		}
 	}()
 }
+
+// dropdownButton is a flat dropdown button: the hover and pressed
+// fills of the bar style around child.
+func dropdownButton(ctx ModuleContext, child widget.Widget, class string, onClick func()) *widget.Button {
+	b := widget.NewButton(child, 6, 8)
+	b.AddClass(class)
+	b.BgHover = ctx.Style.buttonBgHover
+	b.BgPressed = ctx.Style.buttonBgActive
+	b.OnClick = onClick
+	return b
+}

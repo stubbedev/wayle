@@ -16,8 +16,11 @@ import (
 )
 
 // fakePulseSource is a scripted pulse.Source: dev is both the default
-// sink and the default source.
+// sink and the default source. The embedded nil Source leaves the
+// dropdown's list and control methods unscripted; the audio dropdown
+// tests run against a pulsetest server instead.
 type fakePulseSource struct {
+	pulse.Source
 	dev   pulse.Device
 	ticks chan struct{}
 }

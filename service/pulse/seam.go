@@ -24,6 +24,18 @@ type Source interface {
 	SetMuted(ctx context.Context, muted bool) error
 	// SetSourceMuted mutes or unmutes the default source.
 	SetSourceMuted(ctx context.Context, muted bool) error
+	// OutputDevices, InputDevices, and PlaybackStreams snapshot the
+	// lists the audio dropdown renders.
+	OutputDevices() []OutputDevice
+	InputDevices() []InputDevice
+	PlaybackStreams() []AudioStream
+	// SetDeviceVolume, SetDeviceMute, and SetDefault control one
+	// device; SetStreamVolume and SetStreamMute one stream.
+	SetDeviceVolume(ctx context.Context, key DeviceKey, v Volume) error
+	SetDeviceMute(ctx context.Context, key DeviceKey, muted bool) error
+	SetDefault(ctx context.Context, key DeviceKey) error
+	SetStreamVolume(ctx context.Context, key StreamKey, v Volume) error
+	SetStreamMute(ctx context.Context, key StreamKey, muted bool) error
 	// Capture records a target until closed (see Service.Capture).
 	Capture(target CaptureTarget, spec CaptureSpec, onData func([]byte)) (*Capture, error)
 }
