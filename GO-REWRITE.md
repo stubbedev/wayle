@@ -140,6 +140,10 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ### Shell surfaces
 
+- [x] the power menu (shell/power_menu): the dimmed overlay row the
+      power module's `:menu` opens, entering and leaving through the
+      power transition, commands run once it is gone (it was a stand-in
+      dropdown)
 - [x] launcher views: the surface on the launcher socket (dmenu and
       every mode, filtering, keys and pointer bindings, multi-select,
       -dump, -e dialogs, hooks, -select/-selected-row/-auto-select,

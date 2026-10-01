@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/imagedecode"
+	"github.com/stubbedev/wayle/internal/spawn"
 )
 
 // avatarPx is the user avatar's logical box in the session row.
@@ -122,7 +123,7 @@ func userSessionSection(ctx ModuleContext) widget.Widget {
 		}
 		command := spec.command
 		// process::run_if_set: an empty command is a no-op.
-		button.OnClick = func() { spawnCommand(command) }
+		button.OnClick = func() { _ = spawn.Quiet(command) }
 		actions.Append(button, false)
 	}
 	row.Append(actions, false)

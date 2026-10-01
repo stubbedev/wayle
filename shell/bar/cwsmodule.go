@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"math"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/spawn"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -256,10 +256,7 @@ func (m *cwsView) dispatchScroll(action config.WorkspaceClickAction) {
 			}
 		}
 	case config.WorkspaceClickShell:
-		// process::run_if_set: a quiet sh -c spawn.
-		if err := exec.Command("sh", "-c", action.Arg).Start(); err != nil { //nolint:gosec // the command comes from the user's own config
-			log.Printf("%s-workspaces: %s: %v", m.kind, action.Arg, err)
-		}
+		_ = spawn.Quiet(action.Arg) // process::run_if_set
 	}
 }
 

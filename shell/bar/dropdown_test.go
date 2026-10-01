@@ -30,10 +30,14 @@ func TestDropdownBuildersCoverRegistryNames(t *testing.T) {
 		}
 	}
 	// The names the shell's own defaults reference are present.
-	for _, name := range []string{"calendar", "battery", "audio", "weather", "power", "notification"} {
+	for _, name := range []string{"calendar", "battery", "audio", "weather", "notification"} {
 		if _, ok := r.builders[name]; !ok {
 			t.Errorf("default-referenced dropdown %q missing", name)
 		}
+	}
+	// Power is a menu overlay, not a dropdown (the Rust registry has none).
+	if _, ok := r.builders["power"]; ok {
+		t.Error("a power dropdown is registered")
 	}
 }
 

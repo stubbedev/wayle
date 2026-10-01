@@ -13,6 +13,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/spawn"
 	"github.com/stubbedev/wayle/service/mpris"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/sysinfo"
@@ -104,7 +105,7 @@ func (v *dashboardView) card(iconName, title string, extra ...widget.Widget) *wi
 func (v *dashboardView) header() widget.Widget {
 	settings := v.button(v.icon("ld-settings-symbolic", 1, v.tint(config.TokenFgMuted)), "dashboard-settings-btn", func() {
 		// spawn_settings_app; the popover closes on the click.
-		spawnCommand("wayle-settings")
+		_ = spawn.Quiet("wayle-settings")
 	})
 	settings.SetTooltip(i18n.T("dropdown-dashboard-open-settings"))
 	return dropdownHeader(v.ctx, v.font, v.px, "ld-layout-dashboard-symbolic", i18n.T("dropdown-dashboard-title"), settings)

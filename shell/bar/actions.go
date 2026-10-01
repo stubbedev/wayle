@@ -3,9 +3,9 @@ package bar
 import (
 	"context"
 	"log"
-	"os/exec"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/internal/spawn"
 )
 
 // runClickAction dispatches one binding, the Go counterpart of
@@ -48,12 +48,7 @@ func runShellBuiltin(ctx ModuleContext, cmd string) {
 		if verb != "" {
 			log.Printf("click: builtin %q not available yet, shelling out", verb)
 		}
-		if cmd == "" {
-			return
-		}
-		if err := exec.Command("sh", "-c", cmd).Start(); err != nil { //nolint:gosec // the command comes from the user's own config
-			log.Printf("click: %s: %v", cmd, err)
-		}
+		_ = spawn.Quiet(cmd)
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/desktopnotify"
 	"github.com/stubbedev/wayle/internal/icons"
+	"github.com/stubbedev/wayle/internal/spawn"
 	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/service/bluetooth"
 	"github.com/stubbedev/wayle/service/brightness"
@@ -37,6 +38,7 @@ import (
 	"github.com/stubbedev/wayle/shell/lock"
 	"github.com/stubbedev/wayle/shell/osd"
 	"github.com/stubbedev/wayle/shell/popups"
+	"github.com/stubbedev/wayle/shell/powermenu"
 	wallpapershell "github.com/stubbedev/wayle/shell/wallpaper"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -105,6 +107,21 @@ func run(cfg *config.Config, svc *config.Service) error {
 			_ = o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon})
 		}
 	}
+	ink, _ := palette.Token(config.TokenFgDefault)
+	baseCtx.PowerMenu = powermenu.New(powermenu.Deps{
+		Config: current.Load,
+		Open: func(cfg app.LayerConfig) (powermenu.Window, error) {
+			w, err := application.NewLayer(cfg)
+			if err != nil {
+				return nil, err
+			}
+			return w, nil
+		},
+		Run:   spawn.Quiet,
+		Font:  font,
+		Ink:   ink,
+		Sheet: theme.sheet,
+	})
 	// The clipboard history starts with the shell rather than when the
 	// launcher first opens, so it covers the session; a compositor
 	// without data-control simply has none (bootstrap/mod.rs).

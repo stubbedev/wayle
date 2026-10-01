@@ -29,6 +29,7 @@ import (
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/service/weather"
+	"github.com/stubbedev/wayle/shell/powermenu"
 )
 
 // ModuleContext carries what a module needs at construction time: the
@@ -70,6 +71,9 @@ type ModuleContext struct {
 	// Tray drives the tray items and their menus; nil without a host.
 	Tray          TrayService
 	CustomUpdates *customUpdates
+	// PowerMenu is the native power menu the power module's :menu
+	// opens; nil without one.
+	PowerMenu *powermenu.Menu
 	// Dropdowns opens the dropdown:<name> popovers; RunWith owns one
 	// registry across outputs.
 	Dropdowns *dropdownRegistry
