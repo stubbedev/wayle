@@ -41,6 +41,10 @@ type barButton struct {
 
 	binding config.ClickConfig
 	onRun   func(config.ClickAction)
+	// ownClasses are the classes refresh last applied; classes a module
+	// sets on its button (media-disc, the threshold states) are left
+	// alone.
+	ownClasses []string
 }
 
 // barToggle is the button.toggle node: a gelm Button that stays the hit
@@ -128,8 +132,15 @@ func (b *barButton) placeContainers() {
 // calls it once it knows which module the button belongs to.
 func (b *barButton) configure(button config.ButtonConfig, binding config.ClickConfig, onRun func(config.ClickAction)) {
 	b.button, b.binding, b.onRun = button, binding, onRun
-	if b.label != nil && button.LabelMaxLength > 0 {
-		b.label.SetEllipsize(widget.EllipsizeEnd)
+	// label-max-length is BarButtonBehavior's label_max_chars: the
+	// label's width caps at that many characters and ellipsizes there.
+	if b.label != nil {
+		b.label.SetMaxWidthChars(button.LabelMaxLength)
+		if button.LabelMaxLength > 0 {
+			b.label.SetEllipsize(widget.EllipsizeEnd)
+		} else {
+			b.label.SetEllipsize(widget.EllipsizeNone)
+		}
 	}
 	b.refresh()
 }
@@ -150,7 +161,9 @@ func (b *barButton) refresh() {
 	if b.cfg == nil {
 		return
 	}
-	b.SetClasses(b.classes()...)
+	b.RemoveClass(b.ownClasses...)
+	b.ownClasses = b.classes()
+	b.AddClass(b.ownClasses...)
 	b.SetInlineStyle(inlineDecls(styling.ButtonCSS(b.button, b.cfg.Bar, b.cfg.Styling.ColorExtractor.ThemeProvider, b.thresholds)))
 	b.syncVisibility()
 }

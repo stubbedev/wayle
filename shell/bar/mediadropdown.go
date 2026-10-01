@@ -24,7 +24,6 @@ const (
 	mediaUnknownTitle      = "Unknown Title"
 	mediaUnknownArtist     = "Unknown Artist"
 	mediaUnknownAlbum      = "Unknown Album"
-	mediaInfoMaxChars      = 36
 	mediaArtPx             = 180
 	mediaPositionPollEvery = time.Second
 )
@@ -229,6 +228,11 @@ func (v *mediaView) buildPlayer(font render.Font, px float64) {
 	v.title = widget.NewLabel(font, px*1.2, "", v.ctx.Style.fg)
 	v.artist = widget.NewLabel(font, px, "", muted)
 	v.album = widget.NewLabel(font, px*0.9, "", muted)
+	// The info rows fill the panel and ellipsize at its edge (the Rust
+	// labels' max-width-chars 1 with hexpand).
+	for _, l := range []*widget.Label{v.title, v.artist, v.album} {
+		l.SetEllipsize(widget.EllipsizeEnd)
+	}
 	for _, l := range []*widget.Label{v.title, v.artist, v.album} {
 		v.player.Append(l, false)
 	}
@@ -313,9 +317,9 @@ func (v *mediaView) refresh() {
 	v.show("player", v.player)
 	v.identity.SetText(p.Identity)
 	v.sourceIcon.SetThemeName(mediaSourceIcon(p))
-	v.title.SetText(truncateLabel(orUnknown(p.Title, mediaUnknownTitle), mediaInfoMaxChars))
-	v.artist.SetText(truncateLabel(orUnknown(p.Artist, mediaUnknownArtist), mediaInfoMaxChars))
-	v.album.SetText(truncateLabel(orUnknown(p.Album, mediaUnknownAlbum), mediaInfoMaxChars))
+	v.title.SetText(orUnknown(p.Title, mediaUnknownTitle))
+	v.artist.SetText(orUnknown(p.Artist, mediaUnknownArtist))
+	v.album.SetText(orUnknown(p.Album, mediaUnknownAlbum))
 	v.setArt(p.ArtURL)
 	v.length.SetText(lengthText(p.Length))
 	v.seek.SetEnabled(p.CanSeek)

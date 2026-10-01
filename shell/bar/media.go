@@ -54,19 +54,6 @@ func mediaLabel(format string, p mpris.Player) string {
 	return replaceTemplateVar(out, "status_icon", mediaStatusGlyph(p.State))
 }
 
-// truncateLabel applies label-max-length with an ellipsis
-// (BarButtonBehavior's pango ellipsize-end, done manually).
-func truncateLabel(label string, maxChars int) string {
-	if maxChars <= 0 {
-		return label
-	}
-	runes := []rune(label)
-	if len(runes) <= maxChars {
-		return label
-	}
-	return string(runes[:maxChars-1]) + "…"
-}
-
 // mediaIconEnv is what the icon pick reads beyond the config: whether
 // a theme icon exists and a desktop entry's Icon key. Tests fake both.
 type mediaIconEnv struct {
@@ -181,7 +168,7 @@ func (m *mediaModule) refresh() {
 	if !cfg.LabelShow {
 		label = ""
 	}
-	m.label.SetText(truncateLabel(label, int(cfg.LabelMaxLength)))
+	m.label.SetText(label)
 	if m.icon != nil {
 		m.icon.SetThemeName(icon)
 	}

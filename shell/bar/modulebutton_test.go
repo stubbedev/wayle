@@ -270,3 +270,22 @@ func batteryButton(cfg *config.Config) config.ButtonConfig {
 	b, _ := cfg.ModuleButton("battery")
 	return b
 }
+
+// configure and later refreshes replace only the classes the button
+// itself derives; a class the module put on its button stays.
+func TestBarButtonKeepsTheModulesClasses(t *testing.T) {
+	cfg := config.Defaults()
+	b := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), widget.NewLabel(testFont(t), 12, "x", 0))
+	b.AddClass("media-disc")
+	b.configure(config.ButtonConfig{IconShow: true, LabelShow: false}, config.ClickConfig{}, nil)
+	if !b.HasClass("media-disc") || !b.HasClass("bar-button") || !b.HasClass("icon-only") {
+		t.Fatalf("after configure: %v", b.Classes())
+	}
+	b.configure(config.ButtonConfig{IconShow: true, LabelShow: true}, config.ClickConfig{}, nil)
+	if b.HasClass("icon-only") {
+		t.Error("a stale derived class survived the refresh")
+	}
+	if !b.HasClass("media-disc") {
+		t.Error("the refresh dropped the module's class")
+	}
+}

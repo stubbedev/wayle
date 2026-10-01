@@ -121,19 +121,6 @@ func TestMediaLabelPlaceholdersMatchRustAssertions(t *testing.T) {
 	}
 }
 
-func TestTruncateLabelEllipsizes(t *testing.T) {
-	if got := truncateLabel("short", 35); got != "short" {
-		t.Errorf("short label = %q", got)
-	}
-	got := truncateLabel(strings.Repeat("x", 40), 35)
-	if len([]rune(got)) != 35 || !strings.HasSuffix(got, "…") {
-		t.Errorf("long label = %d runes, want 35 with an ellipsis", len([]rune(got)))
-	}
-	if got := truncateLabel("unchanged", 0); got != "unchanged" {
-		t.Errorf("max=0 disables truncation, got %q", got)
-	}
-}
-
 func TestMediaIconResolution(t *testing.T) {
 	spotify := mpris.Player{BusName: "org.mpris.MediaPlayer2.spotify", DesktopEntry: "spotify"}
 	obscure := mpris.Player{BusName: "org.mpris.MediaPlayer2.obscure", DesktopEntry: "obscure"}
@@ -188,11 +175,16 @@ func TestMediaModuleRenders(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	m := module.(*mediaModule)
-	got := m.label.Text()
-	if len([]rune(got)) != 35 || !strings.HasSuffix(got, "…") {
-		t.Errorf("label = %q (%d runes), want the default format truncated to 35", got, len([]rune(got)))
+	// The text is whole; label-max-length caps the button's label width
+	// (max-width-chars) once appendModule configures it.
+	if got := m.label.Text(); got != strings.Repeat("t", 50)+" - Band" {
+		t.Errorf("label = %q, want the whole default format", got)
 	}
 	root := m.root.(*barButton)
+	root.configure(moduleButton("media", cfg), config.ClickConfig{}, nil)
+	if root.label.MaxWidthChars() != int(cfg.Media.LabelMaxLength) || root.label.Ellipsize() != widget.EllipsizeEnd {
+		t.Errorf("label cap = %d chars, ellipsize %v; want %d, end", root.label.MaxWidthChars(), root.label.Ellipsize(), cfg.Media.LabelMaxLength)
+	}
 	if !root.HasClass("media-disc") || !root.HasClass("media-spinning") {
 		t.Error("a playing player in disc mode misses media-disc/media-spinning")
 	}

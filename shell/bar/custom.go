@@ -280,9 +280,6 @@ func (m *customModule) apply(out string) {
 	if m.def.LabelShow {
 		label = formatCustomLabel(m.def, parsed)
 	}
-	if m.def.LabelMaxLength > 0 {
-		label = truncateLabel(label, int(m.def.LabelMaxLength))
-	}
 	m.label.SetText(label)
 	if shouldHideCustom(parsed.raw, m.def.HideIfEmpty) {
 		m.label.SetText("")

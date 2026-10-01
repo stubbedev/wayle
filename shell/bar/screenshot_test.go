@@ -63,9 +63,17 @@ func TestScreenshotModule(t *testing.T) {
 	if !ok || btn.icon == nil || btn.label == nil {
 		t.Fatalf("labelled root %T, want the icon + label bar button", m.Root())
 	}
-	if got := btn.label.Text(); got != "Cap…" {
-		t.Fatalf("label %q, want Cap…", got)
+	btn.configure(moduleButton("screenshot", cfg), config.ClickConfig{}, nil)
+	if got := btn.label.Text(); got != "Capture" || btn.label.MaxWidthChars() != 4 || btn.label.Ellipsize() != widget.EllipsizeEnd {
+		t.Fatalf("label %q capped at %d, want Capture capped at 4 chars", got, btn.label.MaxWidthChars())
 	}
+	// No label-max-length: no cap, no ellipsis.
+	cfg.Screenshot.LabelMaxLength = 0
+	btn.configure(moduleButton("screenshot", cfg), config.ClickConfig{}, nil)
+	if btn.label.MaxWidthChars() != 0 || btn.label.Ellipsize() != widget.EllipsizeNone {
+		t.Fatalf("uncapped label: %d chars, ellipsize %v", btn.label.MaxWidthChars(), btn.label.Ellipsize())
+	}
+	cfg.Screenshot.LabelMaxLength = 4
 	cfg.Screenshot.IconShow, cfg.Screenshot.LabelShow = false, false
 	if _, err := newScreenshot(newTestContext(t, cfg)); err == nil {
 		t.Fatal("a module with nothing to show was built")

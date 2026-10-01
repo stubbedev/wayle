@@ -2,7 +2,6 @@ package bar
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stubbedev/wayle/config"
@@ -141,12 +140,14 @@ func TestApplyCustomDefinitionsValidates(t *testing.T) {
 	}
 }
 
-func TestCustomTruncatesLabel(t *testing.T) {
+func TestCustomLabelMaxLengthCapsTheButton(t *testing.T) {
 	def := config.DefaultsCustomModuleDefinition()
 	def.LabelMaxLength = 3
 	parsed := parseCustomOutput("abcdef")
-	got := truncateLabel(formatCustomLabel(def, parsed), int(def.LabelMaxLength))
-	if strings.HasSuffix(got, "abcdef") {
-		t.Errorf("= %q, want truncated", got)
+	if got := formatCustomLabel(def, parsed); got != "abcdef" {
+		t.Errorf("label text = %q, want it whole (the button caps the width)", got)
+	}
+	if got := def.Button().LabelMaxLength; got != 3 {
+		t.Errorf("button label-max-length = %d, want the definition's 3", got)
 	}
 }

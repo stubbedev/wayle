@@ -89,8 +89,7 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       info row
 - [ ] notification popup cards: close and action buttons, the default
       action, the urgency bar, popup layer/margins/shadow keys
-- [ ] label-max-length and label-color on the remaining modules; the
-      brightness icon and the custom module's dynamic icon
+- [ ] the brightness icon and the custom module's dynamic icon
 - [ ] systray: nested submenu popups (gelm has no popup-in-popup),
       live accelerators, popovers that grow with their content
 - [ ] cava: the wave style and the stereo split (error at creation),
