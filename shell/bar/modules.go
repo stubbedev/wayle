@@ -57,6 +57,10 @@ type ModuleContext struct {
 	Mail          *mail.Service
 	SNI           *sni.Store
 	Weather       *weather.Service
+	// SetConfig writes a runtime override and persists it (the Rust
+	// ConfigService property set the dropdowns use); nil without a
+	// config service.
+	SetConfig func(path string, value any)
 	// Clipboard is the session clipboard history, nil when the
 	// compositor has no data-control protocol (the launcher's
 	// clipboard mode reads it).

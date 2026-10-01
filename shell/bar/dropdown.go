@@ -146,3 +146,10 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	r.mu.Unlock()
 	return nil
 }
+
+// setConfig hands dropdowns opened from now on a new snapshot, for a
+// reload that leaves the bars standing.
+func (r *dropdownRegistry) setConfig(cfg *config.Config) {
+	r.cfg = cfg
+	r.ctx.Config = cfg
+}

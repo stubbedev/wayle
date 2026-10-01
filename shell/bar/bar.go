@@ -90,6 +90,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	palette, style, font := rt.palette, rt.style, rt.font
 	baseCtx := ModuleContext{Config: cfg, App: application, Font: font, Style: &rt.moduleStyle, Theme: theme}
+	if svc != nil {
+		baseCtx.SetConfig = configSetter(svc)
+	}
 	// The clipboard history starts with the shell rather than when the
 	// launcher first opens, so it covers the session; a compositor
 	// without data-control simply has none (bootstrap/mod.rs).
@@ -289,11 +292,18 @@ func run(cfg *config.Config, svc *config.Service) error {
 		// A reload recompiles the stylesheet for the new snapshot,
 		// rebuilds the bars, and hands the OSD and popups their new
 		// sections.
-		cancel := svc.Subscribe(func(_, next *config.Config) {
+		cancel := svc.Subscribe(func(old, next *config.Config) {
 			application.Invoke(func() {
 				current.Store(next)
 				theme.setConfig(next)
-				restyle(next)
+				if barsAffected(old, next) {
+					restyle(next)
+				} else {
+					// The open bars stay; dropdowns opened from now on
+					// read the new snapshot.
+					rt.ctx.Config = next
+					rt.ctx.Dropdowns.setConfig(next)
+				}
 				osdSrv.SetConfig(next.Osd)
 				applyNotificationConfig(notifSvc, next.Notification)
 				weatherSvc.Configure(weatherSettings(next.Weather))

@@ -7,7 +7,6 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/service/recorder"
 )
 
 // dropdownRows builds a titled stack of status lines.
@@ -60,30 +59,6 @@ func networkDropdown(ctx ModuleContext) widget.Widget {
 	col.Append(widget.NewLabel(font, px, i18n.T("dropdown-network-ethernet")+": "+wired, ctx.Style.fg), false)
 	if vpns := vpnSection(ctx, font, px); vpns != nil {
 		col.Append(vpns, false)
-	}
-	return col
-}
-
-// recorderDropdown is the recorder card: a toggle row plus the state
-// and output path while a recording runs.
-func recorderDropdown(ctx ModuleContext) widget.Widget {
-	font, px := dropdownFont(ctx)
-	col := widget.NewBox(widget.Column, 6, 12)
-	if ctx.Recorder == nil {
-		col.Append(widget.NewLabel(font, px, "No recorder", mutedFg(ctx.Style.palette)), false)
-		return col
-	}
-	snap := ctx.Recorder.Snapshot()
-	toggle := i18n.T("dropdown-recorder-record")
-	if snap.Status != recorder.StatusIdle {
-		toggle = i18n.T("dropdown-recorder-stop")
-	}
-	col.Append(dropdownRow(ctx, font, px, toggle, "ld-circle-dot-symbolic", func() { ctx.Recorder.Toggle() }), false)
-	if snap.Status != recorder.StatusIdle {
-		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-recorder-recording")+": "+recorder.FormatElapsed(snap.ElapsedSecs), ctx.Style.fg), false)
-	}
-	if snap.OutputPath != "" {
-		col.Append(widget.NewLabel(font, px, snap.OutputPath, mutedFg(ctx.Style.palette)), false)
 	}
 	return col
 }

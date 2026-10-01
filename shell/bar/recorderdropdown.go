@@ -1,0 +1,409 @@
+package bar
+
+import (
+	"context"
+	"slices"
+	"sync"
+
+	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/gelm/widget"
+
+	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/service/recorder"
+)
+
+// Recorder config paths the dropdown writes.
+const (
+	recorderPathMic       = "modules.recorder.microphone"
+	recorderPathMicDevice = "modules.recorder.microphone-device"
+	recorderPathSystem    = "modules.recorder.system-audio"
+	recorderPathWebcam    = "modules.recorder.webcam-enabled"
+	recorderPathCamDevice = "modules.recorder.webcam-device"
+	recorderPathWebcamX   = "modules.recorder.webcam-x"
+	recorderPathWebcamY   = "modules.recorder.webcam-y"
+)
+
+// previewGeometry is preview_geometry: the 16:9 screen frame fit to the
+// popover width and the webcam frame at its configured size.
+func previewGeometry(width int32, sizePct uint8) (pw, ph, cw, ch int32) {
+	pw = max(width-48, 160)
+	ph = pw * 9 / 16
+	cw = max(pw*int32(sizePct)/100, 24)
+	ch = max(cw*9/16, 14)
+	return pw, ph, cw, ch
+}
+
+// pctFromPx is pct_from_px.
+func pctFromPx(px, margin, travel int32) uint8 {
+	if travel <= 0 {
+		return 0
+	}
+	return uint8(min(max(px-margin, 0), travel) * 100 / travel)
+}
+
+// webcamPreview is the draggable position preview: the outer frame is
+// the screen, the inner one the webcam picture-in-picture, inset by the
+// recording pipeline's margin. A drag tracks the pointer from where it
+// grabbed the frame; the release reports the position as percentages.
+type webcamPreview struct {
+	widget.Base
+	pw, ph, cw, ch int32
+	// camX and camY are the frame's offset inside the preview.
+	camX, camY       int32
+	frame, cam, edge render.Color
+
+	pointer  widget.Point
+	grabX    int32
+	grabY    int32
+	dragging bool
+	onMove   func(x, y uint8)
+}
+
+func newWebcamPreview(width int32, sizePct, x, y uint8, frame, cam, edge render.Color) *webcamPreview {
+	p := &webcamPreview{frame: frame, cam: cam, edge: edge}
+	p.pw, p.ph, p.cw, p.ch = previewGeometry(width, sizePct)
+	p.place(x, y)
+	return p
+}
+
+func (p *webcamPreview) travel() (margin, w, h int32) {
+	margin = recorder.WebcamMargin(p.pw, p.ph)
+	return margin, max(p.pw-p.cw-2*margin, 0), max(p.ph-p.ch-2*margin, 0)
+}
+
+// place is reposition_cam.
+func (p *webcamPreview) place(x, y uint8) {
+	margin, tw, th := p.travel()
+	p.camX = margin + tw*int32(min(x, 100))/100
+	p.camY = margin + th*int32(min(y, 100))/100
+	p.Invalidate()
+}
+
+// percent is the frame's position as the config stores it.
+func (p *webcamPreview) percent() (uint8, uint8) {
+	margin, tw, th := p.travel()
+	return pctFromPx(p.camX, margin, tw), pctFromPx(p.camY, margin, th)
+}
+
+func (p *webcamPreview) Measure(widget.Constraints) widget.Size {
+	return widget.Size{W: int(p.pw), H: int(p.ph)}
+}
+
+func (p *webcamPreview) Paint(cv *render.Canvas) {
+	b := p.Bounds()
+	cv.RoundedRect(render.Rect{X: b.X, Y: b.Y, W: int(p.pw), H: int(p.ph)}, 6, p.frame)
+	r := render.Rect{X: b.X + int(p.camX), Y: b.Y + int(p.camY), W: int(p.cw), H: int(p.ch)}
+	cv.RoundedRect(r, 4, p.cam)
+	cv.BorderRect(r, 1, p.edge)
+}
+
+func (p *webcamPreview) HitTest(pt widget.Point) widget.Widget { return p.HitLeaf(p, pt) }
+
+// HoverMove tracks the pointer, so a press knows where it grabbed.
+func (p *webcamPreview) HoverMove(pt widget.Point) { p.pointer = pt }
+
+// SetPressed is drag begin and end.
+func (p *webcamPreview) SetPressed(on bool) {
+	b := p.Bounds()
+	switch {
+	case on && !p.dragging:
+		p.dragging = true
+		p.grabX = int32(p.pointer.X-b.X) - p.camX
+		p.grabY = int32(p.pointer.Y-b.Y) - p.camY
+	case !on && p.dragging:
+		p.dragging = false
+		if p.onMove != nil {
+			p.onMove(p.percent())
+		}
+	}
+	p.Invalidate()
+}
+
+// DragMove is drag update: the frame follows the pointer, clamped to
+// the inset travel.
+func (p *webcamPreview) DragMove(pt widget.Point) {
+	p.pointer = pt
+	if !p.dragging {
+		return
+	}
+	b := p.Bounds()
+	margin, tw, th := p.travel()
+	p.camX = min(max(int32(pt.X-b.X)-p.grabX, margin), margin+tw)
+	p.camY = min(max(int32(pt.Y-b.Y)-p.grabY, margin), margin+th)
+	p.Invalidate()
+}
+
+// CursorName is the grab and grabbing cursors.
+func (p *webcamPreview) CursorName() string {
+	if p.dragging {
+		return "grabbing"
+	}
+	return "grab"
+}
+
+// recorderView is the recorder dropdown: the live status in the
+// header, the record and pause buttons, the audio card, and the webcam
+// card (hidden without a camera).
+type recorderView struct {
+	ctx  ModuleContext
+	font render.Font
+	px   float64
+
+	*widget.Box
+	status               *widget.Box
+	statusDot, time      *widget.Label
+	record               *widget.Button
+	recordIcon           *widget.Icon
+	recordLabel          *widget.Label
+	pause                *widget.Button
+	pauseIcon            *widget.Icon
+	micRow               *widget.Box
+	micPicker            *widget.Dropdown
+	mics, cams           []deviceChoice
+	webcamHeader, webcam *widget.Box
+	preview              *webcamPreview
+
+	once   sync.Once
+	cancel context.CancelFunc
+}
+
+func recorderDropdown(ctx ModuleContext) widget.Widget {
+	font, px := dropdownFont(ctx)
+	v := &recorderView{ctx: ctx, font: font, px: px, cancel: func() {}}
+	v.Box = widget.NewBox(widget.Column, 10, 14)
+	v.AddClass("dropdown", "recorder-dropdown")
+	cfg := ctx.Config.Recorder
+
+	v.status = widget.NewBox(widget.Row, 6, 0)
+	v.status.AddClass("recorder-status")
+	v.statusDot = widget.NewLabel(font, px*0.7, "●", tokenColor(ctx.Style.palette, config.TokenStatusError))
+	v.statusDot.AddClass("recorder-status-dot")
+	v.time = widget.NewLabel(font, px*0.9, "", ctx.Style.fg)
+	v.time.AddClass("recorder-status-time")
+	v.status.Append(v.statusDot, false)
+	v.status.Append(v.time, false)
+	v.Append(dropdownHeader(ctx, font, px, "ld-video-symbolic", i18n.T("dropdown-recorder-title"), v.status), false)
+
+	v.Append(v.controls(), false)
+
+	v.Append(v.sectionHeader("ld-mic-symbolic", i18n.T("dropdown-recorder-section-audio")), false)
+	audio := v.card()
+	audio.Append(v.switchRow(i18n.T("dropdown-recorder-microphone"), cfg.Microphone, recorderPathMic), false)
+	v.mics = microphoneSources(ctx.Pulse)
+	v.micRow = v.row(i18n.T("dropdown-recorder-microphone-device"))
+	v.micPicker = v.picker(v.mics, cfg.MicrophoneDevice, recorderPathMicDevice, func() []deviceChoice { return v.mics })
+	v.micRow.Append(v.micPicker, false)
+	audio.Append(v.micRow, false)
+	audio.Append(v.switchRow(i18n.T("dropdown-recorder-system-audio"), cfg.SystemAudio, recorderPathSystem), false)
+	v.Append(audio, false)
+
+	v.cams = recorderCameras()
+	v.webcamHeader = v.sectionHeader("ld-camera-symbolic", i18n.T("dropdown-recorder-section-webcam"))
+	v.webcam = v.card()
+	v.webcam.Append(v.switchRow(i18n.T("dropdown-recorder-webcam"), cfg.WebcamEnabled, recorderPathWebcam), false)
+	camRow := v.row(i18n.T("dropdown-recorder-webcam-device"))
+	camRow.Append(v.picker(v.cams, cfg.WebcamDevice, recorderPathCamDevice, func() []deviceChoice { return v.cams }), false)
+	v.webcam.Append(camRow, false)
+	position := widget.NewBox(widget.Column, 6, 0)
+	position.AddClass("recorder-row")
+	position.Append(widget.NewLabel(font, px, i18n.T("dropdown-recorder-position"), ctx.Style.fg), false)
+	width := int32(360)
+	if w, _, ok := dropdownDims("recorder", ctx.Config); ok {
+		width = int32(w)
+	}
+	pal := ctx.Style.palette
+	v.preview = newWebcamPreview(width, uint8(cfg.WebcamSize), uint8(cfg.WebcamX), uint8(cfg.WebcamY),
+		tokenColor(pal, config.TokenBgSurfaceElevated), tokenColor(pal, config.TokenAccentSubtle), tokenColor(pal, config.TokenAccent))
+	v.preview.AddClass("recorder-position-preview")
+	v.preview.onMove = v.webcamMoved
+	centered := widget.NewBox(widget.Row, 0, 0)
+	centered.Append(widget.NewSpacer(0, 0), true)
+	centered.Append(v.preview, false)
+	centered.Append(widget.NewSpacer(0, 0), true)
+	position.Append(centered, false)
+	v.webcam.Append(position, false)
+	hasCamera := len(v.cams) > 1
+	v.webcamHeader.SetVisible(hasCamera)
+	v.webcam.SetVisible(hasCamera)
+	v.Append(v.webcamHeader, false)
+	v.Append(v.webcam, false)
+
+	v.applyState(v.snapshot())
+	v.follow()
+	return v
+}
+
+// controls is the record/stop toggle and the pause button.
+func (v *recorderView) controls() widget.Widget {
+	row := widget.NewBox(widget.Row, 8, 0)
+	row.AddClass("recorder-controls")
+	content := widget.NewBox(widget.Row, 8, 0)
+	v.recordIcon = widget.NewThemeIcon("ld-circle-dot-symbolic", int(v.px))
+	v.recordLabel = widget.NewLabel(v.font, v.px, "", v.ctx.Style.fg)
+	content.Append(widget.NewSpacer(0, 0), true)
+	content.Append(v.recordIcon, false)
+	content.Append(v.recordLabel, false)
+	content.Append(widget.NewSpacer(0, 0), true)
+	v.record = dropdownButton(v.ctx, content, "recorder-record-button", func() {
+		if v.ctx.Recorder != nil {
+			v.ctx.Recorder.Toggle()
+		}
+	})
+	v.record.BgExplicit = true
+	row.Append(v.record, true)
+	v.pauseIcon = widget.NewThemeIcon("ld-pause-symbolic", int(v.px))
+	v.pauseIcon.SetTint(v.ctx.Style.fg)
+	v.pause = dropdownButton(v.ctx, v.pauseIcon, "recorder-pause-button", func() {
+		if r := v.ctx.Recorder; r != nil {
+			r.SetPaused(!r.Snapshot().Paused)
+		}
+	})
+	v.pause.AddClass("secondary")
+	row.Append(v.pause, false)
+	return row
+}
+
+func (v *recorderView) sectionHeader(icon, title string) *widget.Box {
+	row := widget.NewBox(widget.Row, 6, 0)
+	row.AddClass("recorder-section-header")
+	glyph := widget.NewThemeIcon(icon, int(v.px))
+	glyph.SetTint(mutedFg(v.ctx.Style.palette))
+	row.Append(glyph, false)
+	label := widget.NewLabel(v.font, v.px*0.85, title, mutedFg(v.ctx.Style.palette))
+	label.AddClass("section-label")
+	row.Append(label, true)
+	return row
+}
+
+func (v *recorderView) card() *widget.Box {
+	c := widget.NewBox(widget.Column, 8, 10)
+	c.AddClass("card", "recorder-card")
+	return c
+}
+
+func (v *recorderView) row(title string) *widget.Box {
+	r := widget.NewBox(widget.Row, 8, 0)
+	r.AddClass("recorder-row")
+	r.Append(widget.NewLabel(v.font, v.px, title, v.ctx.Style.fg), true)
+	return r
+}
+
+// switchRow is a labeled switch writing a boolean config key.
+func (v *recorderView) switchRow(title string, on bool, path string) *widget.Box {
+	r := v.row(title)
+	sw := widget.NewSwitch(on)
+	sw.OnChanged = func(on bool) { v.ctx.setConfig(path, on) }
+	r.Append(sw, false)
+	return r
+}
+
+// picker is a device selector writing the chosen id; choices reads the
+// list current at selection time.
+func (v *recorderView) picker(list []deviceChoice, saved, path string, choices func() []deviceChoice) *widget.Dropdown {
+	d := widget.NewDropdown(v.font, v.px*0.9, choiceLabels(list), choiceIndex(list, saved))
+	d.OnSelect = func(i int) {
+		if c := choices(); i >= 0 && i < len(c) {
+			v.ctx.setConfig(path, c[i].id)
+		}
+	}
+	return d
+}
+
+// webcamMoved is WebcamMoved.
+func (v *recorderView) webcamMoved(x, y uint8) {
+	v.ctx.setConfig(recorderPathWebcamX, int64(x))
+	v.ctx.setConfig(recorderPathWebcamY, int64(y))
+}
+
+func (v *recorderView) snapshot() recorder.Change {
+	if v.ctx.Recorder == nil {
+		return recorder.Change{}
+	}
+	return v.ctx.Recorder.Snapshot()
+}
+
+// applyState is StateChanged plus the view's #[watch]es.
+func (v *recorderView) applyState(c recorder.Change) {
+	pal := v.ctx.Style.palette
+	v.status.SetVisible(c.Active)
+	v.time.SetText(recorder.FormatElapsed(c.ElapsedSecs))
+	if c.Paused {
+		v.statusDot.AddClass("paused")
+		v.statusDot.SetColor(tokenColor(pal, config.TokenStatusWarning))
+	} else {
+		v.statusDot.RemoveClass("paused")
+		v.statusDot.SetColor(tokenColor(pal, config.TokenStatusError))
+	}
+	onAccent := tokenColor(pal, config.TokenFgOnAccent)
+	v.record.RemoveClass("danger", "primary")
+	if c.Active {
+		v.record.AddClass("danger")
+		v.record.Bg = tokenColor(pal, config.TokenStatusError)
+		v.record.BgHover = tokenColor(pal, config.TokenStatusErrorHover)
+		v.recordIcon.SetThemeName("ld-square-symbolic")
+		v.recordLabel.SetText(i18n.T("dropdown-recorder-stop"))
+	} else {
+		v.record.AddClass("primary")
+		v.record.Bg = tokenColor(pal, config.TokenAccent)
+		v.record.BgHover = tokenColor(pal, config.TokenAccentHover)
+		v.recordIcon.SetThemeName("ld-circle-dot-symbolic")
+		v.recordLabel.SetText(i18n.T("dropdown-recorder-record"))
+	}
+	v.record.BgPressed = v.record.BgHover
+	v.recordIcon.SetTint(onAccent)
+	v.recordLabel.SetColor(onAccent)
+	v.pause.SetEnabled(c.Active)
+	if c.Paused {
+		v.pauseIcon.SetThemeName("ld-play-symbolic")
+		v.pause.SetTooltip(i18n.T("dropdown-recorder-resume"))
+	} else {
+		v.pauseIcon.SetThemeName("ld-pause-symbolic")
+		v.pause.SetTooltip(i18n.T("dropdown-recorder-pause"))
+	}
+}
+
+// syncMics is MicrophonesUpdated: a changed source list rebuilds the
+// picker, keeping the saved selection when it is still there.
+func (v *recorderView) syncMics(mics []deviceChoice) {
+	if slices.Equal(mics, v.mics) {
+		return
+	}
+	v.mics = mics
+	saved := v.ctx.Config.Recorder.MicrophoneDevice
+	next := v.picker(mics, saved, recorderPathMicDevice, func() []deviceChoice { return v.mics })
+	v.micRow.Remove(v.micPicker)
+	v.micRow.Append(next, false)
+	v.micPicker = next
+}
+
+// follow tracks the recorder state and microphone hotplug until the
+// dropdown closes.
+func (v *recorderView) follow() {
+	life, cancel := context.WithCancel(context.Background())
+	v.cancel = cancel
+	if r := v.ctx.Recorder; r != nil {
+		changes, stop := r.Changes()
+		go func() {
+			defer stop()
+			for {
+				select {
+				case <-life.Done():
+					return
+				case c, ok := <-changes:
+					if !ok {
+						return
+					}
+					v.ctx.Invoke(func() { v.applyState(c) })
+				}
+			}
+		}()
+	}
+	if src := v.ctx.Pulse; src != nil {
+		followTicks(v.ctx, life, "recorder microphones", src.Subscribe,
+			func(context.Context) []deviceChoice { return microphoneSources(src) }, v.syncMics)
+	}
+}
+
+// dropdownClosed implements dropdownCloser.
+func (v *recorderView) dropdownClosed() { v.once.Do(func() { v.cancel() }) }
