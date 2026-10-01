@@ -9,11 +9,7 @@
 package usvg
 
 import (
-	"bytes"
-	"encoding/xml"
 	"errors"
-	"io"
-	"regexp"
 	"strings"
 )
 
@@ -26,24 +22,33 @@ const (
 
 // xmlNode is a parsed XML element (roxmltree's element node).
 type xmlNode struct {
+	// space is the namespace URI when bound; an element or attribute
+	// outside any namespace is unbound (a bound URI can be empty).
 	space    string
+	bound    bool
 	name     string
 	attrs    []xmlAttr
-	children []*xmlNode
+	children []*xmlNode // element children only
 	parent   *xmlNode
-	text     strings.Builder
-	index    int // position among the parent's element children
+	// text is Node::text: the first child's text, when the first child
+	// is text.
+	text  strings.Builder
+	index int // position among the parent's element children
+
+	ns    []nsBinding // the namespaces in scope
+	nkids int         // child nodes of every kind
 }
 
 type xmlAttr struct {
 	space string
+	bound bool
 	name  string
 	value string
 }
 
 func (n *xmlNode) attrNS(space, name string) (string, bool) {
 	for _, a := range n.attrs {
-		if a.name == name && a.space == space {
+		if a.name == name && a.bound && a.space == space {
 			return a.value, true
 		}
 	}
@@ -65,71 +70,5 @@ func (n *xmlNode) descendants(visit func(*xmlNode)) {
 	}
 }
 
-var entityDecl = regexp.MustCompile(`<!ENTITY\s+([A-Za-z_:][-A-Za-z0-9._:]*)\s+(?:"([^"]*)"|'([^']*)')\s*>`)
-
 // errNoRoot is roxmltree's NoRootNode.
 var errNoRoot = errors.New("the document does not have a root node")
-
-// parseXML builds the element tree. Internal DTD entities are expanded
-// (roxmltree's allow_dtd); attribute values get XML's whitespace
-// normalization.
-func parseXML(text string) (*xmlNode, error) {
-	dec := xml.NewDecoder(strings.NewReader(text))
-	dec.Strict = true
-	dec.Entity = map[string]string{}
-	// The text is already a string: roxmltree ignores the declared
-	// encoding, and so does this.
-	dec.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
-	root := &xmlNode{}
-	cur := root
-	for {
-		tok, err := dec.Token()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		switch t := tok.(type) {
-		case xml.Directive:
-			for _, m := range entityDecl.FindAllStringSubmatch(string(t), -1) {
-				value := m[2]
-				if value == "" {
-					value = m[3]
-				}
-				dec.Entity[m[1]] = value
-			}
-		case xml.StartElement:
-			n := &xmlNode{space: t.Name.Space, name: t.Name.Local, parent: cur, index: len(cur.children)}
-			for _, a := range t.Attr {
-				if a.Name.Space == "xmlns" || (a.Name.Space == "" && a.Name.Local == "xmlns") {
-					continue
-				}
-				n.attrs = append(n.attrs, xmlAttr{space: a.Name.Space, name: a.Name.Local, value: normalizeAttr(a.Value)})
-			}
-			cur.children = append(cur.children, n)
-			cur = n
-		case xml.EndElement:
-			cur = cur.parent
-		case xml.CharData:
-			if cur != root {
-				cur.text.Write(bytes.Clone(t))
-			}
-		}
-	}
-	if len(root.children) == 0 {
-		return nil, errNoRoot
-	}
-	if cur != root {
-		return nil, errors.New("unexpected end of stream")
-	}
-	return root, nil
-}
-
-func normalizeAttr(v string) string {
-	if !strings.ContainsAny(v, "\t\n\r") {
-		return v
-	}
-	v = strings.ReplaceAll(v, "\r\n", "\n")
-	return strings.NewReplacer("\t", " ", "\n", " ", "\r", " ").Replace(v)
-}

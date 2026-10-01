@@ -83,9 +83,8 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       transform (byte-identical to Rust over the four icon sets),
       migration, the shell's icon registry (search path, live refresh),
       and the mail provider icons
-- [ ] the icon SVG parser's error messages: XML is read by encoding/xml,
-      which accepts and rejects what roxmltree does over the corpus but
-      words the cause differently (port roxmltree)
+- [x] the icon SVG parser's XML layer is a roxmltree port: the same
+      documents accepted, the same trees, the same error messages
 
 ### Bar
 

@@ -17,7 +17,10 @@ Adwaita's symbolic icons (`adwaita-`, CC-BY-SA-3.0/LGPL-3.0), and
 hand-written `edge-` cases for what the sets rarely exercise: broken
 XML with and without a recoverable `d`, CSS, `use`/`symbol`, nested
 `svg`, every join and cap, dashes, units, clips, masks, filters,
-markers (orientations, units, view boxes, paint order), and so on.
+markers (orientations, units, view boxes, paint order), and so on;
+and `edge-xml-` cases for the XML layer (roxmltree): every error it
+reports, entities (markup, loops, attribute normalization),
+namespaces, and the text `<style>` is read from.
 
 To regenerate after changing the Rust transform, or to check the port
 against a larger corpus (the full npm packages of the four sets agree

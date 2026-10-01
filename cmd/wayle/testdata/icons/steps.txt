@@ -15,3 +15,4 @@ list
 export @ROOT@/exported
 sync --dry-run
 install nope x
+import @ROOT@/input/broken.svg broken

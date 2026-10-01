@@ -260,7 +260,7 @@ func (n *xmlNode) parentElement() *xmlNode {
 // with that local name and no namespace.
 func (n *xmlNode) attrAny(name string) (string, bool) {
 	for _, a := range n.attrs {
-		if a.name == name && a.space == "" {
+		if a.name == name && !a.bound {
 			return a.value, true
 		}
 	}

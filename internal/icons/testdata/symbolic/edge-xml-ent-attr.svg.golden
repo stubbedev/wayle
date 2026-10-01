@@ -1,0 +1,12 @@
+<svg width='16' height='16'
+     xmlns:gpa='https://www.gtk.org/grappa'
+     gpa:version='2'>
+  <path d='M1.07 1.07L16.00 1.07L16.00 16.00Z'
+stroke='none'
+fill='rgb(0,0,0)'
+gpa:fill='foreground'/>
+  <path d='M1.07 0.00L17.07 0.00L17.07 18.58L-1.51 -0.00ZM1.07 2.13L1.07 1.07L1.82 0.31L16.75 15.25L16.00 16.00L14.93 16.00L14.93 1.07L16.00 1.07L16.00 2.13L1.07 2.13Z'
+stroke='none'
+fill='rgb(0,0,0)'
+gpa:fill='foreground'/>
+</svg>

@@ -13,7 +13,8 @@ import (
 // TestToSymbolicMatchesRust holds ToSymbolic and usvg.Parse to what the
 // Rust transform makes of every SVG in testdata/symbolic (see
 // testdata/README.md): the same bytes out, or no icon (NONE) where Rust
-// gives up, and the same files rejected by the parser. SYMBOLIC_CORPUS
+// gives up, and the same files rejected by the parser with the same
+// error. SYMBOLIC_CORPUS
 // adds a directory laid out the same way.
 func TestToSymbolicMatchesRust(t *testing.T) {
 	dirs := []string{filepath.Join("testdata", "symbolic")}
@@ -38,9 +39,12 @@ func TestToSymbolicMatchesRust(t *testing.T) {
 				case ok && got != golden:
 					t.Errorf("output differs from Rust:\n%s", firstDifference(got, golden))
 				}
-				_, perr := usvg.Parse(src)
-				if want := readFile(t, file+".parse"); (perr == nil) != (want == "OK") {
-					t.Errorf("parse error = %v, Rust: %q", perr, want)
+				gotParse := "OK"
+				if _, err := usvg.Parse(src); err != nil {
+					gotParse = "ERR: " + err.Error()
+				}
+				if want := readFile(t, file+".parse"); gotParse != want {
+					t.Errorf("parse = %q, Rust: %q", gotParse, want)
 				}
 			})
 		}

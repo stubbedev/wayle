@@ -259,7 +259,7 @@ func parseDocument(root *xmlNode) (*document, error) {
 }
 
 func tagName(x *xmlNode) (string, bool) {
-	if x.space != "" && x.space != svgNS {
+	if x.bound && x.space != svgNS {
 		return "", false
 	}
 	if !knownElements[x.name] {
@@ -302,9 +302,7 @@ func (b *builder) parseNode(x, origin *xmlNode, parent *node, ignoreIDs bool, de
 func (b *builder) parseElement(x *xmlNode, parent *node, tag string, ignoreIDs bool) (*node, error) {
 	n := &node{tag: tag, parent: parent, doc: b.doc}
 	for _, a := range x.attrs {
-		switch a.space {
-		case "", svgNS, xlinkNS, xmlNS:
-		default:
+		if a.bound && a.space != svgNS && a.space != xlinkNS && a.space != xmlNS {
 			continue
 		}
 		if ignoreIDs && a.name == "id" {
