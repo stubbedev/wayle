@@ -108,7 +108,7 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [ ] cava: the wave style and the stereo split (error at creation),
       the `stereo`/`waves`/`input` keys
 - [ ] network dialogs: secret prompt, wifi password, wifi list, VPN
-      add/edit (gelm: focused Entry inside a popover, popover repaint)
+      add/edit
 - [ ] bluetooth: the pairing notifier without a placed module
 - [ ] brightness dropdown: friendly names for DDC monitors
 - [x] weather: the three providers, retrying poll service, condition
@@ -155,12 +155,11 @@ capability. Remedy it in gelm, then delete the workaround in wayle.
 | gelm lacks | wayle workaround (where) | remedy in gelm |
 | --- | --- | --- |
 | a public animation API and a revealer (tweens live in `internal/anim`) | no enter/exit animations anywhere in the Go shell | export the tween/easing API and add a Revealer (slide/crossfade) widget |
-| key routing to a focused Entry inside a popover, and repainting an open popover from the loop | no network dialogs; VPN rows show the state at open | popover focus and loop-driven redraw |
 | popups inside popups | tray submenus slide in place | nested popup surfaces |
 | an fd/file watcher on the event loop | inotify goroutines + Invoke (internal/fswatch) | optional: `app.WatchFD` |
 | `LayerConfig.Output = nil` (documented as "compositor chooses") panics in the Wayland binding | callers always pass an output | send a null output |
 
-Closed in gelm since the inventory: the CSS engine (var(), calc(),
+Closed in gelm since the inventory: popovers driven by the application loop (focused Entry input, loop-driven repaint, layer get_popup, rect-anchored placement), the CSS engine (var(), calc(),
 color-mix(), :not(), structural selectors, the box model, per-side
 padding and borders, rounded rings, gradients, box shadows), raw-pixel
 icons, ext-session-lock, the capture protocols and dmabuf import,
