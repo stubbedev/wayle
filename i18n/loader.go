@@ -52,10 +52,18 @@ var Fallback = MustLangID("en-US")
 // holding `_*.ftl` partials at any depth.
 type Assets struct {
 	fsys fs.FS
+	// file, when set, is the one FTL file each locale holds (a crate
+	// whose locales are plain files, as wayle-greeter's are, loaded by
+	// i18n-embed under the crate's name) instead of `_*.ftl` partials.
+	file string
 }
 
-// NewAssets wraps a locale tree.
+// NewAssets wraps a locale tree of `_*.ftl` partials.
 func NewAssets(fsys fs.FS) Assets { return Assets{fsys: fsys} }
+
+// NewFileAssets wraps a locale tree holding one file per locale,
+// <locale>/<file>.
+func NewFileAssets(fsys fs.FS, file string) Assets { return Assets{fsys: fsys, file: file} }
 
 // Available lists the locales that carry at least one partial, sorted
 // like rust-embed's file list, with the fallback first when missing
@@ -92,6 +100,13 @@ func (a Assets) Available() ([]LangID, error) {
 // partials lists a locale's `_*.ftl` files in the order the Rust build
 // scripts concatenate them: PathBuf order, compared component-wise.
 func (a Assets) partials(locale string) ([]string, error) {
+	if a.file != "" {
+		p := locale + "/" + a.file
+		if _, err := fs.Stat(a.fsys, p); err != nil {
+			return nil, nil // a locale without the file offers nothing
+		}
+		return []string{p}, nil
+	}
 	var files []string
 	err := fs.WalkDir(a.fsys, locale, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {

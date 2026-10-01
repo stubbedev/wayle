@@ -122,3 +122,17 @@ func PaletteFromHex(p config.Palette) (*Palette, error) {
 	}
 	return out, nil
 }
+
+// ConfigPalette is the render palette the styling config resolves to:
+// the active palette through its provider, a failing provider leaving
+// the configured palette (as Rust logs and falls back), an unparsable
+// one the compiled Default. Failures are returned for the caller to
+// log; the palette is always usable.
+func ConfigPalette(s config.StylingConfig) (*Palette, error) {
+	resolved, resolveErr := ResolvePalette(s.ActivePalette(), s)
+	p, err := PaletteFromHex(resolved)
+	if err != nil {
+		return Default(), err
+	}
+	return p, resolveErr
+}

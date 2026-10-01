@@ -14,7 +14,7 @@ launcher → lock screen → settings.
 | `strftime` | chrono strftime formatting | Format strings are validated at load; an unsupported specifier is an error, not garbage at runtime. |
 | `styling` | wayle-styling | theme_css, the palette color math, the matugen/pywal/wallust providers, the user stylesheet (`internal/scss` compiles its SCSS subset), and the embedded compiled Rust stylesheet bundle (`just go-css` refreshes it). |
 | `shell/*` | wayle-shell | bar, osd, popups, lock, credential (the lock/greeter prompt), screenshot, regionoverlay, colorpicker, sharepicker, wallpaper. |
-| `greeter`, `cmd/wayle-greeter` | wayle-greeter | WIP: compiles and passes lint; the greetd screen is unfinished. |
+| `greeter`, `cmd/wayle-greeter` | wayle-greeter | the greetd login screen, apply-config, cursor detection. |
 | `cmd/wayle` | wayle bin | The full clap tree on `internal/cli` (help, errors, and completions byte-for-byte with clap). |
 | `cmd/wayle-lock` | wayle-lock | One-token `wayle lock`. |
 
@@ -150,7 +150,9 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       -dump, -e dialogs, hooks, -select/-selected-row/-auto-select,
       sidebar tabs, -width/-location/-lines, session -font/-style CSS),
       styled by the shell stylesheet's launcher rules
-- [ ] greeter screen (WIP in `greeter/`)
+- [x] greeter: the login state machine under test (prompts, OTP, failure
+      and retry, stale conversations, remembered user and session), the
+      card's fade, the configured palette, the greeter's own FTL domain
 - [ ] portal dialogs: file chooser, color picker, print, share picker
       (`wayle portal share-picker` should call `sharepicker.NewClient`)
 - [ ] the share-preview gbm dmabuf allocator and PipeWire producer

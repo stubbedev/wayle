@@ -147,3 +147,25 @@ func TestPaletteFromHex(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigPalette(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	s := config.DefaultsStyling()
+	configured, err := PaletteFromHex(s.ActivePalette())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := ConfigPalette(s)
+	if err != nil || *p != *configured {
+		t.Errorf("the default styling = %+v, %v; want its own palette", p, err)
+	}
+	// A provider with nothing to read keeps the configured palette.
+	s.ColorExtractor.ThemeProvider = config.ThemeProviderMatugen
+	p, err = ConfigPalette(s)
+	if err == nil {
+		t.Error("a provider without its colors file reported no failure")
+	}
+	if *p != *configured {
+		t.Errorf("after the provider failed = %+v, want the configured palette", p)
+	}
+}

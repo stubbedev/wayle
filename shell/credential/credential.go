@@ -100,7 +100,7 @@ func Build(o Options, onSubmit func(string)) *Prompt {
 	}
 	if o.WithUsername {
 		p.Username = widget.NewEntry(o.Fonts.Text, entryPx, pal.Fg)
-		p.Username.SetPlaceholder("Username")
+
 		p.Username.OnActivate = func(string) {
 			if o.Focus != nil {
 				o.Focus(p.Entry)

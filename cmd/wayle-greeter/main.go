@@ -41,7 +41,7 @@ func main() {
 	sessions = append(sessions, greeter.Discover(opts.XSessionDirs, greeter.X11)...)
 	greeter.SortSessions(sessions)
 	if len(opts.Command) > 0 {
-		sessions = append(sessions, greeter.Session{ID: "custom", Name: greeter.CustomSessionName, Exec: opts.Command})
+		sessions = append(sessions, greeter.Session{ID: "custom", Name: greeter.CustomSessionName(), Exec: opts.Command})
 	}
 	if len(sessions) == 0 {
 		fmt.Fprintf(os.Stderr, "no sessions found in %q or %q and no `-- <argv>` fallback given; nothing to log into\n",

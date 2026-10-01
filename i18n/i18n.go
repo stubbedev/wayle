@@ -2,13 +2,15 @@
 // the Rust crates get from i18n-embed 0.16 (FluentLanguageLoader),
 // fluent-bundle 0.16, fluent-syntax 0.12, and fluent-langneg 0.13.
 //
-// Two domains exist, as in Rust:
+// Three domains exist, as in Rust:
 //
 //   - the shell domain (crates/wayle-shell-core/src/i18n.rs, the t!/td!
 //     macros): bar labels, dropdowns, OSD, notification popups. T and
 //     Attr read it.
 //   - the settings domain (crates/wayle-i18n/src/lib.rs, t/t_attr): the
 //     settings GUI and config field labels. Settings returns it.
+//   - the greeter domain (crates/wayle-greeter/src/i18n.rs, t!): the
+//     login screen's labels. Greeter returns it.
 //
 // Each domain negotiates the desktop locale (LANGUAGE, LC_ALL,
 // LC_MESSAGES, LANG) against its embedded locales once, on first use,
@@ -25,6 +27,7 @@ import (
 	"os"
 	"sync"
 
+	greeterlocales "github.com/stubbedev/wayle/crates/wayle-greeter/locales"
 	settingslocales "github.com/stubbedev/wayle/crates/wayle-i18n/locales"
 	shelllocales "github.com/stubbedev/wayle/crates/wayle-shell-core/locales"
 )
@@ -53,6 +56,7 @@ func (d *domain) get() *Loader {
 var (
 	shellDomain    = &domain{assets: NewAssets(shelllocales.FS)}
 	settingsDomain = &domain{assets: NewAssets(settingslocales.FS)}
+	greeterDomain  = &domain{assets: NewFileAssets(greeterlocales.FS, "wayle-greeter.ftl")}
 )
 
 // Shell returns the shell-domain loader (wayle-shell-core's loader()).
@@ -60,6 +64,9 @@ func Shell() *Loader { return shellDomain.get() }
 
 // Settings returns the settings-domain loader (wayle-i18n's loader()).
 func Settings() *Loader { return settingsDomain.get() }
+
+// Greeter returns the greeter-domain loader (wayle-greeter's loader()).
+func Greeter() *Loader { return greeterDomain.get() }
 
 // T formats a shell message: wayle-shell-core's t!/td!.
 func T(id string, args ...Arg) string { return Shell().Get(id, args...) }

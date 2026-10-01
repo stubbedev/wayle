@@ -42,7 +42,13 @@ func Run(init Init) error {
 	}
 
 	var win *app.Window
-	s := newScreen(init, fonts, styling.Default(), deps{
+	// The theme the desktop and the lock use (install_css: the configured
+	// palette).
+	pal, err := styling.ConfigPalette(init.Config.Styling)
+	if err != nil {
+		log.Printf("greeter: palette: %v", err)
+	}
+	s := newScreen(init, fonts, pal, deps{
 		connect: func(cmd func() []string, env []string) (auth.Conversation, error) {
 			return auth.NewGreetdFromEnv(cmd, env)
 		},

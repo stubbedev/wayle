@@ -13,22 +13,21 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/auth"
 	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/styling"
 )
 
-// The greeter's strings (wayle-greeter.ftl, en-US).
-const (
-	msgEnterUsername = "Enter a username"
-	msgCapsLock      = "Caps Lock is on"
-	msgShutdown      = "Shut down"
-	msgRestart       = "Restart"
-	// CustomSessionName labels the explicit `-- <argv>` session.
-	CustomSessionName = "Custom"
-)
+// t is the greeter's t! (wayle-greeter.ftl, the desktop locale).
+func t(id string, args ...i18n.Arg) string { return i18n.Greeter().Get(id, args...) }
 
-func msgGreetdUnavailable(err error) string { return "greetd unavailable: " + err.Error() }
+// CustomSessionName labels the explicit `-- <argv>` session.
+func CustomSessionName() string { return t("greeter-custom-session") }
+
+// revealFade is the credential card's reveal, fixed in the greeter
+// (CredentialOpts: Fade, 300ms) rather than [animations].
+const revealFade = 300 * time.Millisecond
 
 // maxListedUsers caps the avatar row; beyond it the username entry
 // carries the load.
@@ -138,7 +137,7 @@ func newScreen(init Init, fonts credential.Fonts, pal *styling.Palette, d deps) 
 		s.mu.Unlock()
 	}
 	s.drop.SetVisible(len(init.Sessions) > 1)
-	s.caps = widget.NewLabel(fonts.Text, capsPx, msgCapsLock, pal.Yellow)
+	s.caps = widget.NewLabel(fonts.Text, capsPx, t("greeter-caps-lock"), pal.Yellow)
 	s.caps.SetAlignment(render.AlignCenter)
 	s.caps.SetVisible(false)
 	below := widget.NewBox(widget.Column, 0, 0)
@@ -152,6 +151,9 @@ func newScreen(init Init, fonts credential.Fonts, pal *styling.Palette, d deps) 
 		Fonts: fonts, Palette: pal, ShowClock: g.ShowClock, WithUsername: true,
 		Header: header, Extra: below, Focus: d.focus,
 	}, s.submit)
+	s.prompt.Username.SetPlaceholder(t("greeter-username"))
+	s.prompt.Reveal.SetTransition(widget.RevealFade)
+	s.prompt.Reveal.SetDuration(revealFade)
 
 	layers := widget.NewOverlay().
 		Append(credential.Background(s.background(), credential.HexFill(g.Background.Color))).
@@ -167,6 +169,7 @@ func newScreen(init Init, fonts credential.Fonts, pal *styling.Palette, d deps) 
 // start pre-fills the remembered user and focuses the next field:
 // the password when the username is known, the username otherwise.
 func (s *screen) start() {
+	s.prompt.Reveal.SetRevealed(true)
 	if s.init.LastUser != "" {
 		s.prompt.Username.SetText(s.init.LastUser)
 		s.d.focus(s.prompt.Entry)
@@ -276,7 +279,7 @@ func (s *screen) powerRow(pal *styling.Palette) widget.Widget {
 		svg     []byte
 		tooltip string
 		verb    string
-	}{{powerSVG, msgShutdown, "poweroff"}, {restartSVG, msgRestart, "reboot"}} {
+	}{{powerSVG, t("greeter-shutdown"), "poweroff"}, {restartSVG, t("greeter-restart"), "reboot"}} {
 		icon := widget.NewSVGIcon(b.svg, powerIconPx)
 		icon.SetTint(pal.FgMuted)
 		btn := widget.NewButton(icon, 12, 12)
@@ -319,7 +322,7 @@ func (s *screen) submit(value string) {
 	}
 	username := strings.TrimSpace(s.prompt.Username.Text())
 	if username == "" {
-		s.prompt.SetMessage(msgEnterUsername)
+		s.prompt.SetMessage(t("greeter-enter-username"))
 		s.d.focus(s.prompt.Username)
 		return
 	}
@@ -332,7 +335,7 @@ func (s *screen) startConversation(username, password string) {
 	conv, err := s.d.connect(func() []string { return s.selectedSession().Exec }, s.init.SessionEnv)
 	if err != nil {
 		log.Printf("greeter: cannot connect to greetd: %v", err)
-		s.prompt.SetMessage(msgGreetdUnavailable(err))
+		s.prompt.SetMessage(t("greeter-greetd-unavailable", i18n.Str("error", err.Error())))
 		s.setForm(true)
 		return
 	}
