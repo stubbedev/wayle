@@ -86,6 +86,8 @@ func newHarness(t *testing.T) *harness {
 	}
 	h := &harness{t: t, loop: &fakeLoop{}, cfg: config.Defaults()}
 	h.cfg.Launcher.History.Enable = false
+	// Surfaces close at once here; TestSurfacePlaysItsExit animates.
+	h.cfg.Animations.Enabled = false
 	h.s = New(Deps{
 		Invoke: h.loop.invoke,
 		After: func(d time.Duration, fn func()) func() {
@@ -496,5 +498,37 @@ func TestALateEventFromAnEndedSessionIsDropped(t *testing.T) {
 	stale.onAction(engine.ActionClose{})
 	if h.s.model.len() != 2 || h.s.cur == nil {
 		t.Errorf("a stale event reached the new session: %d rows, live %v", h.s.model.len(), h.s.cur != nil)
+	}
+}
+
+// TestSurfacePlaysItsExit pins the enter and hide_animated: a session
+// opens its surface entering with the launcher transition; when it
+// ends the surface stays mapped through its exit and closes when that
+// lands, while a replacing session already has its own.
+func TestSurfacePlaysItsExit(t *testing.T) {
+	h := newHarness(t)
+	h.cfg.Animations.Enabled = true
+	zoom := config.AnimationZoom
+	h.cfg.Animations.Launcher.Exit = &zoom
+	_, _ = h.open(dmenu(), false, "a")
+	h.until("the first session", func() bool { return h.s.cur != nil && h.s.cur.rev != nil })
+	first := h.s.cur
+	if !first.rev.Revealed() || first.rev.Transition() != widget.RevealFade {
+		t.Errorf("entering: revealed %v, transition %v", first.rev.Revealed(), first.rev.Transition())
+	}
+	_, _ = h.open(dmenu(), true, "b")
+	h.loop.pump()
+	if h.windows[0].closed {
+		t.Fatal("the replaced surface closed before its exit played")
+	}
+	if first.rev.Revealed() || first.rev.Transition() != widget.RevealZoom {
+		t.Errorf("exiting: revealed %v, transition %v; want the launcher's zoom exit", first.rev.Revealed(), first.rev.Transition())
+	}
+	if len(h.windows) != 2 {
+		t.Fatalf("windows = %d, want the replacement mapped meanwhile", len(h.windows))
+	}
+	first.rev.Finish()
+	if !h.windows[0].closed || h.windows[1].closed {
+		t.Errorf("after the exit: first closed %v, second closed %v", h.windows[0].closed, h.windows[1].closed)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/wayle/internal/pango"
 	engine "github.com/stubbedev/wayle/service/launcher"
 	"github.com/stubbedev/wayle/service/launcher/modes"
+	"github.com/stubbedev/wayle/shell/reveal"
 )
 
 // dumpDebounce is how long -dump waits for the matches to settle.
@@ -87,12 +88,14 @@ type active struct {
 	dumpStop func()
 	pending  pendingSelection
 	win      Window
-	views    *views
-	thumbs   engine.Thumbnailer
-	ctx      context.Context
-	cancel   context.CancelFunc
-	keys     []keyBinding
-	mouse    []mouseEntry
+	// rev plays the surface's enter and exit around the views.
+	rev    *widget.Revealer
+	views  *views
+	thumbs engine.Thumbnailer
+	ctx    context.Context
+	cancel context.CancelFunc
+	keys   []keyBinding
+	mouse  []mouseEntry
 }
 
 // Surface is the launcher (shell/launcher/mod.rs): it serves the
@@ -615,7 +618,9 @@ func (s *Surface) end(frame *launcheripc.ServerFrame) {
 		_ = a.history.Close()
 	}
 	if a.win != nil {
-		a.win.Close()
+		// The surface plays its exit, then goes (hide_animated); a new
+		// session meanwhile opens its own.
+		reveal.Hide(a.rev, s.d.Config().Animations, config.AnimLauncher, a.win.Close)
 	}
 	clear(s.multi.picked)
 	s.model.update(nil, nil)
@@ -628,6 +633,7 @@ func (s *Surface) reveal(a *active) {
 	width := s.resolveWidth(a.ui)
 	anchor, margin := locationAnchors(a.ui.location, a.ui.offsetX, a.ui.offsetY)
 	h := a.views.height(width)
+	a.rev = widget.NewRevealer(a.views.root)
 	win, err := s.d.Open(app.LayerConfig{
 		Layer:         app.LayerOverlay,
 		Anchor:        anchor,
@@ -637,7 +643,7 @@ func (s *Surface) reveal(a *active) {
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardOnDemand,
 		Namespace:     "wayle-launcher",
-		Root:          a.views.root,
+		Root:          a.rev,
 		KeyCapture:    s.keyCaptured,
 		OnClosed: func() {
 			// The compositor took the surface away (output gone).
@@ -655,6 +661,7 @@ func (s *Surface) reveal(a *active) {
 	a.win = win
 	a.views.width = width
 	win.SetFocus(a.views.entry)
+	reveal.Show(a.rev, s.d.Config().Animations, config.AnimLauncher)
 }
 
 // resize keeps the surface as tall as its content: the list grows to

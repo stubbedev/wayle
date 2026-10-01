@@ -176,10 +176,10 @@ capability. Remedy it in gelm, then delete the workaround in wayle.
 
 | gelm lacks | wayle workaround (where) | remedy in gelm |
 | --- | --- | --- |
-| a public animation API and a revealer (tweens live in `internal/anim`) | no enter/exit animations anywhere in the Go shell | export the tween/easing API and add a Revealer (slide/crossfade) widget |
 | an fd/file watcher on the event loop | inotify goroutines + Invoke (internal/fswatch) | optional: `app.WatchFD` |
 
-Closed in gelm since the inventory: nested popovers (OpenMenuPopover), filled paths (Canvas.FillPath), popovers driven by the application loop (focused Entry input, loop-driven repaint, layer get_popup, rect-anchored placement, clicks and the wheel inside them), GTK-style give-way layout (a column shrinks its expanding Scroll; Scroll.VerticalOnly and SetMaxContentHeight), the CSS engine (var(), calc(),
+Closed in gelm since the inventory: the Revealer (every enter/exit
+transition, through offscreen layers and affine composites), nested popovers (OpenMenuPopover), filled paths (Canvas.FillPath), popovers driven by the application loop (focused Entry input, loop-driven repaint, layer get_popup, rect-anchored placement, clicks and the wheel inside them), GTK-style give-way layout (a column shrinks its expanding Scroll; Scroll.VerticalOnly and SetMaxContentHeight), the CSS engine (var(), calc(),
 color-mix(), :not(), structural selectors, the box model, per-side
 padding and borders, rounded rings, gradients, box shadows), raw-pixel
 icons, ext-session-lock, the capture protocols and dmabuf import,
@@ -208,8 +208,7 @@ data-control, Button.BgExplicit, menu row icons and MenuStack.
 
 - The launcher's message line shows its markup's text, wrapped (gelm's
   wrapping label is plain); a Super+ key binding does not parse (gelm
-  tracks no Super modifier); the surface opens and closes without its
-  enter/exit animation.
+  tracks no Super modifier).
 - Workspace modules re-query the compositor on each relevant event
   instead of folding events into a local state; the rendered result is
   the same.
