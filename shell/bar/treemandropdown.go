@@ -99,6 +99,7 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.confirm = widget.NewBox(widget.Column, 10, 4)
 	v.confirm.AddClass("treeman-confirm")
 	v.pages = widget.NewStack()
+	pageSlide(v.pages, ctx.Config)
 	v.pages.Add("list", v.list)
 	v.pages.Add("detail", v.details)
 	v.pages.Add("confirm", v.confirm)

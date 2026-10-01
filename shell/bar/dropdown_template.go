@@ -4,9 +4,12 @@ import (
 	"context"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
+
+	"github.com/stubbedev/wayle/config"
 )
 
 // dropdownHeader is the DropdownHeader template: the icon, the title
@@ -200,4 +203,18 @@ func dropdownScroll(child widget.Widget, class string) *widget.Scroll {
 		s.AddClass(class)
 	}
 	return s
+}
+
+// Stack transition timings: a GtkStack's default duration, the hover
+// swaps' HOVER_TRANSITION_MS, and the page slides' interaction-duration.
+const (
+	gtkStackDuration = 200 * time.Millisecond
+	hoverTransition  = 150 * time.Millisecond
+)
+
+// pageSlide gives a dropdown's page stack its slide between pages at
+// the configured interaction-duration (zero, an instant switch, with
+// animations off).
+func pageSlide(s *widget.Stack, cfg *config.Config) {
+	s.SetTransition(widget.StackSlideLeftRight, time.Duration(cfg.Animations.InteractionDurationMs())*time.Millisecond)
 }

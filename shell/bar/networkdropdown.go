@@ -200,6 +200,7 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	// as tall as its taller page, so switching never resizes the popover.
 	v.vpnForm = newNetVPNForm(v)
 	v.body = widget.NewStack()
+	v.body.SetTransition(widget.StackSlideLeftRight, gtkStackDuration)
 	v.body.Add(netPageBrowse, browse)
 	v.body.Add(netPageEdit, v.vpnForm)
 	v.Append(v.body, true)
@@ -327,6 +328,7 @@ func (v *networkView) row(ap apSnapshot) widget.Widget {
 	if secured || ap.known {
 		trailing := widget.NewStack()
 		trailing.AddClass("network-item-trailing")
+		trailing.SetTransition(widget.StackCrossfade, hoverTransition)
 		lock := widget.NewBox(widget.Row, 0, 0)
 		if secured {
 			icon := widget.NewThemeIcon("ld-lock-symbolic", int(v.px*0.9))
@@ -604,6 +606,7 @@ func newNetActive(v *networkView) *netActive {
 
 	a.trailing = widget.NewStack()
 	a.trailing.AddClass("network-hover-stack")
+	a.trailing.SetTransition(widget.StackCrossfade, hoverTransition)
 	status := widget.NewBox(widget.Row, 0, 0)
 	a.wifiStatus = v.statusLabel()
 	status.Append(a.wifiStatus, false)

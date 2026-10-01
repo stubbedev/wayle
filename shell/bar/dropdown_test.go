@@ -184,3 +184,25 @@ func TestDropdownGenieEdgeIsTheBars(t *testing.T) {
 		}
 	}
 }
+
+func TestPageSlideFollowsInteractionDuration(t *testing.T) {
+	build := func(cfg *config.Config) *widget.Stack {
+		s := widget.NewStack()
+		pageSlide(s, cfg)
+		s.Add("a", widget.NewBox(widget.Row, 0, 0))
+		s.Add("b", widget.NewBox(widget.Row, 0, 0))
+		return s
+	}
+	cfg := config.Defaults()
+	s := build(cfg)
+	s.Show("b")
+	if !s.Switching() {
+		t.Error("a page switch did not slide")
+	}
+	cfg.Animations.Enabled = false
+	s = build(cfg)
+	s.Show("b")
+	if s.Switching() {
+		t.Error("animations off: the switch still slid")
+	}
+}

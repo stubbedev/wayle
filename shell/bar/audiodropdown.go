@@ -288,6 +288,7 @@ func audioDropdown(ctx ModuleContext) widget.Widget {
 	v.pickers[audioInput] = newDevicePicker(v, audioInput, i18n.T("dropdown-audio-input-devices"))
 	v.pages = widget.NewStack()
 	v.pages.AddClass("dropdown-content")
+	pageSlide(v.pages, ctx.Config)
 	v.pages.Add("main", v.main)
 	v.pages.Add("output", v.pickers[audioOutput])
 	v.pages.Add("input", v.pickers[audioInput])
