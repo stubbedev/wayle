@@ -3,9 +3,6 @@ package bar
 import (
 	"path/filepath"
 	"testing"
-	"time"
-
-	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
@@ -77,9 +74,9 @@ func TestIdleInhibitModuleFollowsState(t *testing.T) {
 	// Enabling the shared state flips the label (the module's follower
 	// goroutine consumes the change ticks; poll the label).
 	state.Enable(true)
-	waitForIdleText(t, label, i18n.T("bar-idle-inhibit-on"))
+	waitForText(t, label, i18n.T("bar-idle-inhibit-on"))
 	state.Disable()
-	waitForIdleText(t, label, i18n.T("bar-idle-inhibit-off"))
+	waitForText(t, label, i18n.T("bar-idle-inhibit-off"))
 
 	// A module built without the shared state still works standalone.
 	standalone, err := Create("idle-inhibit", newTestContext(t, cfg))
@@ -92,17 +89,4 @@ func TestIdleInhibitModuleFollowsState(t *testing.T) {
 	if label := findLabel(standalone.Root()); label.Text() != i18n.T("bar-idle-inhibit-off") {
 		t.Errorf("standalone label = %q", label.Text())
 	}
-}
-
-// waitForIdleText polls a label until it carries want.
-func waitForIdleText(t *testing.T, label *widget.Label, want string) {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if label.Text() == want {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	t.Fatalf("label = %q, want %q", label.Text(), want)
 }

@@ -3,7 +3,9 @@ package network
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,13 +16,26 @@ import (
 )
 
 // fakeSignIn stands in for package openconnect: it claims openconnect
-// profiles and signs in however the test says.
+// profiles and signs in however the test says. The agent calls it from
+// the bus goroutines, so every field is behind mu and tests read what
+// it saw through Calls, Forgotten, and Callbacks.
 type fakeSignIn struct {
+	mu           sync.Mutex
 	unsupported  bool
-	authenticate func(ctx context.Context, p openconnect.Profile, requestNew, unattended bool, prompter secrets.Prompter) (map[string]string, error)
+	authenticate signInFunc
 	forgotten    []string
 	callbacks    []string
 	waiting      bool
+	calls        []signInCall
+}
+
+type signInFunc func(ctx context.Context, p openconnect.Profile, requestNew, unattended bool, prompter secrets.Prompter) (map[string]string, error)
+
+// signInCall is one Authenticate the agent made.
+type signInCall struct {
+	profile    openconnect.Profile
+	requestNew bool
+	unattended bool
 }
 
 func (s *fakeSignIn) ProfileFrom(conn ConnectionDict, uuid, name string) (openconnect.Profile, bool) {
@@ -31,17 +46,68 @@ func (s *fakeSignIn) ProfileFrom(conn ConnectionDict, uuid, name string) (openco
 	return openconnect.Profile{UUID: uuid, Name: name, Gateway: data["gateway"], Protocol: data["protocol"]}, true
 }
 
-func (s *fakeSignIn) IsSupported(openconnect.Profile) bool { return !s.unsupported }
-
-func (s *fakeSignIn) Authenticate(ctx context.Context, p openconnect.Profile, requestNew, unattended bool, prompter secrets.Prompter) (map[string]string, error) {
-	return s.authenticate(ctx, p, requestNew, unattended, prompter)
+func (s *fakeSignIn) IsSupported(openconnect.Profile) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return !s.unsupported
 }
 
-func (s *fakeSignIn) Forget(uuid string) { s.forgotten = append(s.forgotten, uuid) }
+func (s *fakeSignIn) Authenticate(ctx context.Context, p openconnect.Profile, requestNew, unattended bool, prompter secrets.Prompter) (map[string]string, error) {
+	s.mu.Lock()
+	s.calls = append(s.calls, signInCall{profile: p, requestNew: requestNew, unattended: unattended})
+	fn := s.authenticate
+	s.mu.Unlock()
+	return fn(ctx, p, requestNew, unattended, prompter)
+}
+
+func (s *fakeSignIn) Forget(uuid string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.forgotten = append(s.forgotten, uuid)
+}
 
 func (s *fakeSignIn) DeliverSSOCallback(uri string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.callbacks = append(s.callbacks, uri)
 	return s.waiting
+}
+
+// onAuthenticate sets how the next sign-ins answer.
+func (s *fakeSignIn) onAuthenticate(fn signInFunc) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.authenticate = fn
+}
+
+func (s *fakeSignIn) setUnsupported() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.unsupported = true
+}
+
+func (s *fakeSignIn) setWaiting() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.waiting = true
+}
+
+func (s *fakeSignIn) Calls() []signInCall {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.calls)
+}
+
+func (s *fakeSignIn) Forgotten() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.forgotten)
+}
+
+func (s *fakeSignIn) Callbacks() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.callbacks)
 }
 
 // silentGateway is a sign-in that reaches the gateway and then waits
@@ -275,14 +341,9 @@ func TestAgentSaveAndDeleteSecretsAreAcceptedNoOps(t *testing.T) {
 
 func TestAgentSignsIntoOpenconnectAndNestsTheCookie(t *testing.T) {
 	fx := serveFixture(t, RequestBudget)
-	var sawNew bool
-	fx.signIn.authenticate = func(_ context.Context, p openconnect.Profile, requestNew, unattended bool, _ secrets.Prompter) (map[string]string, error) {
-		sawNew = requestNew
-		if p.UUID != "work" || p.Protocol != "gp" || unattended {
-			t.Errorf("sign-in for %+v unattended=%v", p, unattended)
-		}
+	fx.signIn.onAuthenticate(func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
 		return map[string]string{"cookie": "c00kie", "gateway": "vpn.example.com"}, nil
-	}
+	})
 	fx.agent.setFailure(&AuthFailure{UUID: "work", Reason: "stale"})
 	reply, err := fx.nm.getSecrets(context.Background(), fx.name, gpConnection("work"), settingPath(1), "vpn", nil, flagAllowInteraction|flagRequestNew)
 	if err != nil {
@@ -291,7 +352,14 @@ func TestAgentSignsIntoOpenconnectAndNestsTheCookie(t *testing.T) {
 	if got := stringDict(reply["vpn"]["secrets"])["cookie"]; got != "c00kie" {
 		t.Errorf("cookie = %q", got)
 	}
-	if !sawNew {
+	calls := fx.signIn.Calls()
+	if len(calls) != 1 {
+		t.Fatalf("sign-ins = %+v, want one", calls)
+	}
+	if p := calls[0].profile; p.UUID != "work" || p.Protocol != "gp" || calls[0].unattended {
+		t.Errorf("sign-in for %+v unattended=%v", p, calls[0].unattended)
+	}
+	if !calls[0].requestNew {
 		t.Error("REQUEST_NEW did not reach the sign-in")
 	}
 	if _, ok := fx.agent.Failure(); ok {
@@ -301,9 +369,9 @@ func TestAgentSignsIntoOpenconnectAndNestsTheCookie(t *testing.T) {
 
 func TestAgentPublishesTheGatewaysWordingOnARefusal(t *testing.T) {
 	fx := serveFixture(t, RequestBudget)
-	fx.signIn.authenticate = func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
+	fx.signIn.onAuthenticate(func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
 		return nil, &secrets.AuthenticationFailedError{Reason: "Invalid username or password"}
-	}
+	})
 	_, err := fx.nm.getSecrets(context.Background(), fx.name, gpConnection("work"), settingPath(1), "vpn", nil, flagAllowInteraction)
 	if errName(err) != errUserCanceled || errText(err) != "Invalid username or password" {
 		t.Fatalf("err = %v", err)
@@ -316,9 +384,9 @@ func TestAgentPublishesTheGatewaysWordingOnARefusal(t *testing.T) {
 
 func TestAgentLeavesAGatewayItCannotFollowToAnotherAgent(t *testing.T) {
 	fx := serveFixture(t, RequestBudget)
-	fx.signIn.authenticate = func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
+	fx.signIn.onAuthenticate(func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
 		return nil, &secrets.ProtocolUnsupportedError{Reason: "unknown login form"}
-	}
+	})
 	_, err := fx.nm.getSecrets(context.Background(), fx.name, gpConnection("work"), settingPath(1), "vpn", nil, flagAllowInteraction)
 	if errName(err) != errNoSecrets {
 		t.Fatalf("err = %v, want NoSecrets", err)
@@ -327,7 +395,7 @@ func TestAgentLeavesAGatewayItCannotFollowToAnotherAgent(t *testing.T) {
 		t.Error("a hand-off to another agent was reported as a failed sign-in")
 	}
 
-	fx.signIn.unsupported = true
+	fx.signIn.setUnsupported()
 	_, err = fx.nm.getSecrets(context.Background(), fx.name, gpConnection("work"), settingPath(1), "vpn", nil, flagAllowInteraction)
 	if errName(err) != errNoSecrets || !strings.Contains(errText(err), "no native sign-in for openconnect protocol gp") {
 		t.Fatalf("unsupported protocol: err = %v", err)
@@ -337,7 +405,7 @@ func TestAgentLeavesAGatewayItCannotFollowToAnotherAgent(t *testing.T) {
 func TestAWithdrawnSignInStopsWhereItIsAndReportsNothing(t *testing.T) {
 	fx := serveFixture(t, RequestBudget)
 	reached := make(chan struct{}, 1)
-	fx.signIn.authenticate = silentGateway(reached)
+	fx.signIn.onAuthenticate(silentGateway(reached))
 	pending := fx.ask(gpConnection("withdrawn"), 1, "vpn")
 	<-reached
 	fx.nm.cancelSecrets(fx.name, settingPath(1), "vpn")
@@ -353,7 +421,7 @@ func TestAWithdrawnSignInStopsWhereItIsAndReportsNothing(t *testing.T) {
 func TestWithdrawingOneRequestLeavesTheOthersAlone(t *testing.T) {
 	fx := serveFixture(t, RequestBudget)
 	reached := make(chan struct{}, 1)
-	fx.signIn.authenticate = silentGateway(reached)
+	fx.signIn.onAuthenticate(silentGateway(reached))
 	vpn := fx.ask(gpConnection("work"), 1, "vpn")
 	<-reached
 	wifi := fx.ask(wifiConnection("home-wifi", "Home", []byte("home")), 2, "802-11-wireless-security")
@@ -401,12 +469,12 @@ func TestANewRequestForTheSameSettingSupersedesTheOld(t *testing.T) {
 
 func TestASignInThatOutlastsNetworkManagersPatienceIsEndedAndSaysWhy(t *testing.T) {
 	fx := serveFixture(t, 300*time.Millisecond)
-	fx.signIn.authenticate = func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
+	fx.signIn.onAuthenticate(func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
 		// Ignores its context: the budget must not depend on the
 		// sign-in noticing.
 		time.Sleep(5 * time.Second)
 		return map[string]string{"cookie": "late"}, nil
-	}
+	})
 	start := time.Now()
 	_, err := fx.nm.getSecrets(context.Background(), fx.name, gpConnection("out-of-time"), settingPath(1), "vpn", nil, flagAllowInteraction)
 	if time.Since(start) > 2*time.Second {
@@ -483,16 +551,14 @@ func TestNobodyIsShownAFormForAnActivationNobodyIsWatching(t *testing.T) {
 
 func TestAnUnattendedSignInIsToldSo(t *testing.T) {
 	fx := serveFixture(t, RequestBudget)
-	var got bool
-	fx.signIn.authenticate = func(_ context.Context, _ openconnect.Profile, _, unattended bool, _ secrets.Prompter) (map[string]string, error) {
-		got = unattended
+	fx.signIn.onAuthenticate(func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
 		return map[string]string{"cookie": "c"}, nil
-	}
+	})
 	fx.agent.ExpectUnattended("work")
 	if _, err := fx.nm.getSecrets(context.Background(), fx.name, gpConnection("work"), settingPath(1), "vpn", nil, flagAllowInteraction); err != nil {
 		t.Fatal(err)
 	}
-	if !got {
+	if calls := fx.signIn.Calls(); len(calls) != 1 || !calls[0].unattended {
 		t.Error("the restore's sign-in was not told nobody is watching")
 	}
 }

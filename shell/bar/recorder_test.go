@@ -81,9 +81,9 @@ func TestRecorderModuleFollowsState(t *testing.T) {
 	}
 	// Drive the shared state; the module's follower picks it up.
 	ctx.Recorder.Start()
-	waitForIdleText(t, label, "0:00")
+	waitForText(t, label, "0:00")
 	ctx.Recorder.Stop()
-	waitForIdleText(t, label, "-")
+	waitForText(t, label, "-")
 }
 
 // fakeRecorderEngine hands out live handles the state machine can

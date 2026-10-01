@@ -12,9 +12,9 @@ import (
 
 func TestVPNSSOCallbackReportsTheSignInCompleted(t *testing.T) {
 	bus := dbustest.Start(t)
-	var delivered string
+	var delivered dbustest.Var[string]
 	release, err := shellipc.Serve(bus.Conn(t), shellipc.NewState(nil), shellipc.Hooks{VPNSSOCallback: func(uri string) bool {
-		delivered = uri
+		delivered.Store(uri)
 		return true
 	}})
 	if err != nil {
@@ -29,8 +29,8 @@ func TestVPNSSOCallbackReportsTheSignInCompleted(t *testing.T) {
 	if out.String() != "Sign-in completed; you can close the browser tab.\n" {
 		t.Errorf("output = %q", out.String())
 	}
-	if delivered != "globalprotectcallback:prelogin-cookie=x" {
-		t.Errorf("delivered %q", delivered)
+	if got := delivered.Load(); got != "globalprotectcallback:prelogin-cookie=x" {
+		t.Errorf("delivered %q", got)
 	}
 }
 

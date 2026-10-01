@@ -41,20 +41,6 @@ func startFakeEventStream(t *testing.T, lines []string) string {
 	return path
 }
 
-// waitForText polls the label until the expected text lands or the
-// deadline passes (the event goroutine schedules through the loop).
-func waitForText(t *testing.T, label *widget.Label, want string) {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if label.Text() == want {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	t.Fatalf("label = %q, want %q", label.Text(), want)
-}
-
 func TestWindowTitleLabel(t *testing.T) {
 	if got := windowTitleLabel("{{ title }}", "vim ~/.zshrc", "foot"); got != "vim ~/.zshrc" {
 		t.Errorf("= %q", got)

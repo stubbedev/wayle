@@ -83,10 +83,22 @@ type ModuleContext struct {
 	Theme *barTheme
 }
 
-// Invoke marshals fn onto the loop goroutine; a no-op when the context
-// is headless.
+// headlessLoop stands in for the loop goroutine of a headless context
+// (tests): work Invoke would marshal runs inline under it, so widget
+// state is touched by one goroutine at a time either way.
+var headlessLoop sync.Mutex
+
+// Invoke marshals fn onto the loop goroutine, or for a headless context
+// runs it inline under headlessLoop. A retired generation's work is
+// dropped either way.
 func (c ModuleContext) Invoke(fn func()) {
 	if c.App == nil {
+		if c.gen.retiredNow() {
+			return
+		}
+		headlessLoop.Lock()
+		defer headlessLoop.Unlock()
+		fn()
 		return
 	}
 	c.App.Invoke(func() {
@@ -158,7 +170,7 @@ func (g *mountGen) ended() <-chan struct{} {
 
 // follow runs fn for every value from ch until the module's
 // generation retires or ch closes, then stops the subscription. fn
-// runs on the loop, or inline for a headless context.
+// runs through Invoke.
 func follow[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
 	go func() {
 		if stop != nil {
@@ -171,10 +183,6 @@ func follow[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
 			case v, ok := <-ch:
 				if !ok {
 					return
-				}
-				if ctx.App == nil {
-					fn(v)
-					continue
 				}
 				ctx.Invoke(func() { fn(v) })
 			}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -11,7 +12,7 @@ import (
 )
 
 type fakeActivator struct {
-	got []string
+	got dbustest.Var[[]string]
 	err error
 }
 
@@ -19,7 +20,7 @@ func (f *fakeActivator) Activate(_ context.Context, it sni.Item, x, y int32) err
 	if x != 0 || y != 0 {
 		panic("activation must be at (0, 0)")
 	}
-	f.got = append(f.got, it.ID)
+	f.got.Update(func(ids []string) []string { return append(ids, it.ID) })
 	return f.err
 }
 
@@ -53,8 +54,8 @@ func TestSystrayCommands(t *testing.T) {
 		t.Errorf("status: %q", stdout)
 	}
 	stdout, _, code = runCaptured(t, false, "systray", "activate", "steam")
-	if code != 0 || stdout != "Activated: steam\n" || len(act.got) != 1 || act.got[0] != "steam" {
-		t.Errorf("activate: code %d %q %v", code, stdout, act.got)
+	if code != 0 || stdout != "Activated: steam\n" || !slices.Equal(act.got.Load(), []string{"steam"}) {
+		t.Errorf("activate: code %d %q %v", code, stdout, act.got.Load())
 	}
 }
 

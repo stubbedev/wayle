@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"errors"
 
 	"github.com/stubbedev/gelm/widget"
@@ -42,26 +41,17 @@ func newKeybindMode(ctx ModuleContext) (Module, error) {
 	m := &keybindModeModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.icon = moduleIcon(ctx, ctx.Config.KeybindMode.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
-	events, err := ctx.Hyprland.Events(context.Background())
+	events, err := ctx.Hyprland.Events(ctx.Life())
 	if err != nil {
 		return nil, err
 	}
-	go func() {
-		for event := range events {
-			if event.Kind != hyprland.EventSubmap {
-				continue
-			}
-			apply := func() {
-				m.submap = event.Name
-				m.render()
-			}
-			if m.ctx.App != nil {
-				m.ctx.Invoke(apply)
-			} else {
-				apply()
-			}
+	follow(ctx, events, nil, func(event hyprland.Event) {
+		if event.Kind != hyprland.EventSubmap {
+			return
 		}
-	}()
+		m.submap = event.Name
+		m.render()
+	})
 	return m, nil
 }
 

@@ -1,51 +1,32 @@
 package screenshot
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"os/exec"
-	"strings"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/stubbedev/wayle/internal/dbustest"
 )
 
-// privateBus starts a throwaway dbus-daemon and connects to it twice:
-// one connection serves, one calls.
-func privateBus(t *testing.T) (server, client *dbus.Conn) {
-	t.Helper()
-	bin, err := exec.LookPath("dbus-daemon")
-	if err != nil {
-		t.Skip("no dbus-daemon")
-	}
-	cmd := exec.Command(bin, "--session", "--nofork", "--print-address=1")
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
-	addr, err := bufio.NewReader(out).ReadString('\n')
-	if err != nil {
-		t.Fatal(err)
-	}
-	dial := func() *dbus.Conn {
-		conn, err := dbus.Connect(strings.TrimSpace(addr))
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = conn.Close() })
-		return conn
-	}
-	return dial(), dial()
+// switchCapturer is a host whose failure the test flips while the
+// daemon serves it from the bus goroutine.
+type switchCapturer struct{ err dbustest.Var[error] }
+
+func (s *switchCapturer) Capture(mode, target string) (string, error) {
+	return fakeCapturer{err: s.err.Load()}.Capture(mode, target)
+}
+
+func (s *switchCapturer) PickColor() (float64, float64, float64, error) {
+	return fakeCapturer{err: s.err.Load()}.PickColor()
 }
 
 func TestDaemonOverTheBus(t *testing.T) {
-	server, client := privateBus(t)
-	d := &Daemon{host: fakeCapturer{}}
+	bus := dbustest.Start(t)
+	server, client := bus.Conn(t), bus.Conn(t)
+	host := &switchCapturer{}
+	d := &Daemon{host: host}
 	release, err := d.Export(server)
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +48,7 @@ func TestDaemonOverTheBus(t *testing.T) {
 	}
 
 	// Host errors arrive as Failed replies carrying the message.
-	d.host = fakeCapturer{err: errors.New("window capture not supported on this compositor")}
+	host.err.Store(errors.New("window capture not supported on this compositor"))
 	_, err = c.Capture(context.Background(), "window", "")
 	var dbusErr dbus.Error
 	if !errors.As(err, &dbusErr) || dbusErr.Name != "org.freedesktop.DBus.Error.Failed" ||

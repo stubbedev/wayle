@@ -17,7 +17,7 @@ default:
 go := "go"
 
 # Go release gate: format, lint, test — the mirror of `just check`.
-go-check: go-fmt go-lint go-test
+go-check: go-fmt go-lint go-test go-race
 
 # Lint every Go package; settings live in .golangci.yml (gelm parity).
 go-lint:
@@ -27,6 +27,11 @@ go-lint:
 # Test every Go package.
 go-test:
     {{go}} test ./...
+
+# Test every Go package under the race detector. It needs cgo (a C
+# toolchain), which the shipped CGO_ENABLED=0 build never does.
+go-race:
+    CGO_ENABLED=1 {{go}} test -race ./...
 
 # Format every Go package in place (gofumpt via golangci-lint).
 go-fmt:

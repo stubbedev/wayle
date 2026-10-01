@@ -194,9 +194,9 @@ func TestAFailedAttemptKeepsItsReason(t *testing.T) {
 
 func TestTheGatewaysOwnReasonOutranksNetworkManagersGenericOne(t *testing.T) {
 	fx := startService(t, withProfiles(gpConnection("work")))
-	fx.signIn.authenticate = func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
+	fx.signIn.onAuthenticate(func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
 		return nil, &secrets.AuthenticationFailedError{Reason: "Invalid username or password"}
-	}
+	})
 	must(t, fx.svc.VPN.Connect(t.Context(), "work"))
 	active := fx.activeFor(t, "work")
 	// NM asks the agent, which fails the sign-in and publishes why.
@@ -330,8 +330,8 @@ func TestAWireGuardProfileMadeHereIsItsUsersOwn(t *testing.T) {
 	}
 	must(t, fx.svc.VPN.Remove(t.Context(), uuid))
 	waitFor(t, "the deleted profile to go", func() bool { _, ok := fx.svc.VPN.Get(uuid); return !ok })
-	if !slices.Equal(fx.signIn.forgotten, []string{uuid}) {
-		t.Errorf("forgotten = %v; a deleted profile's cache must go with it", fx.signIn.forgotten)
+	if !slices.Equal(fx.signIn.Forgotten(), []string{uuid}) {
+		t.Errorf("forgotten = %v; a deleted profile's cache must go with it", fx.signIn.Forgotten())
 	}
 }
 
@@ -386,8 +386,8 @@ func TestUpdateRewritesTheProfileItIsEditing(t *testing.T) {
 	if err := fx.svc.VPN.Update(t.Context(), "gone", WireGuard, "x", nil); err == nil {
 		t.Error("updating a missing profile succeeded")
 	}
-	if err := fx.svc.VPN.Remove(t.Context(), "gone"); err == nil || len(fx.signIn.forgotten) != 0 {
-		t.Errorf("removing a missing profile: err=%v forgotten=%v", err, fx.signIn.forgotten)
+	if err := fx.svc.VPN.Remove(t.Context(), "gone"); err == nil || len(fx.signIn.Forgotten()) != 0 {
+		t.Errorf("removing a missing profile: err=%v forgotten=%v", err, fx.signIn.Forgotten())
 	}
 }
 
@@ -396,12 +396,12 @@ func TestTheSSOCallbackReachesAWaitingSignIn(t *testing.T) {
 	if fx.svc.VPN.DeliverSSOCallback("globalprotectcallback:x") {
 		t.Error("a callback with nothing waiting was taken")
 	}
-	fx.signIn.waiting = true
+	fx.signIn.setWaiting()
 	if !fx.svc.VPN.DeliverSSOCallback("globalprotectcallback:y") {
 		t.Error("the waiting sign-in did not take the callback")
 	}
-	if !slices.Equal(fx.signIn.callbacks, []string{"globalprotectcallback:x", "globalprotectcallback:y"}) {
-		t.Errorf("callbacks = %v", fx.signIn.callbacks)
+	if !slices.Equal(fx.signIn.Callbacks(), []string{"globalprotectcallback:x", "globalprotectcallback:y"}) {
+		t.Errorf("callbacks = %v", fx.signIn.Callbacks())
 	}
 }
 
@@ -414,11 +414,9 @@ func (fx *serviceFixture) sleep(t *testing.T, start bool) {
 
 func TestATunnelUpAtSuspendIsBroughtBackUnattendedOnWake(t *testing.T) {
 	fx := startService(t, withProfiles(gpConnection("work"), gpConnection("idle")))
-	var unattended []bool
-	fx.signIn.authenticate = func(_ context.Context, _ openconnect.Profile, _, u bool, _ secrets.Prompter) (map[string]string, error) {
-		unattended = append(unattended, u)
+	fx.signIn.onAuthenticate(func(context.Context, openconnect.Profile, bool, bool, secrets.Prompter) (map[string]string, error) {
 		return map[string]string{"cookie": "c"}, nil
-	}
+	})
 	up := fx.nm.startActive("work", ActiveActivated)
 	fx.waitRow(t, "work", "connected", func(r VPN) bool { return r.State == VPNConnected })
 
@@ -438,8 +436,8 @@ func TestATunnelUpAtSuspendIsBroughtBackUnattendedOnWake(t *testing.T) {
 	}
 	// The activation was said to have nobody watching.
 	_, _ = fx.nm.getSecrets(t.Context(), fx.conn.Names()[0], gpConnection("work"), settingPath(1), "vpn", nil, flagAllowInteraction)
-	if !slices.Equal(unattended, []bool{true}) {
-		t.Errorf("unattended = %v", unattended)
+	if calls := fx.signIn.Calls(); len(calls) != 1 || !calls[0].unattended {
+		t.Errorf("sign-ins = %+v, want one unattended", calls)
 	}
 }
 

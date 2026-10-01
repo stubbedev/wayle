@@ -129,8 +129,6 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [ ] packaging (nix package, systemd unit, portal files) still points
       at the Rust binaries
 - [ ] drop the go.mod replace once gelm tags a release
-- [ ] `go test -race ./shell/bar` reports races in the idle-inhibit and
-      keybind-mode tests; the gate runs without -race
 - [x] module lifetime: each bar is a mount generation; `follow` and
       `ModuleContext.Life` end subscriptions and tickers with it
 

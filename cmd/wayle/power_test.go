@@ -3,21 +3,37 @@ package main
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stubbedev/wayle/internal/dbustest"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 )
 
-// fakeProfiles is power-profiles-daemon as the Go service sees it.
+// fakeProfiles is power-profiles-daemon as the Go service sees it. The
+// daemon reads it from the bus goroutine, so the test changes it
+// through update.
 type fakeProfiles struct {
+	mu     sync.Mutex
 	snap   powerprofiles.Snapshot
 	setErr error
 }
 
-func (f *fakeProfiles) Read(context.Context) (powerprofiles.Snapshot, error) { return f.snap, nil }
+func (f *fakeProfiles) Read(context.Context) (powerprofiles.Snapshot, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.snap, nil
+}
+
+func (f *fakeProfiles) update(fn func(*fakeProfiles)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fn(f)
+}
 
 func (f *fakeProfiles) SetActive(_ context.Context, profile string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.setErr != nil {
 		return f.setErr
 	}
@@ -63,7 +79,7 @@ func TestPowerCommandsAgainstTheDaemon(t *testing.T) {
 		}
 	}
 
-	src.snap.PerformanceDegraded = "lap-detected"
+	src.update(func(f *fakeProfiles) { f.snap.PerformanceDegraded = "lap-detected" })
 	if stdout, _, _ := runCaptured(t, false, "power", "status"); stdout != "Active profile: balanced\nPerformance degraded: lap-detected\n" {
 		t.Errorf("degraded status: %q", stdout)
 	}
@@ -86,7 +102,7 @@ func TestPowerErrorsMatchRust(t *testing.T) {
 	if code != 1 || stderr != "Error: Failed to set profile: Invalid profile: turbo. Expected: power-saver, balanced, performance\n" {
 		t.Errorf("invalid profile: code %d %q", code, stderr)
 	}
-	src.setErr = errors.New("permission denied")
+	src.update(func(f *fakeProfiles) { f.setErr = errors.New("permission denied") })
 	_, stderr, code = runCaptured(t, false, "power", "cycle")
 	if code != 1 || stderr != "Error: Failed to cycle profile: permission denied\n" {
 		t.Errorf("set failure: code %d %q", code, stderr)

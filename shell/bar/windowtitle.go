@@ -1,7 +1,6 @@
 package bar
 
 import (
-	"context"
 	"errors"
 	"strings"
 
@@ -39,26 +38,17 @@ func newWindowTitle(ctx ModuleContext) (Module, error) {
 	}
 	m := &windowTitleModule{ctx: ctx, conn: ctx.Hyprland}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
-	events, err := ctx.Hyprland.Events(context.Background())
+	events, err := ctx.Hyprland.Events(ctx.Life())
 	if err != nil {
 		return nil, err
 	}
-	go func() {
-		for event := range events {
-			if event.Kind != hyprland.EventActiveWindow {
-				continue
-			}
-			apply := func() {
-				m.title, m.appID = event.Title, event.Class
-				m.render()
-			}
-			if m.ctx.App != nil {
-				m.ctx.Invoke(apply)
-			} else {
-				apply()
-			}
+	follow(ctx, events, nil, func(event hyprland.Event) {
+		if event.Kind != hyprland.EventActiveWindow {
+			return
 		}
-	}()
+		m.title, m.appID = event.Title, event.Class
+		m.render()
+	})
 	return m, nil
 }
 

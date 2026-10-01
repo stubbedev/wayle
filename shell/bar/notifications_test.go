@@ -3,7 +3,6 @@ package bar
 import (
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/notifications"
@@ -74,21 +73,15 @@ func TestNotificationModuleFollowsService(t *testing.T) {
 
 	// A notification flips the count and the icon.
 	ctx.Notifications.Notify("app", 0, "", "hello", "", nil, 0)
-	waitForIdleText(t, label, "01")
+	waitForText(t, label, "01")
 	if got := icon.Name(); got != cfg.Notification.IconUnread {
 		t.Errorf("unread icon = %q", got)
 	}
 
 	// DND takes priority over the count and clears the popups.
 	ctx.Notifications.SetDND(true)
-	waitForIdleText(t, label, "01")
-	deadline := time.Now().Add(2 * time.Second)
-	for icon.Name() != cfg.Notification.IconDnd && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
-	if got := icon.Name(); got != cfg.Notification.IconDnd {
-		t.Errorf("dnd icon = %q", got)
-	}
+	waitForText(t, label, "01")
+	waitHeadless(t, "the dnd icon", func() bool { return icon.Name() == cfg.Notification.IconDnd })
 }
 
 func TestNotificationModuleRequiresService(t *testing.T) {

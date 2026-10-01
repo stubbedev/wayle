@@ -10,11 +10,12 @@ import (
 
 func TestVPNSSOCallbackReachesTheWaitingSignIn(t *testing.T) {
 	bus := dbustest.Start(t)
-	var got []string
-	waiting := true
+	var got dbustest.Var[[]string]
+	var waiting dbustest.Var[bool]
+	waiting.Store(true)
 	release, err := Serve(bus.Conn(t), NewState(nil), Hooks{VPNSSOCallback: func(uri string) bool {
-		got = append(got, uri)
-		return waiting
+		got.Update(func(s []string) []string { return append(s, uri) })
+		return waiting.Load()
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -24,14 +25,14 @@ func TestVPNSSOCallbackReachesTheWaitingSignIn(t *testing.T) {
 	if err := VPNSSOCallback(t.Context(), client, "globalprotectcallback:abc"); err != nil {
 		t.Fatalf("a waiting sign-in refused the callback: %v", err)
 	}
-	waiting = false
+	waiting.Store(false)
 	err = VPNSSOCallback(t.Context(), client, "globalprotectcallback:stale")
 	want := "org.freedesktop.DBus.Error.Failed: no VPN browser sign-in is waiting for a callback"
 	if err == nil || err.Error() != want {
 		t.Errorf("stale callback: err = %v, want %q", err, want)
 	}
-	if len(got) != 2 || got[0] != "globalprotectcallback:abc" {
-		t.Errorf("handler saw %v", got)
+	if seen := got.Load(); len(seen) != 2 || seen[0] != "globalprotectcallback:abc" {
+		t.Errorf("handler saw %v", seen)
 	}
 }
 
@@ -59,9 +60,9 @@ func TestVPNSSOCallbackWithNoShellRunningIsAnError(t *testing.T) {
 // daemon's Failed error.
 func TestLockMethod(t *testing.T) {
 	bus := dbustest.Start(t)
-	ready := false
-	calls := 0
-	release, err := Serve(bus.Conn(t), NewState(nil), Hooks{Lock: func() bool { calls++; return ready }})
+	var ready dbustest.Var[bool]
+	var calls dbustest.Var[int]
+	release, err := Serve(bus.Conn(t), NewState(nil), Hooks{Lock: func() bool { calls.Update(func(n int) int { return n + 1 }); return ready.Load() }})
 	if err != nil {
 		t.Fatalf("Serve: %v", err)
 	}
@@ -71,12 +72,12 @@ func TestLockMethod(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "lock screen not ready") {
 		t.Fatalf("Lock before ready = %v, want the not-ready failure", err)
 	}
-	ready = true
+	ready.Store(true)
 	if err := Lock(t.Context(), client); err != nil {
 		t.Fatalf("Lock when ready: %v", err)
 	}
-	if calls != 2 {
-		t.Errorf("handler calls = %d, want 2", calls)
+	if n := calls.Load(); n != 2 {
+		t.Errorf("handler calls = %d, want 2", n)
 	}
 }
 

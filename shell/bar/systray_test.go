@@ -245,12 +245,9 @@ func TestSystrayFollowsTheStore(t *testing.T) {
 	}
 	store.Put(&sni.Item{Bus: ":1.1", Path: "/a", ID: "shown", IconName: "one"})
 	store.Put(&sni.Item{Bus: ":1.2", Path: "/b", ID: "hidden-app"})
-	deadline := time.Now().Add(time.Second)
-	for len(m.root.Children()) != 1 && time.Now().Before(deadline) {
-		time.Sleep(2 * time.Millisecond)
-	}
-	if len(m.root.Children()) != 1 || !m.root.Visible() {
-		t.Fatalf("buttons = %d, want the one not blacklisted", len(m.root.Children()))
+	waitHeadless(t, "the one button not blacklisted", func() bool { return len(m.root.Children()) == 1 })
+	if !onHeadlessLoop(m.root.Visible) {
+		t.Fatal("a tray with a button should show")
 	}
 }
 

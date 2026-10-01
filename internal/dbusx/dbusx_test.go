@@ -22,11 +22,11 @@ const (
 	path  = dbus.ObjectPath("/com/wayle/Test")
 )
 
-func serve(t *testing.T, conn *dbus.Conn, count *uint32) func() {
+func serve(t *testing.T, conn *dbus.Conn, count *dbustest.Var[uint32]) func() {
 	t.Helper()
 	release, err := dbusx.Serve(conn, dbusx.Service{
 		Name: name, Path: path, Interface: iface, Methods: echo{},
-		Properties: dbusx.Getters{"Count": func() any { return *count }},
+		Properties: dbusx.Getters{"Count": func() any { return count.Load() }},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +36,8 @@ func serve(t *testing.T, conn *dbus.Conn, count *uint32) func() {
 
 func TestServeMethodsAndLiveProperties(t *testing.T) {
 	dbustest.Session(t)
-	count := uint32(1)
+	var count dbustest.Var[uint32]
+	count.Store(1)
 	defer serve(t, dbustest.SessionConn(t), &count)()
 
 	obj := dbustest.SessionConn(t).Object(name, path)
@@ -52,7 +53,7 @@ func TestServeMethodsAndLiveProperties(t *testing.T) {
 
 	// Getters are computed per read, like zbus property getters.
 	for _, want := range []uint32{1, 5} {
-		count = want
+		count.Store(want)
 		v, err := obj.GetProperty(iface + ".Count")
 		if err != nil || v.Value() != want {
 			t.Fatalf("Count = %v, %v; want %d", v, err, want)
@@ -66,7 +67,7 @@ func TestServeMethodsAndLiveProperties(t *testing.T) {
 
 func TestServeRejectsUnknownAndWrites(t *testing.T) {
 	dbustest.Session(t)
-	count := uint32(0)
+	var count dbustest.Var[uint32]
 	defer serve(t, dbustest.SessionConn(t), &count)()
 	obj := dbustest.SessionConn(t).Object(name, path)
 
@@ -83,7 +84,7 @@ func TestServeRejectsUnknownAndWrites(t *testing.T) {
 
 func TestServeRefusesAnOwnedName(t *testing.T) {
 	dbustest.Session(t)
-	count := uint32(0)
+	var count dbustest.Var[uint32]
 	defer serve(t, dbustest.SessionConn(t), &count)()
 	_, err := dbusx.Serve(dbustest.SessionConn(t), dbusx.Service{
 		Name: name, Path: path, Interface: iface, Methods: echo{}, Properties: dbusx.Getters{},

@@ -171,10 +171,6 @@ func (c *customUpdates) dispatch(id, output string) {
 	if m == nil {
 		return
 	}
-	if m.ctx.App == nil {
-		m.apply(output)
-		return
-	}
 	m.ctx.Invoke(func() { m.apply(output) })
 }
 

@@ -89,10 +89,10 @@ func TestShell1DaemonProperties(t *testing.T) {
 
 func TestShell1HooksAnswer(t *testing.T) {
 	dbustest.Session(t)
-	var uri string
+	var uri dbustest.Var[string]
 	release, err := Serve(dbustest.SessionConn(t), NewState(nil), Hooks{
 		Lock:           func() bool { return true },
-		VPNSSOCallback: func(u string) bool { uri = u; return true },
+		VPNSSOCallback: func(u string) bool { uri.Store(u); return true },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -102,8 +102,8 @@ func TestShell1HooksAnswer(t *testing.T) {
 	if err := obj.Call(ServiceName+".Lock", 0).Err; err != nil {
 		t.Errorf("Lock: %v", err)
 	}
-	if err := obj.Call(ServiceName+".VpnSsoCallback", 0, "globalprotectcallback:ok").Err; err != nil || uri != "globalprotectcallback:ok" {
-		t.Errorf("VpnSsoCallback: %v %q", err, uri)
+	if err := obj.Call(ServiceName+".VpnSsoCallback", 0, "globalprotectcallback:ok").Err; err != nil || uri.Load() != "globalprotectcallback:ok" {
+		t.Errorf("VpnSsoCallback: %v %q", err, uri.Load())
 	}
 }
 
