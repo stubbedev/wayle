@@ -5,6 +5,7 @@ package popups
 
 import (
 	"math"
+	"slices"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/stubbedev/wayle/service/notifications"
 	"github.com/stubbedev/wayle/shell/layering"
 	"github.com/stubbedev/wayle/shell/notifyui"
+	"github.com/stubbedev/wayle/shell/reveal"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -46,15 +48,19 @@ type Popups struct {
 	mu    sync.Mutex
 	win   *app.LayerWindow
 	root  *widget.Box
+	// cards are the live popups by id; stack is every card on screen
+	// top to bottom, those still playing their exit included.
 	cards map[uint32]*card
-	order []uint32
+	stack []*card
 }
 
 // card is one popup (NotificationPopupCard): the icon, the app and
 // age over the summary and the body, the close button, and the action
 // rows.
 type card struct {
-	id      uint32
+	id uint32
+	// rev plays the card's enter and exit (the WayleRevealer around it).
+	rev     *widget.Revealer
 	root    *widget.Box
 	iconBox *widget.Box
 	app     *widget.Label
@@ -93,6 +99,7 @@ func (p *Popups) SetConfig(cfg *config.Config) {
 	win := p.win
 	p.win, p.root = nil, nil
 	p.cards = make(map[uint32]*card)
+	p.stack = nil
 	p.mu.Unlock()
 	if win != nil {
 		win.Close()
@@ -113,32 +120,68 @@ func (p *Popups) Run() {
 	}
 }
 
-// sync reconciles the visible card stack with the service's popup set.
-// Headless construction tracks the card set; only the window mapping
-// needs the application.
+// sync reconciles the card stack with the service's popup set
+// (reconcile): a card no longer listed plays its exit and leaves the
+// stack once it has; a new one enters at the top (newest first) or the
+// bottom (oldest first), the insert_new_cards prepend. Headless
+// construction tracks the cards; only the window needs the application.
 func (p *Popups) sync() {
 	visible := p.svc.Popups()
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	if limit := int(p.cfg.Notification.PopupMaxVisible); len(visible) > limit {
 		visible = visible[:limit]
 	}
-	order := make([]uint32, 0, len(visible))
 	live := make(map[uint32]bool, len(visible))
 	for _, n := range visible {
 		live[n.ID] = true
-		order = append(order, n.ID)
-		if _, ok := p.cards[n.ID]; !ok {
-			p.cards[n.ID] = p.newCard(n)
-		}
 	}
-	for id := range p.cards {
+	var leaving, entering []*card
+	for id, c := range p.cards {
 		if !live[id] {
 			delete(p.cards, id)
+			leaving = append(leaving, c)
 		}
 	}
-	// The service lists popups newest first.
-	p.order = order
+	newestFirst := p.cfg.Notification.PopupStackingOrder != config.StackingOrderOldestFirst
+	// The service lists popups newest first; inserting the new ones
+	// oldest first puts the newest on top of a newest-first stack and
+	// at the bottom of an oldest-first one.
+	for _, n := range slices.Backward(visible) {
+		if _, ok := p.cards[n.ID]; ok {
+			continue
+		}
+		c := p.newCard(n)
+		p.cards[n.ID] = c
+		entering = append(entering, c)
+		if newestFirst {
+			p.stack = slices.Insert(p.stack, 0, c)
+		} else {
+			p.stack = append(p.stack, c)
+		}
+	}
+	p.layoutLocked()
+	anims := p.cfg.Animations
+	p.mu.Unlock()
+	// Transitions start unlocked: an exit that lands at once (animations
+	// off) drops its card through dropCard, which takes the lock.
+	for _, c := range leaving {
+		reveal.Hide(c.rev, anims, config.AnimNotifications, func() { p.dropCard(c) })
+	}
+	for _, c := range entering {
+		reveal.Show(c.rev, anims, config.AnimNotifications)
+	}
+}
+
+// dropCard takes a card whose exit has played off the stack, and the
+// window down with the last one.
+func (p *Popups) dropCard(c *card) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	i := slices.Index(p.stack, c)
+	if i < 0 {
+		return
+	}
+	p.stack = slices.Delete(p.stack, i, i+1)
 	p.layoutLocked()
 }
 
@@ -229,7 +272,19 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 			p.svc.ReleasePopup(id)
 		})
 	}
+	c.rev = widget.NewRevealer(c.root)
+	c.rev.SetGenieEdge(reveal.GenieEdge(popupAtTop(cfg.PopupPosition)))
 	return c
+}
+
+// popupAtTop is whether the popups sit along the top edge, the edge a
+// genie collapses toward (genie_edge).
+func popupAtTop(position config.PopupPosition) bool {
+	switch position {
+	case config.PopupPositionTopLeft, config.PopupPositionTopCenter, config.PopupPositionTopRight:
+		return true
+	}
+	return false
 }
 
 // actionRows is setup_action_buttons: the non-default actions, three
@@ -284,9 +339,11 @@ func (p *Popups) invokeDefault(id uint32) {
 	p.closeCard(id)
 }
 
-// layoutLocked rebuilds the root stack. The caller holds mu.
+// layoutLocked rebuilds the root from the stack, mapping the window for
+// the first card and closing it after the last has gone. The caller
+// holds mu.
 func (p *Popups) layoutLocked() {
-	if len(p.cards) == 0 {
+	if len(p.stack) == 0 {
 		if p.win != nil {
 			win := p.win
 			p.win = nil
@@ -309,25 +366,9 @@ func (p *Popups) layoutLocked() {
 		return
 	}
 	p.root.Clear()
-	for _, id := range p.stackOrder() {
-		if c, ok := p.cards[id]; ok {
-			p.root.Append(c.root, false)
-		}
+	for _, c := range p.stack {
+		p.root.Append(c.rev, false)
 	}
-}
-
-// stackOrder is the top-to-bottom card order: newest-first prepends
-// each new card (the service's newest-first list as is), oldest-first
-// appends it (the list reversed) — insert_new_cards's use_prepend.
-func (p *Popups) stackOrder() []uint32 {
-	if p.cfg.Notification.PopupStackingOrder != config.StackingOrderOldestFirst {
-		return p.order
-	}
-	ids := make([]uint32, len(p.order))
-	for i, id := range p.order {
-		ids[len(p.order)-1-i] = id
-	}
-	return ids
 }
 
 // ensureWindow maps the popup surface at the configured position,
@@ -424,4 +465,16 @@ func (p *Popups) Visible() int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return len(p.cards)
+}
+
+// stackOrder is the on-screen stack top to bottom by id, cards still
+// playing their exit included (tests).
+func (p *Popups) stackOrder() []uint32 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	ids := make([]uint32, len(p.stack))
+	for i, c := range p.stack {
+		ids[i] = c.id
+	}
+	return ids
 }

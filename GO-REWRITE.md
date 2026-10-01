@@ -104,8 +104,8 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       action, the urgency bar, popup layer/margins/shadow keys (cards
       styled by the shell stylesheet; layers through shell/layering with
       tearing mode)
-- [ ] notification popup enter/exit animations (the Rust WayleRevealer
-      with the notifications animation surface)
+- [x] notification popup enter/exit animations (gelm Revealer through
+      shell/reveal; a leaving card keeps its place until its exit lands)
 - [x] format strings render through internal/jinja (minijinja-checked)
 - [x] the custom module: icon-map/icon-names, color-map, class-format,
       tooltips, on-action, restart policies

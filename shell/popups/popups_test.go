@@ -2,6 +2,7 @@ package popups
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -85,19 +86,84 @@ func TestSyncHonorsStackingOrder(t *testing.T) {
 	b := svc.Notify("app", 0, "", "Second", "", nil, 0)
 	p.sync()
 	// Oldest-first appends each new card: the oldest sits on top.
-	p.mu.Lock()
-	got := p.stackOrder()
-	p.mu.Unlock()
-	if len(got) != 2 || got[0] != a || got[1] != b {
+	if got := p.stackOrder(); !slices.Equal(got, []uint32{a, b}) {
 		t.Errorf("oldest-first order = %v, want [%d %d]", got, a, b)
 	}
+	c := svc.Notify("app", 0, "", "Third", "", nil, 0)
+	p.sync()
+	if got := p.stackOrder(); !slices.Equal(got, []uint32{a, b, c}) {
+		t.Errorf("oldest-first after a third = %v, want it at the bottom", got)
+	}
+
 	// Newest-first (the default) prepends: the newest sits on top.
-	p.cfg.Notification.PopupStackingOrder = config.StackingOrderNewestFirst
-	p.mu.Lock()
-	got = p.stackOrder()
-	p.mu.Unlock()
-	if len(got) != 2 || got[0] != b || got[1] != a {
-		t.Errorf("newest-first order = %v, want [%d %d]", got, b, a)
+	p, svc = newTestPopups(t, config.DefaultsNotification())
+	a = svc.Notify("app", 0, "", "First", "", nil, 0)
+	b = svc.Notify("app", 0, "", "Second", "", nil, 0)
+	p.sync()
+	c = svc.Notify("app", 0, "", "Third", "", nil, 0)
+	p.sync()
+	if got := p.stackOrder(); !slices.Equal(got, []uint32{c, b, a}) {
+		t.Errorf("newest-first order = %v, want [%d %d %d]", got, c, b, a)
+	}
+}
+
+// TestCardsPlayTheirExit pins the exit: a dismissed card leaves the
+// live set at once but stays on the stack, in its place, until its
+// transition lands; with animations off it goes at once.
+func TestCardsPlayTheirExit(t *testing.T) {
+	p, svc := newTestPopups(t, config.DefaultsNotification())
+	a := svc.Notify("app", 0, "", "First", "", nil, 0)
+	b := svc.Notify("app", 0, "", "Second", "", nil, 0)
+	p.sync()
+	if rev := cardOf(t, p, b).rev; !rev.Revealed() || rev.Transition() != widget.RevealFade {
+		t.Errorf("a new card: revealed %v, transition %v; want entering with the configured fade", rev.Revealed(), rev.Transition())
+	}
+	leaving := cardOf(t, p, b)
+	svc.DismissPopup(b)
+	p.sync()
+	if got := p.Visible(); got != 1 {
+		t.Errorf("live cards = %d, want the dismissed one gone from the live set", got)
+	}
+	if got := p.stackOrder(); !slices.Equal(got, []uint32{b, a}) {
+		t.Fatalf("stack mid-exit = %v, want the leaving card still in its place", got)
+	}
+	if leaving.rev.Revealed() {
+		t.Error("the dismissed card is not exiting")
+	}
+	leaving.rev.Finish()
+	if got := p.stackOrder(); !slices.Equal(got, []uint32{a}) {
+		t.Errorf("stack after the exit = %v, want [%d]", got, a)
+	}
+
+	// Disabled animations snap: the card goes with the sync.
+	p.cfg.Animations.Enabled = false
+	svc.DismissPopup(a)
+	p.sync()
+	if got := p.stackOrder(); len(got) != 0 {
+		t.Errorf("stack with animations off = %v, want empty at once", got)
+	}
+}
+
+func TestCardTransitionFollowsConfig(t *testing.T) {
+	ncfg := config.DefaultsNotification()
+	ncfg.PopupPosition = config.PopupPositionTopCenter
+	p, svc := newTestPopups(t, ncfg)
+	enter, exit := config.AnimationGenie, config.AnimationSlideRight
+	p.cfg.Animations.Notifications.Enter = &enter
+	p.cfg.Animations.Notifications.Exit = &exit
+	id := svc.Notify("app", 0, "", "One", "", nil, 0)
+	p.sync()
+	rev := cardOf(t, p, id).rev
+	if rev.Transition() != widget.RevealGenie {
+		t.Errorf("enter transition = %v, want the per-surface genie", rev.Transition())
+	}
+	svc.DismissPopup(id)
+	p.sync()
+	if rev.Transition() != widget.RevealSlideRight {
+		t.Errorf("exit transition = %v, want the per-surface slide-right", rev.Transition())
+	}
+	if !popupAtTop(config.PopupPositionTopCenter) || popupAtTop(config.PopupPositionCenterLeft) {
+		t.Error("genie edge: top positions collapse up, the rest down")
 	}
 }
 
