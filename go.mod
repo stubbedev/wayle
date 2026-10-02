@@ -8,7 +8,8 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/neurlang/wayland v0.4.4
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/gelm v0.0.0-20261002013751-34528c1a59b4
+	github.com/stubbedev/gelm v0.0.0-20261002024326-7d6f7bc8adf3
+	github.com/unxed/xkb-go v0.1.8
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.46.0
@@ -27,7 +28,6 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
-	github.com/unxed/xkb-go v0.1.8 // indirect
 	github.com/yalue/native_endian v1.0.2 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	modernc.org/libc v1.75.7 // indirect

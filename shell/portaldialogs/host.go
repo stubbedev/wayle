@@ -163,7 +163,10 @@ func (h *Dialogs) label(text, class string) *widget.Label {
 }
 
 func (h *Dialogs) button(text, class string, onClick func()) *widget.Button {
-	b := widget.NewButton(credential.Center(h.label(text, class+"-label")), 0, 0)
+	l := h.label(text, class+"-label")
+	l.SetWrap(false)
+	l.SetAlignment(render.AlignCenter)
+	b := widget.NewButton(l, 0, 0)
 	b.AddClass(class)
 	b.OnClick = onClick
 	return b
@@ -269,6 +272,8 @@ func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, co
 		list.Append(b, false)
 		rows = append(rows, row{strings.ToLower(name), b})
 	}
+	// The rows pack at the top; the spacer takes the viewport's slack.
+	list.Append(widget.NewSpacer(0, 0), true)
 	search := widget.NewEntry(h.d.Font, 13, h.d.Ink)
 	search.AddClass("portal-dialog-search")
 	search.SetPlaceholder("Search applications…")
