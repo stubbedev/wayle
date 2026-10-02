@@ -65,11 +65,9 @@ func (k *kit) entry() *widget.Entry {
 	return e
 }
 
-// icon is a theme icon the stylesheet sizes and tints, matching GTK's
-// `image` selectors.
+// icon is a theme icon the stylesheet sizes and tints (an image node).
 func (k *kit) icon(name string, classes ...string) *widget.Icon {
 	ic := widget.NewThemeIcon(name, 16)
-	ic.SetElement("image")
 	ic.AddClass(classes...)
 	return ic
 }

@@ -63,7 +63,6 @@ func newBarButton(ctx ModuleContext, icon *widget.Icon, label *widget.Label) *ba
 	b.iconBox = widget.NewBox(widget.Row, 0, 0)
 	b.iconBox.AddClass("icon-container")
 	if icon != nil {
-		icon.SetElement("image")
 		b.icon = icon
 		b.iconBox.Append(icon, true)
 	}

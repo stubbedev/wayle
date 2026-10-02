@@ -134,6 +134,7 @@ func TestBarButtonTreeAndClasses(t *testing.T) {
 	icon := widget.NewThemeIcon("x-symbolic", 16)
 	b := newBarButton(ctx, icon, label)
 	b.configure(batteryButton(cfg), config.ClickConfig{}, nil)
+	b.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 40}})
 	if b.Element() != "menubutton" || b.toggle.Element() != "button" || !b.toggle.HasClass("toggle") {
 		t.Fatal("the menubutton > button.toggle spine")
 	}
