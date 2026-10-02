@@ -32,18 +32,27 @@ func InvalidArgs(msg string) *dbus.Error { return dbus.NewError(ErrInvalidArgs, 
 // value godbus can marshal; the D-Bus signature is taken from it.
 type Getters map[string]func() any
 
-// properties is org.freedesktop.DBus.Properties for one interface.
+// properties is org.freedesktop.DBus.Properties for the interfaces of
+// one object.
 type properties struct {
-	iface   string
-	getters Getters
+	ifaces map[string]Getters
+}
+
+func (p *properties) of(iface string) (Getters, *dbus.Error) {
+	getters, ok := p.ifaces[iface]
+	if !ok {
+		return nil, dbus.NewError(ErrUnknownIface, []any{"Unknown interface '" + iface + "'"})
+	}
+	return getters, nil
 }
 
 // Get returns one property.
 func (p *properties) Get(iface, name string) (dbus.Variant, *dbus.Error) {
-	if iface != p.iface {
-		return dbus.Variant{}, dbus.NewError(ErrUnknownIface, []any{"Unknown interface '" + iface + "'"})
+	getters, derr := p.of(iface)
+	if derr != nil {
+		return dbus.Variant{}, derr
 	}
-	get, ok := p.getters[name]
+	get, ok := getters[name]
 	if !ok {
 		return dbus.Variant{}, dbus.NewError(ErrUnknownProperty, []any{"Unknown property '" + name + "'"})
 	}
@@ -52,11 +61,12 @@ func (p *properties) Get(iface, name string) (dbus.Variant, *dbus.Error) {
 
 // GetAll returns every property.
 func (p *properties) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error) {
-	if iface != p.iface {
-		return nil, dbus.NewError(ErrUnknownIface, []any{"Unknown interface '" + iface + "'"})
+	getters, derr := p.of(iface)
+	if derr != nil {
+		return nil, derr
 	}
-	out := make(map[string]dbus.Variant, len(p.getters))
-	for name, get := range p.getters {
+	out := make(map[string]dbus.Variant, len(getters))
+	for name, get := range getters {
 		out[name] = dbus.MakeVariant(get())
 	}
 	return out, nil
@@ -81,36 +91,71 @@ type Service struct {
 	Properties Getters
 }
 
+// Interface is one D-Bus interface of an object: its methods (an
+// object whose exported methods each end in a *dbus.Error result) and
+// its read-only properties.
+type Interface struct {
+	Name       string
+	Methods    any
+	Properties Getters
+}
+
+// Export puts ifaces at path on conn, with one Properties object serving
+// all of their properties and introspection listing them all, as zbus's
+// object_server().at does for each interface it mounts at a path. The
+// returned unexport removes them again (a Request or Session object
+// ending).
+func Export(conn *dbus.Conn, path dbus.ObjectPath, ifaces ...Interface) (unexport func(), err error) {
+	props := &properties{ifaces: map[string]Getters{}}
+	node := &introspect.Node{Name: string(path), Interfaces: []introspect.Interface{
+		introspect.IntrospectData,
+		{Name: "org.freedesktop.DBus.Properties", Methods: introspect.Methods(props)},
+	}}
+	names := []string{"org.freedesktop.DBus.Properties", "org.freedesktop.DBus.Introspectable"}
+	for _, iface := range ifaces {
+		if err := conn.Export(iface.Methods, path, iface.Name); err != nil {
+			return nil, fmt.Errorf("export %s: %w", iface.Name, err)
+		}
+		names = append(names, iface.Name)
+		props.ifaces[iface.Name] = iface.Properties
+		node.Interfaces = append(node.Interfaces, introspect.Interface{
+			Name: iface.Name, Methods: introspect.Methods(iface.Methods), Properties: introspectProps(iface.Properties),
+		})
+	}
+	if err := conn.Export(props, path, "org.freedesktop.DBus.Properties"); err != nil {
+		return nil, fmt.Errorf("export %s properties: %w", path, err)
+	}
+	if err := conn.Export(introspect.NewIntrospectable(node), path, "org.freedesktop.DBus.Introspectable"); err != nil {
+		return nil, fmt.Errorf("export %s introspection: %w", path, err)
+	}
+	return func() {
+		for _, name := range names {
+			_ = conn.Export(nil, path, name)
+		}
+	}, nil
+}
+
 // Serve exports s on conn and takes its well-known name; the returned
 // release drops the name. A name already owned is an error, as zbus's
 // request_name with DoNotQueue.
 func Serve(conn *dbus.Conn, s Service) (func(), error) {
-	if err := conn.Export(s.Methods, s.Path, s.Interface); err != nil {
-		return nil, fmt.Errorf("export %s: %w", s.Interface, err)
+	if _, err := Export(conn, s.Path, Interface{Name: s.Interface, Methods: s.Methods, Properties: s.Properties}); err != nil {
+		return nil, err
 	}
-	props := &properties{iface: s.Interface, getters: s.Properties}
-	if err := conn.Export(props, s.Path, "org.freedesktop.DBus.Properties"); err != nil {
-		return nil, fmt.Errorf("export %s properties: %w", s.Interface, err)
-	}
-	node := &introspect.Node{
-		Name: string(s.Path),
-		Interfaces: []introspect.Interface{
-			introspect.IntrospectData,
-			{Name: "org.freedesktop.DBus.Properties", Methods: introspect.Methods(props)},
-			{Name: s.Interface, Methods: introspect.Methods(s.Methods), Properties: introspectProps(s.Properties)},
-		},
-	}
-	if err := conn.Export(introspect.NewIntrospectable(node), s.Path, "org.freedesktop.DBus.Introspectable"); err != nil {
-		return nil, fmt.Errorf("export %s introspection: %w", s.Interface, err)
-	}
-	reply, err := conn.RequestName(s.Name, dbus.NameFlagDoNotQueue)
+	return Own(conn, s.Name)
+}
+
+// Own takes a well-known name; the returned release drops it. A name
+// already owned is an error, as zbus's request_name with DoNotQueue.
+func Own(conn *dbus.Conn, name string) (func(), error) {
+	reply, err := conn.RequestName(name, dbus.NameFlagDoNotQueue)
 	if err != nil {
-		return nil, fmt.Errorf("request %s: %w", s.Name, err)
+		return nil, fmt.Errorf("request %s: %w", name, err)
 	}
 	if reply != dbus.RequestNameReplyPrimaryOwner {
-		return nil, fmt.Errorf("%s is already owned", s.Name)
+		return nil, fmt.Errorf("%s is already owned", name)
 	}
-	return func() { _, _ = conn.ReleaseName(s.Name) }, nil
+	return func() { _, _ = conn.ReleaseName(name) }, nil
 }
 
 func introspectProps(getters Getters) []introspect.Property {

@@ -2,6 +2,7 @@ package dbusx_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -97,4 +98,59 @@ func TestServeRefusesAnOwnedName(t *testing.T) {
 func isDBusError(err error, name string) bool {
 	var de dbus.Error
 	return errors.As(err, &de) && de.Name == name
+}
+
+type other struct{}
+
+func (other) Ping() (string, *dbus.Error) { return "pong", nil }
+
+func TestExportServesSeveralInterfacesOnOnePath(t *testing.T) {
+	bus := dbustest.Start(t)
+	server, client := bus.Conn(t), bus.Conn(t)
+	unexport, err := dbusx.Export(server, path,
+		dbusx.Interface{Name: iface, Methods: echo{}, Properties: dbusx.Getters{"version": func() any { return uint32(2) }}},
+		dbusx.Interface{Name: "com.wayle.Other1", Methods: other{}, Properties: dbusx.Getters{"version": func() any { return uint32(1) }}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj := client.Object(server.Names()[0], path)
+	var out string
+	if err := obj.Call(iface+".Echo", 0, "hi").Store(&out); err != nil || out != "hi" {
+		t.Fatalf("Echo = %q, %v", out, err)
+	}
+	if err := obj.Call("com.wayle.Other1.Ping", 0).Store(&out); err != nil || out != "pong" {
+		t.Fatalf("Ping = %q, %v", out, err)
+	}
+	// One Properties object answers for each interface with its own values.
+	for name, want := range map[string]uint32{iface: 2, "com.wayle.Other1": 1} {
+		v, err := obj.GetProperty(name + ".version")
+		if err != nil || v.Value() != want {
+			t.Errorf("%s.version = %v, %v; want %d", name, v, err, want)
+		}
+	}
+	var all map[string]dbus.Variant
+	err = obj.Call("org.freedesktop.DBus.Properties.GetAll", 0, "com.wayle.Missing1").Store(&all)
+	var de dbus.Error
+	if !errors.As(err, &de) || de.Name != dbusx.ErrUnknownIface {
+		t.Errorf("GetAll of an unexported interface = %v", err)
+	}
+	var xml string
+	if err := obj.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xml); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{iface, "com.wayle.Other1"} {
+		if !strings.Contains(xml, `<interface name="`+name+`">`) {
+			t.Errorf("introspection lacks %s:\n%s", name, xml)
+		}
+	}
+
+	// Unexporting removes every interface again.
+	unexport()
+	if err := obj.Call("com.wayle.Other1.Ping", 0).Err; err == nil {
+		t.Error("Ping still answers after unexport")
+	}
+	if _, err := obj.GetProperty(iface + ".version"); err == nil {
+		t.Error("properties still answer after unexport")
+	}
 }

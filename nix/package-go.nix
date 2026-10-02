@@ -34,6 +34,7 @@ let
       ../greeter
       ../i18n
       ../internal
+      ../portal
       ../resources
       ../service
       ../shell

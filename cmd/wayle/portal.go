@@ -11,18 +11,18 @@ func portalCommand() *cli.Command {
 		Name:               "portal",
 		About:              "xdg-desktop-portal backend, screencast picker stub, and dialog previewer",
 		SubcommandOptional: true,
-		Run:                notPorted("portal"),
+		Run:                runPortal,
 		Subcommands: []*cli.Command{
 			{
 				Name:  "run",
 				About: "Run the xdg-desktop-portal backend (the default when no subcommand is given, so the installed D-Bus/systemd units can keep execing `wayle portal`)",
-				Run:   notPorted("portal run"),
+				Run:   runPortal,
 			},
 			{
 				Name:  "share-picker",
 				About: "xdg-desktop-portal-hyprland screencast picker stub (invoked by the portal, not by hand)",
 				Args:  []*cli.Arg{allowToken},
-				Run:   notPorted("portal share-picker"),
+				Run:   runSharePicker,
 			},
 			{
 				Name:  "show",
