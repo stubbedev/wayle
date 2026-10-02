@@ -1157,6 +1157,7 @@ var schemaDocs = map[string]string{
 	"SeparatorConfig.Color":                                  "Color of the separator line.",
 	"SeparatorConfig.Length":                                 "Length of the separator line. Accepts a scale multiplier or pixels (e.g. `\"24px\"`).",
 	"SeparatorConfig.Size":                                   "Thickness of the separator line in pixels.",
+	"Service.configSet":                                      "configSet is the leaves the config file set, canonical paths.",
 	"SessionAction":                                          "One action the dashboard session actions",
 	"SessionAction=lock":                                     "Lock the session",
 	"SessionAction=log-out":                                  "Logout of the current session",

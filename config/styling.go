@@ -21,7 +21,7 @@ type StylingConfig struct {
 	// Currently active theme preset name, and/or the base for the
 	// palette when the palette has been modified. Persisted backing
 	// state for the theme selector; not a labeled setting of its own.
-	PaletteBaseTheme string `cfg:"palette_base_theme"`
+	PaletteBaseTheme string `cfg:"palette_base_theme,noi18n"`
 	// Available is the discovered themes, populated at runtime from
 	// the built-ins and themes/ (never read from a config file).
 	Available []ThemeEntry `cfg:"-"`

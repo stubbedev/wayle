@@ -22,12 +22,14 @@ type Service struct {
 	dir  string
 	sink DiagnosticSink
 
-	mu      sync.Mutex
-	cfg     *Config
-	tree    any    // the merged config document last loaded, nil for none
-	staged  *table // the runtime leaves in effect, canonical paths
-	subs    map[int]func(old, new *Config)
-	nextSub int
+	mu     sync.Mutex
+	cfg    *Config
+	tree   any    // the merged config document last loaded, nil for none
+	staged *table // the runtime leaves in effect, canonical paths
+	// configSet is the leaves the config file set, canonical paths.
+	configSet *table
+	subs      map[int]func(old, new *Config)
+	nextSub   int
 
 	secretsMu   sync.Mutex
 	secretsSubs map[int]func()
@@ -80,7 +82,7 @@ func Load(dir string, sink DiagnosticSink) *Service {
 	if rerr != nil {
 		log.Printf("config: invalid runtime.toml value:\n%v", rerr)
 	}
-	s.cfg, s.staged = cfg, staged
+	s.cfg, s.staged, s.configSet = cfg, staged, configLeaves(tree)
 	return s
 }
 
@@ -134,6 +136,7 @@ func (s *Service) publish(cfg *Config, staged *table, tree any) {
 	s.mu.Lock()
 	old := s.cfg
 	s.cfg, s.staged, s.tree = cfg, staged, tree
+	s.configSet = configLeaves(tree)
 	var subs []func(old, new *Config)
 	if !reflect.DeepEqual(old, cfg) {
 		for _, fn := range s.subs {

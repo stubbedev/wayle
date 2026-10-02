@@ -30,6 +30,7 @@ import (
 //	nolayer           serialized and in the schema, but never applied
 //	                  from a layer (#[wayle(skip)] with serde, i.e.
 //	                  `imports`)
+//	noi18n            no settings label of its own (#[i18n(skip)])
 //
 // `cfg:"-"` marks an exported field that is not part of the schema.
 // Every exported field of a schema struct carries one of the two; the
@@ -70,6 +71,7 @@ type fieldInfo struct {
 	required   bool
 	hasDefault bool
 	nolayer    bool
+	noI18n     bool
 	typ        reflect.Type
 	// goName is the Go field name, for docs lookup.
 	goName string
@@ -145,6 +147,8 @@ func collectFields(t reflect.Type, prefix []int) []fieldInfo {
 				info.hasDefault = true
 			case "nolayer":
 				info.nolayer = true
+			case "noi18n":
+				info.noI18n = true
 			case "alias":
 				info.aliases = append(info.aliases, value)
 			case "deprecated":

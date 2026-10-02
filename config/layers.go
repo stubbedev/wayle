@@ -121,6 +121,9 @@ func (a *layerApply) applyLeaf(dst reflect.Value, v any, path string) error {
 			setStaged(a.staged, path, encodeValue(dst))
 		}
 	case configLayer:
+		if a.staged != nil {
+			setStaged(a.staged, path, encodeValue(dst))
+		}
 		if a.overridden != nil && a.overridden(path) {
 			d := Diagnostic{Kind: DiagnosticWarning, Title: "config.toml change ignored"}.
 				field("Field", path).
