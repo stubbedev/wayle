@@ -274,13 +274,15 @@ func TestNetworkDropdownScansWhenEmptyAndToggles(t *testing.T) {
 	wifi := &fakeWifiCtl{}
 	v, _, _ := newNetTestView(t, network.Snapshot{WifiEnabled: true}, netDeps{wifiCtl: wifi})
 	waitHeadless(t, "the opening scan", func() bool { _, _, _, s, _ := wifi.calls(); return s == 1 && v.state == netNormal })
-	if !v.noNetworks.Visible() || v.listCard.Visible() {
+	if onHeadlessLoop(func() bool { return !v.noNetworks.Visible() || v.listCard.Visible() }) {
 		t.Error("an empty scan: want the no-networks state")
 	}
-	v.wifiSwitch.SetOn(false)
+	// The view lives on the loop: the test drives it there, never
+	// beside a refresh the toggle's goroutine hands back.
+	onHeadlessLoop(func() bool { v.wifiSwitch.SetOn(false); return true })
 	waitHeadless(t, "the toggle", func() bool { _, _, e, _, _ := wifi.calls(); return len(e) == 1 && !e[0] })
 	// A backend change moves the switch without writing back.
-	v.apply(netState{snap: network.Snapshot{WifiEnabled: true}})
+	onHeadlessLoop(func() bool { v.apply(netState{snap: network.Snapshot{WifiEnabled: true}}); return true })
 	if _, _, e, _, _ := wifi.calls(); len(e) != 1 {
 		t.Error("syncing the switch wrote wifi state back")
 	}

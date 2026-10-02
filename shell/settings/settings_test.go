@@ -42,7 +42,7 @@ func testKit(t *testing.T, configTOML string) *kit {
 	microphoneChoices = func() []recorder.DeviceChoice { return recorder.MicrophoneChoices(nil) }
 	cameraChoices = func() []recorder.DeviceChoice { return []recorder.DeviceChoice{{ID: "", Label: "Automatic"}} }
 	t.Cleanup(func() { microphoneChoices, cameraChoices = mics, cams })
-	return &kit{face: face, store: store{svc}, invoke: func(fn func()) { fn() }}
+	return &kit{face: face, mono: face, store: store{svc}, invoke: func(fn func()) { fn() }}
 }
 
 // runtimeFile is runtime.toml's content.
@@ -1393,7 +1393,7 @@ func TestModulePagesFollowTheRustOrder(t *testing.T) {
 		ids = append(ids, p.id)
 	}
 	want := []string{
-		"battery", "bluetooth", "brightness", "cava", "clock", "cpu", "dashboard", "hyprland-workspaces",
+		"battery", "bluetooth", "brightness", "cava", "clock", "cpu", "custom", "dashboard", "hyprland-workspaces",
 		"hyprsunset", "idle-inhibit", "keybind-mode", "keyboard-input", "mail", "mango-workspaces", "media", "microphone",
 		"netstat", "network", "niri-workspaces", "notification", "power", "power-profiles", "ram", "recorder", "screenshot",
 		"separator", "storage", "sway-workspaces", "systray", "treeman", "volume", "weather", "window-title", "world-clock",
@@ -1534,5 +1534,73 @@ func TestMailAccountCards(t *testing.T) {
 	cfg := k.store.svc.Config()
 	if len(cfg.Mail.Accounts) != 1 || cfg.Mail.Accounts[0].Provider != config.MailProviderFastmail || cfg.Mail.Accounts[0].Icon != nil {
 		t.Errorf("config accounts %+v", cfg.Mail.Accounts)
+	}
+}
+
+func TestTOMLEditor(t *testing.T) {
+	k := testKit(t, "[[modules.custom]]\nid = \"cpu\"\ncommand = \"echo 1\"\n")
+	c := fieldControl(k, field("modules.custom", tomlRow("custom", 40))).(*tomlEditor)
+	if !strings.Contains(c.area.Text(), "[[custom]]") || !strings.Contains(c.area.Text(), `id = "cpu"`) {
+		t.Fatalf("document %q, want the module under [[custom]]", c.area.Text())
+	}
+	if !c.scroll.HasClass("toml-editor") || !c.scroll.HasClass("toml-editor-lines-40") || !c.area.LineNumbers() || !c.area.AutoIndent() || c.area.Indent() != 2 {
+		t.Error("the code view lacks its classes, line numbers or indent")
+	}
+	if c.badge.Visible() {
+		t.Error("an untouched document shows the unsaved badge")
+	}
+	// Typing raises the badge; an unrelated refresh keeps the text.
+	c.area.SetCursor(0, 0)
+	c.area.Insert("# note\n")
+	if !c.badge.Visible() {
+		t.Error("typing did not raise the badge")
+	}
+	_ = k.store.set("bar.location", "bottom")
+	c.refresh()
+	if !strings.HasPrefix(c.area.Text(), "# note") || !c.badge.Visible() {
+		t.Error("a refresh for another field dropped the edit")
+	}
+	// A broken document marks the view and writes nothing.
+	c.area.SetText("[[custom]\nid = ")
+	c.apply()
+	if !c.scroll.HasClass("error") || len(k.store.svc.Config().Custom) != 1 {
+		t.Errorf("a broken document: error %v, modules %d", c.scroll.HasClass("error"), len(k.store.svc.Config().Custom))
+	}
+	// A value the config refuses marks it too.
+	c.area.SetText("custom = \"nope\"\n")
+	c.apply()
+	if !c.scroll.HasClass("error") {
+		t.Error("a refused value left no error")
+	}
+	// A good document writes and clears the marks.
+	c.area.SetText("[[custom]]\nid = \"a\"\ncommand = \"true\"\n\n[[custom]]\nid = \"b\"\ncommand = \"false\"\n")
+	c.apply()
+	if c.scroll.HasClass("error") || c.badge.Visible() {
+		t.Error("a good apply kept the error or the badge")
+	}
+	if mods := k.store.svc.Config().Custom; len(mods) != 2 || mods[1].Id != "b" {
+		t.Errorf("modules %+v", mods)
+	}
+	// An outside change shows the new value.
+	_ = k.store.set("modules.custom", []any{map[string]any{"id": "z", "command": "x"}})
+	c.refresh()
+	if !strings.Contains(c.area.Text(), `id = "z"`) || c.badge.Visible() {
+		t.Errorf("outside change: %q (badge %v)", c.area.Text(), c.badge.Visible())
+	}
+}
+
+func TestPaletteScheme(t *testing.T) {
+	p := config.DefaultsStyling().Palette
+	s := paletteScheme(p)
+	r, g, b, a := p.Blue.RGBA()
+	if kw := s["def:keyword"]; kw.Color != render.RGBA(r, g, b, a) || !kw.Bold {
+		t.Errorf("keyword %+v, want bold blue", kw)
+	}
+	if c := s["def:comment"]; !c.Italic {
+		t.Error("comments are not italic")
+	}
+	// The TOML highlighter's number styles reach def:number.
+	if _, ok := s.Style("def:decimal"); !ok {
+		t.Error("def:decimal finds no style")
 	}
 }

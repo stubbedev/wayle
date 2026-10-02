@@ -12,6 +12,7 @@ func modulePages(cfg *config.Config) []pageSpec {
 		cavaPage(cfg),
 		clockPage(cfg),
 		cpuPage(cfg),
+		customPage(cfg),
 		dashboardPage(cfg),
 		hyprlandWorkspacesPage(cfg),
 		hyprsunsetPage(cfg),
@@ -618,5 +619,13 @@ func systrayPage(*config.Config) pageSpec {
 		}},
 		{title: "settings-section-bar-display", rows: fields(m + ".border-show")},
 		{title: "settings-section-colors", rows: fields(m+".border-color", m+".button-bg-color")},
+	}}
+}
+
+// customPage is pages/modules/custom: the [[modules.custom]] list as
+// a TOML document.
+func customPage(*config.Config) pageSpec {
+	return pageSpec{id: "custom", navKey: "settings-nav-custom", icon: "ld-code-symbolic", header: "settings-page-custom", sections: []sectionSpec{
+		{title: "settings-section-general", rows: []rowSpec{field("modules.custom", withKey("settings-custom-modules-editor"), tomlRow("custom", 40))}},
 	}}
 }

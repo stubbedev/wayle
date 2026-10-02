@@ -122,6 +122,17 @@ func parseDocument(data []byte, path string) (any, error) {
 	return parseTOML(data)
 }
 
+// ParseTOML parses a TOML document into the tree shapes SetByPath
+// takes (the loader's own parse).
+func ParseTOML(text string) (map[string]any, error) {
+	v, err := parseTOML([]byte(text))
+	if err != nil {
+		return nil, err
+	}
+	m, _ := v.(map[string]any)
+	return m, nil
+}
+
 func parseTOML(data []byte) (any, error) {
 	var doc map[string]any
 	if _, err := toml.Decode(string(data), &doc); err != nil {

@@ -46,8 +46,15 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("settings: font %q: %w", cfg.General.FontSans, err)
 	}
+	// The code views are GtkTextView's monospace (the family alias).
+	mono, err := app.Font("monospace", 14)
+	if err != nil {
+		log.Printf("settings: monospace font: %v", err)
+		mono = face
+	}
 	k := &kit{
-		face: app.FontFallback(face), store: store{svc}, invoke: application.Invoke,
+		face: app.FontFallback(face), mono: app.FontFallback(mono), monoVariants: app.FontVariants(mono),
+		store: store{svc}, invoke: application.Invoke,
 		background: func(fn func()) { go fn() },
 	}
 	after := func(d time.Duration, fn func()) {

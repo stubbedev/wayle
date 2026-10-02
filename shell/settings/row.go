@@ -22,8 +22,12 @@ const (
 // from (the stylesheet then sizes and weighs it) and the store the
 // controls write to.
 type kit struct {
-	face  render.Font
-	store store
+	face render.Font
+	// mono and monoVariants are the code views' monospace face and its
+	// bold and italic faces.
+	mono         render.Font
+	monoVariants widget.VariantFunc
+	store        store
 	// invoke runs a function on the loop (the slider's trailing commit).
 	invoke func(func())
 	// pickers opens popovers and dialogs; nil without a window.

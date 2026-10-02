@@ -125,3 +125,42 @@ func TestParseCLIValue(t *testing.T) {
 		t.Error("an array parses as an array")
 	}
 }
+
+// ParseTOML reads back what TOMLDocument writes, in the tree shapes
+// SetByPath takes, and refuses what is no TOML.
+func TestParseTOMLRoundTrips(t *testing.T) {
+	doc := map[string]any{"custom": []any{
+		map[string]any{"id": "cpu", "command": "echo 1", "interval-ms": int64(5000)},
+		map[string]any{"id": "mem", "ratio": 0.5},
+	}}
+	text, err := TOMLDocument(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text, "[[custom]]") {
+		t.Errorf("document %q lacks the array tables", text)
+	}
+	got, err := ParseTOML(text)
+	if err != nil {
+		t.Fatalf("parse %q: %v", text, err)
+	}
+	list, ok := got["custom"].([]any)
+	if !ok || len(list) != 2 {
+		t.Fatalf("custom = %#v, want a two-item []any", got["custom"])
+	}
+	if m := list[0].(map[string]any); m["id"] != "cpu" || m["interval-ms"] != int64(5000) {
+		t.Errorf("first module %#v", m)
+	}
+	if _, err := ParseTOML("custom = [unterminated"); err == nil {
+		t.Error("a broken document parsed")
+	}
+	svc := Load(t.TempDir(), DiscardDiagnostics)
+	defer svc.Close()
+	parsed, _ := ParseTOML("[[custom]]\nid = \"x\"\ncommand = \"true\"\n")
+	if err := svc.SetByPath("modules.custom", parsed["custom"]); err != nil {
+		t.Errorf("SetByPath refused the parsed modules: %v", err)
+	}
+	if len(svc.Config().Custom) != 1 || svc.Config().Custom[0].Id != "x" {
+		t.Errorf("modules %+v", svc.Config().Custom)
+	}
+}
