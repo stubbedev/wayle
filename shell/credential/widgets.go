@@ -193,3 +193,41 @@ func (f *Fill) HitTest(pt widget.Point) widget.Widget {
 	}
 	return f.HitLeaf(f, pt)
 }
+
+// Inset is a child inside fixed per-side margins: GTK's margin-*
+// properties, which sit outside the stylesheet (a blanket
+// `* { padding: 0 }` does not zero them).
+type Inset struct {
+	widget.Base
+	child widget.Widget
+	in    render.Insets
+}
+
+// NewInset wraps child in the margins.
+func NewInset(child widget.Widget, in render.Insets) *Inset { return &Inset{child: child, in: in} }
+
+// Measure adds the margins around the child's natural size.
+func (s *Inset) Measure(con widget.Constraints) widget.Size {
+	h, v := s.in.Left+s.in.Right, s.in.Top+s.in.Bottom
+	sz := s.child.Measure(widget.Constraints{Max: widget.Size{W: max(con.Max.W-h, 0), H: max(con.Max.H-v, 0)}})
+	return clamp(widget.Size{W: sz.W + h, H: sz.H + v}, con)
+}
+
+// Arrange lays the child out inside the margins.
+func (s *Inset) Arrange(r render.Rect) {
+	s.ArrangeSelf(r)
+	s.child.Arrange(s.in.Shrink(r))
+	widget.SetParents(s, s.child)
+}
+
+// ArrangeRoot mirrors Arrange for the tree-root path.
+func (s *Inset) ArrangeRoot(r render.Rect) { s.Arrange(r) }
+
+// Paint paints the child.
+func (s *Inset) Paint(cv *render.Canvas) { s.child.Paint(cv) }
+
+// HitTest forwards to the child; the margins take no input.
+func (s *Inset) HitTest(pt widget.Point) widget.Widget { return s.child.HitTest(pt) }
+
+// Children exposes the child for focus traversal.
+func (s *Inset) Children() []widget.Widget { return []widget.Widget{s.child} }

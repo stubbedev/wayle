@@ -3,6 +3,7 @@ package credential
 import (
 	"testing"
 
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 )
 
@@ -23,5 +24,25 @@ func TestFixedSetSizeRepinsAndInvalidates(t *testing.T) {
 	f.SetSize(120, 30)
 	if got := f.Measure(con); got.W != 120 {
 		t.Errorf("same-size SetSize measure = %+v", got)
+	}
+}
+
+func TestInsetHoldsItsMargins(t *testing.T) {
+	child := widget.NewSpacer(30, 10)
+	s := NewInset(child, render.Insets{Top: 6, Right: 10, Bottom: 6, Left: 10})
+	if got := s.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 500}}); got != (widget.Size{W: 50, H: 22}) {
+		t.Errorf("measure = %+v, want the child plus its margins", got)
+	}
+	s.Arrange(render.Rect{X: 5, Y: 5, W: 100, H: 40})
+	if got := child.Bounds(); got != (render.Rect{X: 15, Y: 11, W: 80, H: 28}) {
+		t.Errorf("child = %+v, want inside the margins", got)
+	}
+	// A stylesheet zeroing padding everywhere leaves the margins.
+	sheet := widget.NewStylesheet("* { padding: 0; margin: 0; }", widget.StylePriorityUser)
+	root := widget.NewBox(widget.Column, 0, 0)
+	root.AttachStylesheet(sheet)
+	root.Append(s, false)
+	if got := root.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 500}}); got != (widget.Size{W: 50, H: 22}) {
+		t.Errorf("under * { padding: 0 } = %+v", got)
 	}
 }

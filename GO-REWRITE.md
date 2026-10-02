@@ -165,9 +165,12 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       Deliberate: a folder pick answers the selected folder (GTK), space
       in a text field types; gelm's window focus ring paints above the
       quick look card
-- [ ] the print dialog and its spooler (shell/printdialog). The share
-      picker and color picker are ported; `wayle portal share-picker`
-      calls `sharepicker.NewClient`
+- [x] the print dialog and its spooler (shell/printdialog, com.wayle.Print1):
+      the printer list and settings form; jobs spool to CUPS over IPP
+      (internal/ipp: CUPS-Get-Printers, Print-Job, the scheduler's domain
+      socket or CUPS_SERVER; GtkPrintJob in Rust), GTK's Print to File
+      writes output.pdf in the documents folder. The settings carry the
+      printer, as GTK's dialog records it
 - [x] the ScreenCast PipeWire producer (internal/pipewire, libpipewire
       through purego, the loop on a locked goroutine)
 - [ ] the share-preview gbm dmabuf allocator (screencast streams SHM)
