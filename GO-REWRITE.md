@@ -198,7 +198,13 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ### Binaries
 
-- [ ] wayle-settings (the settings GUI; the largest single item)
+- [x] wayle-settings (cmd/wayle-settings, shell/settings): every page of
+      the Rust app (50, in pages/nav.rs order) as data over one row and
+      editor kit: the source badges and reset, every editor (enums,
+      numbers, sliders, sizes, colors and color values, fonts, icons,
+      files, actions, lists and maps, card lists, the theme selector,
+      device selects, the TOML code view, the bar layout editor with its
+      draggable chips), runtime.toml writes, the greeter apply
 - [x] xdg-desktop-portal-wayle (portal/): all 21 interfaces, the
       manifests pinned to them; godbus carried patched (fd arrays, struct
       variants, replied files; third_party/godbus-dbus/WAYLE-PATCHES.md);
@@ -218,7 +224,7 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] the NixOS/home-manager modules, the overlay and `packages.default`
       install the Go package (`wayle`, with wayle-greeter and wayle-lock,
       the portal and D-Bus files, the polkit action); the Rust shell
-      stays buildable as `wayle-rust`. wayle-settings joins with its port
+      stays buildable as `wayle-rust`; wayle-settings ships beside wayle
 - [x] go.mod pins gelm by its pushed commit (no local replace)
 - [x] module lifetime: each bar is a mount generation; `follow` and
       `ModuleContext.Life` end subscriptions and tickers with it
@@ -243,7 +249,14 @@ padding and borders, rounded rings, gradients, box shadows), raw-pixel
 icons, ext-session-lock, the capture protocols and dmabuf import,
 data-control, Button.BgExplicit, menu row icons and MenuStack, and
 loop-delivered fd and file watches (app.WatchFD, app.WatchFiles: the
-bar's user styles reload on change instead of a poll).
+bar's user styles reload on change instead of a poll). For the
+settings app: GtkSourceView's code view in TextArea (highlight.TOML,
+line numbers, schemes), FlowBox, SpinButton, Paned, rich dropdown
+rows and SetItems, GtkEntry's text node and width-chars, GtkScrolled-
+Window's CSS box, scroll-to-focus and caret following, rows that
+narrow any shrinkable child (height for width), popovers that resize
+to the output, even-odd SVG fills, and HiDPI fixes (logical clips,
+scaled glyph advances).
 
 ## Decisions
 
