@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -321,5 +322,42 @@ func TestLayerConfigSizesOnlyTheFreeAxis(t *testing.T) {
 		if lc.ExclusiveZone != int32(thick) {
 			t.Errorf("%s: exclusive zone %d, want the thickness %d", tc.loc, lc.ExclusiveZone, thick)
 		}
+	}
+}
+
+func TestUserStylesReloadOnAWatchedChange(t *testing.T) {
+	dir := isolateConfigDir(t)
+	styles := filepath.Join(dir, "styles")
+	if err := os.MkdirAll(styles, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	theme := newBarTheme(config.Defaults())
+	var changed func()
+	var watched []string
+	polled := false
+	theme.watchStyles(func(paths []string, recursive bool, fn func()) (func(), error) {
+		watched, changed = paths, fn
+		if !recursive {
+			t.Error("the styles tree is watched flat")
+		}
+		return func() {}, nil
+	}, func(func()) { polled = true })
+	if len(watched) != 1 || watched[0] != styles || polled {
+		t.Fatalf("watched %v polled %v, want the styles tree watched", watched, polled)
+	}
+	if err := os.WriteFile(filepath.Join(styles, "index.scss"), []byte(".bar .x { color: red; }"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before := theme.userStamp
+	changed()
+	if theme.userStamp == before || theme.userStamp != userStylesStamp() {
+		t.Error("a watched edit did not reload the stylesheet")
+	}
+
+	// No watcher: the styles poll instead.
+	theme.watchStyles(func([]string, bool, func()) (func(), error) { return nil, errors.New("no inotify") },
+		func(func()) { polled = true })
+	if !polled {
+		t.Error("a failed watch did not fall back to polling")
 	}
 }

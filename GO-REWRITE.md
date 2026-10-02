@@ -230,14 +230,20 @@ capability. Remedy it in gelm, then delete the workaround in wayle.
 
 | gelm lacks | wayle workaround (where) | remedy in gelm |
 | --- | --- | --- |
-| an fd/file watcher on the event loop | inotify goroutines + Invoke (internal/fswatch) | optional: `app.WatchFD` |
+| (none open) | | |
+
+The services' inotify watchers (internal/fswatch: brightness, mail,
+icons) stay goroutine-side by design - they feed services, not the
+loop; loop-side watches use app.WatchFiles.
 
 Closed in gelm since the inventory: the Revealer (every enter/exit
 transition, through offscreen layers and affine composites), nested popovers (OpenMenuPopover), filled paths (Canvas.FillPath), popovers driven by the application loop (focused Entry input, loop-driven repaint, layer get_popup, rect-anchored placement, clicks and the wheel inside them), GTK-style give-way layout (a column shrinks its expanding Scroll; Scroll.VerticalOnly and SetMaxContentHeight), the CSS engine (var(), calc(),
 color-mix(), :not(), structural selectors, the box model, per-side
 padding and borders, rounded rings, gradients, box shadows), raw-pixel
 icons, ext-session-lock, the capture protocols and dmabuf import,
-data-control, Button.BgExplicit, menu row icons and MenuStack.
+data-control, Button.BgExplicit, menu row icons and MenuStack, and
+loop-delivered fd and file watches (app.WatchFD, app.WatchFiles: the
+bar's user styles reload on change instead of a poll).
 
 ## Decisions
 

@@ -96,18 +96,31 @@ func (t *barTheme) attach(root interface{ AttachStylesheet(*widget.Stylesheet) }
 	root.AttachStylesheet(t.sheet)
 }
 
-// watchUserStyles polls the user styles tree and reloads the bundle when
-// a .scss or .css file changed (watcher.rs, which debounces inotify
-// events by 100ms; a one-second poll is the Go shell's stand-in until a
-// loop-integrated file watcher lands). A failed compile keeps the
-// stylesheet running: UserCSS logs and contributes nothing.
+// watchUserStyles reloads the bundle when a .scss or .css file under
+// the user styles tree changed (watcher.rs): the tree is watched on the
+// loop (app.WatchFiles), and the stamp filters out changes to other
+// files. Without inotify it polls once a second. A failed compile keeps
+// the stylesheet running: UserCSS logs and contributes nothing.
 func (t *barTheme) watchUserStyles(application *app.Application) {
-	application.Every(time.Second, func() {
+	t.watchStyles(application.WatchFiles, func(fn func()) { application.Every(time.Second, fn) })
+}
+
+// watchStyles is watchUserStyles over its two mechanisms.
+func (t *barTheme) watchStyles(watch func(paths []string, recursive bool, fn func()) (func(), error), poll func(fn func())) {
+	check := func() {
 		if stamp := userStylesStamp(); stamp != t.userStamp {
 			t.userStamp = stamp
 			t.reload()
 		}
-	})
+	}
+	if dir, err := config.Dir(); err == nil {
+		if styles, ok := styling.UserStylesDir(dir); ok {
+			if _, err := watch([]string{styles}, true, check); err == nil {
+				return
+			}
+		}
+	}
+	poll(check)
 }
 
 // userStylesStamp fingerprints every stylesheet under the user styles
