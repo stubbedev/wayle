@@ -416,3 +416,117 @@ func TestResetAllConfirmation(t *testing.T) {
 		t.Errorf("runtime.toml survived reset-all: %v", err)
 	}
 }
+
+// A field of a value struct writes, reads, unsets and resets through
+// its leaf (Rust's field projections).
+func TestValueStructFields(t *testing.T) {
+	k := testKit(t, "[animations.osd]\nenter = \"zoom\"\n")
+	if got := k.store.value("animations.osd.enter"); got != "zoom" {
+		t.Fatalf("enter = %v, want the config's zoom", got)
+	}
+	if err := k.store.set("animations.osd.enter-duration", int64(300)); err != nil {
+		t.Fatal(err)
+	}
+	if err := k.store.set("animations.osd.enter", "fade"); err != nil {
+		t.Fatal(err)
+	}
+	rv, _ := k.store.svc.RuntimeValue("animations.osd")
+	if m, _ := rv.(map[string]any); m["enter"] != "fade" || m["enter-duration"] != int64(300) {
+		t.Fatalf("runtime leaf = %#v, want both fields", rv)
+	}
+	if src := sourceOf(k.store, "animations.osd.enter"); src.class != "warning" || !src.reset {
+		t.Errorf("a set field over config = %+v, want the override badge", src)
+	}
+	// with_field_reset: the field takes the baseline's, the rest stays.
+	k.store.reset("animations.osd.enter")
+	if k.store.value("animations.osd.enter") != "zoom" || k.store.value("animations.osd.enter-duration") != int64(300) {
+		t.Errorf("after reset enter %v duration %v, want zoom and 300 kept",
+			k.store.value("animations.osd.enter"), k.store.value("animations.osd.enter-duration"))
+	}
+	k.store.unset("animations.osd.enter-duration")
+	if v := k.store.value("animations.osd.enter-duration"); v != nil {
+		t.Errorf("an unset field reads %v, want none", v)
+	}
+	if src := sourceOf(k.store, "animations.osd.enter-duration"); src.badge {
+		t.Errorf("an unset field badges: %+v", src)
+	}
+	// A field reset with no runtime value writes nothing.
+	k.store.reset("animations.lock.enter")
+	if strings.Contains(runtimeFile(t, k), "animations.lock") {
+		t.Error("a reset without an override wrote one")
+	}
+	if !strings.Contains(runtimeFile(t, k), "[animations.osd]") {
+		t.Errorf("runtime.toml = %q, want the struct saved", runtimeFile(t, k))
+	}
+}
+
+func TestOptionalEnumInheritsOrPicks(t *testing.T) {
+	k := testKit(t, "")
+	meta, _ := config.Field("animations.enter")
+	c := newOptionalEnum(k, "animations.enter", meta)
+	if c.Selected() != 0 || c.Selection() != i18n.Settings().Get("settings-inherit") {
+		t.Fatalf("unset shows %q", c.Selection())
+	}
+	c.SetSelected(2)
+	if v := k.store.value("animations.enter"); v != meta.Variants[1] {
+		t.Errorf("picked %v, want %s", v, meta.Variants[1])
+	}
+	c.SetSelected(0)
+	if k.store.svc.Source("animations.enter") != config.SourceDefault {
+		t.Error("inherit kept the override")
+	}
+	_ = k.store.set("animations.enter", meta.Variants[3])
+	c.refresh()
+	if c.Selected() != 4 {
+		t.Errorf("refresh selected %d, want the set variant (4)", c.Selected())
+	}
+}
+
+func TestOptionalNumberOverrideSwitch(t *testing.T) {
+	k := testKit(t, "")
+	c := newOptionalNumber(k, "animations.enter-duration", 0, maxDurationMS, durationStepMS, 0, durationFallbackMS)
+	if c.on.On() || c.spin.Enabled() {
+		t.Fatal("an unset duration shows an active override")
+	}
+	c.on.SetOn(true)
+	if v := k.store.value("animations.enter-duration"); v != int64(durationFallbackMS) || !c.spin.Enabled() {
+		t.Fatalf("override on wrote %v (spin live %v), want the fallback", v, c.spin.Enabled())
+	}
+	c.spin.KeyAction(widget.KeyUp, 0)
+	if v := k.store.value("animations.enter-duration"); v != int64(durationFallbackMS+durationStepMS) {
+		t.Errorf("a step wrote %v", v)
+	}
+	c.on.SetOn(false)
+	if k.store.svc.Source("animations.enter-duration") != config.SourceDefault || c.spin.Enabled() {
+		t.Error("override off kept the value or the live spin")
+	}
+	_ = k.store.set("animations.enter-duration", int64(450))
+	c.refresh()
+	if !c.on.On() || c.spin.Value() != 450 || k.store.value("animations.enter-duration") != int64(450) {
+		t.Errorf("refresh shows on=%v %v", c.on.On(), c.spin.Value())
+	}
+}
+
+func TestSizeEditorModes(t *testing.T) {
+	k := testKit(t, "")
+	c := newSizeEditor(k, "osd.margin", config.OsdMarginBaseRem)
+	if c.mode.Selected() != sizeScale || c.spin.Value() != 1 {
+		t.Fatalf("default margin shows mode %d value %v, want scale 1", c.mode.Selected(), c.spin.Value())
+	}
+	c.mode.SetSelected(sizePx)
+	if v := k.store.value("osd.margin"); v != "150px" || c.spin.Value() != 150 {
+		t.Errorf("to px wrote %v (spin %v), want the base's 150px", v, c.spin.Value())
+	}
+	c.mode.SetSelected(sizeScale)
+	if v := k.store.value("osd.margin"); v != float64(1) {
+		t.Errorf("back to scale wrote %#v, want 1", v)
+	}
+	_ = k.store.set("osd.margin", "40px")
+	c.refresh()
+	if c.mode.Selected() != sizePx || c.spin.Value() != 40 {
+		t.Errorf("refresh from 40px: mode %d value %v", c.mode.Selected(), c.spin.Value())
+	}
+	if k.store.value("osd.margin") != "40px" {
+		t.Error("a refresh wrote")
+	}
+}

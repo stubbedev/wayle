@@ -114,3 +114,29 @@ func TestEnumLabelKey(t *testing.T) {
 		}
 	}
 }
+
+func TestLeafPathSplitsAtTheValueStruct(t *testing.T) {
+	for path, want := range map[string][2]string{
+		"osd.enabled":                           {"osd.enabled", ""},
+		"animations.osd":                        {"animations.osd", ""},
+		"animations.osd.enter":                  {"animations.osd", "enter"},
+		"animations.share-picker.exit-duration": {"animations.share-picker", "exit-duration"},
+	} {
+		leaf, sub, ok := LeafPath(path)
+		if !ok || leaf != want[0] || sub != want[1] {
+			t.Errorf("LeafPath(%s) = %q %q %v, want %q %q", path, leaf, sub, ok, want[0], want[1])
+		}
+	}
+	for _, path := range []string{"animations.osd.nope", "osd.enabled.deeper", "osd.margin.value", "nope", "osd"} {
+		if leaf, sub, ok := LeafPath(path); ok {
+			t.Errorf("LeafPath(%s) = %q %q, want none", path, leaf, sub)
+		}
+	}
+	m, ok := Field("animations.osd.enter-duration")
+	if !ok || m.Kind != FieldInt || !m.Optional || m.Max != math.MaxUint32 {
+		t.Errorf("Field(animations.osd.enter-duration) = %+v %v, want an optional u32", m, ok)
+	}
+	if e, ok := Field("animations.osd.enter"); !ok || e.Kind != FieldEnum || e.Type != "AnimationType" || !e.Optional {
+		t.Errorf("Field(animations.osd.enter) = %+v %v, want an optional AnimationType", e, ok)
+	}
+}

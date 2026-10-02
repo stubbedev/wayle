@@ -3,6 +3,7 @@ package config
 import (
 	"math"
 	"reflect"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -47,12 +48,26 @@ type FieldMeta struct {
 	Optional bool
 }
 
-// Field describes the leaf at a dot path; false for a path naming no
-// field or a container.
+// Field describes the leaf at a dot path, or a field inside a value
+// struct leaf (animations.osd.enter); false for a path naming no field
+// or a container.
 func Field(path string) (FieldMeta, bool) {
-	_, f, ok := fieldAtPath(typeOf[Config](), path)
+	leaf, sub, ok := LeafPath(path)
+	if !ok {
+		return FieldMeta{}, false
+	}
+	_, f, ok := fieldAtPath(typeOf[Config](), leaf)
 	if !ok || isContainer(f.typ) {
 		return FieldMeta{}, false
+	}
+	if sub != "" {
+		t := f.typ
+		for t.Kind() == reflect.Pointer {
+			t = t.Elem()
+		}
+		if f, ok = valueFieldAt(t, strings.Split(sub, ".")); !ok {
+			return FieldMeta{}, false
+		}
 	}
 	t := f.typ
 	m := FieldMeta{}
@@ -171,4 +186,69 @@ func pascalToKebab(s string) string {
 // document.
 func newSchemaGen() *schemaGen {
 	return &schemaGen{defs: map[string]Schema{}, ids: map[string]string{}, names: map[string]bool{}, defaults: map[reflect.Type]reflect.Value{}}
+}
+
+// isValueStruct reports whether t is a struct decoded as one value
+// whose fields still carry cfg tags (SurfaceAnimation): a leaf the
+// layers set whole, with fields an editor can address.
+func isValueStruct(t reflect.Type) bool {
+	return t.Kind() == reflect.Struct && (t.Implements(valueStructType) || reflect.PointerTo(t).Implements(valueStructType))
+}
+
+// LeafPath splits a dot path at the config leaf it lies in: leaf is
+// the field the layers set and reset, sub the path inside that leaf's
+// value struct ("" when the path names the leaf). ok is false for a
+// path naming no field.
+func LeafPath(path string) (leaf, sub string, ok bool) {
+	t := typeOf[Config]()
+	segs := strings.Split(path, ".")
+	for i, seg := range segs {
+		_, f, found := fieldAtPath(t, seg)
+		if !found {
+			return "", "", false
+		}
+		t = f.typ
+		for t.Kind() == reflect.Pointer {
+			t = t.Elem()
+		}
+		if isContainer(t) {
+			continue
+		}
+		if i == len(segs)-1 {
+			return path, "", true
+		}
+		if !isValueStruct(t) {
+			return "", "", false
+		}
+		if _, ok := valueFieldAt(t, segs[i+1:]); !ok {
+			return "", "", false
+		}
+		return strings.Join(segs[:i+1], "."), strings.Join(segs[i+1:], "."), true
+	}
+	return "", "", false
+}
+
+// valueFieldAt finds the field a path names inside a value struct.
+func valueFieldAt(t reflect.Type, segs []string) (fieldInfo, bool) {
+	var f fieldInfo
+	for _, seg := range segs {
+		for t.Kind() == reflect.Pointer {
+			t = t.Elem()
+		}
+		if !isValueStruct(t) {
+			return fieldInfo{}, false
+		}
+		found := false
+		for _, cand := range fieldsOf(t) {
+			if slices.Contains(cand.lookupKeys(), seg) {
+				f, found = cand, true
+				break
+			}
+		}
+		if !found {
+			return fieldInfo{}, false
+		}
+		t = f.typ
+	}
+	return f, true
 }

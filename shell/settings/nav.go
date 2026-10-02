@@ -18,6 +18,8 @@ type navSection struct {
 func layout(cfg *config.Config) []navSection {
 	sections := []navSection{
 		{key: "settings-nav-bar-section", pages: []pageSpec{barDropdownPage(cfg)}},
+		{key: "settings-nav-appearance", pages: []pageSpec{animationsPage(cfg)}},
+		{key: "settings-nav-overlays", pages: []pageSpec{sharePickerPage(cfg)}},
 	}
 	out := sections[:0]
 	for _, s := range sections {
@@ -59,6 +61,49 @@ func barDropdownPage(*config.Config) pageSpec {
 		sections: []sectionSpec{
 			{title: "settings-section-behavior", rows: fields("bar.dropdown-shadow", "bar.dropdown-autohide", "bar.dropdown-freeze-label")},
 			{title: "settings-section-appearance", rows: []rowSpec{field("bar.dropdown-opacity", percentage)}},
+		},
+	}
+}
+
+// animationsPage is pages/animations.
+func animationsPage(*config.Config) pageSpec {
+	duration := optionalSpin(0, maxDurationMS, durationStepMS, durationFallbackMS)
+	return pageSpec{
+		id: "animations", navKey: "settings-nav-animations", icon: "ld-zap-symbolic",
+		header: "settings-page-animations",
+		sections: []sectionSpec{
+			{title: "settings-section-general", rows: fields("animations.enabled", "animations.transition", "animations.duration")},
+			{title: "settings-section-direction", rows: []rowSpec{
+				field("animations.enter"), field("animations.exit"),
+				field("animations.enter-duration", duration), field("animations.exit-duration", duration),
+			}},
+			{title: "settings-section-speed", rows: fields("animations.ui-duration", "animations.interaction-duration", "animations.indicators")},
+		},
+	}
+}
+
+// sharePickerPage is pages/share_picker.
+func sharePickerPage(*config.Config) pageSpec {
+	return pageSpec{
+		id: "share-picker", navKey: "settings-nav-share-picker", icon: "ld-app-window-symbolic",
+		header: "settings-page-share-picker",
+		sections: []sectionSpec{
+			{title: "settings-section-general", rows: fields("share-picker.default-page", "share-picker.hide-token-restore")},
+			{title: "settings-section-display", rows: []rowSpec{
+				field("share-picker.width", sizeBase(config.SharePickerWidthBaseRem)),
+				field("share-picker.height", sizeBase(config.SharePickerHeightBaseRem)),
+				field("share-picker.resize-size"),
+				field("share-picker.widget-size", sizeBase(config.SharePickerWidgetBaseRem)),
+			}},
+			{title: "settings-section-share-picker-windows", rows: []rowSpec{
+				field("share-picker.windows-spacing", sizeBase(config.SharePickerWindowsSpacingBaseRem)),
+				field("share-picker.windows-min-per-row"), field("share-picker.windows-max-per-row"),
+			}},
+			{title: "settings-section-share-picker-outputs", rows: []rowSpec{
+				field("share-picker.outputs-spacing", sizeBase(config.SharePickerOutputsSpacingBaseRem)),
+				field("share-picker.outputs-show-label"), field("share-picker.outputs-respect-scaling"),
+			}},
+			{title: "settings-section-animation", rows: surfaceAnimationRows("animations.share-picker")},
 		},
 	}
 }

@@ -18,8 +18,17 @@ import (
 type editorFunc func(k *kit, path string, meta config.FieldMeta) control
 
 // autoEditor is the control a field's type calls for, the editor the
-// Rust page picks for it: toggle, enum_select, number_* and text.
+// Rust page picks for it: toggle, enum_select, number_*, text, size,
+// and the optional (inherit) forms.
 func autoEditor(k *kit, path string, meta config.FieldMeta) (control, error) {
+	switch {
+	case meta.Type == "Size":
+		return newSizeEditor(k, path, 1), nil
+	case meta.Optional && meta.Kind == config.FieldEnum:
+		return newOptionalEnum(k, path, meta), nil
+	case meta.Optional && meta.Kind == config.FieldInt:
+		return newOptionalNumber(k, path, meta.Min, meta.Max, 1, 0, 0), nil
+	}
 	switch meta.Kind {
 	case config.FieldBool:
 		return newToggle(k, path), nil
@@ -74,15 +83,7 @@ type enumSelect struct {
 }
 
 func newEnumSelect(k *kit, path string, meta config.FieldMeta) *enumSelect {
-	t := i18n.Settings()
-	labels := make([]string, len(meta.Variants))
-	for i, v := range meta.Variants {
-		labels[i] = v
-		if key := config.EnumLabelKey(meta.Type, v); t.Has(key) {
-			labels[i] = t.Get(key)
-		}
-	}
-	c := &enumSelect{Dropdown: widget.NewDropdown(k.face, 14, labels, 0), k: k, path: path, variants: meta.Variants}
+	c := &enumSelect{Dropdown: widget.NewDropdown(k.face, 14, enumLabels(meta), 0), k: k, path: path, variants: meta.Variants}
 	c.OnSelect = func(i int) {
 		if !c.syncing && i >= 0 && i < len(c.variants) {
 			_ = k.store.set(path, c.variants[i])
@@ -133,9 +134,7 @@ func (c *number) refresh() {
 
 // text is TextControl: an entry committing on Enter, with the
 // "unsaved" badge up while the typed text is not committed. An
-// optional field's empty text is no value: the override drops, which
-// is where the Rust None lands too once runtime.toml (which cannot
-// hold one) is read back.
+// optional field's empty text is no value (store.unset).
 type text struct {
 	*widget.Entry
 	k        *kit
@@ -171,7 +170,7 @@ func (c *text) dirtyBadge() *widget.Label { return c.badge }
 // badge stays up).
 func (c *text) commit(s string) bool {
 	if c.optional && s == "" {
-		c.k.store.reset(c.path)
+		c.k.store.unset(c.path)
 		return true
 	}
 	return c.k.store.set(c.path, s) == nil

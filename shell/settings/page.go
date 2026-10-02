@@ -64,6 +64,9 @@ func fields(paths ...string) []rowSpec {
 	return rows
 }
 
+// withKey names the row's label key.
+func withKey(key string) rowOpt { return func(r *rowSpec) { r.key = key } }
+
 // withEditor names the row's editor.
 func withEditor(e editorFunc) rowOpt { return func(r *rowSpec) { r.editor = e } }
 

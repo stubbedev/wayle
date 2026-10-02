@@ -69,3 +69,18 @@ func TestSourceAcceptsAliases(t *testing.T) {
 		t.Error("an unknown field resolved")
 	}
 }
+
+func TestPlainUnwrapsTables(t *testing.T) {
+	s := Load(t.TempDir(), DiscardDiagnostics)
+	if err := s.SetByPath("animations.osd", map[string]any{"enter": "fade"}); err != nil {
+		t.Fatal(err)
+	}
+	v, _ := s.GetByPath("animations.osd")
+	m, ok := Plain(v).(map[string]any)
+	if !ok || m["enter"] != "fade" {
+		t.Errorf("Plain = %#v, want the table as a map", Plain(v))
+	}
+	if Plain(int64(3)) != int64(3) {
+		t.Error("a scalar changed")
+	}
+}

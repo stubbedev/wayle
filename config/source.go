@@ -117,3 +117,8 @@ func stagedValue(root *table, path string) (any, bool) {
 	}
 	return widenFloats(toPlain(current)), true
 }
+
+// Plain turns a GetByPath value into plain Go values: tables become
+// map[string]any (their key order dropped), arrays []any, scalars as
+// they are.
+func Plain(v any) any { return toPlain(v) }
