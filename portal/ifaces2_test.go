@@ -244,27 +244,6 @@ func TestWallpaperFailsWithoutTheShell(t *testing.T) {
 	}
 }
 
-func TestFileURIPath(t *testing.T) {
-	for uri, want := range map[string]string{
-		"file:///home/u/bg.png":    "/home/u/bg.png",
-		"file://host/srv/bg.png":   "/srv/bg.png",
-		"file:///a%2":              "/a%2",
-		"file:///a%zz":             "/a%zz",
-		"file:///%E2%9C%93%ff.png": "/✓�.png",
-		"file:///trailing%41":      "/trailingA",
-		"file:///mid%41b":          "/midAb",
-	} {
-		if got, ok := fileURIPath(uri); !ok || got != want {
-			t.Errorf("fileURIPath(%q) = %q, %v; want %q", uri, got, ok, want)
-		}
-	}
-	for _, uri := range []string{"https://x/y", "file://host", "/plain"} {
-		if _, ok := fileURIPath(uri); ok {
-			t.Errorf("%q read as a path", uri)
-		}
-	}
-}
-
 func TestInhibitHoldsTheLockUntilClose(t *testing.T) {
 	var asked dbustest.Var[[]string]
 	var lockErr dbustest.Var[error]

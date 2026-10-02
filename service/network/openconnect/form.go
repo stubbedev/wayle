@@ -3,7 +3,8 @@ package openconnect
 import (
 	"fmt"
 	"strings"
-	"unicode/utf8"
+
+	"github.com/stubbedev/wayle/internal/fileuri"
 )
 
 // application/x-www-form-urlencoded encoding (form.rs). Both the login
@@ -45,40 +46,8 @@ func formEncode(pairs ...pair) string {
 	return strings.Join(parts, "&")
 }
 
-// percentDecode resolves %XX escapes back to bytes. A % that does not
-// begin a valid escape is kept as written rather than dropped: it is a
-// literal percent sign in someone's cookie or filename, and losing it
-// silently corrupts the value.
-func percentDecode(value string) []byte {
-	out := make([]byte, 0, len(value))
-	for i := 0; i < len(value); i++ {
-		if value[i] == '%' && i+2 < len(value) && isHex(value[i+1]) && isHex(value[i+2]) {
-			out = append(out, unhex(value[i+1])<<4|unhex(value[i+2]))
-			i += 2
-			continue
-		}
-		out = append(out, value[i])
-	}
-	return out
-}
-
 // decodeComponent is the inverse of formEscape for one component, with
 // invalid UTF-8 replaced rather than refused (decode_component).
 func decodeComponent(value string) string {
-	return strings.ToValidUTF8(string(percentDecode(value)), string(utf8.RuneError))
-}
-
-func isHex(c byte) bool {
-	return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'
-}
-
-func unhex(c byte) byte {
-	switch {
-	case '0' <= c && c <= '9':
-		return c - '0'
-	case 'a' <= c && c <= 'f':
-		return c - 'a' + 10
-	default:
-		return c - 'A' + 10
-	}
+	return fileuri.DecodeString(value)
 }

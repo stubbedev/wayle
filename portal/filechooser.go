@@ -7,6 +7,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/wayle/internal/fileuri"
 	"github.com/stubbedev/wayle/shell/filechooser"
 )
 
@@ -59,7 +60,7 @@ func (f fileChooser) SaveFiles(_ dbus.ObjectPath, _, _, title string, options Va
 	files, _ := options["files"].Value().([][]byte)
 	uris := make([]string, 0, len(files))
 	for _, name := range files {
-		uris = append(uris, folder+"/"+percentEncode(cString(name), ""))
+		uris = append(uris, folder+"/"+fileuri.Encode(cString(name), ""))
 	}
 	return urisResponse("save files", uris, nil)
 }

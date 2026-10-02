@@ -21,6 +21,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/stubbedev/wayle/internal/fileuri"
 )
 
 // AnyConnect single sign-on through the system browser (sso.rs): the
@@ -291,7 +293,7 @@ func parseRequestLine(line string) (ssoCallback, bool) {
 // character and this is a path, not a form body. Invalid UTF-8 keeps the
 // value as it came.
 func pathDecode(value string) string {
-	decoded := percentDecode(value)
+	decoded := fileuri.Decode(value)
 	if !utf8.Valid(decoded) {
 		return value
 	}

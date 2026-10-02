@@ -10,6 +10,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/wayle/internal/fileuri"
 )
 
 // email is org.freedesktop.impl.portal.Email (email.rs): the user's
@@ -78,33 +79,18 @@ func mailto(options Vardict) string {
 	var params []string
 	for _, key := range []string{"cc", "bcc"} {
 		if list := stringList(options, key); len(list) > 0 {
-			params = append(params, key+"="+percentEncode(strings.Join(list, ","), ""))
+			params = append(params, key+"="+fileuri.Encode(strings.Join(list, ","), ""))
 		}
 	}
 	for _, key := range []string{"subject", "body"} {
 		if s, ok := optString(options, key); ok {
-			params = append(params, key+"="+percentEncode(s, ""))
+			params = append(params, key+"="+fileuri.Encode(s, ""))
 		}
 	}
 	if len(params) > 0 {
 		uri += "?" + strings.Join(params, "&")
 	}
 	return uri
-}
-
-// percentEncode keeps RFC 3986's unreserved bytes and those in keep,
-// and escapes the rest.
-func percentEncode(s, keep string) string {
-	var b strings.Builder
-	for i := range len(s) {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || strings.IndexByte("-_.~", c) >= 0 || strings.IndexByte(keep, c) >= 0 {
-			b.WriteByte(c)
-		} else {
-			fmt.Fprintf(&b, "%%%02X", c)
-		}
-	}
-	return b.String()
 }
 
 // stringList reads an `as` option.

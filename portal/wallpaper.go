@@ -2,12 +2,11 @@ package portal
 
 import (
 	"context"
-	"strconv"
-	"strings"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/wayle/internal/fileuri"
 	"github.com/stubbedev/wayle/service/wallpaper"
 	"github.com/stubbedev/wayle/shell/portaldialogs"
 )
@@ -28,7 +27,7 @@ func wallpaperIface(conn *dbus.Conn) dbusx.Interface {
 // SetWallpaperURI sets the wallpaper, after the preview dialog when
 // show-preview asks for one.
 func (w wallpaperPortal) SetWallpaperURI(_ dbus.ObjectPath, _, _, uri string, options Vardict) (uint32, *dbus.Error) {
-	path, ok := fileURIPath(uri)
+	path, ok := fileuri.Path(uri)
 	if !ok {
 		warnf("wallpaper: only file:// URIs are supported: %s", uri)
 		return ResponseOther, nil
@@ -49,36 +48,4 @@ func (w wallpaperPortal) SetWallpaperURI(_ dbus.ObjectPath, _, _, uri string, op
 		return ResponseOther, nil
 	}
 	return ResponseSuccess, nil
-}
-
-// fileURIPath decodes a file:// URI's path, dropping any authority
-// (file://host/path) and undoing %XX escapes; other schemes, and a
-// file URI with no path, are not paths.
-func fileURIPath(uri string) (string, bool) {
-	rest, ok := strings.CutPrefix(uri, "file://")
-	if !ok {
-		return "", false
-	}
-	slash := strings.IndexByte(rest, '/')
-	if slash < 0 {
-		return "", false
-	}
-	return percentDecode(rest[slash:]), true
-}
-
-// percentDecode undoes %XX escapes, leaving a malformed one as is and
-// replacing invalid UTF-8 as from_utf8_lossy does.
-func percentDecode(s string) string {
-	out := make([]byte, 0, len(s))
-	for i := 0; i < len(s); i++ {
-		if s[i] == '%' && i+2 < len(s) {
-			if b, err := strconv.ParseUint(s[i+1:i+3], 16, 8); err == nil {
-				out = append(out, byte(b))
-				i += 2
-				continue
-			}
-		}
-		out = append(out, s[i])
-	}
-	return strings.ToValidUTF8(string(out), "�")
 }

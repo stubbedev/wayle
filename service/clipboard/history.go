@@ -16,6 +16,8 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/stubbedev/wayle/internal/fileuri"
 )
 
 // DefaultCapacity is how many entries are kept before the oldest is
@@ -139,7 +141,7 @@ func (e Entry) Paths() []string {
 			continue
 		}
 		if rest, ok := strings.CutPrefix(line, "file://"); ok {
-			paths = append(paths, percentDecode(rest))
+			paths = append(paths, fileuri.DecodeString(rest))
 		}
 	}
 	return paths
@@ -345,39 +347,6 @@ func truncateChars(text string, maxChars int) string {
 	}
 	b.WriteRune('…')
 	return b.String()
-}
-
-// percentDecode turns %20 and friends back into bytes. URIs on the
-// clipboard are percent-encoded, so a file called "my photo.png"
-// arrives as my%20photo.png and would otherwise be shown, and opened,
-// under the wrong name. A % not followed by two hex digits is not an
-// escape after all and is kept as it was rather than dropping
-// characters out of a path.
-func percentDecode(value string) string {
-	out := make([]byte, 0, len(value))
-	for i := 0; i < len(value); i++ {
-		if value[i] == '%' && i+2 < len(value) && isHex(value[i+1]) && isHex(value[i+2]) {
-			out = append(out, unhex(value[i+1])<<4|unhex(value[i+2]))
-			i += 2
-			continue
-		}
-		out = append(out, value[i])
-	}
-	return strings.ToValidUTF8(string(out), "�")
-}
-
-func isHex(c byte) bool {
-	return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'
-}
-
-func unhex(c byte) byte {
-	switch {
-	case c >= 'a':
-		return c - 'a' + 10
-	case c >= 'A':
-		return c - 'A' + 10
-	}
-	return c - '0'
 }
 
 // humanSize is a byte count short enough for a list row.

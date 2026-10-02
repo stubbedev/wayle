@@ -6,6 +6,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/wayle/internal/fileuri"
 	"github.com/stubbedev/wayle/shell/screenshot"
 )
 
@@ -38,7 +39,7 @@ func (s screenshotPortal) Screenshot(_ dbus.ObjectPath, _, _ string, options Var
 	case path == "":
 		return ResponseCancelled, Vardict{}, nil
 	}
-	return ResponseSuccess, Vardict{"uri": dbus.MakeVariant(pathURI(path))}, nil
+	return ResponseSuccess, Vardict{"uri": dbus.MakeVariant(fileuri.FromPath(path))}, nil
 }
 
 // PickColor samples one screen pixel as an sRGB (ddd). The shell errors
@@ -52,6 +53,4 @@ func (s screenshotPortal) PickColor(_ dbus.ObjectPath, _, _ string, _ Vardict) (
 	return ResponseSuccess, Vardict{"color": dbus.MakeVariant(colorTuple{r, g, b})}, nil
 }
 
-// pathURI is a file:// URI for an absolute path, escaping every byte
 // but the unreserved ones and '/'.
-func pathURI(path string) string { return "file://" + percentEncode(path, "/") }
