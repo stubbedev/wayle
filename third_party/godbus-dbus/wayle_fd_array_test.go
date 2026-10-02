@@ -59,3 +59,39 @@ func TestFdArrayIndexPastTheFds(t *testing.T) {
 		t.Error("an out-of-range fd index decoded")
 	}
 }
+
+// TestDecodedStructsReencode is the second wayle patch: a struct inside
+// a variant decodes to []any, and re-encoding that must keep the
+// struct's wire form, nested in arrays and dicts too.
+func TestDecodedStructsReencode(t *testing.T) {
+	type sv struct {
+		S string
+		V Variant
+	}
+	for _, value := range []any{
+		sv{"themed", MakeVariant([]string{"a", "b"})},
+		[]sv{{"x", MakeVariant(uint32(1))}, {"y", MakeVariant(true)}},
+		map[string]sv{"k": {"bytes", MakeVariant([]byte{1, 2})}},
+		struct {
+			A byte
+			B []sv
+		}{7, []sv{{"z", MakeVariant(int64(-3))}}},
+	} {
+		body := map[string]Variant{"icon": MakeVariant(value)}
+		first, err := roundTrip(t, body)
+		if err != nil {
+			t.Fatalf("%T: %v", value, err)
+		}
+		// The decoded form, sent again, decodes to itself.
+		second, err := roundTrip(t, first[0])
+		if err != nil {
+			t.Fatalf("%T re-encoded: %v", value, err)
+		}
+		if !reflect.DeepEqual(first, second) {
+			t.Errorf("%T: %#v re-encoded as %#v", value, first, second)
+		}
+		if got := second[0].(map[string]Variant)["icon"].Signature(); got != SignatureOf(value) {
+			t.Errorf("%T: signature %s, want %s", value, got, SignatureOf(value))
+		}
+	}
+}

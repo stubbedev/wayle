@@ -46,7 +46,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 
 // interfaces is every interface the backend mounts at ObjectPath.
 func (b *Backend) interfaces() []dbusx.Interface {
-	return []dbusx.Interface{
+	return append([]dbusx.Interface{
 		settingsIface(b.cfg),
 		lockdownIface(),
 		backgroundIface(),
@@ -56,7 +56,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		inhibitor{b.conn, b.inhibitLock}.iface(),
 		b.notifier.iface(),
 		wallpaperIface(b.conn),
-	}
+	}, dialogIfaces(b.conn)...)
 }
 
 // Serve mounts the interfaces, claims BusName (failing loudly when

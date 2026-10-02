@@ -11,3 +11,10 @@ upstream decodes fd arrays.
   `attachment_fds`) arrived with an empty body. The slice is now
   `[]UnixFD`, and an index past the fds is an InvalidMessageError.
   Pinned by `wayle_fd_array_test.go`.
+- `encoder.go`, case `variantType`, and `wayle_encode_as.go`: a Variant's
+  value is encoded by the Variant's signature. `decode` returns a struct as
+  `[]any`, which the Go-type encoder wrote as an array of variants under the
+  struct signature: a malformed message, which dbus-daemon answers by
+  disconnecting the sender. Echoing a decoded GIcon (DynamicLauncher's
+  PrepareInstall) killed the portal's bus connection. Pinned by
+  `TestDecodedStructsReencode`.

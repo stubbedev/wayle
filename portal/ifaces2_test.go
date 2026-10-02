@@ -137,22 +137,27 @@ func (f *fakeWallpaperd) SetWallpaper(path, monitor string) *dbus.Error {
 	return nil
 }
 
-// fakeDialogs answers every dialog with yes.
+// fakeDialogs answers every dialog with yes or no.
 type fakeDialogs struct {
-	yes   bool
+	yes   dbustest.Var[bool]
 	asked dbustest.Var[[]any]
 }
 
 func (f *fakeDialogs) Access(r portaldialogs.AccessRequest) bool {
 	f.asked.Store([]any{r})
-	return f.yes
+	return f.yes.Load()
 }
 
-func (f *fakeDialogs) Account(reason string) bool       { f.asked.Store([]any{reason}); return f.yes }
-func (f *fakeDialogs) ConfirmWallpaper(uri string) bool { f.asked.Store([]any{uri}); return f.yes }
+func (f *fakeDialogs) Account(reason string) bool { f.asked.Store([]any{reason}); return f.yes.Load() }
+
+func (f *fakeDialogs) ConfirmWallpaper(uri string) bool {
+	f.asked.Store([]any{uri})
+	return f.yes.Load()
+}
+
 func (f *fakeDialogs) ChooseApplication(choices []string, contentType, uri string) string {
 	f.asked.Store([]any{choices, contentType, uri})
-	if f.yes {
+	if f.yes.Load() {
 		return "org.chosen.desktop"
 	}
 	return ""
@@ -160,12 +165,13 @@ func (f *fakeDialogs) ChooseApplication(choices []string, contentType, uri strin
 
 func (f *fakeDialogs) ConfirmInstall(name, icon string) bool {
 	f.asked.Store([]any{name, icon})
-	return f.yes
+	return f.yes.Load()
 }
 
 func serveDialogs(t *testing.T, r *rig, yes bool) *fakeDialogs {
 	t.Helper()
-	f := &fakeDialogs{yes: yes}
+	f := &fakeDialogs{}
+	f.yes.Store(yes)
 	release, err := portaldialogs.NewDaemon(f).Export(r.bus.Conn(t))
 	if err != nil {
 		t.Fatal(err)
@@ -225,7 +231,7 @@ func TestWallpaperPreview(t *testing.T) {
 	if got := d.asked.Load(); got[0] != "file:///a.png" {
 		t.Errorf("previewed %v", got)
 	}
-	d.yes = true
+	d.yes.Store(true)
 	if code := r.setWallpaper(t, "file:///a.png", preview); code != ResponseSuccess || w.set.Load()[0] != "/a.png" {
 		t.Errorf("accepted: code %d, set %v", code, w.set.Load())
 	}

@@ -51,10 +51,21 @@ func (n *notifier) forward() (stop func(), err error) {
 	}
 	signals := make(chan *dbus.Signal, 16)
 	n.conn.Signal(signals)
-	done := make(chan struct{})
+	// godbus closes the channel itself when the connection goes, so the
+	// loop ends on quit or that, and stop never closes it.
+	quit, done := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(done)
-		for s := range signals {
+		for {
+			var s *dbus.Signal
+			select {
+			case <-quit:
+				return
+			case s = <-signals:
+			}
+			if s == nil {
+				return
+			}
 			if s.Name != notifications.Interface+".ActionInvoked" || len(s.Body) != 2 {
 				continue
 			}
@@ -71,7 +82,7 @@ func (n *notifier) forward() (stop func(), err error) {
 	return func() {
 		_ = n.conn.RemoveMatchSignal(match...)
 		n.conn.RemoveSignal(signals)
-		close(signals)
+		close(quit)
 		<-done
 	}, nil
 }

@@ -191,7 +191,8 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		case variantType:
 			variant := v.Interface().(Variant)
 			enc.encode(reflect.ValueOf(variant.sig), depth+1)
-			enc.encode(reflect.ValueOf(variant.value), depth+1)
+			// wayle patch: by the signature (wayle_encode_as.go).
+			enc.encodeAs(reflect.ValueOf(variant.value), variant.sig.str, depth+1)
 		default:
 			for i := 0; i < v.Type().NumField(); i++ {
 				field := t.Field(i)
