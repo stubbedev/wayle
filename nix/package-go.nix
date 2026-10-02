@@ -69,12 +69,13 @@ buildGoModule {
 
   nativeBuildInputs = [ makeWrapper ];
 
-  # The binary dlopens libgstreamer and libglib (recorder) and libpam
-  # (lock screen) through purego, and the recorder finds its GStreamer
+  # The binary dlopens libgstreamer and libglib (recorder), libpam (lock
+  # screen) and libpipewire (the ScreenCast portal) through purego, and
+  # the recorder finds its GStreamer
   # plugins on GST_PLUGIN_SYSTEM_PATH_1_0.
   postFixup = ''
     wrapProgram $out/bin/wayle \
-      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ gst_all_1.gstreamer glib pam ]}" \
+      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ gst_all_1.gstreamer glib pam pipewire ]}" \
       --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins}"
   '';
 
