@@ -226,3 +226,13 @@ func (c ColorValue) ToCSS() string {
 		return TokenAccent.CSSVar()
 	}
 }
+
+// CssTokens are the palette tokens in schema order.
+func CssTokens() []CssToken {
+	variants := enumVariants(cssTokenType)
+	out := make([]CssToken, len(variants))
+	for i, v := range variants {
+		out[i] = CssToken(v)
+	}
+	return out
+}

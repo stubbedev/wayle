@@ -411,6 +411,7 @@ var schemaDocs = map[string]string{
 	"ExecutionMode":                                          "Execution mode for custom module commands.",
 	"ExecutionMode=poll":                                     "Run command at regular intervals defined by `interval-ms`.\n\nBest for commands that complete quickly and return current state\n(e.g., reading a file, querying system status).",
 	"ExecutionMode=watch":                                    "Spawn long-running process and update display on each stdout line.\n\nBest for event-driven updates without polling overhead\n(e.g., `pactl subscribe`, `inotifywait`, `tail -f`).\nConfigure `restart-policy` to control restarts after exit.",
+	"FieldMeta.Elem":                                         "Elem describes a list's items (nil for anything else).",
 	"FieldMeta.Max":                                          "Min and Max bound a number: the type's own range, narrowed by a\nvalidated newtype's (Percentage 0-100, ScaleFactor 0.25-3).",
 	"FieldMeta.Min":                                          "Min and Max bound a number: the type's own range, narrowed by a\nvalidated newtype's (Percentage 0-100, ScaleFactor 0.25-3).",
 	"FieldMeta.Optional":                                     "Optional is an Option<T> leaf, which may be unset.",

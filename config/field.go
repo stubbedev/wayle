@@ -46,6 +46,8 @@ type FieldMeta struct {
 	Min, Max float64
 	// Optional is an Option<T> leaf, which may be unset.
 	Optional bool
+	// Elem describes a list's items (nil for anything else).
+	Elem *FieldMeta
 }
 
 // Field describes the leaf at a dot path, or a field inside a value
@@ -69,12 +71,20 @@ func Field(path string) (FieldMeta, bool) {
 			return FieldMeta{}, false
 		}
 	}
-	t := f.typ
+	return describe(f.typ), true
+}
+
+// describe is the FieldMeta of a field type.
+func describe(t reflect.Type) FieldMeta {
 	m := FieldMeta{}
 	if t.Kind() == reflect.Pointer {
 		m.Optional, t = true, t.Elem()
 	}
 	m.Type = schemaName(t)
+	if t.Kind() == reflect.Slice && !implements(t, schemaProviderType) {
+		elem := describe(t.Elem())
+		m.Elem = &elem
+	}
 	switch {
 	case enumVariants(t) != nil:
 		m.Kind, m.Variants = FieldEnum, enumVariants(t)
@@ -89,7 +99,7 @@ func Field(path string) (FieldMeta, bool) {
 	case encodesAsString(t):
 		m.Kind = FieldText
 	}
-	return m, true
+	return m
 }
 
 func isInt(k reflect.Kind) bool {

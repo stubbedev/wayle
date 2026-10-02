@@ -4,6 +4,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -82,7 +84,7 @@ func TestSourceBadges(t *testing.T) {
 
 func TestToggleWritesAndPersistsAndRefreshesSilently(t *testing.T) {
 	k := testKit(t, "")
-	c := newToggle(k, "bar.dropdown-shadow")
+	c := newToggle(k, pathSlot(k.store, "bar.dropdown-shadow"))
 	if !c.On() {
 		t.Fatal("the switch does not show the default (on)")
 	}
@@ -104,7 +106,7 @@ func TestToggleWritesAndPersistsAndRefreshesSilently(t *testing.T) {
 func TestEnumSelectLabelsAndWrites(t *testing.T) {
 	k := testKit(t, "")
 	meta, _ := config.Field("osd.position")
-	c := newEnumSelect(k, "osd.position", meta)
+	c := newEnumSelect(k, pathSlot(k.store, "osd.position"), meta)
 	if got, want := c.Selection(), i18n.Settings().Get("enum-osd-position-bottom"); got != want {
 		t.Errorf("selection %q, want the default's label %q", got, want)
 	}
@@ -114,7 +116,7 @@ func TestEnumSelectLabelsAndWrites(t *testing.T) {
 	}
 	// An enum Rust leaves unlabeled shows its raw values.
 	vpn, _ := config.Field("modules.network.vpn-show")
-	raw := newEnumSelect(k, "modules.network.vpn-show", vpn)
+	raw := newEnumSelect(k, pathSlot(k.store, "modules.network.vpn-show"), vpn)
 	if raw.Selection() != "auto" {
 		t.Errorf("unlabeled selection %q, want the raw value", raw.Selection())
 	}
@@ -129,7 +131,7 @@ func TestEnumSelectLabelsAndWrites(t *testing.T) {
 func TestNumberWritesWholeNumbersAndClamps(t *testing.T) {
 	k := testKit(t, "")
 	meta, _ := config.Field("osd.duration")
-	c, err := autoEditor(k, "osd.duration", meta)
+	c, err := autoEditor(k, pathSlot(k.store, "osd.duration"), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +144,7 @@ func TestNumberWritesWholeNumbersAndClamps(t *testing.T) {
 		t.Errorf("stored %#v, want int64 2501", v)
 	}
 	scale, _ := config.Field("styling.scale")
-	s := newNumber(k, "styling.scale", scale.Min, scale.Max, 0.05, 2)
+	s := newNumber(k, pathSlot(k.store, "styling.scale"), scale.Min, scale.Max, 0.05, 2)
 	s.SelectAll()
 	s.Insert("9")
 	s.KeyAction(widget.KeyEnter, 0)
@@ -154,7 +156,7 @@ func TestNumberWritesWholeNumbersAndClamps(t *testing.T) {
 func TestTextCommitsOnEnterWithTheDirtyBadge(t *testing.T) {
 	k := testKit(t, "")
 	meta, _ := config.Field("osd.monitor")
-	c, _ := autoEditor(k, "osd.monitor", meta)
+	c, _ := autoEditor(k, pathSlot(k.store, "osd.monitor"), meta)
 	tx := c.(*text)
 	if tx.Text() != "primary" || tx.badge.Visible() {
 		t.Fatalf("initial %q badge %v", tx.Text(), tx.badge.Visible())
@@ -169,7 +171,7 @@ func TestTextCommitsOnEnterWithTheDirtyBadge(t *testing.T) {
 		t.Errorf("after Enter value %v badge %v", v, tx.badge.Visible())
 	}
 	// A value the field refuses keeps the badge up and writes nothing.
-	bg := newText(k, "styling.palette.bg", false)
+	bg := newText(k, pathSlot(k.store, "styling.palette.bg"), false)
 	bg.SelectAll()
 	bg.Insert("#zz")
 	bg.KeyAction(widget.KeyEnter, 0)
@@ -183,7 +185,7 @@ func TestTextCommitsOnEnterWithTheDirtyBadge(t *testing.T) {
 	}
 	// Clearing an optional drops its override.
 	opt, _ := config.Field("modules.weather.visual-crossing-key")
-	key := newText(k, "modules.weather.visual-crossing-key", opt.Optional)
+	key := newText(k, pathSlot(k.store, "modules.weather.visual-crossing-key"), opt.Optional)
 	key.Insert("abc")
 	key.KeyAction(widget.KeyEnter, 0)
 	if k.store.svc.Source("modules.weather.visual-crossing-key") != config.SourceRuntime {
@@ -212,7 +214,7 @@ func TestSliderCommitsPercentages(t *testing.T) {
 func TestFieldControlRefusesWhatItCannotEdit(t *testing.T) {
 	k := testKit(t, "")
 	meta, _ := config.Field("osd.presets")
-	if _, err := autoEditor(k, "osd.presets", meta); err == nil {
+	if _, err := autoEditor(k, pathSlot(k.store, "osd.presets"), meta); err == nil {
 		t.Error("a list got an auto editor")
 	}
 	defer func() {
@@ -465,7 +467,7 @@ func TestValueStructFields(t *testing.T) {
 func TestOptionalEnumInheritsOrPicks(t *testing.T) {
 	k := testKit(t, "")
 	meta, _ := config.Field("animations.enter")
-	c := newOptionalEnum(k, "animations.enter", meta)
+	c := newOptionalEnum(k, pathSlot(k.store, "animations.enter"), meta)
 	if c.Selected() != 0 || c.Selection() != i18n.Settings().Get("settings-inherit") {
 		t.Fatalf("unset shows %q", c.Selection())
 	}
@@ -486,7 +488,7 @@ func TestOptionalEnumInheritsOrPicks(t *testing.T) {
 
 func TestOptionalNumberOverrideSwitch(t *testing.T) {
 	k := testKit(t, "")
-	c := newOptionalNumber(k, "animations.enter-duration", 0, maxDurationMS, durationStepMS, 0, durationFallbackMS)
+	c := newOptionalNumber(k, pathSlot(k.store, "animations.enter-duration"), 0, maxDurationMS, durationStepMS, durationFallbackMS)
 	if c.on.On() || c.spin.Enabled() {
 		t.Fatal("an unset duration shows an active override")
 	}
@@ -511,7 +513,7 @@ func TestOptionalNumberOverrideSwitch(t *testing.T) {
 
 func TestSizeEditorModes(t *testing.T) {
 	k := testKit(t, "")
-	c := newSizeEditor(k, "osd.margin", config.OsdMarginBaseRem)
+	c := newSizeEditor(k, pathSlot(k.store, "osd.margin"), config.OsdMarginBaseRem)
 	if c.mode.Selected() != sizeScale || c.spin.Value() != 1 {
 		t.Fatalf("default margin shows mode %d value %v, want scale 1", c.mode.Selected(), c.spin.Value())
 	}
@@ -560,7 +562,7 @@ func TestFontEditorPicksAFamily(t *testing.T) {
 	prev := fontFamilies
 	fontFamilies = func() ([]string, error) { return []string{"Cantarell", "DejaVu Sans", "Noto Sans"}, nil }
 	t.Cleanup(func() { fontFamilies = prev })
-	c := newFontEditor(k, "general.font-sans")
+	c := newFontEditor(k, pathSlot(k.store, "general.font-sans"))
 	if want, _ := k.store.value("general.font-sans").(string); c.label.Text() != want {
 		t.Fatalf("label %q, want the configured family %q", c.label.Text(), want)
 	}
@@ -602,7 +604,7 @@ func TestColorEditorWritesTheDialogsPick(t *testing.T) {
 	k := testKit(t, "")
 	f := &fakePickers{}
 	k.pickers = f
-	c := newColorEditor(k, "lock.background-color")
+	c := newColorEditor(k, pathSlot(k.store, "lock.background-color"))
 	c.ClickAt(widget.Point{})
 	if f.colorFn == nil {
 		t.Fatal("no dialog opened")
@@ -629,7 +631,7 @@ func TestFileEditorBrowses(t *testing.T) {
 	k := testKit(t, "")
 	f := &fakePickers{}
 	k.pickers = f
-	c := newFileEditor(k, "lock.background-image")
+	c := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
 	c.entry.Insert("/typed")
 	if !c.entry.badge.Visible() {
 		t.Fatal("typing did not raise the unsaved badge")
@@ -677,5 +679,314 @@ func TestGreeterApplyStagesTheAllowedKeys(t *testing.T) {
 	btn.ClickAt(widget.Point{})
 	if !strings.Contains(widget.DumpTree(footer, nil), greeterApplyFailed) {
 		t.Error("a failed apply did not show on the button")
+	}
+}
+
+func TestColorValueEditor(t *testing.T) {
+	for _, tok := range config.CssTokens() {
+		if _, ok := cssTokenMeta[tok]; !ok {
+			t.Errorf("token %s has no label", tok)
+		}
+	}
+	k := testKit(t, "")
+	path := "modules.clock.icon-color"
+	if m, ok := config.Field(path); !ok || m.Type != "ColorValue" {
+		t.Fatalf("test premise: %s is %+v", path, m)
+	}
+	c := fieldControl(k, field(path)).(*colorValueEditor)
+	idx := func(id string) int { return slices.Index(c.ids, id) }
+	cur, _ := k.store.value(path).(string)
+	if c.drop.Selected() != idx(cur) || c.swatch.Visible() {
+		t.Fatalf("shows row %d (swatch %v) for %q", c.drop.Selected(), c.swatch.Visible(), cur)
+	}
+	c.drop.SetSelected(idx("red"))
+	if v := k.store.value(path); v != "red" {
+		t.Errorf("token pick wrote %v", v)
+	}
+	c.drop.SetSelected(idx(colorCustom))
+	if v := k.store.value(path); v != "#ffffff" || !c.swatch.Visible() {
+		t.Errorf("custom wrote %v (swatch %v), want white and the swatch", v, c.swatch.Visible())
+	}
+	_ = k.store.set(path, "#123456")
+	c.refresh()
+	if c.drop.Selected() != idx(colorCustom) || !c.swatch.Visible() {
+		t.Error("a hex value does not show as custom")
+	}
+	c.drop.SetSelected(idx(colorTransparent))
+	c.drop.SetSelected(idx(colorCustom))
+	if v := k.store.value(path); v != "#ffffff" {
+		t.Errorf("custom after a keyword wrote %v, want white", v)
+	}
+	before := k.store.value(path)
+	c.picked(slices.Index(c.ids, ""))
+	if k.store.value(path) != before {
+		t.Error("a header row wrote")
+	}
+}
+
+func TestIconEditorPicks(t *testing.T) {
+	k := testKit(t, "")
+	f := &fakePickers{}
+	k.pickers = f
+	prev := iconNames
+	iconNames = func() []string { return []string{"ld-battery-symbolic", "ld-bell-symbolic", "tb-cpu-symbolic"} }
+	t.Cleanup(func() { iconNames = prev })
+	path := "modules.clock.icon-name"
+	c := newIconEditor(k, pathSlot(k.store, path))
+	if cur, _ := k.store.value(path).(string); c.label.Text() != cur || c.icon.Name() != cur {
+		t.Fatalf("trigger shows %q/%q, want %q", c.label.Text(), c.icon.Name(), cur)
+	}
+	c.btn.ClickAt(widget.Point{})
+	p := c.picker
+	if p == nil || f.content != widget.Widget(p.root) {
+		t.Fatal("no picker opened")
+	}
+	p.search.Insert("LD-B")
+	if len(p.shown) != 2 {
+		t.Errorf("filter kept %v, want the two ld-b icons", p.shown)
+	}
+	p.list.OnActivate(1)
+	if v := k.store.value(path); v != "ld-bell-symbolic" || f.closed != 1 {
+		t.Errorf("pick wrote %v (closed %d)", v, f.closed)
+	}
+	// Enter picks the typed name; the clear button picks none.
+	p.search.SelectAll()
+	p.search.Insert("custom-icon")
+	p.search.KeyAction(widget.KeyEnter, 0)
+	if v := k.store.value(path); v != "custom-icon" {
+		t.Errorf("Enter wrote %v", v)
+	}
+	p.pick("")
+	c.refresh()
+	if c.label.Text() != i18n.Settings().Get("settings-icon-none") || c.icon.Name() != "ld-image-symbolic" {
+		t.Errorf("cleared trigger shows %q/%q", c.label.Text(), c.icon.Name())
+	}
+}
+
+func TestActionEditor(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.volume.left-click"
+	choices := actionChoices("volume")
+	_ = k.store.set(path, "")
+	c := newActionEditor(k, pathSlot(k.store, path), choices)
+	if c.drop.Selected() != c.noneIndex() || c.reveal.Revealed() {
+		t.Fatalf("an empty action shows %d (entry %v), want None", c.drop.Selected(), c.reveal.Revealed())
+	}
+	c.drop.SetSelected(1)
+	if v := k.store.value(path); v != choices[1].command {
+		t.Errorf("preset wrote %v", v)
+	}
+	// Custom: the entry shows, nothing is written until typed, then
+	// every edit writes.
+	c.drop.SetSelected(c.customIndex())
+	if !c.reveal.Revealed() || k.store.value(path) != choices[1].command {
+		t.Fatalf("custom: entry %v, value %v", c.reveal.Revealed(), k.store.value(path))
+	}
+	c.entry.Insert("notify-send hi")
+	if v := k.store.value(path); v != "notify-send hi" {
+		t.Errorf("typed custom wrote %v", v)
+	}
+	c.refresh()
+	if c.drop.Selected() != c.customIndex() || c.entry.Text() != "notify-send hi" {
+		t.Error("a custom command does not refresh as custom")
+	}
+	// A refresh to a preset leaves custom mode; typing then writes nothing.
+	_ = k.store.set(path, choices[0].command)
+	c.refresh()
+	if c.drop.Selected() != 0 || c.reveal.Revealed() || c.custom {
+		t.Errorf("refresh to a preset shows %d (entry %v)", c.drop.Selected(), c.reveal.Revealed())
+	}
+	c.entry.Insert("x")
+	if v := k.store.value(path); v != choices[0].command {
+		t.Errorf("a hidden entry wrote %v", v)
+	}
+	// An unknown command opens as custom.
+	_ = k.store.set(path, "my-script")
+	if d := newActionEditor(k, pathSlot(k.store, path), choices); d.drop.Selected() != d.customIndex() || d.entry.Text() != "my-script" {
+		t.Errorf("an unknown command opens at %d with %q", d.drop.Selected(), d.entry.Text())
+	}
+	c.drop.SetSelected(c.noneIndex())
+	if v := k.store.value(path); v != "" {
+		t.Errorf("None wrote %v", v)
+	}
+}
+
+func TestStringListEditor(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.battery.level-icons"
+	c := fieldControl(k, field(path, stringList)).(*listEditor)
+	start, _ := k.store.value(path).([]any)
+	if len(c.items) != len(start) || len(start) < 2 {
+		t.Fatalf("%d rows for %v", len(c.items), start)
+	}
+	c.items[0].(textItem).Insert("x")
+	got, _ := k.store.value(path).([]any)
+	if got[0] != start[0].(string)+"x" {
+		t.Errorf("an edit wrote %v", got)
+	}
+	c.move(c.items[0], 1)
+	got, _ = k.store.value(path).([]any)
+	if got[1] != start[0].(string)+"x" || got[0] != start[1] {
+		t.Errorf("move down wrote %v", got)
+	}
+	c.move(c.items[len(c.items)-1], 1) // the last row cannot go down
+	c.remove(c.items[0])
+	if got, _ = k.store.value(path).([]any); len(got) != len(start)-1 {
+		t.Errorf("remove left %v", got)
+	}
+	n := len(c.items)
+	c.appendRow("")
+	c.commit()
+	if got, _ = k.store.value(path).([]any); len(got) != n+1 || got[n] != "" {
+		t.Errorf("add wrote %v", got)
+	}
+	// An outside change rebuilds; a matching one keeps the rows.
+	keep := c.items[0]
+	c.refresh()
+	if c.items[0] != keep {
+		t.Error("an unchanged list rebuilt its rows")
+	}
+	_ = k.store.set(path, []any{"a"})
+	c.refresh()
+	if len(c.items) != 1 || c.items[0].itemValue() != "a" {
+		t.Errorf("outside change gave %d rows", len(c.items))
+	}
+}
+
+func TestEnumAndIconListItems(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.dashboard.user-session.actions"
+	m, ok := config.Field(path)
+	if !ok || m.Elem == nil || m.Elem.Kind != config.FieldEnum {
+		t.Fatalf("test premise: %s is %+v", path, m)
+	}
+	c := fieldControl(k, field(path, enumList)).(*listEditor)
+	c.appendRow(c.spec.blank)
+	last := c.items[len(c.items)-1].(enumItem)
+	last.SetSelected(2)
+	got, _ := k.store.value(path).([]any)
+	if got[len(got)-1] != m.Elem.Variants[2] {
+		t.Errorf("enum row wrote %v", got[len(got)-1])
+	}
+	f := &fakePickers{}
+	k.pickers = f
+	prev := iconNames
+	iconNames = func() []string { return []string{"ld-a-symbolic"} }
+	t.Cleanup(func() { iconNames = prev })
+	icons := fieldControl(k, field("modules.battery.level-icons", iconList)).(*listEditor)
+	first := icons.items[0].(iconItem)
+	first.btn.ClickAt(widget.Point{})
+	first.picker.list.OnActivate(0)
+	if got, _ := k.store.value("modules.battery.level-icons").([]any); got[0] != "ld-a-symbolic" {
+		t.Errorf("icon row wrote %v", got)
+	}
+	if first.label.Text() != "ld-a-symbolic" {
+		t.Errorf("icon row shows %q after the pick", first.label.Text())
+	}
+}
+
+func TestThresholdCards(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.battery.thresholds"
+	_ = k.store.set(path, []any{})
+	c := fieldControl(k, field(path, thresholdList)).(*cardList)
+	if len(c.cards) != 0 {
+		t.Fatalf("%d cards for an empty list", len(c.cards))
+	}
+	// Add a card, bound it below 20 and color its icon.
+	c.slot.set(append(c.items(), c.spec.blank()))
+	c.rebuild()
+	if len(c.cards) != 1 || c.cards[0].title.Text() != i18n.Settings().Get("settings-threshold-card-title")+" 1" {
+		t.Fatalf("new card titled %q", c.cards[0].title.Text())
+	}
+	below := c.cards[0].controls[1].(*optionalNumber)
+	below.on.SetOn(true)
+	below.spin.SetValue(20)
+	below.spin.KeyAction(widget.KeyUp, 0)
+	items, _ := k.store.value(path).([]any)
+	if m, _ := items[0].(map[string]any); m["below"] != float64(21) {
+		t.Fatalf("below wrote %#v", items[0])
+	}
+	if got := c.cards[0].title.Text(); got != "≤ 21" {
+		t.Errorf("title %q, want ≤ 21", got)
+	}
+	icon := c.cards[0].controls[2].(*colorValueEditor)
+	if icon.drop.Selected() != slices.Index(icon.ids, colorAuto) {
+		t.Error("an unset color does not show as auto")
+	}
+	icon.drop.SetSelected(slices.Index(icon.ids, "red"))
+	items, _ = k.store.value(path).([]any)
+	if m, _ := items[0].(map[string]any); m["icon-color"] != "red" || m["below"] != float64(21) {
+		t.Errorf("icon color wrote %#v", items[0])
+	}
+	below.on.SetOn(false)
+	items, _ = k.store.value(path).([]any)
+	if m, _ := items[0].(map[string]any); m["below"] != nil {
+		t.Errorf("the override switch kept below: %#v", m)
+	}
+	// An outside change of a field refreshes in place; of the count, rebuilds.
+	keep := c.cards[0]
+	_ = k.store.set(path, []any{map[string]any{"above": 80.0}})
+	c.refresh()
+	if c.cards[0] != keep || c.cards[0].title.Text() != "≥ 80" {
+		t.Errorf("in-place refresh: title %q", c.cards[0].title.Text())
+	}
+	_ = k.store.set(path, []any{map[string]any{}, map[string]any{}})
+	c.refresh()
+	if len(c.cards) != 2 {
+		t.Errorf("%d cards after an outside add", len(c.cards))
+	}
+}
+
+func TestStringMapEditor(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.window-title.icon-mappings"
+	_ = k.store.set(path, map[string]any{"b": "2", "a": "1"})
+	c := fieldControl(k, field(path, stringMap)).(*listEditor)
+	if len(c.items) != 2 || c.items[0].itemValue() != [2]string{"a", "1"} {
+		t.Fatalf("rows %v, want the pairs sorted by key", c.values())
+	}
+	// A new row's typing never reorders or rebuilds the rows.
+	c.appendRow(c.spec.blank)
+	row := c.items[2].(mapItem)
+	row.key.Insert("0")
+	c.refresh()
+	if len(c.items) != 3 || c.items[2] != row {
+		t.Fatal("typing a new key rebuilt the rows")
+	}
+	row.value.Insert("zero")
+	got, _ := k.store.value(path).(map[string]any)
+	if got["0"] != "zero" || got["a"] != "1" || len(got) != 3 {
+		t.Errorf("wrote %v", got)
+	}
+	// An empty key is dropped on write.
+	c.appendRow(c.spec.blank)
+	c.items[3].(mapItem).value.Insert("orphan")
+	if got, _ := k.store.value(path).(map[string]any); len(got) != 3 {
+		t.Errorf("an empty key was written: %v", got)
+	}
+	_ = k.store.set(path, map[string]any{"z": "26"})
+	c.refresh()
+	if len(c.items) != 1 || c.items[0].itemValue() != [2]string{"z", "26"} {
+		t.Errorf("outside change gave %v", c.values())
+	}
+}
+
+func TestMountPointsText(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.storage.mount-point"
+	c := fieldControl(k, field(path, mountPoints)).(*text)
+	for typed, want := range map[string]any{"/home": "/home", " /, /home ,": []any{"/", "/home"}, "  ": "/"} {
+		c.SelectAll()
+		c.Insert(typed)
+		c.KeyAction(widget.KeyEnter, 0)
+		if got := k.store.value(path); !reflect.DeepEqual(got, want) {
+			t.Errorf("%q wrote %#v, want %#v", typed, got, want)
+		}
+	}
+	_ = k.store.set(path, []any{"/a", "/b"})
+	c.refresh()
+	if c.Text() != "/a, /b" {
+		t.Errorf("a list shows %q", c.Text())
 	}
 }

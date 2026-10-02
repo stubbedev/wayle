@@ -119,3 +119,11 @@ func (p *settingsPage) refresh() {
 		r.refresh()
 	}
 }
+
+// spin is a number row with explicit bounds (number_f64,
+// number_u32_range, number_newtype).
+func spin(lo, hi, step float64, digits int) rowOpt {
+	return withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
+		return newNumber(k, s, lo, hi, step, digits)
+	})
+}

@@ -34,21 +34,21 @@ func enumLabels(meta config.FieldMeta) []string {
 type optionalEnum struct {
 	*widget.Dropdown
 	k        *kit
-	path     string
+	slot     slot
 	variants []string
 	syncing  bool
 }
 
-func newOptionalEnum(k *kit, path string, meta config.FieldMeta) *optionalEnum {
+func newOptionalEnum(k *kit, s slot, meta config.FieldMeta) *optionalEnum {
 	labels := append([]string{i18n.Settings().Get("settings-inherit")}, enumLabels(meta)...)
-	c := &optionalEnum{Dropdown: widget.NewDropdown(k.face, 14, labels, 0), k: k, path: path, variants: meta.Variants}
+	c := &optionalEnum{Dropdown: widget.NewDropdown(k.face, 14, labels, 0), k: k, slot: s, variants: meta.Variants}
 	c.OnSelect = func(i int) {
 		switch {
 		case c.syncing:
 		case i == 0:
-			k.store.unset(path)
+			c.slot.unset()
 		case i <= len(c.variants):
-			_ = k.store.set(path, c.variants[i-1])
+			_ = c.slot.set(c.variants[i-1])
 		}
 	}
 	c.refresh()
@@ -56,7 +56,7 @@ func newOptionalEnum(k *kit, path string, meta config.FieldMeta) *optionalEnum {
 }
 
 func (c *optionalEnum) refresh() {
-	v, _ := c.k.store.value(c.path).(string)
+	v, _ := c.slot.get().(string)
 	c.syncing = true
 	c.SetSelected(slices.Index(c.variants, v) + 1)
 	c.syncing = false
@@ -68,19 +68,18 @@ func (c *optionalEnum) refresh() {
 type optionalNumber struct {
 	*widget.Box
 	k       *kit
-	path    string
+	slot    slot
 	on      *widget.Switch
 	spin    *widget.SpinButton
-	digits  int
 	syncing bool
 }
 
-func newOptionalNumber(k *kit, path string, lo, hi, step float64, digits int, fallback float64) *optionalNumber {
-	c := &optionalNumber{Box: widget.NewBox(widget.Row, 8, 0), k: k, path: path, digits: digits}
+func newOptionalNumber(k *kit, s slot, lo, hi, step, fallback float64) *optionalNumber {
+	c := &optionalNumber{Box: widget.NewBox(widget.Row, 8, 0), k: k, slot: s}
 	c.on = widget.NewSwitch(false)
 	c.on.AddClass("inherit-switch")
 	c.on.SetTooltip(i18n.Settings().Get("settings-override"))
-	c.spin = widget.NewSpinButton(k.face, 14, 0, lo, hi, step, digits)
+	c.spin = widget.NewSpinButton(k.face, 14, 0, lo, hi, step, 0)
 	c.spin.SetValue(fallback)
 	c.AppendAligned(c.on, false, widget.AlignCenter)
 	c.AppendAligned(c.spin, false, widget.AlignCenter)
@@ -92,7 +91,7 @@ func newOptionalNumber(k *kit, path string, lo, hi, step float64, digits int, fa
 		if on {
 			c.write(c.spin.Value())
 		} else {
-			k.store.unset(path)
+			c.slot.unset()
 		}
 	}
 	// The spin is disabled while the override is off: only a live one
@@ -102,16 +101,11 @@ func newOptionalNumber(k *kit, path string, lo, hi, step float64, digits int, fa
 	return c
 }
 
-func (c *optionalNumber) write(v float64) {
-	if c.digits == 0 {
-		_ = c.k.store.set(c.path, int64(math.Round(v)))
-		return
-	}
-	_ = c.k.store.set(c.path, v)
-}
+// write stores a whole number (float fields take it as one).
+func (c *optionalNumber) write(v float64) { _ = c.slot.set(int64(math.Round(v))) }
 
 func (c *optionalNumber) refresh() {
-	v := c.k.store.value(c.path)
+	v := c.slot.get()
 	c.syncing = true
 	c.on.SetOn(v != nil)
 	c.spin.SetEnabled(v != nil)
@@ -127,8 +121,8 @@ func (c *optionalNumber) refresh() {
 // optionalSpin is number_u32_optional's row: the override switch and a
 // spin over [lo, hi] stepping by step, starting at fallback.
 func optionalSpin(lo, hi, step, fallback float64) rowOpt {
-	return withEditor(func(k *kit, path string, _ config.FieldMeta) control {
-		return newOptionalNumber(k, path, lo, hi, step, 0, fallback)
+	return withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
+		return newOptionalNumber(k, s, lo, hi, step, fallback)
 	})
 }
 
@@ -146,16 +140,16 @@ const (
 type sizeEditor struct {
 	*widget.Box
 	k       *kit
-	path    string
+	slot    slot
 	basePx  float64
 	mode    *widget.Dropdown
 	spin    *widget.SpinButton
 	syncing bool
 }
 
-func newSizeEditor(k *kit, path string, baseRem float64) *sizeEditor {
+func newSizeEditor(k *kit, s slot, baseRem float64) *sizeEditor {
 	t := i18n.Settings()
-	c := &sizeEditor{Box: widget.NewBox(widget.Row, 8, 0), k: k, path: path, basePx: baseRem * remBasePx}
+	c := &sizeEditor{Box: widget.NewBox(widget.Row, 8, 0), k: k, slot: s, basePx: baseRem * remBasePx}
 	c.mode = widget.NewDropdown(k.face, 14, []string{t.Get("settings-size-scale"), t.Get("settings-size-px")}, sizeScale)
 	c.spin = widget.NewSpinButton(k.face, 14, 0, 0, 10000, 0.05, 2)
 	c.AppendAligned(c.mode, false, widget.AlignCenter)
@@ -194,10 +188,10 @@ func (c *sizeEditor) configure(px bool, v float64) {
 func (c *sizeEditor) commit() {
 	v := c.spin.Value()
 	if c.mode.Selected() == sizePx {
-		_ = c.k.store.set(c.path, strconv.FormatFloat(math.Round(v), 'f', 0, 64)+"px")
+		_ = c.slot.set(strconv.FormatFloat(math.Round(v), 'f', 0, 64) + "px")
 		return
 	}
-	_ = c.k.store.set(c.path, v)
+	_ = c.slot.set(v)
 }
 
 // refresh shows the stored size: a number is a scale, a "<n>px" string
@@ -205,7 +199,7 @@ func (c *sizeEditor) commit() {
 func (c *sizeEditor) refresh() {
 	c.syncing = true
 	defer func() { c.syncing = false }()
-	switch v := c.k.store.value(c.path).(type) {
+	switch v := c.slot.get().(type) {
 	case float64:
 		c.mode.SetSelected(sizeScale)
 		c.configure(false, v)
@@ -224,8 +218,8 @@ func (c *sizeEditor) refresh() {
 
 // sizeBase is size_with_base for a row: the base rem a scale of 1 is.
 func sizeBase(rem float64) rowOpt {
-	return withEditor(func(k *kit, path string, _ config.FieldMeta) control {
-		return newSizeEditor(k, path, rem)
+	return withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
+		return newSizeEditor(k, s, rem)
 	})
 }
 

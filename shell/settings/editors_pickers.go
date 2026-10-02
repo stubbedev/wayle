@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/internal/icons"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -45,15 +47,15 @@ const fontPickerListPx = 18 * remBasePx * 1.1
 type fontEditor struct {
 	*widget.Box
 	k     *kit
-	path  string
+	slot  slot
 	label *widget.Label
 	btn   *widget.Button
 	// picker is the open (or last) picker.
-	picker *fontPicker
+	picker *searchPicker
 }
 
-func newFontEditor(k *kit, path string) *fontEditor {
-	c := &fontEditor{Box: widget.NewBox(widget.Row, 0, 0), k: k, path: path}
+func newFontEditor(k *kit, s slot) *fontEditor {
+	c := &fontEditor{Box: widget.NewBox(widget.Row, 0, 0), k: k, slot: s}
 	c.SetElement("menubutton")
 	c.AddClass("font")
 	c.label = k.label("", "font-picker-label")
@@ -66,7 +68,7 @@ func newFontEditor(k *kit, path string) *fontEditor {
 }
 
 func (c *fontEditor) refresh() {
-	s, _ := c.k.store.value(c.path).(string)
+	s, _ := c.slot.get().(string)
 	c.label.SetText(s)
 }
 
@@ -80,58 +82,115 @@ func (c *fontEditor) open() {
 	if err != nil {
 		log.Printf("settings: font families: %v", err)
 	}
-	var closePicker func()
-	p := newFontPicker(c.k, families, func(family string) {
-		_ = c.k.store.set(c.path, family)
-		if closePicker != nil {
-			closePicker()
-		}
-	})
-	c.picker = p
-	closePicker = c.k.pickers.popover(c.btn, p.root)
+	c.picker = openSearchPicker(c.k, c.btn, families, pickerSpec{
+		class: "font-picker-popover", listClass: "font-picker-list", scrollClass: "font-picker-scroll",
+		placeholder: "settings-font-search", maxH: int(math.Round(fontPickerListPx)),
+		row: func(k *kit, name string) widget.Widget {
+			row := widget.NewBox(widget.Row, 0, 0)
+			row.SetElement("row")
+			l := k.label(name, "font-picker-item")
+			l.SetEllipsize(widget.EllipsizeEnd)
+			row.Append(l, true)
+			return row
+		},
+	}, func(family string) { _ = c.slot.set(family) })
 }
 
-// fontPicker is the popover's tree: the search entry and the list
-// filtered by a case-insensitive substring.
-type fontPicker struct {
+// pickerSpec shapes a searchPicker: the CSS classes, the search
+// placeholder key, the row (or grid cell, with cellW) for a name, the
+// list's height cap and minimum width, and what sits beside the search
+// entry.
+type pickerSpec struct {
+	class, listClass, scrollClass, placeholder string
+	row                                        func(k *kit, name string) widget.Widget
+	cellW, maxH, minW                          int
+	// trailing builds what follows the search entry (the icon picker's
+	// clear button), handed the pick.
+	trailing func(k *kit, pick func(string)) widget.Widget
+	// pickTyped makes Enter in the search entry pick the typed text.
+	pickTyped bool
+}
+
+// searchPicker is the popovers' shared tree (FontPicker, the icon
+// picker): a search row over a virtualized list filtered by a
+// case-insensitive substring; one click on a row picks it, writes and
+// closes the popover.
+type searchPicker struct {
 	root   *widget.Box
 	search *widget.Entry
 	list   *widget.List
 	all    []string
 	shown  []string
 	k      *kit
-	onPick func(string)
+	spec   pickerSpec
+	pick   func(string)
 }
 
-func newFontPicker(k *kit, families []string, onPick func(string)) *fontPicker {
-	p := &fontPicker{k: k, all: families, shown: families, onPick: onPick}
+// openSearchPicker builds the picker and opens it beside anchor.
+func openSearchPicker(k *kit, anchor widget.Widget, names []string, spec pickerSpec, onPick func(string)) *searchPicker {
+	var closePicker func()
+	p := newSearchPicker(k, names, spec, func(name string) {
+		onPick(name)
+		if closePicker != nil {
+			closePicker()
+		}
+	})
+	closePicker = k.pickers.popover(anchor, p.root)
+	return p
+}
+
+func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string)) *searchPicker {
+	p := &searchPicker{k: k, all: names, shown: names, spec: spec, pick: pick}
 	p.root = widget.NewBox(widget.Column, 0, 0)
-	p.root.AddClass("font-picker-popover")
-	contents := widget.NewBox(widget.Column, 0, 0)
+	p.root.AddClass(spec.class)
+	contents := widget.NewBox(widget.Column, 8, 0)
 	contents.SetElement("contents")
 	p.search = widget.NewEntry(k.face, 14, 0)
-	p.search.SetPlaceholder(i18n.Settings().Get("settings-font-search"))
+	p.search.SetPlaceholder(i18n.Settings().Get(spec.placeholder))
 	p.search.OnChanged = p.filter
-	contents.Append(p.search, false)
-	p.list = widget.NewList[widget.Widget](fontRows{p}, 0)
-	p.list.AddClass("font-picker-list")
-	p.list.SetMaxHeight(int(math.Round(fontPickerListPx)))
+	if spec.pickTyped {
+		p.search.OnActivate = func(text string) {
+			if text != "" {
+				p.pick(text)
+			}
+		}
+	}
+	searchRow := widget.NewBox(widget.Row, 4, 0)
+	searchRow.Append(p.search, true)
+	if spec.trailing != nil {
+		searchRow.AppendAligned(spec.trailing(k, p.pick), false, widget.AlignCenter)
+	}
+	contents.Append(searchRow, false)
+	p.list = widget.NewList[widget.Widget](pickerRows{p}, 0)
+	p.list.AddClass(spec.listClass)
+	p.list.SetSingleClickActivate(true)
+	if spec.cellW > 0 {
+		p.list.SetCellWidth(spec.cellW)
+	}
+	if spec.maxH > 0 {
+		p.list.SetMaxHeight(spec.maxH)
+	}
 	p.list.OnActivate = func(i int) {
 		if i >= 0 && i < len(p.shown) {
-			p.onPick(p.shown[i])
+			p.pick(p.shown[i])
 		}
 	}
 	scroll := widget.NewBox(widget.Column, 0, 0)
-	scroll.AddClass("font-picker-scroll")
+	if spec.scrollClass != "" {
+		scroll.AddClass(spec.scrollClass)
+	}
+	if spec.minW > 0 {
+		scroll.SetInlineStyle(fmt.Sprintf("min-width: %dpx;", spec.minW))
+	}
 	scroll.Append(p.list, true)
 	contents.Append(scroll, true)
 	p.root.Append(contents, true)
 	return p
 }
 
-// filter narrows the list to the families containing the query
+// filter narrows the list to the names containing the query
 // (StringFilter, Substring, ignore case).
-func (p *fontPicker) filter(query string) {
+func (p *searchPicker) filter(query string) {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
 		p.shown = p.all
@@ -146,19 +205,12 @@ func (p *fontPicker) filter(query string) {
 	p.list.Reset()
 }
 
-// fontRows is the list model over the shown families.
-type fontRows struct{ p *fontPicker }
+// pickerRows is the list model over the shown names.
+type pickerRows struct{ p *searchPicker }
 
-func (r fontRows) Len() int { return len(r.p.shown) }
+func (r pickerRows) Len() int { return len(r.p.shown) }
 
-func (r fontRows) Row(i int) widget.Widget {
-	row := widget.NewBox(widget.Row, 0, 0)
-	row.SetElement("row")
-	l := r.p.k.label(r.p.shown[i], "font-picker-item")
-	l.SetEllipsize(widget.EllipsizeEnd)
-	row.Append(l, true)
-	return row
-}
+func (r pickerRows) Row(i int) widget.Widget { return r.p.spec.row(r.p.k, r.p.shown[i]) }
 
 // colorEditor is ColorControl: a swatch button opening the color
 // dialog; a pick writes the hex (rgba_to_hex: #rrggbb, #rrggbbaa
@@ -166,13 +218,13 @@ func (r fontRows) Row(i int) widget.Widget {
 type colorEditor struct {
 	*widget.Button
 	k      *kit
-	path   string
+	slot   slot
 	swatch *widget.Box
 	value  render.Color
 }
 
-func newColorEditor(k *kit, path string) *colorEditor {
-	c := &colorEditor{k: k, path: path, swatch: widget.NewBox(widget.Row, 0, 0)}
+func newColorEditor(k *kit, s slot) *colorEditor {
+	c := &colorEditor{k: k, slot: s, swatch: widget.NewBox(widget.Row, 0, 0)}
 	c.swatch.AddClass("color-swatch")
 	c.Button = k.button(c.swatch, c.open)
 	c.SetElement("colorswatch")
@@ -181,7 +233,7 @@ func newColorEditor(k *kit, path string) *colorEditor {
 }
 
 func (c *colorEditor) refresh() {
-	s, _ := c.k.store.value(c.path).(string)
+	s, _ := c.slot.get().(string)
 	col, ok := styling.ParseHex(s)
 	if !ok {
 		return
@@ -195,7 +247,7 @@ func (c *colorEditor) open() {
 		return
 	}
 	c.k.pickers.color(c.value, func(col render.Color) {
-		_ = c.k.store.set(c.path, styling.HexRGBA(col))
+		_ = c.slot.set(styling.HexRGBA(col))
 	})
 }
 
@@ -206,11 +258,11 @@ type fileEditor struct {
 	*widget.Box
 	entry *text
 	k     *kit
-	path  string
+	slot  slot
 }
 
-func newFileEditor(k *kit, path string) *fileEditor {
-	c := &fileEditor{Box: widget.NewBox(widget.Row, 0, 0), entry: newText(k, path, false), k: k, path: path}
+func newFileEditor(k *kit, s slot) *fileEditor {
+	c := &fileEditor{Box: widget.NewBox(widget.Row, 0, 0), entry: newText(k, s, false), k: k, slot: s}
 	c.AddClass("file-picker")
 	browse := k.button(k.icon("ld-folder-open-symbolic"), c.browse, "icon")
 	c.AppendAligned(c.entry, true, widget.AlignCenter)
@@ -227,14 +279,107 @@ func (c *fileEditor) browse() {
 		return
 	}
 	c.k.pickers.openFile(func(file string) {
-		if c.k.store.set(c.path, file) == nil {
+		if c.slot.set(file) == nil {
 			c.entry.badge.SetVisible(false)
 		}
 	})
 }
 
 // filePath is file_picker::file_path for a row.
-var filePath = withEditor(func(k *kit, path string, _ config.FieldMeta) control { return newFileEditor(k, path) })
+var filePath = withEditor(func(k *kit, s slot, _ config.FieldMeta) control { return newFileEditor(k, s) })
 
 // fontRow is font::font for a row.
-var fontRow = withEditor(func(k *kit, path string, _ config.FieldMeta) control { return newFontEditor(k, path) })
+var fontRow = withEditor(func(k *kit, s slot, _ config.FieldMeta) control { return newFontEditor(k, s) })
+
+// Icon picker sizes (editors/icon: PREVIEW_SIZE, the scroller's
+// minimum content size, and the 2rem cell at the 1.1 global scale plus
+// its padding).
+const (
+	iconPreviewPx  = 24
+	iconPickerH    = 420
+	iconPickerW    = 440
+	iconPickerCell = 40
+)
+
+// iconNames lists the installed icons the picker offers (a seam for
+// tests; IconManager::list).
+var iconNames = func() []string {
+	m, err := icons.NewManager()
+	if err != nil {
+		log.Printf("settings: icons: %v", err)
+		return nil
+	}
+	return m.List()
+}
+
+// iconEditor is icon_picker_widget: a trigger showing the icon and its
+// name that opens the searchable grid of installed icons; Enter picks
+// the typed name, the clear button none.
+type iconEditor struct {
+	*widget.Box
+	k      *kit
+	slot   slot
+	btn    *widget.Button
+	icon   *widget.Icon
+	label  *widget.Label
+	picker *searchPicker
+}
+
+func newIconEditor(k *kit, s slot) *iconEditor {
+	c := &iconEditor{Box: widget.NewBox(widget.Row, 0, 0), k: k, slot: s}
+	c.SetElement("menubutton")
+	c.AddClass("icon-picker-trigger")
+	c.icon = k.icon("ld-image-symbolic")
+	c.label = k.label("")
+	c.label.SetEllipsize(widget.EllipsizeEnd)
+	face := widget.NewBox(widget.Row, 8, 0)
+	face.AppendAligned(c.icon, false, widget.AlignCenter)
+	face.AppendAligned(c.label, true, widget.AlignCenter)
+	c.btn = k.button(face, c.open)
+	c.Append(c.btn, false)
+	c.refresh()
+	return c
+}
+
+// refresh is update_display: the icon and its name, or the image
+// placeholder and "None".
+func (c *iconEditor) refresh() {
+	name := c.slot.text()
+	if name == "" {
+		c.icon.SetThemeName("ld-image-symbolic")
+		c.label.SetText(i18n.Settings().Get("settings-icon-none"))
+		return
+	}
+	c.icon.SetThemeName(name)
+	c.label.SetText(name)
+}
+
+func (c *iconEditor) open() {
+	if c.k.pickers == nil {
+		return
+	}
+	c.picker = openSearchPicker(c.k, c.btn, iconNames(), pickerSpec{
+		class: "icon-picker-popover", placeholder: "settings-icon-search",
+		cellW: iconPickerCell, maxH: iconPickerH, minW: iconPickerW, pickTyped: true,
+		row: func(k *kit, name string) widget.Widget {
+			cell := widget.NewBox(widget.Row, 0, 0)
+			cell.AddClass("icon-picker-cell")
+			cell.SetTooltip(name)
+			cell.AppendAligned(widget.NewThemeIcon(name, iconPreviewPx), true, widget.AlignCenter)
+			return cell
+		},
+		trailing: func(k *kit, pick func(string)) widget.Widget {
+			clear := k.button(k.icon("ld-x-circle-symbolic"), func() { pick("") }, "flat", "icon-picker-clear")
+			clear.SetTooltip(i18n.Settings().Get("settings-icon-clear"))
+			return clear
+		},
+	}, func(name string) {
+		_ = c.slot.set(name)
+		c.refresh()
+	})
+}
+
+// iconRow is icon::icon for a row.
+var iconRow = withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
+	return newIconEditor(k, s)
+})

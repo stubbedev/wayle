@@ -204,3 +204,23 @@ func sourceOf(s store, path string) sourceInfo {
 		reset: s.svc.Source(path) == config.SourceRuntime,
 	}
 }
+
+// slot is where an editor reads and writes its value: a config path,
+// or one item of a list editor (written back with the whole list).
+type slot struct {
+	get func() any
+	set func(any) error
+	// unset clears an optional value (store.unset, or the item's key).
+	unset func()
+}
+
+// pathSlot is the value at a config path.
+func pathSlot(s store, path string) slot {
+	return slot{get: func() any { return s.value(path) }, set: func(v any) error { return s.set(path, v) }, unset: func() { s.unset(path) }}
+}
+
+// text is the slot's value as a string ("" for anything else).
+func (s slot) text() string {
+	v, _ := s.get().(string)
+	return v
+}

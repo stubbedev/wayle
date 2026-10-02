@@ -23,6 +23,7 @@ func layout(cfg *config.Config) []navSection {
 		{key: "settings-nav-overlays", pages: []pageSpec{sharePickerPage(cfg)}},
 		{key: "settings-nav-lock", pages: []pageSpec{lockPage(cfg)}},
 		{key: "settings-nav-greeter", pages: []pageSpec{greeterPage(cfg)}},
+		{key: "settings-nav-modules", pages: modulePages(cfg)},
 	}
 	out := sections[:0]
 	for _, s := range sections {

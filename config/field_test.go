@@ -17,12 +17,18 @@ func TestFieldPicksTheEditorFromTheType(t *testing.T) {
 		"styling.scale":                       {Kind: FieldFloat, Type: "ScaleFactor", Min: 0.25, Max: 3},
 		"osd.monitor":                         {Kind: FieldText, Type: "OsdMonitor"},
 		"modules.weather.visual-crossing-key": {Kind: FieldText, Type: "string", Optional: true},
-		"osd.presets":                         {Kind: FieldOther, Type: "Array_of_ToastPreset"},
+		"osd.presets":                         {Kind: FieldOther, Type: "Array_of_ToastPreset", Elem: &FieldMeta{Type: "ToastPreset"}},
 	} {
 		got, ok := Field(path)
 		if !ok || !reflect.DeepEqual(got, want) {
 			t.Errorf("Field(%s) = %+v %v, want %+v", path, got, ok, want)
 		}
+	}
+	if m, _ := Field("modules.battery.level-icons"); m.Elem == nil || m.Elem.Kind != FieldText {
+		t.Errorf("a string list's items = %+v, want text", m.Elem)
+	}
+	if m, _ := Field("osd.duration"); m.Elem != nil {
+		t.Error("a number has items")
 	}
 	pos, _ := Field("osd.position")
 	if pos.Kind != FieldEnum || pos.Type != "OsdPosition" || !slices.Contains(pos.Variants, "top-left") || len(pos.Variants) != 8 {
