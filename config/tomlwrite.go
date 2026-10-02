@@ -130,6 +130,10 @@ func childKey(parent []string, key string) []string {
 // (the form `wayle config set` echoes).
 func TOMLInline(v any) string { return tomlValue(v, false) }
 
+// TOMLDocument renders a table (map[string]any, nested tables as
+// sections) as a TOML document, the form runtime.toml takes.
+func TOMLDocument(table map[string]any) (string, error) { return tomlPretty(table) }
+
 // tomlValue renders one value; multiline puts arrays of two or more
 // elements one per line (the pretty style).
 func tomlValue(v any, multiline bool) string {

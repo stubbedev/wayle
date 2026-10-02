@@ -26,6 +26,8 @@ type kit struct {
 	store store
 	// invoke runs a function on the loop (the slider's trailing commit).
 	invoke func(func())
+	// pickers opens popovers and dialogs; nil without a window.
+	pickers pickers
 }
 
 // label is a styled label; color, size and weight come from the

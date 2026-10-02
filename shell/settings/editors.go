@@ -19,11 +19,13 @@ type editorFunc func(k *kit, path string, meta config.FieldMeta) control
 
 // autoEditor is the control a field's type calls for, the editor the
 // Rust page picks for it: toggle, enum_select, number_*, text, size,
-// and the optional (inherit) forms.
+// color, and the optional (inherit) forms.
 func autoEditor(k *kit, path string, meta config.FieldMeta) (control, error) {
 	switch {
 	case meta.Type == "Size":
 		return newSizeEditor(k, path, 1), nil
+	case meta.Type == "HexColor":
+		return newColorEditor(k, path), nil
 	case meta.Optional && meta.Kind == config.FieldEnum:
 		return newOptionalEnum(k, path, meta), nil
 	case meta.Optional && meta.Kind == config.FieldInt:

@@ -14,6 +14,9 @@ type pageSpec struct {
 	// header titles the page; its breadcrumb attribute heads it.
 	header   string
 	sections []sectionSpec
+	// footer, when set, builds what follows the sections (the greeter's
+	// apply button).
+	footer func(k *kit) widget.Widget
 }
 
 // sectionSpec is SectionSpec: a titled group of rows.
@@ -101,6 +104,9 @@ func buildPage(k *kit, spec pageSpec) *settingsPage {
 		}
 		section.Append(group, false)
 		content.Append(section, false)
+	}
+	if spec.footer != nil {
+		content.Append(spec.footer(k), false)
 	}
 	p.Scroll = widget.NewScroll(content)
 	p.VerticalOnly, p.ShowBars, p.FillY = true, true, true

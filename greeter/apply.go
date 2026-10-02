@@ -17,12 +17,13 @@ import (
 
 // allowedKeys are the [greeter] keys wayle-settings may push to the
 // system config (apply.rs ALLOWED_KEYS).
-var allowedKeys = map[string]bool{
-	"background-mode": true, "background-image": true, "background-color": true,
-	"show-clock": true, "clock-format": true, "date-format": true,
-	"show-user-list": true, "show-power-buttons": true,
-	"cursor-theme": true, "cursor-size": true,
-}
+var allowedKeys = func() map[string]bool {
+	m := make(map[string]bool, len(config.GreeterApplyKeys))
+	for _, k := range config.GreeterApplyKeys {
+		m[k] = true
+	}
+	return m
+}()
 
 // RunApplyConfig is `wayle-greeter apply-config [--config PATH]
 // <STAGED.toml>`, run as root through pkexec by wayle-settings: it

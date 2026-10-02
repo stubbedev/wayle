@@ -95,3 +95,13 @@ func LoadGreeter(path string, sink DiagnosticSink) (*Config, error) {
 	}
 	return cfg, errors.Join(errs...)
 }
+
+// GreeterApplyKeys are the [greeter] keys wayle-settings pushes to the
+// login screen and wayle-greeter apply-config accepts (apply.rs
+// ALLOWED_KEYS), in the settings app's order.
+var GreeterApplyKeys = []string{
+	"background-mode", "background-image", "background-color",
+	"show-clock", "clock-format", "date-format",
+	"show-user-list", "show-power-buttons",
+	"cursor-theme", "cursor-size",
+}

@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/styling"
 )
 
 // testKit is a kit over a config directory holding configTOML, its
@@ -528,5 +530,152 @@ func TestSizeEditorModes(t *testing.T) {
 	}
 	if k.store.value("osd.margin") != "40px" {
 		t.Error("a refresh wrote")
+	}
+}
+
+// fakePickers records what the editors asked for and answers on cue.
+type fakePickers struct {
+	anchor, content widget.Widget
+	closed          int
+	colorIn         render.Color
+	colorFn         func(render.Color)
+	fileFn          func(string)
+}
+
+func (f *fakePickers) popover(anchor, content widget.Widget) func() {
+	f.anchor, f.content = anchor, content
+	return func() { f.closed++ }
+}
+
+func (f *fakePickers) color(initial render.Color, fn func(render.Color)) {
+	f.colorIn, f.colorFn = initial, fn
+}
+
+func (f *fakePickers) openFile(fn func(string)) { f.fileFn = fn }
+
+func TestFontEditorPicksAFamily(t *testing.T) {
+	k := testKit(t, "")
+	f := &fakePickers{}
+	k.pickers = f
+	prev := fontFamilies
+	fontFamilies = func() ([]string, error) { return []string{"Cantarell", "DejaVu Sans", "Noto Sans"}, nil }
+	t.Cleanup(func() { fontFamilies = prev })
+	c := newFontEditor(k, "general.font-sans")
+	if want, _ := k.store.value("general.font-sans").(string); c.label.Text() != want {
+		t.Fatalf("label %q, want the configured family %q", c.label.Text(), want)
+	}
+	c.btn.ClickAt(widget.Point{})
+	if f.anchor != widget.Widget(c.btn) || f.content == nil {
+		t.Fatal("the button opened no picker")
+	}
+	picker := f.content.(*widget.Box)
+	// The picker's search narrows the list case-insensitively.
+	p := c.picker
+	if p == nil || p.root != picker {
+		t.Fatal("the picker tree is not the popover content")
+	}
+	// A new filter resets the list (rows, scroll and selection).
+	p.list.Select(2)
+	p.search.Insert("sans")
+	if p.list.Selected() != -1 {
+		t.Error("filtering kept the stale list")
+	}
+	if len(p.shown) != 2 || p.shown[0] != "DejaVu Sans" {
+		t.Errorf("filtered %v, want the two Sans families", p.shown)
+	}
+	p.list.OnActivate(1)
+	if v := k.store.value("general.font-sans"); v != "Noto Sans" || f.closed != 1 {
+		t.Errorf("picked %v (closed %d), want Noto Sans and the popover closed", v, f.closed)
+	}
+	c.refresh()
+	if c.label.Text() != "Noto Sans" {
+		t.Errorf("label %q after the pick", c.label.Text())
+	}
+	p.search.SelectAll()
+	p.search.Backspace()
+	if len(p.shown) != 3 {
+		t.Errorf("an empty search shows %d, want all", len(p.shown))
+	}
+}
+
+func TestColorEditorWritesTheDialogsPick(t *testing.T) {
+	k := testKit(t, "")
+	f := &fakePickers{}
+	k.pickers = f
+	c := newColorEditor(k, "lock.background-color")
+	c.ClickAt(widget.Point{})
+	if f.colorFn == nil {
+		t.Fatal("no dialog opened")
+	}
+	cur, _ := k.store.value("lock.background-color").(string)
+	if want, _ := styling.ParseHex(cur); f.colorIn != want {
+		t.Errorf("dialog opened at %#08x, want the current %s", uint32(f.colorIn), cur)
+	}
+	f.colorFn(render.RGB(0x12, 0x34, 0x56))
+	if v := k.store.value("lock.background-color"); v != "#123456" {
+		t.Errorf("opaque pick wrote %v", v)
+	}
+	f.colorFn(render.RGBA(0xff, 0, 0, 0x80))
+	if v := k.store.value("lock.background-color"); v != "#ff000080" {
+		t.Errorf("translucent pick wrote %v, want #rrggbbaa", v)
+	}
+	c.refresh()
+	if !strings.Contains(c.swatch.InlineStyle(), "#ff000080") {
+		t.Errorf("swatch style %q", c.swatch.InlineStyle())
+	}
+}
+
+func TestFileEditorBrowses(t *testing.T) {
+	k := testKit(t, "")
+	f := &fakePickers{}
+	k.pickers = f
+	c := newFileEditor(k, "lock.background-image")
+	c.entry.Insert("/typed")
+	if !c.entry.badge.Visible() {
+		t.Fatal("typing did not raise the unsaved badge")
+	}
+	c.browse()
+	f.fileFn("/home/me/wall.png")
+	if v := k.store.value("lock.background-image"); v != "/home/me/wall.png" || c.entry.badge.Visible() {
+		t.Errorf("browse wrote %v (badge %v)", v, c.entry.badge.Visible())
+	}
+	c.refresh()
+	if c.entry.Text() != "/home/me/wall.png" {
+		t.Errorf("entry %q after the pick", c.entry.Text())
+	}
+}
+
+func TestGreeterApplyStagesTheAllowedKeys(t *testing.T) {
+	k := testKit(t, "")
+	_ = k.store.set("greeter.cursor-size", int64(32))
+	var staged string
+	prev := spawnGreeterApply
+	spawnGreeterApply = func(path string) error {
+		b, err := os.ReadFile(path)
+		staged = string(b)
+		return err
+	}
+	t.Cleanup(func() { spawnGreeterApply = prev })
+	if err := applyGreeter(k.store); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(staged, "[greeter]") || !strings.Contains(staged, "cursor-size = 32") || !strings.Contains(staged, "show-clock = ") {
+		t.Errorf("staged:\n%s", staged)
+	}
+	if strings.Contains(staged, "cursor-theme-explicit") {
+		t.Error("a key outside the allowlist was staged")
+	}
+	// A failed spawn shows on the button.
+	spawnGreeterApply = func(string) error { return errors.New("no pkexec") }
+	footer := greeterApplyFooter(k).(*widget.Box)
+	var btn *widget.Button
+	for _, kid := range footer.Children() {
+		if b, ok := kid.(*widget.Button); ok {
+			btn = b
+		}
+	}
+	btn.ClickAt(widget.Point{})
+	if !strings.Contains(widget.DumpTree(footer, nil), greeterApplyFailed) {
+		t.Error("a failed apply did not show on the button")
 	}
 }

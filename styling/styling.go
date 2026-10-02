@@ -171,6 +171,10 @@ func ResolveColor(cv config.ColorValue, p *Palette) (render.Color, bool) {
 	return 0, false
 }
 
+// ParseHex is parseHex for callers outside styling: a CSS hex color
+// as a premultiplied render.Color.
+func ParseHex(s string) (render.Color, bool) { return parseHex(s) }
+
 // parseHex decodes #rgb, #rgba, #rrggbb, or #rrggbbaa (straight alpha,
 // the CSS form) into a premultiplied render.Color.
 func parseHex(s string) (render.Color, bool) {
