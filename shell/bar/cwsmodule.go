@@ -19,11 +19,7 @@ import (
 // cwsBlinkInterval is BLINK_INTERVAL: the urgent pulse half-period.
 const cwsBlinkInterval = 500 * time.Millisecond
 
-// The workspace size bases (niri_workspaces ICON_BASE_REM /
-// LABEL_BASE_REM; the sway schema carries the same pair).
 const (
-	cwsIconBaseRem  = 1.3
-	cwsLabelBaseRem = 1.1
 	// cwsSpaceLgRem is tokens.scss's $base-space-lg, the .workspace
 	// min-width/min-height (--bar-space-lg).
 	cwsSpaceLgRem = 1.5
@@ -205,12 +201,12 @@ func (m *cwsView) scale() float64 {
 
 // labelPx is label-size resolved against LABEL_BASE_REM.
 func (m *cwsView) labelPx() float64 {
-	return math.Round(m.cfg.LabelSize.ResolvePx(cwsLabelBaseRem*styling.RemBase, m.scale()))
+	return math.Round(m.cfg.LabelSize.ResolvePx(config.WorkspaceLabelBaseRem*styling.RemBase, m.scale()))
 }
 
 // iconPx is icon-size resolved against ICON_BASE_REM.
 func (m *cwsView) iconPx() int {
-	return int(math.Round(m.cfg.IconSize.ResolvePx(cwsIconBaseRem*styling.RemBase, m.scale())))
+	return int(math.Round(m.cfg.IconSize.ResolvePx(config.WorkspaceIconBaseRem*styling.RemBase, m.scale())))
 }
 
 // iconGapPx is methods.rs's icon_gap_px: a scale is rem without the

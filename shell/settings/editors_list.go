@@ -31,6 +31,8 @@ type listSpec struct {
 	item     func(k *kit, v any, changed func()) listItem
 	blank    any
 	classes  []string
+	// listCls is the rows container's class (string-list).
+	listCls string
 	// decode turns the stored value into items, encode items into the
 	// stored value (a map's pairs); nil for a plain list.
 	decode func(v any) []any
@@ -50,11 +52,19 @@ func newListEditor(k *kit, s slot, spec listSpec) *listEditor {
 	c := &listEditor{Box: widget.NewBox(widget.Column, 8, 0), k: k, slot: s, spec: spec}
 	c.AddClass(append([]string{"string-list-editor"}, spec.classes...)...)
 	c.rows = widget.NewBox(widget.Column, 4, 0)
-	c.rows.AddClass("string-list")
+	listCls := spec.listCls
+	if listCls == "" {
+		listCls = "string-list"
+	}
+	c.rows.AddClass(listCls)
 	c.Append(c.rows, false)
+	// A new row writes only when it changes the stored value: a blank
+	// list item does, a map's keyless pair encodes away and does not.
 	add := listButton(k, "ld-plus-symbolic", spec.addKey, "list-control-add", func() {
 		c.appendRow(spec.blank)
-		c.commit()
+		if !sameStored(c.slot.get(), c.encoded()) {
+			c.commit()
+		}
 	})
 	c.AppendAligned(add, false, widget.AlignStart)
 	c.rebuild(c.stored())
@@ -260,7 +270,7 @@ func (m mapItem) itemValue() any { return [2]string{m.key.Text(), m.value.Text()
 var stringMap = listRow(func(config.FieldMeta) listSpec {
 	t := i18n.Settings()
 	return listSpec{
-		addKey: "settings-map-add", rowClass: "string-map-row", blank: [2]string{}, classes: []string{"string-map-editor"},
+		addKey: "settings-map-add", rowClass: "string-map-row", blank: [2]string{}, classes: []string{"string-map-editor"}, listCls: "string-map",
 		item: func(k *kit, v any, changed func()) listItem {
 			pair, _ := v.([2]string)
 			row := mapItem{Box: widget.NewBox(widget.Row, 4, 0), key: k.entry(), value: k.entry()}

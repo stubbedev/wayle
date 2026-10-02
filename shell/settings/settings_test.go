@@ -1251,3 +1251,147 @@ func TestEntriesKeepTheirGtkWidth(t *testing.T) {
 		}
 	}
 }
+
+// addButton is a list editor's add button.
+func addButton(c *listEditor) *widget.Button { return c.Children()[1].(*widget.Button) }
+
+func TestListAddWritesOnlyAChange(t *testing.T) {
+	k := testKit(t, "")
+	m := fieldControl(k, field("modules.window-title.icon-mappings", stringMap)).(*listEditor)
+	if m.rows.HasClass("string-list") || !m.rows.HasClass("string-map") {
+		t.Error("the map's rows lack string_map's class")
+	}
+	addButton(m).ClickAt(widget.Point{})
+	if len(m.items) != 1 || k.store.svc.Source("modules.window-title.icon-mappings") != config.SourceDefault {
+		t.Errorf("a blank pair wrote the map (%d rows, source %v)", len(m.items), k.store.svc.Source("modules.window-title.icon-mappings"))
+	}
+	l := fieldControl(k, field("modules.notifications.blocklist", stringList)).(*listEditor)
+	if !l.rows.HasClass("string-list") {
+		t.Error("a list lost string-list")
+	}
+	addButton(l).ClickAt(widget.Point{})
+	if got, _ := k.store.value("modules.notifications.blocklist").([]any); len(got) != 1 {
+		t.Errorf("a blank list item stored %v, want it written", got)
+	}
+}
+
+func TestWorkspaceStyleMapNumericKeys(t *testing.T) {
+	k := testKit(t, "")
+	f := &fakePickers{}
+	k.pickers = f
+	path := "modules.hyprland-workspaces.workspace-map"
+	_ = k.store.set(path, map[string]any{
+		"10": map[string]any{"label": "ten"},
+		"2":  map[string]any{"icon": "ld-globe-symbolic", "color": "#4a90d9"},
+		"-1": map[string]any{},
+	})
+	c := fieldControl(k, field(path, workspaceStyleMap(true))).(*listEditor)
+	var keys []string
+	for _, it := range c.items {
+		keys = append(keys, it.itemValue().(workspaceStyle).key)
+	}
+	if !slices.Equal(keys, []string{"-1", "2", "10"}) {
+		t.Fatalf("rows %v, want numeric order", keys)
+	}
+	two := c.items[1].(workspaceStyleItem)
+	if two.icon.label.Text() != "ld-globe-symbolic" || two.label.Text() != "" {
+		t.Errorf("row 2 shows icon %q label %q", two.icon.label.Text(), two.label.Text())
+	}
+	// Retyping a key trims it; a key that is no number drops.
+	two.key.SelectAll()
+	two.key.Insert(" 3 ")
+	got, _ := k.store.value(path).(map[string]any)
+	if _, ok := got["3"]; !ok || len(got) != 3 {
+		t.Fatalf("retyped key stored %v", got)
+	}
+	if s := got["3"].(map[string]any); s["icon"] != "ld-globe-symbolic" || s["color"] != "#4a90d9" {
+		t.Errorf("the style moved with its key: %v", s)
+	}
+	c.items[0].(workspaceStyleItem).key.Insert("x")
+	got, _ = k.store.value(path).(map[string]any)
+	if _, ok := got["-1x"]; ok || len(got) != 2 {
+		t.Errorf("a non-numeric key was stored: %v", got)
+	}
+	// The label writes only when set; the color through its picker.
+	ten := c.items[2].(workspaceStyleItem)
+	ten.label.SelectAll()
+	ten.label.Backspace()
+	got, _ = k.store.value(path).(map[string]any)
+	if _, has := got["10"].(map[string]any)["label"]; has {
+		t.Errorf("an empty label was stored: %v", got["10"])
+	}
+	ten.color.(*colorValueEditor).slot.set("#112233")
+	got, _ = k.store.value(path).(map[string]any)
+	if got["10"].(map[string]any)["color"] != "#112233" {
+		t.Errorf("color stored %v", got["10"])
+	}
+}
+
+func TestWorkspaceStyleMapNamedKeys(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.niri-workspaces.workspace-map"
+	_ = k.store.set(path, map[string]any{"web": map[string]any{}, "chat": map[string]any{"label": "c"}})
+	c := fieldControl(k, field(path, workspaceStyleMap(false))).(*listEditor)
+	if c.items[0].itemValue().(workspaceStyle).key != "chat" {
+		t.Errorf("first row %v, want names sorted", c.items[0].itemValue())
+	}
+	c.items[0].(workspaceStyleItem).key.SelectAll()
+	c.items[0].(workspaceStyleItem).key.Backspace()
+	got, _ := k.store.value(path).(map[string]any)
+	if _, ok := got[""]; ok || len(got) != 1 {
+		t.Errorf("an empty name was stored: %v", got)
+	}
+	// Named keys keep text that is no number.
+	c.items[1].(workspaceStyleItem).key.Insert("2")
+	got, _ = k.store.value(path).(map[string]any)
+	if _, ok := got["web2"]; !ok {
+		t.Errorf("named key not stored as typed: %v", got)
+	}
+}
+
+func TestWorkspaceChoicesAreFocusActions(t *testing.T) {
+	want := []config.WorkspaceClickKind{config.WorkspaceClickFocusThis, config.WorkspaceClickFocusNext, config.WorkspaceClickFocusPrevious, config.WorkspaceClickFocusLast}
+	got := workspaceChoices()
+	if len(got) != len(want) {
+		t.Fatalf("%d choices", len(got))
+	}
+	for i, ch := range got {
+		if a := config.ParseWorkspaceClickAction(ch.command); a.Kind != want[i] {
+			t.Errorf("choice %q = %q parses as %v", ch.label, ch.command, a.Kind)
+		}
+	}
+	if actionChoices("hyprland-workspaces") != nil {
+		t.Error("the shell choices list the workspace modules")
+	}
+}
+
+func TestActionCustomEntryCollapsesWhileHidden(t *testing.T) {
+	k := testKit(t, "")
+	c := newActionEditor(k, pathSlot(k.store, "modules.battery.left-click"), actionChoices("battery"))
+	con := widget.Constraints{Max: widget.Size{W: 400, H: 400}}
+	c.reveal.Finish()
+	hidden := c.Measure(con).H
+	c.drop.SetSelected(c.customIndex())
+	c.reveal.Finish()
+	c.InvalidateLayout()
+	shown := c.Measure(con).H
+	if shown <= hidden || hidden > c.drop.Measure(con).H+8 {
+		t.Errorf("heights hidden %d shown %d: the hidden entry should take no space", hidden, shown)
+	}
+}
+
+func TestModulePagesFollowTheRustOrder(t *testing.T) {
+	var ids []string
+	for _, p := range modulePages(&config.Config{}) {
+		ids = append(ids, p.id)
+	}
+	want := []string{
+		"battery", "bluetooth", "brightness", "cava", "clock", "cpu", "dashboard", "hyprland-workspaces",
+		"hyprsunset", "idle-inhibit", "keybind-mode", "keyboard-input", "mango-workspaces", "media", "microphone",
+		"netstat", "network", "niri-workspaces", "notification", "power", "power-profiles", "ram", "screenshot",
+		"separator", "storage", "sway-workspaces", "treeman", "volume", "weather", "window-title", "world-clock",
+	}
+	if !slices.Equal(ids, want) {
+		t.Errorf("module pages\n%v\nwant (modules::factories, unported pages aside)\n%v", ids, want)
+	}
+}

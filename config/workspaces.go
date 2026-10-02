@@ -217,6 +217,13 @@ func (NamedWorkspaceMap) configSchema(g *schemaGen) Schema {
 	return Schema{"type": "object", "additionalProperties": g.subschema(typeOf[WorkspaceStyle]())}
 }
 
+// The workspace modules' size bases (ICON_BASE_REM, LABEL_BASE_REM:
+// every workspace schema carries the same pair).
+const (
+	WorkspaceIconBaseRem  = 1.3
+	WorkspaceLabelBaseRem = 1.1
+)
+
 // CompositorWorkspacesConfig is the view the sway and niri workspace
 // modules share: their two schemas are field-for-field identical.
 type CompositorWorkspacesConfig struct {

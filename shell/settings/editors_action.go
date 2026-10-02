@@ -52,6 +52,7 @@ func newActionEditor(k *kit, s slot, choices []actionChoice) *actionEditor {
 	}
 	c.reveal = widget.NewRevealer(c.entry)
 	c.reveal.SetTransition(widget.RevealSlideDown)
+	c.reveal.SetCollapse(true)
 	c.Append(c.drop, false)
 	c.Append(c.reveal, false)
 	command := c.command()
@@ -126,6 +127,17 @@ func actions(choices []actionChoice) rowOpt {
 	return withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
 		return newActionEditor(k, s, choices)
 	})
+}
+
+// workspaceChoices is workspace_choices: the focus actions the
+// workspace modules add (WorkspaceClickAction).
+func workspaceChoices() []actionChoice {
+	return []actionChoice{
+		{"Focus workspace", config.WorkspaceClickAction{Kind: config.WorkspaceClickFocusThis}.String()},
+		{"Focus next", config.WorkspaceClickAction{Kind: config.WorkspaceClickFocusNext}.String()},
+		{"Focus previous", config.WorkspaceClickAction{Kind: config.WorkspaceClickFocusPrevious}.String()},
+		{"Focus last", config.WorkspaceClickAction{Kind: config.WorkspaceClickFocusLast}.String()},
+	}
 }
 
 // actionChoices is choices_for: each module's preset click actions.

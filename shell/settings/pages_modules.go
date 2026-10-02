@@ -13,21 +13,25 @@ func modulePages(cfg *config.Config) []pageSpec {
 		clockPage(cfg),
 		cpuPage(cfg),
 		dashboardPage(cfg),
+		hyprlandWorkspacesPage(cfg),
 		hyprsunsetPage(cfg),
 		idleInhibitPage(cfg),
 		keybindModePage(cfg),
 		keyboardInputPage(cfg),
+		mangoWorkspacesPage(cfg),
 		mediaPage(cfg),
 		microphonePage(cfg),
 		netstatPage(cfg),
 		networkPage(cfg),
+		compositorWorkspacesPage("niri"),
 		notificationPage(cfg),
-		powerProfilesPage(cfg),
 		powerPage(cfg),
+		powerProfilesPage(cfg),
 		ramPage(cfg),
 		screenshotPage(cfg),
 		separatorPage(cfg),
 		storagePage(cfg),
+		compositorWorkspacesPage("sway"),
 		treemanPage(cfg),
 		volumePage(cfg),
 		weatherPage(cfg),
@@ -36,7 +40,7 @@ func modulePages(cfg *config.Config) []pageSpec {
 	}
 }
 
-// batteryPagePage is pages/modules/battery.
+// batteryPage is pages/modules/battery.
 func batteryPage(*config.Config) pageSpec {
 	return pageSpec{id: "battery", navKey: "settings-nav-battery", icon: "ld-battery-full-symbolic", header: "settings-page-battery", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -52,7 +56,7 @@ func batteryPage(*config.Config) pageSpec {
 	}}
 }
 
-// bluetoothPagePage is pages/modules/bluetooth.
+// bluetoothPage is pages/modules/bluetooth.
 func bluetoothPage(*config.Config) pageSpec {
 	return pageSpec{id: "bluetooth", navKey: "settings-nav-bluetooth", icon: "ld-bluetooth-symbolic", header: "settings-page-bluetooth", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -67,7 +71,7 @@ func bluetoothPage(*config.Config) pageSpec {
 	}}
 }
 
-// brightnessPagePage is pages/modules/brightness.
+// brightnessPage is pages/modules/brightness.
 func brightnessPage(*config.Config) pageSpec {
 	return pageSpec{id: "brightness", navKey: "settings-nav-brightness", icon: "ld-sun-symbolic", header: "settings-page-brightness", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -83,7 +87,7 @@ func brightnessPage(*config.Config) pageSpec {
 	}}
 }
 
-// cavaPagePage is pages/modules/cava.
+// cavaPage is pages/modules/cava.
 func cavaPage(*config.Config) pageSpec {
 	return pageSpec{id: "cava", navKey: "settings-nav-cava", icon: "ld-audio-lines-symbolic", header: "settings-page-cava", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -121,7 +125,7 @@ func cavaPage(*config.Config) pageSpec {
 	}}
 }
 
-// clockPagePage is pages/modules/clock.
+// clockPage is pages/modules/clock.
 func clockPage(*config.Config) pageSpec {
 	return pageSpec{id: "clock", navKey: "settings-nav-clock", icon: "ld-clock-symbolic", header: "settings-page-clock", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -138,7 +142,7 @@ func clockPage(*config.Config) pageSpec {
 	}}
 }
 
-// cpuPagePage is pages/modules/cpu.
+// cpuPage is pages/modules/cpu.
 func cpuPage(*config.Config) pageSpec {
 	return pageSpec{id: "cpu", navKey: "settings-nav-cpu", icon: "ld-cpu-symbolic", header: "settings-page-cpu", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -154,7 +158,7 @@ func cpuPage(*config.Config) pageSpec {
 	}}
 }
 
-// dashboardPagePage is pages/modules/dashboard.
+// dashboardPage is pages/modules/dashboard.
 func dashboardPage(*config.Config) pageSpec {
 	return pageSpec{id: "dashboard", navKey: "settings-nav-dashboard", icon: "ld-layout-dashboard-symbolic", header: "settings-page-dashboard", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -193,7 +197,7 @@ func dashboardPage(*config.Config) pageSpec {
 	}}
 }
 
-// hyprsunsetPagePage is pages/modules/hyprsunset.
+// hyprsunsetPage is pages/modules/hyprsunset.
 func hyprsunsetPage(*config.Config) pageSpec {
 	return pageSpec{id: "hyprsunset", navKey: "settings-nav-hyprsunset", icon: "ld-sun-symbolic", header: "settings-page-hyprsunset", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -214,7 +218,7 @@ func hyprsunsetPage(*config.Config) pageSpec {
 	}}
 }
 
-// idleInhibitPagePage is pages/modules/idle_inhibit.
+// idleInhibitPage is pages/modules/idle_inhibit.
 func idleInhibitPage(*config.Config) pageSpec {
 	return pageSpec{id: "idle-inhibit", navKey: "settings-nav-idle-inhibit", icon: "ld-coffee-symbolic", header: "settings-page-idle-inhibit", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -229,7 +233,7 @@ func idleInhibitPage(*config.Config) pageSpec {
 	}}
 }
 
-// keybindModePagePage is pages/modules/keybind_mode.
+// keybindModePage is pages/modules/keybind_mode.
 func keybindModePage(*config.Config) pageSpec {
 	return pageSpec{id: "keybind-mode", navKey: "settings-nav-keybind-mode", icon: "ld-layers-symbolic", header: "settings-page-keybind-mode", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -243,7 +247,7 @@ func keybindModePage(*config.Config) pageSpec {
 	}}
 }
 
-// keyboardInputPagePage is pages/modules/keyboard_input.
+// keyboardInputPage is pages/modules/keyboard_input.
 func keyboardInputPage(*config.Config) pageSpec {
 	return pageSpec{id: "keyboard-input", navKey: "settings-nav-keyboard-input", icon: "ld-keyboard-symbolic", header: "settings-page-keyboard-input", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -257,7 +261,7 @@ func keyboardInputPage(*config.Config) pageSpec {
 	}}
 }
 
-// mediaPagePage is pages/modules/media.
+// mediaPage is pages/modules/media.
 func mediaPage(*config.Config) pageSpec {
 	return pageSpec{id: "media", navKey: "settings-nav-media", icon: "ld-music-symbolic", header: "settings-page-media", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -275,7 +279,7 @@ func mediaPage(*config.Config) pageSpec {
 	}}
 }
 
-// microphonePagePage is pages/modules/microphone.
+// microphonePage is pages/modules/microphone.
 func microphonePage(*config.Config) pageSpec {
 	return pageSpec{id: "microphone", navKey: "settings-nav-microphone", icon: "ld-mic-symbolic", header: "settings-page-microphone", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -289,7 +293,7 @@ func microphonePage(*config.Config) pageSpec {
 	}}
 }
 
-// netstatPagePage is pages/modules/netstat.
+// netstatPage is pages/modules/netstat.
 func netstatPage(*config.Config) pageSpec {
 	return pageSpec{id: "netstat", navKey: "settings-nav-netstat", icon: "ld-activity-symbolic", header: "settings-page-netstat", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -304,7 +308,7 @@ func netstatPage(*config.Config) pageSpec {
 	}}
 }
 
-// networkPagePage is pages/modules/network.
+// networkPage is pages/modules/network.
 func networkPage(*config.Config) pageSpec {
 	return pageSpec{id: "network", navKey: "settings-nav-network", icon: "ld-wifi-symbolic", header: "settings-page-network", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -323,7 +327,7 @@ func networkPage(*config.Config) pageSpec {
 	}}
 }
 
-// notificationPagePage is pages/modules/notification_module.
+// notificationPage is pages/modules/notification_module.
 func notificationPage(*config.Config) pageSpec {
 	return pageSpec{id: "notification", navKey: "settings-nav-notification", icon: "ld-bell-symbolic", header: "settings-page-notification", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -338,7 +342,7 @@ func notificationPage(*config.Config) pageSpec {
 	}}
 }
 
-// powerProfilesPagePage is pages/modules/power_profiles.
+// powerProfilesPage is pages/modules/power_profiles.
 func powerProfilesPage(*config.Config) pageSpec {
 	return pageSpec{id: "power-profiles", navKey: "settings-nav-power-profiles", icon: "ld-scale-symbolic", header: "settings-page-power-profiles", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -358,7 +362,7 @@ func powerProfilesPage(*config.Config) pageSpec {
 	}}
 }
 
-// powerPagePage is pages/modules/power.
+// powerPage is pages/modules/power.
 func powerPage(*config.Config) pageSpec {
 	return pageSpec{id: "power", navKey: "settings-nav-power", icon: "ld-power-symbolic", header: "settings-page-power", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -394,7 +398,7 @@ func powerPage(*config.Config) pageSpec {
 	}}
 }
 
-// ramPagePage is pages/modules/ram.
+// ramPage is pages/modules/ram.
 func ramPage(*config.Config) pageSpec {
 	return pageSpec{id: "ram", navKey: "settings-nav-ram", icon: "ld-memory-stick-symbolic", header: "settings-page-ram", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -409,7 +413,7 @@ func ramPage(*config.Config) pageSpec {
 	}}
 }
 
-// screenshotPagePage is pages/modules/screenshot.
+// screenshotPage is pages/modules/screenshot.
 func screenshotPage(*config.Config) pageSpec {
 	return pageSpec{id: "screenshot", navKey: "settings-nav-screenshot", icon: "ld-camera-symbolic", header: "settings-page-screenshot", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -428,7 +432,7 @@ func screenshotPage(*config.Config) pageSpec {
 	}}
 }
 
-// separatorPagePage is pages/modules/separator.
+// separatorPage is pages/modules/separator.
 func separatorPage(*config.Config) pageSpec {
 	return pageSpec{id: "separator", navKey: "settings-nav-separator", icon: "ld-minus-symbolic", header: "settings-page-separator", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -441,7 +445,7 @@ func separatorPage(*config.Config) pageSpec {
 	}}
 }
 
-// storagePagePage is pages/modules/storage.
+// storagePage is pages/modules/storage.
 func storagePage(*config.Config) pageSpec {
 	return pageSpec{id: "storage", navKey: "settings-nav-storage", icon: "ld-hard-drive-symbolic", header: "settings-page-storage", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -457,7 +461,7 @@ func storagePage(*config.Config) pageSpec {
 	}}
 }
 
-// treemanPagePage is pages/modules/treeman.
+// treemanPage is pages/modules/treeman.
 func treemanPage(*config.Config) pageSpec {
 	return pageSpec{id: "treeman", navKey: "settings-nav-treeman", icon: "ld-layers-symbolic", header: "settings-page-treeman", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -474,7 +478,7 @@ func treemanPage(*config.Config) pageSpec {
 	}}
 }
 
-// volumePagePage is pages/modules/volume.
+// volumePage is pages/modules/volume.
 func volumePage(*config.Config) pageSpec {
 	return pageSpec{id: "volume", navKey: "settings-nav-volume", icon: "ld-volume-2-symbolic", header: "settings-page-volume", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -492,7 +496,7 @@ func volumePage(*config.Config) pageSpec {
 	}}
 }
 
-// weatherPagePage is pages/modules/weather.
+// weatherPage is pages/modules/weather.
 func weatherPage(*config.Config) pageSpec {
 	return pageSpec{id: "weather", navKey: "settings-nav-weather", icon: "ld-cloud-sun-symbolic", header: "settings-page-weather", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -514,7 +518,7 @@ func weatherPage(*config.Config) pageSpec {
 	}}
 }
 
-// windowTitlePagePage is pages/modules/window_title.
+// windowTitlePage is pages/modules/window_title.
 func windowTitlePage(*config.Config) pageSpec {
 	return pageSpec{id: "window-title", navKey: "settings-nav-window-title", icon: "ld-app-window-symbolic", header: "settings-page-window-title", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
@@ -528,7 +532,7 @@ func windowTitlePage(*config.Config) pageSpec {
 	}}
 }
 
-// worldClockPagePage is pages/modules/world_clock.
+// worldClockPage is pages/modules/world_clock.
 func worldClockPage(*config.Config) pageSpec {
 	return pageSpec{id: "world-clock", navKey: "settings-nav-world-clock", icon: "ld-globe-symbolic", header: "settings-page-world-clock", sections: []sectionSpec{
 		{title: "settings-section-general", rows: []rowSpec{
