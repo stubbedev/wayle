@@ -345,7 +345,7 @@ func TestViewClipsToItsBoundsAtScale(t *testing.T) {
 	v.show(red, redSize, TransitionNone)
 	green, greenSize := imageOf(color.NRGBA{G: 255, A: 255}, 8, 8)
 	v.show(green, greenSize, TransitionSlideRight)
-	v.step(0.2) // eased to about half: the outgoing image 2px right
+	v.step(0.2)    // eased to about half: the outgoing image 2px right
 	const dev = 16 // logical 8x8 at 2x; the view holds the top-left 4x4
 	data := make([]byte, render.Stride(dev)*dev)
 	cv := render.NewScaled(data, render.Stride(dev), dev, dev, 2, 1)
