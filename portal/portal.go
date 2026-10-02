@@ -55,6 +55,8 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		secretIface(),
 		inhibitor{b.conn, b.inhibitLock}.iface(),
 		screenshotIface(b.conn),
+		fileChooserIface(b.conn),
+		printIface(b.conn),
 		b.notifier.iface(),
 		wallpaperIface(b.conn),
 	}, dialogIfaces(b.conn)...)
