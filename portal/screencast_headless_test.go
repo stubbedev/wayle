@@ -51,3 +51,31 @@ func TestHeadlessScreenStreams(t *testing.T) {
 		t.Error("a missing window streamed")
 	}
 }
+
+// TestHeadlessGPUStream takes the zero-copy path against a private
+// compositor that renders on the GPU (WLR_RENDERER=gles2 on a render
+// node); WAYLE_CAPTURE_DMABUF=1 asks for it, with the same rule as
+// above: never a developer's screen.
+func TestHeadlessGPUStream(t *testing.T) {
+	if os.Getenv("WAYLE_CAPTURE_DMABUF") == "" {
+		t.Skip("WAYLE_CAPTURE_DMABUF is not set")
+	}
+	c, err := capture.Connect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	outs := c.Outputs()
+	_ = c.Close()
+	if len(outs) == 0 {
+		t.Fatal("no outputs")
+	}
+	pwtest.Start(t)
+	s, err := startGPUStream(outs[0].Name, false, 30)
+	if err != nil {
+		t.Fatalf("the zero-copy path declined: %v", err)
+	}
+	defer s.Close()
+	if w, h := s.Size(); w <= 0 || h <= 0 || s.NodeID() == 0 {
+		t.Errorf("stream %dx%d node %d", w, h, s.NodeID())
+	}
+}

@@ -172,7 +172,14 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       printer, as GTK's dialog records it
 - [x] the ScreenCast PipeWire producer (internal/pipewire, libpipewire
       through purego, the loop on a locked goroutine)
-- [ ] the share-preview gbm dmabuf allocator (screencast streams SHM)
+- [x] zero-copy screencast (internal/gbm over libgbm, the pipewire
+      producer's DmaBuf mode): a whole output screencopies into gbm
+      buffers bound one per PipeWire buffer when the compositor offers a
+      dmabuf target and the GPU allocates and imports it; the consumer
+      that takes only the plain format gets producer-allocated memfds.
+      Verified against a GLES headless sway; any failure stays on shm.
+      24-bit shm formats now map to spa RGB/BGR (Rust offered them as
+      BGRx)
 - [x] enter/exit animations for every ported transient surface (OSD and
       toasts, notification cards, dropdowns, the launcher, the lock card,
       the power menu; the wallpaper crossfades); the portal surfaces get

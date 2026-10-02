@@ -47,6 +47,9 @@ const (
 	VideoBGRx VideoFormat = 8
 	VideoRGBA VideoFormat = 11
 	VideoBGRA VideoFormat = 12
+	// The packed 24-bit formats GPU renderers offer over shm.
+	VideoRGB VideoFormat = 15
+	VideoBGR VideoFormat = 16
 )
 
 // Buffers and meta keys (spa/param/buffers.h).
@@ -66,6 +69,11 @@ const (
 const (
 	dataMemPtr = 1
 	dataMemFd  = 2
+	dataDmaBuf = 3
+
+	// spa_data flags.
+	dataFlagReadable = 1 << 0
+	dataFlagMappable = 1 << 3
 
 	metaHeader         = 1
 	metaVideoDamage    = 3
@@ -161,6 +169,12 @@ const maxDamageRegions = 4
 // VideoDamage metas, declared once a format is negotiated: without the
 // layout the server maps empty buffers and consumers show nothing.
 func bufferPods(stride, height uint32) [][]byte {
+	return bufferPodsOf(stride, height, 1<<dataMemFd|1<<dataMemPtr)
+}
+
+// bufferPodsOf is bufferPods with the buffers' data types (a bit mask of
+// the spa_data types the producer provides).
+func bufferPodsOf(stride, height, dataTypes uint32) [][]byte {
 	return [][]byte{
 		object(objectParamBuffers, paramBuffers,
 			prop{key: buffersBuffers, value: podIntRange(4, 2, 16)},
@@ -168,7 +182,7 @@ func bufferPods(stride, height uint32) [][]byte {
 			prop{key: buffersSize, value: podInt(int32(stride * height))},
 			prop{key: buffersStride, value: podInt(int32(stride))},
 			prop{key: buffersAlign, value: podInt(16)},
-			prop{key: buffersDataType, value: podInt(1<<dataMemFd | 1<<dataMemPtr)},
+			prop{key: buffersDataType, value: podInt(int32(dataTypes))},
 		),
 		object(objectParamMeta, paramMeta,
 			prop{key: metaKeyType, value: podID(metaHeader)},
@@ -183,4 +197,22 @@ func bufferPods(stride, height uint32) [][]byte {
 			prop{key: metaKeySize, value: podIntRange(metaRegionSize*maxDamageRegions, metaRegionSize, metaRegionSize*maxDamageRegions)},
 		),
 	}
+}
+
+// objectHas reports whether the spa_pod_object in b carries the
+// property key: a negotiated format with the modifier is a dmabuf one.
+func objectHas(b []byte, key uint32) bool {
+	u32 := func(i int) uint32 { return binary.LittleEndian.Uint32(b[i:]) }
+	if len(b) < 16 || u32(4) != typeObject {
+		return false
+	}
+	end := min(len(b), 8+int(u32(0)))
+	for i := 16; i+16 <= end; {
+		if u32(i) == key {
+			return true
+		}
+		size := int(u32(i + 8))
+		i += 16 + (size+7)&^7
+	}
+	return false
 }

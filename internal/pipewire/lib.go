@@ -37,6 +37,7 @@ type libpw struct {
 	// The event trampolines: one process-wide C function each, routing
 	// by the stream's data handle to its Producer.
 	onState, onParam, onProcess uintptr
+	onAddBuffer, onRemoveBuffer uintptr
 }
 
 var (
@@ -84,6 +85,8 @@ func bind() (*libpw, error) {
 	l.onState = purego.NewCallback(stateTrampoline)
 	l.onParam = purego.NewCallback(paramTrampoline)
 	l.onProcess = purego.NewCallback(processTrampoline)
+	l.onAddBuffer = purego.NewCallback(addBufferTrampoline)
+	l.onRemoveBuffer = purego.NewCallback(removeBufferTrampoline)
 	l.init(nil, nil)
 	return l, nil
 }
@@ -125,12 +128,12 @@ type cSpaMeta struct {
 }
 
 type cSpaData struct {
-	_       [2]uint32 // type, flags
-	_       int64     // fd
-	_       uint32    // mapoffset
-	maxsize uint32
-	data    unsafe.Pointer
-	chunk   *cSpaChunk
+	typ, flags uint32
+	fd         int64
+	mapoffset  uint32
+	maxsize    uint32
+	data       unsafe.Pointer
+	chunk      *cSpaChunk
 }
 
 type cSpaChunk struct {
@@ -163,6 +166,9 @@ const (
 	directionOutput = 1
 	idAny           = 0xffffffff
 	flagMapBuffers  = 1 << 2
+	// flagAllocBuffers: the producer allocates every buffer's memory
+	// (add_buffer), as a dmabuf stream must.
+	flagAllocBuffers = 1 << 8
 )
 
 // cPwLoop mirrors struct pw_loop; control is a spa_loop_control

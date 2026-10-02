@@ -7,6 +7,7 @@ import (
 
 	"github.com/stubbedev/gelm/capture"
 
+	"github.com/stubbedev/wayle/internal/gbm"
 	"github.com/stubbedev/wayle/internal/pipewire"
 )
 
@@ -44,6 +45,11 @@ func (s *pipewireStream) Close() {
 // one screencopy or toplevel capture per frame.
 func startScreenStream(target captureTarget, cursor bool, fps uint32) (screenStream, error) {
 	if target.kind == targetOutput {
+		if s, err := startGPUStream(target.name, cursor, fps); err == nil {
+			return s, nil
+		} else if !errors.Is(err, errNoDmabuf) {
+			return nil, err
+		}
 		if s, err := capture.OpenOutputStream(target.name, cursor); err == nil {
 			info := s.Info()
 			return startProducer(producerGeometry{
@@ -86,6 +92,11 @@ func videoFormat(f capture.Format) pipewire.VideoFormat {
 		return pipewire.VideoRGBx
 	case capture.FormatABGR8888:
 		return pipewire.VideoRGBA
+	// 24-bit: DRM BGR888 lays out R, G, B in memory, spa's RGB.
+	case capture.FormatBGR888:
+		return pipewire.VideoRGB
+	case capture.FormatRGB888:
+		return pipewire.VideoBGR
 	}
 	return pipewire.VideoBGRx
 }
@@ -172,7 +183,7 @@ func startSnapshotStream(target captureTarget, cursor bool, fps uint32) (screenS
 		}
 		refresh, transform = o.RefreshMHz, o.Transform
 		if target.kind == targetOutput {
-			grab = func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureOutput(o, opts) }
+			grab = outputGrab(c, o, cursor)
 		} else {
 			region := image.Rect(int(target.x), int(target.y), int(target.x+target.width), int(target.y+target.height))
 			grab = func(dst []byte) (*capture.Frame, error) {
@@ -220,4 +231,54 @@ func findToplevel(c *capture.Client, id string) (capture.Toplevel, bool) {
 		}
 	}
 	return capture.Toplevel{}, false
+}
+
+// outputGrab captures a whole output per call, into dst when it fits.
+func outputGrab(c *capture.Client, o capture.Output, cursor bool) func(dst []byte) (*capture.Frame, error) {
+	opts := capture.Options{Cursor: cursor}
+	return func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureOutput(o, opts) }
+}
+
+// startGPUStream streams a whole output zero-copy when the compositor
+// and the GPU allow (screencast_dmabuf.go); errNoDmabuf otherwise, and
+// the caller takes the shared-memory paths.
+func startGPUStream(output string, cursor bool, fps uint32) (screenStream, error) {
+	c, err := capture.Connect()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errNoDmabuf, err)
+	}
+	fail := func(err error) (screenStream, error) {
+		_ = c.Close()
+		return nil, fmt.Errorf("%w: %w", errNoDmabuf, err)
+	}
+	o, ok := findOutput(c, output)
+	if !ok {
+		return fail(fmt.Errorf("output '%s' is gone", output))
+	}
+	offered, err := c.DmabufFormat(o, cursor)
+	if err != nil {
+		return fail(err)
+	}
+	grab := outputGrab(c, o, cursor)
+	first, err := grab(nil)
+	if err != nil {
+		return fail(err)
+	}
+	dev, err := gbm.Open()
+	if err != nil {
+		return fail(err)
+	}
+	shm := &snapshotSource{grab: grab, stride: first.Stride, height: first.Height, buf: first.Data}
+	src, err := probeGPUSource(shm, dev, screencopy{c}, offered, o, cursor, first)
+	if err != nil {
+		dev.Close()
+		return fail(err)
+	}
+	return startProducer(producerGeometry{
+		width: first.Width, height: first.Height, stride: first.Stride, format: first.Format,
+		fps: effectiveFPS(fps, o.RefreshMHz), transform: uint32(o.Transform),
+	}, src, func() {
+		dev.Close()
+		_ = c.Close()
+	})
 }

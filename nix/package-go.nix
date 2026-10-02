@@ -5,6 +5,7 @@
   glib,
   pam,
   pipewire,
+  libgbm,
   gst_all_1,
 }:
 let
@@ -55,7 +56,7 @@ buildGoModule {
   # The module cache's hash: every go.mod change (a gelm bump) changes
   # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-T6/zYvYUw04ioMswI38cjxk06D8sQcitKXE71QD6owQ=";
+  vendorHash = "sha256-1EtgTJYlrMwMGj/iSiBUFPsc11uojc0ole/I8YocowQ=";
 
   subPackages = [
     "cmd/wayle"
@@ -80,7 +81,7 @@ buildGoModule {
   postFixup = ''
     for bin in wayle wayle-greeter wayle-lock; do
       wrapProgram $out/bin/$bin \
-        --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ gst_all_1.gstreamer glib pam pipewire ]}" \
+        --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ gst_all_1.gstreamer glib pam pipewire libgbm ]}" \
         --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins}"
     done
   '';

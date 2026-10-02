@@ -8,6 +8,8 @@ import (
 	"time"
 	"unsafe"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/stubbedev/wayle/internal/clib"
 )
 
@@ -19,6 +21,31 @@ type Rect struct{ X, Y, Width, Height int }
 // skips this cycle (nothing new, or the capture failed).
 type Source interface {
 	Fill(dst []byte) (damage []Rect, ok bool)
+}
+
+// DmabufSource is a Source that also fills GPU buffers: the producer
+// offers its modifier's format first and, when the consumer takes it,
+// binds one buffer from AllocDmabuf to each PipeWire buffer for the
+// stream's life and fills it in place (zero copy). A consumer that
+// takes the plain format gets producer-allocated shared memory, filled
+// through Fill.
+type DmabufSource interface {
+	Source
+	Modifier() uint64
+	// DmabufVideoFormat is the GPU buffers' format, which need not be
+	// the shared-memory one (a GPU compositor hands out 24-bit shm and
+	// 32-bit dmabufs).
+	DmabufVideoFormat() VideoFormat
+	AllocDmabuf() (Dmabuf, error)
+	FillDmabuf(Dmabuf) (damage []Rect, ok bool)
+}
+
+// Dmabuf is one GPU buffer's single plane.
+type Dmabuf interface {
+	Fd() int
+	Offset() uint32
+	Stride() uint32
+	Release()
 }
 
 // Config is one producer's fixed stream geometry.
@@ -47,6 +74,13 @@ type Producer struct {
 
 	ready chan error
 	once  sync.Once
+
+	// dmabuf is the source's GPU side when it has one; useDmabuf is set
+	// once the consumer negotiated the modifier format, bound holds each
+	// PipeWire buffer's memory by its spa_data (loop only).
+	dmabuf    DmabufSource
+	useDmabuf bool
+	bound     map[*cSpaData]binding
 
 	start       time.Time
 	minInterval time.Duration
@@ -93,6 +127,8 @@ func Start(cfg Config) (*Producer, error) {
 		minInterval: time.Second * 10 / time.Duration(cfg.FPS*12),
 	}
 	p.last = p.start.Add(-p.minInterval)
+	p.dmabuf, _ = cfg.Source.(DmabufSource)
+	p.bound = map[*cSpaData]binding{}
 	producersMu.Lock()
 	nextHandle++
 	p.handle = nextHandle
@@ -105,6 +141,15 @@ func Start(cfg Config) (*Producer, error) {
 		return nil, err
 	}
 	p.events = &cStreamEvents{version: 2, stateChanged: l.onState, paramChanged: l.onParam, process: l.onProcess}
+	formats, flags := [][]byte{formatPod(cfg.Width, cfg.Height, cfg.FPS, cfg.Format, nil)}, uint32(flagMapBuffers)
+	if p.dmabuf != nil {
+		// The modifier's format first; the producer allocates every
+		// buffer, a gbm one or shared memory per what was negotiated.
+		mod := p.dmabuf.Modifier()
+		formats = append([][]byte{formatPod(cfg.Width, cfg.Height, cfg.FPS, p.dmabuf.DmabufVideoFormat(), &mod)}, formats...)
+		flags = flagAllocBuffers
+		p.events.addBuffer, p.events.removeBuffer = l.onAddBuffer, l.onRemoveBuffer
+	}
 	p.pinner.Pin(p.events)
 	var rc int32
 	p.loop.do(func() {
@@ -114,9 +159,8 @@ func Start(cfg Config) (*Producer, error) {
 			rc = -1
 			return
 		}
-		format := formatPod(cfg.Width, cfg.Height, cfg.FPS, cfg.Format, nil)
-		rc = withPods([][]byte{format}, func(params unsafe.Pointer, n uint32) int32 {
-			return l.streamConnect(p.stream, directionOutput, idAny, flagMapBuffers, params, n)
+		rc = withPods(formats, func(params unsafe.Pointer, n uint32) int32 {
+			return l.streamConnect(p.stream, directionOutput, idAny, flags, params, n)
 		})
 	})
 	switch {
@@ -157,6 +201,11 @@ func (p *Producer) teardown() {
 			p.loop.do(func() {
 				p.lib.streamDisconnect(p.stream)
 				p.lib.streamDestroy(p.stream)
+				// What remove_buffer did not get to.
+				for d, b := range p.bound {
+					b.release()
+					delete(p.bound, d)
+				}
 			})
 			p.stream = 0
 		}
@@ -214,7 +263,19 @@ func paramTrampoline(data uintptr, id uint32, param unsafe.Pointer) {
 	if p == nil || param == nil || id != paramFormat {
 		return
 	}
-	withPods(bufferPods(p.cfg.Stride, p.cfg.Height), func(params unsafe.Pointer, n uint32) int32 {
+	pods := bufferPods(p.cfg.Stride, p.cfg.Height)
+	if p.dmabuf != nil {
+		// Producer-allocated: a dmabuf when the consumer took the
+		// modifier's format, else a memfd.
+		size := *(*uint32)(param)
+		p.useDmabuf = objectHas(unsafe.Slice((*byte)(param), 8+size), formatVideoModifier) //nolint:gosec // audited: the pod is 8 + size bytes
+		data := uint32(1 << dataMemFd)
+		if p.useDmabuf {
+			data = 1 << dataDmaBuf
+		}
+		pods = bufferPodsOf(p.cfg.Stride, p.cfg.Height, data)
+	}
+	withPods(pods, func(params unsafe.Pointer, n uint32) int32 {
 		return p.lib.streamUpdate(p.stream, params, n)
 	})
 }
@@ -242,11 +303,29 @@ func (p *Producer) process() {
 		return
 	}
 	d := buf.datas
-	if d.data == nil || d.chunk == nil {
+	if d.chunk == nil {
+		return
+	}
+	var damage []Rect
+	var ok bool
+	if b, bound := p.bound[d]; bound && b.dmabuf != nil {
+		damage, ok = p.dmabuf.FillDmabuf(b.dmabuf)
+		d.chunk.offset = b.dmabuf.Offset()
+		d.chunk.stride = int32(b.dmabuf.Stride())
+		if ok {
+			d.chunk.size = b.dmabuf.Stride() * p.cfg.Height
+			p.last = now
+			p.stamp(buf, now, damage)
+		} else {
+			d.chunk.size = 0
+		}
+		return
+	}
+	if d.data == nil {
 		return
 	}
 	dst := unsafe.Slice((*byte)(d.data), d.maxsize) //nolint:gosec // audited: the mapped buffer is maxsize bytes
-	damage, ok := p.cfg.Source.Fill(dst)
+	damage, ok = p.cfg.Source.Fill(dst)
 	d.chunk.offset = 0
 	d.chunk.stride = int32(p.cfg.Stride)
 	if !ok {
@@ -316,4 +395,94 @@ func writeDamage(slots []cMetaRegion, rects []Rect) {
 		slots[i] = cMetaRegion{int32(r.X), int32(r.Y), uint32(r.Width), uint32(r.Height)}
 	}
 	slots[i] = cMetaRegion{}
+}
+
+// binding is one producer-allocated PipeWire buffer's memory: a GPU
+// buffer, or a mapped memfd.
+type binding struct {
+	dmabuf Dmabuf
+	mem    []byte
+	fd     int
+}
+
+// addBufferTrampoline is pw_stream_events.add_buffer: allocate the new
+// buffer's memory (only with ALLOC_BUFFERS, a DmabufSource's stream).
+func addBufferTrampoline(data uintptr, raw unsafe.Pointer) {
+	if p := producerOf(data); p != nil {
+		p.addBuffer((*cPwBuffer)(raw))
+	}
+}
+
+// removeBufferTrampoline is pw_stream_events.remove_buffer.
+func removeBufferTrampoline(data uintptr, raw unsafe.Pointer) {
+	if p := producerOf(data); p != nil {
+		p.removeBuffer((*cPwBuffer)(raw))
+	}
+}
+
+func (p *Producer) addBuffer(pwb *cPwBuffer) {
+	if pwb == nil || pwb.buffer == nil || pwb.buffer.nDatas < 1 {
+		return
+	}
+	d := pwb.buffer.datas
+	size := p.cfg.Stride * p.cfg.Height
+	if p.useDmabuf {
+		b, err := p.dmabuf.AllocDmabuf()
+		if err != nil {
+			return // the buffer stays empty; process skips it
+		}
+		d.typ, d.flags = dataDmaBuf, dataFlagReadable
+		d.fd, d.mapoffset, d.maxsize, d.data = int64(b.Fd()), 0, b.Stride()*p.cfg.Height, nil
+		if d.chunk != nil {
+			d.chunk.offset, d.chunk.stride, d.chunk.size = b.Offset(), int32(b.Stride()), 0
+		}
+		p.bound[d] = binding{dmabuf: b, fd: -1}
+		return
+	}
+	fd, mem, err := memfd(int(size))
+	if err != nil {
+		return
+	}
+	d.typ, d.flags = dataMemFd, dataFlagReadable|dataFlagMappable
+	d.fd, d.mapoffset, d.maxsize, d.data = int64(fd), 0, size, unsafe.Pointer(&mem[0]) //nolint:gosec // audited: the memfd mapping outlives the buffer (removeBuffer clears it)
+	p.bound[d] = binding{mem: mem, fd: fd}
+}
+
+func (p *Producer) removeBuffer(pwb *cPwBuffer) {
+	if pwb == nil || pwb.buffer == nil || pwb.buffer.nDatas < 1 {
+		return
+	}
+	d := pwb.buffer.datas
+	if b, ok := p.bound[d]; ok {
+		b.release()
+		delete(p.bound, d)
+		d.data, d.fd = nil, -1
+	}
+}
+
+func (b binding) release() {
+	if b.dmabuf != nil {
+		b.dmabuf.Release()
+		return
+	}
+	_ = unix.Munmap(b.mem)
+	_ = unix.Close(b.fd)
+}
+
+// memfd is a size-byte sealed-size shared memory file, mapped.
+func memfd(size int) (int, []byte, error) {
+	fd, err := unix.MemfdCreate("wayle-screencast", unix.MFD_CLOEXEC|unix.MFD_ALLOW_SEALING)
+	if err != nil {
+		return -1, nil, err
+	}
+	if err := unix.Ftruncate(fd, int64(size)); err != nil {
+		_ = unix.Close(fd)
+		return -1, nil, err
+	}
+	mem, err := unix.Mmap(fd, 0, size, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
+	if err != nil {
+		_ = unix.Close(fd)
+		return -1, nil, err
+	}
+	return fd, mem, nil
 }

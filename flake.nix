@@ -191,7 +191,7 @@
             # The recorder dlopens libgstreamer, the ScreenCast producer
             # libpipewire; the shell's own copies, so a cgo (-race) test
             # binary never mixes its glibc with a host library's plugins.
-            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.gst_all_1.gstreamer pkgs.glib pkgs.pipewire pkgs.libei ];
+            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.gst_all_1.gstreamer pkgs.glib pkgs.pipewire pkgs.libei pkgs.libgbm ];
             GST_PLUGIN_SYSTEM_PATH_1_0 = pkgs.lib.makeSearchPath "lib/gstreamer-1.0" (with pkgs.gst_all_1; [
               gstreamer
               gst-plugins-base

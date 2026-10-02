@@ -46,6 +46,8 @@ type consumer struct {
 // consumed is one received buffer.
 type consumed struct {
 	size      uint32
+	dataType  uint32
+	fd        int64
 	first     byte
 	seq       uint64
 	transform uint32
@@ -62,6 +64,12 @@ var (
 const consumerHandle = 1 << 30
 
 func newConsumer(t *testing.T, loop *loopThread, width, height uint32) *consumer {
+	return newConsumerOf(t, loop, width, height, nil)
+}
+
+// newConsumerOf is newConsumer offering modifier's dmabuf format, or
+// the plain one when nil.
+func newConsumerOf(t *testing.T, loop *loopThread, width, height uint32, modifier *uint64) *consumer {
 	t.Helper()
 	l, err := load()
 	if err != nil {
@@ -78,7 +86,7 @@ func newConsumer(t *testing.T, loop *loopThread, width, height uint32) *consumer
 			defer l.streamQueue(c.stream, raw)
 			buf := (*cPwBuffer)(raw).buffer
 			d := buf.datas
-			got := consumed{size: d.chunk.size}
+			got := consumed{size: d.chunk.size, dataType: d.typ, fd: d.fd}
 			if d.data != nil && d.chunk.size > 0 {
 				got.first = *(*byte)(d.data)
 			}
@@ -124,7 +132,7 @@ func newConsumer(t *testing.T, loop *loopThread, width, height uint32) *consumer
 	loop.do(func() {
 		props := l.propertiesNew("media.type=Video media.category=Capture node.name=test-consumer")
 		c.stream = l.streamNewSimple(loop.loop, "test-consumer", props, unsafe.Pointer(events), consumerHandle)
-		rc = withPods([][]byte{formatPod(width, height, 30, VideoBGRx, nil)}, func(params unsafe.Pointer, n uint32) int32 {
+		rc = withPods([][]byte{formatPod(width, height, 30, VideoBGRx, modifier)}, func(params unsafe.Pointer, n uint32) int32 {
 			return l.streamConnect(c.stream, 0 /* input */, idAny, flagMapBuffers, params, n)
 		})
 	})
