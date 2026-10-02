@@ -1,9 +1,7 @@
 package pipewire
 
 import (
-	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"slices"
 	"sync"
@@ -12,82 +10,9 @@ import (
 	"unsafe"
 
 	"github.com/ebitengine/purego"
+
+	"github.com/stubbedev/wayle/internal/pipewire/pwtest"
 )
-
-// daemonConf is a private PipeWire daemon: the native protocol, the
-// client-node and adapter modules a pw_stream needs, link creation,
-// and a dummy driver so a linked graph runs with no devices.
-const daemonConf = `
-context.properties = {
-    core.daemon = true
-    core.name   = pipewire-0
-    support.dbus = false
-}
-context.spa-libs = {
-    support.* = support/libspa-support
-    video.convert.* = videoconvert/libspa-videoconvert
-}
-context.modules = [
-    { name = libpipewire-module-protocol-native }
-    { name = libpipewire-module-metadata }
-    { name = libpipewire-module-spa-node-factory }
-    { name = libpipewire-module-client-node }
-    { name = libpipewire-module-access }
-    { name = libpipewire-module-adapter }
-    { name = libpipewire-module-link-factory }
-]
-context.objects = [
-    { factory = spa-node-factory
-        args = {
-            factory.name    = support.node.driver
-            node.name       = Dummy-Driver
-            node.group      = pipewire.dummy
-            priority.driver = 20000
-        }
-    }
-]
-`
-
-// startDaemon runs a private pipewire for the test and points the
-// client library at it. A missing pipewire fails the test: the .#go
-// devShell provides one.
-func startDaemon(t *testing.T) string {
-	t.Helper()
-	bin, err := exec.LookPath("pipewire")
-	if err != nil {
-		t.Fatalf("pipewire not on PATH: %v", err)
-	}
-	dir, err := os.MkdirTemp("", "pwt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	conf := filepath.Join(dir, "test.conf")
-	if err := os.WriteFile(conf, []byte(daemonConf), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PIPEWIRE_RUNTIME_DIR", dir)
-	t.Setenv("PIPEWIRE_REMOTE", "pipewire-0")
-	t.Setenv("XDG_RUNTIME_DIR", dir)
-	cmd := exec.Command(bin, "-c", conf)
-	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
-	})
-	sock := filepath.Join(dir, "pipewire-0")
-	for range 100 {
-		if _, err := os.Stat(sock); err == nil {
-			return dir
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("pipewire did not create its socket")
-	return ""
-}
 
 // solid fills every frame with one byte.
 type solid struct{ b byte }
@@ -100,7 +25,7 @@ func (s solid) Fill(dst []byte) ([]Rect, bool) {
 }
 
 func TestProducerExportsANode(t *testing.T) {
-	startDaemon(t)
+	pwtest.Start(t)
 	p, err := Start(Config{Width: 64, Height: 32, Stride: 256, Format: VideoBGRx, FPS: 30, Source: solid{0x7f}})
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +165,7 @@ func (damaged) Fill(dst []byte) ([]Rect, bool) {
 }
 
 func TestProducerFeedsALinkedConsumer(t *testing.T) {
-	startDaemon(t)
+	pwtest.Start(t)
 	p, err := Start(Config{Width: 64, Height: 32, Stride: 256, Format: VideoBGRx, FPS: 30, Transform: 3, Source: damaged{}})
 	if err != nil {
 		t.Fatal(err)

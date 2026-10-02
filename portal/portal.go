@@ -38,6 +38,9 @@ type Backend struct {
 	shortcuts   *globalShortcuts
 	// zones reads the output layout (outputZones; a fake in tests).
 	zones func() []zone
+	// sizes is the running streams' sizes, ScreenCast's for RemoteDesktop.
+	sizes      *streamSizes
+	screenCast *screenCast
 }
 
 // New builds the backend over a session-bus connection and the config.
@@ -49,6 +52,8 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	}
 	// One Wayland connection serves every interface that needs the
 	// compositor, started by the first of them.
+	b.sizes = &streamSizes{sizes: map[uint32][2]int32{}}
+	b.screenCast = newScreenCast(conn, b.sessions, b.sizes, startScreenStream)
 	loop := &waylandLoop{}
 	b.clipboard = newClipboardBridge(conn, waylandClipboardStarter(loop))
 	b.shortcuts = newGlobalShortcuts(conn, b.sessions, waylandShortcutsStarter(loop))
@@ -71,6 +76,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		b.clipboard.iface(),
 		b.shortcuts.iface(),
 		inputCapture{b.sessions, b.zones}.iface(),
+		b.screenCast.iface(),
 		b.notifier.iface(),
 		wallpaperIface(b.conn),
 	}, dialogIfaces(b.conn)...)
