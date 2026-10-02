@@ -153,9 +153,15 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] greeter: the login state machine under test (prompts, OTP, failure
       and retry, stale conversations, remembered user and session), the
       card's fade, the configured palette, the greeter's own FTL domain
-- [ ] portal dialogs: file chooser, color picker, print, share picker
-      (`wayle portal share-picker` should call `sharepicker.NewClient`)
-- [ ] the share-preview gbm dmabuf allocator and PipeWire producer
+- [ ] portal dialogs: the shell hosts behind the backend's contracts
+      (shell/portaldialogs, shell/filechooser, shell/printdialog): the
+      access / account / app chooser / launcher / wallpaper dialogs, the
+      file chooser, the print dialog and its spooler. The share picker
+      and color picker are ported; `wayle portal share-picker` calls
+      `sharepicker.NewClient`
+- [x] the ScreenCast PipeWire producer (internal/pipewire, libpipewire
+      through purego, the loop on a locked goroutine)
+- [ ] the share-preview gbm dmabuf allocator (screencast streams SHM)
 - [x] enter/exit animations for every ported transient surface (OSD and
       toasts, notification cards, dropdowns, the launcher, the lock card,
       the power menu; the wallpaper crossfades); the portal surfaces get
@@ -172,14 +178,20 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 ### Binaries
 
 - [ ] wayle-settings (the settings GUI; the largest single item)
-- [ ] xdg-desktop-portal-wayle (wayle-portal backend)
+- [x] xdg-desktop-portal-wayle (portal/): all 21 interfaces, the
+      manifests pinned to them; godbus carried patched (fd arrays, struct
+      variants, replied files; third_party/godbus-dbus/WAYLE-PATCHES.md);
+      ConnectToEIS over a pure-Go EIS server held to libei; `wayle portal`,
+      `portal run` and `portal share-picker`. `portal show` (the dialog
+      previews) waits on the dialog hosts
 
 ### Cross-cutting
 
 - [x] a live compositor session smoke test (headless sway: start, three
       config reloads incl. a side bar and a bad value, no fatal exits)
 - [x] `nix build .#wayle-go`: the Go shell built with the pinned
-      toolchain, wrapped for its dlopens (libgstreamer, libglib, libpam)
+      toolchain, wrapped for its dlopens (libgstreamer, libglib, libpam,
+      libpipewire)
       and the GStreamer plugin path; the bundled icons and the unit ship
       with it
 - [ ] the NixOS/home-manager modules, the portal files and the systemd
