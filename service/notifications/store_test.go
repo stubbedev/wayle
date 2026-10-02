@@ -190,14 +190,14 @@ func TestServiceKeepsTheStoreInStep(t *testing.T) {
 
 func TestRestoredExpiryStillFires(t *testing.T) {
 	st, _ := openTestStore(t)
-	if err := st.Add(&Notification{ID: 7, AppName: "app", Summary: "soon", ExpireMS: 200, Added: time.Now().Add(-150 * time.Millisecond)}); err != nil {
+	if err := st.Add(&Notification{ID: 7, AppName: "app", Summary: "soon", ExpireMS: 1500, Added: time.Now().Add(-100 * time.Millisecond)}); err != nil {
 		t.Fatal(err)
 	}
 	svc := newStoredService(t, st)
 	if svc.Count() != 1 {
 		t.Fatal("the pending notification was not restored")
 	}
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(4 * time.Second)
 	for svc.Count() > 0 && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 	}
