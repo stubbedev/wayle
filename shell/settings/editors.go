@@ -257,6 +257,14 @@ var percentage = withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
 	return newSlider(k, s, 0, 100, true, func(v float64) string { return strconv.FormatFloat(v, 'f', 0, 64) + "%" })
 })
 
+// milliseconds is slider::milliseconds: whole milliseconds over
+// [lo, hi], labeled in seconds ("{:.1}s").
+func milliseconds(lo, hi float64) rowOpt {
+	return withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
+		return newSlider(k, s, lo, hi, true, func(v float64) string { return strconv.FormatFloat(v/1000, 'f', 1, 64) + "s" })
+	})
+}
+
 // mountPoints is text_like over a StorageMountPoint: one path, or
 // several shown comma-joined; the typed text splits at commas back
 // into one path ("/" when empty) or a list.

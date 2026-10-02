@@ -46,7 +46,10 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("settings: font %q: %w", cfg.General.FontSans, err)
 	}
-	k := &kit{face: app.FontFallback(face), store: store{svc}, invoke: application.Invoke}
+	k := &kit{
+		face: app.FontFallback(face), store: store{svc}, invoke: application.Invoke,
+		background: func(fn func()) { go fn() },
+	}
 	after := func(d time.Duration, fn func()) {
 		time.AfterFunc(d, func() { application.Invoke(fn) })
 	}

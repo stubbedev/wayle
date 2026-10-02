@@ -28,6 +28,21 @@ type kit struct {
 	invoke func(func())
 	// pickers opens popovers and dialogs; nil without a window.
 	pickers pickers
+	// background runs blocking work off the loop (a D-Bus query);
+	// nil runs it in place, the tests' synchronous loop.
+	background func(func())
+}
+
+// async runs work off the loop and hands its result to done on it.
+func async[T any](k *kit, work func() T, done func(T)) {
+	if k.background == nil {
+		done(work())
+		return
+	}
+	k.background(func() {
+		v := work()
+		k.invoke(func() { done(v) })
+	})
 }
 
 // label is a styled label; color, size and weight come from the

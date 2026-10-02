@@ -18,6 +18,7 @@ func modulePages(cfg *config.Config) []pageSpec {
 		idleInhibitPage(cfg),
 		keybindModePage(cfg),
 		keyboardInputPage(cfg),
+		mailPage(cfg),
 		mangoWorkspacesPage(cfg),
 		mediaPage(cfg),
 		microphonePage(cfg),
@@ -28,10 +29,12 @@ func modulePages(cfg *config.Config) []pageSpec {
 		powerPage(cfg),
 		powerProfilesPage(cfg),
 		ramPage(cfg),
+		recorderPage(cfg),
 		screenshotPage(cfg),
 		separatorPage(cfg),
 		storagePage(cfg),
 		compositorWorkspacesPage("sway"),
+		systrayPage(cfg),
 		treemanPage(cfg),
 		volumePage(cfg),
 		weatherPage(cfg),
@@ -542,5 +545,78 @@ func worldClockPage(*config.Config) pageSpec {
 		barDisplaySection("modules.world-clock"),
 		colorsSection("modules.world-clock"),
 		actionsSection("modules.world-clock", actionChoices("world-clock")),
+	}}
+}
+
+// recorderPage is pages/modules/recorder.
+func recorderPage(*config.Config) pageSpec {
+	const m = "modules.recorder"
+	return pageSpec{id: "recorder", navKey: "settings-nav-recorder", icon: "ld-video-symbolic", header: "settings-page-recorder", sections: []sectionSpec{
+		{title: "settings-section-general", rows: []rowSpec{
+			field(m + ".format"),
+			field(m + ".output-format"),
+			field(m + ".output-directory"),
+			field(m + ".show-cursor"),
+			field(m+".start-delay-ms", milliseconds(0, 5000)),
+		}},
+		// Quality and the encoder are chosen automatically, so the
+		// framerate is the only video knob.
+		{title: "settings-section-video", rows: []rowSpec{field(m+".framerate", spin(1, 240, 1, 0))}},
+		{title: "settings-section-audio", rows: []rowSpec{
+			field(m + ".system-audio"),
+			field(m + ".microphone"),
+			field(m+".microphone-device", microphoneDevice),
+		}},
+		{title: "settings-section-webcam", rows: []rowSpec{
+			field(m + ".webcam-enabled"),
+			field(m+".webcam-device", webcamDevice),
+			field(m+".webcam-x", percentage),
+			field(m+".webcam-y", percentage),
+			field(m+".webcam-size", percentage),
+		}},
+		{title: "settings-section-icons", rows: []rowSpec{
+			field(m+".icon-idle", iconRow),
+			field(m+".icon-recording", iconRow),
+			field(m+".icon-paused", iconRow),
+		}},
+		barDisplaySection(m),
+		colorsSection(m),
+		actionsSection(m, actionChoices("recorder")),
+	}}
+}
+
+// mailPage is pages/modules/mail.
+func mailPage(*config.Config) pageSpec {
+	const m = "modules.mail"
+	return pageSpec{id: "mail", navKey: "settings-nav-mail", icon: "ld-mail-symbolic", header: "settings-page-mail", sections: []sectionSpec{
+		{title: "settings-section-general", rows: []rowSpec{
+			field(m + ".format"),
+			field(m + ".query"),
+			field(m+".icon-name", iconRow),
+			field(m + ".hide-when-zero"),
+			field(m + ".notify"),
+			field(m + ".notify-summary"),
+			field(m + ".notify-body"),
+		}},
+		{title: "settings-section-mail-accounts", rows: []rowSpec{field(m+".accounts", mailAccountList)}},
+		barDisplaySection(m),
+		colorsSection(m),
+		actionsSection(m, actionChoices("mail")),
+	}}
+}
+
+// systrayPage is pages/modules/systray.
+func systrayPage(*config.Config) pageSpec {
+	const m = "modules.systray"
+	return pageSpec{id: "systray", navKey: "settings-nav-systray", icon: "ld-panel-top-symbolic", header: "settings-page-systray", sections: []sectionSpec{
+		{title: "settings-section-general", rows: []rowSpec{
+			field(m+".icon-scale", sizeBase(config.SystrayIconBaseRem)),
+			field(m + ".item-gap"),
+			field(m + ".internal-padding"),
+			field(m+".blacklist", stringList),
+			field(m+".overrides", trayOverrideList),
+		}},
+		{title: "settings-section-bar-display", rows: fields(m + ".border-show")},
+		{title: "settings-section-colors", rows: fields(m+".border-color", m+".button-bg-color")},
 	}}
 }

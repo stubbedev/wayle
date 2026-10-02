@@ -16,6 +16,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
+	"github.com/stubbedev/wayle/service/recorder"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -35,6 +36,12 @@ func testKit(t *testing.T, configTOML string) *kit {
 	}
 	svc := config.Load(dir, config.DiscardDiagnostics)
 	t.Cleanup(svc.Close)
+	// The device lists never reach the session's audio daemon or the
+	// machine's cameras.
+	mics, cams := microphoneChoices, cameraChoices
+	microphoneChoices = func() []recorder.DeviceChoice { return recorder.MicrophoneChoices(nil) }
+	cameraChoices = func() []recorder.DeviceChoice { return []recorder.DeviceChoice{{ID: "", Label: "Automatic"}} }
+	t.Cleanup(func() { microphoneChoices, cameraChoices = mics, cams })
 	return &kit{face: face, store: store{svc}, invoke: func(fn func()) { fn() }}
 }
 
@@ -1387,11 +1394,145 @@ func TestModulePagesFollowTheRustOrder(t *testing.T) {
 	}
 	want := []string{
 		"battery", "bluetooth", "brightness", "cava", "clock", "cpu", "dashboard", "hyprland-workspaces",
-		"hyprsunset", "idle-inhibit", "keybind-mode", "keyboard-input", "mango-workspaces", "media", "microphone",
-		"netstat", "network", "niri-workspaces", "notification", "power", "power-profiles", "ram", "screenshot",
-		"separator", "storage", "sway-workspaces", "treeman", "volume", "weather", "window-title", "world-clock",
+		"hyprsunset", "idle-inhibit", "keybind-mode", "keyboard-input", "mail", "mango-workspaces", "media", "microphone",
+		"netstat", "network", "niri-workspaces", "notification", "power", "power-profiles", "ram", "recorder", "screenshot",
+		"separator", "storage", "sway-workspaces", "systray", "treeman", "volume", "weather", "window-title", "world-clock",
 	}
 	if !slices.Equal(ids, want) {
 		t.Errorf("module pages\n%v\nwant (modules::factories, unported pages aside)\n%v", ids, want)
+	}
+}
+
+func TestDeviceSelect(t *testing.T) {
+	k := testKit(t, "[modules.recorder]\nwebcam-device = \"/dev/video9\"\n")
+	cameraChoices = func() []recorder.DeviceChoice {
+		return []recorder.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: "Integrated"}}
+	}
+	cam := fieldControl(k, field("modules.recorder.webcam-device", webcamDevice)).(*deviceSelect)
+	// The saved camera is gone: it stays listed, under its path, selected.
+	if cam.Selection() != "/dev/video9" || len(cam.choices) != 3 {
+		t.Errorf("selection %q of %v, want the saved node kept", cam.Selection(), cam.choices)
+	}
+	cam.SetSelected(1)
+	if v := k.store.value("modules.recorder.webcam-device"); v != "/dev/video0" {
+		t.Errorf("picking stored %v", v)
+	}
+	k.store.reset("modules.recorder.webcam-device") // back to the config's /dev/video9
+	cam.refresh()
+	if cam.Selected() != 2 || k.store.svc.Source("modules.recorder.webcam-device") == config.SourceRuntime {
+		t.Errorf("refresh selected %d, source %v: it must not write", cam.Selected(), k.store.svc.Source("modules.recorder.webcam-device"))
+	}
+
+	// The microphones arrive after the editor is built; the saved one
+	// is selected when they do, and the arrival writes nothing.
+	var deliver, onLoop func()
+	k.background = func(fn func()) { deliver = fn }
+	k.invoke = func(fn func()) { onLoop = fn }
+	_ = k.store.set("modules.recorder.microphone-device", "usb")
+	microphoneChoices = func() []recorder.DeviceChoice {
+		return recorder.MicrophoneChoices([]recorder.Source{{Name: "mic", Description: "Microphone"}, {Name: "usb", Description: "USB"}})
+	}
+	mic := fieldControl(k, field("modules.recorder.microphone-device", microphoneDevice)).(*deviceSelect)
+	if mic.Selection() != "usb" || deliver == nil {
+		t.Fatalf("before the query: %q (query pending %v), want the saved id kept", mic.Selection(), deliver != nil)
+	}
+	deliver()
+	if mic.Selection() != "usb" || onLoop == nil {
+		t.Fatal("the result was applied off the loop")
+	}
+	onLoop()
+	if mic.Selection() != "USB" || len(mic.choices) != 3 {
+		t.Errorf("after the query: %q of %v", mic.Selection(), mic.choices)
+	}
+	if k.store.value("modules.recorder.microphone-device") != "usb" {
+		t.Error("the arrival rewrote the device")
+	}
+}
+
+func TestMillisecondsSlider(t *testing.T) {
+	k := testKit(t, "")
+	c := fieldControl(k, field("modules.recorder.start-delay-ms", milliseconds(0, 5000))).(*slider)
+	if c.Format(1500) != "1.5s" || c.Label().Text() != c.Format(c.Value()) {
+		t.Errorf("label %q, want seconds", c.Format(1500))
+	}
+	c.Knob.SetValue(1234.6)
+	if v := k.store.value("modules.recorder.start-delay-ms"); v != int64(1235) {
+		t.Errorf("stored %#v, want whole milliseconds", v)
+	}
+}
+
+func TestTrayOverrideList(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.systray.overrides"
+	_ = k.store.set(path, []any{map[string]any{"name": "discord", "color": "#ff0000"}})
+	c := fieldControl(k, field(path, trayOverrideList)).(*listEditor)
+	row := c.items[0].(trayOverrideItem)
+	if row.name.Text() != "discord" || row.icon.Text() != "" {
+		t.Fatalf("row shows %q %q", row.name.Text(), row.icon.Text())
+	}
+	row.icon.Insert("ld-chat-symbolic")
+	got, _ := k.store.value(path).([]any)
+	if m := got[0].(map[string]any); m["icon"] != "ld-chat-symbolic" || m["color"] != "#ff0000" {
+		t.Errorf("stored %v", m)
+	}
+	row.icon.SelectAll()
+	row.icon.Backspace()
+	got, _ = k.store.value(path).([]any)
+	if _, has := got[0].(map[string]any)["icon"]; has {
+		t.Errorf("an empty icon was stored: %v", got[0])
+	}
+	// A nameless override is not written, and adding one writes nothing.
+	addButton(c).ClickAt(widget.Point{})
+	c.items[1].(trayOverrideItem).icon.Insert("x")
+	if got, _ := k.store.value(path).([]any); len(got) != 1 {
+		t.Errorf("a nameless override was stored: %v", got)
+	}
+	c.items[1].(trayOverrideItem).name.Insert("slack")
+	if got, _ := k.store.value(path).([]any); len(got) != 2 || got[1].(map[string]any)["name"] != "slack" {
+		t.Errorf("named override stored %v", got)
+	}
+	if !c.rows.HasClass("string-map") {
+		t.Error("the overrides lack string_map's list class")
+	}
+}
+
+func TestMailAccountCards(t *testing.T) {
+	k := testKit(t, "")
+	path := "modules.mail.accounts"
+	c := fieldControl(k, field(path, mailAccountList)).(*cardList)
+	c.local = append(c.local, c.spec.blank())
+	c.commit()
+	c.rebuild()
+	if got, _ := k.store.value(path).([]any); len(got) != 0 {
+		t.Fatalf("a nameless account was stored: %v", got)
+	}
+	c.cards[0].identity.(*liveText).Insert("Work")
+	got, _ := k.store.value(path).([]any)
+	if len(got) != 1 {
+		t.Fatalf("named account stored %v", got)
+	}
+	m := got[0].(map[string]any)
+	if m["name"] != "Work" || m["query"] != "" || m["provider"] != "generic" {
+		t.Errorf("account %v, want the name with the default query and provider", m)
+	}
+	if _, has := m["icon"]; has {
+		t.Errorf("an empty icon was stored: %v", m)
+	}
+	provider := c.cards[0].controls[1].(*enumSelect)
+	provider.SetSelected(slices.Index(provider.variants, "fastmail"))
+	c.cards[0].controls[0].(*liveText).Insert("tag:inbox")
+	got, _ = k.store.value(path).([]any)
+	if m := got[0].(map[string]any); m["provider"] != "fastmail" || m["query"] != "tag:inbox" {
+		t.Errorf("edited account %v", m)
+	}
+	_ = c.fieldSlot(0, "icon").set("ld-mail-symbolic")
+	_ = c.fieldSlot(0, "icon").set("")
+	got, _ = k.store.value(path).([]any)
+	if _, has := got[0].(map[string]any)["icon"]; has {
+		t.Errorf("a cleared icon was stored: %v", got[0])
+	}
+	cfg := k.store.svc.Config()
+	if len(cfg.Mail.Accounts) != 1 || cfg.Mail.Accounts[0].Provider != config.MailProviderFastmail || cfg.Mail.Accounts[0].Icon != nil {
+		t.Errorf("config accounts %+v", cfg.Mail.Accounts)
 	}
 }

@@ -101,10 +101,10 @@ func (c *configLog) get(path string) any {
 	return c.writes[path]
 }
 
-func recorderTestCtx(t *testing.T, cams []deviceChoice) (ModuleContext, *configLog, *recordertest.Engine) {
+func recorderTestCtx(t *testing.T, cams []recorder.DeviceChoice) (ModuleContext, *configLog, *recordertest.Engine) {
 	t.Helper()
 	prev := recorderCameras
-	recorderCameras = func() []deviceChoice { return cams }
+	recorderCameras = func() []recorder.DeviceChoice { return cams }
 	t.Cleanup(func() { recorderCameras = prev })
 	cfg := config.Defaults()
 	cfg.Recorder.OutputDirectory, cfg.Recorder.StartDelayMs = t.TempDir(), 0
@@ -117,7 +117,7 @@ func recorderTestCtx(t *testing.T, cams []deviceChoice) (ModuleContext, *configL
 }
 
 func TestRecorderDropdownStateAndControls(t *testing.T) {
-	ctx, _, engine := recorderTestCtx(t, []deviceChoice{{"", "Automatic"}})
+	ctx, _, engine := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
 	v := recorderDropdown(ctx).(*recorderView)
 	defer v.dropdownClosed()
 	if v.status.Visible() || v.pause.Enabled() || !v.record.HasClass("primary") || v.recordLabel.Text() != i18n.T("dropdown-recorder-record") {
@@ -145,7 +145,7 @@ func TestRecorderDropdownStateAndControls(t *testing.T) {
 }
 
 func TestRecorderDropdownWritesConfig(t *testing.T) {
-	ctx, log, _ := recorderTestCtx(t, []deviceChoice{{"", "Automatic"}, {"/dev/video0", "Cam"}})
+	ctx, log, _ := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: "Cam"}})
 	srv := pulsetest.New(t)
 	srv.PutSource(pulsetest.Source(10, "mic", "Microphone", native.InvalidIndex, ""))
 	svc, err := pulse.Connect(context.Background(), srv.Addr())
@@ -187,7 +187,7 @@ func TestRecorderDropdownWritesConfig(t *testing.T) {
 	}
 	// An unchanged list keeps the picker.
 	same := v.micPicker
-	v.syncMics(append([]deviceChoice(nil), v.mics...))
+	v.syncMics(append([]recorder.DeviceChoice(nil), v.mics...))
 	if v.micPicker != same {
 		t.Error("an unchanged list rebuilt the picker")
 	}

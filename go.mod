@@ -8,7 +8,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/neurlang/wayland v0.4.4
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/gelm v0.0.0-20261002174825-27196cf7a469
+	github.com/stubbedev/gelm v0.0.0-20261002180447-f5253bcade6d
 	github.com/unxed/xkb-go v0.1.8
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
