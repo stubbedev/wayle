@@ -82,49 +82,66 @@ Every checklist item below is done; what is left is parity polish.
 **gelm: GTK CSS node parity** (a stylesheet written for GTK should
 address gelm widgets as written; the Rust stylesheet is the test):
 
-- [ ] List rows as GTK's `row`: make gelm's list row proxy a CSS box
-      named `row` (padding, background, radius, `:hover`, `:selected`),
-      then drop wayle's inner `SetElement("row")` boxes (settings font,
-      icon and module pickers, launcher rows, file chooser, print
-      dialog), which would otherwise double-match `... row` rules.
-- [ ] The remaining node trees, as done for `entry > text`,
-      `textview > text`, `scale > trough > highlight/slider` and
-      `switch > slider`: `checkbutton > check`, `dropdown > button >
-      arrow` (and its list as `popover > contents`), `expander` title
-      and arrow, `notebook > header > tabs > tab`, `progressbar > trough
-      > progress`, `paned > separator`, menus as `popover.menu` with
-      `modelbutton` rows, the spin button's buttons. One shared
-      style-only part type instead of entryPart / switchSlider.
-- [ ] Names still gelm's own: `listrow`, `menu`, `toast`, `fader`,
-      `elevation`.
-- [ ] CSS transitions on part nodes (Rust fades the scale knob in over
-      `--duration-fast`; gelm shows it at once).
-- [ ] A column short of room takes height from its expanding children
-      only; GTK distributes over every child (rows now do).
-- [ ] Box parents its children at measure time, not on append, so
-      `Element()` and parent links exist only after a layout.
+- [x] List rows are GTK's `row`: the proxy is the CSS box (padding,
+      background, radius, `:hover`, `:selected` through the hover
+      chain and StateSelected), the theme's hover and selection bands
+      moved into it as the fallbacks, and wayle dropped its inner
+      `SetElement("row")` boxes under real lists (settings pickers,
+      launcher, file chooser, print dialog; the chooser's filter and
+      places rows keep theirs - plain boxes, no proxy above).
+- [x] The remaining node trees, on one shared style-only part type:
+      `checkbutton > check` (`:indeterminate`, the mark inked by the
+      check's color), `dropdown > button > arrow`, `expander > title
+      > arrow`, `notebook > header > tabs > tab` (`:checked` on the
+      selected one), `progressbar > trough > progress`, `paned >
+      separator` (its min size slots the divider, its margins shift
+      it), menus as `popover.menu` with `modelbutton` rows in a
+      `contents` node (`:hover`/`:disabled`/`:checked`, padding and
+      min-height band sizing). The spin button stays
+      `spinbutton > text` without steppers - gelm's SpinButton has no
+      buttons by design.
+- [x] Names no longer gelm's own where GTK has them: `listrow` →
+      `row`, `menu` → `popover.menu`. `toast`, `fader`, `elevation`
+      stay - they have no GTK node to take.
+- [x] CSS transitions on background-color (the fades stylesheets
+      write - the scale knob's hover fade, row washes): the tween
+      drives the style cache, retargets mid-flight, honors the
+      timing function (cubic-bezier solved per sample) and delays,
+      and collapses under reduced motion. Other properties still
+      apply at once; a need there would extend the tween.
+- [x] A short column distributes its deficit over every child that
+      can give (GTK's rule, as rows already did), not only the
+      expanding ones.
+- [x] Containers parent children as they measure (landed earlier;
+      the checklist was stale).
 
 **wayle: stylesheet parity**
 
-- [ ] The bar's dropdown panels are Go-painted (shell/bar/style.go
-      barStyle) instead of styled by the Rust stylesheet: their sliders
-      keep the theme look (knob always shown, light trough) where Rust's
-      `scale` rules apply, and every panel's spacing and colors are
-      hand-matched. Move the panels onto the stylesheet now that gelm
-      models the GTK nodes they use.
-- [ ] Settings: the slider value label is not fixed-width, so sliders in
-      one section end at different x when their labels differ.
+- [ ] The bar dropdown panels' remaining hand-matched colors and
+      spacing move onto the stylesheet (their sliders already do:
+      gelm models `scale > trough > highlight/slider`, so the Rust
+      `scale` rules - the hover-shown knob, the dark trough - apply,
+      and gelm's background-color transitions carry the fades). The
+      rest is a panel-by-panel sweep: map each Go-painted color in
+      the ~14 dropdown files to a selector in the Rust SCSS, compile
+      with `just go-css`, and verify each panel against the Rust
+      shell live.
+- [x] Settings: the slider value label is fixed-width (gelm Label
+      width-chars; the label floors at its widest rendering over the
+      range, so a section's sliders end at the same x).
 
 **Smaller**
 
-- [ ] The mouse wheel scrolls 40px a notch (GTK: about page^(2/3)).
-- [ ] Super+Tab still reaches the Tab trap (Super chords no longer type
-      text; the Tab path was left alone untested).
-- [ ] gelm's virtual-pointer clicker (cmd/zz-vpclick) is an uncommitted
-      harness tool; the settings were verified with it on a nested sway.
-- [ ] The network dropdown's toggle test raced once under -race; the fix
-      (driving the view on the headless loop) could not be reproduced
-      deterministically.
+- [x] The mouse wheel scrolls GTK's page^(2/3) a notch (was a flat
+      40px); the touchpad-to-steps fallback keeps its 40px quantum.
+- [x] Super+Tab reaches accelerators, not the Tab trap (Super joins
+      alt in the exclusion; plain, ctrl, and shift Tab keep the
+      traversal and the indent trap).
+- [x] gelm's virtual-pointer clicker (cmd/zz-vpclick) is committed
+      as the manual companion to internal/headlesstest.
+- [x] The network dropdown's toggle test drives the view on the
+      headless loop (the refresh a toggle's goroutine hands back
+      never races the assertions); it has not reproduced since.
 
 ### Parked work (local branches)
 
@@ -307,7 +324,13 @@ rows and SetItems, GtkEntry's text node and width-chars, GtkScrolled-
 Window's CSS box, scroll-to-focus and caret following, rows that
 narrow any shrinkable child (height for width), popovers that resize
 to the output, even-odd SVG fills, and HiDPI fixes (logical clips,
-scaled glyph advances).
+scaled glyph advances). Since then: the GTK node trees (row,
+checkbutton > check, dropdown > button > arrow, expander > title >
+arrow, notebook > header > tabs > tab, progressbar > trough >
+progress, paned > separator, popover.menu with modelbutton rows, one
+shared style-only part type), background-color transitions (the
+timing-function solver in anim), Label width-chars, the wheel's
+page^(2/3) step, and the Super+Tab exclusion from the Tab trap.
 
 ## Decisions
 

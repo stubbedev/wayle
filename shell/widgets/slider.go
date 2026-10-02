@@ -84,6 +84,14 @@ func NewRangedSlider(min, max, value float64, font render.Font, px float64, colo
 	if font != nil {
 		d.label = widget.NewLabel(font, px, d.Format(value), color)
 		d.label.SetAlignment(render.AlignEnd)
+		// The label floors at its widest rendering over the range, so
+		// the sliders of a section end at the same x whatever their
+		// values (GTK width-chars).
+		widest := len(d.Format(min))
+		if n := len(d.Format(max)); n > widest {
+			widest = n
+		}
+		d.label.SetWidthChars(widest)
 		d.Append(d.label, false)
 	}
 	return d
