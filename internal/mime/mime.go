@@ -30,6 +30,10 @@ type Database struct {
 	literal map[string]glob
 	globs   []glob
 	icons   map[string]string
+	// aliases maps an alias to its canonical type; parents a type to
+	// the types it subclasses.
+	aliases map[string]string
+	parents map[string][]string
 }
 
 var (
@@ -66,14 +70,25 @@ func DataDirs() []string {
 	return dirs
 }
 
-// Load reads mime/globs2 and mime/generic-icons from each data dir; an
+// Load reads mime/globs2, generic-icons, aliases and subclasses from each data dir; an
 // earlier directory's entry for the same pattern wins.
 func Load(dirs []string) *Database {
-	db := &Database{literal: map[string]glob{}, icons: map[string]string{}}
+	db := &Database{
+		literal: map[string]glob{}, icons: map[string]string{},
+		aliases: map[string]string{}, parents: map[string][]string{},
+	}
 	seen := map[string]bool{}
 	for _, dir := range dirs {
 		db.readGlobs(filepath.Join(dir, "mime", "globs2"), seen)
 		db.readIcons(filepath.Join(dir, "mime", "generic-icons"))
+		db.readPairs(filepath.Join(dir, "mime", "aliases"), func(alias, canonical string) {
+			if _, ok := db.aliases[alias]; !ok {
+				db.aliases[alias] = canonical
+			}
+		})
+		db.readPairs(filepath.Join(dir, "mime", "subclasses"), func(child, parent string) {
+			db.parents[child] = append(db.parents[child], parent)
+		})
 	}
 	return db
 }
@@ -183,4 +198,60 @@ func (db *Database) GenericIcon(mimeType string) string {
 		return "text-x-generic-symbolic"
 	}
 	return media + "-x-generic"
+}
+
+// readPairs feeds each "a b" line of a two-column mime file to add.
+func (db *Database) readPairs(path string, add func(a, b string)) {
+	f, err := os.Open(path) //nolint:gosec // a system data file
+	if err != nil {
+		return
+	}
+	defer func() { _ = f.Close() }()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		a, b, ok := strings.Cut(sc.Text(), " ")
+		if ok && !strings.HasPrefix(a, "#") {
+			add(a, b)
+		}
+	}
+}
+
+// canonical resolves an alias.
+func (db *Database) canonical(mimeType string) string {
+	if c, ok := db.aliases[mimeType]; ok {
+		return c
+	}
+	return mimeType
+}
+
+// IsA reports whether mimeType is base or a subtype of it, with
+// aliases resolved: g_content_type_is_a, shared-mime-info's
+// is_subclass. Beyond the subclasses file every text/* is a
+// text/plain and every non-inode type an application/octet-stream.
+func (db *Database) IsA(mimeType, base string) bool {
+	mimeType, base = db.canonical(mimeType), db.canonical(base)
+	seen := map[string]bool{}
+	var walk func(t string) bool
+	walk = func(t string) bool {
+		if t == base {
+			return true
+		}
+		if seen[t] {
+			return false
+		}
+		seen[t] = true
+		if base == "text/plain" && strings.HasPrefix(t, "text/") {
+			return true
+		}
+		if base == "application/octet-stream" && !strings.HasPrefix(t, "inode/") {
+			return true
+		}
+		for _, p := range db.parents[t] {
+			if walk(db.canonical(p)) {
+				return true
+			}
+		}
+		return false
+	}
+	return walk(mimeType)
 }

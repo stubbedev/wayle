@@ -283,7 +283,10 @@ func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, co
 			r.button.SetVisible(q == "" || strings.Contains(r.name, q))
 		}
 	}
-	scroll := credential.NewFixed(widget.NewScroll(list), 0, appListHeight)
+	// Filled, so a short list packs at the top instead of floating mid-view.
+	view := widget.NewScroll(list)
+	view.FillX, view.FillY = true, true
+	scroll := credential.NewFixed(view, 0, appListHeight)
 	var rememberRow widget.Widget
 	if contentType != "" {
 		r := widget.NewBox(widget.Row, 8, 0)

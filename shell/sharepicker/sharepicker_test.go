@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/sharepreview"
 	"github.com/stubbedev/wayle/shell/regionoverlay"
+	"github.com/stubbedev/wayle/shell/treetest"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -120,11 +121,11 @@ func TestBuildPagesAndOptions(t *testing.T) {
 	cfg := config.DefaultsSharePicker()
 	cfg.DefaultPage = config.SharePickerOutputs
 	p, _ := testPicker(t, cfg, false, false)
-	nb := findNotebook(p.root)
-	if nb == nil || nb.SelectedTab() != pageOutputs {
+	nb := treetest.First[*widget.Notebook](t, p.root)
+	if nb.SelectedTab() != pageOutputs {
 		t.Fatalf("notebook %v", nb)
 	}
-	if countClass(p.root, "share-picker-restore-button") != 1 {
+	if len(treetest.WithClass(p.root, "share-picker-restore-button")) != 1 {
 		t.Error("the restore-token box is missing")
 	}
 	if p.confirm != nil {
@@ -132,10 +133,10 @@ func TestBuildPagesAndOptions(t *testing.T) {
 	}
 	cfg.HideTokenRestore = true
 	p, _ = testPicker(t, cfg, false, false)
-	if countClass(p.root, "share-picker-restore-button") != 0 {
+	if len(treetest.WithClass(p.root, "share-picker-restore-button")) != 0 {
 		t.Error("hide-token-restore kept the box")
 	}
-	if n := countClass(p.windowsPage(nil), "share-picker-card-button") + countClass(p.outputsPage(), "share-picker-card-button"); n != 4 {
+	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-card-button")) + len(treetest.WithClass(p.outputsPage(), "share-picker-card-button")); n != 4 {
 		t.Errorf("%d cards, want 2 windows + 2 outputs", n)
 	}
 }
@@ -143,7 +144,7 @@ func TestBuildPagesAndOptions(t *testing.T) {
 func TestWindowCardsRunInReverseWithTheirTitles(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	var titles []string
-	walk(p.windowsPage(nil), func(w widget.Widget) {
+	treetest.Walk(p.windowsPage(nil), func(w widget.Widget) {
 		if b, ok := w.(*widget.Button); ok && widget.HasClass(b, "share-picker-card-button") {
 			titles = append(titles, b.TooltipText())
 		}
@@ -159,7 +160,7 @@ func TestEmptyPagesShowPlaceholders(t *testing.T) {
 	p.windows = func() []sharepreview.Toplevel { return nil }
 	p.outputs = func() []outputInfo { return nil }
 	p.root = p.build(nil)
-	if n := countClass(p.windowsPage(nil), "share-picker-placeholder") + countClass(p.outputsPage(), "share-picker-placeholder"); n != 2 {
+	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-placeholder")) + len(treetest.WithClass(p.outputsPage(), "share-picker-placeholder")); n != 2 {
 		t.Fatalf("%d placeholders, want 2", n)
 	}
 }
@@ -256,34 +257,4 @@ func TestDaemonOverTheBus(t *testing.T) {
 	if _, err := (&Daemon{picker: fakePicker{}}).Export(client); err == nil {
 		t.Fatal("a second daemon claimed the owned name")
 	}
-}
-
-// walk visits the tree depth first.
-func walk(w widget.Widget, fn func(widget.Widget)) {
-	fn(w)
-	if c, ok := w.(interface{ Children() []widget.Widget }); ok {
-		for _, k := range c.Children() {
-			walk(k, fn)
-		}
-	}
-}
-
-func countClass(root widget.Widget, class string) int {
-	n := 0
-	walk(root, func(w widget.Widget) {
-		if widget.HasClass(w, class) {
-			n++
-		}
-	})
-	return n
-}
-
-func findNotebook(root widget.Widget) *widget.Notebook {
-	var nb *widget.Notebook
-	walk(root, func(w widget.Widget) {
-		if n, ok := w.(*widget.Notebook); ok {
-			nb = n
-		}
-	})
-	return nb
 }

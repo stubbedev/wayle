@@ -16,6 +16,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/desktopentry"
+	"github.com/stubbedev/wayle/shell/treetest"
 )
 
 type fakeWindow struct{ closed bool }
@@ -91,40 +92,6 @@ func (hs *harness) open(t *testing.T) app.LayerConfig {
 	}
 }
 
-func walk(w widget.Widget, visit func(widget.Widget)) {
-	visit(w)
-	if c, ok := w.(interface{ Children() []widget.Widget }); ok {
-		for _, k := range c.Children() {
-			walk(k, visit)
-		}
-	}
-}
-
-// button finds the button labelled text.
-func button(t *testing.T, root widget.Widget, text string) *widget.Button {
-	t.Helper()
-	var found *widget.Button
-	walk(root, func(w widget.Widget) {
-		if b, ok := w.(*widget.Button); ok && found == nil && widget.Describe(b).Name == text {
-			found = b
-		}
-	})
-	if found == nil {
-		t.Fatalf("no %q button", text)
-	}
-	return found
-}
-
-func labels(root widget.Widget) []string {
-	var out []string
-	walk(root, func(w widget.Widget) {
-		if l, ok := w.(*widget.Label); ok {
-			out = append(out, l.Text())
-		}
-	})
-	return out
-}
-
 func TestConfirmDialogsAnswer(t *testing.T) {
 	hs := newHarness(t, nil)
 	for _, tc := range []struct {
@@ -136,13 +103,13 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 			got <- hs.h.Access(AccessRequest{Title: "Camera", Subtitle: "Sub", Body: "Body", GrantLabel: "Allow", DenyLabel: "Deny", Icon: "camera-web"})
 		}()
 		c := hs.open(t)
-		if l := labels(c.Root); !slices.Contains(l, "Camera") || !slices.Contains(l, "Sub\nBody") {
+		if l := treetest.Labels(c.Root); !slices.Contains(l, "Camera") || !slices.Contains(l, "Sub\nBody") {
 			t.Errorf("labels = %q", l)
 		}
 		if c.Layer != app.LayerOverlay || c.Namespace != "wayle-portal-dialog" || c.Keyboard != app.KeyboardOnDemand {
 			t.Errorf("surface = %+v", c)
 		}
-		hs.do(func() { button(t, c.Root, tc.click).OnClick() })
+		hs.do(func() { treetest.Button(t, c.Root, tc.click).OnClick() })
 		if r := <-got; r != tc.want {
 			t.Errorf("%s answered %v", tc.click, r)
 		}
@@ -160,7 +127,7 @@ func TestEscapeAndPreemption(t *testing.T) {
 	first := make(chan bool, 1)
 	go func() { first <- hs.h.ConfirmInstall("App", "") }()
 	c := hs.open(t)
-	if l := labels(c.Root); !slices.Contains(l, "Install “App”?") {
+	if l := treetest.Labels(c.Root); !slices.Contains(l, "Install “App”?") {
 		t.Errorf("labels = %q", l)
 	}
 	// A second request answers the first no.
@@ -175,7 +142,7 @@ func TestEscapeAndPreemption(t *testing.T) {
 		t.Fatal("a preempted request was never answered")
 	}
 	c = hs.open(t)
-	if l := labels(c.Root); !slices.Contains(l, "An application is requesting your name and avatar.") {
+	if l := treetest.Labels(c.Root); !slices.Contains(l, "An application is requesting your name and avatar.") {
 		t.Errorf("account labels = %q", l)
 	}
 	hs.do(func() { c.OnKey(nil, escapeKeycode, 0) })
@@ -198,7 +165,7 @@ func TestWallpaperPreviewShowsTheImage(t *testing.T) {
 	go func() { got <- hs.h.ConfirmWallpaper("file:///home/u/My%20Walls/a.png") }()
 	c := hs.open(t)
 	var img *widget.Image
-	walk(c.Root, func(w widget.Widget) {
+	treetest.Walk(c.Root, func(w widget.Widget) {
 		if i, ok := w.(*widget.Image); ok {
 			img = i
 		}
@@ -206,7 +173,7 @@ func TestWallpaperPreviewShowsTheImage(t *testing.T) {
 	if img == nil {
 		t.Error("no preview image")
 	}
-	hs.do(func() { button(t, c.Root, "Set wallpaper").OnClick() })
+	hs.do(func() { treetest.Button(t, c.Root, "Set wallpaper").OnClick() })
 	if !<-got {
 		t.Error("confirm answered no")
 	}
@@ -235,7 +202,7 @@ func TestAppChooserFiltersAndPicks(t *testing.T) {
 	c := hs.open(t)
 	var search *widget.Entry
 	var remember *widget.CheckButton
-	walk(c.Root, func(w widget.Widget) {
+	treetest.Walk(c.Root, func(w widget.Widget) {
 		switch v := w.(type) {
 		case *widget.Entry:
 			search = v
@@ -246,7 +213,7 @@ func TestAppChooserFiltersAndPicks(t *testing.T) {
 	if search == nil || remember == nil {
 		t.Fatal("no search entry or remember box")
 	}
-	viewer, editor := button(t, c.Root, "Image Viewer"), button(t, c.Root, "Text Editor")
+	viewer, editor := treetest.Button(t, c.Root, "Image Viewer"), treetest.Button(t, c.Root, "Text Editor")
 	hs.do(func() { search.SetText("text") })
 	if viewer.Visible() || !editor.Visible() {
 		t.Errorf("filter: viewer %v editor %v", viewer.Visible(), editor.Visible())
@@ -273,13 +240,33 @@ func TestAppChooserCancelAndNoType(t *testing.T) {
 	got := make(chan string, 1)
 	go func() { got <- hs.h.ChooseApplication([]string{"viewer.desktop"}, "", "") }()
 	c := hs.open(t)
-	walk(c.Root, func(w widget.Widget) {
+	treetest.Walk(c.Root, func(w widget.Widget) {
 		if _, ok := w.(*widget.CheckButton); ok {
 			t.Error("an \"always use\" box without a content type")
 		}
 	})
-	hs.do(func() { button(t, c.Root, "Cancel").OnClick() })
+	hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
 	if id := <-got; id != "" {
 		t.Errorf("cancel picked %q", id)
 	}
+}
+
+// A short app list packs at the top of its scroll, not mid-view.
+func TestAppChooserShortListPacksAtTheTop(t *testing.T) {
+	hs := newHarness(t, []desktopentry.App{installApp(t, t.TempDir(), "viewer.desktop", "Image Viewer")})
+	got := make(chan string, 1)
+	go func() { got <- hs.h.ChooseApplication(nil, "", "") }()
+	c := hs.open(t)
+	var rowY, scrollY int
+	hs.do(func() {
+		c.Root.Measure(widget.Constraints{Max: widget.Size{W: 1280, H: 720}})
+		c.Root.Arrange(render.Rect{W: 1280, H: 720})
+		rowY = treetest.Button(t, c.Root, "Image Viewer").Bounds().Y
+		scrollY = treetest.First[*widget.Scroll](t, c.Root).Bounds().Y
+	})
+	if rowY-scrollY > 8 {
+		t.Errorf("the only row sits %dpx into the list, want it at the top", rowY-scrollY)
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
+	<-got
 }

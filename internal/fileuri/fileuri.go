@@ -58,8 +58,10 @@ func Path(uri string) (string, bool) {
 	return DecodeString(rest[slash:]), true
 }
 
-// FromPath is the file:// URI of an absolute path.
-func FromPath(path string) string { return "file://" + Encode(path, "/") }
+// FromPath is the file:// URI of an absolute path, as
+// g_filename_to_uri (and so gio and the thumbnail spec) writes it:
+// glib's path-safe sub-delimiters stay literal.
+func FromPath(path string) string { return "file://" + Encode(path, "!$&'()*+,/:=@") }
 
 func isHex(c byte) bool {
 	return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'

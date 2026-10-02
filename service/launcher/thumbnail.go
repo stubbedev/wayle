@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stubbedev/wayle/internal/fileuri"
 	"github.com/stubbedev/wayle/internal/mime"
 	"github.com/stubbedev/wayle/internal/shlex"
 )
@@ -56,38 +57,10 @@ func ThumbnailCacheDir() string {
 	return filepath.Join(base, "thumbnails", "normal")
 }
 
-// FileURI is g_filename_to_uri for an absolute path: file:// plus the
-// path with every byte outside glib's path-safe set percent-escaped.
-func FileURI(path string) string {
-	var b strings.Builder
-	b.WriteString("file://")
-	const hexDigits = "0123456789ABCDEF"
-	for i := range len(path) {
-		c := path[i]
-		if uriPathSafe(c) {
-			b.WriteByte(c)
-			continue
-		}
-		b.WriteByte('%')
-		b.WriteByte(hexDigits[c>>4])
-		b.WriteByte(hexDigits[c&0xf])
-	}
-	return b.String()
-}
-
-// uriPathSafe is glib's UNSAFE_PATH acceptable set.
-func uriPathSafe(c byte) bool {
-	switch {
-	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
-		return true
-	}
-	return strings.IndexByte("!$&'()*+,-./:=@_~", c) >= 0
-}
-
 // ThumbnailCachePath is where file's thumbnail lives per the spec: the
 // md5 of its file:// URI, as PNG.
 func ThumbnailCachePath(file string) string {
-	sum := md5.Sum([]byte(FileURI(file))) //nolint:gosec // the spec's digest, not security
+	sum := md5.Sum([]byte(fileuri.FromPath(file))) //nolint:gosec // the spec's digest, not security
 	return filepath.Join(ThumbnailCacheDir(), hex.EncodeToString(sum[:])+".png")
 }
 
@@ -189,7 +162,7 @@ func (x XDGThumbnailer) Argv(file, output string) ([]string, bool) {
 	if !ok || len(words) == 0 {
 		return nil, false
 	}
-	r := strings.NewReplacer("%s", strconv.Itoa(ThumbnailSize), "%u", FileURI(file), "%i", file, "%o", output)
+	r := strings.NewReplacer("%s", strconv.Itoa(ThumbnailSize), "%u", fileuri.FromPath(file), "%i", file, "%o", output)
 	for i, w := range words {
 		words[i] = r.Replace(w)
 	}

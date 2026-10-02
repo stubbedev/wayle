@@ -36,3 +36,12 @@ func TestEncodeRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+func TestFromPathEscapesLikeGlib(t *testing.T) {
+	if got := FromPath("/tmp/a b/ü#?.png"); got != "file:///tmp/a%20b/%C3%BC%23%3F.png" {
+		t.Errorf("got %s", got)
+	}
+	if got := FromPath("/x/!$&'()*+,-.:=@_~"); got != "file:///x/!$&'()*+,-.:=@_~" {
+		t.Errorf("safe set escaped: %s", got)
+	}
+}

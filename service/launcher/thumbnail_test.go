@@ -30,15 +30,6 @@ func TestTheCachePathIsTheMd5OfTheFileURI(t *testing.T) {
 	}
 }
 
-func TestFileURIEscapesLikeGlib(t *testing.T) {
-	if got := FileURI("/tmp/a b/ü#?.png"); got != "file:///tmp/a%20b/%C3%BC%23%3F.png" {
-		t.Errorf("got %s", got)
-	}
-	if got := FileURI("/x/!$&'()*+,-.:=@_~"); got != "file:///x/!$&'()*+,-.:=@_~" {
-		t.Errorf("safe set escaped: %s", got)
-	}
-}
-
 func TestPreviewCmdPlaceholdersAreArgvNotAShellLine(t *testing.T) {
 	th := NewThumbnailer(`mkthumb "{input}" "{output}" "{size}"`)
 	argv, ok := th.Command("/tmp/a b.raw", "/cache/x.png")

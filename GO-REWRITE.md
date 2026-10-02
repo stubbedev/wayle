@@ -153,12 +153,21 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 - [x] greeter: the login state machine under test (prompts, OTP, failure
       and retry, stale conversations, remembered user and session), the
       card's fade, the configured palette, the greeter's own FTL domain
-- [ ] portal dialogs: the shell hosts behind the backend's contracts
-      (shell/portaldialogs, shell/filechooser, shell/printdialog): the
-      access / account / app chooser / launcher / wallpaper dialogs, the
-      file chooser, the print dialog and its spooler. The share picker
-      and color picker are ported; `wayle portal share-picker` calls
-      `sharepicker.NewClient`
+- [x] portal dialogs (shell/portaldialogs): access / account / app
+      chooser / launcher / wallpaper, behind com.wayle.PortalDialogs1
+- [x] the file chooser (shell/filechooser, com.wayle.FileChooser1):
+      open / multiple / folder / save; places, mounts, breadcrumbs,
+      history and thumb buttons, in-folder and streamed subfolder
+      search, hidden files, type filters (GTK's class globs, MIME by
+      shared-mime-info with subclasses), sort persisted with the
+      list/grid layout, resizable columns, thumbnails, quick look and
+      the preview pane, a movable and resizable sheet, file drops.
+      Deliberate: a folder pick answers the selected folder (GTK), space
+      in a text field types; gelm's window focus ring paints above the
+      quick look card
+- [ ] the print dialog and its spooler (shell/printdialog). The share
+      picker and color picker are ported; `wayle portal share-picker`
+      calls `sharepicker.NewClient`
 - [x] the ScreenCast PipeWire producer (internal/pipewire, libpipewire
       through purego, the loop on a locked goroutine)
 - [ ] the share-preview gbm dmabuf allocator (screencast streams SHM)

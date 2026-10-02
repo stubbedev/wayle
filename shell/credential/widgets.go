@@ -101,6 +101,18 @@ func NewFixed(child widget.Widget, w, h int) *Fixed {
 	return &Fixed{child: child, w: w, h: h}
 }
 
+// SetSize re-pins the size (a column dragged wider).
+func (f *Fixed) SetSize(w, h int) {
+	if f.w == w && f.h == h {
+		return
+	}
+	f.w, f.h = w, h
+	f.InvalidateLayout()
+}
+
+// Size is the pinned size.
+func (f *Fixed) Size() (w, h int) { return f.w, f.h }
+
 // Measure reports the pinned axes and the child's natural others.
 func (f *Fixed) Measure(con widget.Constraints) widget.Size {
 	inner := widget.Constraints{Min: widget.Size{W: f.w, H: f.h}, Max: con.Max}
