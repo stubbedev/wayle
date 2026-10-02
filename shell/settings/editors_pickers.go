@@ -87,12 +87,9 @@ func (c *fontEditor) open() {
 		class: "font-picker-popover", listClass: "font-picker-list", scrollClass: "font-picker-scroll",
 		placeholder: "settings-font-search", maxH: int(math.Round(fontPickerListPx)),
 		row: func(k *kit, name string) widget.Widget {
-			row := widget.NewBox(widget.Row, 0, 0)
-			row.SetElement("row")
 			l := k.label(name, "font-picker-item")
 			l.SetEllipsize(widget.EllipsizeEnd)
-			row.Append(l, true)
-			return row
+			return l
 		},
 	}, func(family string) { _ = c.slot.set(family) })
 }

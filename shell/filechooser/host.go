@@ -513,7 +513,6 @@ func (m rows) Row(i int) widget.Widget {
 // kind cells under their column headers.
 func (c *Chooser) fileRow(e Entry) widget.Widget {
 	row := widget.NewBox(widget.Row, 8, 0)
-	row.SetElement("row")
 	icon := c.entryIcon(e, rowIconPx)
 	row.Append(icon, false)
 	name := c.label(c.s.displayName(e), "")

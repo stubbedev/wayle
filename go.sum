@@ -30,6 +30,8 @@ github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef h1:Ch6Q+AZUxDBCVqd
 github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef/go.mod h1:nXTWP6+gD5+LUJ8krVhhoeHjvHTutPxMYl5SvkcnJNE=
 github.com/stubbedev/gelm v0.0.0-20261002193706-37bdf8f194a5 h1:BTxVKNQTxA/Z5lYfj39Oya28Pk5nbTBAbug8M9avRr8=
 github.com/stubbedev/gelm v0.0.0-20261002193706-37bdf8f194a5/go.mod h1:XcqyAxajl3WoJxLn+79LWLKqAUDnD+PMiQ/p+u5dNek=
+github.com/stubbedev/gelm v0.0.0-20261002210834-e7c4338146ba h1:+qurOoXJJiRiASFHXflpUtGvZlkuS+GaBi8kOYdfVWQ=
+github.com/stubbedev/gelm v0.0.0-20261002210834-e7c4338146ba/go.mod h1:XcqyAxajl3WoJxLn+79LWLKqAUDnD+PMiQ/p+u5dNek=
 github.com/unxed/xkb-go v0.1.8 h1:hqPI2wJw2LQ7YOqghNYat/TJF3pFamCCPjhxI5I3lhU=
 github.com/unxed/xkb-go v0.1.8/go.mod h1:V3LaLLiIMPBQCGnPfTYN8gER39XW26AZBYeXkkZ/GWQ=
 github.com/yalue/native_endian v1.0.2 h1:e4SxBbaCoOOO4E3axd7FSriUhzc1bIzqZGG5jl6Evbg=

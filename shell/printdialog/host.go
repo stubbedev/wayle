@@ -234,7 +234,6 @@ func (m queueRows) Row(i int) widget.Widget {
 	}
 	// shell/print's printer_row margins.
 	row := widget.NewBox(widget.Column, 0, 0)
-	row.SetElement("row")
 	row.Append(credential.NewInset(content, render.Insets{Top: 6, Right: 10, Bottom: 6, Left: 10}), false)
 	return row
 }

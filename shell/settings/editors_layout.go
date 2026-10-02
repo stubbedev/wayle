@@ -313,10 +313,7 @@ func (c *layoutEditor) pickModule(anchor widget.Widget, pick func(config.BarModu
 		class: "module-picker-popover", listClass: "module-picker-list", scrollClass: "module-picker-scroll",
 		placeholder: "settings-layout-search", maxH: modulePickerListPx,
 		row: func(k *kit, name string) widget.Widget {
-			row := widget.NewBox(widget.Row, 0, 0)
-			row.SetElement("row")
-			row.Append(k.label(name, "module-picker-item"), true)
-			return row
+			return k.label(name, "module-picker-item")
 		},
 	}, func(name string) {
 		var m config.BarModule
