@@ -694,3 +694,25 @@ func TestLongNamesKeepTheColumnsAligned(t *testing.T) {
 		t.Errorf("the size cells start at %v, want one column", xs)
 	}
 }
+
+// The chooser's containers report their children to the focus ring.
+func TestLayoutWidgetsReportTheirChildToTheFocusRing(t *testing.T) {
+	for name, wrap := range map[string]func(widget.Widget) widget.Widget{
+		"place":    func(c widget.Widget) widget.Widget { return newPlace(c, alignStart, alignStart) },
+		"sheet":    func(c widget.Widget) widget.Widget { return newSheet(c, 600, 400) },
+		"dragArea": func(c widget.Widget) widget.Widget { return &dragArea{child: c} },
+	} {
+		child := widget.NewSpacer(10, 10)
+		w := wrap(child)
+		w.Measure(widget.Constraints{Max: widget.Size{W: 800, H: 600}})
+		w.Arrange(render.Rect{W: 800, H: 600})
+		cv := render.New(make([]byte, render.Stride(800)*600), render.Stride(800), 800, 600)
+		drawn := false
+		cv.MarkFocus(child, func(*render.Canvas) { drawn = true })
+		w.Paint(cv)
+		if !drawn {
+			t.Errorf("%s did not report its child", name)
+		}
+		cv.FinishFocus()
+	}
+}

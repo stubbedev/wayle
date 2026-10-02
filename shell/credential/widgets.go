@@ -54,7 +54,7 @@ func (p *Panel) ArrangeRoot(r render.Rect) { p.Arrange(r) }
 // Paint fills the card, then the child.
 func (p *Panel) Paint(cv *render.Canvas) {
 	cv.RoundedRect(p.Bounds(), p.radius, p.color)
-	p.child.Paint(cv)
+	widget.PaintChild(cv, p.child)
 }
 
 // HitTest prefers the child; the padding belongs to the card.
@@ -143,7 +143,7 @@ func (f *Fixed) Arrange(r render.Rect) {
 func (f *Fixed) ArrangeRoot(r render.Rect) { f.Arrange(r) }
 
 // Paint paints the child.
-func (f *Fixed) Paint(cv *render.Canvas) { f.child.Paint(cv) }
+func (f *Fixed) Paint(cv *render.Canvas) { widget.PaintChild(cv, f.child) }
 
 // HitTest forwards to the child.
 func (f *Fixed) HitTest(pt widget.Point) widget.Widget { return f.child.HitTest(pt) }
@@ -224,7 +224,7 @@ func (s *Inset) Arrange(r render.Rect) {
 func (s *Inset) ArrangeRoot(r render.Rect) { s.Arrange(r) }
 
 // Paint paints the child.
-func (s *Inset) Paint(cv *render.Canvas) { s.child.Paint(cv) }
+func (s *Inset) Paint(cv *render.Canvas) { widget.PaintChild(cv, s.child) }
 
 // HitTest forwards to the child; the margins take no input.
 func (s *Inset) HitTest(pt widget.Point) widget.Widget { return s.child.HitTest(pt) }

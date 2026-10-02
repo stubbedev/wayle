@@ -163,8 +163,7 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       list/grid layout, resizable columns, thumbnails, quick look and
       the preview pane, a movable and resizable sheet, file drops.
       Deliberate: a folder pick answers the selected folder (GTK), space
-      in a text field types; gelm's window focus ring paints above the
-      quick look card
+      in a text field types
 - [x] the print dialog and its spooler (shell/printdialog, com.wayle.Print1):
       the printer list and settings form; jobs spool to CUPS over IPP
       (internal/ipp: CUPS-Get-Printers, Print-Job, the scheduler's domain

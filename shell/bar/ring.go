@@ -58,7 +58,7 @@ func (r *progressRing) Paint(cv *render.Canvas) {
 			cv.Arc(cx, cy, radius, float64(r.stroke), -math.Pi/2, 2*math.Pi*r.fraction, r.color)
 		}
 	}
-	r.label.Paint(cv)
+	widget.PaintChild(cv, r.label)
 }
 
 // Children exposes the label to the tree walks.

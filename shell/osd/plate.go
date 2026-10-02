@@ -28,7 +28,7 @@ func (p *plate) Arrange(r render.Rect) {
 
 func (p *plate) Paint(cv *render.Canvas) {
 	cv.FillRect(p.Bounds(), p.bg)
-	p.child.Paint(cv)
+	widget.PaintChild(cv, p.child)
 }
 
 func (p *plate) Children() []widget.Widget { return []widget.Widget{p.child} }

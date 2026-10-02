@@ -91,7 +91,7 @@ func (c *cwsContainer) Paint(cv *render.Canvas) {
 	if c.bg != 0 {
 		cv.RoundedRect(r, c.radius, c.bg)
 	}
-	c.box.Paint(cv)
+	widget.PaintChild(cv, c.box)
 	if c.borders.any() {
 		// The border-show edges, rounded with the container.
 		cv.RoundedBorder(r, render.UniformCorners(c.radius), c.borders.insets(), c.border)

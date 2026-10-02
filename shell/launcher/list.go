@@ -135,7 +135,7 @@ func (l *resultList) Paint(cv *render.Canvas) {
 	first, last := l.visible()
 	for i := first; i < last; i++ {
 		if w, ok := l.rows[i]; ok {
-			w.Paint(cv)
+			widget.PaintChild(cv, w)
 		}
 	}
 	cv.PopClip(prev)

@@ -53,7 +53,7 @@ func (d *dragArea) ArrangeRoot(r render.Rect) { d.Arrange(r) }
 
 func (d *dragArea) Paint(cv *render.Canvas) {
 	if d.child != nil {
-		d.child.Paint(cv)
+		widget.PaintChild(cv, d.child)
 	}
 }
 
@@ -164,7 +164,7 @@ func (p *place) ArrangeRoot(r render.Rect) { p.Arrange(r) }
 
 func (p *place) Paint(cv *render.Canvas) {
 	if widget.IsVisible(p.child) {
-		p.child.Paint(cv)
+		widget.PaintChild(cv, p.child)
 	}
 }
 
@@ -219,7 +219,7 @@ func (s *sheet) Arrange(r render.Rect) {
 
 func (s *sheet) ArrangeRoot(r render.Rect) { s.Arrange(r) }
 
-func (s *sheet) Paint(cv *render.Canvas) { s.child.Paint(cv) }
+func (s *sheet) Paint(cv *render.Canvas) { widget.PaintChild(cv, s.child) }
 
 func (s *sheet) HitTest(p widget.Point) widget.Widget { return s.child.HitTest(p) }
 

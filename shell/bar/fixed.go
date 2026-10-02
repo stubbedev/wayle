@@ -45,7 +45,7 @@ func (f *fixedBox) Arrange(r render.Rect) {
 
 func (f *fixedBox) Paint(cv *render.Canvas) {
 	if f.child != nil {
-		f.child.Paint(cv)
+		widget.PaintChild(cv, f.child)
 	}
 }
 

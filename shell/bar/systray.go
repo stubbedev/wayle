@@ -220,7 +220,7 @@ func (b *trayButton) Arrange(r render.Rect) {
 	b.inner.Arrange(r)
 }
 
-func (b *trayButton) Paint(cv *render.Canvas) { b.inner.Paint(cv) }
+func (b *trayButton) Paint(cv *render.Canvas) { widget.PaintChild(cv, b.inner) }
 
 func (b *trayButton) HitTest(p widget.Point) widget.Widget { return b.HitLeaf(b, p) }
 

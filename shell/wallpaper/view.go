@@ -165,13 +165,13 @@ func (v *view) Paint(cv *render.Canvas) {
 	prevClip := cv.PushClip(cv.MapRect(v.Bounds()))
 	defer cv.PopClip(prevClip)
 	if v.prev != nil {
-		v.prev.Paint(cv)
+		widget.PaintChild(cv, v.prev)
 	}
 	if v.cur == nil {
 		return
 	}
 	if v.prev == nil || v.kind != TransitionCrossfade {
-		v.cur.Paint(cv)
+		widget.PaintChild(cv, v.cur)
 		return
 	}
 	// The incoming letterbox is the black backdrop fading in too.
@@ -180,7 +180,7 @@ func (v *view) Paint(cv *render.Canvas) {
 	_, dw, dh := render.ScaleRect(v.curSize.X, v.curSize.Y, box.W, box.H, v.cur.Scale())
 	inner := render.Rect{X: box.X + (box.W-dw)/2, Y: box.Y + (box.H-dh)/2, W: dw, H: dh}
 	fillOutside(cv, box, inner, backdrop)
-	v.cur.Paint(cv)
+	widget.PaintChild(cv, v.cur)
 	cv.PopAlpha(prevAlpha)
 }
 

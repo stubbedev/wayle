@@ -31,7 +31,7 @@ func (s *sized) Arrange(r render.Rect) {
 	widget.SetParents(s, s.child)
 }
 
-func (s *sized) Paint(cv *render.Canvas) { s.child.Paint(cv) }
+func (s *sized) Paint(cv *render.Canvas) { widget.PaintChild(cv, s.child) }
 
 func (s *sized) HitTest(p widget.Point) widget.Widget { return s.child.HitTest(p) }
 
@@ -139,7 +139,7 @@ func (m *outputMap) Arrange(r render.Rect) {
 
 func (m *outputMap) Paint(cv *render.Canvas) {
 	for _, c := range m.cards {
-		c.Paint(cv)
+		widget.PaintChild(cv, c)
 	}
 }
 

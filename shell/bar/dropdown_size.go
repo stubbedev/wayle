@@ -105,7 +105,7 @@ func (p *panelBox) Arrange(r render.Rect) {
 	p.child.Arrange(r)
 }
 
-func (p *panelBox) Paint(cv *render.Canvas) { p.child.Paint(cv) }
+func (p *panelBox) Paint(cv *render.Canvas) { widget.PaintChild(cv, p.child) }
 
 // Children exposes the content to the tree walks.
 func (p *panelBox) Children() []widget.Widget { return []widget.Widget{p.child} }

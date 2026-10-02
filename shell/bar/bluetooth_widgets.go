@@ -61,7 +61,7 @@ func (s *btSurface) Paint(cv *render.Canvas) {
 	if s.bg != 0 {
 		cv.RoundedRect(s.Bounds(), s.radius, s.bg)
 	}
-	s.child.Paint(cv)
+	widget.PaintChild(cv, s.child)
 }
 
 // HitTest prefers the child, else the surface itself.
@@ -162,7 +162,7 @@ func (r *btDeviceRow) Paint(cv *render.Canvas) {
 	if r.hoverBg != 0 && r.rowHovered {
 		cv.RoundedRect(r.Bounds(), 0, r.hoverBg)
 	}
-	r.box.Paint(cv)
+	widget.PaintChild(cv, r.box)
 }
 
 // HitTest routes to a visible action button, else claims the press for

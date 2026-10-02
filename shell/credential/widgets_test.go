@@ -46,3 +46,26 @@ func TestInsetHoldsItsMargins(t *testing.T) {
 		t.Errorf("under * { padding: 0 } = %+v", got)
 	}
 }
+
+// The containers paint their child through widget.PaintChild, so the
+// frame's focus ring draws right after a focused child, in tree order.
+func TestContainersReportTheirChildToTheFocusRing(t *testing.T) {
+	for name, wrap := range map[string]func(widget.Widget) widget.Widget{
+		"Fixed": func(c widget.Widget) widget.Widget { return NewFixed(c, 10, 10) },
+		"Inset": func(c widget.Widget) widget.Widget { return NewInset(c, render.Insets{Top: 1}) },
+		"Panel": func(c widget.Widget) widget.Widget { return NewPanel(c, 1, 0, 0) },
+	} {
+		child := widget.NewSpacer(10, 10)
+		w := wrap(child)
+		w.Measure(widget.Constraints{Max: widget.Size{W: 20, H: 20}})
+		w.Arrange(render.Rect{W: 20, H: 20})
+		cv := render.New(make([]byte, render.Stride(20)*20), render.Stride(20), 20, 20)
+		drawn := false
+		cv.MarkFocus(child, func(*render.Canvas) { drawn = true })
+		w.Paint(cv)
+		if !drawn {
+			t.Errorf("%s did not report its child", name)
+		}
+		cv.FinishFocus()
+	}
+}
