@@ -9,6 +9,7 @@ package portal
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/godbus/dbus/v5"
 
@@ -30,11 +31,17 @@ type Backend struct {
 	// spawn starts a program the portal hands off to (detach; a
 	// recorder in tests).
 	spawn func(argv []string) error
+	// inhibitLock takes a logind lock (logindLock; a fake in tests).
+	inhibitLock func(what string) (*os.File, error)
+	notifier    *notifier
 }
 
 // New builds the backend over a session-bus connection and the config.
 func New(conn *dbus.Conn, cfg *config.Service) *Backend {
-	return &Backend{conn: conn, cfg: cfg, sessions: newSessions(conn), spawn: detach}
+	return &Backend{
+		conn: conn, cfg: cfg, sessions: newSessions(conn),
+		spawn: detach, inhibitLock: logindLock, notifier: newNotifier(conn),
+	}
 }
 
 // interfaces is every interface the backend mounts at ObjectPath.
@@ -46,12 +53,16 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		usbIface(),
 		emailIface(b.spawn),
 		secretIface(),
+		inhibitor{b.conn, b.inhibitLock}.iface(),
+		b.notifier.iface(),
+		wallpaperIface(b.conn),
 	}
 }
 
 // Serve mounts the interfaces, claims BusName (failing loudly when
 // another backend owns it rather than queueing and idling forever) and
-// starts the settings watcher. The returned stop ends the watcher, runs
+// starts the settings watcher and the notification action forwarder.
+// The returned stop ends both, runs
 // every live session's cleanup and drops the name.
 func (b *Backend) Serve() (stop func(), err error) {
 	if _, err := dbusx.Export(b.conn, ObjectPath, b.interfaces()...); err != nil {
@@ -61,9 +72,16 @@ func (b *Backend) Serve() (stop func(), err error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot request D-Bus name: %w", err)
 	}
+	unforward, err := b.notifier.forward()
+	if err != nil {
+		// Buttons still show; their presses just do not reach the app.
+		warnf("notification: cannot subscribe to ActionInvoked: %v", err)
+		unforward = func() {}
+	}
 	unwatch := watchSettings(b.conn, b.cfg)
 	return func() {
 		unwatch()
+		unforward()
 		b.sessions.clearAll()
 		release()
 	}, nil

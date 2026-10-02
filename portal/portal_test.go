@@ -16,6 +16,7 @@ import (
 // rig is a backend serving on a private bus, with a client connection
 // that calls it the way the frontend does.
 type rig struct {
+	bus     *dbustest.Bus
 	cfg     *config.Service
 	backend *Backend
 	client  *dbus.Conn
@@ -42,7 +43,7 @@ func newRig(t *testing.T, edit func(*Backend)) *rig {
 		t.Fatal(err)
 	}
 	t.Cleanup(stop)
-	return &rig{cfg: cfg, backend: b, client: client, obj: client.Object(BusName, ObjectPath), signals: signals}
+	return &rig{bus: bus, cfg: cfg, backend: b, client: client, obj: client.Object(BusName, ObjectPath), signals: signals}
 }
 
 // changed collects the SettingChanged keys emitted within a short wait.
