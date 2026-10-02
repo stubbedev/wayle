@@ -2,6 +2,7 @@ package portal
 
 import (
 	"context"
+	"os"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -9,6 +10,7 @@ import (
 	"github.com/unxed/xkb-go"
 
 	"github.com/stubbedev/wayle/internal/dbusx"
+	"github.com/stubbedev/wayle/internal/eis"
 	"github.com/stubbedev/wayle/shell/portaldialogs"
 )
 
@@ -307,4 +309,39 @@ func (remoteDesktopObject) NotifyTouchMotion(_ dbus.ObjectPath, _ Vardict, _, _ 
 // NotifyTouchUp is unsupported.
 func (remoteDesktopObject) NotifyTouchUp(_ dbus.ObjectPath, _ Vardict, _ uint32) *dbus.Error {
 	return nil
+}
+
+// eisInput replays an EIS client's emulation onto a session's devices.
+type eisInput struct{ in *remoteInput }
+
+func (e eisInput) Motion(dx, dy float64)            { _ = e.in.sink.Motion(dx, dy) }
+func (e eisInput) Button(code uint32, pressed bool) { _ = e.in.sink.Button(code, pressed) }
+func (e eisInput) Scroll(dx, dy float64)            { smoothScroll(e.in.sink, dx, dy) }
+func (e eisInput) Key(code uint32, pressed bool)    { _ = e.in.sink.Key(code, pressed) }
+func (e eisInput) Keysym(sym uint32, pressed bool)  { e.in.keysym(sym, pressed) }
+
+// ScrollDiscrete turns 120ths of a detent into whole wheel steps,
+// vertical then horizontal.
+func (e eisInput) ScrollDiscrete(dx, dy int32) {
+	if dy != 0 {
+		_ = e.in.sink.AxisDiscrete(0, float64(dy/120)*discreteStep, dy/120)
+	}
+	if dx != 0 {
+		_ = e.in.sink.AxisDiscrete(1, float64(dx/120)*discreteStep, dx/120)
+	}
+}
+
+// ConnectToEIS hands the app an EIS socket for the started session,
+// which libei clients prefer to the Notify* calls; godbus closes this
+// end's copy once the reply is out.
+func (o remoteDesktopObject) ConnectToEIS(session dbus.ObjectPath, _ string, _ Vardict) (*os.File, *dbus.Error) {
+	in := o.r.input(session)
+	if in == nil {
+		return nil, dbusx.Failed("no active remote-desktop session")
+	}
+	f, err := eis.Pair(eisInput{in})
+	if err != nil {
+		return nil, dbusx.Failed(err.Error())
+	}
+	return f, nil
 }

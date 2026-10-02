@@ -166,6 +166,8 @@
               # producer tests (internal/pipewire), and the libpipewire its
               # purego binding loads.
               pipewire
+              # libei, the C client the EIS server tests drive (internal/eis).
+              libei
 
               # libgstreamer for the recorder's purego binding and the
               # plugins its tests run pipelines through (videotestsrc,
@@ -182,7 +184,7 @@
             # The recorder dlopens libgstreamer, the ScreenCast producer
             # libpipewire; the shell's own copies, so a cgo (-race) test
             # binary never mixes its glibc with a host library's plugins.
-            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.gst_all_1.gstreamer pkgs.glib pkgs.pipewire ];
+            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.gst_all_1.gstreamer pkgs.glib pkgs.pipewire pkgs.libei ];
             GST_PLUGIN_SYSTEM_PATH_1_0 = pkgs.lib.makeSearchPath "lib/gstreamer-1.0" (with pkgs.gst_all_1; [
               gstreamer
               gst-plugins-base

@@ -1,11 +1,15 @@
 package portal
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -163,5 +167,45 @@ func TestRemoteDesktopWithoutVirtualInput(t *testing.T) {
 	}
 	if got := keysymTable([]byte("not a keymap")); len(got) != 0 {
 		t.Errorf("a garbage keymap mapped %v", got)
+	}
+}
+
+func TestRemoteDesktopConnectToEIS(t *testing.T) {
+	r, sink := remoteRig(t, nil)
+	serveDialogs(t, r, true)
+	r.interactive(t, RemoteDesktopIface+".CreateSession", handle, sessA, "org.app", Vardict{})
+	var fd dbus.UnixFD
+	err := r.obj.Call(RemoteDesktopIface+".ConnectToEIS", 0, sessA, "org.app", Vardict{}).Store(&fd)
+	var de dbus.Error
+	if !errors.As(err, &de) || de.Body[0] != "no active remote-desktop session" {
+		t.Errorf("ConnectToEIS before Start = %v", err)
+	}
+	r.interactive(t, RemoteDesktopIface+".Start", handle, sessA, "org.app", "", Vardict{})
+	if err := r.obj.Call(RemoteDesktopIface+".ConnectToEIS", 0, sessA, "org.app", Vardict{}).Store(&fd); err != nil {
+		t.Fatal(err)
+	}
+	f := os.NewFile(uintptr(fd), "eis")
+	defer f.Close()
+	// An EIS server answers on the other end: it opens with its
+	// handshake version, ei_handshake (object 0) opcode 0.
+	_ = f.SetReadDeadline(time.Now().Add(2 * time.Second))
+	head := make([]byte, 20)
+	if _, err := io.ReadFull(f, head); err != nil {
+		t.Fatal(err)
+	}
+	if binary.LittleEndian.Uint64(head) != 0 || binary.LittleEndian.Uint32(head[8:]) != 20 || binary.LittleEndian.Uint32(head[12:]) != 0 || binary.LittleEndian.Uint32(head[16:]) != 1 {
+		t.Errorf("first message = %x", head)
+	}
+
+	// The handler replays onto the session's devices.
+	in := r.backend.remote.input(sessA)
+	e := eisInput{in}
+	e.ScrollDiscrete(-120, 240)
+	e.ScrollDiscrete(0, 0)
+	e.Scroll(1, 0)
+	e.Keysym(0x41, true)
+	want := []string{"discrete 0 30 2", "discrete 1 -15 -1", "axis 1 1", "key 42 true", "key 30 true"}
+	if got := sink.events.Load(); !slices.Equal(got, want) {
+		t.Errorf("replayed %q, want %q", got, want)
 	}
 }
