@@ -1604,3 +1604,252 @@ func TestPaletteScheme(t *testing.T) {
 		t.Error("def:decimal finds no style")
 	}
 }
+
+const layoutTOML = `[[bar.layout]]
+monitor = "*"
+show = true
+left = ["clock", { name = "sys", modules = ["cpu", "ram"] }]
+center = []
+right = ["battery", "volume"]
+
+[[modules.custom]]
+id = "gpu"
+command = "true"
+`
+
+func newTestLayout(t *testing.T) (*kit, *layoutEditor) {
+	t.Helper()
+	k := testKit(t, layoutTOML)
+	k.pickers = &fakePickers{}
+	return k, fieldControl(k, field("bar.layout", layoutRow)).(*layoutEditor)
+}
+
+func storedLayouts(k *kit) []config.BarLayout { return k.store.svc.Config().Bar.Layout }
+
+func TestLayoutEditorCards(t *testing.T) {
+	k, c := newTestLayout(t)
+	if len(c.layouts) != 1 || len(c.list.Children()) != 1 {
+		t.Fatalf("%d layouts, %d cards", len(c.layouts), len(c.list.Children()))
+	}
+	// The monitor and extends entries write as typed; an empty extends
+	// is unset.
+	card := c.list.Children()[0].(*widget.Box)
+	header := card.Children()[0].(*widget.Box)
+	monitor := header.Children()[1].(*widget.Entry)
+	extends := header.Children()[3].(*widget.Entry)
+	monitor.SelectAll()
+	monitor.Insert("DP-1")
+	extends.Insert("*")
+	if l := storedLayouts(k)[0]; l.Monitor != "DP-1" || l.Extends == nil || *l.Extends != "*" {
+		t.Errorf("layout %+v", l)
+	}
+	extends.SelectAll()
+	extends.Backspace()
+	if storedLayouts(k)[0].Extends != nil {
+		t.Error("an empty extends stayed set")
+	}
+	// Hiding the bar swaps the zones for the note.
+	header.Children()[5].(*widget.Switch).SetOn(false)
+	if storedLayouts(k)[0].Show {
+		t.Error("the show switch did not write")
+	}
+	body := c.list.Children()[0].(*widget.Box).Children()[1].(*widget.Box)
+	if l, ok := body.Children()[0].(*widget.Label); !ok || !l.HasClass("layout-hidden-label") || len(body.Children()) != 1 {
+		t.Error("a hidden layout shows its zones")
+	}
+	// Add and remove cards.
+	addButton := c.Children()[1].(*widget.Button)
+	addButton.ClickAt(widget.Point{})
+	if got := storedLayouts(k); len(got) != 2 || !got[1].Show {
+		t.Fatalf("after add: %+v", got)
+	}
+	remove := c.list.Children()[1].(*widget.Box).Children()[0].(*widget.Box).Children()[6].(*widget.Button)
+	remove.ClickAt(widget.Point{})
+	if len(storedLayouts(k)) != 1 || len(c.list.Children()) != 1 {
+		t.Error("remove left the card")
+	}
+}
+
+func TestLayoutEditorModulesAndGroups(t *testing.T) {
+	k, c := newTestLayout(t)
+	if names := c.moduleNames(); !slices.Contains(names, "clock") || names[len(names)-1] != "custom-gpu" {
+		t.Errorf("picker modules end %v", names[len(names)-3:])
+	}
+	// Picking a module appends it to the zone.
+	p := c.pickModule(nil, func(m config.BarModule) {
+		items := c.zone(0, zoneCenter)
+		*items = append(*items, config.BarItem{Module: m})
+		c.commit()
+	})
+	p.pick("custom-gpu")
+	if got := storedLayouts(k)[0].Center; len(got) != 1 || got[0].Module != "custom-gpu" {
+		t.Errorf("center %+v", got)
+	}
+	p.pick("not-a-module")
+	if len(storedLayouts(k)[0].Center) != 1 {
+		t.Error("an unknown name was added")
+	}
+	// The group chip: rename, remove a module.
+	zone := layoutZoneOf(c, 0, zoneLeft)
+	group := zone.ChildAt(1).Child().(*layoutChip)
+	if !group.HasClass("group-chip") {
+		t.Fatal("the second left item is not the group chip")
+	}
+	name := group.Children()[0].(*widget.Entry)
+	if mn, mx := name.WidthChars(); mn != groupNameChars || mx != groupNameMaxChars {
+		t.Errorf("group name width %d/%d", mn, mx)
+	}
+	name.Insert("!")
+	if g := storedLayouts(k)[0].Left[1].Group; g == nil || g.Name != "sys!" {
+		t.Errorf("group %+v", g)
+	}
+	cpu := group.Children()[1].(*widget.Box)
+	cpu.Children()[1].(*widget.Button).ClickAt(widget.Point{})
+	if g := storedLayouts(k)[0].Left[1].Group; len(g.Modules) != 1 || g.Modules[0].Module != "ram" {
+		t.Errorf("after removing cpu: %+v", g)
+	}
+	// A module chip's remove takes the item out.
+	zone = layoutZoneOf(c, 0, zoneLeft)
+	clock := zone.ChildAt(0).Child().(*layoutChip)
+	clock.Children()[1].(*widget.Button).ClickAt(widget.Point{})
+	if got := storedLayouts(k)[0].Left; len(got) != 1 || got[0].Group == nil {
+		t.Errorf("left after removing clock: %+v", got)
+	}
+	// The add-group button appends a named group.
+	row := c.list.Children()[0].(*widget.Box).Children()[1].(*widget.Box).Children()[zoneRight].(*widget.Box)
+	row.Children()[3].(*widget.Button).ClickAt(widget.Point{})
+	if got := storedLayouts(k)[0].Right; len(got) != 3 || got[2].Group == nil || got[2].Group.Name != i18n.Settings().Get("settings-layout-default-group") {
+		t.Errorf("right after add group: %+v", got)
+	}
+}
+
+// layoutZoneOf finds card i's zone z.
+func layoutZoneOf(c *layoutEditor, i, z int) *layoutZone {
+	body := c.list.Children()[i].(*widget.Box).Children()[1].(*widget.Box)
+	row := body.Children()[z].(*widget.Box)
+	frame := row.Children()[1].(*widget.Box)
+	return frame.Children()[0].(*layoutZone)
+}
+
+func TestLayoutEditorDragAndDrop(t *testing.T) {
+	k, c := newTestLayout(t)
+	if p, ok := decodePayload(dragPayload{0, zoneRight, 1}.encode()); !ok || p != (dragPayload{0, zoneRight, 1}) {
+		t.Errorf("payload round trip %v %v", p, ok)
+	}
+	for _, bad := range []string{"", "0:middle:1", "x:left:1", "0:left"} {
+		if _, ok := decodePayload(bad); ok {
+			t.Errorf("%q decoded", bad)
+		}
+	}
+	// The chip offers its origin and marks itself while dragged.
+	zone := layoutZoneOf(c, 0, zoneRight)
+	chip := zone.ChildAt(1).Child().(*layoutChip)
+	content := chip.DragContent()
+	var buf strings.Builder
+	_ = content.Write(layoutDragMime, &buf)
+	if buf.String() != "0:right:1" || !chip.HasClass("chip-dragging") {
+		t.Errorf("payload %q, dragging %v", buf.String(), chip.HasClass("chip-dragging"))
+	}
+	content.OnDone(true)
+	if chip.HasClass("chip-dragging") {
+		t.Error("the mark outlived the drag")
+	}
+	// Lay the zone out to aim drops by position.
+	zone.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 100}})
+	zone.Arrange(render.Rect{W: 400, H: 100})
+	b0, b1 := zone.ChildAt(0).Bounds(), zone.ChildAt(1).Bounds()
+	if zone.DragEnter([]string{"text/uri-list"}, widget.Point{}) != "" {
+		t.Error("a foreign drag was accepted")
+	}
+	if zone.DragEnter([]string{layoutDragMime}, widget.Point{X: b0.X + 1, Y: b0.Y + 1}) != layoutDragMime || !zone.ChildAt(0).HasClass("drop-before") {
+		t.Error("hovering the first chip's left half does not mark before it")
+	}
+	zone.DragHover(widget.Point{X: b1.X + b1.W - 1, Y: b1.Y + 1})
+	if zone.ChildAt(0).HasClass("drop-before") || !zone.ChildAt(1).HasClass("drop-after") {
+		t.Error("hovering the last chip's right half does not mark after it")
+	}
+	if zone.dropPosition(widget.Point{X: b1.X + b1.W + 50, Y: b1.Y + 1}) != 2 || zone.dropPosition(widget.Point{X: 5, Y: 90}) != 2 {
+		t.Error("past the line's end or below it is the end")
+	}
+	if zone.dropPosition(widget.Point{X: 5, Y: b0.Y - 1}) != 0 {
+		t.Error("above the line is the start")
+	}
+	zone.DragLeave()
+	if zone.ChildAt(1).HasClass("drop-after") {
+		t.Error("the mark outlived the leave")
+	}
+	// Dropping volume (right 1) before battery (right 0) reorders.
+	zone.Drop(layoutDragMime, []byte("0:right:1"), widget.Point{X: b0.X + 1, Y: b0.Y + 1})
+	if got := storedLayouts(k)[0].Right; got[0].Module != "volume" || got[1].Module != "battery" {
+		t.Errorf("right after the drop: %+v", got)
+	}
+	// Within one zone a later position shifts for the removal: battery
+	// dropped before clock lands just before it.
+	c.layouts[0].Right = append(c.layouts[0].Right, config.BarItem{Module: "clock"})
+	c.commit()
+	c.move(dragPayload{0, zoneRight, 0}, 0, zoneRight, 2)
+	if got := modules(storedLayouts(k)[0].Right); !slices.Equal(got, []string{"battery", "volume", "clock"}) {
+		t.Errorf("same-zone move: %v", got)
+	}
+	// Another zone's later position does not shift.
+	c.move(dragPayload{0, zoneLeft, 0}, 0, zoneRight, 1)
+	if got := modules(storedLayouts(k)[0].Right); !slices.Equal(got, []string{"battery", "clock", "volume", "clock"}) {
+		t.Errorf("cross-zone move: %v", got)
+	}
+	// Across zones: the group moves into the empty center.
+	c.move(dragPayload{0, zoneLeft, 0}, 0, zoneCenter, 0)
+	if l := storedLayouts(k)[0]; len(l.Left) != 0 || len(l.Center) != 1 || l.Center[0].Group == nil {
+		t.Errorf("cross-zone move: %+v", l)
+	}
+	// A stale payload moves nothing.
+	before := config.Encode(storedLayouts(k))
+	c.move(dragPayload{0, zoneLeft, 9}, 0, zoneRight, 0)
+	c.move(dragPayload{3, zoneLeft, 0}, 0, zoneRight, 0)
+	zone = layoutZoneOf(c, 0, zoneRight)
+	zone.Drop(layoutDragMime, []byte("junk"), widget.Point{})
+	if !reflect.DeepEqual(before, config.Encode(storedLayouts(k))) {
+		t.Error("a stale or broken payload changed the layout")
+	}
+}
+
+// modules lists the items' module names (groups as "group").
+func modules(items []config.BarItem) []string {
+	out := make([]string, len(items))
+	for i, it := range items {
+		out[i] = string(it.Module)
+		if it.Group != nil {
+			out[i] = "group"
+		}
+	}
+	return out
+}
+
+// The editor edits its own copy: a config snapshot taken before an
+// edit keeps what it held.
+func TestLayoutEditorLeavesSnapshotsAlone(t *testing.T) {
+	k, c := newTestLayout(t)
+	snap := k.store.svc.Config()
+	zone := layoutZoneOf(c, 0, zoneLeft)
+	group := zone.ChildAt(1).Child().(*layoutChip)
+	group.Children()[0].(*widget.Entry).Insert("x")
+	zone.ChildAt(0).Child().(*layoutChip).Children()[1].(*widget.Button).ClickAt(widget.Point{})
+	if l := snap.Bar.Layout[0].Left; l[0].Module != "clock" || l[1].Group.Name != "sys" {
+		t.Errorf("the old snapshot changed: %+v %+v", l[0], l[1].Group)
+	}
+}
+
+func TestLayoutEditorRefresh(t *testing.T) {
+	k, c := newTestLayout(t)
+	keep := c.list.Children()[0]
+	c.refresh()
+	if c.list.Children()[0] != keep {
+		t.Error("an unchanged refresh rebuilt the cards")
+	}
+	layouts := storedLayouts(k)
+	layouts = append(layouts, config.BarLayout{Monitor: "HDMI-1", Show: true})
+	_ = k.store.set("bar.layout", config.Encode(layouts))
+	c.refresh()
+	if len(c.list.Children()) != 2 || c.layouts[1].Monitor != "HDMI-1" {
+		t.Errorf("an outside change: %d cards", len(c.list.Children()))
+	}
+}

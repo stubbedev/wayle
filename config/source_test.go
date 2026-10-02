@@ -84,3 +84,24 @@ func TestPlainUnwrapsTables(t *testing.T) {
 		t.Error("a scalar changed")
 	}
 }
+
+func TestEncodeIsWhatGetByPathReads(t *testing.T) {
+	svc := Load(t.TempDir(), DiscardDiagnostics)
+	defer svc.Close()
+	got, err := svc.GetByPath("bar.layout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enc := Encode(svc.Config().Bar.Layout); !reflect.DeepEqual(enc, Plain(got)) {
+		t.Errorf("Encode = %#v\nGetByPath = %#v", enc, Plain(got))
+	}
+	// And SetByPath takes it back.
+	layouts := svc.Config().Bar.Layout
+	layouts[0].Left = append(layouts[0].Left, BarItem{Module: "clock"})
+	if err := svc.SetByPath("bar.layout", Encode(layouts)); err != nil {
+		t.Fatal(err)
+	}
+	if l := svc.Config().Bar.Layout[0].Left; l[len(l)-1].Module != "clock" {
+		t.Errorf("left zone %+v", l)
+	}
+}

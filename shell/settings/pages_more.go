@@ -2,6 +2,27 @@ package settings
 
 import "github.com/stubbedev/wayle/config"
 
+// barGeneralPage is pages/bar/general.
+func barGeneralPage(*config.Config) pageSpec {
+	return pageSpec{id: "bar-general", navKey: "settings-nav-bar-general", icon: "ld-layout-dashboard-symbolic", header: "settings-page-bar-general", sections: []sectionSpec{
+		{title: "settings-section-layout", rows: []rowSpec{
+			field("bar.location"),
+			field("bar.exclusive"),
+			field("bar.layer"),
+			field("bar.scale"),
+			field("bar.layout", layoutRow),
+		}},
+		{title: "settings-section-appearance", rows: []rowSpec{
+			field("bar.bg"),
+			field("bar.background-opacity", percentage),
+			field("bar.rounding"),
+			field("bar.shadow"),
+		}},
+		{title: "settings-section-spacing", rows: fields("bar.inset-edge", "bar.inset-ends", "bar.padding", "bar.padding-ends", "bar.module-gap")},
+		{title: "settings-section-border", rows: fields("bar.border-location", "bar.border-width", "bar.border-color")},
+	}}
+}
+
 // barButtonPage is pages/bar/button.
 func barButtonPage(*config.Config) pageSpec {
 	return pageSpec{id: "bar-button", navKey: "settings-nav-bar-button", icon: "ld-square-symbolic", header: "settings-page-bar-button", sections: []sectionSpec{

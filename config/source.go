@@ -122,3 +122,7 @@ func stagedValue(root *table, path string) (any, bool) {
 // map[string]any (their key order dropped), arrays []any, scalars as
 // they are.
 func Plain(v any) any { return toPlain(v) }
+
+// Encode is the plain form a typed value stores as: what GetByPath
+// reads for a field holding v, and what SetByPath takes back.
+func Encode(v any) any { return toPlain(widenFloats(encode(v))) }
