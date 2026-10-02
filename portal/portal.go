@@ -35,15 +35,24 @@ type Backend struct {
 	inhibitLock func(what string) (*os.File, error)
 	notifier    *notifier
 	clipboard   *clipboardBridge
+	shortcuts   *globalShortcuts
+	// zones reads the output layout (outputZones; a fake in tests).
+	zones func() []zone
 }
 
 // New builds the backend over a session-bus connection and the config.
 func New(conn *dbus.Conn, cfg *config.Service) *Backend {
-	return &Backend{
+	b := &Backend{
 		conn: conn, cfg: cfg, sessions: newSessions(conn),
 		spawn: detach, inhibitLock: logindLock, notifier: newNotifier(conn),
-		clipboard: newClipboardBridge(conn, startWaylandClipboard),
+		zones: outputZones,
 	}
+	// One Wayland connection serves every interface that needs the
+	// compositor, started by the first of them.
+	loop := &waylandLoop{}
+	b.clipboard = newClipboardBridge(conn, waylandClipboardStarter(loop))
+	b.shortcuts = newGlobalShortcuts(conn, b.sessions, waylandShortcutsStarter(loop))
+	return b
 }
 
 // interfaces is every interface the backend mounts at ObjectPath.
@@ -60,6 +69,8 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		fileChooserIface(b.conn),
 		printIface(b.conn),
 		b.clipboard.iface(),
+		b.shortcuts.iface(),
+		inputCapture{b.sessions, b.zones}.iface(),
 		b.notifier.iface(),
 		wallpaperIface(b.conn),
 	}, dialogIfaces(b.conn)...)

@@ -14,7 +14,6 @@ const implPrefix = "org.freedesktop.impl.portal."
 // pendingInterfaces are declared in the manifests but not yet served
 // by the Go backend; the list only shrinks.
 var pendingInterfaces = []string{
-	"GlobalShortcuts", "InputCapture",
 	"RemoteDesktop", "ScreenCast",
 }
 
