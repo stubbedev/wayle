@@ -191,8 +191,8 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       manifests pinned to them; godbus carried patched (fd arrays, struct
       variants, replied files; third_party/godbus-dbus/WAYLE-PATCHES.md);
       ConnectToEIS over a pure-Go EIS server held to libei; `wayle portal`,
-      `portal run` and `portal share-picker`. `portal show` (the dialog
-      previews) waits on the dialog hosts
+      `portal run`, `portal share-picker` and every `portal show` dialog
+      preview; with it no `wayle` subcommand is left unported
 
 ### Cross-cutting
 
