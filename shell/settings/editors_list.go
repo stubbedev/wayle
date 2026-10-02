@@ -172,7 +172,7 @@ var stringList = listRow(func(config.FieldMeta) listSpec {
 	return listSpec{
 		addKey: "settings-list-add", rowClass: "string-list-row", reorder: true, blank: "",
 		item: func(k *kit, v any, changed func()) listItem {
-			e := widget.NewEntry(k.face, 14, 0)
+			e := k.entry()
 			s, _ := v.(string)
 			e.SetText(s)
 			e.OnChanged = func(string) { changed() }
@@ -263,7 +263,7 @@ var stringMap = listRow(func(config.FieldMeta) listSpec {
 		addKey: "settings-map-add", rowClass: "string-map-row", blank: [2]string{}, classes: []string{"string-map-editor"},
 		item: func(k *kit, v any, changed func()) listItem {
 			pair, _ := v.([2]string)
-			row := mapItem{Box: widget.NewBox(widget.Row, 4, 0), key: widget.NewEntry(k.face, 14, 0), value: widget.NewEntry(k.face, 14, 0)}
+			row := mapItem{Box: widget.NewBox(widget.Row, 4, 0), key: k.entry(), value: k.entry()}
 			row.key.SetPlaceholder(t.Get("settings-map-key-placeholder"))
 			row.value.SetPlaceholder(t.Get("settings-map-value-placeholder"))
 			row.key.SetText(pair[0])

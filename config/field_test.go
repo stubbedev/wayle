@@ -146,3 +146,19 @@ func TestLeafPathSplitsAtTheValueStruct(t *testing.T) {
 		t.Errorf("Field(animations.osd.enter) = %+v %v, want an optional AnimationType", e, ok)
 	}
 }
+
+func TestMetaOfDescribesAType(t *testing.T) {
+	m := MetaOf[FitMode]()
+	if m.Kind != FieldEnum || m.Type != "FitMode" || len(m.Variants) == 0 || m.Variants[0] != string(FitFill) {
+		t.Errorf("MetaOf[FitMode] = %+v, want the enum and its variants", m)
+	}
+	if got, _ := Field("wallpaper.fit-mode"); !reflect.DeepEqual(got, m) {
+		t.Errorf("MetaOf[FitMode] = %+v, Field of a FitMode field = %+v", m, got)
+	}
+	if m := MetaOf[bool](); m.Kind != FieldBool || m.Variants != nil {
+		t.Errorf("MetaOf[bool] = %+v, want a bool without variants", m)
+	}
+	if m := MetaOf[*uint32](); !m.Optional || m.Kind != FieldInt {
+		t.Errorf("MetaOf[*uint32] = %+v, want an optional int", m)
+	}
+}

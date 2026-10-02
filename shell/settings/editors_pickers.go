@@ -146,7 +146,7 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 	p.root.AddClass(spec.class)
 	contents := widget.NewBox(widget.Column, 8, 0)
 	contents.SetElement("contents")
-	p.search = widget.NewEntry(k.face, 14, 0)
+	p.search = k.entry()
 	p.search.SetPlaceholder(i18n.Settings().Get(spec.placeholder))
 	p.search.OnChanged = p.filter
 	if spec.pickTyped {

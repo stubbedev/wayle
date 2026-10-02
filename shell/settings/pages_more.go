@@ -242,3 +242,22 @@ func themePage(*config.Config) pageSpec {
 		}},
 	}}
 }
+
+// wallpaperPage is pages/wallpaper: the image and its scaling, the
+// cycling directory with its options, the per-monitor overrides and
+// the change animation.
+func wallpaperPage(*config.Config) pageSpec {
+	return pageSpec{id: "wallpaper", navKey: "settings-nav-wallpaper", icon: "ld-image-symbolic", header: "settings-page-wallpaper", sections: []sectionSpec{
+		{title: "settings-section-general", rows: []rowSpec{field("wallpaper.wallpaper", filePath), field("wallpaper.fit-mode")}},
+		{title: "settings-section-cycling", rows: []rowSpec{
+			field("wallpaper.cycling-directory", filePath),
+			cyclingReveal("wallpaper.cycling-directory",
+				field("wallpaper.cycling-mode"),
+				field("wallpaper.cycling-interval-mins", spin(1, 1440, 1, 0)),
+				field("wallpaper.cycling-same-image"),
+			),
+		}},
+		{title: "settings-section-display", rows: []rowSpec{field("wallpaper.monitors", monitorWallpaperList)}},
+		{title: "settings-section-animation", rows: surfaceAnimationRows("animations.wallpaper")},
+	}}
+}

@@ -162,7 +162,7 @@ func (v *view) arrangeChildren() {
 // the incoming one over it at the progress: over opaque pixels that is
 // exactly prev*(1-p) + cur*p, the GSK cross-fade.
 func (v *view) Paint(cv *render.Canvas) {
-	prevClip := cv.PushClip(cv.MapRect(v.Bounds()))
+	prevClip := cv.PushClip(v.Bounds())
 	defer cv.PopClip(prevClip)
 	if v.prev != nil {
 		widget.PaintChild(cv, v.prev)

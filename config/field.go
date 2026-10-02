@@ -74,6 +74,10 @@ func Field(path string) (FieldMeta, bool) {
 	return describe(f.typ), true
 }
 
+// MetaOf describes type T as Field would a field of it: for the
+// fields of a list's items, which have no path of their own.
+func MetaOf[T any]() FieldMeta { return describe(typeOf[T]()) }
+
 // describe is the FieldMeta of a field type.
 func describe(t reflect.Type) FieldMeta {
 	m := FieldMeta{}

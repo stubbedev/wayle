@@ -17,10 +17,28 @@ import (
 // add button below.
 
 // cardField is one field of a card: the item key, its label key, and
-// the editor over the field's slot.
+// the editor over the field's slot; or, for a control over several
+// keys of the item, item over the item's field slots. fill gives the
+// control the row's spare width instead of the label.
 type cardField struct {
 	key, label string
 	editor     func(k *kit, s slot) control
+	item       func(k *kit, field func(key string) slot) control
+	fill       bool
+}
+
+// cardChrome is a card list's own card markup: the card, header and
+// body classes and the remove button's (card_form's by default).
+type cardChrome struct {
+	card, header, body string
+	remove             []string
+	// removeKey is the remove button's tooltip ("" for none).
+	removeKey string
+}
+
+var cardFormChrome = cardChrome{
+	card: "card-form-card", header: "card-form-header", body: "card-form-body",
+	remove: []string{"list-control-button", "list-control-remove"}, removeKey: "settings-list-remove",
 }
 
 // cardSpec shapes a card list: the card's header (a title for the
@@ -36,6 +54,9 @@ type cardSpec struct {
 	keep     func(item map[string]any) bool
 	clean    func(item map[string]any) map[string]any
 	unique   string
+	// addKey labels the add button's tooltip (settings-list-add).
+	addKey   string
+	chrome   *cardChrome
 	classes  []string
 	listCls  string
 	rowClass string
@@ -66,7 +87,11 @@ func newCardList(k *kit, s slot, spec cardSpec) *cardList {
 	c.list = widget.NewBox(widget.Column, 8, 0)
 	c.list.AddClass(spec.listCls)
 	c.Append(c.list, false)
-	add := listButton(k, "ld-plus-symbolic", "settings-list-add", "list-control-add", func() {
+	addKey := spec.addKey
+	if addKey == "" {
+		addKey = "settings-list-add"
+	}
+	add := listButton(k, "ld-plus-symbolic", addKey, "list-control-add", func() {
 		c.local = append(c.local, spec.blank())
 		c.commit()
 		c.rebuild()
@@ -149,34 +174,47 @@ func (c *cardList) rebuild() {
 // appendCard is card or card_titled with the fields in its body.
 func (c *cardList) appendCard(i int) {
 	t := i18n.Settings()
+	chrome := cardFormChrome
+	if c.spec.chrome != nil {
+		chrome = *c.spec.chrome
+	}
 	root := widget.NewBox(widget.Column, 0, 0)
-	root.AddClass("card-form-card")
+	root.AddClass(chrome.card)
 	header := widget.NewBox(widget.Row, 8, 0)
-	header.AddClass("card-form-header")
+	header.AddClass(chrome.header)
 	cd := &card{}
 	if id := c.spec.identity; id != nil {
-		header.AppendAligned(c.k.label(t.Get(id.label), "card-form-label"), false, widget.AlignCenter)
+		header.AppendAligned(c.k.label(t.Get(id.label), c.spec.labelCls), false, widget.AlignCenter)
 		cd.identity = id.editor(c.k, c.fieldSlot(i, id.key))
 		header.AppendAligned(cd.identity, true, widget.AlignCenter)
 	} else {
 		cd.title = c.k.label("", "card-form-title")
 		header.AppendAligned(cd.title, true, widget.AlignCenter)
 	}
-	header.AppendAligned(listButton(c.k, "ld-trash-2-symbolic", "settings-list-remove", "list-control-remove", func() {
+	remove := c.k.button(c.k.icon("ld-trash-2-symbolic"), func() {
 		if i < len(c.local) {
 			c.local = append(c.local[:i:i], c.local[i+1:]...)
 			c.commit()
 			c.rebuild()
 		}
-	}), false, widget.AlignCenter)
+	}, chrome.remove...)
+	if chrome.removeKey != "" {
+		remove.SetTooltip(t.Get(chrome.removeKey))
+	}
+	header.AppendAligned(remove, false, widget.AlignCenter)
 	body := widget.NewBox(widget.Column, 0, 0)
-	body.AddClass("card-form-body")
+	body.AddClass(chrome.body)
 	for _, f := range c.spec.fields {
-		ctl := f.editor(c.k, c.fieldSlot(i, f.key))
+		var ctl control
+		if f.item != nil {
+			ctl = f.item(c.k, func(key string) slot { return c.fieldSlot(i, key) })
+		} else {
+			ctl = f.editor(c.k, c.fieldSlot(i, f.key))
+		}
 		row := widget.NewBox(widget.Row, 8, 0)
 		row.AddClass(c.spec.rowClass)
-		row.AppendAligned(c.k.label(t.Get(f.label), c.spec.labelCls), true, widget.AlignCenter)
-		row.AppendAligned(ctl, false, widget.AlignCenter)
+		row.AppendAligned(c.k.label(t.Get(f.label), c.spec.labelCls), !f.fill, widget.AlignCenter)
+		row.AppendAligned(ctl, f.fill, widget.AlignCenter)
 		body.Append(row, false)
 		cd.controls = append(cd.controls, ctl)
 	}
@@ -291,13 +329,13 @@ var thresholdList = cardRow(cardSpec{
 	blank: func() map[string]any { return map[string]any{} },
 	title: thresholdTitle,
 	fields: []cardField{
-		{"above", "settings-threshold-above", thresholdBound},
-		{"below", "settings-threshold-below", thresholdBound},
-		{"icon-color", "settings-threshold-icon-color", optionalColor},
-		{"label-color", "settings-threshold-label-color", optionalColor},
-		{"icon-bg-color", "settings-threshold-icon-bg-color", optionalColor},
-		{"button-bg-color", "settings-threshold-button-bg-color", optionalColor},
-		{"border-color", "settings-threshold-border-color", optionalColor},
+		{key: "above", label: "settings-threshold-above", editor: thresholdBound},
+		{key: "below", label: "settings-threshold-below", editor: thresholdBound},
+		{key: "icon-color", label: "settings-threshold-icon-color", editor: optionalColor},
+		{key: "label-color", label: "settings-threshold-label-color", editor: optionalColor},
+		{key: "icon-bg-color", label: "settings-threshold-icon-bg-color", editor: optionalColor},
+		{key: "button-bg-color", label: "settings-threshold-button-bg-color", editor: optionalColor},
+		{key: "border-color", label: "settings-threshold-border-color", editor: optionalColor},
 	},
 })
 
@@ -346,7 +384,7 @@ type liveText struct {
 }
 
 func newLiveText(k *kit, s slot, placeholder string) *liveText {
-	c := &liveText{Entry: widget.NewEntry(k.face, 14, 0), slot: s}
+	c := &liveText{Entry: k.entry(), slot: s}
 	c.SetPlaceholder(placeholder)
 	c.OnChanged = func(text string) {
 		if !c.syncing {
@@ -370,10 +408,10 @@ func (c *liveText) refresh() {
 // preset without an id is not stored, an empty label or icon is none.
 var toastPresetList = cardRow(cardSpec{
 	listCls: "card-form-list", rowClass: "card-form-row", labelCls: "card-form-label", unique: "id",
-	identity: &cardField{"id", "settings-toast-preset-id", func(k *kit, s slot) control { return newLiveText(k, s, "id") }},
+	identity: &cardField{key: "id", label: "settings-toast-preset-id", editor: func(k *kit, s slot) control { return newLiveText(k, s, "id") }},
 	fields: []cardField{
-		{"label", "settings-toast-preset-label", func(k *kit, s slot) control { return newLiveText(k, s, "label") }},
-		{"icon", "settings-toast-preset-icon", func(k *kit, s slot) control { return newIconEditor(k, s) }},
+		{key: "label", label: "settings-toast-preset-label", editor: func(k *kit, s slot) control { return newLiveText(k, s, "label") }},
+		{key: "icon", label: "settings-toast-preset-icon", editor: func(k *kit, s slot) control { return newIconEditor(k, s) }},
 	},
 	blank: func() map[string]any { return map[string]any{"id": ""} },
 	keep:  func(m map[string]any) bool { id, _ := m["id"].(string); return id != "" },

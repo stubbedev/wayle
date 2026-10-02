@@ -38,6 +38,14 @@ func (k *kit) label(text string, classes ...string) *widget.Label {
 	return l
 }
 
+// entry is a text field sized the way a GtkEntry is: a fixed width
+// the text pans inside, whatever it holds.
+func (k *kit) entry() *widget.Entry {
+	e := widget.NewEntry(k.face, 14, 0)
+	e.SetTextWidth(widget.GTKTextWidth)
+	return e
+}
+
 // icon is a theme icon the stylesheet sizes and tints, matching GTK's
 // `image` selectors.
 func (k *kit) icon(name string, classes ...string) *widget.Icon {

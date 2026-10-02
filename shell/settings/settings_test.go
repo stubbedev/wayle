@@ -1097,3 +1097,157 @@ func TestThemeSelectorApplies(t *testing.T) {
 		t.Error("the action row shows its source")
 	}
 }
+
+func TestCyclingRevealFollowsTheDirectory(t *testing.T) {
+	k := testKit(t, "")
+	spec := cyclingReveal("wallpaper.cycling-directory",
+		field("wallpaper.cycling-mode"),
+		field("wallpaper.cycling-interval-mins", spin(1, 1440, 1, 0)),
+		field("wallpaper.cycling-same-image"),
+	)
+	row := newSettingRow(k, spec, fieldControl(k, spec))
+	g := row.ctl.(*revealGroup)
+	if g.Revealed() || g.Progress() != 0 {
+		t.Fatalf("no directory: revealed %v at %v, want hidden at once", g.Revealed(), g.Progress())
+	}
+	if len(g.rows) != 3 || !g.Collapse() || g.Transition() != widget.RevealSlideDown {
+		t.Errorf("group: %d rows, collapse %v, transition %v", len(g.rows), g.Collapse(), g.Transition())
+	}
+	if row.badge.Visible() || row.reset.Enabled() {
+		t.Error("the action row shows a source badge or reset")
+	}
+	if err := k.store.set("wallpaper.cycling-directory", "/walls"); err != nil {
+		t.Fatal(err)
+	}
+	row.refresh()
+	if !g.Revealed() {
+		t.Error("setting the directory did not reveal the options")
+	}
+	if row.badge.Visible() {
+		t.Error("the directory's override badged the action row")
+	}
+	// The nested rows edit their own fields.
+	interval := g.rows[1].ctl.(*number)
+	interval.KeyAction(widget.KeyUp, 0)
+	if v := k.store.value("wallpaper.cycling-interval-mins"); v != int64(16) {
+		t.Errorf("interval stored %v (%T), want 16", v, v)
+	}
+	row.refresh()
+	if !g.rows[1].badge.Visible() {
+		t.Error("a nested row's override shows no badge")
+	}
+	if err := k.store.set("wallpaper.cycling-directory", ""); err != nil {
+		t.Fatal(err)
+	}
+	row.refresh()
+	if g.Revealed() {
+		t.Error("clearing the directory left the options revealed")
+	}
+
+	// A directory already set shows the options at once.
+	k2 := testKit(t, "[wallpaper]\ncycling-directory = \"/walls\"\n")
+	g2 := fieldControl(k2, spec).(*revealGroup)
+	if !g2.Revealed() || g2.Progress() != 1 {
+		t.Errorf("set directory: revealed %v at %v, want shown at once", g2.Revealed(), g2.Progress())
+	}
+}
+
+func TestMonitorWallpaperCards(t *testing.T) {
+	k := testKit(t, "")
+	f := &fakePickers{}
+	k.pickers = f
+	path := "wallpaper.monitors"
+	c := fieldControl(k, field(path, monitorWallpaperList)).(*cardList)
+	if len(c.cards) != 0 {
+		t.Fatalf("%d cards for no monitors", len(c.cards))
+	}
+	c.local = append(c.local, c.spec.blank())
+	c.commit()
+	c.rebuild()
+	got, _ := k.store.value(path).([]any)
+	if len(got) != 1 || got[0].(map[string]any)["fit-mode"] != "fill" || got[0].(map[string]any)["name"] != "" {
+		t.Fatalf("a new monitor stored %v, want a blank fill entry", got)
+	}
+	card := c.list.Children()[0].(*widget.Box)
+	if !card.HasClass("monitor-card") || card.HasClass("card-form-card") {
+		t.Error("the monitor card lacks its own chrome")
+	}
+	header := card.Children()[0].(*widget.Box)
+	if l := header.Children()[0].(*widget.Label); !l.HasClass("monitor-card-label") || l.HasClass("card-form-label") {
+		t.Error("the identity label lacks the list's label class")
+	}
+	remove := header.Children()[len(header.Children())-1].(*widget.Button)
+	if !remove.HasClass("ghost-icon") || remove.HasClass("list-control-remove") || remove.TooltipText() != "" {
+		t.Errorf("remove button classes/tooltip %q are card_form's", remove.TooltipText())
+	}
+
+	c.cards[0].identity.(*liveText).Insert("DP-1")
+	body := c.cards[0].controls[0].(*monitorBody)
+	body.path.Insert("/a.png")
+	body.fit.SetSelected(slices.Index(body.fit.variants, "fit"))
+	got, _ = k.store.value(path).([]any)
+	if m := got[0].(map[string]any); m["name"] != "DP-1" || m["wallpaper"] != "/a.png" || m["fit-mode"] != "fit" {
+		t.Fatalf("editing the card stored %v", m)
+	}
+	cfg := k.store.svc.Config()
+	if mon, ok := cfg.Wallpaper.Monitor("DP-1"); !ok || mon.FitMode != config.FitFit || mon.Wallpaper != "/a.png" {
+		t.Errorf("config monitor = %+v (%v)", mon, ok)
+	}
+	body.browse.ClickAt(widget.Point{})
+	f.fileFn("/b.png")
+	if m := k.store.value(path).([]any)[0].(map[string]any); m["wallpaper"] != "/b.png" || body.path.Text() != "/b.png" {
+		t.Errorf("browse stored %v, entry %q", m["wallpaper"], body.path.Text())
+	}
+	keep := c.cards[0]
+	if err := k.store.set(path, []any{map[string]any{"name": "DP-1", "wallpaper": "/c.png", "fit-mode": "stretch"}}); err != nil {
+		t.Fatal(err)
+	}
+	c.refresh()
+	if c.cards[0] != keep {
+		t.Error("a refresh rebuilt the cards")
+	}
+	if body.fit.variants[body.fit.Selected()] != "stretch" || body.path.Text() != "/c.png" {
+		t.Errorf("refresh shows fit %q path %q, want the stored stretch /c.png", body.fit.Selection(), body.path.Text())
+	}
+	// The body takes the row's spare width, not its label.
+	bodyRow := c.list.Children()[0].(*widget.Box).Children()[1].(*widget.Box).Children()[0].(*widget.Box)
+	bodyRow.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 400}})
+	bodyRow.Arrange(render.Rect{W: 600, H: 40})
+	if label := bodyRow.Children()[0].(*widget.Label).Bounds(); label.W > 200 || body.Bounds().W < 400 {
+		t.Errorf("label %v and body %v share the row; the body should fill it", label, body.Bounds())
+	}
+	add := c.Children()[1].(*widget.Button)
+	if add.TooltipText() != i18n.Settings().Get("settings-monitor-add") {
+		t.Errorf("add tooltip %q, want the monitor's", add.TooltipText())
+	}
+	remove = c.list.Children()[0].(*widget.Box).Children()[0].(*widget.Box).Children()[2].(*widget.Button)
+	remove.ClickAt(widget.Point{})
+	if got, _ := k.store.value(path).([]any); len(got) != 0 || len(c.cards) != 0 {
+		t.Errorf("remove left %v (%d cards)", got, len(c.cards))
+	}
+
+	// card_form lists keep their own chrome.
+	th := fieldControl(k, field("modules.cpu.thresholds", thresholdList)).(*cardList)
+	th.local = append(th.local, th.spec.blank())
+	th.rebuild()
+	if !th.list.Children()[0].(*widget.Box).HasClass("card-form-card") {
+		t.Error("a threshold card lost card_form's chrome")
+	}
+}
+
+func TestEntriesKeepTheirGtkWidth(t *testing.T) {
+	k := testKit(t, "")
+	con := widget.Constraints{Max: widget.Size{W: 2000, H: 100}}
+	file := newFileEditor(k, pathSlot(k.store, "lock.background-image"))
+	live := newLiveText(k, pathSlot(k.store, "wallpaper.wallpaper"), "")
+	for name, e := range map[string]*widget.Entry{"file": file.entry.Entry, "live": live.Entry} {
+		empty := e.Measure(con).W
+		if empty < widget.GTKTextWidth {
+			t.Errorf("%s: an empty entry measures %d, want GTK's %d text width", name, empty, widget.GTKTextWidth)
+		}
+		e.SetText(strings.Repeat("/long/path", 40))
+		if got := e.Measure(con).W; got != empty {
+			t.Errorf("%s: a long text resized the entry from %d to %d", name, empty, got)
+		}
+	}
+}

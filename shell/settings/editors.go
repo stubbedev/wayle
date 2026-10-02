@@ -155,7 +155,7 @@ type text struct {
 
 func newText(k *kit, s slot, optional bool) *text {
 	t := i18n.Settings()
-	c := &text{Entry: widget.NewEntry(k.face, 14, 0), k: k, slot: s, optional: optional}
+	c := &text{Entry: k.entry(), k: k, slot: s, optional: optional}
 	c.AddClass("setting-text-entry")
 	c.badge = k.label(t.Get("settings-source-unsaved"), "badge-subtle", "warning")
 	c.badge.SetVisible(false)

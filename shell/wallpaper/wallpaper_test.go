@@ -334,3 +334,32 @@ func TestBootstrapCyclingTakesPrecedence(t *testing.T) {
 		t.Errorf("fallback = %+v", svc.Monitors()["DP-1"])
 	}
 }
+
+// The view clips to its own bounds on a scaled canvas: at 2x a
+// half-way slide fills the view's whole device extent and draws
+// nothing past it.
+func TestViewClipsToItsBoundsAtScale(t *testing.T) {
+	v := newView()
+	// 8px sources fill the 4px logical view at 2x exactly.
+	red, redSize := imageOf(color.NRGBA{R: 255, A: 255}, 8, 8)
+	v.show(red, redSize, TransitionNone)
+	green, greenSize := imageOf(color.NRGBA{G: 255, A: 255}, 8, 8)
+	v.show(green, greenSize, TransitionSlideRight)
+	v.step(0.2) // eased to about half: the outgoing image 2px right
+	const dev = 16 // logical 8x8 at 2x; the view holds the top-left 4x4
+	data := make([]byte, render.Stride(dev)*dev)
+	cv := render.NewScaled(data, render.Stride(dev), dev, dev, 2, 1)
+	cv.Clear(cv.Rect(), render.RGB(0, 0, 0))
+	v.Measure(widget.Constraints{Max: widget.Size{W: 4, H: 4}})
+	v.Arrange(render.Rect{W: 4, H: 4})
+	v.Paint(cv)
+	// The outgoing image slides out across the view's right edge.
+	if got := px(data, dev, 7, 3); got != render.RGB(0xff, 0, 0) {
+		t.Errorf("device (7,3) inside the view = %v, want the outgoing image", got)
+	}
+	for _, x := range []int{8, 10} {
+		if got := px(data, dev, x, 3); got != render.RGB(0, 0, 0) {
+			t.Errorf("device (%d,2) past the view painted %v", x, got)
+		}
+	}
+}

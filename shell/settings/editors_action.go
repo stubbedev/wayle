@@ -43,7 +43,7 @@ func newActionEditor(k *kit, s slot, choices []actionChoice) *actionEditor {
 	labels = append(labels, actionNoneLabel, actionCustomLabel)
 	c.drop = widget.NewDropdown(k.face, 14, labels, 0)
 	c.drop.OnSelect = c.selected
-	c.entry = widget.NewEntry(k.face, 14, 0)
+	c.entry = k.entry()
 	c.entry.SetPlaceholder(actionPlaceholder)
 	c.entry.OnChanged = func(text string) {
 		if c.custom && !c.syncing {
