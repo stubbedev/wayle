@@ -75,13 +75,13 @@ func colorScheme(s config.StylingConfig) uint32 {
 }
 
 // accentColor is the palette primary as a (ddd) sRGB tuple in [0, 1].
-func accentColor(primary config.HexColor) accent {
+func accentColor(primary config.HexColor) colorTuple {
 	r, g, b := rgb(primary)
-	return accent{r, g, b}
+	return colorTuple{r, g, b}
 }
 
-// accent marshals as the spec's (ddd) structure.
-type accent struct{ R, G, B float64 }
+// colorTuple is an sRGB color as the spec's (ddd) structure.
+type colorTuple struct{ R, G, B float64 }
 
 func rgb(c config.HexColor) (r, g, b float64) {
 	r8, g8, b8, _ := c.RGBA()

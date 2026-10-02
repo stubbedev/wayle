@@ -78,12 +78,12 @@ func mailto(options Vardict) string {
 	var params []string
 	for _, key := range []string{"cc", "bcc"} {
 		if list := stringList(options, key); len(list) > 0 {
-			params = append(params, key+"="+percentEncode(strings.Join(list, ",")))
+			params = append(params, key+"="+percentEncode(strings.Join(list, ","), ""))
 		}
 	}
 	for _, key := range []string{"subject", "body"} {
 		if s, ok := optString(options, key); ok {
-			params = append(params, key+"="+percentEncode(s))
+			params = append(params, key+"="+percentEncode(s, ""))
 		}
 	}
 	if len(params) > 0 {
@@ -92,12 +92,13 @@ func mailto(options Vardict) string {
 	return uri
 }
 
-// percentEncode keeps RFC 3986's unreserved bytes and escapes the rest.
-func percentEncode(s string) string {
+// percentEncode keeps RFC 3986's unreserved bytes and those in keep,
+// and escapes the rest.
+func percentEncode(s, keep string) string {
 	var b strings.Builder
 	for i := range len(s) {
 		c := s[i]
-		if c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || strings.IndexByte("-_.~", c) >= 0 {
+		if c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || strings.IndexByte("-_.~", c) >= 0 || strings.IndexByte(keep, c) >= 0 {
 			b.WriteByte(c)
 		} else {
 			fmt.Fprintf(&b, "%%%02X", c)
