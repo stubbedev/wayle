@@ -259,6 +259,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	osdSrv := osd.New(application, cfg.Osd, cfg.General, cfg.Animations, font, palette)
 	osdRef.Store(osdSrv)
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
+	servePortalDialogs(application, current.Load, font, ink, theme.sheet)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
 	rt.ctx = baseCtx
