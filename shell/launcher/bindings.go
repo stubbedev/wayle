@@ -85,8 +85,7 @@ func actionFromName(name string) (keyAction, uint8, bool) {
 
 // compileKeys builds the lookup table; unimplemented actions are
 // skipped and unparseable key specs logged. Key specs are GTK
-// accelerator names (Control+Shift+Return); gelm tracks no Super
-// modifier, so a Super binding is reported unparseable.
+// accelerator names (Control+Shift+Return, Super+Return).
 func compileKeys(bindings []engine.Binding) []keyBinding {
 	var table []keyBinding
 	for _, b := range bindings {

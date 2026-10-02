@@ -75,6 +75,57 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ## Remaining for feature parity
 
+### Open (as of 2026-10-02)
+
+Every checklist item below is done; what is left is parity polish.
+
+**gelm: GTK CSS node parity** (a stylesheet written for GTK should
+address gelm widgets as written; the Rust stylesheet is the test):
+
+- [ ] List rows as GTK's `row`: make gelm's list row proxy a CSS box
+      named `row` (padding, background, radius, `:hover`, `:selected`),
+      then drop wayle's inner `SetElement("row")` boxes (settings font,
+      icon and module pickers, launcher rows, file chooser, print
+      dialog), which would otherwise double-match `... row` rules.
+- [ ] The remaining node trees, as done for `entry > text`,
+      `textview > text`, `scale > trough > highlight/slider` and
+      `switch > slider`: `checkbutton > check`, `dropdown > button >
+      arrow` (and its list as `popover > contents`), `expander` title
+      and arrow, `notebook > header > tabs > tab`, `progressbar > trough
+      > progress`, `paned > separator`, menus as `popover.menu` with
+      `modelbutton` rows, the spin button's buttons. One shared
+      style-only part type instead of entryPart / switchSlider.
+- [ ] Names still gelm's own: `listrow`, `menu`, `toast`, `fader`,
+      `elevation`.
+- [ ] CSS transitions on part nodes (Rust fades the scale knob in over
+      `--duration-fast`; gelm shows it at once).
+- [ ] A column short of room takes height from its expanding children
+      only; GTK distributes over every child (rows now do).
+- [ ] Box parents its children at measure time, not on append, so
+      `Element()` and parent links exist only after a layout.
+
+**wayle: stylesheet parity**
+
+- [ ] The bar's dropdown panels are Go-painted (shell/bar/style.go
+      barStyle) instead of styled by the Rust stylesheet: their sliders
+      keep the theme look (knob always shown, light trough) where Rust's
+      `scale` rules apply, and every panel's spacing and colors are
+      hand-matched. Move the panels onto the stylesheet now that gelm
+      models the GTK nodes they use.
+- [ ] Settings: the slider value label is not fixed-width, so sliders in
+      one section end at different x when their labels differ.
+
+**Smaller**
+
+- [ ] The mouse wheel scrolls 40px a notch (GTK: about page^(2/3)).
+- [ ] Super+Tab still reaches the Tab trap (Super chords no longer type
+      text; the Tab path was left alone untested).
+- [ ] gelm's virtual-pointer clicker (cmd/zz-vpclick) is an uncommitted
+      harness tool; the settings were verified with it on a nested sway.
+- [ ] The network dropdown's toggle test raced once under -race; the fix
+      (driving the view on the headless loop) could not be reproduced
+      deterministically.
+
 ### Parked work (local branches)
 
 - [x] `collect/launcher`: superseded by the landed launcher surface
@@ -280,8 +331,7 @@ scaled glyph advances).
 ## Known deviations from the Rust shell
 
 - The launcher's message line shows its markup's text, wrapped (gelm's
-  wrapping label is plain); a Super+ key binding does not parse (gelm
-  tracks no Super modifier).
+  wrapping label is plain).
 - Workspace modules re-query the compositor on each relevant event
   instead of folding events into a local state; the rendered result is
   the same.

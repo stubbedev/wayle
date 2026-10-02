@@ -532,3 +532,21 @@ func TestSurfacePlaysItsExit(t *testing.T) {
 		t.Errorf("after the exit: first closed %v, second closed %v", h.windows[0].closed, h.windows[1].closed)
 	}
 }
+
+func TestSuperKeyBindingsParse(t *testing.T) {
+	table := compileKeys([]engine.Binding{{Action: "accept-entry", Keys: "Super+Return, Control+j"}})
+	if len(table) != 2 {
+		t.Fatalf("%d bindings, want the Super one too", len(table))
+	}
+	press, err := app.ParseAccel("Super+Return")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, ok := lookupKey(table, press); !ok || b.action != table[0].action {
+		t.Error("Super+Return finds no binding")
+	}
+	plain, _ := app.ParseAccel("Return")
+	if _, ok := lookupKey(table, plain); ok {
+		t.Error("plain Return matched the Super binding")
+	}
+}
