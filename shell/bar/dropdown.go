@@ -162,7 +162,9 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	// The panel takes its [dropdowns.<name>] size (or the built-in base
 	// at the global scale).
 	if w, h, ok := dropdownDims(name, r.cfg); ok {
-		content = newPanelBox(w, h, content)
+		panel := newPanelBox(w, h, content)
+		panel.bottom = r.cfg.Bar.Location == config.LocationBottom
+		content = panel
 	}
 	cfg := app.PopoverConfig{
 		Anchor:  bound,

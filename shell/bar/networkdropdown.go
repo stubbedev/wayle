@@ -196,11 +196,14 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	browse.Append(v.noNetworks, false)
 	browse.Append(v.noAdapter, false)
 	// Two pages rather than a form hiding the lists in place: the editor
-	// is somewhere you go, and coming back is one button. The stack is
-	// as tall as its taller page, so switching never resizes the popover.
+	// is somewhere you go, and coming back is one button. Each page is its
+	// own height (vhomogeneous off) and the card tweens between them; the
+	// panel reserves the taller page up front (dropdown_resize).
 	v.vpnForm = newNetVPNForm(v)
 	v.body = widget.NewStack()
 	v.body.SetTransition(widget.StackSlideLeftRight, gtkStackDuration)
+	v.body.SetHomogeneous(false)
+	v.body.SetInterpolateSize(true)
 	v.body.Add(netPageBrowse, browse)
 	v.body.Add(netPageEdit, v.vpnForm)
 	v.Append(v.body, true)

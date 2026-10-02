@@ -48,16 +48,20 @@ let
   };
 in
 buildGoModule {
-  pname = "wayle-go";
+  pname = "wayle";
   version = "0.0.0-go";
   inherit src;
 
   # The module cache's hash: every go.mod change (a gelm bump) changes
   # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-OuJA4AqvM5ugB153TLwkJqF4Ty3QnFQ+sDFRoAQkgZE=";
+  vendorHash = "sha256-T6/zYvYUw04ioMswI38cjxk06D8sQcitKXE71QD6owQ=";
 
-  subPackages = [ "cmd/wayle" ];
+  subPackages = [
+    "cmd/wayle"
+    "cmd/wayle-greeter"
+    "cmd/wayle-lock"
+  ];
 
   # gelm and the purego bindings are pure Go; cgo stays off, as in the
   # devShell.
@@ -69,20 +73,44 @@ buildGoModule {
 
   nativeBuildInputs = [ makeWrapper ];
 
-  # The binary dlopens libgstreamer and libglib (recorder), libpam (lock
+  # The binaries dlopen libgstreamer and libglib (recorder), libpam (lock
   # screen) and libpipewire (the ScreenCast portal) through purego, and
-  # the recorder finds its GStreamer
-  # plugins on GST_PLUGIN_SYSTEM_PATH_1_0.
+  # the recorder finds its GStreamer plugins on
+  # GST_PLUGIN_SYSTEM_PATH_1_0.
   postFixup = ''
-    wrapProgram $out/bin/wayle \
-      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ gst_all_1.gstreamer glib pam pipewire ]}" \
-      --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins}"
+    for bin in wayle wayle-greeter wayle-lock; do
+      wrapProgram $out/bin/$bin \
+        --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ gst_all_1.gstreamer glib pam pipewire ]}" \
+        --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins}"
+    done
   '';
 
+  # What package.nix installs beside the binaries, which the NixOS and
+  # home-manager modules read from the package.
   postInstall = ''
+    # Handler for the globalprotectcallback: URI scheme (GlobalProtect
+    # SAML sign-in answers).
+    install -Dm0644 resources/com.wayle.vpn-sso-callback.desktop -t $out/share/applications
+    # Polkit action for `pkexec wayle-greeter apply-config`.
+    install -Dm0644 resources/dev.stubbe.wayle.greeter.policy \
+      -t $out/share/polkit-1/actions
     install -Dm0644 resources/icons/hicolor/scalable/actions/*.svg \
       -t $out/share/icons/hicolor/scalable/actions
+    # Reference copy of the systemd user unit; the modules define their own.
     install -Dm0644 resources/wayle.service -t $out/share/wayle
+
+    # The xdg-desktop-portal backend: the interface declaration, the D-Bus
+    # activation file, and the reference unit and portals.conf.
+    install -Dm0644 resources/wayle.portal \
+      -t $out/share/xdg-desktop-portal/portals
+    install -d $out/share/dbus-1/services
+    substitute resources/org.freedesktop.impl.portal.desktop.wayle.service \
+      $out/share/dbus-1/services/org.freedesktop.impl.portal.desktop.wayle.service \
+      --replace-fail /usr/bin/wayle "$out/bin/wayle"
+    substitute resources/xdg-desktop-portal-wayle.service \
+      $out/share/wayle/xdg-desktop-portal-wayle.service \
+      --replace-fail /usr/bin/wayle "$out/bin/wayle"
+    install -Dm0644 resources/wayle-portals.conf -t $out/share/wayle
   '';
 
   meta = {

@@ -76,33 +76,91 @@ func resolveDimension(override *config.Size, base, scale float64) int {
 	return int(math.Round(base * scale))
 }
 
-// panelBox gives a dropdown its panel size: the child fills the width,
-// and the height when one is set (h < 0 is the child's natural height,
-// a content-sized dropdown).
+// panelBox gives a dropdown its panel: the card fills the width and the
+// configured height (h < 0: the content's natural height, a
+// content-sized dropdown). A page stack sized to its visible page (the
+// network VPN editor's) grows the card past that by however much the
+// visible page outgrows the room the stack gets, tweened by the stack's
+// interpolate-size (dropdown_resize::animate_height).
+//
+// A mapped popup cannot resize mid-grab without flicker, so the panel
+// reserves, up front, the room every stack's tallest page needs
+// (dropdown_resize::measure, the worst stack, not the sum): the card
+// moves inside that fixed surface, anchored at the bar's edge, and the
+// transparent rest closes the dropdown on a click, as the Rust spacer's
+// gesture does.
 type panelBox struct {
 	widget.Base
 	w, h  int
 	child widget.Widget
+	// bottom anchors the card at the surface's bottom (a bottom bar).
+	bottom bool
+	pop    popoverHandle
 }
 
 func newPanelBox(w, h int, child widget.Widget) *panelBox {
 	return &panelBox{w: w, h: h, child: child}
 }
 
+// layout is the card's height and the surface's at width w: the base
+// (the configured height, else the content's natural one) plus the
+// worst stack shortfall - its visible page's floor, then its neediest
+// page's, against the height the stack is given at the base.
+func (p *panelBox) layout(w, maxH int) (card, surface int) {
+	con := widget.Constraints{Min: widget.Size{W: w}, Max: widget.Size{W: w, H: maxH}}
+	base := p.h
+	if base < 0 {
+		base = p.child.Measure(con).H
+	}
+	base = min(base, maxH)
+	p.fit(w, base)
+	grow, reserve := 0, 0
+	walkStacks(p.child, func(s *widget.Stack) {
+		// A page needs its natural height less what it gives up (a
+		// scrolled list gives way): GTK's natural height, where a
+		// scrolled window asks for none.
+		given := s.Bounds().H
+		grow = max(grow, s.Measure(con).H-s.Shrinkable()-given)
+		reserve = max(reserve, s.PageFloor(con)-given)
+	})
+	return min(base+grow, maxH), min(base+reserve, maxH)
+}
+
+// fit lays the content out in a w x h card at the origin.
+func (p *panelBox) fit(w, h int) {
+	p.child.Measure(widget.Constraints{Min: widget.Size{W: w, H: h}, Max: widget.Size{W: w, H: h}})
+	p.child.Arrange(render.Rect{W: w, H: h})
+}
+
 func (p *panelBox) Measure(con widget.Constraints) widget.Size {
 	w := min(p.w, con.Max.W)
-	if p.h >= 0 {
-		return widget.Size{W: w, H: min(p.h, con.Max.H)}
+	_, surface := p.layout(w, con.Max.H)
+	return widget.Size{W: w, H: surface}
+}
+
+// walkStacks visits every page stack under w (through each stack's
+// visible page).
+func walkStacks(w widget.Widget, visit func(*widget.Stack)) {
+	if s, ok := w.(*widget.Stack); ok {
+		visit(s)
 	}
-	sz := p.child.Measure(widget.Constraints{Min: widget.Size{W: w}, Max: widget.Size{W: w, H: con.Max.H}})
-	return widget.Size{W: w, H: sz.H}
+	if c, ok := w.(interface{ Children() []widget.Widget }); ok {
+		for _, k := range c.Children() {
+			walkStacks(k, visit)
+		}
+	}
 }
 
 func (p *panelBox) Arrange(r render.Rect) {
 	p.ArrangeSelf(r)
 	widget.SetParents(p, p.child)
-	p.child.Measure(widget.Constraints{Min: widget.Size{W: r.W, H: r.H}, Max: widget.Size{W: r.W, H: r.H}})
-	p.child.Arrange(r)
+	h, _ := p.layout(r.W, r.H)
+	card := render.Rect{X: r.X, Y: r.Y, W: r.W, H: h}
+	if p.bottom {
+		card.Y = r.Y + r.H - h
+	}
+	p.child.Measure(widget.Constraints{Min: widget.Size{W: r.W, H: h}, Max: widget.Size{W: r.W, H: h}})
+	p.child.Arrange(card)
 }
 
 func (p *panelBox) Paint(cv *render.Canvas) { widget.PaintChild(cv, p.child) }
@@ -110,7 +168,20 @@ func (p *panelBox) Paint(cv *render.Canvas) { widget.PaintChild(cv, p.child) }
 // Children exposes the content to the tree walks.
 func (p *panelBox) Children() []widget.Widget { return []widget.Widget{p.child} }
 
-func (p *panelBox) HitTest(pt widget.Point) widget.Widget { return p.child.HitTest(pt) }
+// HitTest is the card's content, else the transparent rest.
+func (p *panelBox) HitTest(pt widget.Point) widget.Widget {
+	if hit := p.child.HitTest(pt); hit != nil {
+		return hit
+	}
+	return p.HitLeaf(p, pt)
+}
+
+// ClickAt on the transparent rest closes the dropdown.
+func (p *panelBox) ClickAt(widget.Point) {
+	if p.pop != nil {
+		p.pop.Dismiss()
+	}
+}
 
 // dropdownCloser forwards to the content, so a sized dropdown still
 // stops following its service when the popover closes.
@@ -123,6 +194,7 @@ func (p *panelBox) dropdownClosed() {
 // attachPopover forwards the popover handle to content that acts on
 // its popover.
 func (p *panelBox) attachPopover(h popoverHandle) {
+	p.pop = h
 	if d, ok := p.child.(dropdownAttacher); ok {
 		d.attachPopover(h)
 	}

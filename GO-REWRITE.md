@@ -183,8 +183,11 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       GTK's 200ms, the network hover swaps crossfade at 150ms
 - [x] the bluetooth row's hover swap is a crossfading stack, as wide as
       its wider page
-- [ ] the card's animated height between pages of different heights
-      (dropdown_resize::animate_height)
+- [x] the card's animated height between pages of different heights
+      (dropdown_resize): a page stack sized to its visible page grows
+      the card by its page's floor shortfall, tweened by the stack's
+      interpolate-size; the panel reserves the neediest page up front
+      and the transparent rest closes the dropdown
 
 ### Binaries
 
@@ -205,8 +208,10 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
       libpipewire)
       and the GStreamer plugin path; the bundled icons and the unit ship
       with it
-- [ ] the NixOS/home-manager modules, the portal files and the systemd
-      unit still point at the Rust package
+- [x] the NixOS/home-manager modules, the overlay and `packages.default`
+      install the Go package (`wayle`, with wayle-greeter and wayle-lock,
+      the portal and D-Bus files, the polkit action); the Rust shell
+      stays buildable as `wayle-rust`. wayle-settings joins with its port
 - [x] go.mod pins gelm by its pushed commit (no local replace)
 - [x] module lifetime: each bar is a mount generation; `follow` and
       `ModuleContext.Life` end subscriptions and tickers with it

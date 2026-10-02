@@ -26,29 +26,36 @@
       ];
       forAllSystems =
         f: nixpkgs.lib.genAttrs systems (system: f (import nixpkgs { inherit system; }));
+      # The Go shell, built with the toolchain go.mod pins.
+      goPackage =
+        pkgs:
+        pkgs.callPackage ./nix/package-go.nix {
+          buildGoModule = pkgs.buildGoModule.override { go = pkgs.go_1_27; };
+        };
     in
     {
       packages = forAllSystems (pkgs: rec {
-        wayle = pkgs.callPackage ./nix/package.nix { craneLib = crane.mkLib pkgs; };
+        # The Go rewrite on gelm, built with the toolchain go.mod pins: the
+        # package the modules and the overlay install.
+        wayle = goPackage pkgs;
         default = wayle;
+        # The old name, for `just go-vendor-hash` and existing scripts.
+        wayle-go = wayle;
 
-        # The Go rewrite on gelm, built with the toolchain go.mod pins
-        # (`nix build .#wayle-go`).
-        wayle-go = pkgs.callPackage ./nix/package-go.nix {
-          buildGoModule = pkgs.buildGoModule.override { go = pkgs.go_1_27; };
-        };
+        # The Rust shell (GTK4 + Relm4), kept buildable during the rewrite.
+        wayle-rust = pkgs.callPackage ./nix/package.nix { craneLib = crane.mkLib pkgs; };
 
         # The cached 591-crate dependency layer. Not useful to install — it
         # exists so CI can build and push it to the xilo cache as its own store
         # path, which is what lets a fresh machine (or a fresh CI runner) skip
         # the ~30 min deps compile instead of relying on a GitHub Actions
         # /nix/store snapshot.
-        wayle-deps = wayle.cargoArtifacts;
+        wayle-deps = wayle-rust.cargoArtifacts;
       });
 
       # Adds `wayle` to a nixpkgs instance: `nixpkgs.overlays = [ wayle.overlays.default ];`
       overlays.default = _final: prev: {
-        wayle = prev.callPackage ./nix/package.nix { craneLib = crane.mkLib prev; };
+        wayle = goPackage prev;
       };
 
       # NixOS: `imports = [ wayle.nixosModules.default ]; programs.wayle.enable = true;`
