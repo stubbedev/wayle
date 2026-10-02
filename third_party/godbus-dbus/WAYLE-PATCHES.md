@@ -18,3 +18,9 @@ upstream decodes fd arrays.
   disconnecting the sender. Echoing a decoded GIcon (DynamicLauncher's
   PrepareInstall) killed the portal's bus connection. Pinned by
   `TestDecodedStructsReencode`.
+- `wayle_file_reply.go` (with `sig.go`, `encoder.go`, `dbus.go`,
+  `export.go`): `*os.File` marshals as `h`, and the files an exported
+  method replies are closed once the reply is sent. A method returning a
+  bare UnixFD had no safe moment to close its copy, since the reply goes
+  out after it returns. The portal's clipboard pipes and PipeWire remote
+  ride on this. Pinned by `TestAFileReplyIsSentThenClosed`.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 	"unicode/utf8"
@@ -149,6 +150,11 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		}
 		enc.pos += n
 	case reflect.Ptr:
+		if v.Type() == fileType {
+			// wayle patch: the file's descriptor, as a UnixFD.
+			enc.encode(reflect.ValueOf(UnixFD(v.Interface().(*os.File).Fd())), depth)
+			break
+		}
 		enc.encode(v.Elem(), depth)
 	case reflect.Slice, reflect.Array:
 		// Lookahead offset: 4 bytes for uint32 length (with alignment),

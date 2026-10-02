@@ -55,6 +55,9 @@ func getSignature(t reflect.Type, depth *depthCounter) (sig string) {
 			panic("signature exceeds the length limitation")
 		}
 	}()
+	if t == fileType {
+		return "h" // wayle patch (wayle_file_reply.go)
+	}
 	// handle simple types first
 	switch t.Kind() {
 	case reflect.Uint8:

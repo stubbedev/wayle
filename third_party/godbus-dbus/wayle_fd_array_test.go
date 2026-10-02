@@ -3,8 +3,11 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // roundTrip encodes body into a method call carrying fds and decodes it
@@ -93,5 +96,65 @@ func TestDecodedStructsReencode(t *testing.T) {
 		if got := second[0].(map[string]Variant)["icon"].Signature(); got != SignatureOf(value) {
 			t.Errorf("%T: signature %s, want %s", value, got, SignatureOf(value))
 		}
+	}
+}
+
+type fileReplier struct{ f *os.File }
+
+func (r fileReplier) Take() (*os.File, *Error) { return r.f, nil }
+
+// TestAFileReplyIsSentThenClosed is the third wayle patch: a method
+// replying an *os.File sends its descriptor as 'h' and godbus closes
+// the file after the reply.
+func TestAFileReplyIsSentThenClosed(t *testing.T) {
+	if SignatureOf((*os.File)(nil)).String() != "h" {
+		t.Fatalf("*os.File signature = %s", SignatureOf((*os.File)(nil)))
+	}
+	server, client, cleanup := pairedConns(t)
+	defer cleanup()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	if err := server.Export(fileReplier{w}, "/f", "a.b"); err != nil {
+		t.Fatal(err)
+	}
+	var fd UnixFD
+	if err := client.Object(server.Names()[0], "/f").Call("a.b.Take", 0).Store(&fd); err != nil {
+		t.Fatal(err)
+	}
+	got := os.NewFile(uintptr(fd), "got")
+	if _, err := got.Write([]byte("through")); err != nil {
+		t.Fatal(err)
+	}
+	_ = got.Close()
+	// The server's copy is closed: with the received one closed too, the
+	// read end sees EOF after the payload (not a read that waits on).
+	_ = r.SetReadDeadline(time.Now().Add(2 * time.Second))
+	b, err := io.ReadAll(r)
+	if err != nil || string(b) != "through" {
+		t.Errorf("read %q, %v", b, err)
+	}
+	if err := w.Close(); err == nil {
+		t.Error("the replied file was left open")
+	}
+}
+
+// pairedConns is two session-bus connections, as the upstream tests use.
+func pairedConns(t *testing.T) (server, client *Conn, cleanup func()) {
+	t.Helper()
+	server, err := ConnectSessionBus()
+	if err != nil {
+		t.Skipf("no session bus: %v", err)
+	}
+	client, err = ConnectSessionBus()
+	if err != nil {
+		_ = server.Close()
+		t.Skipf("no session bus: %v", err)
+	}
+	return server, client, func() {
+		_ = server.Close()
+		_ = client.Close()
 	}
 }

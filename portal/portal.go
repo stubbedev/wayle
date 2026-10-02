@@ -34,6 +34,7 @@ type Backend struct {
 	// inhibitLock takes a logind lock (logindLock; a fake in tests).
 	inhibitLock func(what string) (*os.File, error)
 	notifier    *notifier
+	clipboard   *clipboardBridge
 }
 
 // New builds the backend over a session-bus connection and the config.
@@ -41,6 +42,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	return &Backend{
 		conn: conn, cfg: cfg, sessions: newSessions(conn),
 		spawn: detach, inhibitLock: logindLock, notifier: newNotifier(conn),
+		clipboard: newClipboardBridge(conn, startWaylandClipboard),
 	}
 }
 
@@ -57,6 +59,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		screenshotIface(b.conn),
 		fileChooserIface(b.conn),
 		printIface(b.conn),
+		b.clipboard.iface(),
 		b.notifier.iface(),
 		wallpaperIface(b.conn),
 	}, dialogIfaces(b.conn)...)
