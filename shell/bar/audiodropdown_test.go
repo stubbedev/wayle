@@ -196,8 +196,8 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	if v.output.name.Text() != "Speakers" || v.output.icon.Name() != "tb-device-speaker-symbolic" {
 		t.Errorf("output = %q %q", v.output.name.Text(), v.output.icon.Name())
 	}
-	if v.output.slider.value() != 50 || v.output.muteIcon.Name() != "ld-volume-1-symbolic" {
-		t.Errorf("output slider %v icon %q", v.output.slider.value(), v.output.muteIcon.Name())
+	if v.output.slider.Value() != 50 || v.output.muteIcon.Name() != "ld-volume-1-symbolic" {
+		t.Errorf("output slider %v icon %q", v.output.slider.Value(), v.output.muteIcon.Name())
 	}
 	if v.input.name.Text() != "Microphone" || v.input.muteIcon.Name() != "ld-mic-symbolic" {
 		t.Errorf("input = %q %q", v.input.name.Text(), v.input.muteIcon.Name())
@@ -236,7 +236,7 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 	}
 
 	// A slider commit sets the device volume.
-	v.output.slider.knob.SetValue(30)
+	v.output.slider.Knob.SetValue(30)
 	waitHeadless(t, "the volume write", func() bool {
 		s, _ := srv.Sink(1)
 		return s.Volume[0] < 0x8000
@@ -244,7 +244,7 @@ func TestAudioDropdownSectionsAndApps(t *testing.T) {
 
 	// An app commit sets the stream volume; the row survives (no
 	// rebuild on a property change).
-	app.slider.knob.SetValue(40)
+	app.slider.Knob.SetValue(40)
 	waitHeadless(t, "the app volume", func() bool {
 		st, _ := srv.SinkInput(40)
 		return st.Volume[0] < native.VolumeNorm

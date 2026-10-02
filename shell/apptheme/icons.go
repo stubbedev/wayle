@@ -1,4 +1,4 @@
-package bar
+package apptheme
 
 import (
 	"log"
@@ -41,4 +41,17 @@ func initIcons(r *icons.Registry, search iconSearch) (stop func()) {
 		return func() {}
 	}
 	return stop
+}
+
+// Setup is the process-wide half of a surface's start: the stylesheet
+// fonts resolve through the system store, and wayle's icons join the
+// icon search path. The returned function stops the icons watch.
+func Setup() (stop func()) {
+	widget.SetFaceResolver(FontResolver)
+	registry, err := icons.NewRegistry()
+	if err != nil {
+		log.Printf("wayle: icon registry init failed: %v", err)
+		return func() {}
+	}
+	return initIcons(registry, gelmIcons)
 }

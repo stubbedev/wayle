@@ -13,6 +13,7 @@ import (
 
 	"github.com/stubbedev/wayle/internal/appicons"
 	"github.com/stubbedev/wayle/service/mpris"
+	"github.com/stubbedev/wayle/shell/widgets"
 )
 
 // Media dropdown strings (locales dropdowns/_media.ftl).
@@ -113,7 +114,7 @@ type mediaView struct {
 	title      *widget.Label
 	artist     *widget.Label
 	album      *widget.Label
-	seek       *debouncedSlider
+	seek       *widgets.DebouncedSlider
 	position   *widget.Label
 	length     *widget.Label
 	shuffle    *widget.Button
@@ -215,9 +216,9 @@ func (v *mediaView) buildPlayer(font render.Font, px float64) {
 	}
 
 	// The seek bar is a DebouncedSlider without its value label.
-	v.seek = newDebouncedSlider(0, nil, 0, 0, v.ctx.Invoke)
+	v.seek = widgets.NewDebouncedSlider(0, nil, 0, 0, v.ctx.Invoke)
 	v.seek.AddClass("media-seek-slider")
-	v.seek.onCommit = v.seekTo
+	v.seek.OnCommit = v.seekTo
 	v.player.Append(v.seek, false)
 	times := widget.NewBox(widget.Row, 0, 0)
 	v.position = widget.NewLabel(font, px*0.85, "0:00", muted)
@@ -357,7 +358,7 @@ func (v *mediaView) setPosition(pos time.Duration) {
 		return
 	}
 	v.position.SetText(formatMediaDuration(pos))
-	v.seek.set(mediaProgress(pos, v.current.Length))
+	v.seek.Set(mediaProgress(pos, v.current.Length))
 }
 
 // showPicker is ShowSourcePicker: the list of players.

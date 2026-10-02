@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/sysinfo"
 	"github.com/stubbedev/wayle/service/upower"
+	"github.com/stubbedev/wayle/shell/widgets"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -288,9 +289,9 @@ func (v *dashboardView) controls() widget.Widget {
 		}()
 	})
 	row.Append(mute, false)
-	slider := newDebouncedSlider(0, v.font, v.px*0.9, v.tint(config.TokenFgMuted), v.ctx.Invoke)
+	slider := widgets.NewDebouncedSlider(0, v.font, v.px*0.9, v.tint(config.TokenFgMuted), v.ctx.Invoke)
 	slider.AddClass("dashboard-volume-slider")
-	slider.onCommit = func(pct float64) {
+	slider.OnCommit = func(pct float64) {
 		go func() {
 			if err := v.ctx.Pulse.SetVolume(bctx, pct); err != nil {
 				log.Printf("dashboard: volume set failed: %v", err)
@@ -315,7 +316,7 @@ func (v *dashboardView) controls() widget.Widget {
 		}
 		muted = sink.Muted
 		device.SetText(sink.Description)
-		slider.set(sink.Volume.AveragePercentage())
+		slider.Set(sink.Volume.AveragePercentage())
 		muteIcon.SetThemeName(map[bool]string{true: "ld-volume-x-symbolic", false: "ld-volume-2-symbolic"}[muted])
 	})
 	return card
@@ -382,10 +383,10 @@ func (v *dashboardView) media() widget.Widget {
 	compact.Append(info, true)
 	compact.Append(controls, false)
 
-	seek := newDebouncedSlider(0, nil, 0, 0, v.ctx.Invoke)
+	seek := widgets.NewDebouncedSlider(0, nil, 0, 0, v.ctx.Invoke)
 	elapsed := v.label("0:00", 0.8, v.tint(config.TokenFgSubtle))
 	length := v.label("0:00", 0.8, v.tint(config.TokenFgSubtle))
-	seek.onCommit = func(pct float64) {
+	seek.OnCommit = func(pct float64) {
 		if current.Length <= 0 {
 			return
 		}
@@ -417,14 +418,14 @@ func (v *dashboardView) media() widget.Widget {
 
 	setPosition := func(pos time.Duration) {
 		elapsed.SetText(formatMediaDuration(pos))
-		seek.set(mediaProgress(pos, current.Length))
+		seek.Set(mediaProgress(pos, current.Length))
 	}
 	v.refreshers = append(v.refreshers, func() {
 		current, has = src.Active()
 		switchBtn.SetVisible(len(src.Players()) > 1)
 		if !has {
 			body.Show("empty")
-			seek.set(0)
+			seek.Set(0)
 			return
 		}
 		body.Show("player")

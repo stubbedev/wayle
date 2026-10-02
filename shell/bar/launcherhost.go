@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/launcheripc"
 	engine "github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/shell/launcher"
 	"github.com/stubbedev/wayle/styling"
 )
@@ -19,7 +20,7 @@ import (
 // surface on the UI loop, which reads the live config on every session
 // (so a reload reaches the next one). The returned stop closes the
 // socket.
-func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, ctx ModuleContext, theme *barTheme, font render.Font, palette *styling.Palette) func() {
+func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, ctx ModuleContext, theme *apptheme.Theme, font render.Font, palette *styling.Palette) func() {
 	ink, _ := palette.Token(config.TokenFgDefault)
 	deps := launcher.Deps{
 		Invoke: application.Invoke,
@@ -37,8 +38,8 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 		},
 		Font:          font,
 		Ink:           ink,
-		Sheet:         theme.sheet,
-		SheetPriority: barThemePriority,
+		Sheet:         theme.Sheet,
+		SheetPriority: apptheme.Priority,
 		MonitorWidth: func() int {
 			if outs := outputs(); len(outs) > 0 {
 				return int(outs[0].LogicalW)

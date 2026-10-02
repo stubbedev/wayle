@@ -56,12 +56,13 @@ buildGoModule {
   # The module cache's hash: every go.mod change (a gelm bump) changes
   # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-O+n6NtmRJfnYMTUnAhizXXJKkaZ5ybmxdYRSL3NNcVo=";
+  vendorHash = "sha256-CqiAT0WGHcigL6yMumc9yPWjVyb08Up0ESjzSmF0EBQ=";
 
   subPackages = [
     "cmd/wayle"
     "cmd/wayle-greeter"
     "cmd/wayle-lock"
+    "cmd/wayle-settings"
   ];
 
   # gelm and the purego bindings are pure Go; cgo stays off, as in the
@@ -79,7 +80,7 @@ buildGoModule {
   # the recorder finds its GStreamer plugins on
   # GST_PLUGIN_SYSTEM_PATH_1_0.
   postFixup = ''
-    for bin in wayle wayle-greeter wayle-lock; do
+    for bin in wayle wayle-greeter wayle-lock wayle-settings; do
       wrapProgram $out/bin/$bin \
         --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ gst_all_1.gstreamer glib pam pipewire libgbm ]}" \
         --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${lib.makeSearchPath "lib/gstreamer-1.0" gstPlugins}"
@@ -92,6 +93,9 @@ buildGoModule {
     # Handler for the globalprotectcallback: URI scheme (GlobalProtect
     # SAML sign-in answers).
     install -Dm0644 resources/com.wayle.vpn-sso-callback.desktop -t $out/share/applications
+    install -Dm0644 resources/com.wayle.settings.desktop -t $out/share/applications
+    install -Dm0644 resources/wayle-settings.svg \
+      $out/share/icons/hicolor/scalable/apps/wayle-settings.svg
     # Polkit action for `pkexec wayle-greeter apply-config`.
     install -Dm0644 resources/dev.stubbe.wayle.greeter.policy \
       -t $out/share/polkit-1/actions

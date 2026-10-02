@@ -1,4 +1,4 @@
-package bar
+package apptheme
 
 import (
 	"os"

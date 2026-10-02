@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/brightness"
+	"github.com/stubbedev/wayle/shell/widgets"
 )
 
 // brightnessDeviceIcon is DEVICE_ICON.
@@ -86,7 +87,7 @@ type brightnessView struct {
 	body    *widget.Stack
 	list    *widget.Box
 	devices []brightness.Device
-	sliders map[string]*debouncedSlider
+	sliders map[string]*widgets.DebouncedSlider
 
 	once   sync.Once
 	cancel context.CancelFunc
@@ -134,12 +135,12 @@ func (v *brightnessView) apply(devices []brightness.Device) {
 	v.devices = devices
 	if same && v.sliders != nil {
 		for _, d := range devices {
-			v.sliders[d.Name].set(d.Percentage())
+			v.sliders[d.Name].Set(d.Percentage())
 		}
 		return
 	}
 	v.list.Clear()
-	v.sliders = make(map[string]*debouncedSlider, len(devices))
+	v.sliders = make(map[string]*widgets.DebouncedSlider, len(devices))
 	if len(devices) == 0 {
 		v.body.Show("empty")
 		return
@@ -177,11 +178,11 @@ func (v *brightnessView) item(d brightness.Device, multi bool) widget.Widget {
 	header.Append(info, true)
 	card.Append(header, false)
 
-	slider := newDebouncedSlider(d.Percentage(), v.font, v.px*0.9, v.ctx.Style.fg, v.ctx.Invoke)
+	slider := widgets.NewDebouncedSlider(d.Percentage(), v.font, v.px*0.9, v.ctx.Style.fg, v.ctx.Invoke)
 	slider.AddClass("brightness-slider-row")
-	slider.knob.AddClass("brightness-slider")
+	slider.Knob.AddClass("brightness-slider")
 	name := d.Name
-	slider.onCommit = func(pct float64) { v.commit(name, pct) }
+	slider.OnCommit = func(pct float64) { v.commit(name, pct) }
 	v.sliders[name] = slider
 	card.Append(slider, false)
 	return card

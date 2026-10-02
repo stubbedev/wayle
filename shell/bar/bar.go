@@ -16,7 +16,6 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/desktopnotify"
-	"github.com/stubbedev/wayle/internal/icons"
 	"github.com/stubbedev/wayle/internal/spawn"
 	"github.com/stubbedev/wayle/internal/widgetipc"
 	"github.com/stubbedev/wayle/service/bluetooth"
@@ -34,6 +33,7 @@ import (
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/service/weather"
+	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/shell/layering"
 	"github.com/stubbedev/wayle/shell/lock"
 	"github.com/stubbedev/wayle/shell/osd"
@@ -87,14 +87,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	// The bars load the Rust stylesheet bundle; the surfaces it does not
 	// reach (OSD, popups, dropdowns) paint from the same resolved palette.
-	theme := newBarTheme(cfg)
-	theme.watchUserStyles(application)
-	widget.SetFaceResolver(fontResolver)
-	if registry, err := icons.NewRegistry(); err == nil {
-		defer initIcons(registry, gelmIcons)()
-	} else {
-		log.Printf("wayle: icon registry init failed: %v", err)
-	}
+	theme := apptheme.New(cfg)
+	theme.WatchUserStyles(application)
+	defer apptheme.Setup()()
 	// rt is what the bars are built from; a config reload or a new
 	// palette re-derives it and rebuilds them.
 	rt := &barRuntime{theme: theme, palette: new(styling.Palette)}
@@ -124,7 +119,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		Run:   spawn.Quiet,
 		Font:  font,
 		Ink:   ink,
-		Sheet: theme.sheet,
+		Sheet: theme.Sheet,
 	})
 	// The clipboard history starts with the shell rather than when the
 	// launcher first opens, so it covers the session; a compositor
@@ -259,7 +254,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	osdSrv := osd.New(application, cfg.Osd, cfg.General, cfg.Animations, font, palette)
 	osdRef.Store(osdSrv)
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
-	servePortalHosts(application, current.Load, font, ink, theme.sheet)
+	servePortalHosts(application, current.Load, font, ink, theme.Sheet)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
 	rt.ctx = baseCtx
@@ -312,7 +307,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	var popupHost *popups.Popups
 	if notifSvc != nil {
 		if output := popups.Output(outputs, cfg.Notification.PopupMonitor); output != nil {
-			popupHost = popups.New(application, notifSvc, cfg, font, palette, theme.sheet, output)
+			popupHost = popups.New(application, notifSvc, cfg, font, palette, theme.Sheet, output)
 			go popupHost.Run()
 		}
 	}
@@ -335,7 +330,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		cancel := svc.Subscribe(func(old, next *config.Config) {
 			application.Invoke(func() {
 				current.Store(next)
-				theme.setConfig(next)
+				theme.SetConfig(next)
 				if barsAffected(old, next) {
 					restyle(next)
 				} else {
@@ -375,7 +370,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 					// watcher); the bars rebuild only for a new palette, so
 					// an extraction that changed nothing (a monitor plugged
 					// in) leaves them open.
-					theme.reload()
+					theme.Reload()
 					if rt.paletteStale() {
 						restyle(current.Load())
 					}
@@ -598,7 +593,7 @@ func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) wid
 	root.AddClass(rootClasses(connector, cfg)...)
 	root.SetInlineStyle(inlineDecls(styling.BarCSS(cfg.Bar, cfg.Styling.ColorExtractor.ThemeProvider)))
 	if ctx.Theme != nil {
-		ctx.Theme.attach(root)
+		ctx.Theme.Attach(root)
 	}
 	center := widget.NewBox(axis, 0, 0)
 	for i, part := range []struct {
@@ -689,7 +684,7 @@ func applyPalette(palette *styling.Palette) {
 // derive resolves from a config snapshot.
 type barRuntime struct {
 	ctx   ModuleContext
-	theme *barTheme
+	theme *apptheme.Theme
 	// palette is the one resolved palette every Go-painted surface
 	// (OSD, popups, lock, capture) holds; derive updates it in place,
 	// on the loop.
@@ -706,7 +701,7 @@ type barRuntime struct {
 // theme's compiled palette. A font that does not load is an error and
 // leaves the previous font in place.
 func (r *barRuntime) derive(cfg *config.Config) error {
-	*r.palette = *r.theme.renderPalette()
+	*r.palette = *r.theme.RenderPalette()
 	applyPalette(r.palette)
 	r.style = computeStyle(cfg, r.palette)
 	r.moduleStyle = r.style
@@ -721,7 +716,7 @@ func (r *barRuntime) derive(cfg *config.Config) error {
 
 // paletteStale reports whether the theme's compiled palette differs
 // from the one derive last resolved.
-func (r *barRuntime) paletteStale() bool { return *r.theme.renderPalette() != *r.palette }
+func (r *barRuntime) paletteStale() bool { return *r.theme.RenderPalette() != *r.palette }
 
 // mount starts a generation for cfg: the previous one is retired, the
 // dropdowns are rebuilt, and the context carries the new snapshot.

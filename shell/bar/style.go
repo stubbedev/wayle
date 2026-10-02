@@ -46,7 +46,7 @@ func (b borderWidths) fromLocation(location config.BorderLocation, width int) bo
 // barStyle is what the Go-painted surfaces (the dropdown panels, the
 // workspace buttons, the popups) read to match the bar: the resolved
 // palette, the text ink and size, and the dropdown button shades. The
-// bar itself is styled by the Rust stylesheet (barTheme); nothing here
+// bar itself is styled by the Rust stylesheet (apptheme.Theme); nothing here
 // re-derives its cascade.
 type barStyle struct {
 	palette *styling.Palette

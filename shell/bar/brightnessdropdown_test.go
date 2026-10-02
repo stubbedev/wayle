@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/brightness"
+	"github.com/stubbedev/wayle/shell/widgets"
 )
 
 func TestFriendlyDeviceName(t *testing.T) {
@@ -95,10 +96,10 @@ func TestBrightnessDropdownItemsSubtitlesAndCommit(t *testing.T) {
 		t.Error("a lone device shows a subtitle")
 	}
 	slider := v.sliders["intel_backlight"]
-	if slider.value() != 50 {
-		t.Errorf("slider = %v, want 50", slider.value())
+	if slider.Value() != 50 {
+		t.Errorf("slider = %v, want 50", slider.Value())
 	}
-	slider.knob.SetValue(70)
+	slider.Knob.SetValue(70)
 	waitHeadless(t, "the commit write", func() bool { return len(source.recorded()) == 1 })
 	if got := source.recorded()[0]; got != (brightnessSet{"intel_backlight", 70}) {
 		t.Errorf("set = %+v", got)
@@ -124,12 +125,12 @@ func TestBrightnessDropdownFollowsLevels(t *testing.T) {
 	}
 	ctx.Brightness = source
 	v := brightnessDropdown(ctx).(*brightnessView)
-	slider := onHeadlessLoop(func() *debouncedSlider { return v.sliders["intel_backlight"] })
+	slider := onHeadlessLoop(func() *widgets.DebouncedSlider { return v.sliders["intel_backlight"] })
 
 	source.setDevices([]brightness.Device{{Name: "intel_backlight", Brightness: 80, Max: 100}})
 	source.ticks <- struct{}{}
-	waitHeadless(t, "the level update", func() bool { return slider.value() == 80 })
-	if onHeadlessLoop(func() *debouncedSlider { return v.sliders["intel_backlight"] }) != slider {
+	waitHeadless(t, "the level update", func() bool { return slider.Value() == 80 })
+	if onHeadlessLoop(func() *widgets.DebouncedSlider { return v.sliders["intel_backlight"] }) != slider {
 		t.Error("a level change rebuilt the slider")
 	}
 	if len(source.recorded()) != 0 {

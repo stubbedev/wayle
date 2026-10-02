@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -25,7 +26,7 @@ func withBg(t *testing.T, cfg *config.Config, hex string) *config.Config {
 func TestReloadRecompilesTheThemeAndUpdatesTheSharedPalette(t *testing.T) {
 	isolateConfigDir(t)
 	cfg := config.Defaults()
-	rt := &barRuntime{theme: newBarTheme(cfg), palette: new(styling.Palette)}
+	rt := &barRuntime{theme: apptheme.New(cfg), palette: new(styling.Palette)}
 	if err := rt.derive(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +37,7 @@ func TestReloadRecompilesTheThemeAndUpdatesTheSharedPalette(t *testing.T) {
 	}
 
 	next := withBg(t, cfg, "#123456")
-	rt.theme.setConfig(next)
+	rt.theme.SetConfig(next)
 	if !rt.paletteStale() {
 		t.Fatal("a recompiled theme with a new bg is not stale before derive")
 	}
@@ -49,12 +50,12 @@ func TestReloadRecompilesTheThemeAndUpdatesTheSharedPalette(t *testing.T) {
 	if shared.Bg == before.Bg {
 		t.Errorf("shared palette bg unchanged (%#08x) after a bg change", uint32(shared.Bg))
 	}
-	if !strings.Contains(strings.ToLower(rt.theme.bundle()), "#123456") {
+	if !strings.Contains(strings.ToLower(rt.theme.Bundle()), "#123456") {
 		t.Error("the recompiled bundle does not carry the new bg")
 	}
 
 	// Without setConfig the theme keeps compiling the old snapshot.
-	stale := &barRuntime{theme: newBarTheme(cfg), palette: new(styling.Palette)}
+	stale := &barRuntime{theme: apptheme.New(cfg), palette: new(styling.Palette)}
 	if err := stale.derive(next); err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +69,7 @@ func TestReloadRecompilesTheThemeAndUpdatesTheSharedPalette(t *testing.T) {
 func TestMountGivesModulesTheUnsetInk(t *testing.T) {
 	isolateConfigDir(t)
 	cfg := config.Defaults()
-	rt := &barRuntime{theme: newBarTheme(cfg), palette: new(styling.Palette)}
+	rt := &barRuntime{theme: apptheme.New(cfg), palette: new(styling.Palette)}
 	if err := rt.derive(cfg); err != nil {
 		t.Fatal(err)
 	}

@@ -29,6 +29,7 @@ import (
 	"github.com/stubbedev/wayle/service/treeman"
 	"github.com/stubbedev/wayle/service/upower"
 	"github.com/stubbedev/wayle/service/weather"
+	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/shell/powermenu"
 )
 
@@ -92,7 +93,7 @@ type ModuleContext struct {
 	Screenshot func(mode, target string)
 	// Theme is the bar stylesheet every bar root attaches; nil in
 	// headless construction, where the tree builds unstyled.
-	Theme *barTheme
+	Theme *apptheme.Theme
 }
 
 // headlessLoop stands in for the loop goroutine of a headless context

@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/appicons"
 	"github.com/stubbedev/wayle/service/pulse"
+	"github.com/stubbedev/wayle/shell/widgets"
 )
 
 // PulseAudio property keys the dropdown reads (helpers.rs).
@@ -358,7 +359,7 @@ type volumeSection struct {
 	icon, muteIcon               *widget.Icon
 	name                         *widget.Label
 	mute                         *widget.Button
-	slider                       *debouncedSlider
+	slider                       *widgets.DebouncedSlider
 
 	device *audioDevice
 }
@@ -403,10 +404,10 @@ func newVolumeSection(v *audioView, kind audioKind) *volumeSection {
 	s.trigger.Append(s.mute, false)
 	s.Append(s.trigger, false)
 
-	s.slider = newDebouncedSlider(0, v.font, v.px*0.9, fg, v.ctx.Invoke)
-	s.slider.knob.AddClass("audio-volume-slider")
-	s.slider.onCommit = s.commitVolume
-	s.slider.onValue = func(float64) { s.syncMuteIcon() }
+	s.slider = widgets.NewDebouncedSlider(0, v.font, v.px*0.9, fg, v.ctx.Invoke)
+	s.slider.Knob.AddClass("audio-volume-slider")
+	s.slider.OnCommit = s.commitVolume
+	s.slider.OnValue = func(float64) { s.syncMuteIcon() }
 	s.sliderRow = widget.NewBox(widget.Row, 0, 0)
 	s.sliderRow.AddClass("audio-slider-row")
 	s.sliderRow.Append(s.slider, true)
@@ -437,7 +438,7 @@ func (s *volumeSection) apply(dev *audioDevice, has bool) {
 	s.device = dev
 	s.name.SetText(dev.description)
 	s.icon.SetThemeName(dev.icon)
-	s.slider.set(dev.volume.AveragePercentage())
+	s.slider.Set(dev.volume.AveragePercentage())
 	s.setMuted(dev.muted)
 }
 
@@ -459,7 +460,7 @@ func (s *volumeSection) syncMuteIcon() {
 		s.muteIcon.SetThemeName(audioInputIcon(muted))
 		return
 	}
-	s.muteIcon.SetThemeName(audioVolumeIcon(s.slider.value(), muted))
+	s.muteIcon.SetThemeName(audioVolumeIcon(s.slider.Value(), muted))
 }
 
 // commitVolume is commit_volume.
@@ -576,7 +577,7 @@ type appVolumeItem struct {
 	value    *widget.Label
 	mute     *widget.Button
 	muteIcon *widget.Icon
-	slider   *debouncedSlider
+	slider   *widgets.DebouncedSlider
 }
 
 func newAppVolumeItem(v *audioView, r appVolume) *appVolumeItem {
@@ -607,11 +608,11 @@ func newAppVolumeItem(v *audioView, r appVolume) *appVolumeItem {
 	header.Append(it.mute, false)
 	it.Append(header, false)
 
-	it.slider = newDebouncedSlider(r.vol.AveragePercentage(), nil, 0, fg, v.ctx.Invoke)
+	it.slider = widgets.NewDebouncedSlider(r.vol.AveragePercentage(), nil, 0, fg, v.ctx.Invoke)
 	it.slider.AddClass("audio-app-slider")
-	it.slider.knob.AddClass("audio-app-scale")
-	it.slider.onCommit = it.commitVolume
-	it.slider.onValue = func(float64) { it.sync() }
+	it.slider.Knob.AddClass("audio-app-scale")
+	it.slider.OnCommit = it.commitVolume
+	it.slider.OnValue = func(float64) { it.sync() }
 	it.Append(it.slider, false)
 	it.sync()
 	return it
@@ -620,13 +621,13 @@ func newAppVolumeItem(v *audioView, r appVolume) *appVolumeItem {
 // apply is SetBackendState.
 func (it *appVolumeItem) apply(r appVolume) {
 	it.row = r
-	it.slider.set(r.vol.AveragePercentage())
+	it.slider.Set(r.vol.AveragePercentage())
 	it.sync()
 }
 
 // sync refreshes the #[watch]ed value label, mute icon, and classes.
 func (it *appVolumeItem) sync() {
-	pct := it.slider.value()
+	pct := it.slider.Value()
 	it.value.SetText(strconv.FormatFloat(pct, 'f', 0, 64) + "%")
 	it.muteIcon.SetThemeName(audioVolumeIcon(pct, it.row.muted))
 	if it.row.muted {

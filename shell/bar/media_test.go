@@ -308,9 +308,9 @@ func TestMediaDropdownTransport(t *testing.T) {
 	v.loop.OnClick()
 	// A drag seeks at the percent of the length: the first move commits,
 	// and the release commits again (DebouncedSlider).
-	v.seek.knob.SetPressed(true)
-	v.seek.knob.SetValue(25)
-	v.seek.knob.SetPressed(false)
+	v.seek.Knob.SetPressed(true)
+	v.seek.Knob.SetValue(25)
+	v.seek.Knob.SetPressed(false)
 	calls := waitCalls(t, source, 5)
 	want := map[string]bool{"play-pause " + bus: true, "next " + bus: true, "loop " + bus: true, "seek " + bus + " 15s": true}
 	seeks := 0
@@ -331,17 +331,17 @@ func TestMediaDropdownTransport(t *testing.T) {
 	}
 
 	// A position read moves the knob unless it is held (or just let go).
-	v.seek.now = func() time.Time { return time.Now().Add(time.Second) }
+	v.seek.SetClock(func() time.Time { return time.Now().Add(time.Second) })
 	v.setPosition(45 * time.Second)
-	if v.seek.value() != 75 || v.position.Text() != "0:45" {
-		t.Errorf("position = %v / %q, want 75 / 0:45", v.seek.value(), v.position.Text())
+	if v.seek.Value() != 75 || v.position.Text() != "0:45" {
+		t.Errorf("position = %v / %q, want 75 / 0:45", v.seek.Value(), v.position.Text())
 	}
-	v.seek.knob.SetPressed(true)
+	v.seek.Knob.SetPressed(true)
 	v.setPosition(0)
-	if v.seek.value() != 75 {
+	if v.seek.Value() != 75 {
 		t.Error("a position read moved the held knob")
 	}
-	v.seek.knob.SetPressed(false)
+	v.seek.Knob.SetPressed(false)
 
 	// The picker switches the active player and returns to the view.
 	v.showPicker()
