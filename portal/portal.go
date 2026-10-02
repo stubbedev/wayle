@@ -27,11 +27,14 @@ type Backend struct {
 	conn     *dbus.Conn
 	cfg      *config.Service
 	sessions *sessions
+	// spawn starts a program the portal hands off to (detach; a
+	// recorder in tests).
+	spawn func(argv []string) error
 }
 
 // New builds the backend over a session-bus connection and the config.
 func New(conn *dbus.Conn, cfg *config.Service) *Backend {
-	return &Backend{conn: conn, cfg: cfg, sessions: newSessions(conn)}
+	return &Backend{conn: conn, cfg: cfg, sessions: newSessions(conn), spawn: detach}
 }
 
 // interfaces is every interface the backend mounts at ObjectPath.
@@ -39,6 +42,10 @@ func (b *Backend) interfaces() []dbusx.Interface {
 	return []dbusx.Interface{
 		settingsIface(b.cfg),
 		lockdownIface(),
+		backgroundIface(),
+		usbIface(),
+		emailIface(b.spawn),
+		secretIface(),
 	}
 }
 

@@ -23,7 +23,7 @@ type rig struct {
 	signals chan *dbus.Signal
 }
 
-func newRig(t *testing.T) *rig {
+func newRig(t *testing.T, edit func(*Backend)) *rig {
 	t.Helper()
 	bus := dbustest.Start(t)
 	cfg := config.Load(t.TempDir(), config.DiscardDiagnostics)
@@ -34,6 +34,9 @@ func newRig(t *testing.T) *rig {
 	}
 	client.Signal(signals)
 	b := New(bus.Conn(t), cfg)
+	if edit != nil {
+		edit(b)
+	}
 	stop, err := b.Serve()
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +73,7 @@ func (r *rig) readOne(ns, key string) (any, error) {
 }
 
 func TestSettingsReadAllServesAppearance(t *testing.T) {
-	r := newRig(t)
+	r := newRig(t, nil)
 	var all map[string]map[string]dbus.Variant
 	if err := r.obj.Call(SettingsIface+".ReadAll", 0, []string{}).Store(&all); err != nil {
 		t.Fatal(err)
@@ -100,7 +103,7 @@ func TestSettingsReadAllServesAppearance(t *testing.T) {
 }
 
 func TestSettingsReadOneAndUnknownKeys(t *testing.T) {
-	r := newRig(t)
+	r := newRig(t, nil)
 	if v, err := r.readOne(AppearanceNS, keyColorScheme); err != nil || v != uint32(1) {
 		t.Errorf("ReadOne color-scheme = %v, %v", v, err)
 	}
@@ -138,7 +141,7 @@ func TestColorScheme(t *testing.T) {
 }
 
 func TestSettingChangedFollowsTheConfig(t *testing.T) {
-	r := newRig(t)
+	r := newRig(t, nil)
 	// Each followed source emits its current value once at startup.
 	if got, want := r.changed(t), []string{keyColorScheme, keyColorScheme, keyAccentColor, keyContrast, keyReducedMotion}; !slices.Equal(got, want) {
 		t.Fatalf("startup emissions = %v, want %v", got, want)
@@ -168,7 +171,7 @@ func TestSettingChangedFollowsTheConfig(t *testing.T) {
 }
 
 func TestLockdownLocksNothing(t *testing.T) {
-	r := newRig(t)
+	r := newRig(t, nil)
 	var all map[string]dbus.Variant
 	if err := r.obj.Call("org.freedesktop.DBus.Properties.GetAll", 0, "org.freedesktop.impl.portal.Lockdown").Store(&all); err != nil {
 		t.Fatal(err)

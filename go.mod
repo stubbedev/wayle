@@ -34,3 +34,6 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
+
+// The godbus fd-array decode fix (third_party/godbus-dbus/WAYLE-PATCHES.md).
+replace github.com/godbus/dbus/v5 => ./third_party/godbus-dbus

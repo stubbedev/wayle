@@ -21,7 +21,7 @@ let
   ]) ++ [ pipewire ];
 
   # Only the Go tree, so editing the Rust crates, docs or nix files does
-  # not rebuild it. The two locales packages live under crates/ and embed
+  # not rebuild it. The three locales packages live under crates/ and embed
   # the Fluent files the Rust crates share.
   src = lib.fileset.toSource {
     root = ../.;
@@ -40,6 +40,8 @@ let
       ../shell
       ../strftime
       ../styling
+      ../third_party
+      ../crates/wayle-greeter/locales
       ../crates/wayle-i18n/locales
       ../crates/wayle-shell-core/locales
     ];
@@ -53,7 +55,7 @@ buildGoModule {
   # The module cache's hash: every go.mod change (a gelm bump) changes
   # it; `just go-vendor-hash` recomputes it (a stale one is reused, not
   # reported, the derivation being fixed-output).
-  vendorHash = "sha256-mLyizYSWJzqbXAHEMYP6nbiGLVf5ZMBjj4WxxXwxLWU=";
+  vendorHash = "sha256-lPb5dhSnpvg3rzgY7R3SR3Nhf2spXnq6LTW2a1YO2mM=";
 
   subPackages = [ "cmd/wayle" ];
 
