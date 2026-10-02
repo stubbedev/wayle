@@ -242,3 +242,59 @@ const (
 	durationStepMS     = 10
 	durationFallbackMS = 200
 )
+
+// optionalSize is dropdown_size's size_control: the override switch
+// and the size editor, live only while it is on; turning it on writes
+// the size the editor shows (a scale of 1 until one was set).
+type optionalSize struct {
+	*widget.Box
+	slot    slot
+	on      *widget.Switch
+	size    *sizeEditor
+	syncing bool
+}
+
+func newOptionalSize(k *kit, s slot, baseRem float64) *optionalSize {
+	c := &optionalSize{Box: widget.NewBox(widget.Row, 8, 0), slot: s}
+	c.on = widget.NewSwitch(false)
+	c.on.AddClass("inherit-switch")
+	c.on.SetTooltip(i18n.Settings().Get("settings-override"))
+	c.size = newSizeEditor(k, s, baseRem)
+	c.size.spin.SetValue(1)
+	c.AppendAligned(c.on, false, widget.AlignCenter)
+	c.AppendAligned(c.size, false, widget.AlignCenter)
+	c.on.OnChanged = func(on bool) {
+		c.size.SetEnabled(on)
+		if c.syncing {
+			return
+		}
+		if on {
+			c.size.commit()
+		} else {
+			s.unset()
+		}
+	}
+	c.refresh()
+	return c
+}
+
+func (c *optionalSize) refresh() {
+	set := c.slot.get() != nil
+	c.syncing = true
+	c.on.SetOn(set)
+	c.syncing = false
+	c.size.SetEnabled(set)
+	if set {
+		c.size.refresh()
+	}
+}
+
+// dropdownSizeRows are dropdown_size_rows for the dropdown at path:
+// its optional width and height.
+func dropdownSizeRows(path string) []rowSpec {
+	size := withEditor(func(k *kit, s slot, _ config.FieldMeta) control { return newOptionalSize(k, s, 1) })
+	return []rowSpec{
+		field(path+".width", withKey("settings-dropdown-width"), size),
+		field(path+".height", withKey("settings-dropdown-height"), size),
+	}
+}

@@ -894,7 +894,8 @@ func TestThresholdCards(t *testing.T) {
 		t.Fatalf("%d cards for an empty list", len(c.cards))
 	}
 	// Add a card, bound it below 20 and color its icon.
-	c.slot.set(append(c.items(), c.spec.blank()))
+	c.local = append(c.local, c.spec.blank())
+	c.commit()
 	c.rebuild()
 	if len(c.cards) != 1 || c.cards[0].title.Text() != i18n.Settings().Get("settings-threshold-card-title")+" 1" {
 		t.Fatalf("new card titled %q", c.cards[0].title.Text())
@@ -988,5 +989,111 @@ func TestMountPointsText(t *testing.T) {
 	c.refresh()
 	if c.Text() != "/a, /b" {
 		t.Errorf("a list shows %q", c.Text())
+	}
+}
+
+func TestOptionalSize(t *testing.T) {
+	k := testKit(t, "")
+	path := "dropdowns.audio.width"
+	c := fieldControl(k, dropdownSizeRows("dropdowns.audio")[0]).(*optionalSize)
+	if c.on.On() || c.size.Enabled() || k.store.value(path) != nil {
+		t.Fatal("an unset width shows an override")
+	}
+	c.on.SetOn(true)
+	if v := k.store.value(path); v != float64(1) || !c.size.Enabled() {
+		t.Errorf("override on wrote %#v", v)
+	}
+	c.size.mode.SetSelected(sizePx)
+	if v := k.store.value(path); v != "16px" {
+		t.Errorf("px mode wrote %#v, want 16px (a scale of 1 at the 1rem base)", v)
+	}
+	c.on.SetOn(false)
+	if k.store.value(path) != nil || c.size.Enabled() {
+		t.Error("override off kept the width")
+	}
+	_ = k.store.set(path, "300px")
+	c.refresh()
+	if !c.on.On() || c.size.mode.Selected() != sizePx || c.size.spin.Value() != 300 {
+		t.Errorf("refresh from 300px: on %v mode %d value %v", c.on.On(), c.size.mode.Selected(), c.size.spin.Value())
+	}
+}
+
+func TestToastPresetCards(t *testing.T) {
+	k := testKit(t, "")
+	path := "osd.presets"
+	c := fieldControl(k, field(path, toastPresetList)).(*cardList)
+	c.local = append(c.local, c.spec.blank())
+	c.commit()
+	c.rebuild()
+	if got, _ := k.store.value(path).([]any); len(got) != 0 || len(c.cards) != 1 {
+		t.Fatalf("an id-less preset was stored (%v) or lost (%d cards)", got, len(c.cards))
+	}
+	id := c.cards[0].identity.(*liveText)
+	id.Insert("vol")
+	got, _ := k.store.value(path).([]any)
+	if len(got) != 1 || got[0].(map[string]any)["id"] != "vol" {
+		t.Fatalf("typing the id stored %v", got)
+	}
+	if _, has := got[0].(map[string]any)["label"]; has {
+		t.Error("an empty label was stored")
+	}
+	label := c.cards[0].controls[0].(*liveText)
+	label.Insert("Volume")
+	got, _ = k.store.value(path).([]any)
+	if got[0].(map[string]any)["label"] != "Volume" {
+		t.Errorf("label stored %v", got)
+	}
+	// A refresh with the preset stored keeps the cards in place.
+	keep := c.cards[0]
+	c.refresh()
+	if c.cards[0] != keep {
+		t.Error("a refresh rebuilt the cards")
+	}
+	// A second preset with the same id is flagged, and both stored.
+	c.local = append(c.local, map[string]any{"id": "vol"})
+	c.commit()
+	c.rebuild()
+	if !c.cards[0].identity.(*liveText).HasClass("error") || !c.cards[1].identity.(*liveText).HasClass("error") {
+		t.Error("duplicate ids are not flagged")
+	}
+	c.cards[1].identity.(*liveText).Insert("2")
+	if c.cards[0].identity.(*liveText).HasClass("error") {
+		t.Error("a fixed duplicate stays flagged")
+	}
+}
+
+func TestThemeSelectorApplies(t *testing.T) {
+	k := testKit(t, "")
+	f := &fakePickers{}
+	k.pickers = f
+	themes := config.BuiltinThemes()
+	if len(themes) < 2 {
+		t.Fatal("test premise: built-in themes")
+	}
+	spec := themePreset()
+	row := newSettingRow(k, spec, fieldControl(k, spec))
+	c := row.ctl.(*themeSelector)
+	if c.badge.Visible() {
+		t.Error("no base theme shows a badge")
+	}
+	c.btn.ClickAt(widget.Point{})
+	if len(c.picker.all) != len(themes) {
+		t.Fatalf("picker lists %d themes, want the %d built-ins", len(c.picker.all), len(themes))
+	}
+	pick := themes[1]
+	c.picker.list.OnActivate(1)
+	if v := k.store.value("styling.palette_base_theme"); v != pick.Name {
+		t.Errorf("base theme %v, want %s", v, pick.Name)
+	}
+	if v := k.store.value("styling.palette.primary"); !strings.EqualFold(v.(string), pick.Palette.Primary) {
+		t.Errorf("primary %v, want %s", v, pick.Palette.Primary)
+	}
+	if !c.badge.Visible() || c.badge.Text() != pick.Name || f.closed != 1 {
+		t.Errorf("badge %q visible %v, closed %d", c.badge.Text(), c.badge.Visible(), f.closed)
+	}
+	// An action row shows no source badge or reset, even overridden.
+	row.refresh()
+	if row.badge.Visible() || row.reset.Enabled() {
+		t.Error("the action row shows its source")
 	}
 }

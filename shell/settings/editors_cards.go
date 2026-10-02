@@ -23,29 +23,40 @@ type cardField struct {
 	editor     func(k *kit, s slot) control
 }
 
-// cardSpec shapes a card list: the card title for an item (1-based
-// number), its fields, the new item, and the container classes.
+// cardSpec shapes a card list: the card's header (a title for the
+// item, or an identity field beside its label), its body fields, the
+// new item, what of the cards is stored (keep filters, clean tidies
+// each written item), the key duplicates of which are an error, and
+// the container classes.
 type cardSpec struct {
 	title    func(item map[string]any, number int) string
+	identity *cardField
 	fields   []cardField
 	blank    func() map[string]any
+	keep     func(item map[string]any) bool
+	clean    func(item map[string]any) map[string]any
+	unique   string
 	classes  []string
 	listCls  string
 	rowClass string
 	labelCls string
 }
 
+// cardList holds its cards as the source of truth (local), writing the
+// kept, cleaned items; an outside change replaces them.
 type cardList struct {
 	*widget.Box
 	k     *kit
 	slot  slot
 	spec  cardSpec
 	list  *widget.Box
+	local []map[string]any
 	cards []*card
 }
 
 type card struct {
 	title    *widget.Label
+	identity control
 	controls []control
 }
 
@@ -56,80 +67,105 @@ func newCardList(k *kit, s slot, spec cardSpec) *cardList {
 	c.list.AddClass(spec.listCls)
 	c.Append(c.list, false)
 	add := listButton(k, "ld-plus-symbolic", "settings-list-add", "list-control-add", func() {
-		_ = c.slot.set(append(c.items(), spec.blank()))
+		c.local = append(c.local, spec.blank())
+		c.commit()
 		c.rebuild()
 	})
 	c.AppendAligned(add, false, widget.AlignStart)
+	c.local = c.stored()
 	c.rebuild()
 	return c
 }
 
-// items are the list's items, plain.
-func (c *cardList) items() []any {
+// stored are the slot's items, plain.
+func (c *cardList) stored() []map[string]any {
 	v, _ := c.slot.get().([]any)
-	return v
-}
-
-func (c *cardList) item(i int) map[string]any {
-	items := c.items()
-	if i < 0 || i >= len(items) {
-		return nil
+	out := make([]map[string]any, 0, len(v))
+	for _, it := range v {
+		m, _ := it.(map[string]any)
+		out = append(out, maps.Clone(m))
 	}
-	m, _ := items[i].(map[string]any)
-	return m
+	return out
 }
 
-// fieldSlot is the slot of one key of item i: written back with the
-// whole list, unset by removing the key.
-func (c *cardList) fieldSlot(i int, key string) slot {
-	write := func(v any, remove bool) error {
-		items := c.items()
-		if i >= len(items) {
-			return nil
+// written is what the cards store: the kept items, cleaned.
+func (c *cardList) written() []any {
+	out := make([]any, 0, len(c.local))
+	for _, m := range c.local {
+		if c.spec.keep != nil && !c.spec.keep(m) {
+			continue
 		}
-		m := maps.Clone(c.item(i))
-		if m == nil {
-			m = map[string]any{}
+		if c.spec.clean != nil {
+			m = c.spec.clean(maps.Clone(m))
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+func (c *cardList) commit() {
+	_ = c.slot.set(c.written())
+	c.validate()
+}
+
+// fieldSlot is the slot of one key of card i: unset removes the key.
+func (c *cardList) fieldSlot(i int, key string) slot {
+	write := func(v any, remove bool) {
+		if i >= len(c.local) {
+			return
+		}
+		if c.local[i] == nil {
+			c.local[i] = map[string]any{}
 		}
 		if remove {
-			delete(m, key)
+			delete(c.local[i], key)
 		} else {
-			m[key] = v
+			c.local[i][key] = v
 		}
-		items[i] = m
-		err := c.slot.set(items)
+		c.commit()
 		c.retitle(i)
-		return err
 	}
 	return slot{
-		get:   func() any { return c.item(i)[key] },
-		set:   func(v any) error { return write(v, false) },
-		unset: func() { _ = write(nil, true) },
+		get: func() any {
+			if i < len(c.local) {
+				return c.local[i][key]
+			}
+			return nil
+		},
+		set:   func(v any) error { write(v, false); return nil },
+		unset: func() { write(nil, true) },
 	}
 }
 
 func (c *cardList) rebuild() {
 	c.list.Clear()
 	c.cards = nil
-	for i := range c.items() {
+	for i := range c.local {
 		c.appendCard(i)
 	}
+	c.validate()
 }
 
-// appendCard is card_titled with the fields in its body.
+// appendCard is card or card_titled with the fields in its body.
 func (c *cardList) appendCard(i int) {
 	t := i18n.Settings()
 	root := widget.NewBox(widget.Column, 0, 0)
 	root.AddClass("card-form-card")
 	header := widget.NewBox(widget.Row, 8, 0)
 	header.AddClass("card-form-header")
-	cd := &card{title: c.k.label("", "card-form-title")}
-	header.AppendAligned(cd.title, true, widget.AlignCenter)
+	cd := &card{}
+	if id := c.spec.identity; id != nil {
+		header.AppendAligned(c.k.label(t.Get(id.label), "card-form-label"), false, widget.AlignCenter)
+		cd.identity = id.editor(c.k, c.fieldSlot(i, id.key))
+		header.AppendAligned(cd.identity, true, widget.AlignCenter)
+	} else {
+		cd.title = c.k.label("", "card-form-title")
+		header.AppendAligned(cd.title, true, widget.AlignCenter)
+	}
 	header.AppendAligned(listButton(c.k, "ld-trash-2-symbolic", "settings-list-remove", "list-control-remove", func() {
-		items := c.items()
-		if i < len(items) {
-			items = append(items[:i:i], items[i+1:]...)
-			_ = c.slot.set(items)
+		if i < len(c.local) {
+			c.local = append(c.local[:i:i], c.local[i+1:]...)
+			c.commit()
 			c.rebuild()
 		}
 	}), false, widget.AlignCenter)
@@ -152,24 +188,72 @@ func (c *cardList) appendCard(i int) {
 }
 
 func (c *cardList) retitle(i int) {
-	if i < len(c.cards) {
-		c.cards[i].title.SetText(c.spec.title(c.item(i), i+1))
+	if i < len(c.cards) && c.cards[i].title != nil && c.spec.title != nil {
+		c.cards[i].title.SetText(c.spec.title(c.local[i], i+1))
 	}
 }
 
-// refresh rebuilds when the count changed, else refreshes every
-// field and title (the watcher).
+// validate marks the identity of every card whose unique key repeats
+// another's (the duplicate preset id): the error class and tooltip.
+func (c *cardList) validate() {
+	if c.spec.unique == "" {
+		return
+	}
+	counts := map[string]int{}
+	for _, m := range c.local {
+		if s, _ := m[c.spec.unique].(string); s != "" {
+			counts[s]++
+		}
+	}
+	for i, cd := range c.cards {
+		w, ok := cd.identity.(interface {
+			AddClass(...string)
+			RemoveClass(...string)
+			SetTooltip(string)
+		})
+		if !ok || i >= len(c.local) {
+			continue
+		}
+		s, _ := c.local[i][c.spec.unique].(string)
+		if s != "" && counts[s] > 1 {
+			w.AddClass("error")
+			w.SetTooltip(i18n.Settings().Get("settings-toast-preset-id-duplicate"))
+		} else {
+			w.RemoveClass("error")
+			w.SetTooltip("")
+		}
+	}
+}
+
+// refresh follows the store (the watcher): with as many items as the
+// cards keep, those cards take the stored values in place; with
+// another count the cards are replaced.
 func (c *cardList) refresh() {
-	if len(c.items()) != len(c.cards) {
+	stored := c.stored()
+	var kept []int
+	for i, m := range c.local {
+		if c.spec.keep == nil || c.spec.keep(m) {
+			kept = append(kept, i)
+		}
+	}
+	if len(kept) != len(stored) {
+		c.local = stored
 		c.rebuild()
 		return
 	}
+	for j, i := range kept {
+		c.local[i] = stored[j]
+	}
 	for i, cd := range c.cards {
+		if cd.identity != nil {
+			cd.identity.refresh()
+		}
 		for _, ctl := range cd.controls {
 			ctl.refresh()
 		}
 		c.retitle(i)
 	}
+	c.validate()
 }
 
 // cardRow makes a full-width row with the card list spec builds.
@@ -253,3 +337,52 @@ func thresholdTitle(item map[string]any, number int) string {
 	}
 	return i18n.Settings().Get("settings-threshold-card-title") + " " + strconv.Itoa(number)
 }
+
+// liveText is card_form::entry: an entry writing as it is typed.
+type liveText struct {
+	*widget.Entry
+	slot    slot
+	syncing bool
+}
+
+func newLiveText(k *kit, s slot, placeholder string) *liveText {
+	c := &liveText{Entry: widget.NewEntry(k.face, 14, 0), slot: s}
+	c.SetPlaceholder(placeholder)
+	c.OnChanged = func(text string) {
+		if !c.syncing {
+			_ = c.slot.set(text)
+		}
+	}
+	c.refresh()
+	return c
+}
+
+func (c *liveText) refresh() {
+	if text := c.slot.text(); text != c.Text() {
+		c.syncing = true
+		c.SetText(text)
+		c.syncing = false
+	}
+}
+
+// toastPresetList is toast_preset_list: a card per preset with its id
+// in the header (a duplicate one flagged), the label and the icon; a
+// preset without an id is not stored, an empty label or icon is none.
+var toastPresetList = cardRow(cardSpec{
+	listCls: "card-form-list", rowClass: "card-form-row", labelCls: "card-form-label", unique: "id",
+	identity: &cardField{"id", "settings-toast-preset-id", func(k *kit, s slot) control { return newLiveText(k, s, "id") }},
+	fields: []cardField{
+		{"label", "settings-toast-preset-label", func(k *kit, s slot) control { return newLiveText(k, s, "label") }},
+		{"icon", "settings-toast-preset-icon", func(k *kit, s slot) control { return newIconEditor(k, s) }},
+	},
+	blank: func() map[string]any { return map[string]any{"id": ""} },
+	keep:  func(m map[string]any) bool { id, _ := m["id"].(string); return id != "" },
+	clean: func(m map[string]any) map[string]any {
+		for _, key := range []string{"label", "icon"} {
+			if s, _ := m[key].(string); s == "" {
+				delete(m, key)
+			}
+		}
+		return m
+	},
+})

@@ -245,6 +245,12 @@ var normalized = withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
 	return newSlider(k, s, 0, 1, false, func(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) })
 })
 
+// signedNormalized is slider::signed_normalized: a -1-1 value, labeled
+// "{:.2}".
+var signedNormalized = withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
+	return newSlider(k, s, -1, 1, false, func(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) })
+})
+
 // percentage is slider::percentage: a 0-100 Percentage, labeled
 // "{:.0}%".
 var percentage = withEditor(func(k *kit, s slot, _ config.FieldMeta) control {

@@ -71,6 +71,8 @@ type settingRow struct {
 	ctl   control
 	badge *widget.Label
 	reset *widget.Button
+	// action is the row's RowBehavior::Action.
+	action bool
 }
 
 // newSettingRow lays a row out (row/mod.rs view): a full-width control
@@ -81,7 +83,7 @@ func newSettingRow(k *kit, spec rowSpec, ctl control) *settingRow {
 	if spec.fullWidth {
 		axis = widget.Column
 	}
-	r := &settingRow{kit: k, path: spec.path, ctl: ctl, Box: widget.NewBox(axis, 0, 0)}
+	r := &settingRow{kit: k, path: spec.path, ctl: ctl, action: spec.action, Box: widget.NewBox(axis, 0, 0)}
 	r.AddClass("setting-row")
 
 	info := widget.NewBox(widget.Column, 0, 0)
@@ -136,7 +138,10 @@ func (r *settingRow) refresh() {
 // (update_source_info): the button keeps its place, invisible and
 // inert, while there is no runtime override.
 func (r *settingRow) refreshSource() {
-	src := sourceOf(r.kit.store, r.path)
+	src := sourceInfo{}
+	if !r.action {
+		src = sourceOf(r.kit.store, r.path)
+	}
 	r.badge.SetVisible(src.badge)
 	r.badge.SetText(src.label)
 	r.badge.SetTooltip(src.tooltip)

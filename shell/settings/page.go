@@ -33,6 +33,9 @@ type rowSpec struct {
 	editor    editorFunc
 	fullWidth bool
 	unit      string
+	// action marks a row that acts rather than holds a value
+	// (RowBehavior::Action): no source badge, no reset.
+	action bool
 }
 
 // labelKey is the row's label key.

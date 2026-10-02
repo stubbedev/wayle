@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"path/filepath"
 	"strings"
 
 	"github.com/stubbedev/gelm/app"
@@ -383,3 +384,131 @@ func (c *iconEditor) open() {
 var iconRow = withEditor(func(k *kit, s slot, _ config.FieldMeta) control {
 	return newIconEditor(k, s)
 })
+
+// Theme selector sizes (theme_selector: BASE_MAX_HEIGHT at the
+// styling scale).
+const themeListPx = 384
+
+// paletteKeys are the [styling.palette] keys a theme sets, in the
+// palette's order.
+var paletteKeys = []string{"bg", "surface", "elevated", "fg", "fg-muted", "primary", "red", "yellow", "green", "blue"}
+
+// availableThemes lists the selectable themes (styling.available):
+// the built-ins and the config's themes/ files (a seam for tests).
+var availableThemes = func(s store) []config.ThemeEntry {
+	themes, skipped := config.LoadThemes(filepath.Join(s.svc.Dir(), "themes"))
+	for _, err := range skipped {
+		log.Printf("settings: theme: %v", err)
+	}
+	return themes
+}
+
+// themeSelector is ThemeSelectorControl: a button opening the preset
+// list (each theme's swatches and name); applying one names it the
+// palette's base theme and writes its colors, the badge showing it.
+type themeSelector struct {
+	*widget.Box
+	k      *kit
+	btn    *widget.Button
+	badge  *widget.Label
+	themes []config.ThemeEntry
+	picker *searchPicker
+}
+
+func newThemeSelector(k *kit) *themeSelector {
+	t := i18n.Settings()
+	c := &themeSelector{Box: widget.NewBox(widget.Row, 0, 0), k: k}
+	content := widget.NewBox(widget.Row, 0, 0)
+	content.AppendAligned(k.icon("ld-palette-symbolic", "theme-preset-button-icon"), false, widget.AlignCenter)
+	content.AppendAligned(k.label(t.Get("settings-theme-preset-apply"), "theme-preset-button-label"), false, widget.AlignCenter)
+	content.AppendAligned(k.icon("ld-chevron-down-symbolic", "theme-preset-button-chevron"), false, widget.AlignCenter)
+	c.btn = k.button(content, c.open, "theme-preset-button")
+	c.Append(c.btn, false)
+	c.badge = k.label("", "badge", "badge-subtle")
+	c.refresh()
+	return c
+}
+
+func (c *themeSelector) dirtyBadge() *widget.Label { return c.badge }
+
+// refresh shows the base theme on the badge.
+func (c *themeSelector) refresh() {
+	name, _ := c.k.store.value("styling.palette_base_theme").(string)
+	c.badge.SetText(name)
+	c.badge.SetVisible(name != "")
+}
+
+func (c *themeSelector) open() {
+	if c.k.pickers == nil {
+		return
+	}
+	c.themes = availableThemes(c.k.store)
+	names := make([]string, len(c.themes))
+	for i, th := range c.themes {
+		names[i] = th.Name
+	}
+	scale, _ := c.k.store.value("styling.scale").(float64)
+	c.picker = openSearchPicker(c.k, c.btn, names, pickerSpec{
+		class: "theme-preset-popover", listClass: "theme-preset-list", scrollClass: "theme-preset-scroll",
+		placeholder: "settings-theme-preset", maxH: int(math.Round(themeListPx * max(scale, 0.25))),
+		row: func(k *kit, name string) widget.Widget { return c.row(name) },
+	}, c.apply)
+}
+
+// row is build_theme_row: the swatches (bg, primary, red, yellow,
+// green, blue) and the name.
+func (c *themeSelector) row(name string) widget.Widget {
+	row := widget.NewBox(widget.Row, 0, 0)
+	row.AddClass("theme-preset-entry")
+	content := widget.NewBox(widget.Row, 0, 0)
+	content.AddClass("theme-preset-row")
+	swatches := widget.NewBox(widget.Row, 0, 0)
+	swatches.AddClass("theme-preset-swatches")
+	if th, ok := c.theme(name); ok {
+		p := th.Palette
+		for _, hex := range []string{p.Bg, p.Primary, p.Red, p.Yellow, p.Green, p.Blue} {
+			sw := widget.NewBox(widget.Row, 0, 0)
+			sw.AddClass("theme-preset-swatch")
+			sw.SetInlineStyle("background-color: " + hex + "; background-image: none;")
+			swatches.AppendAligned(sw, false, widget.AlignCenter)
+		}
+	}
+	content.AppendAligned(swatches, false, widget.AlignCenter)
+	content.AppendAligned(c.k.label(name, "theme-preset-name"), true, widget.AlignCenter)
+	row.Append(content, true)
+	return row
+}
+
+func (c *themeSelector) theme(name string) (config.ThemeEntry, bool) {
+	for _, th := range c.themes {
+		if th.Name == name {
+			return th, true
+		}
+	}
+	return config.ThemeEntry{}, false
+}
+
+// apply is on_apply: the base theme, then each valid palette color.
+func (c *themeSelector) apply(name string) {
+	th, ok := c.theme(name)
+	if !ok {
+		return
+	}
+	_ = c.k.store.set("styling.palette_base_theme", name)
+	p := th.Palette
+	for i, hex := range []string{p.Bg, p.Surface, p.Elevated, p.Fg, p.FgMuted, p.Primary, p.Red, p.Yellow, p.Green, p.Blue} {
+		if _, err := config.ParseHexColor(hex); err == nil {
+			_ = c.k.store.set("styling.palette."+paletteKeys[i], hex)
+		}
+	}
+	c.refresh()
+}
+
+// themePreset is theme_selector's row: an action row under the preset
+// key.
+func themePreset() rowSpec {
+	return rowSpec{
+		path: "styling.palette_base_theme", key: "settings-theme-preset", action: true,
+		editor: func(k *kit, _ slot, _ config.FieldMeta) control { return newThemeSelector(k) },
+	}
+}
