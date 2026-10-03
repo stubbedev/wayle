@@ -153,6 +153,35 @@ press-away notice); the Rust combobox just closes.
 - [x] the icon SVG parser's XML layer is a roxmltree port: the same
       documents accepted, the same trees, the same error messages
 
+### Dropdown parity — still open (found in the 2026-10-03 sweep)
+
+The structural sweep matched every dropdown's widget tree, classes,
+spacing model, and cursors against the Rust code, and the toolkit gaps
+that blocked it closed in gelm (wrapping markup labels, selectable
+labels, `background-image: url()`, the entry's primary icon,
+homogeneous boxes, ancestor key interceptors, natural-height
+propagation). What remains:
+
+- [ ] Live visual comparison per panel against the Rust shell — the
+      code-level parity is test-pinned; the eyeball pass is not done.
+- [ ] Dropdown instance caching: the Rust registry keeps one instance
+      per dropdown name (stack page, scroll position, and form state
+      persist across open/close, and every instance is warmed at
+      startup); the Go registry rebuilds the content each open.
+- [ ] Animated dismissal on a transparent-area click: the Rust
+      registry plays the configured exit before popdown; the Go panel
+      closes instantly there (only the programmatic close animates).
+- [ ] Modal dialogs: the Rust network VPN delete and treeman reset use
+      `gtk::AlertDialog`; the Go side confirms inside the form/panel.
+- [ ] Icon-theme reload reaching open dropdowns: the Rust watchers
+      rebuild groups when `icon-source` changes; the Go context would
+      need a config-watch hook to do the same.
+- [ ] Registry behaviors not yet ported: `dropdown-freeze-label`
+      (locking the anchor button's size while its dropdown is open),
+      `dropdown-autohide` (the no-grab dismissal mode), and the
+      card-height tween on stack page switches (only the network
+      stack opts in today).
+
 ### Bar
 
 - [x] dashboard dropdown: quick actions, volume, now playing, battery,
