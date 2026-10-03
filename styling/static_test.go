@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stubbedev/gelm/widget"
 )
 
 // TestStaticCSSIsFresh pins the embedded stylesheet to the SCSS it was
@@ -72,5 +74,24 @@ func TestStaticCSSIsTheCompiledBundle(t *testing.T) {
 	}
 	if strings.Contains(StaticCSS, "$") || strings.Contains(StaticCSS, "@import") {
 		t.Error("static.css still carries SCSS syntax: it is not compiled output")
+	}
+}
+
+// TestStaticCSSParsesClean pins engine completeness: the compiled
+// stylesheet goes through gelm's CSS engine with zero parse warnings.
+// Every declaration the engine cannot honor warns — a property the
+// SCSS starts using before the engine grows it, or a rule regression —
+// so this fails naming it instead of silently rendering wrong.
+func TestStaticCSSParsesClean(t *testing.T) {
+	var warns []string
+	widget.SetParseWarn(func(msg string) { warns = append(warns, msg) })
+	defer widget.SetParseWarn(nil)
+	widget.NewStylesheet(StaticCSS, 200)
+	if len(warns) == 0 {
+		return
+	}
+	t.Fatalf("the compiled stylesheet trips the CSS engine %d times:", len(warns))
+	for _, w := range warns {
+		t.Errorf("  %s", w)
 	}
 }

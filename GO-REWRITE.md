@@ -75,73 +75,43 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ## Remaining for feature parity
 
-### Open (as of 2026-10-02)
+### Open (as of 2026-10-03)
 
-Every checklist item below is done; what is left is parity polish.
+**CSS engine completeness** — the compiled stylesheet now parses
+through gelm's engine with zero warnings (`styling`
+`TestStaticCSSParsesClean` fails naming anything the engine cannot
+honor). What landed for it: `@keyframes` + `animation` +
+`animation-play-state` (the spins and pulses run; opacity and
+`-gtk-icon-transform` rotation interpolate, `steps()` timing,
+`alternate`, iteration counts, paused holds, cascade revert on end),
+`-gtk-icon-source` (`-gtk-icontheme()` names), `-gtk-icon-palette`
+(the check mark takes the theme's glyphs recolored by the palette),
+`caret-color`, `text-decoration: underline`, and the earlier
+transitions. Still silently dropped, each needing real engineering:
 
-**gelm: GTK CSS node parity** (a stylesheet written for GTK should
-address gelm widgets as written; the Rust stylesheet is the test):
+- [ ] `transform: scale(...)` on colorswatch and emoji hover (needs a
+      canvas transform push, not just the icon raster blit).
+- [ ] `font-feature-settings: "tnum"` (needs shaper OpenType feature
+      support; the recorder's clock digits want tabular figures).
+- [ ] `line-height` (one rule, rich text).
 
-- [x] List rows are GTK's `row`: the proxy is the CSS box (padding,
-      background, radius, `:hover`, `:selected` through the hover
-      chain and StateSelected), the theme's hover and selection bands
-      moved into it as the fallbacks, and wayle dropped its inner
-      `SetElement("row")` boxes under real lists (settings pickers,
-      launcher, file chooser, print dialog; the chooser's filter and
-      places rows keep theirs - plain boxes, no proxy above).
-- [x] The remaining node trees, on one shared style-only part type:
-      `checkbutton > check` (`:indeterminate`, the mark inked by the
-      check's color), `dropdown > button > arrow`, `expander > title
-      > arrow`, `notebook > header > tabs > tab` (`:checked` on the
-      selected one), `progressbar > trough > progress`, `paned >
-      separator` (its min size slots the divider, its margins shift
-      it), menus as `popover.menu` with `modelbutton` rows in a
-      `contents` node (`:hover`/`:disabled`/`:checked`, padding and
-      min-height band sizing). The spin button stays
-      `spinbutton > text` without steppers - gelm's SpinButton has no
-      buttons by design.
-- [x] Names no longer gelm's own where GTK has them: `listrow` →
-      `row`, `menu` → `popover.menu`. `toast`, `fader`, `elevation`
-      stay - they have no GTK node to take.
-- [x] CSS transitions on background-color (the fades stylesheets
-      write - the scale knob's hover fade, row washes): the tween
-      drives the style cache, retargets mid-flight, honors the
-      timing function (cubic-bezier solved per sample) and delays,
-      and collapses under reduced motion. Other properties still
-      apply at once; a need there would extend the tween.
-- [x] A short column distributes its deficit over every child that
-      can give (GTK's rule, as rows already did), not only the
-      expanding ones.
-- [x] Containers parent children as they measure (landed earlier;
-      the checklist was stale).
+**The one sanctioned deviation**: gelm's widget Dropdown closes with
+its animated exit on a click anywhere outside it (the router's
+press-away notice); the Rust combobox just closes.
 
 **wayle: stylesheet parity**
 
 - [ ] The bar dropdown panels' remaining hand-matched colors and
-      spacing move onto the stylesheet (their sliders already do:
-      gelm models `scale > trough > highlight/slider`, so the Rust
-      `scale` rules - the hover-shown knob, the dark trough - apply,
-      and gelm's background-color transitions carry the fades). The
-      rest is a panel-by-panel sweep: map each Go-painted color in
-      the ~14 dropdown files to a selector in the Rust SCSS, compile
-      with `just go-css`, and verify each panel against the Rust
-      shell live.
+      spacing move onto the stylesheet. The engine now honors
+      everything their rules use, so this is a panel-by-panel sweep:
+      map each Go-painted color in the ~14 dropdown files to its
+      selector in the Rust SCSS (largely present), delete the Go
+      painting, and verify against the Rust shell live - the `b.Bg =
+      tokenColor(...)` sites are Go-only tints with no Rust rule to
+      copy, and each needs the Rust panel beside it.
 - [x] Settings: the slider value label is fixed-width (gelm Label
       width-chars; the label floors at its widest rendering over the
       range, so a section's sliders end at the same x).
-
-**Smaller**
-
-- [x] The mouse wheel scrolls GTK's page^(2/3) a notch (was a flat
-      40px); the touchpad-to-steps fallback keeps its 40px quantum.
-- [x] Super+Tab reaches accelerators, not the Tab trap (Super joins
-      alt in the exclusion; plain, ctrl, and shift Tab keep the
-      traversal and the indent trap).
-- [x] gelm's virtual-pointer clicker (cmd/zz-vpclick) is committed
-      as the manual companion to internal/headlesstest.
-- [x] The network dropdown's toggle test drives the view on the
-      headless loop (the refresh a toggle's goroutine hands back
-      never races the assertions); it has not reproduced since.
 
 ### Parked work (local branches)
 
