@@ -101,14 +101,26 @@ press-away notice); the Rust combobox just closes.
 
 **wayle: stylesheet parity**
 
-- [ ] The bar dropdown panels' remaining hand-matched colors and
-      spacing move onto the stylesheet. The engine now honors
-      everything their rules use, so this is a panel-by-panel sweep:
-      map each Go-painted color in the ~14 dropdown files to its
-      selector in the Rust SCSS (largely present), delete the Go
-      painting, and verify against the Rust shell live - the `b.Bg =
-      tokenColor(...)` sites are Go-only tints with no Rust rule to
-      copy, and each needs the Rust panel beside it.
+- [ ] The bar dropdown panels' remaining hand-matched colors move
+      onto the stylesheet. Landed: the popover now carries the GTK
+      class chain (`popover.dropdown.shadow.position-* > contents`
+      around the `.dropdown` panel) and the theme sheet attaches to it
+      — popovers are their own tree, so until now no CSS reached them
+      and every panel hand-painted everything. The shared templates
+      paint from the stylesheet (header strip and title via
+      `.dropdown-header`/`.dropdown-title`, `.empty-state`, the flat
+      panel buttons via their classes' hover and ghost/primary
+      variants), and the audio and network panels (rows, active
+      connections, password and secret cards, VPN list and form) are
+      fully migrated — `TestDropdownPanelsPaintFromTheStylesheet`
+      pins it. Remaining: battery, brightness, calendar, dashboard,
+      mail, media, notification, recorder, treeman, weather,
+      bluetooth bespoke rows and gauges — same sweep per panel: class
+      names to match the SCSS selectors, Go colors to 0 (widget
+      colors beat the cascade), delete the paint where a rule covers
+      it. Verify against the Rust shell live per panel; the
+      `b.Bg = tokenColor(...)` sites with no Rust rule need the Rust
+      panel beside them.
 - [x] Settings: the slider value label is fixed-width (gelm Label
       width-chars; the label floors at its widest rendering over the
       range, so a section's sliders end at the same x).

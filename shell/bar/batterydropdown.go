@@ -193,10 +193,9 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 	v := &batteryView{ctx: ctx, font: font, px: px, cancel: func() {}}
 	v.Box = widget.NewBox(widget.Column, 12, 14)
 	v.AddClass("dropdown", "battery-dropdown")
-	v.Append(dropdownHeader(ctx, font, px, "ld-battery-full-symbolic", i18n.T("dropdown-battery-title")), false)
+	v.Append(dropdownHeader(font, px, "ld-battery-full-symbolic", i18n.T("dropdown-battery-title")), false)
 	v.body = widget.NewStack()
-	v.body.Add("empty", emptyState(ctx, font, px, "ld-unplug-symbolic",
-		i18n.T("dropdown-battery-no-battery-title"), i18n.T("dropdown-battery-no-battery-description")))
+	v.body.Add("empty", emptyState(font, px, "ld-unplug-symbolic", i18n.T("dropdown-battery-no-battery-title"), i18n.T("dropdown-battery-no-battery-description")))
 	v.body.Add("battery", v.batterySection())
 	v.Append(v.body, false)
 	v.Append(v.profileSection(), false)
@@ -333,7 +332,7 @@ func (v *batteryView) profileSection() widget.Widget {
 		content.Append(widget.NewLabel(v.font, v.px*0.9, i18n.T(p.label), v.ctx.Style.fg), false)
 		content.Append(widget.NewSpacer(0, 0), true)
 		name := p.name
-		b := dropdownButton(v.ctx, content, "profile-seg-btn", func() { v.selectProfile(name) })
+		b := dropdownButton(content, "profile-seg-btn", func() { v.selectProfile(name) })
 		v.profileButtons[name] = b
 		seg.Append(b, true)
 	}

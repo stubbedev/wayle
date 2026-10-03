@@ -97,6 +97,11 @@ func NewRangedSlider(min, max, value float64, font render.Font, px float64, colo
 	return d
 }
 
+// ValueLabel hands back the formatted value label, for the caller to
+// class the way its stylesheet names it (audio-slider-value,
+// brightness-slider-value, ...).
+func (d *DebouncedSlider) ValueLabel() *widget.Label { return d.label }
+
 // changed is the value_changed handler: user moves update the label
 // and commit through the throttle; programmatic ones do not commit.
 func (d *DebouncedSlider) changed(v float64) {

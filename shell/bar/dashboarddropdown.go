@@ -84,7 +84,7 @@ func (v *dashboardView) label(text string, scale float64, color render.Color) *w
 }
 
 func (v *dashboardView) button(child widget.Widget, class string, onClick func()) *widget.Button {
-	return dropdownButton(v.ctx, child, class, onClick)
+	return dropdownButton(child, class, onClick)
 }
 
 // card is the "card dashboard-card" shell with its titled header.
@@ -109,7 +109,7 @@ func (v *dashboardView) header() widget.Widget {
 		_ = spawn.Quiet("wayle-settings")
 	})
 	settings.SetTooltip(i18n.T("dropdown-dashboard-open-settings"))
-	return dropdownHeader(v.ctx, v.font, v.px, "ld-layout-dashboard-symbolic", i18n.T("dropdown-dashboard-title"), settings)
+	return dropdownHeader(v.font, v.px, "ld-layout-dashboard-symbolic", i18n.T("dropdown-dashboard-title"), settings)
 }
 
 // quickActionsState is what the quick actions cannot read back from a
@@ -410,7 +410,7 @@ func (v *dashboardView) media() widget.Widget {
 	player.Append(compact, false)
 	player.Append(progress, false)
 
-	empty := emptyState(v.ctx, v.font, v.px, "ld-music-symbolic", i18n.T("dropdown-dashboard-no-media-title"), i18n.T("dropdown-dashboard-no-media-description"))
+	empty := emptyState(v.font, v.px, "ld-music-symbolic", i18n.T("dropdown-dashboard-no-media-title"), i18n.T("dropdown-dashboard-no-media-description"))
 	body := widget.NewStack()
 	body.Add("player", player)
 	body.Add("empty", empty)

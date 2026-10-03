@@ -86,9 +86,9 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.AddClass("dropdown", "treeman-dropdown")
 	backIcon := widget.NewThemeIcon("ld-arrow-left-symbolic", int(px))
 	backIcon.SetTint(ctx.Style.fg)
-	v.back = dropdownButton(ctx, backIcon, "ghost-icon", func() { v.openDetail("") })
+	v.back = dropdownButton(backIcon, "ghost-icon", func() { v.openDetail("") })
 	v.back.SetTooltip(i18n.T("dropdown-treeman-back"))
-	header, _, title := dropdownHeaderParts(ctx, font, px, "ld-layers-symbolic", i18n.T("dropdown-treeman-title"), v.back)
+	header, _, title := dropdownHeaderParts(font, px, "ld-layers-symbolic", i18n.T("dropdown-treeman-title"), v.back)
 	v.title = title
 	v.Append(header, false)
 
@@ -203,8 +203,7 @@ func (v *treemanView) mainBadge() *widget.Label {
 func (v *treemanView) renderList() {
 	v.list.Clear()
 	if v.status == nil || len(v.status.Repos) == 0 {
-		empty := emptyState(v.ctx, v.font, v.px, "ld-layers-symbolic",
-			i18n.T("dropdown-treeman-empty-title"), i18n.T("dropdown-treeman-empty-desc"))
+		empty := emptyState(v.font, v.px, "ld-layers-symbolic", i18n.T("dropdown-treeman-empty-title"), i18n.T("dropdown-treeman-empty-desc"))
 		v.list.Append(empty, false)
 		return
 	}
@@ -257,7 +256,7 @@ func (v *treemanView) repoCard(repo treeman.Repo) widget.Widget {
 	head.Append(v.capped(repo.Repo, 1, v.ctx.Style.fg, "treeman-repo-name"), true)
 	head.Append(v.badge(strconv.FormatUint(uint64(repo.Total), 10), ""), false)
 	name := repo.Repo
-	header := dropdownButton(v.ctx, head, "treeman-repo-header", func() {
+	header := dropdownButton(head, "treeman-repo-header", func() {
 		open := !rows.Visible()
 		rows.SetVisible(open)
 		chevron.SetThemeName(treemanChevron(open))
@@ -318,7 +317,7 @@ func (v *treemanView) worktreeRow(wt treeman.Worktree) widget.Widget {
 func (v *treemanView) ghostIcon(icon, tooltip string, onClick func()) *widget.Button {
 	glyph := widget.NewThemeIcon(icon, int(v.px*0.9))
 	glyph.SetTint(mutedFg(v.ctx.Style.palette))
-	b := dropdownButton(v.ctx, glyph, "ghost-icon", onClick)
+	b := dropdownButton(glyph, "ghost-icon", onClick)
 	b.SetTooltip(tooltip)
 	return b
 }
@@ -368,10 +367,10 @@ func (v *treemanView) confirmReset(path string) {
 	buttons := widget.NewBox(widget.Row, 8, 0)
 	buttons.Append(widget.NewSpacer(0, 0), true)
 	cancel := widget.NewLabel(v.font, v.px, i18n.T("dropdown-treeman-confirm-cancel"), v.ctx.Style.fg)
-	buttons.Append(dropdownButton(v.ctx, cancel, "treeman-confirm-cancel", v.endConfirm), false)
+	buttons.Append(dropdownButton(cancel, "treeman-confirm-cancel", v.endConfirm), false)
 	accept := widget.NewLabel(v.font, v.px, i18n.T("dropdown-treeman-confirm-reset-accept"),
 		tokenColor(v.ctx.Style.palette, config.TokenStatusError))
-	buttons.Append(dropdownButton(v.ctx, accept, "treeman-confirm-accept", func() {
+	buttons.Append(dropdownButton(accept, "treeman-confirm-accept", func() {
 		v.endConfirm()
 		v.run(treeman.ActionReset, path)
 	}), false)

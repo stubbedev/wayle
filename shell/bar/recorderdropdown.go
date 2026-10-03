@@ -183,7 +183,7 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	v.time.AddClass("recorder-status-time")
 	v.status.Append(v.statusDot, false)
 	v.status.Append(v.time, false)
-	v.Append(dropdownHeader(ctx, font, px, "ld-video-symbolic", i18n.T("dropdown-recorder-title"), v.status), false)
+	v.Append(dropdownHeader(font, px, "ld-video-symbolic", i18n.T("dropdown-recorder-title"), v.status), false)
 
 	v.Append(v.controls(), false)
 
@@ -245,7 +245,7 @@ func (v *recorderView) controls() widget.Widget {
 	content.Append(v.recordIcon, false)
 	content.Append(v.recordLabel, false)
 	content.Append(widget.NewSpacer(0, 0), true)
-	v.record = dropdownButton(v.ctx, content, "recorder-record-button", func() {
+	v.record = dropdownButton(content, "recorder-record-button", func() {
 		if v.ctx.Recorder != nil {
 			v.ctx.Recorder.Toggle()
 		}
@@ -254,7 +254,7 @@ func (v *recorderView) controls() widget.Widget {
 	row.Append(v.record, true)
 	v.pauseIcon = widget.NewThemeIcon("ld-pause-symbolic", int(v.px))
 	v.pauseIcon.SetTint(v.ctx.Style.fg)
-	v.pause = dropdownButton(v.ctx, v.pauseIcon, "recorder-pause-button", func() {
+	v.pause = dropdownButton(v.pauseIcon, "recorder-pause-button", func() {
 		if r := v.ctx.Recorder; r != nil {
 			r.SetPaused(!r.Snapshot().Paused)
 		}

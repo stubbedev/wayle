@@ -158,7 +158,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 // mediaEmptyState is the EmptyState template with the media strings.
 func mediaEmptyState(ctx ModuleContext) *widget.Box {
 	font, px := dropdownFont(ctx)
-	return emptyState(ctx, font, px, "ld-play-symbolic", mediaNoPlayerTitle, mediaNoPlayerText)
+	return emptyState(font, px, "ld-play-symbolic", mediaNoPlayerTitle, mediaNoPlayerText)
 }
 
 // controlButton builds one transport button around a tinted glyph.

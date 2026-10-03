@@ -6,61 +6,108 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 )
 
+// popoverCard is the popover root the stylesheet styles through: the
+// popover element carrying GTK's dropdown classes, a contents node
+// under it (popover.dropdown > contents .dropdown takes the surface
+// color), and the card inside. gravity picks the shadow-direction
+// class the position rules read.
+func popoverCard(content widget.Widget, gravity app.Gravity) *widget.Box {
+	card := widget.NewBox(widget.Column, 0, 0)
+	card.SetElement("popover")
+	card.AddClass("dropdown", "shadow", positionClass(gravity))
+	contents := widget.NewBox(widget.Column, 0, 0)
+	contents.AddClass("contents")
+	card.Append(contents, true)
+	contents.Append(content, true)
+	return card
+}
+
+// positionClass names the popover's opened-toward edge, GTK's
+// position-* classes: a bar at the bottom opens its dropdown upward.
+func positionClass(gravity app.Gravity) string {
+	switch gravity {
+	case app.GravityTop:
+		return "position-top"
+	case app.GravityLeft:
+		return "position-left"
+	case app.GravityRight:
+		return "position-right"
+	}
+	return "position-bottom"
+}
+
 // dropdownHeader is the DropdownHeader template: the icon, the title
 // (taking the free width), and any trailing actions.
-func dropdownHeader(ctx ModuleContext, font render.Font, px float64, icon, title string, actions ...widget.Widget) *widget.Box {
-	row, _ := dropdownHeaderIcon(ctx, font, px, icon, title, actions...)
+func dropdownHeader(font render.Font, px float64, icon, title string, actions ...widget.Widget) *widget.Box {
+	row, _ := dropdownHeaderIcon(font, px, icon, title, actions...)
 	return row
 }
 
 // dropdownHeaderIcon is dropdownHeader that also hands back its icon,
 // for headers whose icon follows state.
-func dropdownHeaderIcon(ctx ModuleContext, font render.Font, px float64, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon) {
-	row, glyph, _ := dropdownHeaderParts(ctx, font, px, icon, title, actions...)
+func dropdownHeaderIcon(font render.Font, px float64, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon) {
+	row, glyph, _ := dropdownHeaderParts(font, px, icon, title, actions...)
 	return row, glyph
 }
 
 // dropdownHeaderParts is dropdownHeader with its icon and title label,
-// for headers whose icon or title follows state.
-func dropdownHeaderParts(ctx ModuleContext, font render.Font, px float64, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon, *widget.Label) {
-	row := widget.NewBox(widget.Row, 8, 0)
+// for headers whose icon or title follows state. The tree carries the
+// stylesheet's classes: .dropdown-header paints the strip (padding,
+// elevated background, bottom border) and .dropdown-title paints the
+// label (size, weight, ink) and its image (accent, size, right
+// margin), so nothing here colors itself.
+func dropdownHeaderParts(font render.Font, px float64, icon, title string, actions ...widget.Widget) (*widget.Box, *widget.Icon, *widget.Label) {
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("dropdown-header")
+	titleBox := widget.NewBox(widget.Row, 0, 0)
+	titleBox.AddClass("dropdown-title")
 	glyph := widget.NewThemeIcon(icon, int(px*1.2))
-	glyph.SetTint(ctx.Style.fg)
-	row.Append(glyph, false)
-	label := widget.NewLabel(font, px*1.1, title, ctx.Style.fg)
+	titleBox.Append(glyph, false)
+	label := widget.NewLabel(font, px*1.1, title, 0)
 	label.SetEllipsize(widget.EllipsizeEnd)
-	row.Append(label, true)
-	for _, a := range actions {
-		row.Append(a, false)
+	titleBox.Append(label, true)
+	row.Append(titleBox, true)
+	if len(actions) > 0 {
+		acts := widget.NewBox(widget.Row, 0, 0)
+		acts.AddClass("dropdown-actions")
+		for _, a := range actions {
+			acts.Append(a, false)
+		}
+		row.Append(acts, false)
 	}
 	return row, glyph, label
 }
 
 // emptyState is the EmptyState template: a muted icon over the title
 // and the wrapped description. An empty description is omitted.
-func emptyState(ctx ModuleContext, font render.Font, px float64, icon, title, description string) *widget.Box {
-	col, _ := emptyStateIcon(ctx, font, px, icon, title, description)
+func emptyState(font render.Font, px float64, icon, title, description string) *widget.Box {
+	col, _ := emptyStateIcon(font, px, icon, title, description)
 	return col
 }
 
-// emptyStateIcon is emptyState that also hands back its icon.
-func emptyStateIcon(ctx ModuleContext, font render.Font, px float64, icon, title, description string) (*widget.Box, *widget.Icon) {
+// emptyStateIcon is emptyState that also hands back its icon. The
+// stylesheet paints it: .empty-state .icon colors and sizes the glyph,
+// .title and .description ink the text.
+func emptyStateIcon(font render.Font, px float64, icon, title, description string) (*widget.Box, *widget.Icon) {
 	col := widget.NewBox(widget.Column, 6, 14)
 	col.AddClass("empty-state")
 	glyph := widget.NewThemeIcon(icon, int(px*2))
-	glyph.SetTint(mutedFg(ctx.Style.palette))
+	glyph.AddClass("icon")
 	col.Append(glyph, false)
-	col.Append(widget.NewLabel(font, px*1.1, title, ctx.Style.fg), false)
+	titleLbl := widget.NewLabel(font, px*1.1, title, 0)
+	titleLbl.AddClass("title")
+	col.Append(titleLbl, false)
 	if description != "" {
-		desc := widget.NewLabel(font, px*0.9, description, mutedFg(ctx.Style.palette))
+		desc := widget.NewLabel(font, px*0.9, description, 0)
 		desc.SetWrap(true)
+		desc.AddClass("description")
 		col.Append(desc, false)
 	}
 	return col, glyph
@@ -181,15 +228,25 @@ func followInto[T any](life context.Context, what string, subscribe func(context
 	}()
 }
 
-// dropdownButton is a flat dropdown button: the hover and pressed
-// fills of the bar style around child.
-func dropdownButton(ctx ModuleContext, child widget.Widget, class string, onClick func()) *widget.Button {
+// dropdownButton is a flat dropdown button: the class's stylesheet
+// rules paint it (the hover and active shades, the ink), so nothing is
+// set here.
+func dropdownButton(child widget.Widget, class string, onClick func()) *widget.Button {
 	b := widget.NewButton(child, 6, 8)
 	b.AddClass(class)
-	b.BgHover = ctx.Style.buttonBgHover
-	b.BgPressed = ctx.Style.buttonBgActive
 	b.OnClick = onClick
 	return b
+}
+
+// iconTile wraps icon in the styled tile box the stylesheets target:
+// the box paints the tile (overlay background, radius, min size) and
+// the image paints through its own class (size, ink, margin).
+func iconTile(icon *widget.Icon, boxClass, imgClass string) *widget.Box {
+	icon.AddClass(imgClass)
+	tile := widget.NewBox(widget.Row, 0, 0)
+	tile.AddClass(boxClass)
+	tile.Append(icon, false)
+	return tile
 }
 
 // dropdownScroll is a dropdown's ScrolledWindow: vertical only, as

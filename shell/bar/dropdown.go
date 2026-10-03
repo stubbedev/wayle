@@ -178,7 +178,16 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	// The card enters through the dropdown transition (animate_in).
 	rev := widget.NewRevealer(content)
 	rev.SetGenieEdge(dropdownGenieEdge(r.cfg.Bar.Location))
-	cfg.Content = rev
+	// The popover carries the GTK class chain the stylesheet styles
+	// through: popover.dropdown > contents .dropdown gets the surface,
+	// and the shadow/position classes pick the shadow's direction. The
+	// popover is its own tree, so the theme sheet attaches here — the
+	// panels paint from the same CSS the Rust shell loads.
+	card := popoverCard(rev, dropdownGravity(r.cfg.Bar.Location))
+	cfg.Content = card
+	if r.ctx.Theme != nil {
+		r.ctx.Theme.Attach(card)
+	}
 	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
 		if cfg.OnClosed != nil {

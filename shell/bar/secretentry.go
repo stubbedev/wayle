@@ -28,7 +28,7 @@ func newSecretEntry(ctx ModuleContext, font render.Font, px float64) *secretEntr
 	s.Append(s.entry, true)
 	s.eye = widget.NewThemeIcon(iconEyeOff, int(px))
 	s.eye.SetTint(mutedFg(ctx.Style.palette))
-	s.Append(dropdownButton(ctx, s.eye, "network-reveal-toggle", s.toggle), false)
+	s.Append(dropdownButton(s.eye, "network-reveal-toggle", s.toggle), false)
 	return s
 }
 

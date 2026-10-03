@@ -87,8 +87,8 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	v.AddClass("dropdown", "notification-dropdown")
 
 	clearLabel := widget.NewLabel(font, px*0.9, i18n.T("notification-dropdown-clear-all"), ctx.Style.fg)
-	v.clearAll = dropdownButton(ctx, clearLabel, "notification-dropdown-clear-all", v.dismissAll)
-	header, headerIcon := dropdownHeaderIcon(ctx, font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-title"), v.clearAll)
+	v.clearAll = dropdownButton(clearLabel, "notification-dropdown-clear-all", v.dismissAll)
+	header, headerIcon := dropdownHeaderIcon(font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-title"), v.clearAll)
 	v.headerIcon = headerIcon
 	v.Append(header, false)
 
@@ -102,8 +102,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	dndRow.Append(v.dnd, false)
 	v.Append(dndRow, false)
 
-	empty, emptyIcon := emptyStateIcon(ctx, font, px, "ld-bell-symbolic",
-		i18n.T("notification-dropdown-empty-title"), i18n.T("notification-dropdown-empty-description"))
+	empty, emptyIcon := emptyStateIcon(font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-empty-title"), i18n.T("notification-dropdown-empty-description"))
 	v.emptyIcon = emptyIcon
 	v.list = widget.NewBox(widget.Column, 8, 0)
 	v.list.AddClass("notification-dropdown-groups")
@@ -285,13 +284,13 @@ func newNotifGroup(v *notificationView, data notifGroupData) *notifGroup {
 
 	header := widget.NewBox(widget.Row, 4, 0)
 	header.AddClass("notification-dropdown-group-header")
-	header.Append(dropdownButton(v.ctx, toggleRow, "notification-dropdown-group-toggle", g.toggle), true)
+	header.Append(dropdownButton(toggleRow, "notification-dropdown-group-toggle", g.toggle), true)
 	clearLabel := widget.NewLabel(v.font, v.px*0.85, i18n.T("notification-dropdown-group-clear"), muted)
-	header.Append(dropdownButton(v.ctx, clearLabel, "notification-dropdown-group-clear", g.clear), false)
+	header.Append(dropdownButton(clearLabel, "notification-dropdown-group-clear", g.clear), false)
 	g.chevron = widget.NewThemeIcon("ld-chevron-up-symbolic", int(v.px))
 	g.chevron.SetTint(muted)
 	g.chevron.AddClass("notification-dropdown-group-chevron-icon")
-	header.Append(dropdownButton(v.ctx, g.chevron, "notification-dropdown-group-chevron", g.toggle), false)
+	header.Append(dropdownButton(g.chevron, "notification-dropdown-group-chevron", g.toggle), false)
 	g.Append(header, false)
 
 	g.itemsBox = widget.NewBox(widget.Column, 6, 0)
@@ -299,7 +298,7 @@ func newNotifGroup(v *notificationView, data notifGroupData) *notifGroup {
 	g.list = widget.NewBox(widget.Column, 6, 0)
 	g.itemsBox.Append(g.list, false)
 	g.moreLabel = widget.NewLabel(v.font, v.px*0.85, "", tokenColor(v.ctx.Style.palette, config.TokenAccent))
-	g.more = dropdownButton(v.ctx, g.moreLabel, "notification-dropdown-group-more", g.showAll)
+	g.more = dropdownButton(g.moreLabel, "notification-dropdown-group-more", g.showAll)
 	g.itemsBox.Append(g.more, false)
 	g.Append(g.itemsBox, false)
 
@@ -422,7 +421,7 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 	x := widget.NewThemeIcon("ld-x-symbolic", int(v.px*0.9))
 	x.SetTint(muted)
 	id := n.ID
-	header.Append(dropdownButton(v.ctx, x, "notification-dropdown-item-dismiss", func() { v.dismiss(id) }), false)
+	header.Append(dropdownButton(x, "notification-dropdown-item-dismiss", func() { v.dismiss(id) }), false)
 	content.Append(header, false)
 	if n.Body != "" {
 		body := widget.NewLabel(v.font, v.px*0.9, notifyui.BodyText(n.Body), muted)
@@ -464,7 +463,7 @@ func (it *notifItem) actionRows() widget.Widget {
 			label := widget.NewLabel(v.font, v.px*0.9, a.Label, v.ctx.Style.fg)
 			label.SetAlignment(render.AlignCenter)
 			key := a.ID
-			row.Append(dropdownButton(v.ctx, label, "notification-dropdown-item-action-btn", func() { it.invoke(key) }), true)
+			row.Append(dropdownButton(label, "notification-dropdown-item-action-btn", func() { it.invoke(key) }), true)
 		}
 		box.Append(row, false)
 	}

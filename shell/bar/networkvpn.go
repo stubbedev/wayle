@@ -17,7 +17,6 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/portal"
 	"github.com/stubbedev/wayle/service/network"
@@ -331,14 +330,13 @@ func newNetVPNs(v *networkView) *netVPNs {
 	card.Append(s.rows, false)
 	content := widget.NewBox(widget.Row, 10, 0)
 	plus := widget.NewThemeIcon("ld-plus-symbolic", int(v.px*1.1))
-	plus.SetTint(v.ctx.Style.fg)
 	plus.AddClass("network-item-signal")
 	content.Append(plus, false)
-	label := widget.NewLabel(v.font, v.px, i18n.T("dropdown-network-vpn-add"), v.ctx.Style.fg)
+	label := widget.NewLabel(v.font, v.px, i18n.T("dropdown-network-vpn-add"), 0)
 	label.AddClass("network-item-name")
 	content.Append(label, true)
-	s.add = dropdownButton(v.ctx, content, "vpn-add", v.vpnAdd)
-	s.add.AddClass("network-item", "vpn-item")
+	s.add = dropdownButton(content, "vpn-add", v.vpnAdd)
+	s.add.AddClass("network-item", "vpn-item", "vpn-add")
 	card.Append(s.add, false)
 	s.Append(card, false)
 	s.errLabel = v.errorLabel()
@@ -370,37 +368,32 @@ func (s *netVPNs) showError(reason string) {
 // reason, a click toggling the tunnel, and the edit button.
 func (s *netVPNs) row(r network.VPN) widget.Widget {
 	v := s.v
-	pal := v.ctx.Style.palette
 	content := widget.NewBox(widget.Row, 10, 0)
 	icon := widget.NewThemeIcon(vpnStateIcon(r.State), int(v.px*1.1))
-	icon.SetTint(v.ctx.Style.fg)
 	icon.AddClass("network-item-signal")
 	switch r.State {
 	case network.VPNConnected:
 		icon.AddClass("connected")
-		icon.SetTint(tokenColor(pal, config.TokenStatusSuccess))
 	case network.VPNConnecting:
 		icon.AddClass("connecting")
-		icon.SetTint(tokenColor(pal, config.TokenStatusWarning))
 	}
 	content.Append(icon, false)
 	info := widget.NewBox(widget.Column, 2, 0)
 	info.AddClass("network-item-info")
-	name := widget.NewLabel(v.font, v.px, r.Name, v.ctx.Style.fg)
+	name := widget.NewLabel(v.font, v.px, r.Name, 0)
 	name.AddClass("network-item-name")
 	name.SetEllipsize(widget.EllipsizeEnd)
 	name.SetMaxWidthChars(24)
 	info.Append(name, false)
 	// A gateway's reason is a sentence: wrapped at the row's width, three
 	// lines at most, the tooltip holding the rest.
-	caption := widget.NewLabel(v.font, v.px*0.8, vpnRowCaption(r), mutedFg(pal))
+	caption := widget.NewLabel(v.font, v.px*0.8, vpnRowCaption(r), 0)
 	caption.AddClass("network-item-security")
 	caption.SetWrap(true)
 	caption.SetMaxWidthChars(24)
 	caption.SetMaxLines(3)
 	if r.Detail != "" {
 		caption.AddClass("failed")
-		caption.SetColor(tokenColor(pal, config.TokenStatusError))
 		caption.SetTooltip(r.Detail)
 	}
 	info.Append(caption, false)
@@ -408,10 +401,9 @@ func (s *netVPNs) row(r network.VPN) widget.Widget {
 	uuid := r.UUID
 	row := widget.NewBox(widget.Row, 4, 0)
 	row.AddClass("network-item", "vpn-item")
-	row.Append(dropdownButton(v.ctx, content, "vpn-item-toggle", func() { v.vpnToggle(uuid) }), true)
+	row.Append(dropdownButton(content, "vpn-item-toggle", func() { v.vpnToggle(uuid) }), true)
 	gear := widget.NewThemeIcon("ld-settings-symbolic", int(v.px))
-	gear.SetTint(mutedFg(pal))
-	edit := dropdownButton(v.ctx, gear, "network-vpn-edit", func() { v.vpnEdit(uuid) })
+	edit := dropdownButton(gear, "network-vpn-edit", func() { v.vpnEdit(uuid) })
 	edit.AddClass("ghost-icon")
 	edit.SetTooltip(i18n.T("dropdown-network-vpn-edit"))
 	row.Append(edit, false)
@@ -467,28 +459,27 @@ type netVPNForm struct {
 func newNetVPNForm(v *networkView) *netVPNForm {
 	f := &netVPNForm{v: v, Box: widget.NewBox(widget.Column, 8, 10)}
 	f.AddClass("card", "network-password-card", "network-vpn-form")
-	fg, muted := v.ctx.Style.fg, mutedFg(v.ctx.Style.palette)
 
 	header := widget.NewBox(widget.Row, 10, 0)
 	header.AddClass("network-password-header")
 	back := widget.NewThemeIcon("ld-arrow-left-symbolic", int(v.px))
-	back.SetTint(muted)
-	backBtn := dropdownButton(v.ctx, back, "network-vpn-back", f.cancel)
+	backBtn := dropdownButton(back, "network-vpn-back", f.cancel)
+	backBtn.AddClass("ghost-icon")
 	backBtn.SetTooltip(i18n.T("dropdown-network-vpn-back"))
 	header.Append(backBtn, false)
-	f.title = widget.NewLabel(v.font, v.px, i18n.T("dropdown-network-vpn-new"), fg)
+	f.title = widget.NewLabel(v.font, v.px, i18n.T("dropdown-network-vpn-new"), 0)
 	f.title.AddClass("network-password-name")
 	header.Append(f.title, true)
 	folder := widget.NewThemeIcon("ld-folder-open-symbolic", int(v.px))
-	folder.SetTint(muted)
-	f.importBtn = dropdownButton(v.ctx, folder, "network-vpn-import", f.importFile)
+	f.importBtn = dropdownButton(folder, "network-vpn-import", f.importFile)
+	f.importBtn.AddClass("ghost-icon")
 	f.importBtn.SetTooltip(i18n.T("dropdown-network-vpn-import"))
 	header.Append(f.importBtn, false)
 	f.Append(header, false)
 
 	body := widget.NewBox(widget.Column, 6, 0)
 	body.Append(f.fieldLabel(i18n.T("dropdown-network-vpn-name")), false)
-	f.name = widget.NewEntry(v.font, v.px, fg)
+	f.name = widget.NewEntry(v.font, v.px, 0)
 	f.name.AddClass("network-password-input")
 	body.Append(f.name, false)
 	f.kindLabel = f.fieldLabel(i18n.T("dropdown-network-vpn-type"))
@@ -498,13 +489,15 @@ func newNetVPNForm(v *networkView) *netVPNForm {
 	f.fields = widget.NewBox(widget.Column, 6, 0)
 	f.fields.AddClass("network-secret-fields")
 	body.Append(f.fields, false)
-	f.advLabel = widget.NewLabel(v.font, v.px*0.85, "", fg)
-	f.advanced = dropdownButton(v.ctx, f.advLabel, "network-vpn-advanced", f.toggleAdvanced)
+	f.advLabel = widget.NewLabel(v.font, v.px*0.85, "", 0)
+	f.advLabel.AddClass("network-secret-label")
+	f.advanced = dropdownButton(f.advLabel, "network-vpn-advanced", f.toggleAdvanced)
+	f.advanced.AddClass("ghost")
 	body.Append(f.advanced, false)
 	f.rawHint = f.fieldLabel("")
 	f.rawHint.SetWrap(true)
 	body.Append(f.rawHint, false)
-	f.raw = widget.NewTextArea(monoFont(v.ctx, v.font, v.px), v.px*0.9, fg)
+	f.raw = widget.NewTextArea(monoFont(v.ctx, v.font, v.px), v.px*0.9, 0)
 	f.raw.AddClass("network-vpn-raw")
 	body.Append(f.raw, false)
 	scroll := dropdownScroll(body, "network-vpn-form-scroll")
@@ -527,18 +520,20 @@ func newNetVPNForm(v *networkView) *netVPNForm {
 	// lives only in NM), so Delete asks first, in place of the buttons.
 	f.confirm = widget.NewBox(widget.Column, 6, 0)
 	f.confirm.AddClass("network-vpn-delete-confirm")
-	f.confirmMsg = widget.NewLabel(v.font, v.px*0.9, "", fg)
+	f.confirmMsg = widget.NewLabel(v.font, v.px*0.9, "", 0)
 	f.confirmMsg.SetWrap(true)
+	f.confirmMsg.AddClass("network-password-name")
 	f.confirm.Append(f.confirmMsg, false)
-	detail := widget.NewLabel(v.font, v.px*0.8, i18n.T("dropdown-network-vpn-delete-confirm-detail"), muted)
+	detail := widget.NewLabel(v.font, v.px*0.8, i18n.T("dropdown-network-vpn-delete-confirm-detail"), 0)
 	detail.SetWrap(true)
+	detail.AddClass("network-secret-message")
 	f.confirm.Append(detail, false)
 	buttons := widget.NewBox(widget.Row, 6, 0)
 	buttons.Append(widget.NewSpacer(0, 0), true)
 	buttons.Append(v.ghostText(i18n.T("dropdown-network-cancel"), "network-vpn-delete-dismiss", f.dismissDelete), false)
 	really := v.ghostText(i18n.T("dropdown-network-vpn-delete"), "network-vpn-delete-confirmed", f.confirmDelete)
-	really.BgExplicit = true
-	really.Bg = tokenColor(v.ctx.Style.palette, config.TokenStatusError)
+	really.RemoveClass("ghost")
+	really.AddClass("danger")
 	buttons.Append(really, false)
 	f.confirm.Append(buttons, false)
 	f.Append(f.confirm, false)
@@ -560,7 +555,7 @@ func monoFont(ctx ModuleContext, fallback render.Font, px float64) render.Font {
 }
 
 func (f *netVPNForm) fieldLabel(text string) *widget.Label {
-	l := widget.NewLabel(f.v.font, f.v.px*0.85, text, mutedFg(f.v.ctx.Style.palette))
+	l := widget.NewLabel(f.v.font, f.v.px*0.85, text, 0)
 	l.AddClass("network-secret-label")
 	return l
 }
@@ -649,7 +644,7 @@ func (f *netVPNForm) rebuild(values map[string]string) {
 	section := ""
 	for _, field := range kind.Fields {
 		if field.Section != "" && field.Section != section {
-			heading := widget.NewLabel(f.v.font, f.v.px*0.9, vpnSectionHeading(field.Section), f.v.ctx.Style.fg)
+			heading := widget.NewLabel(f.v.font, f.v.px*0.9, vpnSectionHeading(field.Section), 0)
 			heading.AddClass("network-vpn-section")
 			f.fields.Append(heading, false)
 			section = field.Section
@@ -697,7 +692,7 @@ func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current
 		s := newSecretEntry(f.v.ctx, f.v.font, f.v.px)
 		entry, input = s.entry, s.Box
 	} else {
-		entry = widget.NewEntry(f.v.font, f.v.px, f.v.ctx.Style.fg)
+		entry = widget.NewEntry(f.v.font, f.v.px, 0)
 		entry.AddClass("network-password-input")
 		input = widget.NewBox(widget.Row, 4, 0)
 		input.Append(entry, true)
@@ -709,10 +704,10 @@ func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current
 	var readout *widget.Label
 	if kind.ID == network.WireGuard && field.Key == wireGuardPrivateKey {
 		key := widget.NewThemeIcon(iconGenerateKey, int(f.v.px))
-		key.SetTint(mutedFg(f.v.ctx.Style.palette))
-		generate := dropdownButton(f.v.ctx, key, "network-vpn-generate", func() {
+		generate := dropdownButton(key, "network-vpn-generate", func() {
 			entry.SetText(network.GenerateKeyPair().Private)
 		})
+		generate.AddClass("ghost-icon")
 		generate.SetTooltip(i18n.T("dropdown-network-vpn-generate-key"))
 		input.Append(generate, false)
 		readout = f.fieldLabel(publicKeyReadout(current))

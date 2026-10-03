@@ -207,7 +207,7 @@ func (v *weatherView) header() widget.Widget {
 	refresh.BgHover = v.ctx.Style.buttonBgHover
 	refresh.BgPressed = v.ctx.Style.buttonBgActive
 	refresh.OnClick = v.svc.Refresh
-	return dropdownHeader(v.ctx, v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-title"), refresh)
+	return dropdownHeader(v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-title"), refresh)
 }
 
 func (v *weatherView) loadingPage() widget.Widget {
