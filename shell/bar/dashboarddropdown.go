@@ -50,7 +50,8 @@ func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	v.AddClass("dropdown", "dashboard-dropdown")
 	v.Append(v.header(), false)
 	content := widget.NewBox(widget.Column, 10, 0)
-	content.AddClass("dashboard-content-box")
+	// The DropdownContent template's classes over the section box.
+	content.AddClass("dropdown-content", "dashboard-content-box")
 	content.Append(v.quickActions(), false)
 	if ctx.Pulse != nil {
 		content.Append(v.controls(), false)
@@ -61,7 +62,7 @@ func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	content.Append(v.infoRow(), false)
 	content.Append(v.systemStats(), false)
 	content.Append(userSessionSection(ctx), false)
-	v.Append(dropdownScroll(content, ""), true)
+	v.Append(dropdownScroll(content, "dashboard-scroll"), true)
 	for _, refresh := range v.refreshers {
 		refresh()
 	}
@@ -73,28 +74,32 @@ func (v *dashboardView) tint(token config.CssToken) render.Color {
 	return tokenColor(v.ctx.Style.palette, token)
 }
 
-func (v *dashboardView) icon(name string, scale float64, color render.Color) *widget.Icon {
-	icon := widget.NewThemeIcon(name, int(math.Round(v.px*scale)))
-	icon.SetTint(color)
-	return icon
+// icon and label build the panel's icons and labels; the stylesheet
+// inks them through their classes, so no color is set here.
+func (v *dashboardView) icon(name string, scale float64) *widget.Icon {
+	return widget.NewThemeIcon(name, int(math.Round(v.px*scale)))
 }
 
-func (v *dashboardView) label(text string, scale float64, color render.Color) *widget.Label {
-	return widget.NewLabel(v.font, v.px*scale, text, color)
+func (v *dashboardView) label(text string, scale float64) *widget.Label {
+	return widget.NewLabel(v.font, v.px*scale, text, 0)
 }
 
 func (v *dashboardView) button(child widget.Widget, class string, onClick func()) *widget.Button {
 	return dropdownButton(child, class, onClick)
 }
 
-// card is the "card dashboard-card" shell with its titled header.
-func (v *dashboardView) card(iconName, title string, extra ...widget.Widget) *widget.Box {
+// card is the "card dashboard-card" shell with its titled header: the
+// .card-title box paints its icon and label.
+func (v *dashboardView) card(iconName, heading string, extra ...widget.Widget) *widget.Box {
 	card := widget.NewBox(widget.Column, 8, 10)
 	card.AddClass("card", "dashboard-card")
 	header := widget.NewBox(widget.Row, 6, 0)
 	header.AddClass("card-header")
-	header.Append(v.icon(iconName, 1, v.tint(config.TokenFgMuted)), false)
-	header.Append(v.label(title, 0.95, v.tint(config.TokenFgMuted)), true)
+	title := widget.NewBox(widget.Row, 6, 0)
+	title.AddClass("card-title")
+	title.Append(v.icon(iconName, 1), false)
+	title.Append(v.label(heading, 0.95), true)
+	header.Append(title, true)
 	for _, w := range extra {
 		header.Append(w, false)
 	}
@@ -104,10 +109,11 @@ func (v *dashboardView) card(iconName, title string, extra ...widget.Widget) *wi
 
 // header is the DropdownHeader with the open-settings action.
 func (v *dashboardView) header() widget.Widget {
-	settings := v.button(v.icon("ld-settings-symbolic", 1, v.tint(config.TokenFgMuted)), "dashboard-settings-btn", func() {
+	settings := v.button(v.icon("ld-settings-symbolic", 1), "ghost-icon", func() {
 		// spawn_settings_app; the popover closes on the click.
 		_ = spawn.Quiet("wayle-settings")
 	})
+	settings.AddClass("dashboard-settings-btn")
 	settings.SetTooltip(i18n.T("dropdown-dashboard-open-settings"))
 	return dropdownHeader(v.font, v.px, "ld-layout-dashboard-symbolic", i18n.T("dropdown-dashboard-title"), settings)
 }
@@ -133,10 +139,12 @@ func (v *dashboardView) quickActions() widget.Widget {
 		icon *widget.Icon
 	}
 	make1 := func(col, row int, iconName, labelID string, onClick func()) toggle {
-		icon := v.icon(iconName, 1.3, v.ctx.Style.fg)
+		icon := v.icon(iconName, 1.3)
 		col2 := widget.NewBox(widget.Column, 4, 0)
-		col2.Append(icon, false)
-		col2.Append(v.label(i18n.T(labelID), 0.8, v.ctx.Style.fg), false)
+		col2.Append(iconTile(icon, "quick-action-icon", ""), false)
+		lbl := v.label(i18n.T(labelID), 0.8)
+		lbl.AddClass("quick-action-label")
+		col2.Append(lbl, false)
 		b := v.button(col2, "quick-action", onClick)
 		grid.Attach(b, col, row, 1, 1)
 		return toggle{b, icon}
@@ -277,10 +285,10 @@ func (v *dashboardView) controls() widget.Widget {
 	card := v.card("ld-audio-lines-symbolic", i18n.T("dropdown-dashboard-volume"))
 	row := widget.NewBox(widget.Row, 8, 0)
 	row.AddClass("dashboard-slider-row")
-	muteIcon := v.icon("ld-volume-2-symbolic", 1.1, v.ctx.Style.fg)
+	muteIcon := v.icon("ld-volume-2-symbolic", 1.1)
 	var muted bool
 	bctx := context.Background()
-	mute := v.button(muteIcon, "dashboard-volume-icon", func() {
+	mute := v.button(muteIcon, "ghost-icon", func() {
 		target := !muted
 		go func() {
 			if err := v.ctx.Pulse.SetMuted(bctx, target); err != nil {
@@ -288,9 +296,11 @@ func (v *dashboardView) controls() widget.Widget {
 			}
 		}()
 	})
+	mute.AddClass("dashboard-volume-icon")
 	row.Append(mute, false)
-	slider := widgets.NewDebouncedSlider(0, v.font, v.px*0.9, v.tint(config.TokenFgMuted), v.ctx.Invoke)
-	slider.AddClass("dashboard-volume-slider")
+	slider := widgets.NewDebouncedSlider(0, v.font, v.px*0.9, 0, v.ctx.Invoke)
+	slider.Knob.AddClass("dashboard-volume-slider")
+	slider.ValueLabel().AddClass("dashboard-slider-value")
 	slider.OnCommit = func(pct float64) {
 		go func() {
 			if err := v.ctx.Pulse.SetVolume(bctx, pct); err != nil {
@@ -300,7 +310,7 @@ func (v *dashboardView) controls() widget.Widget {
 	}
 	row.Append(slider, true)
 	card.Append(row, false)
-	device := v.label(i18n.T("dropdown-dashboard-no-device"), 0.85, v.tint(config.TokenFgSubtle))
+	device := v.label(i18n.T("dropdown-dashboard-no-device"), 0.85)
 	device.AddClass("controls-device")
 	device.SetEllipsize(widget.EllipsizeEnd)
 	device.SetAlignment(render.AlignEnd)
@@ -329,7 +339,7 @@ func (v *dashboardView) media() widget.Widget {
 	var current mpris.Player
 	var has bool
 	bctx := context.Background()
-	switchBtn := v.button(v.icon("ld-arrow-left-right-symbolic", 1, v.tint(config.TokenFgMuted)), "media-switch-btn", func() {
+	switchBtn := v.button(v.icon("ld-arrow-left-right-symbolic", 1), "ghost-icon", func() {
 		// cycle_player: the next player after the active one.
 		players := src.Players()
 		if len(players) < 2 {
@@ -345,13 +355,16 @@ func (v *dashboardView) media() widget.Widget {
 			log.Printf("dashboard: switch player failed: %v", err)
 		}
 	})
+	switchBtn.AddClass("media-switch-btn")
 	card := v.card("ld-disc-3-symbolic", i18n.T("dropdown-dashboard-now-playing"), switchBtn)
 	artPx := int(math.Round(v.px * 3.5))
 	art := newFixedBox(artPx, artPx, nil)
 	art.AddClass("dashboard-media-art")
 	artURL := "\x00"
-	title := v.label("", 1, v.ctx.Style.fg)
-	artist := v.label("", 0.85, v.tint(config.TokenFgMuted))
+	title := v.label("", 1)
+	title.AddClass("media-track")
+	artist := v.label("", 0.85)
+	artist.AddClass("media-artist")
 	for _, l := range []*widget.Label{title, artist} {
 		l.SetEllipsize(widget.EllipsizeEnd)
 	}
@@ -367,11 +380,14 @@ func (v *dashboardView) media() widget.Widget {
 			}
 		}()
 	}
-	prev := v.button(v.icon("ld-skip-back-symbolic", 1, v.ctx.Style.fg), "media-btn", func() { fire("previous", src.Previous) })
-	playIcon := v.icon("ld-play-symbolic", 1, v.ctx.Style.fg)
-	play := v.button(playIcon, "media-btn", func() { fire("play-pause", src.PlayPause) })
+	prev := v.button(v.icon("ld-skip-back-symbolic", 1), "ghost-icon", func() { fire("previous", src.Previous) })
+	prev.AddClass("media-btn")
+	playIcon := v.icon("ld-play-symbolic", 1)
+	play := v.button(playIcon, "ghost-icon", func() { fire("play-pause", src.PlayPause) })
+	play.AddClass("media-btn")
 	play.AddClass("play")
-	next := v.button(v.icon("ld-skip-forward-symbolic", 1, v.ctx.Style.fg), "media-btn", func() { fire("next", src.Next) })
+	next := v.button(v.icon("ld-skip-forward-symbolic", 1), "ghost-icon", func() { fire("next", src.Next) })
+	next.AddClass("media-btn")
 	controls := widget.NewBox(widget.Row, 2, 0)
 	controls.AddClass("media-controls")
 	controls.Append(prev, false)
@@ -384,8 +400,11 @@ func (v *dashboardView) media() widget.Widget {
 	compact.Append(controls, false)
 
 	seek := widgets.NewDebouncedSlider(0, nil, 0, 0, v.ctx.Invoke)
-	elapsed := v.label("0:00", 0.8, v.tint(config.TokenFgSubtle))
-	length := v.label("0:00", 0.8, v.tint(config.TokenFgSubtle))
+	seek.Knob.AddClass("media-seek-slider")
+	elapsed := v.label("0:00", 0.8)
+	elapsed.AddClass("media-time")
+	length := v.label("0:00", 0.8)
+	length.AddClass("media-time")
 	seek.OnCommit = func(pct float64) {
 		if current.Length <= 0 {
 			return
@@ -433,7 +452,7 @@ func (v *dashboardView) media() widget.Widget {
 		artist.SetText(current.Artist)
 		if current.ArtURL != artURL {
 			artURL = current.ArtURL
-			art.SetChild(mediaArt(v.ctx, artURL, "ld-music-symbolic", int(v.px*1.4)))
+			art.SetChild(mediaArt(artURL, "ld-music-symbolic", "dashboard-media-art-placeholder", "", int(v.px*1.4)))
 		}
 		playIcon.SetThemeName(map[bool]string{true: "ld-pause-symbolic", false: "ld-play-symbolic"}[current.State == mpris.StatePlaying])
 		prev.SetEnabled(current.CanGoPrevious)
@@ -515,19 +534,25 @@ func (v *dashboardView) battery() widget.Widget {
 	cfg := v.ctx.Config.Dashboard
 	status := widget.NewBox(widget.Row, 8, 0)
 	status.AddClass("battery-status")
-	icon := v.icon("ld-battery-full-symbolic", 1.4, v.ctx.Style.fg)
-	percent := v.label("", 1.3, v.ctx.Style.fg)
-	status.Append(icon, false)
+	icon := v.icon("ld-battery-full-symbolic", 1.4)
+	tile := iconTile(icon, "battery-icon", "")
+	percent := v.label("", 1.3)
+	percent.AddClass("battery-percent")
+	status.Append(tile, false)
 	status.Append(percent, false)
 	card.Append(status, false)
 	gauge := widget.NewProgressBar(0)
+	gauge.AddClass("progress-bar", "sm")
 	card.Append(gauge, false)
-	remaining := v.label("", 0.8, v.tint(config.TokenFgMuted))
+	remaining := v.label("", 0.8)
+	remaining.AddClass("battery-detail")
 	card.Append(remaining, false)
 	profileRow := widget.NewBox(widget.Row, 6, 0)
 	profileRow.AddClass("battery-profile")
-	profileIcon := v.icon("ld-scale-symbolic", 0.9, v.tint(config.TokenFgMuted))
-	profileLabel := v.label("", 0.8, v.tint(config.TokenFgMuted))
+	profileIcon := v.icon("ld-scale-symbolic", 0.9)
+	profileIcon.AddClass("battery-profile-icon")
+	profileLabel := v.label("", 0.8)
+	profileLabel.AddClass("battery-profile-label")
 	profileRow.Append(profileIcon, false)
 	profileRow.Append(profileLabel, false)
 	card.Append(profileRow, false)
@@ -540,23 +565,19 @@ func (v *dashboardView) battery() widget.Widget {
 		pct := dev.Percentage
 		warning := pct <= float64(cfg.BatteryWarning) && pct > float64(cfg.BatteryCritical)
 		critical := pct <= float64(cfg.BatteryCritical)
-		color := v.tint(config.TokenStatusSuccess)
-		switch {
-		case critical:
-			color = v.tint(config.TokenStatusError)
-		case warning:
-			color = v.tint(config.TokenStatusWarning)
-		}
-		ink := v.ctx.Style.fg
-		if warning || critical {
-			ink = color
-		}
+		// The thresholds are state classes: .battery-icon, .battery-percent,
+		// and .battery-detail carry warning/critical, the gauge success,
+		// warning, or error.
 		icon.SetThemeName(dashboardBatteryIcon(pct, dev.State == upower.StateCharging))
-		icon.SetTint(ink)
+		setClass(tile, "warning", warning)
+		setClass(tile, "critical", critical)
 		percent.SetText(strconv.FormatFloat(pct, 'f', 0, 64) + "%")
-		percent.SetColor(ink)
+		setClass(percent, "warning", warning)
+		setClass(percent, "critical", critical)
 		gauge.SetValue(pct / 100)
-		gauge.Fill = color
+		setClass(gauge, "success", !warning && !critical)
+		setClass(gauge, "warning", warning)
+		setClass(gauge, "error", critical)
 		var secs int64
 		switch dev.State {
 		case upower.StateDischarging:
@@ -600,18 +621,22 @@ func (v *dashboardView) network() widget.Widget {
 		box          *widget.Box
 		value, units *widget.Label
 	}
-	mk := func(arrow string) stat {
+	mk := func(glyph, dir string) stat {
 		s := stat{box: widget.NewBox(widget.Column, 2, 0)}
-		s.box.AddClass("speed-stat")
-		s.box.Append(v.icon(arrow, 0.9, v.tint(config.TokenFgMuted)), false)
-		s.value = v.label("--", 1.1, v.ctx.Style.fg)
-		s.units = v.label(i18n.T("dropdown-dashboard-network-speed-kbs"), 0.75, v.tint(config.TokenFgSubtle))
+		s.box.AddClass("speed-stat", dir)
+		icon := v.icon(glyph, 0.9)
+		icon.AddClass("speed-arrow")
+		s.box.Append(icon, false)
+		s.value = v.label("--", 1.1)
+		s.value.AddClass("speed-value")
+		s.units = v.label(i18n.T("dropdown-dashboard-network-speed-kbs"), 0.75)
+		s.units.AddClass("speed-unit")
 		s.box.Append(s.value, false)
 		s.box.Append(s.units, false)
 		speeds.Append(s.box, true)
 		return s
 	}
-	up, down := mk("ld-arrow-up-symbolic"), mk("ld-arrow-down-symbolic")
+	up, down := mk("ld-arrow-up-symbolic", "up"), mk("ld-arrow-down-symbolic", "down")
 	card.Append(speeds, false)
 	var prev map[string]sysinfo.NetTotals
 	var prevAt time.Time
@@ -633,11 +658,9 @@ func (v *dashboardView) network() widget.Widget {
 			}
 			s.value.SetText(value)
 			s.units.SetText(unit(mega))
-			muted := v.ctx.Style.fg
-			if !connected {
-				muted = v.tint(config.TokenFgSubtle)
-			}
-			s.value.SetColor(muted)
+			// .speed-value.muted and .speed-stat.muted image.speed-arrow
+			// dim while disconnected.
+			setClass(s.value, "muted", !connected)
 			setClass(s.box, "muted", !connected)
 		}
 	}
@@ -699,11 +722,15 @@ func (v *dashboardView) systemStats() widget.Widget {
 	row := widget.NewBox(widget.Row, 8, 0)
 	row.AddClass("system-stats-inline")
 	ring := func(labelID string) *progressRing {
+		// The ring is hand-painted (draw_ring): its track, fill, and
+		// label ink stay programmatic threshold colors.
 		r := newProgressRing(size, stroke, v.font, v.px*0.85, v.ctx.Style.fg)
 		col := widget.NewBox(widget.Column, 4, 0)
 		col.AddClass("stat-inline")
 		col.Append(r, false)
-		col.Append(v.label(i18n.T(labelID), 0.75, v.tint(config.TokenFgMuted)), false)
+		lbl := v.label(i18n.T(labelID), 0.75)
+		lbl.AddClass("stat-label")
+		col.Append(lbl, false)
 		row.Append(col, true)
 		return r
 	}

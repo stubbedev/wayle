@@ -54,7 +54,7 @@ type btDropdown struct {
 	card       *btPairingCard
 
 	myLabel, availLabel *widget.Label
-	myCard, availCard   *btSurface
+	myCard, availCard   *widget.Box
 	myList, availList   *widget.Box
 	scanningHint        *widget.Label
 	emptyNoDevices      widget.Widget
@@ -93,8 +93,8 @@ func (r *btDropdownRoot) dropdownClosed() { r.d.close() }
 func bluetoothDropdown(ctx ModuleContext) widget.Widget {
 	if ctx.Bluetooth == nil {
 		font, px := dropdownFont(ctx)
-		return btEmptyState(font, px, newBtPalette(ctx), "ld-bluetooth-off-symbolic",
-			"dropdown-bluetooth-no-adapter-title", "dropdown-bluetooth-no-adapter-description")
+		return emptyState(font, px, "ld-bluetooth-off-symbolic",
+			btText("dropdown-bluetooth-no-adapter-title"), btText("dropdown-bluetooth-no-adapter-description"))
 	}
 	d := newBtDropdown(ctx, ctx.Bluetooth)
 	ticks, stop := ctx.Bluetooth.Subscribe()
@@ -114,61 +114,54 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 		ctx: ctx, src: src, pal: newBtPalette(ctx), font: font, px: px,
 		pending: make(map[dbus.ObjectPath]btPending),
 	}
-	pal := d.pal
-
-	// The header (DropdownHeader): icon, title, scan button, switch.
-	header := widget.NewBox(widget.Row, 8, 12)
-	header.AddClass("dropdown-header")
-	d.headerIcon = widget.NewThemeIcon("ld-bluetooth-symbolic", int(px*1.3))
-	d.headerIcon.SetTint(pal.fg)
-	header.Append(d.headerIcon, false)
-	header.Append(widget.NewLabel(font, px*1.15, btText("dropdown-bluetooth-title"), pal.fg), true)
+	// The header (DropdownHeader): icon, title, scan button, switch. The
+	// template's `.dropdown-title` box lets the stylesheet ink the icon
+	// and title.
 	d.scanIcon = widget.NewThemeIcon("tb-refresh-symbolic", int(px))
-	d.scanIcon.SetTint(pal.muted)
-	d.scanBtn = ghostButton(d.scanIcon, pal)
+	d.scanBtn = ghostButton(d.scanIcon)
 	d.scanBtn.AddClass("ghost-icon", "bluetooth-scan-btn")
 	d.scanBtn.OnClick = d.onScan
-	header.Append(d.scanBtn, false)
 	d.toggle = widget.NewSwitch(false)
 	d.toggle.OnChanged = d.onToggle
-	header.Append(d.toggle, false)
+	header, glyph, _ := dropdownHeaderParts(font, px, "ld-bluetooth-symbolic", btText("dropdown-bluetooth-title"), d.scanBtn, d.toggle)
+	d.headerIcon = glyph
 
 	// The content (DropdownContent + the scrolled column).
 	col := widget.NewBox(widget.Column, 8, 12)
-	col.AddClass("bluetooth-content")
-	d.card = newBtPairingCard(ctx, pal)
+	col.AddClass("dropdown-content", "bluetooth-content")
+	d.card = newBtPairingCard(ctx)
 	d.card.onOutput = d.onPairingOutput
 	col.Append(d.card.root, false)
 
 	sectionLabel := func(key string) *widget.Label {
-		l := widget.NewLabel(font, px*0.9, btText(key), pal.subtle)
+		l := widget.NewLabel(font, px*0.9, btText(key), 0)
 		l.AddClass("section-label")
 		return l
 	}
 	d.myLabel = sectionLabel("dropdown-bluetooth-my-devices")
 	col.Append(d.myLabel, false)
 	d.myList = widget.NewBox(widget.Column, 0, 0)
-	d.myCard = newBtSurface(d.myList, pal.elevated, pal.radius)
+	d.myCard = widget.NewBox(widget.Column, 0, 0)
 	d.myCard.AddClass("card", "bluetooth-device-list")
 	col.Append(d.myCard, false)
 	d.availLabel = sectionLabel("dropdown-bluetooth-available-devices")
 	col.Append(d.availLabel, false)
 	d.availList = widget.NewBox(widget.Column, 0, 0)
-	d.availCard = newBtSurface(d.availList, pal.elevated, pal.radius)
+	d.availCard = widget.NewBox(widget.Column, 0, 0)
 	d.availCard.AddClass("card", "bluetooth-device-list")
 	col.Append(d.availCard, false)
 
-	d.scanningHint = widget.NewLabel(font, px, btText("dropdown-bluetooth-no-new"), pal.muted)
+	d.scanningHint = widget.NewLabel(font, px, btText("dropdown-bluetooth-no-new"), 0)
 	d.scanningHint.AddClass("bluetooth-no-new-devices")
 	col.Append(d.scanningHint, false)
-	d.emptyNoDevices = btEmptyState(font, px, pal, "ld-bluetooth-searching-symbolic",
-		"dropdown-bluetooth-no-devices-title", "dropdown-bluetooth-no-devices-description")
+	d.emptyNoDevices = emptyState(font, px, "ld-bluetooth-searching-symbolic",
+		btText("dropdown-bluetooth-no-devices-title"), btText("dropdown-bluetooth-no-devices-description"))
 	col.Append(d.emptyNoDevices, false)
-	d.emptyOff = btEmptyState(font, px, pal, "ld-bluetooth-off-symbolic",
-		"dropdown-bluetooth-off-title", "dropdown-bluetooth-off-description")
+	d.emptyOff = emptyState(font, px, "ld-bluetooth-off-symbolic",
+		btText("dropdown-bluetooth-off-title"), btText("dropdown-bluetooth-off-description"))
 	col.Append(d.emptyOff, false)
-	d.emptyNoAdapter = btEmptyState(font, px, pal, "ld-bluetooth-off-symbolic",
-		"dropdown-bluetooth-no-adapter-title", "dropdown-bluetooth-no-adapter-description")
+	d.emptyNoAdapter = emptyState(font, px, "ld-bluetooth-off-symbolic",
+		btText("dropdown-bluetooth-no-adapter-title"), btText("dropdown-bluetooth-no-adapter-description"))
 	col.Append(d.emptyNoAdapter, false)
 
 	scroll := dropdownScroll(col, "bluetooth-scroll")
@@ -181,23 +174,6 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	d.root = &btDropdownRoot{btSurface: surface, d: d}
 	d.sync()
 	return d
-}
-
-// btEmptyState is the EmptyState template: icon, title, description.
-func btEmptyState(font render.Font, px float64, pal btPalette, icon, titleKey, descKey string) widget.Widget {
-	col := widget.NewBox(widget.Column, 6, 24)
-	col.AddClass("empty-state")
-	ic := widget.NewThemeIcon(icon, int(px*2.4))
-	ic.SetTint(pal.subtle)
-	col.Append(ic, false)
-	title := widget.NewLabel(font, px*1.1, btText(titleKey), pal.fg)
-	title.SetAlignment(render.AlignCenter)
-	col.Append(title, false)
-	desc := widget.NewLabel(font, px*0.9, btText(descKey), pal.muted)
-	desc.SetAlignment(render.AlignCenter)
-	desc.SetWrap(true)
-	col.Append(desc, false)
-	return col
 }
 
 // close releases the subscription (the popover went away).
@@ -296,12 +272,7 @@ func (d *btDropdown) rebuildList(list *widget.Box, snaps []deviceSnapshot, old [
 		return old
 	}
 	list.Clear()
-	for i, s := range snaps {
-		if i > 0 {
-			sep := newBtSurface(widget.NewSpacer(0, 1), d.pal.border, 0)
-			sep.h = 1
-			list.Append(sep, false)
-		}
+	for _, s := range snaps {
 		list.Append(d.buildRow(s), false)
 	}
 	list.InvalidateLayout()
@@ -330,42 +301,37 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 	}
 	row.onClick = func() { d.onDeviceClick(s) }
 
-	iconBg, iconTint := pal.overlay, pal.muted
-	iconClasses := []string{"bluetooth-device-icon"}
+	icon := widget.NewThemeIcon(s.icon, int(px*1.4))
+	// The icon tile (device_item's icon_container): the box paints the
+	// well (overlay, or accent-subtle while connected), the image the ink.
+	well := iconTile(icon, "bluetooth-device-icon", "bluetooth-icon")
 	switch s.category {
 	case categoryConnected:
-		iconBg, iconTint = pal.accentSubtle, pal.accent
-		iconClasses = append(iconClasses, "connected")
+		well.AddClass("connected")
 	case categoryPaired:
-		iconClasses = append(iconClasses, "paired")
+		well.AddClass("paired")
 	}
-	icon := widget.NewThemeIcon(s.icon, int(px*1.4))
-	icon.SetTint(iconTint)
-	icon.AddClass("bluetooth-icon")
-	well := newBtSurface(widget.NewBox(widget.Row, 0, 8).Append(icon, false), iconBg, pal.radius)
-	well.AddClass(iconClasses...)
 	row.box.Append(well, false)
 
 	info := widget.NewBox(widget.Column, 2, 0)
 	info.AddClass("bluetooth-device-info")
-	name := widget.NewLabel(font, px, s.name, pal.fg)
+	name := widget.NewLabel(font, px, s.name, 0)
 	name.SetEllipsize(widget.EllipsizeEnd)
 	name.AddClass("bluetooth-device-name")
 	info.Append(name, false)
 	detail := widget.NewBox(widget.Row, 4, 0)
 	detail.AddClass("bluetooth-device-detail-row")
-	typeLabel := widget.NewLabel(font, px*0.9, btText(s.typeKey), pal.subtle)
+	typeLabel := widget.NewLabel(font, px*0.9, btText(s.typeKey), 0)
 	typeLabel.AddClass("bluetooth-device-detail")
 	detail.Append(typeLabel, false)
 	if s.battery != nil {
-		sep := widget.NewLabel(font, px*0.9, btDetailSeparator, pal.subtle)
+		sep := widget.NewLabel(font, px*0.9, btDetailSeparator, 0)
 		sep.AddClass("bluetooth-detail-separator")
 		detail.Append(sep, false)
 		bat := widget.NewThemeIcon(batteryLevelIcon(*s.battery), int(px))
-		bat.SetTint(pal.subtle)
 		bat.AddClass("bluetooth-battery-icon")
 		detail.Append(bat, false)
-		pct := widget.NewLabel(font, px*0.9, batteryText(s.battery), pal.subtle)
+		pct := widget.NewLabel(font, px*0.9, batteryText(s.battery), 0)
 		pct.AddClass("bluetooth-device-detail")
 		detail.Append(pct, false)
 	}
@@ -374,11 +340,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 
 	// The trailing slot: status, or the actions while hovered.
 	if s.category != categoryAvailable || pending != 0 {
-		statusColor := pal.subtle
-		if pending != 0 {
-			statusColor = pal.muted
-		}
-		status := widget.NewLabel(font, px*0.85, statusLabel(s, pending), statusColor)
+		status := widget.NewLabel(font, px*0.85, statusLabel(s, pending), 0)
 		status.AddClass("bluetooth-device-status")
 		if pending != 0 {
 			status.AddClass("pending")
@@ -394,10 +356,10 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		if s.connected {
 			toggleKey = "dropdown-bluetooth-disconnect"
 		}
-		toggle := &btActionButton{Button: ghostButton(widget.NewLabel(font, px*0.85, btText(toggleKey), pal.fg), pal), row: row}
+		toggle := &btActionButton{Button: ghostButton(widget.NewLabel(font, px*0.85, btText(toggleKey), 0)), row: row}
 		toggle.AddClass("bluetooth-action-toggle")
 		toggle.OnClick = func() { d.onDeviceClick(s) }
-		forget := &btActionButton{Button: ghostButton(widget.NewLabel(font, px*0.85, btText("dropdown-bluetooth-forget"), pal.fg), pal), row: row}
+		forget := &btActionButton{Button: ghostButton(widget.NewLabel(font, px*0.85, btText("dropdown-bluetooth-forget"), 0)), row: row}
 		forget.AddClass("bluetooth-forget")
 		forget.OnClick = func() { d.onForget(s) }
 		toggle.SetEnabled(pending == 0)
@@ -449,10 +411,8 @@ func (d *btDropdown) render() {
 	d.scanBtn.SetEnabled(!d.scanning)
 	if d.scanning {
 		d.scanBtn.AddClass("scanning")
-		d.scanIcon.SetTint(d.pal.accent)
 	} else {
 		d.scanBtn.RemoveClass("scanning")
-		d.scanIcon.SetTint(d.pal.muted)
 	}
 	// set_active under block_signal: a state sync is not a user toggle.
 	onChanged := d.toggle.OnChanged

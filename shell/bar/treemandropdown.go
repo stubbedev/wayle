@@ -44,14 +44,6 @@ func treemanVariant(b treeman.Bucket) string {
 	return "success"
 }
 
-// treemanVariantToken colors a variant class programmatically.
-var treemanVariantToken = map[string]config.CssToken{
-	"success": config.TokenStatusSuccess,
-	"info":    config.TokenStatusInfo,
-	"warning": config.TokenStatusWarning,
-	"error":   config.TokenStatusError,
-}
-
 // treemanView is the treeman dropdown: the repo list (bucket summary
 // chips over accordion repo cards of worktree rows) and a worktree's
 // detail page, plus the reset confirmation; the header's back button
@@ -85,7 +77,6 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.Box = widget.NewBox(widget.Column, 10, 14)
 	v.AddClass("dropdown", "treeman-dropdown")
 	backIcon := widget.NewThemeIcon("ld-arrow-left-symbolic", int(px))
-	backIcon.SetTint(ctx.Style.fg)
 	v.back = dropdownButton(backIcon, "ghost-icon", func() { v.openDetail("") })
 	v.back.SetTooltip(i18n.T("dropdown-treeman-back"))
 	header, _, title := dropdownHeaderParts(font, px, "ld-layers-symbolic", i18n.T("dropdown-treeman-title"), v.back)
@@ -95,7 +86,7 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.list = widget.NewBox(widget.Column, 8, 0)
 	v.list.AddClass("treeman-list")
 	v.details = widget.NewBox(widget.Column, 8, 0)
-	v.details.AddClass("treeman-list")
+	v.details.AddClass("treeman-list", "treeman-detail")
 	v.confirm = widget.NewBox(widget.Column, 10, 4)
 	v.confirm.AddClass("treeman-confirm")
 	v.pages = widget.NewStack()
@@ -104,7 +95,12 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.pages.Add("detail", v.details)
 	v.pages.Add("confirm", v.confirm)
 	scroll := dropdownScroll(v.pages, "treeman-scroll")
-	v.Append(scroll, true)
+	// DropdownContent: the content box the stylesheet's .dropdown-content
+	// rules hang off (default ink, the section-label family).
+	content := widget.NewBox(widget.Column, 0, 0)
+	content.AddClass("dropdown-content")
+	content.Append(scroll, true)
+	v.Append(content, true)
 
 	v.apply(v.read(context.Background()))
 	v.follow()
@@ -157,25 +153,18 @@ func (v *treemanView) syncPage() {
 	v.pages.Show("list")
 }
 
-func (v *treemanView) tint(variant string) render.Color {
-	return tokenColor(v.ctx.Style.palette, treemanVariantToken[variant])
-}
-
-// dot is a status-dot in the bucket's color.
-func (v *treemanView) dot(b treeman.Bucket) *widget.Label {
-	variant := treemanVariant(b)
-	d := widget.NewLabel(v.font, v.px*0.7, "●", v.tint(variant))
-	d.AddClass("status-dot", variant)
+// dot is a status-dot: the empty classed box whose variant rule
+// paints the circle (.status-dot.info/.warning/.error/.success).
+func (v *treemanView) dot(b treeman.Bucket) *widget.Box {
+	d := widget.NewBox(widget.Row, 0, 0)
+	d.AddClass("status-dot", treemanVariant(b))
 	return d
 }
 
-// badge is a small colored label.
+// badge is a small colored label; the .badge rule (or its variant)
+// paints both the fill and the ink.
 func (v *treemanView) badge(text, variant string) *widget.Label {
-	color := mutedFg(v.ctx.Style.palette)
-	if variant != "" {
-		color = v.tint(variant)
-	}
-	b := widget.NewLabel(v.font, v.px*0.8, text, color)
+	b := widget.NewLabel(v.font, v.px*0.8, text, 0)
 	b.AddClass("badge")
 	if variant != "" {
 		b.AddClass(variant)
@@ -184,9 +173,9 @@ func (v *treemanView) badge(text, variant string) *widget.Label {
 }
 
 // capped is a label whose natural width cannot widen the popover
-// (cap_natural_width).
-func (v *treemanView) capped(text string, scale float64, color render.Color, class string) *widget.Label {
-	l := widget.NewLabel(v.font, v.px*scale, text, color)
+// (cap_natural_width); its ink comes from the class's rule.
+func (v *treemanView) capped(text string, scale float64, class string) *widget.Label {
+	l := widget.NewLabel(v.font, v.px*scale, text, 0)
 	l.AddClass(class)
 	l.SetEllipsize(widget.EllipsizeEnd)
 	l.SetMaxWidthChars(treemanMaxLabelChars)
@@ -194,7 +183,7 @@ func (v *treemanView) capped(text string, scale float64, color render.Color, cla
 }
 
 func (v *treemanView) mainBadge() *widget.Label {
-	b := widget.NewLabel(v.font, v.px*0.75, i18n.T("dropdown-treeman-main"), tokenColor(v.ctx.Style.palette, config.TokenAccent))
+	b := widget.NewLabel(v.font, v.px*0.75, i18n.T("dropdown-treeman-main"), 0)
 	b.AddClass("treeman-badge", "main")
 	return b
 }
@@ -228,7 +217,7 @@ func (v *treemanView) summary() widget.Widget {
 		chip := widget.NewBox(widget.Row, 4, 0)
 		chip.AddClass("treeman-stat")
 		chip.Append(v.dot(c.b), false)
-		label := widget.NewLabel(v.font, v.px*0.85, strconv.FormatUint(uint64(c.n), 10)+" "+treemanBucketLabel(c.b), v.ctx.Style.fg)
+		label := widget.NewLabel(v.font, v.px*0.85, strconv.FormatUint(uint64(c.n), 10)+" "+treemanBucketLabel(c.b), 0)
 		label.AddClass("treeman-stat-label")
 		chip.Append(label, false)
 		row.Append(chip, false)
@@ -250,10 +239,9 @@ func (v *treemanView) repoCard(repo treeman.Repo) widget.Widget {
 
 	head := widget.NewBox(widget.Row, 8, 0)
 	chevron := widget.NewThemeIcon(treemanChevron(expanded), int(v.px))
-	chevron.SetTint(mutedFg(v.ctx.Style.palette))
 	chevron.AddClass("treeman-repo-chevron")
 	head.Append(chevron, false)
-	head.Append(v.capped(repo.Repo, 1, v.ctx.Style.fg, "treeman-repo-name"), true)
+	head.Append(v.capped(repo.Repo, 1, "treeman-repo-name"), true)
 	head.Append(v.badge(strconv.FormatUint(uint64(repo.Total), 10), ""), false)
 	name := repo.Repo
 	header := dropdownButton(head, "treeman-repo-header", func() {
@@ -288,7 +276,7 @@ func (v *treemanView) worktreeRow(wt treeman.Worktree) widget.Widget {
 	row.Append(v.dot(bucket), false)
 	line := widget.NewBox(widget.Row, 6, 0)
 	line.AddClass("treeman-wt-info")
-	line.Append(v.capped(wt.Branch, 1, v.ctx.Style.fg, "treeman-branch"), true)
+	line.Append(v.capped(wt.Branch, 1, "treeman-branch"), true)
 	if wt.IsMain {
 		line.Append(v.mainBadge(), false)
 	}
@@ -316,7 +304,6 @@ func (v *treemanView) worktreeRow(wt treeman.Worktree) widget.Widget {
 
 func (v *treemanView) ghostIcon(icon, tooltip string, onClick func()) *widget.Button {
 	glyph := widget.NewThemeIcon(icon, int(v.px*0.9))
-	glyph.SetTint(mutedFg(v.ctx.Style.palette))
 	b := dropdownButton(glyph, "ghost-icon", onClick)
 	b.SetTooltip(tooltip)
 	return b
@@ -354,7 +341,9 @@ func (v *treemanView) run(action treeman.Action, path string) {
 }
 
 // confirmReset is confirm_then_run for reset: the confirmation page
-// (the Rust modal) with the worktree path, Cancel and Reset.
+// (the Go stand-in for the Rust AlertDialog) with the worktree path,
+// Cancel and Reset. The stylesheet has no .treeman-confirm rules, so
+// the inks here stay programmatic.
 func (v *treemanView) confirmReset(path string) {
 	v.returnTo = v.pages.Visible()
 	v.confirm.Clear()
@@ -390,7 +379,7 @@ func (v *treemanView) renderDetail(repo treeman.Repo, wt treeman.Worktree) {
 	head := widget.NewBox(widget.Row, 8, 0)
 	head.AddClass("treeman-detail-head")
 	head.Append(v.dot(bucket), false)
-	head.Append(v.capped(wt.Branch, 1.05, v.ctx.Style.fg, "treeman-detail-branch"), true)
+	head.Append(v.capped(wt.Branch, 1.05, "treeman-detail-branch"), true)
 	if wt.IsMain {
 		head.Append(v.mainBadge(), false)
 	}
@@ -421,10 +410,10 @@ func (v *treemanView) renderDetail(repo treeman.Repo, wt treeman.Worktree) {
 func (v *treemanView) field(key, value string, wrap bool) widget.Widget {
 	row := widget.NewBox(widget.Row, 10, 0)
 	row.AddClass("treeman-detail-field")
-	k := widget.NewLabel(v.font, v.px*0.85, key, mutedFg(v.ctx.Style.palette))
+	k := widget.NewLabel(v.font, v.px*0.85, key, 0)
 	k.AddClass("treeman-detail-key")
 	row.Append(k, false)
-	val := widget.NewLabel(v.font, v.px*0.9, value, v.ctx.Style.fg)
+	val := widget.NewLabel(v.font, v.px*0.9, value, 0)
 	val.AddClass("treeman-detail-value")
 	val.SetMaxWidthChars(treemanMaxLabelChars)
 	if wrap {

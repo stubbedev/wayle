@@ -63,6 +63,72 @@ func TestDashboardSpeedAndThresholds(t *testing.T) {
 	}
 }
 
+// The dashboard paints from the stylesheet: the battery gauge and its
+// status read threshold state classes instead of fills and tints, and
+// the quick-action icons follow the cascade.
+func TestDashboardPaintsFromTheStylesheet(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
+	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying})
+	ctx.Battery = newFakeBattery(upower.Device{Percentage: 8, State: upower.StateDischarging, IsPresent: true, TimeToEmpty: 20 * time.Minute})
+	v := dashboardDropdown(ctx).(*dashboardView)
+
+	var gauge *widget.ProgressBar
+	var percent *widget.Label
+	walkTree(v, func(w widget.Widget) bool {
+		switch w := w.(type) {
+		case *widget.ProgressBar:
+			if w.HasClass("progress-bar") {
+				gauge = w
+			}
+		case *widget.Label:
+			if w.HasClass("battery-percent") {
+				percent = w
+			}
+		}
+		return true
+	})
+	if gauge == nil || percent == nil {
+		t.Fatalf("the battery card = gauge %v, percent %v; want a classed gauge and percent", gauge, percent)
+	}
+	if gauge.Fill != 0 {
+		t.Errorf("the gauge carries a fill %#08x", uint32(gauge.Fill))
+	}
+	if !gauge.HasClass("error") || gauge.HasClass("success") || gauge.HasClass("warning") {
+		t.Error("a critical battery did not put the gauge in the error state")
+	}
+	if got := percent.Color(); got != 0 {
+		t.Errorf("the percent carries a programmatic color %#08x", uint32(got))
+	}
+	if !percent.HasClass("critical") {
+		t.Error("a critical battery did not mark the percent")
+	}
+
+	// The quick-action icons have no tint: .quick-action-icon image
+	// inks them, .active inverts to fg-on-accent.
+	walkTree(v, func(w widget.Widget) bool {
+		if b, ok := w.(*widget.Button); ok && b.HasClass("quick-action") {
+			walkTree(b, func(c widget.Widget) bool {
+				if icon, ok := c.(*widget.Icon); ok && icon.Tint() != 0 {
+					t.Errorf("a quick-action icon carries a tint %#08x", uint32(icon.Tint()))
+				}
+				return true
+			})
+		}
+		return true
+	})
+
+	// No network: the speeds read muted through the class, uncolored.
+	walkTree(v, func(w widget.Widget) bool {
+		if l, ok := w.(*widget.Label); ok && l.HasClass("speed-value") {
+			if got := l.Color(); got != 0 || !l.HasClass("muted") {
+				t.Errorf("a disconnected speed = color %#08x muted %v", uint32(l.Color()), l.HasClass("muted"))
+			}
+		}
+		return true
+	})
+}
+
 func TestDashboardQuickActionsDriveTheServices(t *testing.T) {
 	// DND persists to the state dir; keep it out of the real one.
 	t.Setenv("XDG_STATE_HOME", t.TempDir())

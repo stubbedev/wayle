@@ -201,9 +201,13 @@ func TestNotificationItemBodyIconAndUrgency(t *testing.T) {
 	if len(plainContent.Children()) != 1 {
 		t.Error("an empty body still shows a label")
 	}
-	icon := ff.Children()[0].(*widget.Box).Children()[0].(*widget.Icon)
-	if icon.Name() != "si-firefox-symbolic" || icon.HasClass("file-icon") {
+	tile := ff.Children()[0].(*widget.Box).Children()[0].(*widget.Box)
+	icon := tile.Children()[0].(*widget.Icon)
+	if icon.Name() != "si-firefox-symbolic" || !icon.HasClass("notification-dropdown-item-icon-img") {
 		t.Errorf("mapped icon = %q", icon.Name())
+	}
+	if !tile.HasClass("notification-dropdown-item-icon") || tile.HasClass("file-icon") {
+		t.Error("the mapped icon tile classes")
 	}
 	if ff.time.Text() != i18n.T("notification-dropdown-time-just-now") {
 		t.Errorf("time = %q", ff.time.Text())

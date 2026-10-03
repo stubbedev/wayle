@@ -83,13 +83,12 @@ const passkeyTotal = 6
 // btPairingCard is pairing_card: the prompt for the pending agent
 // request, above the device lists.
 type btPairingCard struct {
-	root    *btSurface
+	root    *widget.Box
 	variant pairingVariant
 	// onOutput receives the user's answer; the dropdown clears the
 	// card and forwards it to the service.
 	onOutput func(pairingOutput)
 
-	iconWell   *btSurface
 	icon       *widget.Icon
 	deviceName *widget.Label
 	deviceType *widget.Label
@@ -113,7 +112,7 @@ type cardSection struct {
 	variants []pairingVariant
 }
 
-func newBtPairingCard(ctx ModuleContext, pal btPalette) *btPairingCard {
+func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	font, px := dropdownFont(ctx)
 	c := &btPairingCard{}
 	col := widget.NewBox(widget.Column, 8, 12)
@@ -123,48 +122,43 @@ func newBtPairingCard(ctx ModuleContext, pal btPalette) *btPairingCard {
 	header := widget.NewBox(widget.Row, 8, 0)
 	header.AddClass("bluetooth-pairing-header")
 	c.icon = widget.NewThemeIcon("ld-bluetooth-symbolic", int(px*1.4))
-	c.icon.SetTint(pal.muted)
-	c.iconWell = newBtSurface(widget.NewBox(widget.Row, 0, 8).Append(c.icon, false), pal.overlay, pal.radius)
-	c.iconWell.AddClass("bluetooth-device-icon")
-	header.Append(c.iconWell, false)
+	header.Append(iconTile(c.icon, "bluetooth-device-icon", "bluetooth-icon"), false)
 	info := widget.NewBox(widget.Column, 2, 0)
 	info.AddClass("bluetooth-pairing-device-info")
-	c.deviceName = widget.NewLabel(font, px, "", pal.fg)
+	c.deviceName = widget.NewLabel(font, px, "", 0)
 	c.deviceName.SetEllipsize(widget.EllipsizeEnd)
 	c.deviceName.AddClass("bluetooth-device-name")
-	c.deviceType = widget.NewLabel(font, px*0.9, "", pal.subtle)
+	c.deviceType = widget.NewLabel(font, px*0.9, "", 0)
 	c.deviceType.AddClass("bluetooth-device-detail")
 	info.Append(c.deviceName, false)
 	info.Append(c.deviceType, false)
 	header.Append(info, true)
 	closeIcon := widget.NewThemeIcon("ld-x-symbolic", int(px))
-	closeIcon.SetTint(pal.muted)
-	closeBtn := ghostButton(closeIcon, pal)
+	closeBtn := ghostButton(closeIcon)
 	closeBtn.AddClass("ghost-icon", "bluetooth-pairing-close")
 	closeBtn.OnClick = func() { c.emit(pairingOutput{kind: outputCancelled}) }
 	header.Append(closeBtn, false)
 	col.Append(header, false)
 
 	message := func(key string) *widget.Label {
-		l := widget.NewLabel(font, px*0.95, btText(key), pal.muted)
+		l := widget.NewLabel(font, px*0.95, btText(key), 0)
 		l.SetWrap(true)
 		l.AddClass("bluetooth-pairing-message")
 		return l
 	}
-	codeBlock := func(labelKey string) *btSurface {
+	codeBlock := func(labelKey string) *widget.Box {
 		box := widget.NewBox(widget.Column, 4, 12)
+		box.AddClass("bluetooth-pin-display")
 		if labelKey != "" {
-			l := widget.NewLabel(font, px*0.95, btText(labelKey), pal.subtle)
+			l := widget.NewLabel(font, px*0.95, btText(labelKey), 0)
 			l.AddClass("bluetooth-pin-label")
 			box.Append(l, false)
 		}
-		code := widget.NewLabel(font, px*1.8, "", pal.fg)
+		code := widget.NewLabel(font, px*1.8, "", 0)
 		code.AddClass("bluetooth-pin-code")
 		box.Append(code, false)
-		surface := newBtSurface(box, pal.overlay, pal.radius)
-		surface.AddClass("bluetooth-pin-display")
 		c.pinCode = append(c.pinCode, code)
-		return surface
+		return box
 	}
 	add := func(w widget.Widget, variants ...pairingVariant) {
 		c.sections = append(c.sections, cardSection{w: w, variants: variants})
@@ -179,7 +173,7 @@ func newBtPairingCard(ctx ModuleContext, pal btPalette) *btPairingCard {
 
 	// One digits-only entry stands in for the Rust six single-digit
 	// boxes: gelm has no programmatic focus to step between them.
-	c.passkeyEntry = widget.NewEntry(font, px*1.4, pal.fg)
+	c.passkeyEntry = widget.NewEntry(font, px*1.4, 0)
 	c.passkeyEntry.AddClass("bluetooth-pin-input-row")
 	c.passkeyEntry.OnChanged = limitEntry(c.passkeyEntry, passkeyTotal, isDigit)
 	add(c.passkeyEntry, variantRequestPasskey)
@@ -193,33 +187,33 @@ func newBtPairingCard(ctx ModuleContext, pal btPalette) *btPairingCard {
 	c.progress = message("dropdown-bluetooth-pairing-entering")
 	add(c.progress, variantDisplayPasskey)
 
-	c.serviceName = widget.NewLabel(font, px, "", pal.fg)
+	c.serviceName = widget.NewLabel(font, px, "", 0)
 	c.serviceName.AddClass("bluetooth-service-name")
-	service := newBtSurface(widget.NewBox(widget.Column, 0, 12).Append(c.serviceName, false), pal.overlay, pal.radius)
+	service := widget.NewBox(widget.Column, 0, 12)
 	service.AddClass("bluetooth-service-info")
+	service.Append(c.serviceName, false)
 	add(service, variantRequestServiceAuthorization)
 	add(message("dropdown-bluetooth-pairing-service-allow"), variantRequestServiceAuthorization)
 
 	add(message("dropdown-bluetooth-pairing-enter-legacy-pin"), variantRequestPinCode)
-	c.legacyPinEntry = widget.NewEntry(font, px*1.2, pal.fg)
+	c.legacyPinEntry = widget.NewEntry(font, px*1.2, 0)
 	c.legacyPinEntry.AddClass("bluetooth-legacy-pin-input")
 	c.legacyPinEntry.SetPlaceholder(btText("dropdown-bluetooth-pairing-pin-placeholder"))
 	c.legacyPinEntry.OnChanged = limitEntry(c.legacyPinEntry, 16, func(rune) bool { return true })
 	add(c.legacyPinEntry, variantRequestPinCode)
-	hint := widget.NewLabel(font, px*0.9, btText("dropdown-bluetooth-pairing-common-pins"), pal.subtle)
+	hint := widget.NewLabel(font, px*0.9, btText("dropdown-bluetooth-pairing-common-pins"), 0)
 	hint.AddClass("bluetooth-pin-hint")
 	add(hint, variantRequestPinCode)
 
 	// The actions: reject/cancel on the left, the confirm on the right.
 	actions := widget.NewBox(widget.Row, 8, 0)
 	actions.AddClass("bluetooth-pairing-actions")
-	c.leftLabel = widget.NewLabel(font, px, "", pal.fg)
-	left := ghostButton(c.leftLabel, pal)
+	c.leftLabel = widget.NewLabel(font, px, "", 0)
+	left := ghostButton(c.leftLabel)
 	left.OnClick = func() { c.emit(c.rejectOutput()) }
 	actions.Append(left, true)
-	c.rightLabel = widget.NewLabel(font, px, "", pal.onAccent)
-	c.right = widget.NewButton(c.rightLabel, 8, pal.radius)
-	c.right.Bg, c.right.BgHover, c.right.BgPressed = pal.accent, pal.accent, pal.accent
+	c.rightLabel = widget.NewLabel(font, px, "", 0)
+	c.right = dropdownButton(c.rightLabel, "primary", nil)
 	c.right.OnClick = func() {
 		if out, ok := c.confirmOutput(); ok {
 			c.emit(out)
@@ -228,18 +222,15 @@ func newBtPairingCard(ctx ModuleContext, pal btPalette) *btPairingCard {
 	actions.Append(c.right, true)
 	col.Append(actions, false)
 
-	c.root = newBtSurface(col, pal.elevated, pal.radius)
+	c.root = col
 	c.apply()
 	return c
 }
 
-// ghostButton is the GhostButton template: transparent until hovered.
-func ghostButton(child widget.Widget, pal btPalette) *widget.Button {
-	b := widget.NewButton(child, 6, pal.radius)
-	b.BgExplicit = true
-	b.BgHover, b.BgPressed = pal.hover, pal.hover
-	b.AddClass("ghost")
-	return b
+// ghostButton is the GhostButton template: the `ghost` class's
+// stylesheet rules paint it (transparent until hovered, muted ink).
+func ghostButton(child widget.Widget) *widget.Button {
+	return dropdownButton(child, "ghost", nil)
 }
 
 func isDigit(r rune) bool { return r >= '0' && r <= '9' }

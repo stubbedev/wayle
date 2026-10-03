@@ -365,3 +365,63 @@ func TestMediaDropdownTransport(t *testing.T) {
 		t.Errorf("mode without a player = %q, want empty", v.mode)
 	}
 }
+
+// The media panel paints from the stylesheet: the transport buttons
+// carry no Go hover fills (button.media-control paints them), the
+// labels take the cascade's ink through their classes, unknown
+// metadata is the .placeholder state, and the seek class sits on the
+// scale the slider rules target.
+func TestMediaDropdownPaintsFromTheStylesheet(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
+	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.vlc", Identity: "VLC", Title: "Song", State: mpris.StatePlaying})
+	v := mediaDropdown(ctx).(*mediaView)
+	defer v.dropdownClosed()
+
+	for _, b := range []*widget.Button{v.shuffle, v.previous, v.playPause, v.next, v.loop} {
+		if b.BgHover != 0 || b.BgPressed != 0 {
+			t.Error("a transport button carries Go hover fills")
+		}
+	}
+	if got := v.title.Color(); got != 0 {
+		t.Errorf("the title carries a programmatic color %#08x", uint32(got))
+	}
+	if got := v.position.Color(); got != 0 {
+		t.Errorf("the position label carries a programmatic color %#08x", uint32(got))
+	}
+	if !v.seek.Knob.HasClass("media-seek-slider") {
+		t.Error("the seek class is not on the scale")
+	}
+	// Unknown metadata is the placeholder state; known metadata is not.
+	if v.title.HasClass("placeholder") || !v.artist.HasClass("placeholder") || !v.album.HasClass("placeholder") {
+		t.Error("the placeholder state does not follow the raw fields")
+	}
+
+	// The picker is a classed list of option buttons with no Go fills;
+	// the active player's option is the selected state.
+	v.showPicker()
+	var option *widget.Button
+	list := false
+	walkTree(v.sources, func(w widget.Widget) bool {
+		switch w := w.(type) {
+		case *widget.Button:
+			if w.HasClass("media-source-option") {
+				option = w
+			}
+		case *widget.Box:
+			if w.HasClass("media-source-list") {
+				list = true
+			}
+		}
+		return true
+	})
+	if option == nil || !list {
+		t.Fatalf("the picker = option %v, list %v; want a classed option in a media-source-list", option, list)
+	}
+	if option.BgHover != 0 || option.BgPressed != 0 {
+		t.Error("the source option carries Go hover fills")
+	}
+	if !option.HasClass("selected") {
+		t.Error("the active player's option is not selected")
+	}
+}

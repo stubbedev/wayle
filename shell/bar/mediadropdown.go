@@ -140,7 +140,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 	}
 	v := &mediaView{ctx: ctx, src: ctx.Media, stop: make(chan struct{})}
 	v.Box = widget.NewBox(widget.Column, 0, 14)
-	v.AddClass("media-dropdown")
+	v.AddClass("dropdown", "media-dropdown")
 	v.main = widget.NewBox(widget.Column, 0, 0)
 	v.sources = widget.NewBox(widget.Column, 0, 0)
 	v.pages = widget.NewStack()
@@ -161,71 +161,82 @@ func mediaEmptyState(ctx ModuleContext) *widget.Box {
 	return emptyState(font, px, "ld-play-symbolic", mediaNoPlayerTitle, mediaNoPlayerText)
 }
 
-// controlButton builds one transport button around a tinted glyph.
+// controlButton builds one transport button: button.media-control
+// paints it (the ink, the hover fill, the sizes), so nothing is set
+// here.
 func (v *mediaView) controlButton(icon *widget.Icon, class string, onClick func()) *widget.Button {
-	icon.SetTint(v.ctx.Style.fg)
 	b := widget.NewButton(icon, 6, 6)
 	b.AddClass("media-control")
 	if class != "" {
 		b.AddClass(class)
 	}
-	b.BgHover = v.ctx.Style.buttonBgHover
-	b.BgPressed = v.ctx.Style.buttonBgActive
 	b.OnClick = onClick
 	return b
 }
 
 // buildPlayer assembles the player view once; refresh fills it in.
 func (v *mediaView) buildPlayer(font render.Font, px float64) {
-	muted := mutedFg(v.ctx.Style.palette)
 	v.player = widget.NewBox(widget.Column, 8, 0)
 
 	header := widget.NewBox(widget.Row, 8, 0)
 	header.AddClass("media-header")
-	header.Append(widget.NewLabel(font, px, mediaTitleText, v.ctx.Style.fg), true)
+	title := widget.NewLabel(font, px, mediaTitleText, 0)
+	title.AddClass("media-header-title")
+	header.Append(title, true)
 	v.sourceIcon = widget.NewThemeIcon("ld-music-symbolic", int(px))
-	v.sourceIcon.SetTint(v.ctx.Style.fg)
-	v.identity = widget.NewLabel(font, px*0.9, "", muted)
+	v.sourceIcon.AddClass("media-source-icon")
+	v.identity = widget.NewLabel(font, px*0.9, "", 0)
+	v.identity.AddClass("media-source-name")
 	chevron := widget.NewThemeIcon("ld-chevron-right-symbolic", int(px))
-	chevron.SetTint(muted)
+	chevron.AddClass("media-source-chevron")
 	source := widget.NewBox(widget.Row, 6, 0)
 	source.Append(v.sourceIcon, false)
 	source.Append(v.identity, false)
 	source.Append(chevron, false)
 	sourceButton := widget.NewButton(source, 4, 6)
 	sourceButton.AddClass("media-source-button")
-	sourceButton.BgHover = v.ctx.Style.buttonBgHover
-	sourceButton.BgPressed = v.ctx.Style.buttonBgActive
 	sourceButton.OnClick = v.showPicker
 	header.Append(sourceButton, false)
 	v.player.Append(header, false)
 
 	v.art = newFixedBox(mediaArtPx, mediaArtPx, nil)
+	v.art.AddClass("media-artwork")
 	v.player.Append(v.art, false)
 
-	v.title = widget.NewLabel(font, px*1.2, "", v.ctx.Style.fg)
-	v.artist = widget.NewLabel(font, px, "", muted)
-	v.album = widget.NewLabel(font, px*0.9, "", muted)
+	info := widget.NewBox(widget.Column, 0, 0)
+	info.AddClass("media-info")
+	v.title = widget.NewLabel(font, px*1.2, "", 0)
+	v.title.AddClass("media-title")
+	v.artist = widget.NewLabel(font, px, "", 0)
+	v.artist.AddClass("media-artist")
+	v.album = widget.NewLabel(font, px*0.9, "", 0)
+	v.album.AddClass("media-album")
 	// The info rows fill the panel and ellipsize at its edge (the Rust
 	// labels' max-width-chars 1 with hexpand).
 	for _, l := range []*widget.Label{v.title, v.artist, v.album} {
 		l.SetEllipsize(widget.EllipsizeEnd)
+		info.Append(l, false)
 	}
-	for _, l := range []*widget.Label{v.title, v.artist, v.album} {
-		v.player.Append(l, false)
-	}
+	v.player.Append(info, false)
 
-	// The seek bar is a DebouncedSlider without its value label.
+	// The seek bar is a DebouncedSlider without its value label; the
+	// scale carries the class the slider rules target.
 	v.seek = widgets.NewDebouncedSlider(0, nil, 0, 0, v.ctx.Invoke)
-	v.seek.AddClass("media-seek-slider")
+	v.seek.Knob.AddClass("media-seek-slider")
 	v.seek.OnCommit = v.seekTo
-	v.player.Append(v.seek, false)
 	times := widget.NewBox(widget.Row, 0, 0)
-	v.position = widget.NewLabel(font, px*0.85, "0:00", muted)
-	v.length = widget.NewLabel(font, px*0.85, "0:00", muted)
+	times.AddClass("media-progress-times")
+	v.position = widget.NewLabel(font, px*0.85, "0:00", 0)
+	v.position.AddClass("media-time")
+	v.length = widget.NewLabel(font, px*0.85, "0:00", 0)
+	v.length.AddClass("media-time")
 	times.Append(v.position, true)
 	times.Append(v.length, false)
-	v.player.Append(times, false)
+	progress := widget.NewBox(widget.Column, 2, 0)
+	progress.AddClass("media-progress")
+	progress.Append(v.seek, false)
+	progress.Append(times, false)
+	v.player.Append(progress, false)
 
 	controls := widget.NewBox(widget.Row, 6, 0)
 	controls.AddClass("media-controls")
@@ -298,8 +309,11 @@ func (v *mediaView) refresh() {
 	v.identity.SetText(p.Identity)
 	v.sourceIcon.SetThemeName(mediaSourceIcon(p))
 	v.title.SetText(orUnknown(p.Title, mediaUnknownTitle))
+	setClass(v.title, "placeholder", p.Title == "")
 	v.artist.SetText(orUnknown(p.Artist, mediaUnknownArtist))
+	setClass(v.artist, "placeholder", p.Artist == "")
 	v.album.SetText(orUnknown(p.Album, mediaUnknownAlbum))
+	setClass(v.album, "placeholder", p.Album == "")
 	v.setArt(p.ArtURL)
 	v.length.SetText(lengthText(p.Length))
 	v.seek.SetEnabled(p.CanSeek)
@@ -330,12 +344,13 @@ func (v *mediaView) setArt(url string) {
 	}
 	v.artURL = url
 	_, px := dropdownFont(v.ctx)
-	v.art.SetChild(mediaArt(v.ctx, url, "ld-disc-3-symbolic", int(px*3)))
+	v.art.SetChild(mediaArt(url, "ld-disc-3-symbolic", "media-artwork-placeholder", "media-artwork-placeholder-icon", int(px*3)))
 }
 
 // mediaArt is a player's cover: the art at a file or http(s) URL scaled
-// to cover, else the placeholder glyph.
-func mediaArt(ctx ModuleContext, url, placeholder string, px int) widget.Widget {
+// to cover, else the placeholder glyph in its tile box (boxClass, whose
+// rules paint the tile, with imgClass on the glyph).
+func mediaArt(url, placeholder, boxClass, imgClass string, px int) widget.Widget {
 	var img *widget.Image
 	switch {
 	case strings.HasPrefix(url, "file://"):
@@ -344,9 +359,7 @@ func mediaArt(ctx ModuleContext, url, placeholder string, px int) widget.Widget 
 		img = widget.NewURLImage(url)
 	}
 	if img == nil {
-		glyph := widget.NewThemeIcon(placeholder, px)
-		glyph.SetTint(mutedFg(ctx.Style.palette))
-		return glyph
+		return iconTile(widget.NewThemeIcon(placeholder, px), boxClass, imgClass)
 	}
 	img.SetScale(widget.ImageCover)
 	return img
@@ -373,24 +386,28 @@ func (v *mediaView) buildPicker() {
 	font, px := dropdownFont(v.ctx)
 	col := widget.NewBox(widget.Column, 4, 0)
 	col.AddClass("media-source-picker")
-	col.Append(widget.NewLabel(font, px, mediaSourcesText, v.ctx.Style.fg), false)
+	header := widget.NewLabel(font, px, mediaSourcesText, 0)
+	header.AddClass("picker-title")
+	col.Append(header, false)
+	list := widget.NewBox(widget.Column, 0, 0)
+	list.AddClass("media-source-list")
 	active, _ := v.src.Active()
 	for _, p := range v.src.Players() {
 		row := widget.NewBox(widget.Row, 8, 0)
+		row.AddClass("media-source-option-content")
 		icon := widget.NewThemeIcon(mediaSourceIcon(p), int(px))
-		icon.SetTint(v.ctx.Style.fg)
-		row.Append(icon, false)
-		row.Append(widget.NewLabel(font, px, orUnknown(p.Identity, p.BusName), v.ctx.Style.fg), true)
+		row.Append(iconTile(icon, "media-source-option-icon", ""), false)
+		name := widget.NewLabel(font, px, orUnknown(p.Identity, p.BusName), 0)
+		name.AddClass("media-source-option-name")
+		row.Append(name, true)
 		if p.BusName == active.BusName {
 			check := widget.NewThemeIcon("ld-check-symbolic", int(px))
-			check.SetTint(v.ctx.Style.fg)
+			check.AddClass("media-source-option-check")
 			row.Append(check, false)
 		}
 		b := widget.NewButton(row, 4, 6)
 		b.AddClass("media-source-option")
 		setClass(b, "selected", p.BusName == active.BusName)
-		b.BgHover = v.ctx.Style.buttonBgHover
-		b.BgPressed = v.ctx.Style.buttonBgActive
 		bus := p.BusName
 		b.OnClick = func() {
 			if err := v.src.SetActive(bus); err != nil {
@@ -399,8 +416,9 @@ func (v *mediaView) buildPicker() {
 			v.mode = ""
 			v.refresh()
 		}
-		col.Append(b, false)
+		list.Append(b, false)
 	}
+	col.Append(list, false)
 	v.sources.Clear()
 	v.sources.Append(col, false)
 	v.pages.Show("sources")

@@ -123,25 +123,28 @@ func calendarDropdown(ctx ModuleContext) widget.Widget {
 	v.Box = widget.NewBox(widget.Column, 12, 14)
 	v.AddClass("dropdown", "calendar-dropdown")
 	v.Append(dropdownHeader(font, px, "tb-calendar-time-symbolic", i18n.T("dropdown-calendar-title")), false)
-	v.Append(v.hero(), false)
-	v.Append(v.calendar(), false)
+	// DropdownContent: the content box the stylesheet's .dropdown-content
+	// rules hang off (default ink, the section-label family).
+	content := widget.NewBox(widget.Column, 12, 0)
+	content.AddClass("dropdown-content")
+	content.Append(v.hero(), false)
+	content.Append(v.calendar(), false)
+	v.Append(content, false)
 	v.tick()
 	v.follow()
 	return v
 }
 
-func (v *calendarView) tint(token config.CssToken) render.Color {
-	return tokenColor(v.ctx.Style.palette, token)
+// icon sizes a theme icon; its ink follows the cascade color, and the
+// stylesheet's -gtk-icon-size overrides the constructor size.
+func (v *calendarView) icon(name string, scale float64) *widget.Icon {
+	return widget.NewThemeIcon(name, int(v.px*scale))
 }
 
-func (v *calendarView) icon(name string, scale float64, color render.Color) *widget.Icon {
-	icon := widget.NewThemeIcon(name, int(v.px*scale))
-	icon.SetTint(color)
-	return icon
-}
-
-func (v *calendarView) label(text string, scale float64, color render.Color) *widget.Label {
-	return widget.NewLabel(v.font, v.px*scale, text, color)
+// label paints with the constructor ink unset (0): the cascade's
+// color — a classed rule, or the content box's default — supplies it.
+func (v *calendarView) label(text string, scale float64) *widget.Label {
+	return widget.NewLabel(v.font, v.px*scale, text, 0)
 }
 
 // hero is the clock-hero: HH:MM[:SS][ AM] over "Weekday, Month D, YYYY".
@@ -151,18 +154,29 @@ func (v *calendarView) hero() widget.Widget {
 	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("clock-time-row")
 	big := 2.6
-	v.hours, v.minutes, v.seconds = v.label("", big, v.ctx.Style.fg), v.label("", big, v.ctx.Style.fg), v.label("", big, v.ctx.Style.fg)
-	sep := func() *widget.Label { return v.label(":", big, v.tint(config.TokenFgSubtle)) }
+	timeLabel := func() *widget.Label {
+		l := v.label("", big)
+		l.AddClass("clock-time")
+		return l
+	}
+	v.hours, v.minutes, v.seconds = timeLabel(), timeLabel(), timeLabel()
+	sep := func() *widget.Label {
+		l := v.label(":", big)
+		l.AddClass("clock-time", "clock-separator")
+		return l
+	}
 	v.secSep = sep()
-	v.ampm = v.label("", 1.1, v.tint(config.TokenFgMuted))
+	v.ampm = v.label("", 1.1)
+	v.ampm.AddClass("clock-ampm")
 	for _, w := range []widget.Widget{v.hours, sep(), v.minutes, v.secSep, v.seconds, v.ampm} {
 		row.Append(w, false)
 	}
 	col.Append(centered(row), false)
 	date := widget.NewBox(widget.Row, 0, 0)
 	date.AddClass("clock-date")
-	v.dayName = v.label("", 1, v.ctx.Style.fg)
-	v.dateRest = v.label("", 1, v.tint(config.TokenFgMuted))
+	v.dayName = v.label("", 1)
+	v.dayName.AddClass("clock-date-day")
+	v.dateRest = v.label("", 1)
 	date.Append(v.dayName, false)
 	date.Append(v.dateRest, false)
 	col.Append(centered(date), false)
@@ -185,21 +199,24 @@ func (v *calendarView) calendar() widget.Widget {
 	col.AddClass("cal-section")
 	header := widget.NewBox(widget.Row, 4, 0)
 	header.AddClass("cal-header")
-	v.monthLabel = v.label("", 1, v.ctx.Style.fg)
+	v.monthLabel = v.label("", 1)
+	v.monthLabel.AddClass("cal-month")
 	header.Append(v.monthLabel, true)
 	nav := func(child widget.Widget, onClick func()) *widget.Button {
 		b := widget.NewButton(child, 4, 6)
 		b.AddClass("cal-nav-btn")
-		b.BgHover = v.ctx.Style.buttonBgHover
+		// buttonBgActive stays: the stylesheet gives .cal-nav-btn a hover
+		// but no :active, so the pressed shade keeps its programmatic
+		// paint (pickc lets it win).
 		b.BgPressed = v.ctx.Style.buttonBgActive
 		b.OnClick = onClick
 		return b
 	}
-	today := nav(v.label(i18n.T("cal-today"), 0.85, v.tint(config.TokenFgMuted)), v.goToToday)
+	today := nav(v.label(i18n.T("cal-today"), 0.85), v.goToToday)
 	today.AddClass("cal-today-btn")
 	header.Append(today, false)
-	header.Append(nav(v.icon("ld-chevron-left-symbolic", 1, v.tint(config.TokenFgMuted)), func() { v.step(-1) }), false)
-	header.Append(nav(v.icon("ld-chevron-right-symbolic", 1, v.tint(config.TokenFgMuted)), func() { v.step(1) }), false)
+	header.Append(nav(v.icon("ld-chevron-left-symbolic", 1), func() { v.step(-1) }), false)
+	header.Append(nav(v.icon("ld-chevron-right-symbolic", 1), func() { v.step(1) }), false)
 	col.Append(header, false)
 	v.grid = widget.NewBox(widget.Column, 2, 0)
 	v.grid.AddClass("cal-grid")
@@ -246,11 +263,10 @@ func (v *calendarView) rebuild() {
 	header := widget.NewBox(widget.Row, 2, 0)
 	for col := range 7 {
 		wd := time.Weekday((int(v.weekStart) + col) % 7)
-		color := v.tint(config.TokenFgSubtle)
-		if wd == time.Saturday || wd == time.Sunday {
-			color = v.tint(config.TokenAccent)
-		}
-		header.Append(centered(v.label(i18n.T(calendarWeekdayIDs[wd]), 0.8, color)), true)
+		wdLabel := v.label(i18n.T(calendarWeekdayIDs[wd]), 0.8)
+		wdLabel.AddClass("cal-weekday")
+		setClass(wdLabel, "weekend", wd == time.Saturday || wd == time.Sunday)
+		header.Append(centered(wdLabel), true)
 	}
 	v.grid.Append(header, false)
 	cells := calendarGrid(v.month, v.today, v.selected, v.weekStart)
@@ -263,48 +279,28 @@ func (v *calendarView) rebuild() {
 	}
 }
 
-// dayCell is one cal-day with the stylesheet's state colors: today on
-// the accent, the selection on bg-selected, other months faded,
-// weekends tinted.
+// dayCell is one cal-day: the label fills its cell and the stylesheet
+// paints it (today on the accent, the selection on bg-selected, other
+// months faded, weekends tinted, hover on the overlay). The cell box
+// only forwards the click — labels don't click, and a button here would
+// take the hover the label's :hover rule needs.
 func (v *calendarView) dayCell(c calendarCell) widget.Widget {
-	fg := v.tint(config.TokenFgMuted)
-	var bg render.Color
-	switch {
-	case c.today:
-		fg, bg = v.tint(config.TokenFgOnAccent), v.tint(config.TokenAccent)
-	case c.selected:
-		fg, bg = v.tint(config.TokenAccent), v.tint(config.TokenBgSelected)
-	case !c.currentMonth:
-		fg = v.tint(config.TokenBgActive)
-	case c.weekend:
-		fg = mixColor(v.tint(config.TokenAccent), v.tint(config.TokenFgMuted))
-	}
-	b := widget.NewButton(centered(v.label(strconv.Itoa(c.date.Day()), 0.9, fg)), 4, 6)
-	b.AddClass("cal-day")
-	setClass(b, "today", c.today)
-	setClass(b, "selected", c.selected)
-	setClass(b, "other", !c.currentMonth)
-	setClass(b, "weekend", c.weekend)
-	b.BgExplicit = true
-	b.Bg = bg
+	number := v.label(strconv.Itoa(c.date.Day()), 0.9)
+	number.AddClass("cal-day")
+	number.SetAlignment(render.AlignCenter)
+	setClass(number, "today", c.today)
+	setClass(number, "selected", c.selected)
+	setClass(number, "other", !c.currentMonth)
+	setClass(number, "weekend", c.weekend)
+	cell := widget.NewBox(widget.Row, 0, 0)
+	cell.Append(number, true)
 	if c.currentMonth {
-		b.BgHover = v.tint(config.TokenBgOverlay)
-		if c.today {
-			b.BgHover = v.tint(config.TokenAccentHover)
-		}
 		d := c.date
-		b.OnClick = func() { v.click(d) }
+		cell.SetOnClickWithin(func() { v.click(d) })
 	} else {
-		b.BgHover = bg
-		b.SetEnabled(false)
+		cell.SetEnabled(false)
 	}
-	return b
-}
-
-// mixColor is color-mix(in srgb, a 50%, b): the channel average.
-func mixColor(a, b render.Color) render.Color {
-	avg := func(x, y uint8) uint32 { return (uint32(x) + uint32(y) + 1) / 2 }
-	return render.Color(avg(a.A(), b.A())<<24 | avg(a.R(), b.R())<<16 | avg(a.G(), b.G())<<8 | avg(a.B(), b.B()))
+	return cell
 }
 
 // tick is TimeTick: the hero's fields and, across midnight, today.

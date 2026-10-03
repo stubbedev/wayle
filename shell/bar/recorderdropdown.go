@@ -152,7 +152,8 @@ type recorderView struct {
 
 	*widget.Box
 	status               *widget.Box
-	statusDot, time      *widget.Label
+	statusDot            *widget.Box
+	time                 *widget.Label
 	record               *widget.Button
 	recordIcon           *widget.Icon
 	recordLabel          *widget.Label
@@ -177,17 +178,24 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 
 	v.status = widget.NewBox(widget.Row, 6, 0)
 	v.status.AddClass("recorder-status")
-	v.statusDot = widget.NewLabel(font, px*0.7, "●", tokenColor(ctx.Style.palette, config.TokenStatusError))
+	v.statusDot = widget.NewBox(widget.Row, 0, 0)
 	v.statusDot.AddClass("recorder-status-dot")
-	v.time = widget.NewLabel(font, px*0.9, "", ctx.Style.fg)
+	v.time = widget.NewLabel(font, px*0.9, "", 0)
 	v.time.AddClass("recorder-status-time")
 	v.status.Append(v.statusDot, false)
 	v.status.Append(v.time, false)
 	v.Append(dropdownHeader(font, px, "ld-video-symbolic", i18n.T("dropdown-recorder-title"), v.status), false)
 
-	v.Append(v.controls(), false)
+	// The DropdownContent template: everything below the header; its
+	// classes let the stylesheet's `.recorder-dropdown-content` rules
+	// reach the rows, cards, and section headers.
+	content := widget.NewBox(widget.Column, 0, 0)
+	content.AddClass("dropdown-content", "recorder-dropdown-content")
+	v.Append(content, true)
 
-	v.Append(v.sectionHeader("ld-mic-symbolic", i18n.T("dropdown-recorder-section-audio")), false)
+	content.Append(v.controls(), false)
+
+	content.Append(v.sectionHeader("ld-mic-symbolic", i18n.T("dropdown-recorder-section-audio")), false)
 	audio := v.card()
 	audio.Append(v.switchRow(i18n.T("dropdown-recorder-microphone"), cfg.Microphone, recorderPathMic), false)
 	v.mics = microphoneSources(ctx.Pulse)
@@ -196,7 +204,7 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	v.micRow.Append(v.micPicker, false)
 	audio.Append(v.micRow, false)
 	audio.Append(v.switchRow(i18n.T("dropdown-recorder-system-audio"), cfg.SystemAudio, recorderPathSystem), false)
-	v.Append(audio, false)
+	content.Append(audio, false)
 
 	v.cams = recorderCameras()
 	v.webcamHeader = v.sectionHeader("ld-camera-symbolic", i18n.T("dropdown-recorder-section-webcam"))
@@ -207,7 +215,7 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	v.webcam.Append(camRow, false)
 	position := widget.NewBox(widget.Column, 6, 0)
 	position.AddClass("recorder-row")
-	position.Append(widget.NewLabel(font, px, i18n.T("dropdown-recorder-position"), ctx.Style.fg), false)
+	position.Append(widget.NewLabel(font, px, i18n.T("dropdown-recorder-position"), 0), false)
 	width := int32(360)
 	if w, _, ok := dropdownDims("recorder", ctx.Config); ok {
 		width = int32(w)
@@ -226,8 +234,8 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	hasCamera := len(v.cams) > 1
 	v.webcamHeader.SetVisible(hasCamera)
 	v.webcam.SetVisible(hasCamera)
-	v.Append(v.webcamHeader, false)
-	v.Append(v.webcam, false)
+	content.Append(v.webcamHeader, false)
+	content.Append(v.webcam, false)
 
 	v.applyState(v.snapshot())
 	v.follow()
@@ -240,7 +248,7 @@ func (v *recorderView) controls() widget.Widget {
 	row.AddClass("recorder-controls")
 	content := widget.NewBox(widget.Row, 8, 0)
 	v.recordIcon = widget.NewThemeIcon("ld-circle-dot-symbolic", int(v.px))
-	v.recordLabel = widget.NewLabel(v.font, v.px, "", v.ctx.Style.fg)
+	v.recordLabel = widget.NewLabel(v.font, v.px, "", 0)
 	content.Append(widget.NewSpacer(0, 0), true)
 	content.Append(v.recordIcon, false)
 	content.Append(v.recordLabel, false)
@@ -250,10 +258,8 @@ func (v *recorderView) controls() widget.Widget {
 			v.ctx.Recorder.Toggle()
 		}
 	})
-	v.record.BgExplicit = true
 	row.Append(v.record, true)
 	v.pauseIcon = widget.NewThemeIcon("ld-pause-symbolic", int(v.px))
-	v.pauseIcon.SetTint(v.ctx.Style.fg)
 	v.pause = dropdownButton(v.pauseIcon, "recorder-pause-button", func() {
 		if r := v.ctx.Recorder; r != nil {
 			r.SetPaused(!r.Snapshot().Paused)
@@ -268,9 +274,8 @@ func (v *recorderView) sectionHeader(icon, title string) *widget.Box {
 	row := widget.NewBox(widget.Row, 6, 0)
 	row.AddClass("recorder-section-header")
 	glyph := widget.NewThemeIcon(icon, int(v.px))
-	glyph.SetTint(mutedFg(v.ctx.Style.palette))
 	row.Append(glyph, false)
-	label := widget.NewLabel(v.font, v.px*0.85, title, mutedFg(v.ctx.Style.palette))
+	label := widget.NewLabel(v.font, v.px*0.85, title, 0)
 	label.AddClass("section-label")
 	row.Append(label, true)
 	return row
@@ -285,7 +290,7 @@ func (v *recorderView) card() *widget.Box {
 func (v *recorderView) row(title string) *widget.Box {
 	r := widget.NewBox(widget.Row, 8, 0)
 	r.AddClass("recorder-row")
-	r.Append(widget.NewLabel(v.font, v.px, title, v.ctx.Style.fg), true)
+	r.Append(widget.NewLabel(v.font, v.px, title, 0), true)
 	return r
 }
 
@@ -323,36 +328,27 @@ func (v *recorderView) snapshot() recorder.Change {
 	return v.ctx.Recorder.Snapshot()
 }
 
-// applyState is StateChanged plus the view's #[watch]es.
+// applyState is StateChanged plus the view's #[watch]es. The record
+// button's `primary`/`danger` classes and the status dot's `paused`
+// class carry the colors; the stylesheet paints them.
 func (v *recorderView) applyState(c recorder.Change) {
-	pal := v.ctx.Style.palette
 	v.status.SetVisible(c.Active)
 	v.time.SetText(recorder.FormatElapsed(c.ElapsedSecs))
 	if c.Paused {
 		v.statusDot.AddClass("paused")
-		v.statusDot.SetColor(tokenColor(pal, config.TokenStatusWarning))
 	} else {
 		v.statusDot.RemoveClass("paused")
-		v.statusDot.SetColor(tokenColor(pal, config.TokenStatusError))
 	}
-	onAccent := tokenColor(pal, config.TokenFgOnAccent)
 	v.record.RemoveClass("danger", "primary")
 	if c.Active {
 		v.record.AddClass("danger")
-		v.record.Bg = tokenColor(pal, config.TokenStatusError)
-		v.record.BgHover = tokenColor(pal, config.TokenStatusErrorHover)
 		v.recordIcon.SetThemeName("ld-square-symbolic")
 		v.recordLabel.SetText(i18n.T("dropdown-recorder-stop"))
 	} else {
 		v.record.AddClass("primary")
-		v.record.Bg = tokenColor(pal, config.TokenAccent)
-		v.record.BgHover = tokenColor(pal, config.TokenAccentHover)
 		v.recordIcon.SetThemeName("ld-circle-dot-symbolic")
 		v.recordLabel.SetText(i18n.T("dropdown-recorder-record"))
 	}
-	v.record.BgPressed = v.record.BgHover
-	v.recordIcon.SetTint(onAccent)
-	v.recordLabel.SetColor(onAccent)
 	v.pause.SetEnabled(c.Active)
 	if c.Paused {
 		v.pauseIcon.SetThemeName("ld-play-symbolic")

@@ -7,7 +7,6 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/mail"
 )
@@ -38,7 +37,12 @@ func mailDropdown(ctx ModuleContext) widget.Widget {
 	v.Append(dropdownHeader(font, px, "ld-mail-symbolic", i18n.T("dropdown-mail-title")), false)
 	v.list = widget.NewBox(widget.Column, 4, 0)
 	v.list.AddClass("mail-dropdown-list")
-	v.Append(dropdownScroll(v.list, ""), true)
+	// The DropdownContent template's box: the stylesheet's default ink
+	// and padding for everything the list does not class itself.
+	content := widget.NewBox(widget.Column, 0, 0)
+	content.AddClass("dropdown-content")
+	content.Append(dropdownScroll(v.list, ""), true)
+	v.Append(content, true)
 	v.rebuild()
 	v.follow()
 	return v
@@ -56,7 +60,8 @@ func (v *mailView) rebuild() {
 	v.list.Clear()
 	accounts := v.accounts()
 	if len(accounts) == 0 {
-		empty := widget.NewLabel(v.font, v.px, i18n.T("dropdown-mail-empty"), mutedFg(v.ctx.Style.palette))
+		// .mail-dropdown-empty inks it muted.
+		empty := widget.NewLabel(v.font, v.px, i18n.T("dropdown-mail-empty"), 0)
 		empty.AddClass("mail-dropdown-empty")
 		empty.SetWrap(true)
 		v.list.Append(empty, false)
@@ -72,18 +77,19 @@ func (v *mailView) row(a mail.AccountUnread) widget.Widget {
 	row := widget.NewBox(widget.Row, 8, 0)
 	row.AddClass("mail-dropdown-row")
 	icon := widget.NewThemeIcon(a.Icon, mailRowIconPx)
+	// The row provider icon has no stylesheet rule; it keeps its tint.
 	icon.SetTint(v.ctx.Style.fg)
 	row.Append(icon, false)
-	name := widget.NewLabel(v.font, v.px, a.Name, v.ctx.Style.fg)
+	// .mail-account-name inks it fg-default.
+	name := widget.NewLabel(v.font, v.px, a.Name, 0)
 	name.AddClass("mail-account-name")
 	name.SetEllipsize(widget.EllipsizeEnd)
 	row.Append(name, true)
-	countColor := v.ctx.Style.fg
-	count := widget.NewLabel(v.font, v.px, strconv.FormatUint(uint64(a.Count), 10), countColor)
+	// .mail-account-count inks it fg-default, .dim muted.
+	count := widget.NewLabel(v.font, v.px, strconv.FormatUint(uint64(a.Count), 10), 0)
 	count.AddClass("mail-account-count")
 	if a.Count == 0 {
 		count.AddClass("dim")
-		count.SetColor(tokenColor(v.ctx.Style.palette, config.TokenFgSubtle))
 	}
 	row.Append(count, false)
 	return row

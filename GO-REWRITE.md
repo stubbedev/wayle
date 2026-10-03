@@ -87,13 +87,16 @@ honor). What landed for it: `@keyframes` + `animation` +
 `-gtk-icon-source` (`-gtk-icontheme()` names), `-gtk-icon-palette`
 (the check mark takes the theme's glyphs recolored by the palette),
 `caret-color`, `text-decoration: underline`, and the earlier
-transitions. Still silently dropped, each needing real engineering:
-
-- [ ] `transform: scale(...)` on colorswatch and emoji hover (needs a
-      canvas transform push, not just the icon raster blit).
-- [ ] `font-feature-settings: "tnum"` (needs shaper OpenType feature
-      support; the recorder's clock digits want tabular figures).
-- [ ] `line-height` (one rule, rich text).
+transitions. The last three deferred properties landed (gelm
+50dd44b): `transform` parses scale and translateX and a box carrying
+it paints its subtree into an offscreen layer composited back through
+the affine, with `transition: transform` tweening the hover zoom;
+`font-feature-settings` parses the tag list and the shaper honors
+tnum (each face's memoized Tabular twin — the recorder's clock
+digits); `line-height` lays every label line box at it. rotate and
+the other affine-less functions still warn and drop. Nothing is
+silently dropped anymore: a property the SCSS starts using that the
+engine cannot honor fails `TestStaticCSSParsesClean` naming it.
 
 **The one sanctioned deviation**: gelm's widget Dropdown closes with
 its animated exit on a click anywhere outside it (the router's
@@ -101,26 +104,29 @@ press-away notice); the Rust combobox just closes.
 
 **wayle: stylesheet parity**
 
-- [ ] The bar dropdown panels' remaining hand-matched colors move
-      onto the stylesheet. Landed: the popover now carries the GTK
-      class chain (`popover.dropdown.shadow.position-* > contents`
-      around the `.dropdown` panel) and the theme sheet attaches to it
-      — popovers are their own tree, so until now no CSS reached them
+- [x] The bar dropdown panels' hand-matched colors moved onto the
+      stylesheet. Landed: the popover carries the GTK class chain
+      (`popover.dropdown.shadow.position-* > contents` around the
+      `.dropdown` panel) and the theme sheet attaches to it —
+      popovers are their own tree, so until now no CSS reached them
       and every panel hand-painted everything. The shared templates
-      paint from the stylesheet (header strip and title via
-      `.dropdown-header`/`.dropdown-title`, `.empty-state`, the flat
-      panel buttons via their classes' hover and ghost/primary
-      variants), and the audio and network panels (rows, active
-      connections, password and secret cards, VPN list and form) are
-      fully migrated — `TestDropdownPanelsPaintFromTheStylesheet`
-      pins it. Remaining: battery, brightness, calendar, dashboard,
-      mail, media, notification, recorder, treeman, weather,
-      bluetooth bespoke rows and gauges — same sweep per panel: class
-      names to match the SCSS selectors, Go colors to 0 (widget
-      colors beat the cascade), delete the paint where a rule covers
-      it. Verify against the Rust shell live per panel; the
-      `b.Bg = tokenColor(...)` sites with no Rust rule need the Rust
-      panel beside them.
+      paint from the rules (header strip and title, empty states, the
+      flat panel buttons through their classes' hover and the
+      ghost/primary/danger primitives), and every panel migrated:
+      audio and network (rows, active connections, password and
+      secret cards, VPN list and form) first, then battery,
+      brightness, calendar, weather, treeman, mail, media, dashboard,
+      notification, recorder, and bluetooth (list and pairing).
+      `TestDropdownPanelsPaintFromTheStylesheet` and per-panel paint
+      tests pin it. Kept, where no node can carry the rule: the
+      battery gauge fill (gelms's progressbar tree cannot match the
+      Rust levelbar selectors), the recorder webcam preview and the
+      bluetooth row hover (custom painters), the dashboard's canvas
+      rings, the treeman reset-confirm page (Rust uses a native
+      AlertDialog the stylesheet has no rules for), and the weather
+      nil-service fallback (outside the popover tree). Live
+      comparison against the Rust shell per panel is the remaining
+      visual pass.
 - [x] Settings: the slider value label is fixed-width (gelm Label
       width-chars; the label floors at its widest rendering over the
       range, so a section's sliders end at the same x).

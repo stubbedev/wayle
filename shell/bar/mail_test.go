@@ -108,6 +108,50 @@ func TestLoadFileAppliesMailAccounts(t *testing.T) {
 	}
 }
 
+// The mail rows paint from the stylesheet: .mail-account-name and
+// .mail-account-count (dim at zero) take the cascade's ink, and only
+// the provider icon, which no rule covers, keeps its tint.
+func TestMailDropdownPaintsFromTheStylesheet(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
+	mc := cfg.Mail
+	mc.Accounts = []config.MailAccount{{Name: "Work", Query: "tag:work"}}
+	ctx.Mail = seededMail(t, mc, 0)
+	v := mailDropdown(ctx).(*mailView)
+
+	row := v.list.Children()[0].(*widget.Box)
+	var icon *widget.Icon
+	var labels []*widget.Label
+	walkTree(row, func(w widget.Widget) bool {
+		switch w := w.(type) {
+		case *widget.Icon:
+			icon = w
+		case *widget.Label:
+			labels = append(labels, w)
+		}
+		return true
+	})
+	if icon == nil || len(labels) != 2 {
+		t.Fatalf("row = icon %v, %d labels; want an icon, a name, and a count", icon, len(labels))
+	}
+	if got := labels[0].Color(); got != 0 {
+		t.Errorf("the account name carries a programmatic color %#08x", uint32(got))
+	}
+	count := labels[1]
+	if got := count.Color(); got != 0 || !count.HasClass("dim") {
+		t.Errorf("the zero count = color %#08x dim %v; want uncolored and dim", uint32(count.Color()), count.HasClass("dim"))
+	}
+	if icon.Tint() == 0 {
+		t.Error("the provider icon lost its tint although no rule covers it")
+	}
+
+	// The empty text is uncolored; .mail-dropdown-empty inks it muted.
+	empty := mailDropdown(newTestContext(t, config.Defaults())).(*mailView)
+	if l, ok := empty.list.Children()[0].(*widget.Label); !ok || l.Color() != 0 || !l.HasClass("mail-dropdown-empty") {
+		t.Errorf("the empty state = %#v, want an uncolored mail-dropdown-empty label", empty.list.Children()[0])
+	}
+}
+
 func TestMailDropdownRowsAndEmptyState(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)

@@ -128,8 +128,9 @@ func resumeThreshold(end uint32) uint32 {
 	return end - 5
 }
 
-// batteryVariantToken colors the stylesheet's variant classes, which
-// the Go-painted dropdown cannot read from CSS.
+// batteryVariantToken colors the gauge fill, the one variant ink the
+// stylesheet cannot reach: its levelbar rules select a GTK levelbar
+// tree, while the Go bar is a progressbar (trough > progress).
 var batteryVariantToken = map[string]config.CssToken{
 	"crit":    config.TokenStatusError,
 	"warn":    config.TokenStatusWarning,
@@ -194,33 +195,35 @@ func batteryDropdown(ctx ModuleContext) widget.Widget {
 	v.Box = widget.NewBox(widget.Column, 12, 14)
 	v.AddClass("dropdown", "battery-dropdown")
 	v.Append(dropdownHeader(font, px, "ld-battery-full-symbolic", i18n.T("dropdown-battery-title")), false)
+	// DropdownContent: the sheet's .dropdown-content wraps both
+	// sections and carries the .section-label rules.
+	content := widget.NewBox(widget.Column, 12, 0)
+	content.AddClass("dropdown-content")
 	v.body = widget.NewStack()
 	v.body.Add("empty", emptyState(font, px, "ld-unplug-symbolic", i18n.T("dropdown-battery-no-battery-title"), i18n.T("dropdown-battery-no-battery-description")))
 	v.body.Add("battery", v.batterySection())
-	v.Append(v.body, false)
-	v.Append(v.profileSection(), false)
+	content.Append(v.body, false)
+	content.Append(v.profileSection(), false)
+	v.Append(content, true)
 	v.applyDevice(v.readDevice(context.Background()))
 	v.applyProfiles(v.readProfiles(context.Background()))
 	v.follow()
 	return v
 }
 
-func (v *batteryView) label(text string, scale float64, token config.CssToken, class string) *widget.Label {
-	l := widget.NewLabel(v.font, v.px*scale, text, tokenColor(v.ctx.Style.palette, token))
+func (v *batteryView) label(text string, scale float64, class string) *widget.Label {
+	l := widget.NewLabel(v.font, v.px*scale, text, 0)
 	l.AddClass(class)
 	return l
 }
 
-// setVariant swaps l's variant class to class ("" for none) and its
-// color to the variant's token, or fallback.
-func (v *batteryView) setVariant(l *widget.Label, class string, fallback config.CssToken) {
+// setVariant swaps l's variant class to class ("" for none); the
+// variant's ink is the stylesheet's state rule.
+func (v *batteryView) setVariant(l *widget.Label, class string) {
 	l.RemoveClass(batteryVariants...)
-	token := fallback
 	if class != "" {
 		l.AddClass(class)
-		token = batteryVariantToken[class]
 	}
-	l.SetColor(tokenColor(v.ctx.Style.palette, token))
 }
 
 // batterySection builds battery_content.
@@ -229,13 +232,13 @@ func (v *batteryView) batterySection() widget.Widget {
 
 	hero := widget.NewBox(widget.Row, 12, 0)
 	hero.AddClass("battery-hero")
-	v.heroPct = v.label("", 2.4, config.TokenFgDefault, "battery-hero-pct")
+	v.heroPct = v.label("", 2.4, "battery-hero-pct")
 	hero.Append(v.heroPct, false)
 	meta := widget.NewBox(widget.Column, 2, 0)
 	meta.AddClass("battery-hero-meta")
-	v.heroState = v.label("", 1, config.TokenFgDefault, "battery-hero-state")
-	v.heroTime = v.label("", 0.85, config.TokenFgMuted, "battery-hero-time")
-	v.heroInput = v.label("", 0.85, config.TokenFgMuted, "battery-hero-time")
+	v.heroState = v.label("", 1, "battery-hero-state")
+	v.heroTime = v.label("", 0.85, "battery-hero-time")
+	v.heroInput = v.label("", 0.85, "battery-hero-time")
 	meta.Append(v.heroState, false)
 	meta.Append(v.heroTime, false)
 	meta.Append(v.heroInput, false)
@@ -244,6 +247,9 @@ func (v *batteryView) batterySection() widget.Widget {
 
 	v.gauge = widget.NewProgressBar(0)
 	v.gauge.AddClass("battery-gauge")
+	// Kept programmatic: the sheet's gauge rules select
+	// levelbar.battery-gauge > trough > block.filled, which no part of
+	// this progressbar tree matches.
 	v.gauge.Trough = tokenColor(v.ctx.Style.palette, config.TokenBgSurfaceElevated)
 	col.Append(v.gauge, false)
 
@@ -258,33 +264,33 @@ func (v *batteryView) batterySection() widget.Widget {
 		box.Append(label, false)
 		return box
 	}
-	v.drawValue = v.label("", 1, config.TokenFgDefault, "battery-detail-value")
-	v.drawLabel = v.label("", 0.8, config.TokenFgMuted, "battery-detail-label")
+	v.drawValue = v.label("", 1, "battery-detail-value")
+	v.drawLabel = v.label("", 0.8, "battery-detail-label")
 	details.Append(detail(v.drawValue, v.drawLabel, render.AlignStart), true)
-	v.capacityValue = v.label("", 1, config.TokenFgDefault, "battery-detail-value")
-	v.capacityLabel = v.label("", 0.8, config.TokenFgMuted, "battery-detail-label")
+	v.capacityValue = v.label("", 1, "battery-detail-value")
+	v.capacityLabel = v.label("", 0.8, "battery-detail-label")
 	details.Append(detail(v.capacityValue, v.capacityLabel, render.AlignCenter), true)
 	health := widget.NewBox(widget.Row, 4, 0)
-	v.healthDot = v.label("●", 0.7, config.TokenFgSubtle, "health-dot")
-	v.healthText = v.label("", 1, config.TokenFgDefault, "battery-detail-value")
+	v.healthDot = v.label("●", 0.7, "health-dot")
+	v.healthText = v.label("", 1, "battery-detail-value")
 	health.Append(widget.NewSpacer(0, 0), true)
 	health.Append(v.healthDot, false)
 	health.Append(v.healthText, false)
 	healthBox := widget.NewBox(widget.Column, 2, 0)
 	healthBox.AddClass("battery-detail")
 	healthBox.Append(health, false)
-	healthLabel := v.label(i18n.T("dropdown-battery-health"), 0.8, config.TokenFgMuted, "battery-detail-label")
+	healthLabel := v.label(i18n.T("dropdown-battery-health"), 0.8, "battery-detail-label")
 	healthLabel.SetAlignment(render.AlignEnd)
 	healthBox.Append(healthLabel, false)
 	details.Append(healthBox, true)
 	col.Append(details, false)
 
-	col.Append(v.label(i18n.T("dropdown-battery-charge-limit"), 0.85, config.TokenFgMuted, "section-label"), false)
+	col.Append(v.label(i18n.T("dropdown-battery-charge-limit"), 0.85, "section-label"), false)
 	v.chargeCard = widget.NewBox(widget.Row, 8, 10)
 	v.chargeCard.AddClass("charge-limit")
 	info := widget.NewBox(widget.Column, 2, 0)
-	v.chargeTitle = v.label("", 1, config.TokenFgDefault, "charge-limit-title")
-	v.chargeSubtitle = v.label("", 0.85, config.TokenFgMuted, "charge-limit-subtitle")
+	v.chargeTitle = v.label("", 1, "charge-limit-title")
+	v.chargeSubtitle = v.label("", 0.85, "charge-limit-subtitle")
 	info.Append(v.chargeTitle, false)
 	info.Append(v.chargeSubtitle, false)
 	v.chargeCard.Append(info, true)
@@ -304,10 +310,9 @@ func (v *batteryView) infoNote(class, iconClass, textClass, text string) *widget
 	row := widget.NewBox(widget.Row, 6, 0)
 	row.AddClass(class)
 	icon := widget.NewThemeIcon("ld-info-symbolic", int(v.px))
-	icon.SetTint(tokenColor(v.ctx.Style.palette, config.TokenFgMuted))
 	icon.AddClass(iconClass)
 	row.Append(icon, false)
-	text2 := v.label(text, 0.85, config.TokenFgMuted, textClass)
+	text2 := v.label(text, 0.85, textClass)
 	text2.SetWrap(true)
 	row.Append(text2, true)
 	return row
@@ -317,7 +322,7 @@ func (v *batteryView) infoNote(class, iconClass, textClass, text string) *widget
 // segments, and the daemon-missing note.
 func (v *batteryView) profileSection() widget.Widget {
 	col := widget.NewBox(widget.Column, 8, 0)
-	col.Append(v.label(i18n.T("dropdown-battery-power-profile"), 0.85, config.TokenFgMuted, "section-label"), false)
+	col.Append(v.label(i18n.T("dropdown-battery-power-profile"), 0.85, "section-label"), false)
 	seg := widget.NewBox(widget.Row, 4, 0)
 	seg.AddClass("profile-seg")
 	v.profileButtons = make(map[string]*widget.Button, len(batteryProfiles))
@@ -325,11 +330,10 @@ func (v *batteryView) profileSection() widget.Widget {
 		content := widget.NewBox(widget.Row, 6, 0)
 		content.AddClass("profile-seg-btn-content")
 		icon := widget.NewThemeIcon(p.icon, int(v.px))
-		icon.SetTint(v.ctx.Style.fg)
 		icon.AddClass("profile-seg-icon")
 		content.Append(widget.NewSpacer(0, 0), true)
 		content.Append(icon, false)
-		content.Append(widget.NewLabel(v.font, v.px*0.9, i18n.T(p.label), v.ctx.Style.fg), false)
+		content.Append(widget.NewLabel(v.font, v.px*0.9, i18n.T(p.label), 0), false)
 		content.Append(widget.NewSpacer(0, 0), true)
 		name := p.name
 		b := dropdownButton(content, "profile-seg-btn", func() { v.selectProfile(name) })
@@ -371,9 +375,9 @@ func (v *batteryView) applyDevice(dev upower.Device, ok bool) {
 	charging := batteryCharging(dev.State)
 
 	v.heroPct.SetText(strconv.Itoa(int(dev.Percentage)) + "%")
-	v.setVariant(v.heroPct, batteryLevelClass(dev, ""), config.TokenFgDefault)
+	v.setVariant(v.heroPct, batteryLevelClass(dev, ""))
 	v.heroState.SetText(batteryStateLabel(dev))
-	v.setVariant(v.heroState, heroStateClass(dev), config.TokenFgDefault)
+	v.setVariant(v.heroState, heroStateClass(dev))
 	remaining := batteryTimeDisplay(dev)
 	v.heroTime.SetText(remaining)
 	v.heroTime.SetVisible(remaining != "")
@@ -395,7 +399,7 @@ func (v *batteryView) applyDevice(dev upower.Device, ok bool) {
 		v.drawLabel.SetText(i18n.T("dropdown-battery-draw"))
 		v.capacityLabel.SetText(i18n.T("dropdown-battery-capacity"))
 	}
-	v.setVariant(v.healthDot, healthClass(dev.Capacity), config.TokenFgSubtle)
+	v.setVariant(v.healthDot, healthClass(dev.Capacity))
 	v.healthText.SetText(healthValue(dev.Capacity))
 
 	v.chargeCard.SetVisible(dev.ChargeThresholdSupported)
@@ -457,16 +461,10 @@ func (v *batteryView) applyProfiles(snap *powerprofiles.Snapshot) {
 	v.profilesUnavailable.SetVisible(len(available) == 0)
 }
 
-// markProfile styles a segment as the toggled one.
+// markProfile styles a segment as the toggled one: :checked selects
+// the sheet's accent rule.
 func (v *batteryView) markProfile(name string, active bool) {
-	b := v.profileButtons[name]
-	if active {
-		b.AddClass("active")
-		b.Bg = tokenColor(v.ctx.Style.palette, config.TokenBgSelected)
-	} else {
-		b.RemoveClass("active")
-		b.Bg = 0
-	}
+	v.profileButtons[name].SetState(widget.StateChecked, active)
 }
 
 // selectProfile is select_profile: the segment toggles at once, the

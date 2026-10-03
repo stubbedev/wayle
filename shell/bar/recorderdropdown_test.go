@@ -161,7 +161,7 @@ func TestRecorderDropdownWritesConfig(t *testing.T) {
 	}
 
 	// Switches and pickers write their keys.
-	micSwitch := v.Children()[3].(*widget.Box).Children()[0].(*widget.Box).Children()[1].(*widget.Switch)
+	micSwitch := v.Children()[1].(*widget.Box).Children()[2].(*widget.Box).Children()[0].(*widget.Box).Children()[1].(*widget.Switch)
 	micSwitch.SetOn(!micSwitch.On())
 	if log.get(recorderPathMic) != micSwitch.On() {
 		t.Errorf("microphone write = %v", log.get(recorderPathMic))

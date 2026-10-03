@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/gelm/widget"
+
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/powerprofiles"
@@ -174,7 +176,7 @@ func TestBatteryDropdownProfiles(t *testing.T) {
 	if v.profilesUnavailable.Visible() {
 		t.Error("daemon up: the note shows")
 	}
-	if !v.profileButtons[powerprofiles.ProfileBalanced].HasClass("active") {
+	if !v.profileButtons[powerprofiles.ProfileBalanced].HasState(widget.StateChecked) {
 		t.Error("balanced is not marked active")
 	}
 	if v.profileButtons[powerprofiles.ProfilePerformance].Enabled() {
@@ -189,8 +191,8 @@ func TestBatteryDropdownProfiles(t *testing.T) {
 		t.Errorf("sets = %v", got)
 	}
 	waitHeadless(t, "the saver mark", func() bool {
-		return v.profileButtons[powerprofiles.ProfilePowerSaver].HasClass("active") &&
-			!v.profileButtons[powerprofiles.ProfileBalanced].HasClass("active")
+		return v.profileButtons[powerprofiles.ProfilePowerSaver].HasState(widget.StateChecked) &&
+			!v.profileButtons[powerprofiles.ProfileBalanced].HasState(widget.StateChecked)
 	})
 
 	// A daemon-side change follows while open.
@@ -199,6 +201,6 @@ func TestBatteryDropdownProfiles(t *testing.T) {
 	pp.mu.Unlock()
 	pp.ticks <- struct{}{}
 	waitHeadless(t, "the followed profile", func() bool {
-		return v.profileButtons[powerprofiles.ProfileBalanced].HasClass("active")
+		return v.profileButtons[powerprofiles.ProfileBalanced].HasState(widget.StateChecked)
 	})
 }

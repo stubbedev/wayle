@@ -12,7 +12,6 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/brightness"
 	"github.com/stubbedev/wayle/shell/widgets"
@@ -103,10 +102,15 @@ func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	v.list.AddClass("brightness-devices")
 	empty := emptyState(font, px, brightnessDeviceIcon, i18n.T("dropdown-brightness-empty-title"), i18n.T("dropdown-brightness-empty-description"))
 	empty.AddClass("brightness-empty")
+	// DropdownContent: the sheet wraps the device list and the empty
+	// state in it.
+	content := widget.NewBox(widget.Column, 0, 0)
+	content.AddClass("dropdown-content")
 	v.body = widget.NewStack()
 	v.body.Add("devices", dropdownScroll(v.list, ""))
 	v.body.Add("empty", empty)
-	v.Append(v.body, true)
+	content.Append(v.body, true)
+	v.Append(content, true)
 	v.apply(v.read(context.Background()))
 	v.follow()
 	return v
@@ -159,17 +163,15 @@ func (v *brightnessView) item(d brightness.Device, multi bool) widget.Widget {
 	header := widget.NewBox(widget.Row, 8, 0)
 	header.AddClass("brightness-device-header")
 	icon := widget.NewThemeIcon(brightnessDeviceIcon, int(v.px*1.2))
-	icon.SetTint(v.ctx.Style.fg)
-	icon.AddClass("brightness-device-icon")
-	header.Append(icon, false)
+	header.Append(iconTile(icon, "brightness-device-icon", "brightness-device-icon-img"), false)
 	info := widget.NewBox(widget.Column, 2, 0)
 	info.AddClass("brightness-device-info")
-	title := widget.NewLabel(v.font, v.px, friendlyDeviceName(d.Name, d.Type), v.ctx.Style.fg)
+	title := widget.NewLabel(v.font, v.px, friendlyDeviceName(d.Name, d.Type), 0)
 	title.AddClass("brightness-device-name")
 	title.SetEllipsize(widget.EllipsizeEnd)
 	info.Append(title, false)
 	if sub, ok := deviceSubtitle(d.Name, d.Type, multi); ok {
-		meta := widget.NewLabel(v.font, v.px*0.85, sub, tokenColor(v.ctx.Style.palette, config.TokenFgMuted))
+		meta := widget.NewLabel(v.font, v.px*0.85, sub, 0)
 		meta.AddClass("brightness-device-meta")
 		meta.SetEllipsize(widget.EllipsizeEnd)
 		info.Append(meta, false)
@@ -177,9 +179,10 @@ func (v *brightnessView) item(d brightness.Device, multi bool) widget.Widget {
 	header.Append(info, true)
 	card.Append(header, false)
 
-	slider := widgets.NewDebouncedSlider(d.Percentage(), v.font, v.px*0.9, v.ctx.Style.fg, v.ctx.Invoke)
+	slider := widgets.NewDebouncedSlider(d.Percentage(), v.font, v.px*0.9, 0, v.ctx.Invoke)
 	slider.AddClass("brightness-slider-row")
 	slider.Knob.AddClass("brightness-slider")
+	slider.ValueLabel().AddClass("brightness-slider-value")
 	name := d.Name
 	slider.OnCommit = func(pct float64) { v.commit(name, pct) }
 	v.sliders[name] = slider
