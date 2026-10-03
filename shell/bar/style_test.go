@@ -130,13 +130,24 @@ func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	if len(items) != 1 || !widget.HasClass(items[0], "bar-item") {
 		t.Fatalf("center items = %v, want one bar-item", items)
 	}
-	btn, ok := items[0].(*widget.Box).Children()[0].(*barButton)
+	// The module wrapper carries module + the layout instance class;
+	// the bar button sits inside it.
+	wrap, ok := items[0].(*widget.Box).Children()[0].(*widget.Box)
 	if !ok {
-		t.Fatalf("bar-item child = %T, want the bar button", items[0].(*widget.Box).Children()[0])
+		t.Fatalf("bar-item child = %T, want the module wrapper", items[0].(*widget.Box).Children()[0])
 	}
-	for _, c := range []string{"bar-button", cfg.Bar.ButtonVariant.CSSClass(), "module", "mine"} {
+	btn, ok := wrap.Children()[0].(*barButton)
+	if !ok {
+		t.Fatalf("wrapper child = %T, want the bar button", wrap.Children()[0])
+	}
+	for _, c := range []string{"bar-button", cfg.Bar.ButtonVariant.CSSClass()} {
 		if !btn.HasClass(c) {
 			t.Errorf("bar button misses %q (classes %v)", c, btn.Classes())
+		}
+	}
+	for _, c := range []string{"module", "mine"} {
+		if !wrap.HasClass(c) {
+			t.Errorf("module wrapper misses %q (classes %v)", c, wrap.Classes())
 		}
 	}
 

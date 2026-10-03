@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/stubbedev/gelm/render"
@@ -24,6 +25,11 @@ import (
 // dashboardPoll paces what has no change signal while the dashboard is
 // open: system stats, network rates, and the media position.
 const dashboardPoll = time.Second
+
+// dashboardArtInstances numbers the media art's per-instance class
+// (media_section's dashboard-media-art-instance-N); the stylesheet
+// hangs the cover's background-image off it per section.
+var dashboardArtInstances atomic.Uint64
 
 // dashboardView is the dashboard dropdown (dropdowns/dashboard): quick
 // actions, the volume control, now playing, battery and network, the
@@ -44,24 +50,29 @@ type dashboardView struct {
 
 func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
+	// The Dropdown template box is spacing-0: the header strip and the
+	// .dropdown-content rules carry every gap.
 	v := &dashboardView{ctx: ctx, font: font, px: px, stop: make(chan struct{})}
-	v.Box = widget.NewBox(widget.Column, 10, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "dashboard-dropdown")
 	v.Append(v.header(), false)
-	content := widget.NewBox(widget.Column, 10, 0)
-	// The DropdownContent template's classes over the section box.
-	content.AddClass("dropdown-content", "dashboard-content-box")
-	content.Append(v.quickActions(), false)
-	if ctx.Pulse != nil {
-		content.Append(v.controls(), false)
-	}
-	if ctx.Media != nil {
-		content.Append(v.media(), false)
-	}
-	content.Append(v.infoRow(), false)
-	content.Append(v.systemStats(), false)
-	content.Append(userSessionSection(ctx), false)
-	v.Append(dropdownScroll(content, "dashboard-scroll"), true)
+	// The DropdownContent template's padding box sits outside the
+	// scroll: .dropdown-content > .dashboard-scroll >
+	// .dashboard-content-box (dashboard/mod.rs).
+	content := widget.NewBox(widget.Column, 0, 0)
+	content.AddClass("dropdown-content")
+	sections := widget.NewBox(widget.Column, 0, 0)
+	sections.AddClass("dashboard-content-box")
+	sections.Append(v.quickActions(), false)
+	// The volume and media cards are always present; their no-device
+	// and empty states live inside (controls/mod.rs, media_section).
+	sections.Append(v.controls(), false)
+	sections.Append(v.media(), false)
+	sections.Append(v.infoRow(), false)
+	sections.Append(v.systemStats(), false)
+	sections.Append(userSessionSection(ctx), false)
+	content.Append(dropdownScroll(sections, "dashboard-scroll"), true)
+	v.Append(content, true)
 	for _, refresh := range v.refreshers {
 		refresh()
 	}
@@ -83,14 +94,25 @@ func (v *dashboardView) button(child widget.Widget, class string, onClick func()
 	return dropdownButton(child, class, onClick)
 }
 
+// quickActionTile is a quick action's column: the icon tile over the
+// label, spacing-0 — .quick-action-label's CSS margin-top carries the
+// gap (quick_actions/mod.rs:138-142).
+func quickActionTile(icon *widget.Icon, label widget.Widget) *widget.Box {
+	col := widget.NewBox(widget.Column, 0, 0)
+	col.Append(iconTile(icon, "quick-action-icon", ""), false)
+	col.Append(label, false)
+	return col
+}
+
 // card is the "card dashboard-card" shell with its titled header: the
-// .card-title box paints its icon and label.
+// .card-title box paints its icon and label (its border-spacing from
+// the stylesheet), and .card-header's CSS margin-bottom spaces it.
 func (v *dashboardView) card(iconName, heading string, extra ...widget.Widget) *widget.Box {
 	card := widget.NewBox(widget.Column, 8, 10)
 	card.AddClass("card", "dashboard-card")
-	header := widget.NewBox(widget.Row, 6, 0)
+	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("card-header")
-	title := widget.NewBox(widget.Row, 6, 0)
+	title := widget.NewBox(widget.Row, 0, 0)
 	title.AddClass("card-title")
 	title.Append(v.icon(iconName, 1), false)
 	title.Append(v.label(heading, 0.95), true)
@@ -135,12 +157,9 @@ func (v *dashboardView) quickActions() widget.Widget {
 	}
 	make1 := func(col, row int, iconName, labelID string, onClick func()) toggle {
 		icon := v.icon(iconName, 1.3)
-		col2 := widget.NewBox(widget.Column, 4, 0)
-		col2.Append(iconTile(icon, "quick-action-icon", ""), false)
 		lbl := v.label(i18n.T(labelID), 0.8)
 		lbl.AddClass("quick-action-label")
-		col2.Append(lbl, false)
-		b := v.button(col2, "quick-action", onClick)
+		b := v.button(quickActionTile(icon, lbl), "quick-action", onClick)
 		grid.Attach(b, col, row, 1, 1)
 		return toggle{b, icon}
 	}
@@ -275,10 +294,12 @@ func (v *dashboardView) quickActions() widget.Widget {
 }
 
 // controls is the volume card: mute, the debounced slider, and the
-// output device's name.
+// output device's name, inside the .dashboard-controls box.
 func (v *dashboardView) controls() widget.Widget {
 	card := v.card("ld-audio-lines-symbolic", i18n.T("dropdown-dashboard-volume"))
-	row := widget.NewBox(widget.Row, 8, 0)
+	controls := widget.NewBox(widget.Column, 0, 0)
+	controls.AddClass("dashboard-controls")
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("dashboard-slider-row")
 	muteIcon := v.icon("ld-volume-2-symbolic", 1.1)
 	var muted bool
@@ -304,13 +325,22 @@ func (v *dashboardView) controls() widget.Widget {
 		}()
 	}
 	row.Append(slider, true)
-	card.Append(row, false)
+	controls.Append(row, false)
 	device := v.label(i18n.T("dropdown-dashboard-no-device"), 0.85)
 	device.AddClass("controls-device")
 	device.SetEllipsize(widget.EllipsizeEnd)
 	device.SetAlignment(render.AlignEnd)
-	card.Append(device, false)
+	controls.Append(device, false)
+	card.Append(controls, false)
 	v.refreshers = append(v.refreshers, func() {
+		// No service: the no-device state, like ControlsSection without
+		// an AudioService.
+		if v.ctx.Pulse == nil {
+			row.SetEnabled(false)
+			device.SetText(i18n.T("dropdown-dashboard-no-device"))
+			muteIcon.SetThemeName("ld-volume-x-symbolic")
+			return
+		}
 		sink, err := v.ctx.Pulse.DefaultSink(bctx)
 		has := err == nil
 		row.SetEnabled(has)
@@ -328,14 +358,17 @@ func (v *dashboardView) controls() widget.Widget {
 }
 
 // media is media_section: the active player's art, track, transport,
-// and progress, or the empty state.
+// and progress, or the empty state when no player is active.
 func (v *dashboardView) media() widget.Widget {
-	src := v.ctx.Media
 	var current mpris.Player
 	var has bool
 	bctx := context.Background()
 	switchBtn := v.button(v.icon("ld-arrow-left-right-symbolic", 1), "ghost-icon", func() {
 		// cycle_player: the next player after the active one.
+		src := v.ctx.Media
+		if src == nil {
+			return
+		}
 		players := src.Players()
 		if len(players) < 2 {
 			return
@@ -355,6 +388,10 @@ func (v *dashboardView) media() widget.Widget {
 	artPx := int(math.Round(v.px * 3.5))
 	art := newFixedBox(artPx, artPx, nil)
 	art.AddClass("dashboard-media-art")
+	// The per-instance class the Rust stylesheet hangs the section's
+	// cover rule on (gelm cannot paint a background-image url, so the
+	// art stays a rasterized child).
+	art.AddClass("dashboard-media-art-instance-" + strconv.FormatUint(dashboardArtInstances.Add(1), 10))
 	artURL := "\x00"
 	title := v.label("", 1)
 	title.AddClass("media-track")
@@ -362,33 +399,41 @@ func (v *dashboardView) media() widget.Widget {
 	artist.AddClass("media-artist")
 	for _, l := range []*widget.Label{title, artist} {
 		l.SetEllipsize(widget.EllipsizeEnd)
+		// xalign 0 under a natural-width cap of one character
+		// (media_section's max-width-chars pair).
+		l.SetAlignment(render.AlignStart)
+		l.SetMaxWidthChars(1)
 	}
-	info := widget.NewBox(widget.Column, 2, 0)
+	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("media-info")
 	info.Append(title, false)
 	info.Append(artist, false)
-	fire := func(what string, cmd func(context.Context, string) error) {
+	fire := func(what string, cmd func(mpris.Source, context.Context, string) error) {
+		src := v.ctx.Media
+		if src == nil {
+			return
+		}
 		bus := current.BusName
 		go func() {
-			if err := cmd(bctx, bus); err != nil {
+			if err := cmd(src, bctx, bus); err != nil {
 				log.Printf("dashboard: %s failed: %v", what, err)
 			}
 		}()
 	}
-	prev := v.button(v.icon("ld-skip-back-symbolic", 1), "ghost-icon", func() { fire("previous", src.Previous) })
+	prev := v.button(v.icon("ld-skip-back-symbolic", 1), "ghost-icon", func() { fire("previous", mpris.Source.Previous) })
 	prev.AddClass("media-btn")
 	playIcon := v.icon("ld-play-symbolic", 1)
-	play := v.button(playIcon, "ghost-icon", func() { fire("play-pause", src.PlayPause) })
+	play := v.button(playIcon, "ghost-icon", func() { fire("play-pause", mpris.Source.PlayPause) })
 	play.AddClass("media-btn")
 	play.AddClass("play")
-	next := v.button(v.icon("ld-skip-forward-symbolic", 1), "ghost-icon", func() { fire("next", src.Next) })
+	next := v.button(v.icon("ld-skip-forward-symbolic", 1), "ghost-icon", func() { fire("next", mpris.Source.Next) })
 	next.AddClass("media-btn")
-	controls := widget.NewBox(widget.Row, 2, 0)
+	controls := widget.NewBox(widget.Row, 0, 0)
 	controls.AddClass("media-controls")
 	controls.Append(prev, false)
 	controls.Append(play, false)
 	controls.Append(next, false)
-	compact := widget.NewBox(widget.Row, 10, 0)
+	compact := widget.NewBox(widget.Row, 0, 0)
 	compact.AddClass("media-compact")
 	compact.Append(art, false)
 	compact.Append(info, true)
@@ -407,8 +452,10 @@ func (v *dashboardView) media() widget.Widget {
 		target := time.Duration(pct / 100 * float64(current.Length))
 		bus := current.BusName
 		go func() {
-			if err := src.SetPosition(bctx, bus, target); err != nil {
-				log.Printf("dashboard: seek failed: %v", err)
+			if src := v.ctx.Media; src != nil {
+				if err := src.SetPosition(bctx, bus, target); err != nil {
+					log.Printf("dashboard: seek failed: %v", err)
+				}
 			}
 		}()
 	}
@@ -416,18 +463,23 @@ func (v *dashboardView) media() widget.Widget {
 	times.AddClass("media-progress-times")
 	times.Append(elapsed, true)
 	times.Append(length, false)
-	progress := widget.NewBox(widget.Column, 2, 0)
+	progress := widget.NewBox(widget.Column, 0, 0)
 	progress.AddClass("media-progress")
 	progress.Append(seek, false)
 	progress.Append(times, false)
-	player := widget.NewBox(widget.Column, 8, 0)
+	player := widget.NewBox(widget.Column, 0, 0)
 	player.Append(compact, false)
 	player.Append(progress, false)
 
-	empty := emptyState(v.font, v.px, "ld-music-symbolic", i18n.T("dropdown-dashboard-no-media-title"), i18n.T("dropdown-dashboard-no-media-description"))
+	// The empty state is expand with align Center (the EmptyState
+	// template) and its glyph in the sm class; the page fills the
+	// stack and centers it.
+	empty, emptyIcon := emptyStateIcon(v.font, v.px, "ld-music-symbolic", i18n.T("dropdown-dashboard-no-media-title"), i18n.T("dropdown-dashboard-no-media-description"))
+	emptyIcon.AddClass("sm")
+	emptyPage := vcentered(widget.NewBox(widget.Column, 0, 0), empty)
 	body := widget.NewStack()
 	body.Add("player", player)
-	body.Add("empty", empty)
+	body.Add("empty", emptyPage)
 	card.Append(body, false)
 
 	setPosition := func(pos time.Duration) {
@@ -435,6 +487,14 @@ func (v *dashboardView) media() widget.Widget {
 		seek.Set(mediaProgress(pos, current.Length))
 	}
 	v.refreshers = append(v.refreshers, func() {
+		src := v.ctx.Media
+		if src == nil {
+			current, has = mpris.Player{}, false
+			switchBtn.SetVisible(false)
+			body.Show("empty")
+			seek.Set(0)
+			return
+		}
 		current, has = src.Active()
 		switchBtn.SetVisible(len(src.Players()) > 1)
 		if !has {
@@ -457,6 +517,10 @@ func (v *dashboardView) media() widget.Widget {
 	})
 	v.pollers = append(v.pollers, func() {
 		if !has {
+			return
+		}
+		src := v.ctx.Media
+		if src == nil {
 			return
 		}
 		bus := current.BusName
@@ -582,6 +646,10 @@ func (v *dashboardView) battery() widget.Widget {
 		}
 		remaining.SetText(dashboardBatteryTime(secs))
 		remaining.SetVisible(secs > 0)
+		// battery-detail carries the thresholds like the icon and the
+		// percent (battery_section/mod.rs).
+		setClass(remaining, "warning", warning)
+		setClass(remaining, "critical", critical)
 		if v.ctx.PowerProfiles != nil {
 			if snap, err := v.ctx.PowerProfiles.Read(bctx); err == nil && snap.Available {
 				label, glyph := dashboardProfile(snap.Active)
@@ -610,14 +678,14 @@ func dashboardSpeed(bytesPerSec uint64) (value string, mega bool) {
 // interface, "--" while disconnected.
 func (v *dashboardView) network() widget.Widget {
 	card := v.card("ld-wifi-symbolic", i18n.T("dropdown-dashboard-network"))
-	speeds := widget.NewBox(widget.Row, 8, 0)
+	speeds := widget.NewBox(widget.Row, 0, 0)
 	speeds.AddClass("network-speeds")
 	type stat struct {
 		box          *widget.Box
 		value, units *widget.Label
 	}
 	mk := func(glyph, dir string) stat {
-		s := stat{box: widget.NewBox(widget.Column, 2, 0)}
+		s := stat{box: widget.NewBox(widget.Column, 0, 0)}
 		s.box.AddClass("speed-stat", dir)
 		icon := v.icon(glyph, 0.9)
 		icon.AddClass("speed-arrow")

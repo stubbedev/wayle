@@ -156,7 +156,8 @@ type batteryView struct {
 	gauge                                   *widget.LevelBar
 	drawValue, drawLabel                    *widget.Label
 	capacityValue, capacityLabel            *widget.Label
-	healthDot, healthText                   *widget.Label
+	healthDot                               *widget.Box
+	healthText                              *widget.Label
 	chargeCard, chargeUnsupported           *widget.Box
 	chargeTitle, chargeSubtitle             *widget.Label
 	chargeSwitch                            *widget.Switch
@@ -179,15 +180,18 @@ type batteryView struct {
 func batteryDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &batteryView{ctx: ctx, font: font, px: px, cancel: func() {}}
-	v.Box = widget.NewBox(widget.Column, 12, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 14)
 	v.AddClass("dropdown", "battery-dropdown")
 	v.Append(dropdownHeader(font, px, "ld-battery-full-symbolic", i18n.T("dropdown-battery-title")), false)
 	// DropdownContent: the sheet's .dropdown-content wraps both
-	// sections and carries the .section-label rules.
-	content := widget.NewBox(widget.Column, 12, 0)
+	// sections and carries the .section-label rules. Spacing stays 0 —
+	// the cascade's margins own every gap.
+	content := widget.NewBox(widget.Column, 0, 0)
 	content.AddClass("dropdown-content")
 	v.body = widget.NewStack()
-	v.body.Add("empty", emptyState(font, px, "ld-unplug-symbolic", i18n.T("dropdown-battery-no-battery-title"), i18n.T("dropdown-battery-no-battery-description")))
+	empty, _, _ := templateEmptyState(font, px, "ld-unplug-symbolic", nil,
+		i18n.T("dropdown-battery-no-battery-title"), i18n.T("dropdown-battery-no-battery-description"))
+	v.body.Add("empty", empty)
 	v.body.Add("battery", v.batterySection())
 	content.Append(v.body, false)
 	content.Append(v.profileSection(), false)
@@ -204,24 +208,33 @@ func (v *batteryView) label(text string, scale float64, class string) *widget.La
 	return l
 }
 
-// setVariant swaps l's variant class to class ("" for none); the
+// classed is a widget carrying classes: setVariant swaps variants on
+// labels and the health-dot box alike.
+type classed interface {
+	widget.Widget
+	AddClass(names ...string)
+	RemoveClass(names ...string)
+}
+
+// setVariant swaps w's variant class to class ("" for none); the
 // variant's ink is the stylesheet's state rule.
-func (v *batteryView) setVariant(l *widget.Label, class string) {
-	l.RemoveClass(batteryVariants...)
+func (v *batteryView) setVariant(w classed, class string) {
+	w.RemoveClass(batteryVariants...)
 	if class != "" {
-		l.AddClass(class)
+		w.AddClass(class)
 	}
 }
 
-// batterySection builds battery_content.
+// batterySection builds battery_content. Every box is spacing 0, as
+// Rust builds them: the cascade's margins and paddings own the gaps.
 func (v *batteryView) batterySection() widget.Widget {
-	col := widget.NewBox(widget.Column, 10, 0)
+	col := widget.NewBox(widget.Column, 0, 0)
 
-	hero := widget.NewBox(widget.Row, 12, 0)
+	hero := widget.NewBox(widget.Row, 0, 0)
 	hero.AddClass("battery-hero")
 	v.heroPct = v.label("", 2.4, "battery-hero-pct")
 	hero.Append(v.heroPct, false)
-	meta := widget.NewBox(widget.Column, 2, 0)
+	meta := widget.NewBox(widget.Column, 0, 0)
 	meta.AddClass("battery-hero-meta")
 	v.heroState = v.label("", 1, "battery-hero-state")
 	v.heroTime = v.label("", 0.85, "battery-hero-time")
@@ -229,49 +242,30 @@ func (v *batteryView) batterySection() widget.Widget {
 	meta.Append(v.heroState, false)
 	meta.Append(v.heroTime, false)
 	meta.Append(v.heroInput, false)
-	hero.Append(meta, true)
+	hero.AppendAligned(meta, true, widget.AlignCenter) // set_valign Center
 	col.Append(hero, false)
 
 	v.gauge = widget.NewLevelBar(0)
 	v.gauge.AddClass("battery-gauge")
 	col.Append(v.gauge, false)
 
-	details := widget.NewBox(widget.Row, 8, 0)
-	details.AddClass("battery-details")
-	detail := func(value, label *widget.Label, align render.Alignment) *widget.Box {
-		box := widget.NewBox(widget.Column, 2, 0)
-		box.AddClass("battery-detail")
-		value.SetAlignment(align)
-		label.SetAlignment(align)
-		box.Append(value, false)
-		box.Append(label, false)
-		return box
-	}
+	// details is a CenterBox: the capacity column sits geometrically
+	// centered, not stretched between two expanding boxes.
 	v.drawValue = v.label("", 1, "battery-detail-value")
 	v.drawLabel = v.label("", 0.8, "battery-detail-label")
-	details.Append(detail(v.drawValue, v.drawLabel, render.AlignStart), true)
 	v.capacityValue = v.label("", 1, "battery-detail-value")
 	v.capacityLabel = v.label("", 0.8, "battery-detail-label")
-	details.Append(detail(v.capacityValue, v.capacityLabel, render.AlignCenter), true)
-	health := widget.NewBox(widget.Row, 4, 0)
-	v.healthDot = v.label("●", 0.7, "health-dot")
-	v.healthText = v.label("", 1, "battery-detail-value")
-	health.Append(widget.NewSpacer(0, 0), true)
-	health.Append(v.healthDot, false)
-	health.Append(v.healthText, false)
-	healthBox := widget.NewBox(widget.Column, 2, 0)
-	healthBox.AddClass("battery-detail")
-	healthBox.Append(health, false)
-	healthLabel := v.label(i18n.T("dropdown-battery-health"), 0.8, "battery-detail-label")
-	healthLabel.SetAlignment(render.AlignEnd)
-	healthBox.Append(healthLabel, false)
-	details.Append(healthBox, true)
+	details := widget.NewCenterBox(
+		v.detail(v.drawValue, v.drawLabel, render.AlignStart),
+		v.detail(v.capacityValue, v.capacityLabel, render.AlignStart),
+		v.healthDetail())
+	details.AddClass("battery-details")
 	col.Append(details, false)
 
 	col.Append(v.label(i18n.T("dropdown-battery-charge-limit"), 0.85, "section-label"), false)
-	v.chargeCard = widget.NewBox(widget.Row, 8, 10)
+	v.chargeCard = widget.NewBox(widget.Row, 0, 0)
 	v.chargeCard.AddClass("charge-limit")
-	info := widget.NewBox(widget.Column, 2, 0)
+	info := widget.NewBox(widget.Column, 0, 0)
 	v.chargeTitle = v.label("", 1, "charge-limit-title")
 	v.chargeSubtitle = v.label("", 0.85, "charge-limit-subtitle")
 	info.Append(v.chargeTitle, false)
@@ -279,7 +273,7 @@ func (v *batteryView) batterySection() widget.Widget {
 	v.chargeCard.Append(info, true)
 	v.chargeSwitch = widget.NewSwitch(false)
 	v.chargeSwitch.OnChanged = v.chargeToggled
-	v.chargeCard.Append(v.chargeSwitch, false)
+	v.chargeCard.AppendAligned(v.chargeSwitch, false, widget.AlignCenter) // set_valign Center
 	col.Append(v.chargeCard, false)
 	v.chargeUnsupported = v.infoNote("charge-limit-not-supported", "charge-limit-info-icon",
 		"charge-limit-info-text", i18n.T("dropdown-battery-charge-limit-not-supported"))
@@ -287,10 +281,42 @@ func (v *batteryView) batterySection() widget.Widget {
 	return col
 }
 
+// detail is one battery-detail column: the value over the label, the
+// text alignment set where Rust sets set_halign. The capacity column
+// keeps the default — the CenterBox centers the slot, not the text.
+func (v *batteryView) detail(value, label *widget.Label, align render.Alignment) *widget.Box {
+	box := widget.NewBox(widget.Column, 0, 0)
+	box.AddClass("battery-detail")
+	value.SetAlignment(align)
+	label.SetAlignment(align)
+	box.Append(value, false)
+	box.Append(label, false)
+	return box
+}
+
+// healthDetail is the end slot: the empty health-dot box the CSS
+// paints as a circle (min sizes, border-radius, variant background)
+// beside the value, the label under, both end-aligned.
+func (v *batteryView) healthDetail() *widget.Box {
+	health := widget.NewBox(widget.Row, 0, 0) // health_indicator
+	v.healthDot = widget.NewBox(widget.Row, 0, 0)
+	v.healthDot.AddClass("health-dot")
+	v.healthText = v.label("", 1, "battery-detail-value")
+	health.AppendAligned(v.healthDot, false, widget.AlignCenter) // set_valign Center
+	health.Append(v.healthText, false)
+	box := widget.NewBox(widget.Column, 0, 0)
+	box.AddClass("battery-detail")
+	box.AppendAligned(health, false, widget.AlignEnd) // set_halign End
+	healthLabel := v.label(i18n.T("dropdown-battery-health"), 0.8, "battery-detail-label")
+	healthLabel.SetAlignment(render.AlignEnd)
+	box.Append(healthLabel, false)
+	return box
+}
+
 // infoNote is the info-icon row the Rust sections show when a feature
 // is missing.
 func (v *batteryView) infoNote(class, iconClass, textClass, text string) *widget.Box {
-	row := widget.NewBox(widget.Row, 6, 0)
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass(class)
 	icon := widget.NewThemeIcon("ld-info-symbolic", int(v.px))
 	icon.AddClass(iconClass)
@@ -304,13 +330,15 @@ func (v *batteryView) infoNote(class, iconClass, textClass, text string) *widget
 // profileSection builds PowerProfileSection: the label, the three
 // segments, and the daemon-missing note.
 func (v *batteryView) profileSection() widget.Widget {
-	col := widget.NewBox(widget.Column, 8, 0)
+	col := widget.NewBox(widget.Column, 0, 0)
 	col.Append(v.label(i18n.T("dropdown-battery-power-profile"), 0.85, "section-label"), false)
-	seg := widget.NewBox(widget.Row, 4, 0)
+	seg := widget.NewBox(widget.Row, 0, 0)
 	seg.AddClass("profile-seg")
 	v.profileButtons = make(map[string]*widget.Button, len(batteryProfiles))
+	var buttons []*widget.Button
+	widest := 0
 	for _, p := range batteryProfiles {
-		content := widget.NewBox(widget.Row, 6, 0)
+		content := widget.NewBox(widget.Row, 0, 0)
 		content.AddClass("profile-seg-btn-content")
 		icon := widget.NewThemeIcon(p.icon, int(v.px))
 		icon.AddClass("profile-seg-icon")
@@ -318,10 +346,20 @@ func (v *batteryView) profileSection() widget.Widget {
 		content.Append(icon, false)
 		content.Append(widget.NewLabel(v.font, v.px*0.9, i18n.T(p.label), 0), false)
 		content.Append(widget.NewSpacer(0, 0), true)
+		// set_homogeneous (power_profile/mod.rs:49): gelm's Box has no
+		// homogeneous, so every segment floors at the widest content's
+		// natural width through the same min-width the cascade reads.
+		if w := content.Measure(widget.Constraints{Max: widget.Size{W: 1 << 14, H: 1 << 14}}).W; w > widest {
+			widest = w
+		}
 		name := p.name
 		b := dropdownButton(content, "profile-seg-btn", func() { v.selectProfile(name) })
 		v.profileButtons[name] = b
+		buttons = append(buttons, b)
 		seg.Append(b, true)
+	}
+	for _, b := range buttons {
+		b.SetInlineStyle(fmt.Sprintf("min-width: %dpx", widest))
 	}
 	col.Append(seg, false)
 	v.profilesUnavailable = v.infoNote("power-profile-not-available", "power-profile-info-icon",

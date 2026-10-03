@@ -9,152 +9,42 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/bluetooth"
 )
 
 // The bluetooth dropdown's pure helpers, ported from
 // crates/wayle-bar-network/src/dropdowns/bluetooth/helpers.rs. Labels
 // travel as their Fluent keys (the Rust t!/td! arguments) and resolve
-// through btText, so the i18n port swaps one table.
+// through btText, over the same shell-domain bundle the Rust loader
+// reads (crates/wayle-shell-core/locales).
 
-// btStrings is the en-US text of dropdowns/_bluetooth.ftl the dropdown
-// uses; placeholders are the Fluent { $name } arguments.
-var btStrings = map[string]string{ //nolint:gosec // Fluent UI text; the "pin" keys are labels, not credentials
-	"dropdown-bluetooth-title":             "Bluetooth",
-	"dropdown-bluetooth-my-devices":        "My Devices",
-	"dropdown-bluetooth-available-devices": "Available Devices",
-	"dropdown-bluetooth-connected":         "Connected",
-	"dropdown-bluetooth-connect":           "Connect",
-	"dropdown-bluetooth-disconnect":        "Disconnect",
-	"dropdown-bluetooth-forget":            "Forget",
-	"dropdown-bluetooth-pair":              "Pair",
-	"dropdown-bluetooth-cancel":            "Cancel",
-	"dropdown-bluetooth-confirm":           "Confirm",
-	"dropdown-bluetooth-reject":            "Reject",
-	"dropdown-bluetooth-allow":             "Allow",
-	"dropdown-bluetooth-deny":              "Deny",
-
-	"dropdown-bluetooth-battery":              "{ $percent }%",
-	"dropdown-bluetooth-paired":               "Paired",
-	"dropdown-bluetooth-new-device":           "New device",
-	"dropdown-bluetooth-status-connecting":    "Connecting...",
-	"dropdown-bluetooth-status-disconnecting": "Disconnecting...",
-	"dropdown-bluetooth-status-forgetting":    "Removing...",
-
-	"dropdown-bluetooth-type-computer":              "Computer",
-	"dropdown-bluetooth-type-desktop":               "Desktop",
-	"dropdown-bluetooth-type-server":                "Server",
-	"dropdown-bluetooth-type-laptop":                "Laptop",
-	"dropdown-bluetooth-type-handheld":              "Handheld PC",
-	"dropdown-bluetooth-type-palm":                  "Palm PC",
-	"dropdown-bluetooth-type-wearable-computer":     "Wearable computer",
-	"dropdown-bluetooth-type-computer-tablet":       "Tablet",
-	"dropdown-bluetooth-type-phone":                 "Phone",
-	"dropdown-bluetooth-type-cellular":              "Cellular",
-	"dropdown-bluetooth-type-cordless":              "Cordless",
-	"dropdown-bluetooth-type-smartphone":            "Smart phone",
-	"dropdown-bluetooth-type-modem":                 "Modem",
-	"dropdown-bluetooth-type-network":               "Access point",
-	"dropdown-bluetooth-type-headset":               "Headset",
-	"dropdown-bluetooth-type-handsfree":             "Hands-free",
-	"dropdown-bluetooth-type-microphone":            "Microphone",
-	"dropdown-bluetooth-type-loudspeaker":           "Loudspeaker",
-	"dropdown-bluetooth-type-headphones":            "Headphones",
-	"dropdown-bluetooth-type-portable-audio":        "Portable audio",
-	"dropdown-bluetooth-type-car-audio":             "Car audio",
-	"dropdown-bluetooth-type-set-top-box":           "Set-top box",
-	"dropdown-bluetooth-type-hifi":                  "Hi-Fi audio",
-	"dropdown-bluetooth-type-vcr":                   "VCR",
-	"dropdown-bluetooth-type-video-camera":          "Video camera",
-	"dropdown-bluetooth-type-camcorder":             "Camcorder",
-	"dropdown-bluetooth-type-video-monitor":         "Video monitor",
-	"dropdown-bluetooth-type-video-display":         "Video display and loudspeaker",
-	"dropdown-bluetooth-type-video-conferencing":    "Video conferencing",
-	"dropdown-bluetooth-type-gaming":                "Gaming/Toy",
-	"dropdown-bluetooth-type-audio-video":           "Audio/Video",
-	"dropdown-bluetooth-type-keyboard":              "Keyboard",
-	"dropdown-bluetooth-type-mouse":                 "Pointing device",
-	"dropdown-bluetooth-type-combo-keyboard":        "Keyboard/Pointing device",
-	"dropdown-bluetooth-type-joystick":              "Joystick",
-	"dropdown-bluetooth-type-gamepad":               "Gamepad",
-	"dropdown-bluetooth-type-remote":                "Remote control",
-	"dropdown-bluetooth-type-sensing":               "Sensing device",
-	"dropdown-bluetooth-type-tablet":                "Digitizer tablet",
-	"dropdown-bluetooth-type-card-reader":           "Card reader",
-	"dropdown-bluetooth-type-peripheral":            "Peripheral",
-	"dropdown-bluetooth-type-imaging":               "Imaging",
-	"dropdown-bluetooth-type-display":               "Display",
-	"dropdown-bluetooth-type-camera":                "Camera",
-	"dropdown-bluetooth-type-scanner":               "Scanner",
-	"dropdown-bluetooth-type-printer":               "Printer",
-	"dropdown-bluetooth-type-wearable":              "Wearable",
-	"dropdown-bluetooth-type-wrist-watch":           "Wrist watch",
-	"dropdown-bluetooth-type-pager":                 "Pager",
-	"dropdown-bluetooth-type-jacket":                "Jacket",
-	"dropdown-bluetooth-type-helmet":                "Helmet",
-	"dropdown-bluetooth-type-glasses":               "Glasses",
-	"dropdown-bluetooth-type-toy":                   "Toy",
-	"dropdown-bluetooth-type-robot":                 "Robot",
-	"dropdown-bluetooth-type-vehicle":               "Vehicle",
-	"dropdown-bluetooth-type-doll":                  "Doll",
-	"dropdown-bluetooth-type-controller":            "Controller",
-	"dropdown-bluetooth-type-game":                  "Game",
-	"dropdown-bluetooth-type-health":                "Health",
-	"dropdown-bluetooth-type-unknown":               "Bluetooth device",
-	"dropdown-bluetooth-service-serial-port":        "Serial Port",
-	"dropdown-bluetooth-service-lan-access":         "LAN Access",
-	"dropdown-bluetooth-service-dialup-networking":  "Dialup Networking",
-	"dropdown-bluetooth-service-object-push":        "Object Push",
-	"dropdown-bluetooth-service-file-transfer":      "File Transfer",
-	"dropdown-bluetooth-service-headset":            "Headset Audio",
-	"dropdown-bluetooth-service-audio-source":       "Audio Source",
-	"dropdown-bluetooth-service-audio-sink":         "Audio Sink",
-	"dropdown-bluetooth-service-remote-control":     "Remote Control",
-	"dropdown-bluetooth-service-audio-distribution": "Audio Streaming",
-	"dropdown-bluetooth-service-handsfree":          "Hands-Free",
-	"dropdown-bluetooth-service-network-access":     "Network Access",
-	"dropdown-bluetooth-service-input-device":       "Input Device",
-	"dropdown-bluetooth-service-sim-access":         "SIM Access",
-	"dropdown-bluetooth-service-phonebook":          "Phonebook Access",
-	"dropdown-bluetooth-service-messaging":          "Messaging",
-	"dropdown-bluetooth-service-unknown":            "Bluetooth Service",
-	"dropdown-bluetooth-service-proprietary":        "Bluetooth Service",
-
-	"dropdown-bluetooth-no-devices-title":       "No Devices Found",
-	"dropdown-bluetooth-no-devices-description": "Make sure your device is in pairing mode",
-	"dropdown-bluetooth-off-title":              "Bluetooth is Off",
-	"dropdown-bluetooth-off-description":        "Turn on Bluetooth to connect devices",
-	"dropdown-bluetooth-notify-title":           "Bluetooth pairing request",
-	"dropdown-bluetooth-notify-body":            "{ $device } wants to connect — open the Bluetooth menu to respond",
-	"dropdown-bluetooth-notify-passkey":         "{ $device } wants to pair with passkey { $passkey } — open the Bluetooth menu to respond",
-	"dropdown-bluetooth-no-adapter-title":       "No Bluetooth Adapter",
-	"dropdown-bluetooth-no-adapter-description": "No Bluetooth adapter was detected",
-	"dropdown-bluetooth-no-new":                 "No new devices found",
-
-	"dropdown-bluetooth-pairing-enter-pin":        "Enter this PIN on the device",
-	"dropdown-bluetooth-pairing-type-on-device":   "Type the PIN on the device, then press Enter",
-	"dropdown-bluetooth-pairing-enter-shown-pin":  "Enter the PIN displayed on the device",
-	"dropdown-bluetooth-pairing-confirm-code":     "Confirm that this code matches the one on the device:",
-	"dropdown-bluetooth-pairing-entering":         "{ $entered } of { $total } digits entered",
-	"dropdown-bluetooth-pairing-allow-pairing":    "Allow this device to pair?",
-	"dropdown-bluetooth-pairing-service-allow":    "Allow this device to access the requested service?",
-	"dropdown-bluetooth-pairing-enter-legacy-pin": "Enter the PIN for this device",
-	"dropdown-bluetooth-pairing-pin-placeholder":  "PIN",
-	"dropdown-bluetooth-pairing-common-pins":      "Common PINs: 0000, 1234, 1111",
-}
-
-// btText resolves a key with its Fluent arguments as name/value pairs.
-// An unknown key is a programming error and renders as the key itself,
-// as Fluent does.
+// btText resolves a key through the shell domain (the Rust t!/td!
+// sites) with its Fluent arguments as name/value pairs. An unknown key
+// is a programming error and renders the loader's "No localization"
+// marker, as the Rust lookup does.
 func btText(key string, args ...any) string {
-	text, ok := btStrings[key]
-	if !ok {
-		return key
-	}
+	var fluent []i18n.Arg
 	for i := 0; i+1 < len(args); i += 2 {
-		text = strings.ReplaceAll(text, "{ $"+fmt.Sprint(args[i])+" }", fmt.Sprint(args[i+1]))
+		name := fmt.Sprint(args[i])
+		switch v := args[i+1].(type) {
+		case string:
+			fluent = append(fluent, i18n.Str(name, v))
+		case int:
+			fluent = append(fluent, i18n.Int(name, int64(v)))
+		case int64:
+			fluent = append(fluent, i18n.Int(name, v))
+		case uint8:
+			fluent = append(fluent, i18n.Int(name, int64(v)))
+		case uint16:
+			fluent = append(fluent, i18n.Int(name, int64(v)))
+		case uint32:
+			fluent = append(fluent, i18n.Int(name, int64(v)))
+		default:
+			fluent = append(fluent, i18n.Str(name, fmt.Sprint(v)))
+		}
 	}
-	return text
+	return i18n.T(key, fluent...)
 }
 
 // The Bluetooth class-of-device major classes.

@@ -107,6 +107,7 @@ type calendarView struct {
 	dayName, dateRest             *widget.Label
 	monthLabel                    *widget.Label
 	grid                          *widget.Box
+	timeRow                       *widget.Box
 
 	month, today time.Time
 	selected     *time.Time
@@ -119,13 +120,15 @@ type calendarView struct {
 
 func calendarDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
+	// The Dropdown template box is spacing-0: the header strip and the
+	// .dropdown-content rules carry every gap.
 	v := &calendarView{ctx: ctx, font: font, px: px, stop: make(chan struct{}), now: time.Now}
-	v.Box = widget.NewBox(widget.Column, 12, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "calendar-dropdown")
 	v.Append(dropdownHeader(font, px, "tb-calendar-time-symbolic", i18n.T("dropdown-calendar-title")), false)
 	// DropdownContent: the content box the stylesheet's .dropdown-content
 	// rules hang off (default ink, the section-label family).
-	content := widget.NewBox(widget.Column, 12, 0)
+	content := widget.NewBox(widget.Column, 0, 0)
 	content.AddClass("dropdown-content")
 	content.Append(v.hero(), false)
 	content.Append(v.calendar(), false)
@@ -149,10 +152,11 @@ func (v *calendarView) label(text string, scale float64) *widget.Label {
 
 // hero is the clock-hero: HH:MM[:SS][ AM] over "Weekday, Month D, YYYY".
 func (v *calendarView) hero() widget.Widget {
-	col := widget.NewBox(widget.Column, 4, 0)
+	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("clock-hero")
 	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("clock-time-row")
+	v.timeRow = row
 	big := 2.6
 	timeLabel := func() *widget.Label {
 		l := v.label("", big)
@@ -171,7 +175,7 @@ func (v *calendarView) hero() widget.Widget {
 	for _, w := range []widget.Widget{v.hours, sep(), v.minutes, v.secSep, v.seconds, v.ampm} {
 		row.Append(w, false)
 	}
-	col.Append(centered(row), false)
+	col.AppendAligned(row, false, widget.AlignCenter)
 	date := widget.NewBox(widget.Row, 0, 0)
 	date.AddClass("clock-date")
 	v.dayName = v.label("", 1)
@@ -179,7 +183,7 @@ func (v *calendarView) hero() widget.Widget {
 	v.dateRest = v.label("", 1)
 	date.Append(v.dayName, false)
 	date.Append(v.dateRest, false)
-	col.Append(centered(date), false)
+	col.AppendAligned(date, false, widget.AlignCenter)
 	return col
 }
 
@@ -195,32 +199,42 @@ func centered(w widget.Widget) widget.Widget {
 // calendar is the Calendar component: month label, today and month
 // navigation, the weekday header, and the 42-day grid.
 func (v *calendarView) calendar() widget.Widget {
-	col := widget.NewBox(widget.Column, 6, 0)
+	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("cal-section")
-	header := widget.NewBox(widget.Row, 4, 0)
+	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("cal-header")
 	v.monthLabel = v.label("", 1)
 	v.monthLabel.AddClass("cal-month")
 	header.Append(v.monthLabel, true)
-	nav := func(child widget.Widget, onClick func()) *widget.Button {
+	// cal-nav is hexpand with halign End: the month label takes the
+	// free width, so the plain nav row lands on the row's end.
+	nav := widget.NewBox(widget.Row, 0, 0)
+	nav.AddClass("cal-nav")
+	navBtn := func(child widget.Widget, onClick func()) *widget.Button {
 		b := widget.NewButton(child, 4, 6)
 		b.AddClass("cal-nav-btn")
-		// buttonBgActive stays: the stylesheet gives .cal-nav-btn a hover
-		// but no :active, so the pressed shade keeps its programmatic
-		// paint (pickc lets it win).
-		b.BgPressed = v.ctx.Style.buttonBgActive
+		// No programmatic pressed shade: .cal-nav-btn is all:unset and
+		// the stylesheet paints the hover.
 		b.OnClick = onClick
 		return b
 	}
-	today := nav(v.label(i18n.T("cal-today"), 0.85), v.goToToday)
+	today := navBtn(v.label(i18n.T("cal-today"), 0.85), v.goToToday)
 	today.AddClass("cal-today-btn")
-	header.Append(today, false)
-	header.Append(nav(v.icon("ld-chevron-left-symbolic", 1), func() { v.step(-1) }), false)
-	header.Append(nav(v.icon("ld-chevron-right-symbolic", 1), func() { v.step(1) }), false)
+	nav.Append(today, false)
+	nav.Append(navBtn(v.icon("ld-chevron-left-symbolic", 1), func() { v.step(-1) }), false)
+	nav.Append(navBtn(v.icon("ld-chevron-right-symbolic", 1), func() { v.step(1) }), false)
+	header.Append(nav, false)
 	col.Append(header, false)
-	v.grid = widget.NewBox(widget.Column, 2, 0)
+	// cal-grid-wrap paints the elevated panel; the grid's border-spacing
+	// comes from the stylesheet's .cal-grid-wrap grid rule, which needs
+	// the GTK grid element name.
+	wrap := widget.NewBox(widget.Column, 0, 0)
+	wrap.AddClass("cal-grid-wrap")
+	v.grid = widget.NewBox(widget.Column, 0, 0)
 	v.grid.AddClass("cal-grid")
-	col.Append(v.grid, false)
+	v.grid.SetElement("grid")
+	wrap.Append(v.grid, false)
+	col.Append(wrap, false)
 	now := v.now()
 	v.today = now
 	v.month = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
@@ -260,7 +274,7 @@ func (v *calendarView) click(d time.Time) {
 func (v *calendarView) rebuild() {
 	v.monthLabel.SetText(calendarMonthLabel(v.month))
 	v.grid.Clear()
-	header := widget.NewBox(widget.Row, 2, 0)
+	header := widget.NewBox(widget.Row, 0, 0)
 	for col := range 7 {
 		wd := time.Weekday((int(v.weekStart) + col) % 7)
 		wdLabel := v.label(i18n.T(calendarWeekdayIDs[wd]), 0.8)
@@ -271,7 +285,7 @@ func (v *calendarView) rebuild() {
 	v.grid.Append(header, false)
 	cells := calendarGrid(v.month, v.today, v.selected, v.weekStart)
 	for row := range 6 {
-		week := widget.NewBox(widget.Row, 2, 0)
+		week := widget.NewBox(widget.Row, 0, 0)
 		for _, cell := range cells[row*7 : row*7+7] {
 			week.Append(v.dayCell(cell), true)
 		}
@@ -319,6 +333,10 @@ func (v *calendarView) tick() {
 	v.seconds.SetVisible(clock.DropdownShowSeconds)
 	v.secSep.SetVisible(clock.DropdownShowSeconds)
 	v.ampm.SetVisible(use12h)
+	// The row's state classes: use-12h indents the row, show-seconds
+	// stops the separator blink.
+	setClass(v.timeRow, "show-seconds", clock.DropdownShowSeconds)
+	setClass(v.timeRow, "use-12h", use12h)
 	v.dayName.SetText(i18n.T(calendarDayIDs[now.Weekday()]))
 	v.dateRest.SetText(i18n.T("cal-clock-date-rest",
 		i18n.Str("month", i18n.T(calendarMonthIDs[now.Month()-1])),

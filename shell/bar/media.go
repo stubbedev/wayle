@@ -131,6 +131,10 @@ type mediaModule struct {
 	label  *widget.Label
 	icon   *widget.Icon
 	root   widget.Widget
+	// chrome is the module box around the button: the disc classes are
+	// ancestor selectors (`.media-disc menubutton ... image`), so they
+	// must sit above the menubutton, on the wrapper.
+	chrome classer
 }
 
 func newMedia(ctx ModuleContext) (Module, error) {
@@ -150,9 +154,17 @@ func (m *mediaModule) build() {
 	m.label = widget.NewLabel(m.ctx.Font, m.ctx.Style.labelPx, "", m.ctx.Style.fg)
 	m.icon = moduleIcon(m.ctx, cfg.Icon())
 	m.root = assembleModule(m.ctx, m.icon, m.label)
-	if c, ok := m.root.(classer); ok {
-		c.AddClass("media")
-	}
+	m.refresh()
+}
+
+// typeClass is the module box's type class, the ancestor the disc
+// selectors hang from.
+func (m *mediaModule) typeClass() string { return "media" }
+
+// setChrome takes the module box appendModule wraps the button in;
+// the disc classes re-apply now that the ancestor exists.
+func (m *mediaModule) setChrome(c classer) {
+	m.chrome = c
 	m.refresh()
 }
 
@@ -172,9 +184,8 @@ func (m *mediaModule) refresh() {
 	if m.icon != nil {
 		m.icon.SetThemeName(icon)
 	}
-	classes, _ := m.root.(classer)
-	setClass(classes, "media-disc", ok && cfg.IconType == config.MediaIconTypeSpinningDisc)
-	setClass(classes, "media-spinning", ok && p.State == mpris.StatePlaying)
+	setClass(m.chrome, "media-disc", ok && cfg.IconType == config.MediaIconTypeSpinningDisc)
+	setClass(m.chrome, "media-spinning", ok && p.State == mpris.StatePlaying)
 }
 
 // classer is a widget carrying style classes (every gelm node).

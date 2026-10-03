@@ -196,15 +196,15 @@ type recorderView struct {
 func recorderDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &recorderView{ctx: ctx, font: font, px: px, cancel: func() {}}
-	v.Box = widget.NewBox(widget.Column, 10, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 14)
 	v.AddClass("dropdown", "recorder-dropdown")
 	cfg := ctx.Config.Recorder
 
-	v.status = widget.NewBox(widget.Row, 6, 0)
+	v.status = widget.NewBox(widget.Row, 0, 0)
 	v.status.AddClass("recorder-status")
 	v.statusDot = widget.NewBox(widget.Row, 0, 0)
 	v.statusDot.AddClass("recorder-status-dot")
-	v.time = widget.NewLabel(font, px*0.9, "", 0)
+	v.time = widget.NewLabel(font, px, "", 0)
 	v.time.AddClass("recorder-status-time")
 	v.status.Append(v.statusDot, false)
 	v.status.Append(v.time, false)
@@ -296,20 +296,20 @@ func (v *recorderView) sectionHeader(icon, title string) *widget.Box {
 	row.AddClass("recorder-section-header")
 	glyph := widget.NewThemeIcon(icon, int(v.px))
 	row.Append(glyph, false)
-	label := widget.NewLabel(v.font, v.px*0.85, title, 0)
+	label := widget.NewLabel(v.font, v.px, title, 0)
 	label.AddClass("section-label")
 	row.Append(label, true)
 	return row
 }
 
 func (v *recorderView) card() *widget.Box {
-	c := widget.NewBox(widget.Column, 8, 10)
+	c := widget.NewBox(widget.Column, 0, 10)
 	c.AddClass("card", "recorder-card")
 	return c
 }
 
 func (v *recorderView) row(title string) *widget.Box {
-	r := widget.NewBox(widget.Row, 8, 0)
+	r := widget.NewBox(widget.Row, 0, 0)
 	r.AddClass("recorder-row")
 	r.Append(widget.NewLabel(v.font, v.px, title, 0), true)
 	return r
@@ -327,7 +327,7 @@ func (v *recorderView) switchRow(title string, on bool, path string) *widget.Box
 // picker is a device selector writing the chosen id; choices reads the
 // list current at selection time.
 func (v *recorderView) picker(list []recorder.DeviceChoice, saved, path string, choices func() []recorder.DeviceChoice) *widget.Dropdown {
-	d := widget.NewDropdown(v.font, v.px*0.9, recorder.ChoiceLabels(list), recorder.ChoiceIndex(list, saved))
+	d := widget.NewDropdown(v.font, v.px, recorder.ChoiceLabels(list), recorder.ChoiceIndex(list, saved))
 	d.OnSelect = func(i int) {
 		if c := choices(); i >= 0 && i < len(c) {
 			v.ctx.setConfig(path, c[i].ID)

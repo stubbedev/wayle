@@ -147,30 +147,22 @@ type weatherView struct {
 
 func weatherDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
-	if ctx.Weather == nil {
-		// No service: the error page's classes paint it, like every
-		// other page — the fallback returns as the popover content, so
-		// the theme sheet reaches it.
-		col := widget.NewBox(widget.Column, 8, 24)
-		col.AddClass("dropdown", "weather-dropdown", "error-weather")
-		glyph := widget.NewThemeIcon("ld-info-symbolic", int(px*2.5))
-		glyph.AddClass("error-icon")
-		col.Append(glyph, false)
-		title := widget.NewLabel(font, px*1.1, i18n.T("dropdown-weather-error-unknown"), 0)
-		title.AddClass("error-title")
-		col.Append(title, false)
-		return col
-	}
+	// The Dropdown template box is spacing-0: the header strip and the
+	// .dropdown-content rules carry every gap.
 	v := &weatherView{ctx: ctx, svc: ctx.Weather, font: font, px: px, stop: make(chan struct{})}
-	v.Box = widget.NewBox(widget.Column, 10, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "weather-dropdown")
 	v.Append(v.header(), false)
 	v.pages = widget.NewStack()
 	v.pages.SetTransition(widget.StackCrossfade, gtkStackDuration)
 	v.pages.Add("loading", v.loadingPage())
 	v.pages.Add("error", v.errorPage())
-	v.loaded = widget.NewBox(widget.Column, 14, 0)
-	v.pages.Add("loaded", dropdownScroll(v.loaded, "weather-scroll"))
+	v.loaded = widget.NewBox(widget.Column, 0, 0)
+	// The loaded child is vexpand inside the scroll (weather/mod.rs):
+	// the sections fill the viewport, top-anchored.
+	scroll := dropdownScroll(v.loaded, "weather-scroll")
+	scroll.FillY = true
+	v.pages.Add("loaded", scroll)
 	// DropdownContent: the content box the stylesheet's .dropdown-content
 	// rules hang off (default ink, the section-label family).
 	content := widget.NewBox(widget.Column, 0, 0)
@@ -204,45 +196,59 @@ func (v *weatherView) header() widget.Widget {
 	refresh := widget.NewButton(v.icon("tb-refresh-symbolic", 1), 6, 6)
 	refresh.AddClass("ghost-icon")
 	refresh.OnClick = v.svc.Refresh
+	refresh.SetTooltip(i18n.T("dropdown-weather-refresh"))
 	return dropdownHeader(v.font, v.px, "ld-sun-symbolic", i18n.T("dropdown-weather-title"), refresh)
 }
 
+// vcentered fills a column page's height and centers its kids as a
+// group — a filling stack page's valign Center, with each kid at the
+// natural size the page's halign Fill renders centered.
+func vcentered(col *widget.Box, kids ...widget.Widget) *widget.Box {
+	col.Append(widget.NewBox(widget.Column, 0, 0), true)
+	for _, k := range kids {
+		col.AppendAligned(k, false, widget.AlignCenter)
+	}
+	col.Append(widget.NewBox(widget.Column, 0, 0), true)
+	return col
+}
+
 func (v *weatherView) loadingPage() widget.Widget {
-	col := widget.NewBox(widget.Column, 8, 24)
+	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("loading-weather")
-	col.Append(v.icon("ld-sun-symbolic", 2.5, "loading-icon"), false)
-	col.Append(v.label(i18n.T("dropdown-weather-loading"), 1, "loading-text"), false)
+	text := v.label(i18n.T("dropdown-weather-loading"), 1, "loading-text")
+	text.SetEllipsize(widget.EllipsizeEnd)
+	vcentered(col, v.icon("ld-sun-symbolic", 2.5, "loading-icon"), text)
 	return col
 }
 
 func (v *weatherView) errorPage() widget.Widget {
-	col := widget.NewBox(widget.Column, 8, 24)
+	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("error-weather")
-	col.Append(v.icon("ld-info-symbolic", 2.5, "error-icon"), false)
-	col.Append(v.label(i18n.T("dropdown-weather-error-title"), 1.1, "error-title"), false)
+	title := v.label(i18n.T("dropdown-weather-error-title"), 1.1, "error-title")
+	title.SetEllipsize(widget.EllipsizeEnd)
 	v.errorText = v.label("", 0.95, "error-text")
 	v.errorText.SetEllipsize(widget.EllipsizeEnd)
-	col.Append(v.errorText, false)
 	retry := widget.NewButton(widget.NewLabel(v.font, v.px, i18n.T("dropdown-weather-retry"), 0), 8, 6)
 	retry.AddClass("weather-retry-btn")
 	retry.OnClick = v.svc.Refresh
-	col.Append(retry, false)
+	vcentered(col, v.icon("ld-info-symbolic", 2.5, "error-icon"), title, v.errorText, retry)
 	return col
 }
 
 // refresh shows the status's page and rebuilds the loaded sections
-// from the latest data (every section's refresh at once).
+// from the latest data (every section's refresh at once). Every
+// refetch crossfades to the loading page, after a success too; the
+// loaded page keeps its last render until the new data lands.
 func (v *weatherView) refresh() {
-	st := v.svc.Status()
-	page := weatherPage(st)
-	w := v.svc.Weather()
-	// A refetch after a success keeps the last data on screen, as the
-	// Rust sections keep their last render while loading.
-	if page == "loading" && w != nil {
-		page = "loaded"
+	if v.svc == nil {
+		// No service: nothing to read (the Rust factory never builds the
+		// dropdown without one; the builders sweep must not panic).
+		return
 	}
+	st := v.svc.Status()
+	w := v.svc.Weather()
 	v.errorText.SetText(weatherErrorText(st))
-	v.pages.Show(page)
+	v.pages.Show(weatherPage(st))
 	if w == nil {
 		return
 	}
@@ -257,21 +263,29 @@ func (v *weatherView) refresh() {
 }
 
 // currentHeader is weather_header: the condition icon, temperature,
-// and condition, with the place and data age on the right. Every label
-// and the icon carry the class whose rule paints them.
+// and condition inside .weather-current, with the place and data age
+// in .weather-location on the right. Every label and the icon carry
+// the class whose rule paints them.
 func (v *weatherView) currentHeader(w *weather.Weather, imperial bool) widget.Widget {
 	c := w.Current
-	row := widget.NewBox(widget.Row, 12, 0)
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("weather-header")
-	row.Append(v.icon(weatherConditionIcon(c.Condition, c.IsDay), 3, "weather-icon", weatherConditionClass(c.Condition)), false)
-	temps := widget.NewBox(widget.Column, 2, 0)
+	current := widget.NewBox(widget.Row, 0, 0)
+	current.AddClass("weather-current")
+	current.Append(v.icon(weatherConditionIcon(c.Condition, c.IsDay), 3, "weather-icon", weatherConditionClass(c.Condition)), false)
+	temps := widget.NewBox(widget.Column, 0, 0)
+	temps.AddClass("weather-temp-group")
 	temp := widget.NewBox(widget.Row, 2, 0)
 	temp.Append(v.label(weatherTemp(c.Temperature, imperial), 2.4, "weather-temp"), false)
 	temp.Append(v.label(weatherUnitSymbol(imperial), 1.2, "weather-temp-unit"), false)
 	temps.Append(temp, false)
 	temps.Append(v.label(weatherConditionLabel(c.Condition), 1, "weather-condition"), false)
-	row.Append(temps, true)
-	place := widget.NewBox(widget.Column, 2, 0)
+	current.Append(temps, false)
+	row.Append(current, false)
+	// weather-location is hexpand, valign Center: it takes the free
+	// width and its right-aligned labels sit mid-height.
+	place := widget.NewBox(widget.Column, 0, 0)
+	place.AddClass("weather-location")
 	city := v.label(weatherLocationDisplay(w.Location), 1, "weather-city")
 	city.SetEllipsize(widget.EllipsizeEnd)
 	city.SetAlignment(render.AlignEnd)
@@ -279,7 +293,7 @@ func (v *weatherView) currentHeader(w *weather.Weather, imperial bool) widget.Wi
 	ago := v.label(weatherUpdatedAgo(w.UpdatedAt, time.Now()), 0.85, "weather-updated")
 	ago.SetAlignment(render.AlignEnd)
 	place.Append(ago, false)
-	row.Append(place, false)
+	row.AppendAligned(place, true, widget.AlignCenter)
 	return row
 }
 
@@ -335,15 +349,18 @@ func (v *weatherView) hourly(w *weather.Weather, imperial bool, format config.Ti
 	return col
 }
 
-// daily is daily_forecast: five days, each with its span on the week's
-// temperature range. The span is a .daily-bar track with a
-// .daily-bar-fill the stylesheet paints; the fill's offset and width
-// are per-day geometry, so they go inline like the Rust
-// set_margin_start/set_width_request pair.
+// daily is daily_forecast: five days in the .daily-forecast list, each
+// with its span on the week's temperature range. The span is a
+// .daily-bar track with a .daily-bar-fill the stylesheet paints; the
+// fill's offset and width are per-day geometry, so they go inline —
+// gelm has no widget-level min-width/margin-start to carry the Rust
+// set_width_request/set_margin_start pair.
 func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
-	col := widget.NewBox(widget.Column, 4, 0)
+	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("weather-section")
 	col.Append(v.label(i18n.T("dropdown-weather-daily"), 0.9, "section-label"), false)
+	list := widget.NewBox(widget.Column, 0, 0)
+	list.AddClass("daily-forecast")
 	days := w.Daily[:min(len(w.Daily), weatherDailyDays)]
 	lo, hi := weatherTempRange(days)
 	scale := float64(v.ctx.Config.Styling.Scale)
@@ -358,7 +375,7 @@ func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 		if isToday {
 			name = i18n.T("dropdown-weather-today")
 		}
-		row := widget.NewBox(widget.Row, 8, 2)
+		row := widget.NewBox(widget.Row, 0, 0)
 		row.AddClass("daily-item")
 		setClass(row, "today", isToday)
 		row.Append(v.label(name, 1, "daily-day"), false)
@@ -377,16 +394,20 @@ func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 		fill.SetInlineStyle(fmt.Sprintf("margin-left: %dpx; min-width: %dpx;", leftPx, fillPx))
 		bar.Append(fill, false)
 		row.AppendAligned(bar, false, widget.AlignCenter)
-		row.Append(v.label(weatherTemp(d.TempHigh, imperial)+"°", 1, "daily-high"), false)
-		row.Append(v.label(weatherTemp(d.TempLow, imperial)+"°", 1, "daily-low"), false)
-		col.Append(row, false)
+		temps := widget.NewBox(widget.Row, 0, 0)
+		temps.AddClass("daily-temps")
+		temps.Append(v.label(weatherTemp(d.TempHigh, imperial)+"°", 1, "daily-high"), false)
+		temps.Append(v.label(weatherTemp(d.TempLow, imperial)+"°", 1, "daily-low"), false)
+		row.Append(temps, false)
+		list.Append(row, false)
 	}
+	col.Append(list, false)
 	return col
 }
 
 // sunTimes is sun_times: today's sunrise and sunset.
 func (v *weatherView) sunTimes(w *weather.Weather, format config.TimeFormat) widget.Widget {
-	row := widget.NewBox(widget.Row, 12, 0)
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("sun-times")
 	for i, s := range []struct {
 		icon, label, class string
@@ -395,10 +416,10 @@ func (v *weatherView) sunTimes(w *weather.Weather, format config.TimeFormat) wid
 		{"ld-sunrise-symbolic", "dropdown-weather-sunrise", "sunrise", w.Astronomy.Sunrise},
 		{"ld-sunset-symbolic", "dropdown-weather-sunset", "sunset", w.Astronomy.Sunset},
 	} {
-		cell := widget.NewBox(widget.Row, 8, 0)
+		cell := widget.NewBox(widget.Row, 0, 0)
 		cell.AddClass("sun-time")
 		cell.Append(v.icon(s.icon, 1.4, "sun-icon", s.class), false)
-		info := widget.NewBox(widget.Column, 2, 0)
+		info := widget.NewBox(widget.Column, 0, 0)
 		info.AddClass("sun-info")
 		info.Append(v.label(i18n.T(s.label), 0.8, "sun-label"), false)
 		info.Append(v.label(weatherSunTime(s.at, format), 1, "sun-value"), false)

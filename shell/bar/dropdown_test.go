@@ -52,7 +52,7 @@ func TestDropdownOpenWithoutHostErrors(t *testing.T) {
 		t.Fatal("hostless open: want an error")
 	}
 	// An unknown dropdown name errors too.
-	r.attachHost("DP-1", fakeHost{})
+	r.attachHost("DP-1", fakeHost{}, 1000)
 	if err := r.open("DP-1", "nope", anchor); err == nil {
 		t.Fatal("unknown dropdown: want an error")
 	}

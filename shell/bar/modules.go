@@ -310,18 +310,30 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 		*ctx.Attachers = append(*ctx.Attachers, a)
 	}
 	root := module.Root()
-	classes := []string{"module"}
-	if item.Class != "" {
-		classes = append(classes, item.Class)
-	}
 	// Components that are not BarButtons in the Rust shell (the
 	// workspace rows) carry their own chrome and input handling.
 	if _, ok := module.(interface{ ownsChrome() }); ok {
 		if n, ok := root.(interface{ AddClass(...string) }); ok {
-			n.AddClass(classes...)
+			n.AddClass("module", item.Class)
 		}
 		row.Append(root, false)
 		return nil
+	}
+	// Every button module wraps in the module box the Rust factory
+	// builds: `module`, the module's own type class (battery, clock,
+	// media, ... — the layout name, overridable by the module), and the
+	// layout entry's instance class, so ancestor selectors like
+	// `.media-disc menubutton ...` reach the button.
+	wrap := widget.NewBox(widget.Row, 0, 0)
+	wrap.AddClass("module", string(item.Module))
+	if t, ok := module.(interface{ typeClass() string }); ok {
+		wrap.AddClass(t.typeClass())
+	}
+	if item.Class != "" {
+		wrap.AddClass(item.Class)
+	}
+	if c, ok := module.(interface{ setChrome(classer) }); ok {
+		c.setChrome(wrap)
 	}
 	var handler interface {
 		RunAction(config.ClickAction)
@@ -352,11 +364,11 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 			follower.followAction(action, scroll)
 		}
 	})
-	btn.AddClass(classes...)
 	if r, ok := module.(interface{ setButton(*barButton) }); ok {
 		r.setButton(btn)
 	}
-	row.Append(btn, false)
+	wrap.Append(btn, false)
+	row.Append(wrap, false)
 	return nil
 }
 

@@ -95,7 +95,10 @@ func TestBarButtonRoutesAllFiveBindings(t *testing.T) {
 	}
 	button, rec := newWrappedModule(t, binding)
 
-	button.toggle.OnClick()
+	// The primary fires on the press, the Rust GestureClick's
+	// connect_pressed; the release fires nothing more.
+	button.toggle.SetPressed(true)
+	button.toggle.SetPressed(false)
 	button.toggle.PointerButton(widget.BTNMiddle)
 	button.toggle.PointerButton(widget.BTNRight)
 	button.toggle.ScrollInput(-120)
@@ -115,15 +118,35 @@ func TestBarButtonRoutesAllFiveBindings(t *testing.T) {
 	}
 }
 
-func TestUnboundBarButtonPassesInputThrough(t *testing.T) {
+func TestUnboundBarButtonConsumesScroll(t *testing.T) {
 	button, rec := newWrappedModule(t, config.ClickConfig{})
-	if button.toggle.ScrollInput(1) {
-		t.Error("an unbound button consumed scroll")
+	// Scroll steps are always consumed (the Rust helper's
+	// Propagation::Stop); the unbound action no-ops in run.
+	if !button.toggle.ScrollInput(1) {
+		t.Error("scroll passed through the bar button; content behind it scrolls")
 	}
 	button.toggle.PointerButton(widget.BTNRight)
-	button.toggle.OnClick()
+	button.toggle.SetPressed(true)
+	button.toggle.SetPressed(false)
 	if len(rec.actions) != 0 || button.bound() {
 		t.Errorf("unbound button dispatched %+v", rec.actions)
+	}
+}
+
+// The module wrapper: `module` plus the module's own type class sit on
+// a box ABOVE the menubutton, so ancestor selectors like
+// `.media-disc menubutton ... image` match, the Rust factory's shape.
+func TestModuleWrapsTheButtonInModuleClasses(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := newTestContext(t, cfg)
+	row := CreateAll([]config.BarItem{{Module: "clock"}}, ctx)
+	item := row.Children()[0].(*widget.Box).Children()[0].(*widget.Box)
+	if !item.HasClass("module") || !item.HasClass("clock") {
+		t.Fatalf("wrapper classes %v, want module + clock above the button", item.Classes())
+	}
+	type hasClass interface{ HasClass(string) bool }
+	if b, ok := item.Children()[0].(hasClass); !ok || !b.HasClass("bar-button") {
+		t.Errorf("the wrapper holds %T, want the bar button", item.Children()[0])
 	}
 }
 

@@ -158,7 +158,10 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	life, cancel := context.WithCancel(context.Background()) //nolint:gosec // dropdownClosed cancels it
 	v.life, v.cancel = life, cancel
 	v.reads = newRefresher(ctx, life, v.read, v.apply)
-	v.Box = widget.NewBox(widget.Column, 10, 14)
+	// The popover frame (Popover.dropdown.network-dropdown > Dropdown):
+	// spacing-0, the header strip full width, .dropdown-content on the
+	// content wrapper (network/mod.rs:63-183).
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "network-dropdown")
 
 	scanIcon := widget.NewThemeIcon("tb-refresh-symbolic", int(px))
@@ -168,30 +171,39 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.wifiSwitch.OnChanged = v.wifiToggled
 	header, icon, _ := dropdownHeaderParts(font, px, "tb-wifi-symbolic", i18n.T("dropdown-network-title"), v.scanBtn, v.wifiSwitch)
 	v.headerIcon = icon
-	v.Append(header, false)
 
 	v.active = newNetActive(v)
-	v.Append(v.active, false)
 	v.secret = newNetSecretForm(v)
-	v.Append(v.secret, false)
 
-	browse := widget.NewBox(widget.Column, 10, 0)
-	browse.AddClass("dropdown-content", "network-content")
+	// The content wrapper carries .dropdown-content: its stylesheet
+	// padding owns the hand margins, and the header strip runs full
+	// width. It wraps the active connections, the secret form, and the
+	// body stack (network/mod.rs:129-183).
+	content := widget.NewBox(widget.Column, 0, 0)
+	content.AddClass("dropdown-content", "network-content")
+	content.Append(v.active, false)
+	content.Append(v.secret, false)
+
+	browse := widget.NewBox(widget.Column, 0, 0)
 	v.vpns = newNetVPNs(v)
 	browse.Append(v.vpns, false)
 	v.availLabel = v.sectionLabel(i18n.T("dropdown-network-available"))
 	browse.Append(v.availLabel, false)
 	v.password = newNetPasswordForm(v)
 	browse.Append(v.password, false)
-	v.list = widget.NewBox(widget.Column, 2, 0)
-	v.listCard = widget.NewBox(widget.Column, 0, 6)
+	v.list = widget.NewBox(widget.Column, 0, 0)
+	v.listCard = widget.NewBox(widget.Column, 0, 0)
 	v.listCard.AddClass("card", "network-list")
-	v.listCard.Append(dropdownScroll(v.list, ""), true)
+	v.listCard.Append(dropdownScroll(v.list, "network-list-scroll"), true)
 	browse.Append(v.listCard, true)
-	v.noNetworks = emptyState(font, px, "cm-wireless-disabled-symbolic", i18n.T("dropdown-network-no-networks-title"), i18n.T("dropdown-network-no-networks-description"))
-	v.noAdapter = emptyState(font, px, "tb-wifi-off-symbolic", i18n.T("dropdown-network-no-adapter-title"), i18n.T("dropdown-network-no-adapter-description"))
-	browse.Append(v.noNetworks, false)
-	browse.Append(v.noAdapter, false)
+	noNetworks, noNetworksIcon := emptyStateIcon(font, px, "cm-wireless-disabled-symbolic", i18n.T("dropdown-network-no-networks-title"), i18n.T("dropdown-network-no-networks-description"))
+	v.noNetworks = noNetworks
+	noNetworksIcon.AddClass("sm")
+	noAdapter, noAdapterIcon := emptyStateIcon(font, px, "tb-wifi-off-symbolic", i18n.T("dropdown-network-no-adapter-title"), i18n.T("dropdown-network-no-adapter-description"))
+	v.noAdapter = noAdapter
+	noAdapterIcon.AddClass("sm")
+	browse.AppendAligned(v.noNetworks, true, widget.AlignCenter)
+	browse.AppendAligned(v.noAdapter, true, widget.AlignCenter)
 	// Two pages rather than a form hiding the lists in place: the editor
 	// is somewhere you go, and coming back is one button. Each page is its
 	// own height (vhomogeneous off) and the card tweens between them; the
@@ -200,10 +212,11 @@ func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	v.body = widget.NewStack()
 	v.body.SetTransition(widget.StackSlideLeftRight, gtkStackDuration)
 	v.body.SetHomogeneous(false)
-	v.body.SetInterpolateSize(true)
 	v.body.Add(netPageBrowse, browse)
 	v.body.Add(netPageEdit, v.vpnForm)
-	v.Append(v.body, true)
+	content.Append(v.body, true)
+	v.Append(header, false)
+	v.Append(content, true)
 
 	v.apply(v.read(context.Background()))
 	v.scanIfEmpty()
@@ -297,14 +310,25 @@ func (v *networkView) rebuildList() {
 	v.noAdapter.SetVisible(!wifiAvail)
 }
 
-// row is NetworkItem: the signal icon, the SSID over its security
-// line, and the lock, or on hover the forget action for a saved one.
+// row is NetworkItem: a plain box carrying the whole row's click
+// (GestureClick on the root, network_item.rs:181-190) and the pointer
+// cursor — the lock, the name, the forget button, every part of the row
+// selects; the forget button, being a button, keeps its own click.
 func (v *networkView) row(ap apSnapshot) widget.Widget {
-	content := widget.NewBox(widget.Row, 10, 0)
+	row := widget.NewBox(widget.Row, 0, 0)
+	row.AddClass("network-item")
+	row.SetCursorName("pointer")
+	if ap.stale {
+		row.AddClass("stale")
+	}
+	ssid := ap.ssid
+	row.SetOnClickWithin(func() { v.selectNetwork(ssid) })
+
 	signal := widget.NewThemeIcon(signalStrengthIcon(ap.strength), int(v.px*1.1))
 	signal.AddClass("network-item-signal")
-	content.Append(signal, false)
-	info := widget.NewBox(widget.Column, 2, 0)
+	row.AppendAligned(signal, false, widget.AlignCenter)
+	info := widget.NewBox(widget.Column, 0, 0)
+	info.AddClass("network-item-info")
 	name := widget.NewLabel(v.font, v.px, ap.ssid, 0)
 	name.AddClass("network-item-name")
 	name.SetEllipsize(widget.EllipsizeEnd)
@@ -312,16 +336,8 @@ func (v *networkView) row(ap apSnapshot) widget.Widget {
 	sec := widget.NewLabel(v.font, v.px*0.8, rowSecurityLabel(ap), 0)
 	sec.AddClass("network-item-security")
 	info.Append(sec, false)
-	content.Append(info, true)
-	ssid := ap.ssid
-	pick := dropdownButton(content, "network-item-pick", func() { v.selectNetwork(ssid) })
+	row.Append(info, true)
 
-	row := widget.NewBox(widget.Row, 4, 0)
-	row.AddClass("network-item")
-	if ap.stale {
-		row.AddClass("stale")
-	}
-	row.Append(pick, true)
 	secured := ap.security.RequiresPassword()
 	if secured || ap.known {
 		trailing := widget.NewStack()
@@ -338,7 +354,10 @@ func (v *networkView) row(ap apSnapshot) widget.Widget {
 			actions := widget.NewBox(widget.Row, 0, 0)
 			actions.AddClass("network-item-actions")
 			forget := widget.NewLabel(v.font, v.px*0.85, i18n.T("dropdown-network-forget"), 0)
-			actions.Append(dropdownButton(forget, "network-item-forget", func() { v.forget(ssid) }), false)
+			// GhostButton + network-item-forget (network_item.rs:115-123).
+			forgetBtn := dropdownButton(forget, "ghost", func() { v.forget(ssid) })
+			forgetBtn.AddClass("network-item-forget")
+			actions.Append(forgetBtn, false)
 			trailing.Add("actions", actions)
 			row.SetOnHoverWithin(func(on bool) {
 				if on {
@@ -349,7 +368,7 @@ func (v *networkView) row(ap apSnapshot) widget.Widget {
 			})
 		}
 		trailing.Show("lock")
-		row.Append(trailing, false)
+		row.AppendAligned(trailing, false, widget.AlignCenter)
 	}
 	return row
 }
@@ -568,17 +587,18 @@ type netActive struct {
 }
 
 func newNetActive(v *networkView) *netActive {
-	a := &netActive{v: v, Box: widget.NewBox(widget.Column, 6, 0)}
+	a := &netActive{v: v, Box: widget.NewBox(widget.Column, 0, 0)}
 	a.label = v.sectionLabel("")
 	a.Append(a.label, false)
-	group := widget.NewBox(widget.Column, 6, 8)
+	group := widget.NewBox(widget.Column, 0, 0)
 	group.AddClass("card", "network-connections-group")
 
-	a.wired = widget.NewBox(widget.Row, 10, 0)
+	a.wired = widget.NewBox(widget.Row, 0, 0)
 	a.wired.AddClass("network-connection-card")
 	wiredIcon := widget.NewThemeIcon("cm-wired-symbolic", int(v.px*1.3))
 	a.wired.Append(iconTile(wiredIcon, "network-connection-icon ethernet", ""), false)
-	wiredInfo := widget.NewBox(widget.Column, 2, 0)
+	wiredInfo := widget.NewBox(widget.Column, 0, 0)
+	wiredInfo.AddClass("network-connection-info")
 	wiredName := widget.NewLabel(v.font, v.px, i18n.T("dropdown-network-ethernet"), 0)
 	wiredName.AddClass("network-connection-name")
 	wiredInfo.Append(wiredName, false)
@@ -586,22 +606,27 @@ func newNetActive(v *networkView) *netActive {
 	a.wiredDetail.AddClass("network-connection-detail")
 	wiredInfo.Append(a.wiredDetail, false)
 	a.wired.Append(wiredInfo, true)
-	a.wired.Append(v.statusLabel(), false)
+	a.wired.AppendAligned(v.statusLabel(), false, widget.AlignCenter)
 	group.Append(a.wired, false)
 
-	a.wifiCard = widget.NewBox(widget.Row, 10, 0)
+	a.wifiCard = widget.NewBox(widget.Row, 0, 0)
 	a.wifiCard.AddClass("network-connection-card")
 	a.wifiIcon = widget.NewThemeIcon(signalStrengthIcon(0), int(v.px*1.3))
 	a.wifiTile = iconTile(a.wifiIcon, "network-connection-icon wifi", "")
 	a.wifiCard.Append(a.wifiTile, false)
-	info := widget.NewBox(widget.Column, 2, 0)
+	info := widget.NewBox(widget.Column, 0, 0)
+	info.AddClass("network-connection-info")
 	a.wifiName = widget.NewLabel(v.font, v.px, "", 0)
 	a.wifiName.AddClass("network-connection-name")
 	a.wifiName.SetEllipsize(widget.EllipsizeEnd)
+	// A long name or detail must not drive the popover's width (the
+	// labels cap their natural width, active_connections/mod.rs:145,167).
+	a.wifiName.SetMaxWidthChars(1)
 	info.Append(a.wifiName, false)
 	a.wifiDetail = widget.NewLabel(v.font, v.px*0.8, "", 0)
 	a.wifiDetail.AddClass("network-connection-detail")
 	a.wifiDetail.SetEllipsize(widget.EllipsizeEnd)
+	a.wifiDetail.SetMaxWidthChars(1)
 	info.Append(a.wifiDetail, false)
 	a.wifiCard.Append(info, true)
 
@@ -615,7 +640,7 @@ func newNetActive(v *networkView) *netActive {
 	a.badge.AddClass("badge-subtle", "network-connection-status")
 	status.Append(a.badge, false)
 	a.trailing.Add("status", status)
-	actions := widget.NewBox(widget.Row, 4, 0)
+	actions := widget.NewBox(widget.Row, 0, 0)
 	actions.AddClass("network-connection-actions")
 	actions.Append(v.ghostText(i18n.T("dropdown-network-disconnect"), "network-action-disconnect", a.disconnect), false)
 	actions.Append(v.ghostText(i18n.T("dropdown-network-forget"), "network-action-forget", a.forget), false)
@@ -687,11 +712,15 @@ func (a *netActive) apply(s network.Snapshot, p netProgress) {
 
 	a.wifiCard.SetVisible(s.WifiConnected || connecting || p.err != "")
 	if a.wifiErr {
+		// The tile swaps wifi for error, it never wears both
+		// (active_connections/methods.rs:100-110).
 		a.wifiIcon.SetThemeName("cm-wireless-disabled-symbolic")
+		a.wifiTile.RemoveClass("wifi")
 		a.wifiTile.AddClass("error")
 	} else {
 		a.wifiIcon.SetThemeName(signalStrengthIcon(s.WifiStrength))
 		a.wifiTile.RemoveClass("error")
+		a.wifiTile.AddClass("wifi")
 	}
 	switch {
 	case s.WifiSSID != "":
@@ -798,13 +827,13 @@ type netPasswordForm struct {
 }
 
 func newNetPasswordForm(v *networkView) *netPasswordForm {
-	f := &netPasswordForm{v: v, Box: widget.NewBox(widget.Column, 8, 10)}
+	f := &netPasswordForm{v: v, Box: widget.NewBox(widget.Column, 0, 0)}
 	f.AddClass("card", "network-password-card")
-	header := widget.NewBox(widget.Row, 10, 0)
+	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("network-password-header")
 	f.signal = widget.NewThemeIcon(signalStrengthIcon(0), int(v.px*1.3))
 	header.Append(iconTile(f.signal, "network-connection-icon wifi", ""), false)
-	info := widget.NewBox(widget.Column, 2, 0)
+	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("network-password-info")
 	f.ssid = widget.NewLabel(v.font, v.px, "", 0)
 	f.ssid.AddClass("network-password-name")
@@ -815,7 +844,9 @@ func newNetPasswordForm(v *networkView) *netPasswordForm {
 	info.Append(f.security, false)
 	header.Append(info, true)
 	closeIcon := widget.NewThemeIcon("ld-x-symbolic", int(v.px))
-	header.Append(dropdownButton(closeIcon, "network-password-close", f.cancel), false)
+	pwClose := dropdownButton(closeIcon, "ghost-icon", f.cancel)
+	pwClose.AddClass("network-password-close")
+	header.Append(pwClose, false)
 	f.Append(header, false)
 	f.secret = newSecretEntry(v.ctx, v.font, v.px)
 	f.secret.entry.SetPlaceholder(i18n.T("dropdown-network-password-placeholder"))
@@ -823,7 +854,7 @@ func newNetPasswordForm(v *networkView) *netPasswordForm {
 	f.Append(f.secret, false)
 	f.errLabel = v.errorLabel()
 	f.Append(f.errLabel, false)
-	actions := widget.NewBox(widget.Row, 6, 0)
+	actions := widget.NewBox(widget.Row, 0, 0)
 	actions.AddClass("network-password-actions")
 	actions.Append(widget.NewSpacer(0, 0), true)
 	actions.Append(v.ghostText(i18n.T("dropdown-network-cancel"), "network-password-cancel", f.cancel), false)
@@ -875,13 +906,13 @@ type netSecretField struct {
 }
 
 func newNetSecretForm(v *networkView) *netSecretForm {
-	f := &netSecretForm{v: v, Box: widget.NewBox(widget.Column, 8, 10)}
+	f := &netSecretForm{v: v, Box: widget.NewBox(widget.Column, 0, 0)}
 	f.AddClass("card", "network-password-card", "network-secret-card")
-	header := widget.NewBox(widget.Row, 10, 0)
+	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("network-password-header")
 	lock := widget.NewThemeIcon("ld-lock-symbolic", int(v.px*1.3))
 	header.Append(iconTile(lock, "network-connection-icon vpn", ""), false)
-	info := widget.NewBox(widget.Column, 2, 0)
+	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("network-password-info")
 	f.name = widget.NewLabel(v.font, v.px, "", 0)
 	f.name.AddClass("network-password-name")
@@ -893,16 +924,21 @@ func newNetSecretForm(v *networkView) *netSecretForm {
 	info.Append(secTitle, false)
 	header.Append(info, true)
 	closeIcon := widget.NewThemeIcon("ld-x-symbolic", int(v.px))
-	header.Append(dropdownButton(closeIcon, "network-password-close", f.cancel), false)
+	secretClose := dropdownButton(closeIcon, "ghost-icon", f.cancel)
+	secretClose.AddClass("network-password-close")
+	header.Append(secretClose, false)
 	f.Append(header, false)
 	f.message = widget.NewLabel(v.font, v.px*0.85, "", 0)
 	f.message.AddClass("network-secret-message")
 	f.message.SetWrap(true)
+	// The challenge must not drive the popover's width
+	// (secret_form/mod.rs:118-128).
+	f.message.SetMaxWidthChars(32)
 	f.Append(f.message, false)
-	f.fields = widget.NewBox(widget.Column, 6, 0)
+	f.fields = widget.NewBox(widget.Column, 0, 0)
 	f.fields.AddClass("network-secret-fields")
 	f.Append(f.fields, false)
-	actions := widget.NewBox(widget.Row, 6, 0)
+	actions := widget.NewBox(widget.Row, 0, 0)
 	actions.AddClass("network-password-actions")
 	actions.Append(widget.NewSpacer(0, 0), true)
 	actions.Append(v.ghostText(i18n.T("dropdown-network-cancel"), "network-password-cancel", f.cancel), false)

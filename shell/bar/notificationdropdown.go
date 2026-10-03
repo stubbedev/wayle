@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"os"
 	"slices"
 	"strconv"
 	"sync"
@@ -70,11 +71,18 @@ type notificationView struct {
 	*widget.Box
 	headerIcon, emptyIcon *widget.Icon
 	clearAll              *widget.Button
-	dnd                   *widget.Switch
-	syncing               bool
-	body                  *widget.Stack
-	list                  *widget.Box
-	groups                []*notifGroup
+	// clearBox is clearAll's inner box: GhostButton's button > box >
+	// label tree, the stylesheet's > box margin hangs off it.
+	clearBox *widget.Box
+	dnd      *widget.Switch
+	syncing  bool
+	// body is the DropdownContent: the empty state and the list swap
+	// by visibility, no Stack (the Rust tree sets visible in place).
+	body   *widget.Box
+	empty  *widget.Box
+	scroll *widget.Scroll
+	list   *widget.Box
+	groups []*notifGroup
 
 	once sync.Once
 	stop chan struct{}
@@ -83,17 +91,23 @@ type notificationView struct {
 func notificationDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &notificationView{ctx: ctx, svc: ctx.Notifications, font: font, px: px, now: time.Now, stop: make(chan struct{})}
-	v.Box = widget.NewBox(widget.Column, 10, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "notification-dropdown")
 
+	// GhostButton: the button wraps a box around the label, so the
+	// stylesheet's button.notification-dropdown-clear-all > box margin
+	// applies.
 	clearLabel := widget.NewLabel(font, px*0.9, i18n.T("notification-dropdown-clear-all"), 0)
-	v.clearAll = dropdownButton(clearLabel, "notification-dropdown-clear-all", v.dismissAll)
+	clearBox := widget.NewBox(widget.Row, 0, 0)
+	clearBox.Append(clearLabel, false)
+	v.clearBox = clearBox
+	v.clearAll = dropdownButton(clearBox, "notification-dropdown-clear-all", v.dismissAll)
 	v.clearAll.AddClass("ghost")
 	header, headerIcon := dropdownHeaderIcon(font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-title"), v.clearAll)
 	v.headerIcon = headerIcon
 	v.Append(header, false)
 
-	dndRow := widget.NewBox(widget.Row, 8, 0)
+	dndRow := widget.NewBox(widget.Row, 0, 0)
 	dndRow.AddClass("notification-dropdown-dnd-row")
 	dndLabel := widget.NewLabel(font, px, i18n.T("notification-dropdown-dnd-label"), 0)
 	dndLabel.AddClass("notification-dropdown-dnd-label")
@@ -105,13 +119,15 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 
 	empty, emptyIcon := emptyStateIcon(font, px, "ld-bell-symbolic", i18n.T("notification-dropdown-empty-title"), i18n.T("notification-dropdown-empty-description"))
 	v.emptyIcon = emptyIcon
-	v.list = widget.NewBox(widget.Column, 8, 0)
+	v.empty = empty
+	v.list = widget.NewBox(widget.Column, 0, 0)
 	v.list.AddClass("notification-dropdown-groups")
 	scroll := dropdownScroll(v.list, "notification-dropdown-scroll")
-	v.body = widget.NewStack()
+	v.scroll = scroll
+	v.body = widget.NewBox(widget.Column, 0, 0)
 	v.body.AddClass("dropdown-content", "notification-dropdown-content")
-	v.body.Add("empty", empty)
-	v.body.Add("list", scroll)
+	v.body.Append(empty, false)
+	v.body.Append(scroll, true)
 	v.Append(v.body, true)
 
 	v.syncDND()
@@ -162,11 +178,8 @@ func (v *notificationView) rebuild() {
 		notifs = v.svc.Notifications()
 	}
 	v.clearAll.SetVisible(len(notifs) > 0)
-	if len(notifs) == 0 {
-		v.body.Show("empty")
-	} else {
-		v.body.Show("list")
-	}
+	v.empty.SetVisible(len(notifs) == 0)
+	v.scroll.SetVisible(len(notifs) > 0)
 	byApp := make(map[string]*notifGroup, len(v.groups))
 	for _, g := range v.groups {
 		byApp[g.app] = g
@@ -248,19 +261,17 @@ type notifGroup struct {
 	count, preview *widget.Label
 	chevron        *widget.Icon
 	itemsBox, list *widget.Box
-	more           *widget.Button
 	moreLabel      *widget.Label
 }
 
 func newNotifGroup(v *notificationView, data notifGroupData) *notifGroup {
-	g := &notifGroup{view: v, app: data.app, expanded: true, Box: widget.NewBox(widget.Column, 6, 0)}
+	g := &notifGroup{view: v, app: data.app, expanded: true, Box: widget.NewBox(widget.Column, 0, 0)}
 	g.AddClass("notification-dropdown-group")
 
 	g.icon = widget.NewThemeIcon(notifyui.FallbackIcon, int(v.px*1.3))
-	g.icon.AddClass("notification-dropdown-group-icon")
-	info := widget.NewBox(widget.Column, 2, 0)
+	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("notification-dropdown-group-info")
-	nameRow := widget.NewBox(widget.Row, 4, 0)
+	nameRow := widget.NewBox(widget.Row, 0, 0)
 	appName := data.app
 	if appName == "" {
 		appName = i18n.T("notification-dropdown-unknown-app")
@@ -277,27 +288,41 @@ func newNotifGroup(v *notificationView, data notifGroupData) *notifGroup {
 	g.preview.AddClass("notification-dropdown-group-preview")
 	g.preview.SetEllipsize(widget.EllipsizeEnd)
 	info.Append(g.preview, false)
-	toggleRow := widget.NewBox(widget.Row, 8, 0)
-	toggleRow.Append(iconTile(g.icon, "notification-dropdown-group-icon", "notification-dropdown-group-icon-img"), false)
-	toggleRow.Append(info, true)
 
-	header := widget.NewBox(widget.Row, 4, 0)
+	// The whole header is the click target (the GestureClick): the
+	// icon and the info sit directly in it, the chevron is a passive
+	// box+image, and the clear button ends the click walk before the
+	// header's toggle (a clicking widget on the way up stops it).
+	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("notification-dropdown-group-header")
-	header.Append(dropdownButton(toggleRow, "notification-dropdown-group-toggle", g.toggle), true)
+	header.SetCursorName("pointer")
+	header.SetOnClickWithin(g.toggle)
+	header.AppendAligned(iconTile(g.icon, "notification-dropdown-group-icon", "notification-dropdown-group-icon-img"), false, widget.AlignCenter)
+	header.AppendAligned(info, true, widget.AlignCenter)
+	actions := widget.NewBox(widget.Row, 0, 0)
+	actions.AddClass("notification-dropdown-group-actions")
 	clearLabel := widget.NewLabel(v.font, v.px*0.85, i18n.T("notification-dropdown-group-clear"), 0)
-	header.Append(dropdownButton(clearLabel, "notification-dropdown-group-clear", g.clear), false)
+	actions.AppendAligned(dropdownButton(clearLabel, "notification-dropdown-group-clear", g.clear), false, widget.AlignCenter)
+	chevron := widget.NewBox(widget.Row, 0, 0)
+	chevron.AddClass("notification-dropdown-group-chevron")
 	g.chevron = widget.NewThemeIcon("ld-chevron-up-symbolic", int(v.px))
 	g.chevron.AddClass("notification-dropdown-group-chevron-icon")
-	header.Append(dropdownButton(g.chevron, "notification-dropdown-group-chevron", g.toggle), false)
+	chevron.Append(g.chevron, false)
+	actions.AppendAligned(chevron, false, widget.AlignCenter)
+	header.Append(actions, false)
 	g.Append(header, false)
 
-	g.itemsBox = widget.NewBox(widget.Column, 6, 0)
+	g.itemsBox = widget.NewBox(widget.Column, 0, 0)
 	g.itemsBox.AddClass("notification-dropdown-group-items")
-	g.list = widget.NewBox(widget.Column, 6, 0)
+	g.list = widget.NewBox(widget.Column, 0, 0)
 	g.itemsBox.Append(g.list, false)
+	// The "N more" row is a label with the click and the pointer (the
+	// GestureClick sits on the label itself).
 	g.moreLabel = widget.NewLabel(v.font, v.px*0.85, "", 0)
-	g.more = dropdownButton(g.moreLabel, "notification-dropdown-group-more", g.showAll)
-	g.itemsBox.Append(g.more, false)
+	g.moreLabel.AddClass("notification-dropdown-group-more")
+	g.moreLabel.SetCursorName("pointer")
+	g.moreLabel.SetOnClickWithin(g.showAll)
+	g.itemsBox.Append(g.moreLabel, false)
 	g.Append(g.itemsBox, false)
 
 	g.update(data.notifs)
@@ -347,7 +372,7 @@ func (g *notifGroup) sync() {
 		g.chevron.SetThemeName("ld-chevron-down-symbolic")
 	}
 	g.moreLabel.SetText(i18n.T("notification-dropdown-group-more", i18n.Str("count", strconv.Itoa(g.overflow))))
-	g.more.SetVisible(g.overflow > 0)
+	g.moreLabel.SetVisible(g.overflow > 0)
 }
 
 // toggle is ToggleExpanded: collapsing drops back to the default cap
@@ -390,23 +415,36 @@ type notifItem struct {
 	time *widget.Label
 }
 
+// itemIcon builds the item's icon: an unloadable file picture falls
+// back to the themed bell (apply_icon's load failure) and reports
+// whether the glyph still draws a picture, so the tile takes the
+// file-icon class only when the file actually shows.
+func itemIcon(icon notifyui.Icon, size int) (*widget.Icon, bool) {
+	if icon.File != "" {
+		if _, err := os.Stat(icon.File); err != nil {
+			icon = notifyui.Icon{Name: notifyui.FallbackIcon}
+		}
+	}
+	return notifyui.NewIcon(icon, size, 0), notifyui.IsFileIcon(icon)
+}
+
 func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem {
-	it := &notifItem{view: v, n: n, Box: widget.NewBox(widget.Column, 6, 8)}
+	it := &notifItem{view: v, n: n, Box: widget.NewBox(widget.Column, 0, 0)}
 	it.AddClass("notification-dropdown-item", notifyui.UrgencyClass(n.Urgency))
 
-	main := widget.NewBox(widget.Row, 10, 0)
+	main := widget.NewBox(widget.Row, 0, 0)
 	main.AddClass("notification-dropdown-item-main")
 	icon := notifyui.ResolveIcon(v.ctx.Config.Notification.IconSource, n)
-	glyph := notifyui.NewIcon(icon, notifIconPx, 0)
+	glyph, isFile := itemIcon(icon, notifIconPx)
 	tile := iconTile(glyph, "notification-dropdown-item-icon", "notification-dropdown-item-icon-img")
-	if notifyui.IsFileIcon(icon) {
+	if isFile {
 		tile.AddClass("file-icon")
 	}
-	main.Append(tile, false)
+	main.AppendAligned(tile, false, widget.AlignStart)
 
-	content := widget.NewBox(widget.Column, 2, 0)
+	content := widget.NewBox(widget.Column, 0, 0)
 	content.AddClass("notification-dropdown-item-content")
-	header := widget.NewBox(widget.Row, 6, 0)
+	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("notification-dropdown-item-header")
 	title := widget.NewLabel(v.font, v.px, n.Summary, 0)
 	title.AddClass("notification-dropdown-item-title")
@@ -435,6 +473,7 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 	// dismiss button does not take (setup_default_action's gesture).
 	if _, ok := n.DefaultAction(); ok {
 		main.AddClass("notification-dropdown-item-default")
+		main.SetCursorName("pointer")
 		main.SetOnClickWithin(it.invokeDefault)
 	}
 	it.Append(main, false)
@@ -452,16 +491,21 @@ func (it *notifItem) actionRows() widget.Widget {
 		return nil
 	}
 	v := it.view
-	box := widget.NewBox(widget.Column, 4, 0)
+	box := widget.NewBox(widget.Column, 0, 0)
 	box.AddClass("notification-dropdown-item-actions")
 	for chunk := range slices.Chunk(visible, notifyui.ActionsPerRow) {
-		row := widget.NewBox(widget.Row, 4, 0)
+		// The homogeneous row: a column-homogeneous grid gives every
+		// button the widest button's width, gtk Box homogeneous's
+		// equal shares.
+		row := widget.NewGrid(0, 0)
+		row.SetColumnHomogeneous(true)
 		row.AddClass("notification-dropdown-item-action-row")
-		for _, a := range chunk {
+		for i, a := range chunk {
 			label := widget.NewLabel(v.font, v.px*0.9, a.Label, 0)
 			label.SetAlignment(render.AlignCenter)
 			key := a.ID
-			row.Append(dropdownButton(label, "notification-dropdown-item-action-btn", func() { it.invoke(key) }), true)
+			btn := dropdownButton(label, "notification-dropdown-item-action-btn", func() { it.invoke(key) })
+			row.Attach(btn, i, 0, 1, 1)
 		}
 		box.Append(row, false)
 	}

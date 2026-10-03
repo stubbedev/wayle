@@ -73,7 +73,7 @@ type treemanView struct {
 func treemanDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &treemanView{ctx: ctx, font: font, px: px, collapsed: map[string]bool{}, cancel: func() {}}
-	v.Box = widget.NewBox(widget.Column, 10, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "treeman-dropdown")
 	backIcon := widget.NewThemeIcon("ld-arrow-left-symbolic", int(px))
 	v.back = dropdownButton(backIcon, "ghost-icon", func() { v.openDetail("") })
@@ -82,12 +82,16 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.title = title
 	v.Append(header, false)
 
-	v.list = widget.NewBox(widget.Column, 8, 0)
+	v.list = widget.NewBox(widget.Column, 0, 0)
 	v.list.AddClass("treeman-list")
-	v.details = widget.NewBox(widget.Column, 8, 0)
+	v.details = widget.NewBox(widget.Column, 0, 0)
 	v.details.AddClass("treeman-list", "treeman-detail")
+	// The reset confirmation: the stylesheet's alert primitive (the
+	// warning variant, its title and description classes) instead of an
+	// invented class. Rust shows a native modal AlertDialog; gelm has
+	// no dialog, so the dropdown keeps an in-place page.
 	v.confirm = widget.NewBox(widget.Column, 10, 4)
-	v.confirm.AddClass("treeman-confirm")
+	v.confirm.AddClass("alert", "warning")
 	v.pages = widget.NewStack()
 	pageSlide(v.pages, ctx.Config)
 	v.pages.Add("list", v.list)
@@ -160,6 +164,12 @@ func (v *treemanView) dot(b treeman.Bucket) *widget.Box {
 	return d
 }
 
+// dotIn appends a status-dot to a row centered across it, GTK's
+// set_valign Center, so the dot keeps its compact circle.
+func (v *treemanView) dotIn(row *widget.Box, b treeman.Bucket) {
+	row.AppendAligned(v.dot(b), false, widget.AlignCenter)
+}
+
 // badge is a small colored label; the .badge rule (or its variant)
 // paints both the fill and the ink.
 func (v *treemanView) badge(text, variant string) *widget.Label {
@@ -203,7 +213,7 @@ func (v *treemanView) renderList() {
 
 // summary is the per-bucket chip row; empty buckets are left out.
 func (v *treemanView) summary() widget.Widget {
-	row := widget.NewBox(widget.Row, 12, 0)
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("treeman-summary")
 	s := v.status
 	for _, c := range []struct {
@@ -213,9 +223,9 @@ func (v *treemanView) summary() widget.Widget {
 		if c.n == 0 {
 			continue
 		}
-		chip := widget.NewBox(widget.Row, 4, 0)
+		chip := widget.NewBox(widget.Row, 0, 0)
 		chip.AddClass("treeman-stat")
-		chip.Append(v.dot(c.b), false)
+		v.dotIn(chip, c.b)
 		label := widget.NewLabel(v.font, v.px*0.85, strconv.FormatUint(uint64(c.n), 10)+" "+treemanBucketLabel(c.b), 0)
 		label.AddClass("treeman-stat-label")
 		chip.Append(label, false)
@@ -224,28 +234,32 @@ func (v *treemanView) summary() widget.Widget {
 	return row
 }
 
-// repoCard is repo_card: a header folding the worktree rows, the fold
-// kept across status refreshes.
+// repoCard is repo_card: a header folding its worktree rows into a
+// slide-down revealer, the fold kept across status refreshes.
 func (v *treemanView) repoCard(repo treeman.Repo) widget.Widget {
-	card := widget.NewBox(widget.Column, 4, 8)
+	card := widget.NewBox(widget.Column, 0, 0)
 	card.AddClass("card", "treeman-repo")
-	rows := widget.NewBox(widget.Column, 2, 0)
+	rows := widget.NewBox(widget.Column, 0, 0)
 	for _, wt := range repo.Worktrees {
 		rows.Append(v.worktreeRow(wt), false)
 	}
 	expanded := !v.collapsed[repo.Repo]
-	rows.SetVisible(expanded)
+	// The accordion: a revealer sliding the rows in and out, the Rust
+	// Revealer's SlideDown.
+	fold := widget.NewRevealer(rows)
+	fold.SetTransition(widget.RevealSlideDown)
+	fold.SetRevealed(expanded)
 
-	head := widget.NewBox(widget.Row, 8, 0)
+	head := widget.NewBox(widget.Row, 0, 0)
 	chevron := widget.NewThemeIcon(treemanChevron(expanded), int(v.px))
 	chevron.AddClass("treeman-repo-chevron")
 	head.Append(chevron, false)
 	head.Append(v.capped(repo.Repo, 1, "treeman-repo-name"), true)
-	head.Append(v.badge(strconv.FormatUint(uint64(repo.Total), 10), ""), false)
+	head.AppendAligned(v.badge(strconv.FormatUint(uint64(repo.Total), 10), ""), false, widget.AlignCenter)
 	name := repo.Repo
 	header := dropdownButton(head, "treeman-repo-header", func() {
-		open := !rows.Visible()
-		rows.SetVisible(open)
+		open := !fold.Revealed()
+		fold.SetRevealed(open)
 		chevron.SetThemeName(treemanChevron(open))
 		if open {
 			delete(v.collapsed, name)
@@ -254,7 +268,7 @@ func (v *treemanView) repoCard(repo treeman.Repo) widget.Widget {
 		}
 	})
 	card.Append(header, false)
-	card.Append(rows, false)
+	card.Append(fold, false)
 	return card
 }
 
@@ -266,39 +280,36 @@ func treemanChevron(expanded bool) string {
 }
 
 // worktreeRow is worktree_row: the dot, branch, main badge, and state
-// badge; hovering the row swaps the badge for the action cluster (the
-// overlay that reserves no width at rest).
+// badge under a treeman-wt-overlay: an Overlay whose second child is
+// the action cluster, floating at the trailing edge (halign end,
+// valign center). It reserves no width at rest and hits only inside
+// its own rect; the hover rules — the row background, the cluster's
+// opacity/translateX slide-in, the badge fade — are the stylesheet's
+// .treeman-wt-overlay:hover paints, no Go swap.
 func (v *treemanView) worktreeRow(wt treeman.Worktree) widget.Widget {
 	bucket := treeman.ParseBucket(wt.Bucket)
-	row := widget.NewBox(widget.Row, 8, 4)
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("treeman-wt")
-	row.Append(v.dot(bucket), false)
-	line := widget.NewBox(widget.Row, 6, 0)
+	v.dotIn(row, bucket)
+	line := widget.NewBox(widget.Row, 0, 0)
 	line.AddClass("treeman-wt-info")
 	line.Append(v.capped(wt.Branch, 1, "treeman-branch"), true)
 	if wt.IsMain {
-		line.Append(v.mainBadge(), false)
+		line.AppendAligned(v.mainBadge(), false, widget.AlignCenter)
 	}
 	row.Append(line, true)
 	row.SetTooltip(wt.Path)
-	trailing := widget.NewStack()
-	trailing.Add("state", v.badge(wt.State, treemanVariant(bucket)))
+	row.AppendAligned(v.badge(wt.State, treemanVariant(bucket)), false, widget.AlignCenter)
+
+	overlay := widget.NewOverlay()
+	overlay.AddClass("treeman-wt-overlay")
+	overlay.Append(row)
 	if wt.Path != "" {
 		cluster := v.actions(wt.Path)
-		info := v.ghostIcon("ld-info-symbolic", i18n.T("dropdown-treeman-action-info"), func() { v.openDetail(wt.Path) })
-		cluster.InsertAt(0, info, false)
-		trailing.Add("actions", cluster)
-		row.SetOnHoverWithin(func(on bool) {
-			if on {
-				trailing.Show("actions")
-			} else {
-				trailing.Show("state")
-			}
-		})
+		cluster.InsertAt(0, v.ghostIcon("ld-info-symbolic", i18n.T("dropdown-treeman-action-info"), func() { v.openDetail(wt.Path) }), false)
+		overlay.AppendAligned(cluster, widget.AlignEnd, widget.AlignCenter)
 	}
-	trailing.Show("state")
-	row.Append(trailing, false)
-	return row
+	return overlay
 }
 
 func (v *treemanView) ghostIcon(icon, tooltip string, onClick func()) *widget.Button {
@@ -310,7 +321,7 @@ func (v *treemanView) ghostIcon(icon, tooltip string, onClick func()) *widget.Bu
 
 // actions is Actions::buttons: prepare, reset (confirmed), teardown.
 func (v *treemanView) actions(path string) *widget.Box {
-	row := widget.NewBox(widget.Row, 2, 0)
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("treeman-actions")
 	row.Append(v.ghostIcon("tb-refresh-symbolic", i18n.T("dropdown-treeman-action-prepare"),
 		func() { v.run(treeman.ActionPrepare, path) }), false)
@@ -341,13 +352,12 @@ func (v *treemanView) run(action treeman.Action, path string) {
 
 // confirmReset is confirm_then_run for reset: the confirmation page
 // (the Go stand-in for the Rust AlertDialog) built on the stylesheet's
-// alert primitive — the warning variant, its title and description
-// classes, and a danger accept button — with the worktree path,
-// Cancel and Reset.
+// alert primitive the view was built with — the warning variant, its
+// title and description classes, and a danger accept button — with
+// the worktree path, Cancel and Reset.
 func (v *treemanView) confirmReset(path string) {
 	v.returnTo = v.pages.Visible()
 	v.confirm.Clear()
-	v.confirm.AddClass("alert", "warning")
 	title := widget.NewLabel(v.font, v.px*1.05, i18n.T("dropdown-treeman-confirm-reset-title"), 0)
 	title.SetWrap(true)
 	title.AddClass("alert-title")
@@ -378,17 +388,17 @@ func (v *treemanView) endConfirm() {
 func (v *treemanView) renderDetail(repo treeman.Repo, wt treeman.Worktree) {
 	v.details.Clear()
 	bucket := treeman.ParseBucket(wt.Bucket)
-	head := widget.NewBox(widget.Row, 8, 0)
+	head := widget.NewBox(widget.Row, 0, 0)
 	head.AddClass("treeman-detail-head")
-	head.Append(v.dot(bucket), false)
+	v.dotIn(head, bucket)
 	head.Append(v.capped(wt.Branch, 1.05, "treeman-detail-branch"), true)
 	if wt.IsMain {
-		head.Append(v.mainBadge(), false)
+		head.AppendAligned(v.mainBadge(), false, widget.AlignCenter)
 	}
-	head.Append(v.badge(wt.State, treemanVariant(bucket)), false)
+	head.AppendAligned(v.badge(wt.State, treemanVariant(bucket)), false, widget.AlignCenter)
 	v.details.Append(head, false)
 
-	fields := widget.NewBox(widget.Column, 6, 10)
+	fields := widget.NewBox(widget.Column, 0, 0)
 	fields.AddClass("card", "treeman-detail-fields")
 	fields.Append(v.field(i18n.T("dropdown-treeman-detail-repo"), repo.Repo, false), false)
 	fields.Append(v.field(i18n.T("dropdown-treeman-detail-bucket"), treemanBucketLabel(bucket), false), false)
@@ -410,7 +420,7 @@ func (v *treemanView) renderDetail(repo treeman.Repo, wt treeman.Worktree) {
 
 // field is one key/value line; the path wraps instead of truncating.
 func (v *treemanView) field(key, value string, wrap bool) widget.Widget {
-	row := widget.NewBox(widget.Row, 10, 0)
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("treeman-detail-field")
 	k := widget.NewLabel(v.font, v.px*0.85, key, 0)
 	k.AddClass("treeman-detail-key")

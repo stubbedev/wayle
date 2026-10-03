@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -173,5 +174,59 @@ func TestMailDropdownRowsAndEmptyState(t *testing.T) {
 	count := row.Children()[2].(*widget.Label)
 	if count.Text() != "0" || !count.HasClass("dim") {
 		t.Errorf("zero count = %q dim %v", count.Text(), count.HasClass("dim"))
+	}
+}
+
+// The frame is spacing-0 with no hand padding: .dropdown-content sits
+// on the content wrapper under the full-width header strip, and the
+// stylesheet's padding insets the list only (mail/mod.rs:46-48).
+func TestMailDropdownContentCarriesThePadding(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
+	v := mailDropdown(ctx).(*mailView)
+	if widget.HasClass(v.Box, "dropdown-content") {
+		t.Error("the frame wears .dropdown-content")
+	}
+	kids := v.Children()
+	if len(kids) != 2 {
+		t.Fatalf("frame children = %d, want the header and the content wrapper", len(kids))
+	}
+	header, ok := kids[0].(*widget.Box)
+	if !ok || !widget.HasClass(header, "dropdown-header") {
+		t.Fatalf("first child = %T, want the header strip", kids[0])
+	}
+	content, ok := kids[1].(*widget.Box)
+	if !ok || !widget.HasClass(content, "dropdown-content") {
+		t.Fatalf("second child = %T, want the dropdown-content wrapper", kids[1])
+	}
+
+	// Laid out under the stylesheet: the header strip sits at the
+	// frame's own edge (the frame carries no hand padding — the
+	// regression is a padded root), and the list is inset by the
+	// content's CSS padding.
+	restore := widget.SetAnimationsInstant(true)
+	t.Cleanup(restore)
+	ctx.Theme.Attach(v)
+	sz := v.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 600}})
+	v.Arrange(render.Rect{X: 0, Y: 0, W: sz.W, H: 600})
+	frame := v.Bounds()
+	strip := header.Bounds()
+	wrapper := content.Bounds()
+	if strip.X-frame.X > 2 || wrapper.X-frame.X > 2 {
+		t.Errorf("the frame carries hand padding: header +%d wrapper +%d", strip.X-frame.X, wrapper.X-frame.X)
+	}
+	var scroll *widget.Scroll
+	walkTree(content, func(w widget.Widget) bool {
+		if s, ok := w.(*widget.Scroll); ok {
+			scroll = s
+		}
+		return scroll == nil
+	})
+	if scroll == nil {
+		t.Fatal("no scrolled list under the content wrapper")
+	}
+	inner := widget.Boundser(scroll).Bounds()
+	if inner.X <= strip.X {
+		t.Errorf("the list is not inset by the content padding: list %v header %v", inner, strip)
 	}
 }

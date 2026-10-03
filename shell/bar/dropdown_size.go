@@ -93,9 +93,10 @@ type panelBox struct {
 	widget.Base
 	w, h  int
 	child widget.Widget
-	// bottom anchors the card at the surface's bottom (a bottom bar).
-	bottom bool
-	pop    popoverHandle
+	// maxH caps the card's height (the monitor less the Rust registry's
+	// scrolled-content margin); <= 0 takes the measure constraints.
+	maxH int
+	pop  popoverHandle
 }
 
 func newPanelBox(w, h int, child widget.Widget) *panelBox {
@@ -107,6 +108,9 @@ func newPanelBox(w, h int, child widget.Widget) *panelBox {
 // worst stack shortfall - its visible page's floor, then its neediest
 // page's, against the height the stack is given at the base.
 func (p *panelBox) layout(w, maxH int) (card, surface int) {
+	if p.maxH > 0 {
+		maxH = min(maxH, p.maxH)
+	}
 	con := widget.Constraints{Min: widget.Size{W: w}, Max: widget.Size{W: w, H: maxH}}
 	base := p.h
 	if base < 0 {
@@ -133,7 +137,11 @@ func (p *panelBox) fit(w, h int) {
 }
 
 func (p *panelBox) Measure(con widget.Constraints) widget.Size {
-	w := min(p.w, con.Max.W)
+	// The Rust registry sizes the surface to the card's natural width,
+	// the configured width only a floor (the popover's width_request).
+	nat := p.child.Measure(widget.Constraints{Max: widget.Size{W: con.Max.W}})
+	w := max(p.w, nat.W)
+	w = min(w, con.Max.W)
 	_, surface := p.layout(w, con.Max.H)
 	return widget.Size{W: w, H: surface}
 }
@@ -155,12 +163,11 @@ func (p *panelBox) Arrange(r render.Rect) {
 	p.ArrangeSelf(r)
 	widget.SetParents(p, p.child)
 	h, _ := p.layout(r.W, r.H)
-	card := render.Rect{X: r.X, Y: r.Y, W: r.W, H: h}
-	if p.bottom {
-		card.Y = r.Y + r.H - h
-	}
+	// The card sits at the surface's top unconditionally (the Rust
+	// revealer's valign Start): the fixed surface's transparent rest
+	// hangs below, and closes the dropdown on a click.
 	p.child.Measure(widget.Constraints{Min: widget.Size{W: r.W, H: h}, Max: widget.Size{W: r.W, H: h}})
-	p.child.Arrange(card)
+	p.child.Arrange(render.Rect{X: r.X, Y: r.Y, W: r.W, H: h})
 }
 
 func (p *panelBox) Paint(cv *render.Canvas) { widget.PaintChild(cv, p.child) }

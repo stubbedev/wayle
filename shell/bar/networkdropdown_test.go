@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -16,6 +17,21 @@ import (
 	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/network/secrets"
 )
+
+// clickAt presses and releases through a Router on target, arranged
+// under root — the real input path for a row's SetOnClickWithin and
+// its buttons.
+func clickAt(t *testing.T, root, target widget.Widget) {
+	t.Helper()
+	root.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 400}})
+	root.Arrange(render.Rect{X: 0, Y: 0, W: 500, H: 400})
+	b := target.(widget.Boundser).Bounds()
+	p := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
+	router := &widget.Router{Root: root}
+	router.Move(p)
+	router.Press(widget.BTNLeft, p)
+	router.Release(widget.BTNLeft, p)
+}
 
 // fakeWifiCtl is a scripted wifiControl.
 type fakeWifiCtl struct {
@@ -326,5 +342,196 @@ func TestNetworkSecretForm(t *testing.T) {
 	f.cancel()
 	if agent.cancels != 1 || f.Visible() {
 		t.Error("cancel did not reach the agent")
+	}
+}
+
+// The wifi rows are the plain boxes Rust's GestureClick lands on
+// (network_item.rs:49-190): not buttons, pointer cursor, and the click
+// hits anywhere in the row — the trailing lock icon included. A known
+// row's hover swaps the lock for the actions, and then the forget
+// button — a button — keeps its own click and does not select the row.
+func TestNetworkRowIsAClickableBoxNotAButton(t *testing.T) {
+	wifi := &fakeWifiCtl{
+		aps: []network.AccessPoint{
+			netAP("cafe", 60, network.SecurityWPA2, "/ap/2"),
+			netAP("saved", 70, network.SecurityWPA2, "/ap/3"),
+		},
+		known: map[string]bool{"saved": true},
+	}
+	v, _, pop := newNetTestView(t, network.Snapshot{WifiEnabled: true}, netDeps{wifiCtl: wifi})
+	if len(v.list.Children()) != 2 {
+		t.Fatalf("rows = %d, want cafe and saved", len(v.list.Children()))
+	}
+	// Strongest first: the saved network outranks the unknown one.
+	saved, ok := v.list.Children()[0].(*widget.Box)
+	if !ok {
+		t.Fatalf("row = %T, want a plain box", v.list.Children()[0])
+	}
+	cafe, ok := v.list.Children()[1].(*widget.Box)
+	if !ok {
+		t.Fatalf("row = %T, want a plain box", v.list.Children()[1])
+	}
+	if _, isButton := any(cafe).(*widget.Button); isButton {
+		t.Fatal("the row is a button element")
+	}
+	if !cafe.HasClass("network-item") || widget.HasClass(cafe, "network-item-pick") {
+		t.Error("the row is not the network-item box")
+	}
+	if widget.CursorNameOf(cafe) != "pointer" {
+		t.Error("the row does not carry the pointer cursor")
+	}
+
+	// The trailing lock icon is a plain widget: clicking it selects; a
+	// secured unknown network asks for its password, focused.
+	var lock widget.Widget
+	walkTree(cafe, func(w widget.Widget) bool {
+		if i, ok := w.(*widget.Icon); ok && i.HasClass("network-item-lock") {
+			lock = i
+		}
+		return lock == nil
+	})
+	if lock == nil {
+		t.Fatal("no lock icon in the row")
+	}
+	clickAt(t, cafe, lock)
+	if v.state != netPasswordEntry || pop.focused != v.password.secret.entry {
+		t.Errorf("a click on the trailing icon did not select: state %d focus %v", v.state, pop.focused)
+	}
+
+	// The forget button on the saved row forgets; it does not select the
+	// row. The hover that reveals it is the pointer clickAt moves.
+	var trailing *widget.Stack
+	walkTree(saved, func(w widget.Widget) bool {
+		if s, ok := w.(*widget.Stack); ok && s.HasClass("network-item-trailing") {
+			trailing = s
+		}
+		return trailing == nil
+	})
+	if trailing == nil {
+		t.Fatal("no trailing stack on the saved row")
+	}
+	trailing.Show("actions")
+	forget := findButton(trailing, "network-item-forget")
+	if forget == nil {
+		t.Fatal("no forget button in the row")
+	}
+	if !widget.HasClass(forget, "ghost") || widget.HasClass(forget, "ghost-icon") {
+		t.Error("the forget button is not GhostButton + network-item-forget")
+	}
+	clickAt(t, saved, forget)
+	waitHeadless(t, "the forget", func() bool { _, f, _, _, _ := wifi.calls(); return len(f) == 1 && f[0] == "saved" })
+	if v.selection != nil && v.selection.ssid == "saved" {
+		t.Error("the forget button also selected the row")
+	}
+
+	// The saved row's name still selects the row itself.
+	var name widget.Widget
+	walkTree(saved, func(w widget.Widget) bool {
+		if l, ok := w.(*widget.Label); ok && l.HasClass("network-item-name") {
+			name = l
+		}
+		return name == nil
+	})
+	if name == nil {
+		t.Fatal("no name label in the row")
+	}
+	clickAt(t, saved, name)
+	// The selection went straight to connecting: the watch records the
+	// connect, and its completion lands back on the loop.
+	waitHeadless(t, "the connect", func() bool {
+		c, _, _, _, _ := wifi.calls()
+		return len(c) == 1 && c[0].path == "/ap/3" && c[0].password == ""
+	})
+	waitHeadless(t, "the connect finished", func() bool { return v.state == netNormal })
+}
+
+// .dropdown-content is on the root content wrapper — active
+// connections, secret form, and body stack under one padded box — and
+// nowhere else in the tree (network/mod.rs:129-183).
+func TestNetworkDropdownContentOnTheRootWrapper(t *testing.T) {
+	v, _, _ := newNetTestView(t, network.Snapshot{}, netDeps{})
+	if widget.HasClass(v.Box, "dropdown-content") {
+		t.Error("the frame wears .dropdown-content")
+	}
+	var content *widget.Box
+	found := 0
+	walkTree(v, func(w widget.Widget) bool {
+		if b, ok := w.(*widget.Box); ok && widget.HasClass(b, "dropdown-content") {
+			found++
+			for _, kid := range v.Children() {
+				if kid == widget.Widget(b) {
+					content = b
+				}
+			}
+		}
+		return true
+	})
+	if found != 1 || content == nil {
+		t.Fatalf(".dropdown-content boxes = %d, want the one root wrapper", found)
+	}
+	kids := content.Children()
+	if len(kids) != 3 {
+		t.Fatalf("content children = %d, want active, secret, and the body stack", len(kids))
+	}
+	if kids[0] != widget.Widget(v.active) || kids[1] != widget.Widget(v.secret) {
+		t.Error("the active connections and secret form are not under the content wrapper")
+	}
+	if kids[2] != widget.Widget(v.body) {
+		t.Error("the body stack is not under the content wrapper")
+	}
+}
+
+// The scan button is GhostIconButton: ghost-icon, never ghost
+// (network/mod.rs:97-109).
+func TestNetworkScanButtonGhostIconOnly(t *testing.T) {
+	v, _, _ := newNetTestView(t, network.Snapshot{WifiEnabled: true}, netDeps{wifiCtl: &fakeWifiCtl{}})
+	if !widget.HasClass(v.scanBtn, "ghost-icon") || !widget.HasClass(v.scanBtn, "network-scan-btn") {
+		t.Error("the scan button is not ghost-icon + network-scan-btn")
+	}
+	if widget.HasClass(v.scanBtn, "ghost") {
+		t.Error("the scan button carries the ghost class")
+	}
+}
+
+// The empty states' icons carry the sm size class (available_networks/
+// mod.rs:114,137).
+func TestNetworkEmptyStatesCarryTheSmIcon(t *testing.T) {
+	v, _, _ := newNetTestView(t, network.Snapshot{}, netDeps{})
+	for _, empty := range []*widget.Box{v.noAdapter, v.noNetworks} {
+		var icon *widget.Icon
+		walkTree(empty, func(w widget.Widget) bool {
+			if i, ok := w.(*widget.Icon); ok && i.HasClass("icon") {
+				icon = i
+			}
+			return icon == nil
+		})
+		if icon == nil {
+			t.Fatal("the empty state has no icon")
+		}
+		if !icon.HasClass("sm") {
+			t.Error("the empty state icon lacks the sm class")
+		}
+	}
+}
+
+// The wifi tile swaps wifi for error; it never wears both
+// (active_connections/methods.rs:100-110).
+func TestNetworkWifiTileSwapsWifiForError(t *testing.T) {
+	v, _, _ := newNetTestView(t, network.Snapshot{WifiEnabled: true}, netDeps{wifiCtl: &fakeWifiCtl{}})
+	onHeadlessLoop(func() bool {
+		v.progress = netProgress{err: "no answer"}
+		v.active.apply(v.cur.snap, v.progress)
+		return true
+	})
+	if !v.active.wifiTile.HasClass("error") || v.active.wifiTile.HasClass("wifi") {
+		t.Error("a failed join left the tile in its wifi state")
+	}
+	onHeadlessLoop(func() bool {
+		v.progress = netProgress{}
+		v.active.apply(v.cur.snap, v.progress)
+		return true
+	})
+	if !v.active.wifiTile.HasClass("wifi") || v.active.wifiTile.HasClass("error") {
+		t.Error("the tile did not return to its wifi state")
 	}
 }

@@ -192,3 +192,65 @@ func TestRecorderDropdownWritesConfig(t *testing.T) {
 		t.Error("an unchanged list rebuilt the picker")
 	}
 }
+
+// The recorder tree is spacing-0 wherever Rust's boxes are (mod.rs sets
+// no spacing on the root, the status, the cards, and the rows — the CSS
+// padding and the .recorder-row + .recorder-row border-top carry the
+// layout); the boxes Rust does space keep their gaps.
+func TestRecorderSpacingIsZero(t *testing.T) {
+	ctx, _, _ := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
+	v := recorderDropdown(ctx).(*recorderView)
+	defer v.dropdownClosed()
+	if got := v.Spacing(); got != 0 {
+		t.Errorf("root spacing = %d, want 0", got)
+	}
+	if got := v.status.Spacing(); got != 0 {
+		t.Errorf("status spacing = %d, want 0", got)
+	}
+	card := findByClass(v, "recorder-card")
+	if card == nil {
+		t.Fatal("no recorder card")
+	}
+	if got := card.(*widget.Box).Spacing(); got != 0 {
+		t.Errorf("card spacing = %d, want 0", got)
+	}
+	row := findByClass(v, "recorder-row")
+	if row == nil {
+		t.Fatal("no recorder row")
+	}
+	if got := row.(*widget.Box).Spacing(); got != 0 {
+		t.Errorf("row spacing = %d, want 0", got)
+	}
+
+	// Negative: the boxes Rust itself spaces keep their gaps — zeroing
+	// those would be the same bug the other way.
+	for _, tc := range []struct {
+		class string
+		want  int
+	}{
+		{"recorder-controls", 8},
+		{"recorder-section-header", 6},
+	} {
+		w := findByClass(v, tc.class)
+		if w == nil {
+			t.Fatalf("no %s", tc.class)
+		}
+		if got := w.(*widget.Box).Spacing(); got != tc.want {
+			t.Errorf("%s spacing = %d, want %d (the Rust set_spacing)", tc.class, got, tc.want)
+		}
+	}
+	var position *widget.Box
+	walkTree(v, func(w widget.Widget) bool {
+		b, ok := w.(*widget.Box)
+		if !ok || !b.HasClass("recorder-row") || len(b.Children()) == 0 {
+			return true
+		}
+		if l, ok := b.Children()[0].(*widget.Label); ok && l.Text() == i18n.T("dropdown-recorder-position") {
+			position = b
+		}
+		return true
+	})
+	if position == nil || position.Spacing() != 6 {
+		t.Errorf("position row = %v, want spacing 6 (the Rust set_spacing)", position)
+	}
+}

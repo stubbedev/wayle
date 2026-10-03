@@ -2,6 +2,7 @@ package bar
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/stubbedev/gelm/app"
@@ -27,8 +28,14 @@ type dropdownRegistry struct {
 
 	mu      sync.Mutex
 	openPop map[string]*app.Popover
-	// openRev is the revealer around each open popover's card.
-	openRev map[string]*widget.Revealer
+	// openRev is the revealer around each open popover's card; openName
+	// is the dropdown it shows, so a second module's click re-anchors
+	// instead of toggling off.
+	openRev  map[string]*widget.Revealer
+	openName map[string]string
+	// monH is each connector's monitor height in logical pixels, the
+	// popover ceiling's input (GTK keeps a popover on its output).
+	monH map[string]int
 }
 
 // dropdownCloser is live dropdown content (a service subscription) that
@@ -97,14 +104,17 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 		builders: dropdownBuilders(),
 		openPop:  make(map[string]*app.Popover),
 		openRev:  make(map[string]*widget.Revealer),
+		openName: make(map[string]string),
+		monH:     make(map[string]int),
 	}
 }
 
 // attachHost registers the layer window a connector's dropdowns open
-// on.
-func (r *dropdownRegistry) attachHost(connector string, host app.Host) {
+// on, with the monitor's logical height for the popover ceiling.
+func (r *dropdownRegistry) attachHost(connector string, host app.Host, monH int) {
 	r.mu.Lock()
 	r.hosts[connector] = host
+	r.monH[connector] = monH
 	r.mu.Unlock()
 }
 
@@ -115,6 +125,8 @@ func (r *dropdownRegistry) detachHost(connector string) {
 	delete(r.hosts, connector)
 	delete(r.openPop, connector)
 	delete(r.openRev, connector)
+	delete(r.openName, connector)
+	delete(r.monH, connector)
 	r.mu.Unlock()
 }
 
@@ -129,20 +141,28 @@ func (r *dropdownRegistry) Names() []string {
 
 // open shows one dropdown anchored to the module's root widget on the
 // connector's host. Re-clicking the same module dismisses; opening
-// another re-anchors (the Rust registry's toggle_for).
+// another while one is up dismisses it and opens the new (the Rust
+// registry's reparent_and_show), so the bar never shows two.
 func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) error {
 	r.mu.Lock()
+	host := r.hosts[connector]
+	monH := r.monH[connector]
 	// A popover that already went away (click-away, Esc) no longer
 	// counts as open: the next click opens instead of toggling off.
 	if prev := r.openPop[connector]; prev != nil && !prev.Closed() {
+		same := r.openName[connector] == name
 		rev := r.openRev[connector]
 		delete(r.openPop, connector)
 		delete(r.openRev, connector)
+		delete(r.openName, connector)
 		r.mu.Unlock()
 		dismissAnimated(prev, rev, r.cfg.Animations)
-		return nil
+		if same {
+			return nil
+		}
+		// The exit plays before the next popover opens.
+		r.mu.Lock()
 	}
-	host := r.hosts[connector]
 	build, ok := r.builders[name]
 	r.mu.Unlock()
 	if !ok {
@@ -160,10 +180,14 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 		return fmt.Errorf("dropdown %q has no content", name)
 	}
 	// The panel takes its [dropdowns.<name>] size (or the built-in base
-	// at the global scale).
+	// at the global scale), its content clamped to the monitor less the
+	// Rust registry's scrolled-content margin, the popover surface to
+	// the monitor less its own.
 	if w, h, ok := dropdownDims(name, r.cfg); ok {
 		panel := newPanelBox(w, h, content)
-		panel.bottom = r.cfg.Bar.Location == config.LocationBottom
+		if monH > 0 {
+			panel.maxH = monH - 180
+		}
 		content = panel
 	}
 	cfg := app.PopoverConfig{
@@ -171,6 +195,9 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 		Gravity: dropdownGravity(r.cfg.Bar.Location),
 		Content: content,
 		Serial:  r.app.LastPressSerial(host),
+	}
+	if monH > 0 {
+		cfg.MaxHeight = monH - 100
 	}
 	if closer, ok := content.(dropdownCloser); ok {
 		cfg.OnClosed = closer.dropdownClosed
@@ -183,8 +210,11 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	// and the shadow/position classes pick the shadow's direction. The
 	// popover is its own tree, so the theme sheet attaches here — the
 	// panels paint from the same CSS the Rust shell loads.
-	card := popoverCard(rev, dropdownGravity(r.cfg.Bar.Location))
-	cfg.Content = card
+	card := popoverCard(rev, dropdownGravity(r.cfg.Bar.Location), r.cfg.Bar.DropdownShadow)
+	// The Rust registry's surface margins: a narrow gap toward the bar,
+	// the wide one everywhere else, scaled.
+	framed := withDropdownMargins(card, r.cfg)
+	cfg.Content = framed
 	if r.ctx.Theme != nil {
 		r.ctx.Theme.Attach(card)
 	}
@@ -202,6 +232,7 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	r.mu.Lock()
 	r.openPop[connector] = pop
 	r.openRev[connector] = rev
+	r.openName[connector] = name
 	r.mu.Unlock()
 	return nil
 }
@@ -235,6 +266,49 @@ func dropdownGenieEdge(location config.Location) widget.Edge {
 func (r *dropdownRegistry) setConfig(cfg *config.Config) {
 	r.cfg = cfg
 	r.ctx.Config = cfg
+}
+
+// dropdownMargins is the Rust registry's DropdownMargins: a narrow gap
+// toward the bar's edge, the wide one everywhere else, rounded to
+// whole pixels at the bar scale.
+type dropdownMargins struct{ top, bottom, start, end int }
+
+const (
+	marginsGapRem     = 0.275
+	marginsContentRem = 1.0
+	marginsRemPx      = 16.0
+)
+
+func newDropdownMargins(scale float64, location config.Location) dropdownMargins {
+	gap := roundMarginRem(marginsGapRem, scale)
+	content := roundMarginRem(marginsContentRem, scale)
+	m := dropdownMargins{content, content, content, content}
+	switch location {
+	case config.LocationTop:
+		m.top = gap
+	case config.LocationBottom:
+		m.bottom = gap
+	case config.LocationLeft:
+		m.start = gap
+	case config.LocationRight:
+		m.end = gap
+	}
+	return m
+}
+
+func roundMarginRem(rem, scale float64) int {
+	return int(math.Round(rem * marginsRemPx * scale))
+}
+
+// withDropdownMargins wraps the popover card in the margins box: the
+// Rust registry sets them on the popover child at every show, so the
+// card floats inside the surface away from its edges.
+func withDropdownMargins(card widget.Widget, cfg *config.Config) widget.Widget {
+	m := newDropdownMargins(float64(cfg.Styling.Scale), cfg.Bar.Location)
+	box := widget.NewBox(widget.Column, 0, 0)
+	box.SetPadding(render.Insets{Top: m.top, Bottom: m.bottom, Left: m.start, Right: m.end})
+	box.Append(card, true)
+	return box
 }
 
 // dropdownGravity is detect_popover_position: dropdowns open away from

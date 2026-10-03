@@ -54,6 +54,9 @@ const passkeyTotal = 6
 type btPairingCard struct {
 	root    *widget.Box
 	variant pairingVariant
+	// focus moves the keyboard focus inside the hosting popover (the
+	// Rust entries' grab_focus); nil until the popover attaches.
+	focus func(widget.Widget)
 	// onOutput receives the user's answer; the dropdown clears the
 	// card and forwards it to the service.
 	onOutput func(pairingOutput)
@@ -66,10 +69,13 @@ type btPairingCard struct {
 	// shows under.
 	sections []cardSection
 
-	pinCode        []*widget.Label
+	pinCode []*widget.Label
+	// pinRow holds the six single-digit passkey boxes
+	// (pairing_card's pin_input_row).
+	pinRow         *widget.Box
+	pinDigits      []*widget.Entry
 	progress       *widget.Label
 	serviceName    *widget.Label
-	passkeyEntry   *widget.Entry
 	legacyPinEntry *widget.Entry
 
 	leftLabel, rightLabel *widget.Label
@@ -84,15 +90,17 @@ type cardSection struct {
 func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	font, px := dropdownFont(ctx)
 	c := &btPairingCard{}
-	col := widget.NewBox(widget.Column, 8, 12)
+	// Rust's boxes are spacing-0; the card SCSS's margins carry the gaps
+	// (pairing_card/mod.rs:47-101).
+	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("bluetooth-pairing-card")
 
 	// The header: device icon, name and type, the close button.
-	header := widget.NewBox(widget.Row, 8, 0)
+	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("bluetooth-pairing-header")
 	c.icon = widget.NewThemeIcon("ld-bluetooth-symbolic", int(px*1.4))
 	header.Append(iconTile(c.icon, "bluetooth-device-icon", "bluetooth-icon"), false)
-	info := widget.NewBox(widget.Column, 2, 0)
+	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("bluetooth-pairing-device-info")
 	c.deviceName = widget.NewLabel(font, px, "", 0)
 	c.deviceName.SetEllipsize(widget.EllipsizeEnd)
@@ -101,10 +109,10 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	c.deviceType.AddClass("bluetooth-device-detail")
 	info.Append(c.deviceName, false)
 	info.Append(c.deviceType, false)
-	header.Append(info, true)
+	header.AppendAligned(info, true, widget.AlignCenter)
 	closeIcon := widget.NewThemeIcon("ld-x-symbolic", int(px))
-	closeBtn := ghostButton(closeIcon)
-	closeBtn.AddClass("ghost-icon", "bluetooth-pairing-close")
+	closeBtn := dropdownButton(closeIcon, "ghost-icon", nil)
+	closeBtn.AddClass("bluetooth-pairing-close")
 	closeBtn.OnClick = func() { c.emit(pairingOutput{kind: outputCancelled}) }
 	header.Append(closeBtn, false)
 	col.Append(header, false)
@@ -116,7 +124,7 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 		return l
 	}
 	codeBlock := func(labelKey string) *widget.Box {
-		box := widget.NewBox(widget.Column, 4, 12)
+		box := widget.NewBox(widget.Column, 0, 0)
 		box.AddClass("bluetooth-pin-display")
 		if labelKey != "" {
 			l := widget.NewLabel(font, px*0.95, btText(labelKey), 0)
@@ -140,25 +148,45 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	add(message("dropdown-bluetooth-pairing-allow-pairing"), variantRequestAuthorization)
 	add(message("dropdown-bluetooth-pairing-enter-shown-pin"), variantRequestPasskey)
 
-	// One digits-only entry stands in for the Rust six single-digit
-	// boxes: gelm has no programmatic focus to step between them.
-	c.passkeyEntry = widget.NewEntry(font, px*1.4, 0)
-	c.passkeyEntry.AddClass("bluetooth-pin-input-row")
-	c.passkeyEntry.OnChanged = limitEntry(c.passkeyEntry, passkeyTotal, isDigit)
-	add(c.passkeyEntry, variantRequestPasskey)
+	// The passkey prompt: six single-digit boxes in a centered row
+	// (pairing_card/mod.rs:147-190). The entry.bluetooth-pin-digit rules
+	// size and ink them; the mono font is the stylesheet's.
+	c.pinRow = widget.NewBox(widget.Row, 0, 0)
+	c.pinRow.AddClass("bluetooth-pin-input-row")
+	for i := range passkeyTotal {
+		digit := widget.NewEntry(font, px*1.4, 0)
+		digit.AddClass("bluetooth-pin-digit")
+		// set_max_length 1 (the digit filter) and set_max_width_chars 1;
+		// a typed digit moves to the next box, as handle_pin_key does.
+		digit.SetWidthChars(0, 1)
+		digit.OnChanged = func(string) {
+			limitEntry(digit, 1, isDigit)(digit.Text())
+			if runes := []rune(digit.Text()); len(runes) == 1 && i < passkeyTotal-1 {
+				c.focusDigit(i + 1)
+			}
+		}
+		c.pinDigits = append(c.pinDigits, digit)
+		c.pinRow.Append(digit, false)
+	}
+	add(c.pinRow, variantRequestPasskey)
 
 	add(message("dropdown-bluetooth-pairing-confirm-code"), variantRequestConfirmation)
 	confirmPin := codeBlock("")
 	add(confirmPin, variantRequestConfirmation)
 
 	displayPasskey := codeBlock("dropdown-bluetooth-pairing-enter-pin")
+	// The typing-progress dots box under the code
+	// (pairing_card/mod.rs:229-230): an empty box the stylesheet spaces.
+	dots := widget.NewBox(widget.Row, 0, 0)
+	dots.AddClass("bluetooth-progress-dots")
+	displayPasskey.Append(dots, false)
 	add(displayPasskey, variantDisplayPasskey)
 	c.progress = message("dropdown-bluetooth-pairing-entering")
 	add(c.progress, variantDisplayPasskey)
 
 	c.serviceName = widget.NewLabel(font, px, "", 0)
 	c.serviceName.AddClass("bluetooth-service-name")
-	service := widget.NewBox(widget.Column, 0, 12)
+	service := widget.NewBox(widget.Column, 0, 0)
 	service.AddClass("bluetooth-service-info")
 	service.Append(c.serviceName, false)
 	add(service, variantRequestServiceAuthorization)
@@ -174,8 +202,9 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	hint.AddClass("bluetooth-pin-hint")
 	add(hint, variantRequestPinCode)
 
-	// The actions: reject/cancel on the left, the confirm on the right.
-	actions := widget.NewBox(widget.Row, 8, 0)
+	// The actions: reject/cancel on the left, the confirm on the right
+	// (homogeneous, spacing-0: the shared buttons split the width).
+	actions := widget.NewBox(widget.Row, 0, 0)
 	actions.AddClass("bluetooth-pairing-actions")
 	c.leftLabel = widget.NewLabel(font, px, "", 0)
 	left := ghostButton(c.leftLabel)
@@ -231,12 +260,32 @@ func (c *btPairingCard) emit(out pairingOutput) {
 	}
 }
 
+// focusDigit moves the keyboard to digit i (grab_focus), a no-op
+// before the popover attaches.
+func (c *btPairingCard) focusDigit(i int) {
+	if c.focus != nil && i >= 0 && i < len(c.pinDigits) {
+		c.focus(c.pinDigits[i])
+	}
+}
+
+// passkeyText is the six boxes' contents joined: what the confirm
+// sends (build_confirm_output's RequestPasskey arm).
+func (c *btPairingCard) passkeyText() string {
+	var b strings.Builder
+	for _, digit := range c.pinDigits {
+		b.WriteString(digit.Text())
+	}
+	return b.String()
+}
+
 // set shows req for the device (SetRequest + apply_request).
 func (c *btPairingCard) set(req bluetooth.PairingRequest, display deviceDisplay) {
 	c.deviceName.SetText(display.name)
 	c.deviceType.SetText(btText(display.typeKey))
 	c.icon.SetThemeName(display.icon)
-	c.passkeyEntry.SetText("")
+	for _, digit := range c.pinDigits {
+		digit.SetText("")
+	}
 	c.legacyPinEntry.SetText("")
 	code := ""
 	switch r := req.(type) {
@@ -325,13 +374,14 @@ func (c *btPairingCard) hasConfirmAction() bool {
 	return true
 }
 
-// confirmOutput is build_confirm_output. The passkey entry answers
-// RequestPasskey with the number (the Rust sends it as a PIN, which
-// its own provider refuses); an empty entry has nothing to send.
+// confirmOutput is build_confirm_output. The six digit boxes answer
+// RequestPasskey with the number they spell (the Rust sends it as a
+// PIN, which its own provider refuses); an incomplete passkey has
+// nothing to send.
 func (c *btPairingCard) confirmOutput() (pairingOutput, bool) {
 	switch c.variant {
 	case variantRequestPasskey:
-		passkey, err := strconv.ParseUint(c.passkeyEntry.Text(), 10, 32)
+		passkey, err := strconv.ParseUint(c.passkeyText(), 10, 32)
 		if err != nil {
 			return pairingOutput{}, false
 		}

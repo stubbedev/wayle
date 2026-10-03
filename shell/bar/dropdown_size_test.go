@@ -64,23 +64,47 @@ func TestContentSizedPanelFollowsTheVisiblePage(t *testing.T) {
 	}
 }
 
-func TestPanelAnchorsAtTheBarAndTheRestCloses(t *testing.T) {
+func TestPanelAnchorsAtTheTopAndTheRestCloses(t *testing.T) {
 	p, _ := pagedPanel(300, widget.NewSpacer(10, 500))
-	p.bottom = true
 	_, card := panelLayout(p)
-	if card.Y != 200 {
-		t.Errorf("bottom bar: card %+v, want it at the surface's bottom", card)
+	if card.Y != 0 {
+		t.Errorf("card %+v, want it anchored at the surface's top like the Rust revealer's valign Start", card)
 	}
 	pop := &fakePopover{}
 	p.attachPopover(pop)
-	if hit := p.HitTest(widget.Point{X: 10, Y: 50}); hit != widget.Widget(p) {
+	// The reserved surface is taller than the visible card: the rest
+	// below it is the transparent close target.
+	if hit := p.HitTest(widget.Point{X: 10, Y: card.Y + card.H + 50}); hit != widget.Widget(p) {
 		t.Fatalf("the transparent rest hit %T, want the panel", hit)
 	}
-	p.ClickAt(widget.Point{X: 10, Y: 50})
+	p.ClickAt(widget.Point{X: 10, Y: card.Y + card.H + 50})
 	if pop.dismissed != 1 {
 		t.Errorf("a click on the rest dismissed %d times, want once", pop.dismissed)
 	}
-	if hit := p.HitTest(widget.Point{X: 10, Y: 250}); hit == widget.Widget(p) {
+	if hit := p.HitTest(widget.Point{X: 10, Y: card.Y + card.H/2}); hit == widget.Widget(p) {
 		t.Error("a click on the card fell through to the panel")
+	}
+}
+
+// The card's height caps at the panel's monitor-derived ceiling even
+// when the measure constraints are looser.
+func TestPanelCapsAtTheMonitorCeiling(t *testing.T) {
+	p, _ := pagedPanel(300, widget.NewSpacer(10, 900))
+	p.maxH = 400
+	_, card := panelLayout(p)
+	if card.H > 400 {
+		t.Errorf("card %+v, want it capped at 400", card)
+	}
+}
+
+// The configured width is a floor: content wider than it widens the
+// surface, the Rust registry's natural-width sizing.
+func TestPanelWidthFloorsAtTheConfig(t *testing.T) {
+	wide := widget.NewBox(widget.Row, 0, 0)
+	wide.Append(widget.NewSpacer(500, 20), false)
+	p := newPanelBox(300, 0, wide)
+	sz := p.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 1000}})
+	if sz.W != 500 {
+		t.Errorf("panel width %d, want the content's 500 over the config's 300", sz.W)
 	}
 }

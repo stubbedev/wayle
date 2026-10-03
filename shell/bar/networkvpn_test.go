@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/gelm/widget"
 
@@ -306,6 +307,53 @@ func TestVPNSection(t *testing.T) {
 	waitHeadless(t, "the toggle", func() bool { _, _, _, tg := vpn.writes(); return slices.Equal(tg, []string{"u2"}) })
 }
 
+// The VPN rows are plain boxes carrying the whole row's click
+// (vpn_item.rs:82-197): not buttons, pointer cursor, and the row's
+// state glyph — a plain icon — toggles the tunnel. The add row is the
+// same kind of box (vpn_connections/mod.rs:75-107).
+func TestVPNRowsAreClickableBoxes(t *testing.T) {
+	vpn := &fakeVPN{entries: []network.VPN{{UUID: "u1", Name: "Work", State: network.VPNDisconnected}}}
+	v, _ := newVPNTestView(t, vpn, nil)
+	v.apply(v.read(context.Background()))
+	row, ok := v.vpns.rows.Children()[0].(*widget.Box)
+	if !ok {
+		t.Fatalf("row = %T, want a plain box", v.vpns.rows.Children()[0])
+	}
+	if _, isButton := any(row).(*widget.Button); isButton {
+		t.Fatal("the row is a button element")
+	}
+	if !row.HasClass("network-item") || !row.HasClass("vpn-item") || widget.HasClass(row, "vpn-item-toggle") {
+		t.Error("the row is not the network-item vpn-item box")
+	}
+	if widget.CursorNameOf(row) != "pointer" {
+		t.Error("the row does not carry the pointer cursor")
+	}
+	var icon widget.Widget
+	walkTree(row, func(w widget.Widget) bool {
+		if i, ok := w.(*widget.Icon); ok && i.HasClass("network-item-signal") {
+			icon = i
+		}
+		return icon == nil
+	})
+	if icon == nil {
+		t.Fatal("no state glyph in the row")
+	}
+	clickAt(t, row, icon)
+	waitHeadless(t, "the row toggle", func() bool { _, _, _, tg := vpn.writes(); return slices.Equal(tg, []string{"u1"}) })
+
+	// The add row: a box, not a button; clicking it opens the editor.
+	if _, isButton := any(v.vpns.add).(*widget.Button); isButton {
+		t.Fatal("the add row is a button element")
+	}
+	if widget.CursorNameOf(v.vpns.add) != "pointer" {
+		t.Error("the add row does not carry the pointer cursor")
+	}
+	clickAt(t, v.vpns.add, v.vpns.add)
+	if v.body.Visible() != netPageEdit {
+		t.Error("clicking the add row did not open the editor")
+	}
+}
+
 func TestVPNFormCreates(t *testing.T) {
 	vpn := &fakeVPN{}
 	v, pop := newVPNTestView(t, vpn, nil)
@@ -400,8 +448,8 @@ func TestVPNFormEditsAndDeletes(t *testing.T) {
 	f := v.vpnForm
 	v.vpnEdit("u1")
 	waitHeadless(t, "the edit page", func() bool { return v.body.Visible() == netPageEdit })
-	if f.kindSlot.Visible() || !f.deleteBtn.Visible() || f.name.Text() != "Corp" || f.title.Text() != i18n.T("dropdown-network-vpn-edit") {
-		t.Error("editing: want no type picker, delete, the name")
+	if f.kindSlot.Visible() || !f.deleteBtn.Visible() || f.name.Text() != "Corp" || f.title.Text() != i18n.T("dropdown-network-vpn-new") {
+		t.Error("editing: want no type picker, delete, the name, the shared New VPN title")
 	}
 	if typedEntry(t, f, "gateway").Text() != "vpn.example.com" || f.pickers[0].picker.Selected() != 1 {
 		t.Error("the form does not hold the saved values")
@@ -456,16 +504,15 @@ func TestVPNFormEditsAndDeletes(t *testing.T) {
 		t.Errorf("saved as %q, not its own kind", u[1].kind)
 	}
 
-	// An unreadable profile never opens the editor.
+	// An unreadable profile never opens the editor, and nothing appears
+	// in the list: the reason is the log's (Rust's SettingsOf failure
+	// only warns).
 	v.vpnCloseForm()
 	v.vpnEdit("missing")
-	waitHeadless(t, "the read error", func() bool { return v.vpns.errLabel.Visible() })
+	time.Sleep(50 * time.Millisecond)
+	onHeadlessLoop(func() bool { return true })
 	if v.body.Visible() != netPageBrowse {
 		t.Error("an unreadable profile opened the editor")
-	}
-	v.vpnAdd()
-	if v.vpns.errLabel.Visible() {
-		t.Error("the read error outlived the next action")
 	}
 }
 

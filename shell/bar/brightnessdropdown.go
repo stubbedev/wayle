@@ -92,22 +92,33 @@ type brightnessView struct {
 	cancel context.CancelFunc
 }
 
+// templateEmptyState is the EmptyState widget template, the shared
+// one in dropdown_template.go: the description comes back so the
+// caller can tune it.
+
 func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &brightnessView{ctx: ctx, font: font, px: px, cancel: func() {}}
-	v.Box = widget.NewBox(widget.Column, 10, 14)
+	v.Box = widget.NewBox(widget.Column, 0, 14)
 	v.AddClass("dropdown", "brightness-dropdown")
 	v.Append(dropdownHeader(font, px, brightnessDeviceIcon, i18n.T("dropdown-brightness-title")), false)
-	v.list = widget.NewBox(widget.Column, 10, 0)
+	v.list = widget.NewBox(widget.Column, 0, 0)
 	v.list.AddClass("brightness-devices")
-	empty := emptyState(font, px, brightnessDeviceIcon, i18n.T("dropdown-brightness-empty-title"), i18n.T("dropdown-brightness-empty-description"))
+	empty, _, desc := templateEmptyState(font, px, brightnessDeviceIcon, []string{"sm"},
+		i18n.T("dropdown-brightness-empty-title"), i18n.T("dropdown-brightness-empty-description"))
 	empty.AddClass("brightness-empty")
+	// mod.rs:108-111: WordChar wrap, centered justification, 32 max
+	// width chars.
+	desc.SetWrap(true)
+	desc.SetAlignment(render.AlignCenter)
+	desc.SetMaxWidthChars(32)
 	// DropdownContent: the sheet wraps the device list and the empty
-	// state in it.
+	// state in it. No ScrolledWindow — Rust shows the list bare and the
+	// panel grows.
 	content := widget.NewBox(widget.Column, 0, 0)
 	content.AddClass("dropdown-content")
 	v.body = widget.NewStack()
-	v.body.Add("devices", dropdownScroll(v.list, ""))
+	v.body.Add("devices", v.list)
 	v.body.Add("empty", empty)
 	content.Append(v.body, true)
 	v.Append(content, true)
@@ -156,15 +167,16 @@ func (v *brightnessView) apply(devices []brightness.Device) {
 }
 
 // item is BrightnessDeviceItem: the icon, the name over the optional
-// subtitle, and the labeled slider committing to the device.
+// subtitle, and the labeled slider committing to the device. Spacing
+// stays 0 — the cascade's border-spacing and margins own the gaps.
 func (v *brightnessView) item(d brightness.Device, multi bool) widget.Widget {
-	card := widget.NewBox(widget.Column, 6, 0)
+	card := widget.NewBox(widget.Column, 0, 0)
 	card.AddClass("brightness-device")
-	header := widget.NewBox(widget.Row, 8, 0)
+	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("brightness-device-header")
 	icon := widget.NewThemeIcon(brightnessDeviceIcon, int(v.px*1.2))
-	header.Append(iconTile(icon, "brightness-device-icon", "brightness-device-icon-img"), false)
-	info := widget.NewBox(widget.Column, 2, 0)
+	header.AppendAligned(iconTile(icon, "brightness-device-icon", "brightness-device-icon-img"), false, widget.AlignCenter) // set_valign Center
+	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("brightness-device-info")
 	title := widget.NewLabel(v.font, v.px, friendlyDeviceName(d.Name, d.Type), 0)
 	title.AddClass("brightness-device-name")
@@ -176,7 +188,7 @@ func (v *brightnessView) item(d brightness.Device, multi bool) widget.Widget {
 		meta.SetEllipsize(widget.EllipsizeEnd)
 		info.Append(meta, false)
 	}
-	header.Append(info, true)
+	header.AppendAligned(info, true, widget.AlignCenter) // set_valign Center
 	card.Append(header, false)
 
 	slider := widgets.NewDebouncedSlider(d.Percentage(), v.font, v.px*0.9, 0, v.ctx.Invoke)

@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/mpris"
 )
 
@@ -175,6 +176,9 @@ func TestMediaModuleRenders(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	m := module.(*mediaModule)
+	// appendModule hands the module its wrapper; the disc classes are
+	// ancestor selectors on it.
+	m.setChrome(widget.NewBox(widget.Row, 0, 0))
 	// The text is whole; label-max-length caps the button's label width
 	// (max-width-chars) once appendModule configures it.
 	if got := m.label.Text(); got != strings.Repeat("t", 50)+" - Band" {
@@ -185,8 +189,8 @@ func TestMediaModuleRenders(t *testing.T) {
 	if root.label.MaxWidthChars() != int(cfg.Media.LabelMaxLength) || root.label.Ellipsize() != widget.EllipsizeEnd {
 		t.Errorf("label cap = %d chars, ellipsize %v; want %d, end", root.label.MaxWidthChars(), root.label.Ellipsize(), cfg.Media.LabelMaxLength)
 	}
-	if !root.HasClass("media-disc") || !root.HasClass("media-spinning") {
-		t.Error("a playing player in disc mode misses media-disc/media-spinning")
+	if m.chrome == nil || !widget.HasClass(m.chrome.(widget.Widget), "media-disc") || !widget.HasClass(m.chrome.(widget.Widget), "media-spinning") {
+		t.Error("a playing player in disc mode misses media-disc/media-spinning on the module wrapper")
 	}
 
 	// No player: the "--" label, icon-name, and no disc classes.
@@ -198,7 +202,7 @@ func TestMediaModuleRenders(t *testing.T) {
 	if m.icon.Name() != cfg.Media.IconName {
 		t.Errorf("no-player icon = %q, want icon-name", m.icon.Name())
 	}
-	if root.HasClass("media-disc") || root.HasClass("media-spinning") {
+	if widget.HasClass(m.chrome.(widget.Widget), "media-disc") || widget.HasClass(m.chrome.(widget.Widget), "media-spinning") {
 		t.Error("disc classes stayed without a player")
 	}
 }
@@ -286,7 +290,7 @@ func TestMediaDropdownTransport(t *testing.T) {
 	v := mediaDropdown(ctx).(*mediaView)
 	defer v.dropdownClosed()
 
-	if v.mode != "player" || v.title.Text() != "Song" || v.artist.Text() != mediaUnknownArtist {
+	if v.mode != "player" || v.title.Text() != "Song" || v.artist.Text() != i18n.T("dropdown-media-unknown-artist") {
 		t.Fatalf("player view = mode %q, title %q, artist %q", v.mode, v.title.Text(), v.artist.Text())
 	}
 	if v.playIcon.Name() != "ld-pause-symbolic" || v.loopIcon.Name() != "ld-repeat-1-symbolic" {
@@ -351,7 +355,7 @@ func TestMediaDropdownTransport(t *testing.T) {
 	source.SetActive("org.mpris.MediaPlayer2.mpv")
 	v.mode = ""
 	v.refresh()
-	if v.title.Text() != mediaUnknownTitle {
+	if v.title.Text() != i18n.T("dropdown-media-unknown-title") {
 		t.Errorf("after switching = %q, want mpv's placeholder title", v.title.Text())
 	}
 	if v.pages.Visible() != "main" {
@@ -423,5 +427,143 @@ func TestMediaDropdownPaintsFromTheStylesheet(t *testing.T) {
 	}
 	if !option.HasClass("selected") {
 		t.Error("the active player's option is not selected")
+	}
+}
+
+// The picker's chrome is the Rust tree: the header is the ghost-icon
+// picker-back chain over the title, the rows scroll in a .picker-body,
+// and the active row checks with tb-check-symbolic while the others
+// carry none (source_item.rs:75, source_picker/mod.rs:36-65).
+func TestMediaPickerChrome(t *testing.T) {
+	source := newFakeMedia(
+		mpris.Player{BusName: "org.mpris.MediaPlayer2.vlc", Identity: "VLC"},
+		mpris.Player{BusName: "org.mpris.MediaPlayer2.mpv", Identity: "mpv"},
+	)
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Media = source
+	v := mediaDropdown(ctx).(*mediaView)
+	defer v.dropdownClosed()
+	v.showPicker()
+
+	var back *widget.Button
+	var body *widget.Scroll
+	walkTree(v.sources, func(w widget.Widget) bool {
+		switch w := w.(type) {
+		case *widget.Button:
+			if w.HasClass("picker-back") {
+				back = w
+			}
+		case *widget.Scroll:
+			if w.HasClass("picker-body") {
+				body = w
+			}
+		}
+		return true
+	})
+	if back == nil {
+		t.Fatal("the picker has no back button")
+	}
+	if !back.HasClass("ghost-icon") || !back.HasClass("picker-back") {
+		t.Errorf("back button classes = %v, want ghost-icon + picker-back", back.Classes())
+	}
+	if body == nil {
+		t.Error("the rows do not scroll in a .picker-body")
+	}
+	// The active row checks with tb-check-symbolic (source_item.rs:75);
+	// buttons hide their subtrees from the walks, so the view carries
+	// the icon.
+	if v.check == nil || v.check.Name() != "tb-check-symbolic" || !v.check.HasClass("media-source-option-check") {
+		t.Errorf("check icon = %v, want the tb-check-symbolic media-source-option-check", v.check)
+	}
+
+	// Negative: only the back button wears the ghost chrome — the
+	// option rows are plain classed buttons.
+	var ghost *widget.Button
+	walkTree(v.sources, func(w widget.Widget) bool {
+		if b, ok := w.(*widget.Button); ok && b != back && b.HasClass("ghost-icon") {
+			ghost = b
+		}
+		return true
+	})
+	if ghost != nil {
+		t.Error("another picker button wears the ghost-icon chrome")
+	}
+
+	// Back is NavigateBack: the player (or empty) page returns.
+	back.OnClick()
+	if v.mode == "picker" || v.pages.Visible() != "main" {
+		t.Errorf("after back = mode %q page %q, want the main page", v.mode, v.pages.Visible())
+	}
+}
+
+// The transport buttons carry no programmatic padding (button.media-control
+// paints the box, static.css:6057-6071) and the pointer cursor every
+// button gets.
+func TestMediaTransportButtonsAreUnpaddedPointers(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.vlc", Identity: "VLC", State: mpris.StatePlaying})
+	v := mediaDropdown(ctx).(*mediaView)
+	defer v.dropdownClosed()
+	_, px := dropdownFont(ctx)
+	for _, tc := range []struct {
+		b     *widget.Button
+		glyph string
+		px    float64
+	}{
+		{v.shuffle, "ld-shuffle-symbolic", px},
+		{v.previous, "ld-skip-back-symbolic", px},
+		{v.playPause, "ld-play-symbolic", px * 1.4},
+		{v.next, "ld-skip-forward-symbolic", px},
+		{v.loop, "ld-repeat-symbolic", px},
+	} {
+		want := widget.NewThemeIcon(tc.glyph, int(tc.px)).Measure(widgetConstraintsMax(200, 200))
+		if got := tc.b.Measure(widgetConstraintsMax(200, 200)); got != want {
+			t.Errorf("%s measures %v, want the bare icon's %v (programmatic padding)", tc.glyph, got, want)
+		}
+		if got := widget.CursorNameOf(tc.b); got != "pointer" {
+			t.Errorf("%s cursor = %q, want pointer", tc.glyph, got)
+		}
+	}
+	// Negative: the constructor padding the Rust tree leaves out would
+	// show up as a padded measure.
+	padded := widget.NewButton(widget.NewThemeIcon("ld-play-symbolic", int(px)), 6, 6)
+	if padded.Measure(widgetConstraintsMax(200, 200)) == widget.NewThemeIcon("ld-play-symbolic", int(px)).Measure(widgetConstraintsMax(200, 200)) {
+		t.Error("a padded button measures like its icon; the test cannot see padding")
+	}
+}
+
+// A player switch retires the old knob position (methods.rs:164,200):
+// the slider restarts from zero for the new player, a clear zeroes it,
+// and a same-player refresh keeps the polled position.
+func TestMediaSeekResetsOnPlayerSwitch(t *testing.T) {
+	source := newFakeMedia(
+		mpris.Player{BusName: "org.mpris.MediaPlayer2.vlc", Identity: "VLC", Length: time.Minute, CanSeek: true},
+		mpris.Player{BusName: "org.mpris.MediaPlayer2.mpv", Identity: "mpv", Length: time.Minute, CanSeek: true},
+	)
+	ctx := newTestContext(t, config.Defaults())
+	ctx.Media = source
+	v := mediaDropdown(ctx).(*mediaView)
+	defer v.dropdownClosed()
+	v.setPosition(45 * time.Second)
+	if v.seek.Value() != 75 {
+		t.Fatalf("knob = %v, want 75 before the switch", v.seek.Value())
+	}
+	v.refresh()
+	if v.seek.Value() != 75 {
+		t.Errorf("a same-player refresh reset the knob to %v", v.seek.Value())
+	}
+	source.SetActive("org.mpris.MediaPlayer2.mpv")
+	v.refresh()
+	if v.seek.Value() != 0 {
+		t.Errorf("after the switch the knob = %v, want the new player's 0", v.seek.Value())
+	}
+	v.setPosition(45 * time.Second)
+	if v.seek.Value() != 75 {
+		t.Fatalf("the new player's knob = %v, want 75", v.seek.Value())
+	}
+	source.active = -1
+	v.refresh()
+	if v.seek.Value() != 0 {
+		t.Errorf("without a player the knob = %v, want 0", v.seek.Value())
 	}
 }

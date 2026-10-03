@@ -64,7 +64,11 @@ func newBarButton(ctx ModuleContext, icon *widget.Icon, label *widget.Label) *ba
 	b.iconBox.AddClass("icon-container")
 	if icon != nil {
 		b.icon = icon
-		b.iconBox.Append(icon, true)
+		if b.vertical {
+			b.iconBox.AppendAligned(icon, true, widget.AlignCenter)
+		} else {
+			b.iconBox.Append(icon, true)
+		}
 	}
 	b.labelBox = widget.NewBox(widget.Row, 0, 0)
 	b.labelBox.AddClass("label-container")
@@ -105,7 +109,6 @@ func newBarButtonShell(ctx ModuleContext) *barButton {
 	b.toggle = &barToggle{Button: widget.NewButton(b.content, 0, 0), owner: b}
 	b.toggle.SetElement("button")
 	b.toggle.AddClass("toggle")
-	b.toggle.OnClick = func() { b.run(b.binding.LeftClick, false) }
 	b.Box = widget.NewBox(widget.Row, 0, 0)
 	b.SetElement("menubutton")
 	b.Append(b.toggle, true)
@@ -114,17 +117,41 @@ func newBarButtonShell(ctx ModuleContext) *barButton {
 }
 
 // placeContainers orders the icon and label containers by the bar's
-// icon position.
+// icon position. A vertical bar centers the icon across the button,
+// the Rust component's hexpand + halign Center on the icon-only and
+// vertical shapes.
 func (b *barButton) placeContainers() {
 	b.content.Clear()
 	if b.cfg != nil && b.cfg.Bar.ButtonIconPosition == config.IconEnd {
-		b.content.Append(b.labelBox, b.vertical)
-		b.content.Append(b.iconBox, false)
+		b.appendCross(b.labelBox)
+		b.appendIcon()
 	} else {
-		b.content.Append(b.iconBox, false)
-		b.content.Append(b.labelBox, b.vertical)
+		b.appendIcon()
+		b.appendCross(b.labelBox)
 	}
 	b.syncVisibility()
+}
+
+// appendIcon appends the icon container: in a vertical content it
+// expands and centers (the glyph centered inside it, set at
+// construction), a row just takes it at natural width.
+func (b *barButton) appendIcon() {
+	if b.vertical {
+		b.content.AppendAligned(b.iconBox, true, widget.AlignCenter)
+		return
+	}
+	b.content.Append(b.iconBox, false)
+}
+
+// appendCross appends a container in the content's cross position: in
+// a vertical (column) content the free axis is horizontal, so the
+// container expands and centers; a row just takes it.
+func (b *barButton) appendCross(w widget.Widget) {
+	if b.vertical {
+		b.content.AppendAligned(w, true, widget.AlignCenter)
+		return
+	}
+	b.content.Append(w, true)
 }
 
 // configure applies a module's button config and bindings; appendModule
@@ -237,6 +264,18 @@ func (t *barToggle) HitTest(p widget.Point) widget.Widget {
 	return nil
 }
 
+// SetPressed opens on the press, the Rust GestureClick's
+// connect_pressed: the dropdown appears under the button-down, and a
+// press that slides off before the release still opened it. OnClick
+// stays unset, so the release cannot fire a second time.
+func (t *barToggle) SetPressed(on bool) {
+	was := t.Pressed
+	t.Button.SetPressed(on)
+	if on && !was {
+		t.owner.run(t.owner.binding.LeftClick, false)
+	}
+}
+
 // PointerButton routes middle and right presses; with no bindings the
 // hooks pass through unconsumed.
 func (t *barToggle) PointerButton(button uint32) {
@@ -249,14 +288,12 @@ func (t *barToggle) PointerButton(button uint32) {
 }
 
 // ScrollInput maps vertical steps to the up/down bindings; positive dy
-// scrolls down, matching the wire convention Axis feeds ScrollBy. With
-// neither scroll binding set the step passes through, so scroll
-// containers keep scrolling through inert modules.
+// scrolls down, matching the wire convention Axis feeds ScrollBy. The
+// step is always consumed and the action always emitted, the Rust
+// helper's Propagation::Stop — an unbound action no-ops in run, and
+// content behind the bar never scrolls through a module.
 func (t *barToggle) ScrollInput(dy int) bool {
 	c := t.owner.binding
-	if c.ScrollUp.Kind == config.ClickNone && c.ScrollDown.Kind == config.ClickNone {
-		return false
-	}
 	switch {
 	case dy > 0:
 		t.owner.run(c.ScrollDown, true)

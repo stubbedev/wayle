@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/gelm/widget"
+
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 )
@@ -88,5 +90,131 @@ func TestCalendarViewNavigatesAndSelects(t *testing.T) {
 	}
 	if got := v.dayName.Text(); got != i18n.T(calendarDayIDs[time.Now().Weekday()]) {
 		t.Errorf("day name = %q", got)
+	}
+}
+
+// The calendar matches the Rust tree: the nav buttons sit in a
+// .cal-nav box on the header's end and the grid rides in a
+// .cal-grid-wrap panel under the grid element name.
+func TestCalendarWrapsTheNavAndTheGrid(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	v := calendarDropdown(ctx).(*calendarView)
+	section, ok := findByClass(v, "cal-section").(*widget.Box)
+	if !ok {
+		t.Fatal("no cal-section")
+	}
+	var header, wrap *widget.Box
+	for _, c := range section.Children() {
+		if b, isBox := c.(*widget.Box); isBox {
+			switch {
+			case b.HasClass("cal-header"):
+				header = b
+			case b.HasClass("cal-grid-wrap"):
+				wrap = b
+			}
+		}
+		// Negative: the grid hangs off the wrap, not the bare section.
+		if h, hasClass := c.(interface{ HasClass(string) bool }); hasClass && h.HasClass("cal-grid") {
+			t.Error("the cal-grid is a direct child of cal-section")
+		}
+	}
+	if header == nil || wrap == nil {
+		t.Fatalf("cal-section children missing the header or the wrap (%v, %v)", header, wrap)
+	}
+	nav, _ := findByClass(header, "cal-nav").(*widget.Box)
+	if nav == nil {
+		t.Fatal("no cal-nav box: the nav buttons ride the bare header row")
+	}
+	var navBtns []*widget.Button
+	walkTree(nav, func(w widget.Widget) bool {
+		if b, isBtn := w.(*widget.Button); isBtn && b.HasClass("cal-nav-btn") {
+			navBtns = append(navBtns, b)
+		}
+		return true
+	})
+	if len(navBtns) != 3 {
+		t.Fatalf("cal-nav buttons = %d, want today and the two chevrons", len(navBtns))
+	}
+	// The nav buttons paint from the stylesheet (.cal-nav-btn is
+	// all:unset): no programmatic pressed shade.
+	for _, b := range navBtns {
+		if b.BgPressed != 0 {
+			t.Errorf("a cal-nav button carries a pressed fill %#08x", uint32(b.BgPressed))
+		}
+	}
+	// The month label sits beside the nav, not inside it.
+	for _, c := range nav.Children() {
+		if l, isLabel := c.(*widget.Label); isLabel && l.HasClass("cal-month") {
+			t.Error("the month label landed in the cal-nav box")
+		}
+	}
+	// The grid rides in the wrap under the grid element name, so the
+	// stylesheet's .cal-grid-wrap grid rules reach it.
+	grid, isBox := wrap.Children()[0].(*widget.Box)
+	if len(wrap.Children()) != 1 || !isBox || !grid.HasClass("cal-grid") {
+		t.Fatalf("cal-grid-wrap children = %v, want the cal-grid", wrap.Children())
+	}
+	if grid.Element() != "grid" {
+		t.Errorf("cal-grid element = %q, want grid", grid.Element())
+	}
+}
+
+// The clock row's state classes follow the clock config: use-12h
+// indents the row, show-seconds stops the separator blink.
+func TestCalendarClockRowCarriesTheStateClasses(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Clock.Format = "%I:%M %p"
+	cfg.Clock.DropdownShowSeconds = true
+	ctx := newTestContext(t, cfg)
+	v := calendarDropdown(ctx).(*calendarView)
+	if !v.timeRow.HasClass("use-12h") || !v.timeRow.HasClass("show-seconds") {
+		t.Errorf("12h with seconds: classes = %v, want use-12h and show-seconds", v.timeRow.Classes())
+	}
+	// 24h without seconds drops both.
+	cfg.Clock.Format = "%H:%M"
+	cfg.Clock.DropdownShowSeconds = false
+	v.tick()
+	if v.timeRow.HasClass("use-12h") || v.timeRow.HasClass("show-seconds") {
+		t.Errorf("24h without seconds: classes = %v, want neither", v.timeRow.Classes())
+	}
+	if v.ampm.Visible() {
+		t.Error("24h renders the ampm")
+	}
+	// Seconds come back alone; use-12h waits for the format.
+	cfg.Clock.DropdownShowSeconds = true
+	v.tick()
+	if !v.timeRow.HasClass("show-seconds") || v.timeRow.HasClass("use-12h") {
+		t.Errorf("24h with seconds: classes = %v, want show-seconds only", v.timeRow.Classes())
+	}
+}
+
+// The Rust boxes are spacing-0 — the stylesheet's border-spacing and
+// margins carry every gap — so the constructors leave no additive
+// spacing behind.
+func TestCalendarSpacingIsCSSCarried(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	v := calendarDropdown(ctx).(*calendarView)
+	sites := map[string]func() int{
+		"dropdown root": func() int { return v.Spacing() },
+		"dropdown-content": func() int {
+			return classedBox(t, v, "dropdown-content").Spacing()
+		},
+		"clock-hero":    func() int { return classedBox(t, v, "clock-hero").Spacing() },
+		"cal-section":   func() int { return classedBox(t, v, "cal-section").Spacing() },
+		"cal-header":    func() int { return classedBox(t, v, "cal-header").Spacing() },
+		"cal-nav":       func() int { return classedBox(t, v, "cal-nav").Spacing() },
+		"cal-grid-wrap": func() int { return classedBox(t, v, "cal-grid-wrap").Spacing() },
+		"cal-grid":      func() int { return classedBox(t, v, "cal-grid").Spacing() },
+	}
+	for what, get := range sites {
+		if got := get(); got != 0 {
+			t.Errorf("%s spacing = %d, want 0 (the CSS carries it)", what, got)
+		}
+	}
+	grid := classedBox(t, v, "cal-grid")
+	for _, row := range grid.Children() {
+		if b, isBox := row.(*widget.Box); isBox && b.Spacing() != 0 {
+			t.Errorf("a cal-grid row carries spacing %d", b.Spacing())
+		}
 	}
 }

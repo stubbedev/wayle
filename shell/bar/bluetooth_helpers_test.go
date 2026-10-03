@@ -1,8 +1,10 @@
 package bar
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/bluetooth"
 )
 
@@ -77,8 +79,8 @@ func TestDeviceTypeKeyMatchesRust(t *testing.T) {
 		if got := deviceTypeKey(c.hint, c.class); got != "dropdown-bluetooth-type-"+c.want {
 			t.Errorf("deviceTypeKey(%v, %v) = %q, want %s", c.hint, c.class, got, c.want)
 		}
-		if btText(deviceTypeKey(c.hint, c.class)) == deviceTypeKey(c.hint, c.class) {
-			t.Errorf("type key %q has no text", deviceTypeKey(c.hint, c.class))
+		if got := btText(deviceTypeKey(c.hint, c.class)); got == deviceTypeKey(c.hint, c.class) || strings.HasPrefix(got, "No localization") {
+			t.Errorf("type key %q has no text: %q", deviceTypeKey(c.hint, c.class), got)
 		}
 	}
 }
@@ -121,14 +123,20 @@ func TestFormatPasskeyPads(t *testing.T) {
 }
 
 func TestBtText(t *testing.T) {
-	if got := btText("dropdown-bluetooth-battery", "percent", 80); got != "80%" {
+	// The en-US wording comes from the shared Fluent bundle, not a Go
+	// table: one placeholder key and one plain key.
+	if got := plain(btText("dropdown-bluetooth-battery", "percent", uint8(80))); got != "80%" {
 		t.Errorf("battery = %q", got)
 	}
-	if got := btText("dropdown-bluetooth-pairing-entering", "entered", 2, "total", 6); got != "2 of 6 digits entered" {
+	if got := btText("dropdown-bluetooth-forget"); got != i18n.T("dropdown-bluetooth-forget") {
+		t.Errorf("forget = %q, want the bundle's text", got)
+	}
+	if got := plain(btText("dropdown-bluetooth-pairing-entering", "entered", 2, "total", 6)); got != "2 of 6 digits entered" {
 		t.Errorf("entering = %q", got)
 	}
-	// An unknown key renders as itself, as Fluent does.
-	if got := btText("dropdown-bluetooth-nope"); got != "dropdown-bluetooth-nope" {
+	// An unknown key renders the loader's "No localization" marker, as
+	// the Rust lookup does.
+	if got := btText("dropdown-bluetooth-nope"); got != `No localization for id: "dropdown-bluetooth-nope"` {
 		t.Errorf("unknown key = %q", got)
 	}
 }

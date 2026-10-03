@@ -78,22 +78,56 @@ type btDropdown struct {
 }
 
 // btDropdownRoot is the popover content; it releases the subscription
-// when the popover closes.
+// when the popover closes, and takes the popover handle so the passkey
+// boxes can move the keyboard focus (grab_focus).
 type btDropdownRoot struct {
 	*btSurface
 	d *btDropdown
+	popoverHook
 }
 
-// dropdownClosed implements dropdownCloser.
-func (r *btDropdownRoot) dropdownClosed() { r.d.close() }
+// dropdownClosed implements dropdownCloser; the no-adapter shell has
+// no dropdown behind it and holds nothing.
+func (r *btDropdownRoot) dropdownClosed() {
+	if r.d == nil {
+		return
+	}
+	r.d.close()
+}
+
+// btNoAdapterDropdown is the dropdown shell for a machine without an
+// adapter: the header stays, the content shows the no-adapter empty
+// state alone, and nothing follows a service.
+func btNoAdapterDropdown(ctx ModuleContext) widget.Widget {
+	font, px := dropdownFont(ctx)
+	col := widget.NewBox(widget.Column, 0, 0)
+	col.AddClass("dropdown-content", "bluetooth-content")
+	empty := emptyState(font, px, "ld-bluetooth-off-symbolic",
+		btText("dropdown-bluetooth-no-adapter-title"), btText("dropdown-bluetooth-no-adapter-description"))
+	col.AppendAligned(empty, true, widget.AlignCenter)
+	return btShell(font, px, "ld-bluetooth-off-symbolic", dropdownScroll(col, "bluetooth-scroll"))
+}
+
+// btShell is the frame the two entries share: the header over the
+// scrolled content, at the dropdown's fixed size (mod.rs:55-72).
+func btShell(font render.Font, px float64, icon string, scroll widget.Widget) widget.Widget {
+	header, _, _ := dropdownHeaderParts(font, px, icon, btText("dropdown-bluetooth-title"))
+	frame := widget.NewBox(widget.Column, 0, 0)
+	frame.AddClass("dropdown", "bluetooth-dropdown")
+	frame.Append(header, false)
+	frame.Append(scroll, true)
+	surface := newBtSurface(frame, 0, 0)
+	surface.w, surface.h = btBaseWidth, btBaseHeight
+	return &btDropdownRoot{btSurface: surface}
+}
 
 // bluetoothDropdown builds the dropdown content; the registry's
 // "bluetooth" builder.
 func bluetoothDropdown(ctx ModuleContext) widget.Widget {
 	if ctx.Bluetooth == nil {
-		font, px := dropdownFont(ctx)
-		return emptyState(font, px, "ld-bluetooth-off-symbolic",
-			btText("dropdown-bluetooth-no-adapter-title"), btText("dropdown-bluetooth-no-adapter-description"))
+		// No adapter (mod.rs:303-326): the same shell — header above the
+		// no-adapter empty state — without a service to follow.
+		return btNoAdapterDropdown(ctx)
 	}
 	d := newBtDropdown(ctx, ctx.Bluetooth)
 	ticks, stop := ctx.Bluetooth.Subscribe()
@@ -117,16 +151,19 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	// template's `.dropdown-title` box lets the stylesheet ink the icon
 	// and title.
 	d.scanIcon = widget.NewThemeIcon("tb-refresh-symbolic", int(px))
-	d.scanBtn = ghostButton(d.scanIcon)
-	d.scanBtn.AddClass("ghost-icon", "bluetooth-scan-btn")
+	// GhostIconButton: class ghost-icon only, the extra `ghost` the
+	// GhostButton template carries is not on it (mod.rs:95-121).
+	d.scanBtn = dropdownButton(d.scanIcon, "ghost-icon", nil)
+	d.scanBtn.AddClass("bluetooth-scan-btn")
 	d.scanBtn.OnClick = d.onScan
 	d.toggle = widget.NewSwitch(false)
 	d.toggle.OnChanged = d.onToggle
 	header, glyph, _ := dropdownHeaderParts(font, px, "ld-bluetooth-symbolic", btText("dropdown-bluetooth-title"), d.scanBtn, d.toggle)
 	d.headerIcon = glyph
 
-	// The content (DropdownContent + the scrolled column).
-	col := widget.NewBox(widget.Column, 8, 12)
+	// The content (DropdownContent + the scrolled column). Rust's box is
+	// spacing-0: the CSS margins between the sections carry the gaps.
+	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("dropdown-content", "bluetooth-content")
 	d.card = newBtPairingCard(ctx)
 	d.card.onOutput = d.onPairingOutput
@@ -155,13 +192,15 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	col.Append(d.scanningHint, false)
 	d.emptyNoDevices = emptyState(font, px, "ld-bluetooth-searching-symbolic",
 		btText("dropdown-bluetooth-no-devices-title"), btText("dropdown-bluetooth-no-devices-description"))
-	col.Append(d.emptyNoDevices, false)
 	d.emptyOff = emptyState(font, px, "ld-bluetooth-off-symbolic",
 		btText("dropdown-bluetooth-off-title"), btText("dropdown-bluetooth-off-description"))
-	col.Append(d.emptyOff, false)
 	d.emptyNoAdapter = emptyState(font, px, "ld-bluetooth-off-symbolic",
 		btText("dropdown-bluetooth-no-adapter-title"), btText("dropdown-bluetooth-no-adapter-description"))
-	col.Append(d.emptyNoAdapter, false)
+	// The EmptyState template expands and centers itself
+	// (empty_state/mod.rs:13-14).
+	col.AppendAligned(d.emptyNoDevices, true, widget.AlignCenter)
+	col.AppendAligned(d.emptyOff, true, widget.AlignCenter)
+	col.AppendAligned(d.emptyNoAdapter, true, widget.AlignCenter)
 
 	scroll := dropdownScroll(col, "bluetooth-scroll")
 	frame := widget.NewBox(widget.Column, 0, 0)
@@ -171,6 +210,7 @@ func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	surface := newBtSurface(frame, 0, 0)
 	surface.w, surface.h = btBaseWidth, btBaseHeight
 	d.root = &btDropdownRoot{btSurface: surface, d: d}
+	d.card.focus = func(w widget.Widget) { d.root.focus(w) }
 	d.sync()
 	return d
 }
@@ -289,7 +329,9 @@ func batteryText(battery *uint8) string {
 func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 	font, px := d.font, d.px
 	pending := d.pending[s.path]
-	row := &btDeviceRow{Box: widget.NewBox(widget.Row, 8, 8), hoverSwaps: s.category != categoryAvailable, pending: pending != 0}
+	// Every box here is spacing-0 in Rust; the stylesheet's margins and
+	// paddings carry the gaps.
+	row := &btDeviceRow{Box: widget.NewBox(widget.Row, 0, 0), hoverSwaps: s.category != categoryAvailable, pending: pending != 0}
 	row.AddClass("bluetooth-device")
 	if s.category == categoryAvailable {
 		row.AddClass("available")
@@ -314,13 +356,13 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 	}
 	row.Append(well, false)
 
-	info := widget.NewBox(widget.Column, 2, 0)
+	info := widget.NewBox(widget.Column, 0, 0)
 	info.AddClass("bluetooth-device-info")
 	name := widget.NewLabel(font, px, s.name, 0)
 	name.SetEllipsize(widget.EllipsizeEnd)
 	name.AddClass("bluetooth-device-name")
 	info.Append(name, false)
-	detail := widget.NewBox(widget.Row, 4, 0)
+	detail := widget.NewBox(widget.Row, 0, 0)
 	detail.AddClass("bluetooth-device-detail-row")
 	typeLabel := widget.NewLabel(font, px*0.9, btText(s.typeKey), 0)
 	typeLabel.AddClass("bluetooth-device-detail")
@@ -337,7 +379,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		detail.Append(pct, false)
 	}
 	info.Append(detail, false)
-	row.Append(info, true)
+	row.AppendAligned(info, true, widget.AlignCenter)
 
 	// The trailing slot: status, or the actions while hovered.
 	if s.category != categoryAvailable || pending != 0 {
@@ -351,7 +393,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		statusPage := widget.NewBox(widget.Row, 0, 0)
 		statusPage.Append(status, false)
 
-		actions := widget.NewBox(widget.Row, 4, 0)
+		actions := widget.NewBox(widget.Row, 0, 0)
 		actions.AddClass("bluetooth-device-actions")
 		toggleKey := "dropdown-bluetooth-connect"
 		if s.connected {
@@ -375,7 +417,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		row.slot.SetTransition(widget.StackCrossfade, hoverTransition)
 		row.slot.Add(btSlotStatus, statusPage)
 		row.slot.Add(btSlotActions, actions)
-		row.Append(row.slot, false)
+		row.AppendAligned(row.slot, false, widget.AlignCenter)
 		row.syncSlot()
 	}
 	return row

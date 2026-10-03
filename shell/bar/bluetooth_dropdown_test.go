@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,7 +99,7 @@ func TestBtDropdownListsDevices(t *testing.T) {
 	if n := len(detail.Children()); n != 4 {
 		t.Fatalf("headset detail has %d parts, want type, separator, icon, percent", n)
 	}
-	if got := detail.Children()[3].(*widget.Label).Text(); got != "64%" {
+	if got := plain(detail.Children()[3].(*widget.Label).Text()); got != "64%" {
 		t.Errorf("battery = %q", got)
 	}
 	if got := detail.Children()[0].(*widget.Label).Text(); got != "Headphones" {
@@ -384,14 +385,35 @@ func TestBtPairingPasskeyEntry(t *testing.T) {
 	if len(src.Calls()) != 0 {
 		t.Errorf("an empty passkey was sent: %v", src.Calls())
 	}
-	// Digits only, six at most.
-	c.passkeyEntry.SetText("12a3456789")
-	if got := c.passkeyEntry.Text(); got != "123456" {
-		t.Errorf("entry = %q, want the first six digits", got)
+	// Six single-digit boxes, digits only.
+	if len(c.pinDigits) != passkeyTotal {
+		t.Fatalf("digit boxes = %d, want %d", len(c.pinDigits), passkeyTotal)
+	}
+	c.pinDigits[0].SetText("12a3456789")
+	if got := c.pinDigits[0].Text(); got != "1" {
+		t.Errorf("a digit box took %q, want one digit", got)
+	}
+	for i, digit := range []string{"2", "3", "4", "5", "6"} {
+		c.pinDigits[i+1].SetText(digit)
+	}
+	if got := c.passkeyText(); got != "123456" {
+		t.Errorf("passkey = %q, want the six digits", got)
 	}
 	c.right.OnClick()
 	if !slices.Equal(src.Calls(), []string{"passkey 123456"}) {
 		t.Errorf("calls = %v", src.Calls())
+	}
+	// A partial passkey still submits, the Rust build_confirm_output's
+	// PinSubmitted(passkey) over whatever the boxes spell — its provider
+	// does the refusing.
+	st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
+	src.setState(st)
+	d.sync()
+	c = d.card
+	c.pinDigits[0].SetText("9")
+	c.right.OnClick()
+	if !slices.Contains(src.Calls(), "passkey 9") {
+		t.Errorf("a partial passkey is not submitted: %v", src.Calls())
 	}
 }
 
@@ -449,14 +471,14 @@ func TestBtPairingDisplayRequests(t *testing.T) {
 	if visible(c.right) || c.leftLabel.Text() != "Cancel" {
 		t.Error("a display request offers a confirm")
 	}
-	if c.progress.Text() != "2 of 6 digits entered" || c.pinCode[2].Text() != "000007" {
+	if plain(c.progress.Text()) != "2 of 6 digits entered" || c.pinCode[2].Text() != "000007" {
 		t.Errorf("progress %q code %q", c.progress.Text(), c.pinCode[2].Text())
 	}
 	// The typing progress updates in place.
 	st.Pairing = bluetooth.DisplayPasskey{Device: pathHeadset, Passkey: 7, Entered: 5}
 	src.setState(st)
 	d.sync()
-	if c.progress.Text() != "5 of 6 digits entered" {
+	if plain(c.progress.Text()) != "5 of 6 digits entered" {
 		t.Errorf("progress = %q", c.progress.Text())
 	}
 	// BlueZ withdrawing it clears the card.
@@ -515,8 +537,14 @@ func TestBtDropdownClosedStopsFollowing(t *testing.T) {
 
 func TestBtDropdownWithoutServiceShowsNoAdapter(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
-	if _, ok := bluetoothDropdown(ctx).(dropdownCloser); ok {
-		t.Error("the serviceless dropdown holds a subscription")
+	content := bluetoothDropdown(ctx)
+	// The full shell builds without a service; closing it is a no-op,
+	// not a panic, and nothing subscribed.
+	if c, ok := content.(dropdownCloser); ok {
+		c.dropdownClosed()
+	}
+	if findBox(content, "dropdown-header") == nil {
+		t.Error("the no-adapter dropdown dropped the header")
 	}
 }
 
@@ -551,12 +579,13 @@ func TestBtNotifierAsksForConfirmation(t *testing.T) {
 	st.Pairing = bluetooth.RequestConfirmation{Device: pathHeadset, Passkey: 99}
 	n, src, sender := newTestNotifier(st, "allow", true)
 	n.check()
-	if len(sender.asked) != 1 || sender.asked[0] != "Headset wants to pair with passkey 000099 — open the Bluetooth menu to respond" {
+	want := "Headset wants to pair with passkey 000099 — open the Bluetooth menu to respond"
+	if len(sender.asked) != 1 || plain(sender.asked[0]) != want {
 		t.Fatalf("asked = %v", sender.asked)
 	}
-	want := []string{"confirmation true", "trust-paired " + string(pathHeadset)}
-	if !slices.Equal(src.Calls(), want) {
-		t.Errorf("calls = %v, want %v", src.Calls(), want)
+	wantCalls := []string{"confirmation true", "trust-paired " + string(pathHeadset)}
+	if !slices.Equal(src.Calls(), wantCalls) {
+		t.Errorf("calls = %v, want %v", src.Calls(), wantCalls)
 	}
 	// The same request does not notify twice.
 	n.check()
@@ -593,7 +622,7 @@ func TestBtNotifierLinksInputPrompts(t *testing.T) {
 	if len(sender.asked) != 0 || len(sender.sent) != 1 {
 		t.Fatalf("sent %v asked %v, want one plain notification", sender.sent, sender.asked)
 	}
-	if sender.sent[0] != "Bluetooth pairing request: New device wants to connect — open the Bluetooth menu to respond" {
+	if plain(sender.sent[0]) != "Bluetooth pairing request: New device wants to connect — open the Bluetooth menu to respond" {
 		t.Errorf("notification = %q", sender.sent[0])
 	}
 	if len(src.Calls()) != 0 {
@@ -610,5 +639,199 @@ func TestBtNotifierQuietWhileTheDropdownIsOpen(t *testing.T) {
 	n.check()
 	if len(sender.asked)+len(sender.sent) != 0 {
 		t.Error("notified while the dropdown shows the request")
+	}
+}
+
+// findBox walks the tree for the first box carrying class.
+func findBox(w widget.Widget, class string) *widget.Box {
+	var found *widget.Box
+	walkTree(w, func(k widget.Widget) bool {
+		if found != nil {
+			return false
+		}
+		if b, ok := k.(*widget.Box); ok && widget.HasClass(b, class) {
+			found = b
+		}
+		return found == nil
+	})
+	return found
+}
+
+// findButton walks the tree for the first button carrying class.
+func findButton(w widget.Widget, class string) *widget.Button {
+	var found *widget.Button
+	walkTree(w, func(k widget.Widget) bool {
+		if found != nil {
+			return false
+		}
+		if b, ok := k.(*widget.Button); ok && widget.HasClass(b, class) {
+			found = b
+		}
+		return found == nil
+	})
+	return found
+}
+
+// The no-adapter state is the whole dropdown shell — the header stays
+// above the empty state (mod.rs:73-147,303-326); the early return of a
+// bare empty state is the regression.
+func TestBtNoAdapterDropdownKeepsTheHeader(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	content := bluetoothDropdown(ctx)
+	if c, ok := content.(dropdownCloser); ok {
+		c.dropdownClosed()
+	}
+	if findBox(content, "dropdown-header") == nil {
+		t.Error("the no-adapter dropdown dropped the header")
+	}
+	empty := findBox(content, "empty-state")
+	if empty == nil {
+		t.Fatal("the no-adapter dropdown lost its empty state")
+	}
+	if !visible(empty) {
+		t.Error("the no-adapter empty state is hidden")
+	}
+	// The shell is the dropdown frame at its fixed size, not a bare box.
+	if findBox(content, "bluetooth-dropdown") == nil {
+		t.Fatal("the no-adapter state is not the dropdown frame")
+	}
+	sz := content.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 700}})
+	if sz.W != btBaseWidth || sz.H != btBaseHeight {
+		t.Errorf("size = %dx%d, want the %dx%d base", sz.W, sz.H, btBaseWidth, btBaseHeight)
+	}
+	// A live dropdown with an adapter keeps the same header; the
+	// no-adapter state never grows device rows.
+	d, _ := newTestBtDropdown(t, btWorld())
+	if findBox(d.root, "dropdown-header") == nil {
+		t.Error("the live dropdown lost its header")
+	}
+	if findBox(content, "bluetooth-device") != nil {
+		t.Error("the no-adapter state shows a device row")
+	}
+}
+
+// The passkey prompt is six single-digit boxes (pairing_card/mod.rs:
+// 147-190), classed entry.bluetooth-pin-digit, in a centered row that
+// only the RequestPasskey variant shows.
+func TestBtPairingCardDigitBoxes(t *testing.T) {
+	st := btWorld()
+	st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
+	d, src := newTestBtDropdown(t, st)
+	c := d.card
+	if len(c.pinDigits) != passkeyTotal {
+		t.Fatalf("digit boxes = %d, want %d", len(c.pinDigits), passkeyTotal)
+	}
+	for i, digit := range c.pinDigits {
+		if !digit.HasClass("bluetooth-pin-digit") {
+			t.Errorf("digit box %d lost bluetooth-pin-digit", i)
+		}
+		if _, maxChars := digit.WidthChars(); maxChars != 1 {
+			t.Errorf("digit box %d max width = %d chars, want 1", i, maxChars)
+		}
+	}
+	if !visible(c.pinRow) || len(c.pinRow.Children()) != passkeyTotal {
+		t.Error("the pin row is not the six boxes")
+	}
+	// The legacy PIN box is not a digit box, and the row hides for the
+	// other variants.
+	if c.legacyPinEntry.HasClass("bluetooth-pin-digit") {
+		t.Error("the legacy PIN entry wears the digit class")
+	}
+	st.Pairing = bluetooth.RequestConfirmation{Device: pathSpeaker, Passkey: 1}
+	src.setState(st)
+	d.sync()
+	if visible(c.pinRow) {
+		t.Error("the digit boxes show for a confirmation prompt")
+	}
+	st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
+	src.setState(st)
+	d.sync()
+	if !visible(c.pinRow) {
+		t.Error("the digit boxes stayed hidden for a passkey prompt")
+	}
+}
+
+// fluent renders placeables wrapped in Unicode isolation marks (the
+// Rust fluent-rs defaults to isolating): tests compare the plain text.
+func plain(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\u2068' || r == '\u2069' {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+// The progress dots box rides in the display-passkey code block
+// (pairing_card/mod.rs:229-230): an empty box the stylesheet spaces,
+// with no dot children of its own.
+func TestBtPairingCardProgressDots(t *testing.T) {
+	st := btWorld()
+	st.Pairing = bluetooth.DisplayPasskey{Device: pathHeadset, Passkey: 7, Entered: 2}
+	d, _ := newTestBtDropdown(t, st)
+	dots := findBox(d.card.root, "bluetooth-progress-dots")
+	if dots == nil {
+		t.Fatal("no bluetooth-progress-dots box")
+	}
+	if n := len(dots.Children()); n != 0 {
+		t.Errorf("the dots box has %d children, want none (the Rust box is empty)", n)
+	}
+}
+
+// Ghost-icon buttons carry ghost-icon only; ghost buttons carry ghost
+// only — the two templates do not mix (mod.rs:95-121,
+// pairing_card/mod.rs:94-100).
+func TestBtGhostClassesAreExact(t *testing.T) {
+	d, _ := newTestBtDropdown(t, btWorld())
+	if !widget.HasClass(d.scanBtn, "ghost-icon") || !widget.HasClass(d.scanBtn, "bluetooth-scan-btn") {
+		t.Errorf("scan button classes wrong: ghost-icon %v scan-btn %v",
+			widget.HasClass(d.scanBtn, "ghost-icon"), widget.HasClass(d.scanBtn, "bluetooth-scan-btn"))
+	}
+	if widget.HasClass(d.scanBtn, "ghost") {
+		t.Error("the scan button carries the ghost class")
+	}
+	closeBtn := findButton(d.card.root, "bluetooth-pairing-close")
+	if closeBtn == nil {
+		t.Fatal("no pairing close button")
+	}
+	if widget.HasClass(closeBtn, "ghost") || !widget.HasClass(closeBtn, "ghost-icon") {
+		t.Error("the close button is not ghost-icon only")
+	}
+	// The row actions are GhostButtons: ghost, not ghost-icon.
+	mouse := rowNamed(t, d, "Mouse")
+	forget := mouse.actions.Children()[1].(*widget.Button)
+	if !widget.HasClass(forget, "ghost") || !widget.HasClass(forget, "bluetooth-forget") {
+		t.Error("the forget button is not the ghost template")
+	}
+	if widget.HasClass(forget, "ghost-icon") {
+		t.Error("the forget button carries the ghost-icon class")
+	}
+}
+
+// A typed digit steps the keyboard to the next box (handle_pin_key's
+// grab_focus), through the popover handle.
+func TestBtPairingDigitBoxesStepTheFocus(t *testing.T) {
+	st := btWorld()
+	st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
+	d, _ := newTestBtDropdown(t, st)
+	pop := &fakePopover{}
+	d.root.attachPopover(pop)
+	c := d.card
+	c.pinDigits[2].SetText("4")
+	if pop.focused != c.pinDigits[3] {
+		t.Error("typing a digit did not move to the next box")
+	}
+	// The last box has no next.
+	pop.focused = nil
+	c.pinDigits[5].SetText("1")
+	if pop.focused != nil {
+		t.Error("the last digit box stepped past itself")
+	}
+	// A filtered-out keystroke does not step.
+	pop.focused = nil
+	c.pinDigits[0].SetText("")
+	c.pinDigits[0].SetText("x")
+	if pop.focused != nil {
+		t.Error("a rejected keystroke stepped the focus")
 	}
 }

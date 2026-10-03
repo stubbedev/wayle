@@ -278,7 +278,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		for _, a := range *ctx.Attachers {
 			a.Attach(layer)
 		}
-		rt.ctx.Dropdowns.attachHost(output.Name, layer)
+		rt.ctx.Dropdowns.attachHost(output.Name, layer, logicalSize(output).H)
 		return barWindow{layer, ctx.gen}, nil
 	}
 	bars := newBarSet(openBar)
