@@ -51,6 +51,10 @@ type pressSlider struct {
 // HitTest makes the wrapper the input leaf, so SetPressed reaches it.
 func (s *pressSlider) HitTest(p widget.Point) widget.Widget { return s.HitLeaf(s, p) }
 
+// CursorName is the hover pointer: the hand, like the wrapped slider
+// asks (the wrapper is the input leaf, so its own answer wins).
+func (s *pressSlider) CursorName() string { return "pointer" }
+
 // SetPressed tracks the drag; the release commits the final value.
 func (s *pressSlider) SetPressed(on bool) {
 	was := s.Pressed
