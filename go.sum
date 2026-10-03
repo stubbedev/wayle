@@ -46,6 +46,8 @@ github.com/stubbedev/gelm v0.0.0-20261003085237-717b915e8241 h1:T7/B1mYC/NE8v9TI
 github.com/stubbedev/gelm v0.0.0-20261003085237-717b915e8241/go.mod h1:XcqyAxajl3WoJxLn+79LWLKqAUDnD+PMiQ/p+u5dNek=
 github.com/stubbedev/gelm v0.0.0-20261003085318-a6bd3d2a1c5e h1:QYfB17G8VFtQILguXITG09QjsM32Scp16QYP17ZKUKs=
 github.com/stubbedev/gelm v0.0.0-20261003085318-a6bd3d2a1c5e/go.mod h1:XcqyAxajl3WoJxLn+79LWLKqAUDnD+PMiQ/p+u5dNek=
+github.com/stubbedev/gelm v0.0.0-20261003105244-8fe71f2c56b1 h1:i8yfpk7B8UbbJzB3yraPugYjjFvrXtqO/UzEJpVrEp0=
+github.com/stubbedev/gelm v0.0.0-20261003105244-8fe71f2c56b1/go.mod h1:XcqyAxajl3WoJxLn+79LWLKqAUDnD+PMiQ/p+u5dNek=
 github.com/unxed/xkb-go v0.1.8 h1:hqPI2wJw2LQ7YOqghNYat/TJF3pFamCCPjhxI5I3lhU=
 github.com/unxed/xkb-go v0.1.8/go.mod h1:V3LaLLiIMPBQCGnPfTYN8gER39XW26AZBYeXkkZ/GWQ=
 github.com/yalue/native_endian v1.0.2 h1:e4SxBbaCoOOO4E3axd7FSriUhzc1bIzqZGG5jl6Evbg=

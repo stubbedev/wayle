@@ -80,23 +80,27 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 **CSS engine completeness** — the compiled stylesheet now parses
 through gelm's engine with zero warnings (`styling`
 `TestStaticCSSParsesClean` fails naming anything the engine cannot
-honor). What landed for it: `@keyframes` + `animation` +
-`animation-play-state` (the spins and pulses run; opacity and
-`-gtk-icon-transform` rotation interpolate, `steps()` timing,
-`alternate`, iteration counts, paused holds, cascade revert on end),
-`-gtk-icon-source` (`-gtk-icontheme()` names), `-gtk-icon-palette`
-(the check mark takes the theme's glyphs recolored by the palette),
+honor), and the engine is feature complete for animation and
+transition work: gelm 8fe71f2 landed the full 2-D transform set
+(matrix, translate, scale, rotate, skew and their single-axis forms,
+lengths and all four angle units, composed left to right) painted
+through the affine about a `transform-origin`, transitions over every
+animatable channel (the colors, opacity, filter brightness, letter
+spacing, padding, margin, border widths, min sizes, outline, corner
+radii, and both transforms — one tween, layout channels relaying
+per frame), keyframes over the same channels, and the animation
+shorthand's complete grammar: comma lists, direction (normal, reverse,
+alternate, alternate-reverse), fill mode (none, forwards, backwards,
+both), negative delays starting mid-flight, steps() and the bezier
+curves, iteration counts, and play-state. Transform keyframes
+interpolate per function when the lists match, so a 0→360 spin turns
+instead of standing still. What landed earlier for it: `@keyframes` +
+`animation` + `animation-play-state` (the spins and pulses run),
+`-gtk-icon-source` (`-gtk-icontheme()` names), `-gtk-icon-palette`,
 `caret-color`, `text-decoration: underline`, and the earlier
-transitions. The last three deferred properties landed (gelm
-50dd44b): `transform` parses scale and translateX and a box carrying
-it paints its subtree into an offscreen layer composited back through
-the affine, with `transition: transform` tweening the hover zoom;
-`font-feature-settings` parses the tag list and the shaper honors
-tnum (each face's memoized Tabular twin — the recorder's clock
-digits); `line-height` lays every label line box at it. rotate and
-the other affine-less functions still warn and drop. Nothing is
-silently dropped anymore: a property the SCSS starts using that the
-engine cannot honor fails `TestStaticCSSParsesClean` naming it.
+transitions. Nothing is silently dropped: a property the SCSS starts
+using that the engine cannot honor fails `TestStaticCSSParsesClean`
+naming it.
 
 **The one sanctioned deviation**: gelm's widget Dropdown closes with
 its animated exit on a click anywhere outside it (the router's
