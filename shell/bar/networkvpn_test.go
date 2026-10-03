@@ -541,14 +541,17 @@ func TestVPNFormWireGuard(t *testing.T) {
 	// The private key's generate button and live public key.
 	priv := typedEntry(t, f, wireGuardPrivateKey)
 	readout := f.fields.Children()
-	var pub *widget.Label
+	var pub *widget.RichLabel
 	for _, w := range readout {
-		if l, ok := w.(*widget.Label); ok && l.HasClass("network-vpn-public-key") {
+		if l, ok := w.(*widget.RichLabel); ok && l.HasClass("network-vpn-public-key") {
 			pub = l
 		}
 	}
 	if pub == nil || pub.Text() != i18n.T("dropdown-network-vpn-public-key-empty") {
 		t.Fatal("no empty public-key readout")
+	}
+	if !pub.Selectable() {
+		t.Error("the public-key readout is not selectable")
 	}
 	priv.SetText(pair.Private)
 	if pub.Text() != publicKeyReadout(pair.Private) {

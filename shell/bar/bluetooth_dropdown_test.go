@@ -835,3 +835,50 @@ func TestBtPairingDigitBoxesStepTheFocus(t *testing.T) {
 		t.Error("a rejected keystroke stepped the focus")
 	}
 }
+
+// Backspace on the digit row is the Rust key controller
+// (handle_pin_key): on an empty box it clears and focuses the previous
+// one, on a filled box it clears it, and the entry never sees it.
+func TestBtPairingPinBackspaceSteps(t *testing.T) {
+	st := btWorld()
+	st.Pairing = bluetooth.RequestPasskey{Device: pathSpeaker}
+	d, _ := newTestBtDropdown(t, st)
+	c := d.card
+	arrangeDropdown(t, c.root, 320, 400)
+	// The popover's focus handle: the test wires it to the router, the
+	// attach does in the app.
+	router := &widget.Router{Root: c.root}
+	c.focus = func(w widget.Widget) { router.SetFocus(w) }
+	focused := c.pinDigits[2]
+	router.SetFocus(focused)
+	if router.Focused() != widget.Widget(focused) {
+		t.Fatal("the middle digit box did not take focus")
+	}
+	// A filled box's backspace clears it in place; focus stays.
+	focused.SetText("7")
+	router.KeyAction(widget.KeyBackspace, 0)
+	if focused.Text() != "" {
+		t.Errorf("backspace on a filled box left %q", focused.Text())
+	}
+	if router.Focused() != widget.Widget(focused) {
+		t.Error("a filled box's backspace moved focus")
+	}
+	// An empty box's backspace clears and focuses the previous one.
+	router.SetFocus(c.pinDigits[1])
+	c.pinDigits[0].SetText("9")
+	router.KeyAction(widget.KeyBackspace, 0)
+	if c.pinDigits[0].Text() != "" {
+		t.Errorf("the previous box kept %q", c.pinDigits[0].Text())
+	}
+	if router.Focused() != widget.Widget(c.pinDigits[0]) {
+		t.Error("the previous box did not take focus")
+	}
+	// Other actions reach the entry: a delete at the end of the text
+	// deletes nothing forward.
+	router.SetFocus(c.pinDigits[1])
+	c.pinDigits[1].SetText("5")
+	router.KeyAction(widget.KeyDelete, 0)
+	if c.pinDigits[1].Text() != "5" {
+		t.Errorf("the delete deleted backward: %q", c.pinDigits[1].Text())
+	}
+}

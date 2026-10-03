@@ -334,9 +334,10 @@ func (v *batteryView) profileSection() widget.Widget {
 	col.Append(v.label(i18n.T("dropdown-battery-power-profile"), 0.85, "section-label"), false)
 	seg := widget.NewBox(widget.Row, 0, 0)
 	seg.AddClass("profile-seg")
+	// set_homogeneous (power_profile/mod.rs:49): the segments equalize
+	// to the widest.
+	seg.SetHomogeneous(true)
 	v.profileButtons = make(map[string]*widget.Button, len(batteryProfiles))
-	var buttons []*widget.Button
-	widest := 0
 	for _, p := range batteryProfiles {
 		content := widget.NewBox(widget.Row, 0, 0)
 		content.AddClass("profile-seg-btn-content")
@@ -346,20 +347,10 @@ func (v *batteryView) profileSection() widget.Widget {
 		content.Append(icon, false)
 		content.Append(widget.NewLabel(v.font, v.px*0.9, i18n.T(p.label), 0), false)
 		content.Append(widget.NewSpacer(0, 0), true)
-		// set_homogeneous (power_profile/mod.rs:49): gelm's Box has no
-		// homogeneous, so every segment floors at the widest content's
-		// natural width through the same min-width the cascade reads.
-		if w := content.Measure(widget.Constraints{Max: widget.Size{W: 1 << 14, H: 1 << 14}}).W; w > widest {
-			widest = w
-		}
 		name := p.name
 		b := dropdownButton(content, "profile-seg-btn", func() { v.selectProfile(name) })
 		v.profileButtons[name] = b
-		buttons = append(buttons, b)
 		seg.Append(b, true)
-	}
-	for _, b := range buttons {
-		b.SetInlineStyle(fmt.Sprintf("min-width: %dpx", widest))
 	}
 	col.Append(seg, false)
 	v.profilesUnavailable = v.infoNote("power-profile-not-available", "power-profile-info-icon",

@@ -693,29 +693,27 @@ func (f *netVPNForm) entry(kind network.VPNKind, field network.VPNField, current
 	entry.SetText(current)
 	entry.OnActivate = func(string) { f.save() }
 	f.fields.Append(input, false)
-	var readout *widget.Label
+	var readout *widget.RichLabel
 	// WireGuard's key generation is the entry's primary icon in Rust
-	// (vpn_form/mod.rs:147-160); gelm entries have one icon slot and the
-	// reveal toggle owns it, so the generator stands beside the entry —
-	// reported as a gap.
 	if kind.ID == network.WireGuard && field.Key == wireGuardPrivateKey {
-		key := widget.NewThemeIcon(iconGenerateKey, int(f.v.px))
-		generate := dropdownButton(key, "network-vpn-generate", func() {
+		// The entry's primary icon generates a keypair
+		// (vpn_form/mod.rs:147-160); the reveal toggle keeps the
+		// secondary slot.
+		entry.SetLeadingIcon(iconGenerateKey, f.v.px, func() {
 			entry.SetText(network.GenerateKeyPair().Private)
 		})
-		generate.AddClass("ghost-icon")
-		generate.SetTooltip(i18n.T("dropdown-network-vpn-generate-key"))
-		input.Append(generate, false)
-		readout = f.fieldLabel(publicKeyReadout(current))
-		readout.AddClass("network-vpn-public-key")
+		readout = widget.NewRichLabel(f.v.font, f.v.px*0.85, publicKeyReadout(current), 0)
+		readout.SetVariants(app.FontVariantsOf(f.v.font))
+		readout.AddClass("network-vpn-public-key", "network-secret-label")
 		readout.SetWrap(true)
+		readout.SetSelectable(true)
 		f.fields.Append(readout, false)
 	}
 	// A box stops being wrong the moment it is edited.
 	entry.OnChanged = func(text string) {
 		entry.RemoveClass("error")
 		if readout != nil {
-			readout.SetText(publicKeyReadout(text))
+			readout.SetMarkup(publicKeyReadout(text))
 		}
 	}
 	f.entries = append(f.entries, vpnEntry{key: field.Key, entry: entry})

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/gelm/widget"
@@ -189,7 +190,8 @@ func TestUserSessionUsesTheFaceImage(t *testing.T) {
 		img.Pix[i] = 0xff
 	}
 	img.Set(0, 0, color.NRGBA{A: 255})
-	f, err := os.Create(filepath.Join(home, ".face"))
+	face := filepath.Join(home, ".face")
+	f, err := os.Create(face)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,18 +199,29 @@ func TestUserSessionUsesTheFaceImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = f.Close()
-	face := loadAvatar(facePath())
-	if face == nil {
-		t.Fatal("a decodable ~/.face did not load")
+	// The face rides on the tile as its background image, the Rust
+	// avatar's inline url().
+	tile := widget.NewBox(widget.Row, 0, 0)
+	tile.AddClass("user-avatar")
+	setAvatar(tile)
+	if !strings.Contains(tile.InlineStyle(), `url('`+face+`')`) {
+		t.Errorf("the tile carries %q, want the face's url", tile.InlineStyle())
 	}
-	if w, h := face.Size(); w != avatarPx || h != avatarPx {
-		t.Errorf("avatar = %dx%d, want the %dpx square", w, h, avatarPx)
-	}
-	// Garbage is no avatar, not a crash.
-	if err := os.WriteFile(filepath.Join(home, ".face"), []byte("nope"), 0o600); err != nil {
+	// An undecodable face still takes the inline style: the paint
+	// falls back to the box's background color under it.
+	if err := os.WriteFile(face, []byte("nope"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if loadAvatar(facePath()) != nil {
-		t.Error("an undecodable ~/.face produced an avatar")
+	tile2 := widget.NewBox(widget.Row, 0, 0)
+	setAvatar(tile2)
+	if tile2.InlineStyle() == "" {
+		t.Error("a present face file set no background image")
+	}
+	// No file at all: the tile stays clean for the user glyph.
+	os.Remove(face)
+	tile3 := widget.NewBox(widget.Row, 0, 0)
+	setAvatar(tile3)
+	if tile3.InlineStyle() != "" {
+		t.Errorf("a missing face set %q", tile3.InlineStyle())
 	}
 }

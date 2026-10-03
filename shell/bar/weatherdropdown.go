@@ -162,6 +162,9 @@ func weatherDropdown(ctx ModuleContext) widget.Widget {
 	// the sections fill the viewport, top-anchored.
 	scroll := dropdownScroll(v.loaded, "weather-scroll")
 	scroll.FillY = true
+	// propagate_natural_height (weather/mod.rs:119): the panel grows to
+	// the content's height instead of scrolling at the base height.
+	scroll.PropagateNaturalHeight = true
 	v.pages.Add("loaded", scroll)
 	// DropdownContent: the content box the stylesheet's .dropdown-content
 	// rules hang off (default ink, the section-label family).

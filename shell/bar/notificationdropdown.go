@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
@@ -460,7 +461,8 @@ func newNotifItem(v *notificationView, n *notifications.Notification) *notifItem
 	header.Append(dismiss, false)
 	content.Append(header, false)
 	if n.Body != "" {
-		body := widget.NewLabel(v.font, v.px*0.9, notifyui.BodyText(n.Body), 0)
+		body := widget.NewRichLabel(v.font, v.px*0.9, notifyui.BodyMarkup(n.Body), 0)
+		body.SetVariants(app.FontVariantsOf(v.font))
 		body.AddClass("notification-dropdown-item-body")
 		body.SetWrap(true)
 		body.SetEllipsize(widget.EllipsizeEnd)

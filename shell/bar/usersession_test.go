@@ -6,6 +6,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/gelm/widget"
@@ -164,9 +165,10 @@ func writeFace(t *testing.T, home string) {
 	}
 }
 
-// A readable ~/.face rasterizes into the avatar tile; the glyph shows
-// only when the face is absent.
-func TestUserSessionAvatarRasterizesTheFace(t *testing.T) {
+// The avatar tile is the face's background image (the Rust avatar's
+// inline url()); without a face file it carries none and the glyph
+// shows.
+func TestUserSessionAvatarTakesTheFaceAsItsBackground(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("USER", "wayle")
 	t.Setenv("HOME", home)
@@ -174,19 +176,16 @@ func TestUserSessionAvatarRasterizesTheFace(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	_, _, avatar, _, _, _ := sessionCardTree(t, userSessionSection(ctx))
-	raster, isRaster := avatar.Children()[0].(*widget.Icon)
-	if !isRaster || raster.Name() != "" {
-		t.Fatalf("with a face the avatar = %v, want the rasterized icon", avatar.Children()[0])
+	face := filepath.Join(home, ".face")
+	if !strings.Contains(avatar.InlineStyle(), `url('`+face+`')`) {
+		t.Errorf("the tile carries %q, want the face's url", avatar.InlineStyle())
 	}
 
-	// An undecodable face falls back to the glyph.
-	if err := os.WriteFile(filepath.Join(home, ".face"), []byte("not an image"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	// No face file, no background image: the glyph shows.
+	os.Remove(face)
 	ctx = newTestContext(t, cfg)
 	_, _, avatar, _, _, _ = sessionCardTree(t, userSessionSection(ctx))
-	glyph, isIcon := avatar.Children()[0].(*widget.Icon)
-	if !isIcon || glyph.Name() != "ld-user-symbolic" {
-		t.Fatalf("an undecodable face left the avatar = %v, want the glyph", avatar.Children()[0])
+	if avatar.InlineStyle() != "" {
+		t.Errorf("without a face the tile carries %q", avatar.InlineStyle())
 	}
 }

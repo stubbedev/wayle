@@ -108,17 +108,19 @@ func TestRelativeTime(t *testing.T) {
 	}
 }
 
-func TestBodyText(t *testing.T) {
+func TestBodyMarkup(t *testing.T) {
 	for in, want := range map[string]string{
-		"<b>bold</b> and <i>italic</i>": "bold and italic",
-		"a &amp; b &lt;c&gt;":           "a & b <c>",
-		"NixOS Package & Module":        "NixOS Package & Module",
-		"<b>unclosed":                   "<b>unclosed",
+		// Well-formed markup passes through with its tags, the label
+		// rendering it; anything else escapes to the literal characters.
+		"<b>bold</b> and <i>italic</i>": "<b>bold</b> and <i>italic</i>",
+		"a &amp; b &lt;c&gt;":           "a &amp; b &lt;c&gt;",
+		"NixOS Package & Module":        "NixOS Package &amp; Module",
+		"<b>unclosed":                   "&lt;b&gt;unclosed",
 		"plain":                         "plain",
 		"":                              "",
 	} {
-		if got := BodyText(in); got != want {
-			t.Errorf("BodyText(%q) = %q, want %q", in, got, want)
+		if got := BodyMarkup(in); got != want {
+			t.Errorf("BodyMarkup(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

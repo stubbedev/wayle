@@ -334,44 +334,53 @@ func TestBatterySectionsKeepRustsZeroSpacing(t *testing.T) {
 }
 
 // set_homogeneous: the three segments measure equal though their
-// labels differ; the floor is the inline min-width, and without it the
-// naturals drift apart.
+// labels differ, the seg equalizing them — no hand-set min-widths.
 func TestBatteryProfileSegmentsEqualWidth(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	v := batteryDropdown(ctx).(*batteryView)
 	defer v.dropdownClosed()
 	big := widget.Constraints{Max: widget.Size{W: 1 << 14, H: 1 << 14}}
 
-	// Without the floor the segments measure apart (the precondition:
-	// there is something to equalize).
+	// The segments' own naturals differ (the precondition: there is
+	// something to equalize).
 	naturals := map[string]int{}
-	floors := map[string]string{}
 	for _, p := range batteryProfiles {
-		b := v.profileButtons[p.name]
-		floors[p.name] = b.InlineStyle()
-		b.SetInlineStyle("")
-		naturals[p.name] = b.Measure(big).W
+		naturals[p.name] = v.profileButtons[p.name].Measure(big).W
 	}
 	lo, hi := 1<<30, 0
 	for _, w := range naturals {
 		lo, hi = min(lo, w), max(hi, w)
 	}
 	if lo == hi {
-		t.Fatal("the segments measure equal without the floor; nothing to equalize")
+		t.Fatal("the segments measure equal; nothing to equalize")
 	}
-
-	// With it every segment is as wide as the widest.
+	var seg *widget.Box
+	for _, b := range treetest.WithClass(v, "profile-seg") {
+		seg = b.(*widget.Box)
+	}
+	if seg == nil || !seg.Homogeneous() {
+		t.Fatal("the segment row is missing or not homogeneous")
+	}
 	for _, p := range batteryProfiles {
 		b := v.profileButtons[p.name]
-		b.SetInlineStyle(floors[p.name])
-		if !strings.HasPrefix(b.InlineStyle(), "min-width: ") {
-			t.Errorf("%s carries no min-width floor: %q", p.name, b.InlineStyle())
+		if strings.Contains(b.InlineStyle(), "min-width") {
+			t.Errorf("%s carries a hand-set min-width floor: %q", p.name, b.InlineStyle())
 		}
-		if w := b.Measure(big).W; w != hi {
-			t.Errorf("%s segment = %d, want the widest %d", p.name, w, hi)
-		}
-		if naturals[p.name] < hi && b.Measure(big).W <= naturals[p.name] {
-			t.Errorf("%s = %d did not grow past its natural %d", p.name, b.Measure(big).W, naturals[p.name])
+	}
+	// The seg lays the segments out equal: one shared width, the
+	// widest child's.
+	arrangeDropdown(t, seg, hi*3+8, 60)
+	seen := map[int]bool{}
+	for _, p := range batteryProfiles {
+		w := v.profileButtons[p.name].Bounds().W
+		seen[w] = true
+	}
+	if len(seen) != 1 {
+		t.Errorf("the segments took %d widths (%v), want one shared size", len(seen), seen)
+	}
+	for w := range seen {
+		if w < hi {
+			t.Errorf("the shared width %d is under the widest natural %d", w, hi)
 		}
 	}
 }

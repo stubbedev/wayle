@@ -4,9 +4,6 @@
 package notifyui
 
 import (
-	"encoding/xml"
-	"errors"
-	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -128,24 +125,15 @@ func RelativeTime(now, ts time.Time) Age {
 	return Age{Hours: int64(d / time.Hour)}
 }
 
-// BodyText is the text a markup body shows (sanitize_markup through a
-// markup label): well-formed markup renders its character data, tags
-// and entities resolved; anything that fails to parse shows literally.
-func BodyText(body string) string {
-	dec := xml.NewDecoder(strings.NewReader("<markup>" + body + "</markup>"))
-	var b strings.Builder
-	for {
-		tok, err := dec.Token()
-		if errors.Is(err, io.EOF) {
-			return b.String()
-		}
-		if err != nil {
-			return body
-		}
-		if text, ok := tok.(xml.CharData); ok {
-			b.Write(text)
-		}
+// BodyMarkup is the sanitized body (the Rust sanitize_markup): markup
+// gelm's parser accepts passes through with its tags intact, anything
+// else escapes to the literal characters.
+func BodyMarkup(body string) string {
+	if _, ok := widget.ParseMarkup(body); ok {
+		return body
 	}
+	repl := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+	return repl.Replace(body)
 }
 
 // NewIcon builds the widget for a resolved icon at size pixels: a file

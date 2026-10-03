@@ -1,16 +1,13 @@
 package bar
 
 import (
-	"image"
 	"os"
 	"path/filepath"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
-	"github.com/stubbedev/wayle/internal/imagedecode"
 	"github.com/stubbedev/wayle/internal/spawn"
 )
 
@@ -58,33 +55,19 @@ func facePath() string {
 	return filepath.Join(home, ".face")
 }
 
-// loadAvatar rasterizes the face image into the avatar box, center-
-// cropped to a square the way the Rust avatar's background-image
-// covers it. Nil when the file is absent or undecodable; the row then
-// shows the user glyph. (gelm cannot paint a CSS background-image
-// url, so the face stays a rasterized icon instead.)
-func loadAvatar(path string) *render.Icon {
+// setAvatar paints the face onto the tile as its background image —
+// the Rust avatar's `background-image: url(file://…)` inline style —
+// cover-fit inside the rounded box. The tile shows the user glyph
+// when the file is absent.
+func setAvatar(tile *widget.Box) {
+	path := facePath()
 	if path == "" {
-		return nil
+		return
 	}
-	img, err := imagedecode.Open(path)
-	if err != nil {
-		return nil
+	if _, err := os.Stat(path); err != nil {
+		return
 	}
-	b := img.Bounds()
-	side := min(b.Dx(), b.Dy())
-	square := image.Rect(b.Min.X+(b.Dx()-side)/2, b.Min.Y+(b.Dy()-side)/2, 0, 0)
-	square.Max = square.Min.Add(image.Pt(side, side))
-	if sub, ok := img.(interface {
-		SubImage(image.Rectangle) image.Image
-	}); ok {
-		img = sub.SubImage(square)
-	}
-	icon, err := render.IconFromImage(img, avatarPx, avatarPx)
-	if err != nil {
-		return nil
-	}
-	return icon
+	tile.SetInlineStyle("background-image: url('" + path + "');")
 }
 
 // userSessionSection is the dashboard's user-session card
@@ -107,11 +90,8 @@ func userSessionSection(ctx ModuleContext) widget.Widget {
 	info.AddClass("user-info")
 	tile := widget.NewBox(widget.Row, 0, 0)
 	tile.AddClass("user-avatar")
-	if face := loadAvatar(facePath()); face != nil {
-		tile.Append(widget.NewIcon(face), false)
-	} else {
-		tile.Append(widget.NewThemeIcon("ld-user-symbolic", avatarPx), false)
-	}
+	setAvatar(tile)
+	tile.Append(widget.NewThemeIcon("ld-user-symbolic", avatarPx), false)
 	info.AppendAligned(tile, false, widget.AlignStart)
 	meta := widget.NewBox(widget.Column, 0, 0)
 	name := widget.NewLabel(font, px, sessionUsername(), 0)

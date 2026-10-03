@@ -66,7 +66,7 @@ type card struct {
 	app     *widget.Label
 	time    *widget.Label
 	title   *widget.Label
-	body    *widget.Label
+	body    *widget.RichLabel
 	close   *widget.Button
 	actions *widget.Box
 }
@@ -234,7 +234,8 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 	c.title.SetEllipsize(widget.EllipsizeEnd)
 	c.title.SetMaxWidthChars(cardMaxWidthChars)
 	text.Append(c.title, false)
-	c.body = widget.NewLabel(p.font, 12, notifyui.BodyText(n.Body), muted)
+	c.body = widget.NewRichLabel(p.font, 12, notifyui.BodyMarkup(n.Body), muted)
+	c.body.SetVariants(app.FontVariantsOf(p.font))
 	c.body.AddClass("notification-popup-body")
 	c.body.SetWrap(true)
 	c.body.SetMaxWidthChars(cardMaxWidthChars)

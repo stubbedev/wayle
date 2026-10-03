@@ -71,8 +71,9 @@ type btPairingCard struct {
 
 	pinCode []*widget.Label
 	// pinRow holds the six single-digit passkey boxes
-	// (pairing_card's pin_input_row).
-	pinRow         *widget.Box
+	// (pairing_card's pin_input_row); the row is the key controller
+	// (handle_pin_key) so backspace steps to the previous box.
+	pinRow         *pinKeyRow
 	pinDigits      []*widget.Entry
 	progress       *widget.Label
 	serviceName    *widget.Label
@@ -151,7 +152,7 @@ func newBtPairingCard(ctx ModuleContext) *btPairingCard {
 	// The passkey prompt: six single-digit boxes in a centered row
 	// (pairing_card/mod.rs:147-190). The entry.bluetooth-pin-digit rules
 	// size and ink them; the mono font is the stylesheet's.
-	c.pinRow = widget.NewBox(widget.Row, 0, 0)
+	c.pinRow = &pinKeyRow{Box: widget.NewBox(widget.Row, 0, 0), card: c}
 	c.pinRow.AddClass("bluetooth-pin-input-row")
 	for i := range passkeyTotal {
 		digit := widget.NewEntry(font, px*1.4, 0)
@@ -232,6 +233,35 @@ func ghostButton(child widget.Widget) *widget.Button {
 }
 
 func isDigit(r rune) bool { return r >= '0' && r <= '9' }
+
+// pinKeyRow is the digit row and its key controller (handle_pin_key):
+// backspace on an empty box clears and focuses the previous one, on a
+// filled box just clears it, and the action never reaches the entry.
+type pinKeyRow struct {
+	*widget.Box
+	card *btPairingCard
+}
+
+// InterceptKey implements widget.KeyInterceptor for the focused digit
+// box.
+func (r *pinKeyRow) InterceptKey(target widget.Widget, a widget.KeyAction, mods widget.Mods) bool {
+	if a != widget.KeyBackspace {
+		return false
+	}
+	for i, d := range r.card.pinDigits {
+		if target != widget.Widget(d) {
+			continue
+		}
+		if d.Text() == "" && i > 0 {
+			r.card.pinDigits[i-1].SetText("")
+			r.card.focusDigit(i - 1)
+		} else {
+			d.SetText("")
+		}
+		return true
+	}
+	return false
+}
 
 // limitEntry keeps an entry to max runes that pass keep (set_max_length
 // plus the Rust digit key filter).

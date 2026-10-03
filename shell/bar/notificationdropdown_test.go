@@ -198,9 +198,9 @@ func TestNotificationItemBodyIconAndUrgency(t *testing.T) {
 		t.Error("urgency classes")
 	}
 	content := ff.Children()[0].(*widget.Box).Children()[1].(*widget.Box)
-	body := content.Children()[1].(*widget.Label)
-	if body.Text() != "a & b" || body.MaxLines() != 2 {
-		t.Errorf("body = %q (max lines %d)", body.Text(), body.MaxLines())
+	body := content.Children()[1].(*widget.RichLabel)
+	if body.Text() != "a & b" || body.MaxLines() != 2 || !body.Wrap() {
+		t.Errorf("body = %q (max lines %d, wrap %v)", body.Text(), body.MaxLines(), body.Wrap())
 	}
 	plainContent := plain.Children()[0].(*widget.Box).Children()[1].(*widget.Box)
 	if len(plainContent.Children()) != 1 {
