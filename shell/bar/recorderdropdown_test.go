@@ -39,7 +39,7 @@ func TestPreviewGeometryAndPercent(t *testing.T) {
 // The frame follows the pointer from where it was grabbed, clamped to
 // the inset travel, and the release reports the percentages.
 func TestWebcamPreviewDrag(t *testing.T) {
-	p := newWebcamPreview(360, 20, 0, 0, 0, 0, 0)
+	p := newWebcamPreview(360, 20, 0, 0)
 	p.Arrange(render.Rect{X: 100, Y: 50, W: int(p.pw), H: int(p.ph)})
 	margin, tw, th := p.travel()
 	if p.camX != margin || p.camY != margin {

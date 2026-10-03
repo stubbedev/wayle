@@ -641,7 +641,7 @@ func (v *networkView) statusLabel() *widget.Label {
 }
 
 func (v *networkView) ghostText(text, class string, onClick func()) *widget.Button {
-	b := dropdownButton(widget.NewLabel(v.font, v.px*0.85, text, v.ctx.Style.fg), class, onClick)
+	b := dropdownButton(widget.NewLabel(v.font, v.px*0.85, text, 0), class, onClick)
 	b.AddClass("ghost")
 	return b
 }

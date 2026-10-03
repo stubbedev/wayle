@@ -42,7 +42,6 @@ const (
 type btDropdown struct {
 	ctx  ModuleContext
 	src  bluetooth.Source
-	pal  btPalette
 	font render.Font
 	px   float64
 
@@ -111,7 +110,7 @@ func bluetoothDropdown(ctx ModuleContext) widget.Widget {
 func newBtDropdown(ctx ModuleContext, src bluetooth.Source) *btDropdown {
 	font, px := dropdownFont(ctx)
 	d := &btDropdown{
-		ctx: ctx, src: src, pal: newBtPalette(ctx), font: font, px: px,
+		ctx: ctx, src: src, font: font, px: px,
 		pending: make(map[dbus.ObjectPath]btPending),
 	}
 	// The header (DropdownHeader): icon, title, scan button, switch. The
@@ -288,18 +287,20 @@ func batteryText(battery *uint8) string {
 
 // buildRow is DeviceItem's view for one snapshot.
 func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
-	pal, font, px := d.pal, d.font, d.px
+	font, px := d.font, d.px
 	pending := d.pending[s.path]
-	row := &btDeviceRow{box: widget.NewBox(widget.Row, 8, 8), hoverSwaps: s.category != categoryAvailable, pending: pending != 0}
-	row.box.AddClass("bluetooth-device")
+	row := &btDeviceRow{Box: widget.NewBox(widget.Row, 8, 8), hoverSwaps: s.category != categoryAvailable, pending: pending != 0}
+	row.AddClass("bluetooth-device")
 	if s.category == categoryAvailable {
-		row.box.AddClass("available")
-		row.hoverBg = pal.hover
+		row.AddClass("available")
 	}
 	if pending != 0 {
-		row.box.AddClass("pending")
+		row.AddClass("pending")
 	}
 	row.onClick = func() { d.onDeviceClick(s) }
+	row.SetOnClickWithin(func() { row.onClick() })
+	row.SetOnHoverWithin(func(bool) { row.syncSlot() })
+	row.SetCursorName("pointer")
 
 	icon := widget.NewThemeIcon(s.icon, int(px*1.4))
 	// The icon tile (device_item's icon_container): the box paints the
@@ -311,7 +312,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 	case categoryPaired:
 		well.AddClass("paired")
 	}
-	row.box.Append(well, false)
+	row.Append(well, false)
 
 	info := widget.NewBox(widget.Column, 2, 0)
 	info.AddClass("bluetooth-device-info")
@@ -336,7 +337,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		detail.Append(pct, false)
 	}
 	info.Append(detail, false)
-	row.box.Append(info, true)
+	row.Append(info, true)
 
 	// The trailing slot: status, or the actions while hovered.
 	if s.category != categoryAvailable || pending != 0 {
@@ -356,10 +357,10 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		if s.connected {
 			toggleKey = "dropdown-bluetooth-disconnect"
 		}
-		toggle := &btActionButton{Button: ghostButton(widget.NewLabel(font, px*0.85, btText(toggleKey), 0)), row: row}
+		toggle := ghostButton(widget.NewLabel(font, px*0.85, btText(toggleKey), 0))
 		toggle.AddClass("bluetooth-action-toggle")
 		toggle.OnClick = func() { d.onDeviceClick(s) }
-		forget := &btActionButton{Button: ghostButton(widget.NewLabel(font, px*0.85, btText("dropdown-bluetooth-forget"), 0)), row: row}
+		forget := ghostButton(widget.NewLabel(font, px*0.85, btText("dropdown-bluetooth-forget"), 0))
 		forget.AddClass("bluetooth-forget")
 		forget.OnClick = func() { d.onForget(s) }
 		toggle.SetEnabled(pending == 0)
@@ -374,7 +375,7 @@ func (d *btDropdown) buildRow(s deviceSnapshot) *btDeviceRow {
 		row.slot.SetTransition(widget.StackCrossfade, hoverTransition)
 		row.slot.Add(btSlotStatus, statusPage)
 		row.slot.Add(btSlotActions, actions)
-		row.box.Append(row.slot, false)
+		row.Append(row.slot, false)
 		row.syncSlot()
 	}
 	return row

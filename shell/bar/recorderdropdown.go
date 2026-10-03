@@ -8,7 +8,6 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/recorder"
 )
@@ -44,14 +43,16 @@ func pctFromPx(px, margin, travel int32) uint8 {
 
 // webcamPreview is the draggable position preview: the outer frame is
 // the screen, the inner one the webcam picture-in-picture, inset by the
-// recording pipeline's margin. A drag tracks the pointer from where it
-// grabbed the frame; the release reports the position as percentages.
+// recording pipeline's margin. Both are classed boxes the stylesheet
+// paints (recorder-position-preview, recorder-position-cam); a drag
+// tracks the pointer from where it grabbed the frame, and the release
+// reports the position as percentages.
 type webcamPreview struct {
 	widget.Base
 	pw, ph, cw, ch int32
 	// camX and camY are the frame's offset inside the preview.
-	camX, camY       int32
-	frame, cam, edge render.Color
+	camX, camY int32
+	frame, cam *widget.Box
 
 	pointer  widget.Point
 	grabX    int32
@@ -60,8 +61,12 @@ type webcamPreview struct {
 	onMove   func(x, y uint8)
 }
 
-func newWebcamPreview(width int32, sizePct, x, y uint8, frame, cam, edge render.Color) *webcamPreview {
-	p := &webcamPreview{frame: frame, cam: cam, edge: edge}
+func newWebcamPreview(width int32, sizePct, x, y uint8) *webcamPreview {
+	p := &webcamPreview{}
+	p.frame = widget.NewBox(widget.Row, 0, 0)
+	p.frame.AddClass("recorder-position-preview")
+	p.cam = widget.NewBox(widget.Row, 0, 0)
+	p.cam.AddClass("recorder-position-cam")
 	p.pw, p.ph, p.cw, p.ch = previewGeometry(width, sizePct)
 	p.place(x, y)
 	return p
@@ -86,17 +91,35 @@ func (p *webcamPreview) percent() (uint8, uint8) {
 	return pctFromPx(p.camX, margin, tw), pctFromPx(p.camY, margin, th)
 }
 
+// Arrange lays the frame over the whole preview and the cam at its
+// offset; the boxes paint from their cascades.
+func (p *webcamPreview) Arrange(rect render.Rect) {
+	p.Base.Arrange(rect)
+	p.layOut()
+	widget.SetParents(p, p.frame, p.cam)
+}
+
+// layOut positions both boxes against the current bounds.
+func (p *webcamPreview) layOut() {
+	b := p.Bounds()
+	if b.Empty() {
+		return
+	}
+	p.frame.Arrange(render.Rect{X: b.X, Y: b.Y, W: int(p.pw), H: int(p.ph)})
+	p.cam.Arrange(render.Rect{X: b.X + int(p.camX), Y: b.Y + int(p.camY), W: int(p.cw), H: int(p.ch)})
+}
+
 func (p *webcamPreview) Measure(widget.Constraints) widget.Size {
 	return widget.Size{W: int(p.pw), H: int(p.ph)}
 }
 
 func (p *webcamPreview) Paint(cv *render.Canvas) {
-	b := p.Bounds()
-	cv.RoundedRect(render.Rect{X: b.X, Y: b.Y, W: int(p.pw), H: int(p.ph)}, 6, p.frame)
-	r := render.Rect{X: b.X + int(p.camX), Y: b.Y + int(p.camY), W: int(p.cw), H: int(p.ch)}
-	cv.RoundedRect(r, 4, p.cam)
-	cv.BorderRect(r, 1, p.edge)
+	widget.PaintChild(cv, p.frame)
+	widget.PaintChild(cv, p.cam)
 }
+
+// Children exposes the boxes to the tree walks.
+func (p *webcamPreview) Children() []widget.Widget { return []widget.Widget{p.frame, p.cam} }
 
 func (p *webcamPreview) HitTest(pt widget.Point) widget.Widget { return p.HitLeaf(p, pt) }
 
@@ -131,6 +154,7 @@ func (p *webcamPreview) DragMove(pt widget.Point) {
 	margin, tw, th := p.travel()
 	p.camX = min(max(int32(pt.X-b.X)-p.grabX, margin), margin+tw)
 	p.camY = min(max(int32(pt.Y-b.Y)-p.grabY, margin), margin+th)
+	p.layOut()
 	p.Invalidate()
 }
 
@@ -220,10 +244,7 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	if w, _, ok := dropdownDims("recorder", ctx.Config); ok {
 		width = int32(w)
 	}
-	pal := ctx.Style.palette
-	v.preview = newWebcamPreview(width, uint8(cfg.WebcamSize), uint8(cfg.WebcamX), uint8(cfg.WebcamY),
-		tokenColor(pal, config.TokenBgSurfaceElevated), tokenColor(pal, config.TokenAccentSubtle), tokenColor(pal, config.TokenAccent))
-	v.preview.AddClass("recorder-position-preview")
+	v.preview = newWebcamPreview(width, uint8(cfg.WebcamSize), uint8(cfg.WebcamX), uint8(cfg.WebcamY))
 	v.preview.onMove = v.webcamMoved
 	centered := widget.NewBox(widget.Row, 0, 0)
 	centered.Append(widget.NewSpacer(0, 0), true)

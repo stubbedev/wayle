@@ -77,8 +77,6 @@ func (v *mailView) row(a mail.AccountUnread) widget.Widget {
 	row := widget.NewBox(widget.Row, 8, 0)
 	row.AddClass("mail-dropdown-row")
 	icon := widget.NewThemeIcon(a.Icon, mailRowIconPx)
-	// The row provider icon has no stylesheet rule; it keeps its tint.
-	icon.SetTint(v.ctx.Style.fg)
 	row.Append(icon, false)
 	// .mail-account-name inks it fg-default.
 	name := widget.NewLabel(v.font, v.px, a.Name, 0)

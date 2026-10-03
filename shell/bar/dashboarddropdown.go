@@ -11,7 +11,6 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/spawn"
 	"github.com/stubbedev/wayle/service/mpris"
@@ -68,10 +67,6 @@ func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	}
 	v.follow()
 	return v
-}
-
-func (v *dashboardView) tint(token config.CssToken) render.Color {
-	return tokenColor(v.ctx.Style.palette, token)
 }
 
 // icon and label build the panel's icons and labels; the stylesheet
@@ -696,16 +691,17 @@ func (v *dashboardView) network() widget.Widget {
 	return card
 }
 
-// dashboardThresholdColor is threshold_color: error at or past the
-// error mark, warning at or past the warning mark, else success.
-func dashboardThresholdColor(value, warning, errorAt float32) config.CssToken {
+// dashboardThresholdClass is threshold_color: the ring variant class —
+// error at or past the error mark, warning at or past the warning mark,
+// else success.
+func dashboardThresholdClass(value, warning, errorAt float32) string {
 	switch {
 	case value >= errorAt:
-		return config.TokenStatusError
+		return "error"
 	case value >= warning:
-		return config.TokenStatusWarning
+		return "warning"
 	}
-	return config.TokenStatusSuccess
+	return "success"
 }
 
 // systemStats is system_stats: CPU, RAM, root disk, and CPU temperature
@@ -718,16 +714,15 @@ func (v *dashboardView) systemStats() widget.Widget {
 		scale = 1
 	}
 	size := int(math.Round(4 * styling.RemBase * scale))
-	stroke := int(math.Round(4 * scale))
 	row := widget.NewBox(widget.Row, 8, 0)
 	row.AddClass("system-stats-inline")
 	ring := func(labelID string) *progressRing {
-		// The ring is hand-painted (draw_ring): its track, fill, and
-		// label ink stay programmatic threshold colors.
-		r := newProgressRing(size, stroke, v.font, v.px*0.85, v.ctx.Style.fg)
+		// ProgressRing: the canvas paints from its cascade; the variant
+		// class recolors it.
+		r, overlay := newProgressRing(size, "lg", v.font, v.px*0.85)
 		col := widget.NewBox(widget.Column, 4, 0)
 		col.AddClass("stat-inline")
-		col.Append(r, false)
+		col.Append(overlay, false)
 		lbl := v.label(i18n.T(labelID), 0.75)
 		lbl.AddClass("stat-label")
 		col.Append(lbl, false)
@@ -737,7 +732,7 @@ func (v *dashboardView) systemStats() widget.Widget {
 	cpuRing, memRing, diskRing, tempRing := ring("dropdown-dashboard-cpu"), ring("dropdown-dashboard-ram"), ring("dropdown-dashboard-disk"), ring("dropdown-dashboard-temp")
 	card.Append(row, false)
 	usage := func(r *progressRing, pct float32) {
-		r.set(float64(pct/100), strconv.FormatFloat(float64(pct), 'f', 0, 32)+"%", v.tint(dashboardThresholdColor(pct, cfg.UsageWarning, cfg.UsageError)))
+		r.set(float64(pct/100), strconv.FormatFloat(float64(pct), 'f', 0, 32)+"%", dashboardThresholdClass(pct, cfg.UsageWarning, cfg.UsageError))
 	}
 	reader := &sysinfo.CPUReader{Sensor: v.ctx.Config.CPU.TempSensor}
 	poll := func() {
@@ -745,7 +740,7 @@ func (v *dashboardView) systemStats() widget.Widget {
 			usage(cpuRing, cpu.UsagePercent)
 			if cpu.HasTemperature {
 				c := cpu.TemperatureC
-				tempRing.set(float64(min(max(c/100, 0), 1)), strconv.FormatFloat(float64(c), 'f', 0, 32)+"°", v.tint(dashboardThresholdColor(c, cfg.TempWarning, cfg.TempError)))
+				tempRing.set(float64(min(max(c/100, 0), 1)), strconv.FormatFloat(float64(c), 'f', 0, 32)+"°", dashboardThresholdClass(c, cfg.TempWarning, cfg.TempError))
 			}
 		}
 		if mem, err := sysinfo.ReadMemory(); err == nil {

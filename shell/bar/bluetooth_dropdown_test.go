@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -61,7 +62,7 @@ func rowNamed(t *testing.T, d *btDropdown, name string) *btDeviceRow {
 	t.Helper()
 	for _, list := range []*widget.Box{d.myList, d.availList} {
 		for _, r := range rows(list) {
-			info := r.box.Children()[1].(*widget.Box)
+			info := r.Children()[1].(*widget.Box)
 			if info.Children()[0].(*widget.Label).Text() == name {
 				return r
 			}
@@ -93,7 +94,7 @@ func TestBtDropdownListsDevices(t *testing.T) {
 		}
 	}
 	// The battery detail: separator, icon, percent.
-	detail := mine[0].box.Children()[1].(*widget.Box).Children()[1].(*widget.Box)
+	detail := mine[0].Children()[1].(*widget.Box).Children()[1].(*widget.Box)
 	if n := len(detail.Children()); n != 4 {
 		t.Fatalf("headset detail has %d parts, want type, separator, icon, percent", n)
 	}
@@ -200,17 +201,17 @@ func TestBtDropdownToggleOffCancelsTheScan(t *testing.T) {
 
 func TestBtDropdownConnectAvailableDevice(t *testing.T) {
 	d, src := newTestBtDropdown(t, btWorld())
-	rowNamed(t, d, "Speaker").ClickAt(widget.Point{})
+	rowNamed(t, d, "Speaker").clickRow(t)
 	want := []string{"connect " + string(pathSpeaker), "trust-paired " + string(pathSpeaker)}
 	if !slices.Equal(src.Calls(), want) {
 		t.Fatalf("calls = %v, want %v", src.Calls(), want)
 	}
 	row := rowNamed(t, d, "Speaker")
-	if !row.pending || row.status == nil || row.status.Text() != "Connecting..." || !widget.HasClass(row.box, "pending") {
+	if !row.pending || row.status == nil || row.status.Text() != "Connecting..." || !widget.HasClass(row.Box, "pending") {
 		t.Error("a connecting row does not show its pending state")
 	}
 	// A click while pending does nothing.
-	row.ClickAt(widget.Point{})
+	row.clickRow(t)
 	if len(src.Calls()) != 2 {
 		t.Error("a pending row took a second click")
 	}
@@ -227,7 +228,7 @@ func TestBtDropdownConnectAvailableDevice(t *testing.T) {
 func TestBtDropdownFailedConnectClearsPending(t *testing.T) {
 	d, src := newTestBtDropdown(t, btWorld())
 	src.fail["connect"] = errors.New("page timeout")
-	rowNamed(t, d, "Speaker").ClickAt(widget.Point{})
+	rowNamed(t, d, "Speaker").clickRow(t)
 	if slices.Contains(src.Calls(), "trust-paired "+string(pathSpeaker)) {
 		t.Error("a failed connect still trusted the device")
 	}
@@ -238,7 +239,7 @@ func TestBtDropdownFailedConnectClearsPending(t *testing.T) {
 
 func TestBtDropdownDisconnectAndForget(t *testing.T) {
 	d, src := newTestBtDropdown(t, btWorld())
-	rowNamed(t, d, "Headset").ClickAt(widget.Point{})
+	rowNamed(t, d, "Headset").clickRow(t)
 	if got := src.Calls(); len(got) != 1 || got[0] != "disconnect "+string(pathHeadset) {
 		t.Fatalf("calls = %v, want a disconnect", got)
 	}
@@ -246,7 +247,7 @@ func TestBtDropdownDisconnectAndForget(t *testing.T) {
 		t.Errorf("status = %q", got)
 	}
 	mouse := rowNamed(t, d, "Mouse")
-	forget := mouse.actions.Children()[1].(*btActionButton)
+	forget := mouse.actions.Children()[1].(*widget.Button)
 	forget.OnClick()
 	if got := src.Calls(); len(got) != 2 || got[1] != "forget "+string(pathMouse) {
 		t.Fatalf("calls = %v, want a forget", got)
@@ -270,28 +271,49 @@ func TestBtDeviceRowHoverSwapsStatusForActions(t *testing.T) {
 	if row.slot.Visible() != btSlotStatus || !visible(row.status) {
 		t.Fatal("at rest the row shows its status")
 	}
-	row.SetHovered(true)
+	// One pointer: the router moves over the row, onto a button, then
+	// off the row entirely.
+	row.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
+	row.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 40})
+	router := &widget.Router{Root: row}
+	router.Move(widget.Point{X: 10, Y: 10})
 	if row.slot.Visible() != btSlotActions || !row.slot.Switching() {
 		t.Fatal("hovered, the row crossfades to its actions")
 	}
-	toggle := row.actions.Children()[0].(*btActionButton)
-	// Moving onto a button keeps the actions (the router unhovers the
-	// row, then hovers the button).
-	row.SetHovered(false)
-	toggle.SetHovered(true)
+	toggle := row.actions.Children()[0].(*widget.Button)
+	b := toggle.Bounds()
+	// Moving onto a button keeps the actions: the button is a
+	// descendant, so the row's hover-within holds.
+	router.Move(widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2})
 	if row.slot.Visible() != btSlotActions {
 		t.Error("moving onto an action hid the actions")
 	}
-	toggle.SetHovered(false)
+	router.Move(widget.Point{X: 1000, Y: 1000})
 	if row.slot.Visible() != btSlotStatus || !visible(row.status) {
 		t.Error("leaving the row keeps the actions")
 	}
 	// Hovering an available row never swaps.
 	speaker := rowNamed(t, d, "Speaker")
-	speaker.SetHovered(true)
+	speaker.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
+	speaker.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 40})
+	(&widget.Router{Root: speaker}).Move(widget.Point{X: 10, Y: 10})
 	if speaker.actions != nil {
 		t.Error("an available row grew actions")
 	}
+}
+
+// clickRow presses and releases through a Router, the real input path:
+// the hit lands inside the row and the row's SetOnClickWithin hook
+// hears it.
+func (r *btDeviceRow) clickRow(t *testing.T) {
+	t.Helper()
+	r.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 200}})
+	r.Arrange(render.Rect{X: 0, Y: 0, W: 400, H: 40})
+	router := &widget.Router{Root: r}
+	p := widget.Point{X: 10, Y: 10}
+	router.Move(p)
+	router.Press(widget.BTNLeft, p)
+	router.Release(widget.BTNLeft, p)
 }
 
 func TestBtPairingConfirmation(t *testing.T) {

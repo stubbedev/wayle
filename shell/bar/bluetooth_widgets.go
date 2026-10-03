@@ -78,42 +78,27 @@ func (s *btSurface) HitTest(p widget.Point) widget.Widget {
 // Children exposes the child for traversal.
 func (s *btSurface) Children() []widget.Widget { return []widget.Widget{s.child} }
 
-// btDeviceRow is one device row (device_item): the whole row is the
-// click target (connect/disconnect), hovering a paired row swaps its
-// status label for the action buttons, and presses over a visible
-// action button go to that button.
+// btDeviceRow is one device row (device_item): the row box carries the
+// classes and the stylesheet paints it — the available :hover, the
+// padding, the first-child radii. The whole row is the click target
+// (SetOnClickWithin; the action buttons are clicking descendants and
+// keep their own), and hovering swaps the status label for the actions
+// (SetOnHoverWithin; the buttons are descendants, so moving onto one
+// holds the swap).
 type btDeviceRow struct {
-	widget.Base
-	box *widget.Box
-	bg  render.Color
-	// hoverBg paints under an available row while hovered
-	// (.bluetooth-device.available:hover).
-	hoverBg render.Color
+	*widget.Box
 	// status and actions are the hover stack's two pages.
 	slot   *widget.Stack
 	status *widget.Label
 	// statusShown is status_visible: connected, paired, or pending.
 	statusShown bool
 	actions     *widget.Box
-	// hoverSwaps is set for my devices: only they carry the hover
-	// controller.
+	// hoverSwaps is set for my devices: only they carry the swap.
 	hoverSwaps bool
 	pending    bool
 
-	rowHovered    bool
-	actionHovered int
-	onClick       func()
+	onClick func()
 }
-
-// SetHovered implements widget.HoverSetter.
-func (r *btDeviceRow) SetHovered(on bool) {
-	r.rowHovered = on
-	r.syncSlot()
-	r.Invalidate()
-}
-
-// hovered is the Rust hover state: over the row or one of its buttons.
-func (r *btDeviceRow) hovered() bool { return r.rowHovered || r.actionHovered > 0 }
 
 // syncSlot shows the actions while hovered and idle, else the status
 // (set_visible_child_name).
@@ -122,7 +107,7 @@ func (r *btDeviceRow) syncSlot() {
 		return
 	}
 	r.status.SetVisible(r.statusShown)
-	if r.hoverSwaps && r.hovered() && !r.pending {
+	if r.hoverSwaps && r.HoverWithin() && !r.pending {
 		r.slot.Show(btSlotActions)
 	} else {
 		r.slot.Show(btSlotStatus)
@@ -134,75 +119,3 @@ const (
 	btSlotStatus  = "status"
 	btSlotActions = "actions"
 )
-
-// ClickAt implements widget.Clicker.
-func (r *btDeviceRow) ClickAt(widget.Point) {
-	if r.onClick != nil {
-		r.onClick()
-	}
-}
-
-// CursorName implements widget.CursorNamer (set_cursor_from_name).
-func (r *btDeviceRow) CursorName() string { return "pointer" }
-
-func (r *btDeviceRow) Measure(con widget.Constraints) widget.Size { return r.box.Measure(con) }
-
-func (r *btDeviceRow) Arrange(rect render.Rect) {
-	r.Base.Arrange(rect)
-	r.box.Arrange(rect)
-	widget.SetParents(r, r.box)
-}
-
-func (r *btDeviceRow) ArrangeRoot(rect render.Rect) { r.Arrange(rect) }
-
-func (r *btDeviceRow) Paint(cv *render.Canvas) {
-	if r.bg != 0 {
-		cv.RoundedRect(r.Bounds(), 0, r.bg)
-	}
-	if r.hoverBg != 0 && r.rowHovered {
-		cv.RoundedRect(r.Bounds(), 0, r.hoverBg)
-	}
-	widget.PaintChild(cv, r.box)
-}
-
-// HitTest routes to a visible action button, else claims the press for
-// the row, so the labels inside never swallow the click.
-func (r *btDeviceRow) HitTest(p widget.Point) widget.Widget {
-	if !r.Bounds().Contains(p.X, p.Y) {
-		return nil
-	}
-	if r.actions != nil && r.slot.Visible() == btSlotActions {
-		if hit := r.actions.HitTest(p); hit != nil {
-			return hit
-		}
-	}
-	return r
-}
-
-func (r *btDeviceRow) Children() []widget.Widget { return []widget.Widget{r.box} }
-
-// btActionButton is a row action that keeps its row hovered while the
-// pointer is on it, so moving onto the button does not swap it away.
-type btActionButton struct {
-	*widget.Button
-	row *btDeviceRow
-}
-
-// HitTest returns the wrapper, so the router's hover lands here.
-func (b *btActionButton) HitTest(p widget.Point) widget.Widget {
-	if b.Button.HitTest(p) != nil {
-		return b
-	}
-	return nil
-}
-
-// SetHovered implements widget.HoverSetter.
-func (b *btActionButton) SetHovered(on bool) {
-	b.Button.SetHovered(on)
-	if on {
-		b.row.actionHovered++
-	} else if b.row.actionHovered > 0 {
-		b.row.actionHovered--
-	}
-	b.row.syncSlot()
-}

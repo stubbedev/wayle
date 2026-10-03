@@ -11,7 +11,6 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/upower"
@@ -128,18 +127,6 @@ func resumeThreshold(end uint32) uint32 {
 	return end - 5
 }
 
-// batteryVariantToken colors the gauge fill, the one variant ink the
-// stylesheet cannot reach: its levelbar rules select a GTK levelbar
-// tree, while the Go bar is a progressbar (trough > progress).
-var batteryVariantToken = map[string]config.CssToken{
-	"crit":    config.TokenStatusError,
-	"warn":    config.TokenStatusWarning,
-	"good":    config.TokenStatusSuccess,
-	"fair":    config.TokenStatusWarning,
-	"poor":    config.TokenStatusError,
-	"unknown": config.TokenFgSubtle,
-}
-
 // batteryVariants is every variant class a battery label may carry.
 var batteryVariants = []string{"crit", "warn", "good", "fair", "poor", "unknown"}
 
@@ -166,7 +153,7 @@ type batteryView struct {
 	body *widget.Stack
 
 	heroPct, heroState, heroTime, heroInput *widget.Label
-	gauge                                   *widget.ProgressBar
+	gauge                                   *widget.LevelBar
 	drawValue, drawLabel                    *widget.Label
 	capacityValue, capacityLabel            *widget.Label
 	healthDot, healthText                   *widget.Label
@@ -245,12 +232,8 @@ func (v *batteryView) batterySection() widget.Widget {
 	hero.Append(meta, true)
 	col.Append(hero, false)
 
-	v.gauge = widget.NewProgressBar(0)
+	v.gauge = widget.NewLevelBar(0)
 	v.gauge.AddClass("battery-gauge")
-	// Kept programmatic: the sheet's gauge rules select
-	// levelbar.battery-gauge > trough > block.filled, which no part of
-	// this progressbar tree matches.
-	v.gauge.Trough = tokenColor(v.ctx.Style.palette, config.TokenBgSurfaceElevated)
 	col.Append(v.gauge, false)
 
 	details := widget.NewBox(widget.Row, 8, 0)
@@ -386,9 +369,7 @@ func (v *batteryView) applyDevice(dev upower.Device, ok bool) {
 
 	v.gauge.SetValue(min(max(dev.Percentage, 0), 100) / 100)
 	v.gauge.RemoveClass(batteryVariants...)
-	gaugeClass := batteryLevelClass(dev, "good")
-	v.gauge.AddClass(gaugeClass)
-	v.gauge.Fill = tokenColor(v.ctx.Style.palette, batteryVariantToken[gaugeClass])
+	v.gauge.AddClass(batteryLevelClass(dev, "good"))
 
 	v.drawValue.SetText(formatWatts(dev.EnergyRate))
 	v.capacityValue.SetText(formatWattHours(dev.EnergyFull))

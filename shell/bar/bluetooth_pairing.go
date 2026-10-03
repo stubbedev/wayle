@@ -4,41 +4,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/bluetooth"
-	"github.com/stubbedev/wayle/styling"
 )
-
-// btPalette is the token set the bluetooth dropdown paints with.
-type btPalette struct {
-	fg, muted, subtle, accent, accentSubtle, onAccent render.Color
-	elevated, overlay, hover, border                  render.Color
-	radius                                            int
-}
-
-func newBtPalette(ctx ModuleContext) btPalette {
-	palette := styling.Default()
-	if ctx.Style != nil && ctx.Style.palette != nil {
-		palette = ctx.Style.palette
-	}
-	token := func(t config.CssToken) render.Color { return tokenColor(palette, t) }
-	return btPalette{
-		fg:           token(config.TokenFgDefault),
-		muted:        token(config.TokenFgMuted),
-		subtle:       token(config.TokenFgSubtle),
-		accent:       token(config.TokenAccent),
-		accentSubtle: token(config.TokenAccentSubtle),
-		onAccent:     token(config.TokenFgOnAccent),
-		elevated:     token(config.TokenBgElevated),
-		overlay:      token(config.TokenBgOverlay),
-		hover:        token(config.TokenBgHover),
-		border:       token(config.TokenBorderSubtle),
-		radius:       styling.RoundingRadiusPx(config.RoundingMd, 1),
-	}
-}
 
 // pairingVariant is PairingVariant: which prompt the card shows. The
 // Rust Failed variant is never entered there and is not carried.

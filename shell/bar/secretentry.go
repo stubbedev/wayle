@@ -11,35 +11,35 @@ const (
 	iconEyeOff = "ld-eye-off-symbolic"
 )
 
-// secretEntry is a masked Entry with the eye button every secret box in
+// secretEntry is a masked Entry with the peek icon every secret box in
 // the network dropdown carries (attach_reveal_toggle): a mistyped key
-// or password is otherwise only fixable by retyping it.
+// or password is otherwise only fixable by retyping it. The eye is the
+// entry's trailing icon — the entry > image node, which the
+// stylesheet's fg-subtle rule colors, exactly the Rust peek.
 type secretEntry struct {
 	*widget.Box
 	entry *widget.Entry
-	eye   *widget.Icon
+	eye   bool
 }
 
-func newSecretEntry(ctx ModuleContext, font render.Font, px float64) *secretEntry {
+func newSecretEntry(_ ModuleContext, font render.Font, px float64) *secretEntry {
 	s := &secretEntry{Box: widget.NewBox(widget.Row, 4, 0)}
-	s.entry = widget.NewEntry(font, px, ctx.Style.fg)
+	s.entry = widget.NewEntry(font, px, 0)
 	s.entry.SetEcho(widget.EchoPassword)
 	s.entry.AddClass("network-password-input")
+	s.entry.SetTrailingIcon(iconEyeOff, px, s.toggle)
 	s.Append(s.entry, true)
-	s.eye = widget.NewThemeIcon(iconEyeOff, int(px))
-	s.eye.SetTint(mutedFg(ctx.Style.palette))
-	s.Append(dropdownButton(s.eye, "network-reveal-toggle", s.toggle), false)
 	return s
 }
 
 // toggle flips the reveal.
 func (s *secretEntry) toggle() {
-	on := !s.entry.Revealing()
-	s.entry.EchoReveal(on)
-	if on {
-		s.eye.SetThemeName(iconEye)
+	s.eye = !s.eye
+	s.entry.EchoReveal(s.eye)
+	if s.eye {
+		s.entry.SetTrailingIcon(iconEye, 0, s.toggle)
 	} else {
-		s.eye.SetThemeName(iconEyeOff)
+		s.entry.SetTrailingIcon(iconEyeOff, 0, s.toggle)
 	}
 }
 
@@ -47,5 +47,6 @@ func (s *secretEntry) toggle() {
 func (s *secretEntry) reset() {
 	s.entry.SetText("")
 	s.entry.EchoReveal(false)
-	s.eye.SetThemeName(iconEyeOff)
+	s.eye = false
+	s.entry.SetTrailingIcon(iconEyeOff, 0, s.toggle)
 }

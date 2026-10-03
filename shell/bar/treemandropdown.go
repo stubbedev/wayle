@@ -9,7 +9,6 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
-	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/treeman"
 )
@@ -341,25 +340,28 @@ func (v *treemanView) run(action treeman.Action, path string) {
 }
 
 // confirmReset is confirm_then_run for reset: the confirmation page
-// (the Go stand-in for the Rust AlertDialog) with the worktree path,
-// Cancel and Reset. The stylesheet has no .treeman-confirm rules, so
-// the inks here stay programmatic.
+// (the Go stand-in for the Rust AlertDialog) built on the stylesheet's
+// alert primitive — the warning variant, its title and description
+// classes, and a danger accept button — with the worktree path,
+// Cancel and Reset.
 func (v *treemanView) confirmReset(path string) {
 	v.returnTo = v.pages.Visible()
 	v.confirm.Clear()
-	title := widget.NewLabel(v.font, v.px*1.05, i18n.T("dropdown-treeman-confirm-reset-title"), v.ctx.Style.fg)
+	v.confirm.AddClass("alert", "warning")
+	title := widget.NewLabel(v.font, v.px*1.05, i18n.T("dropdown-treeman-confirm-reset-title"), 0)
 	title.SetWrap(true)
+	title.AddClass("alert-title")
 	v.confirm.Append(title, false)
-	detail := widget.NewLabel(v.font, v.px*0.85, path, mutedFg(v.ctx.Style.palette))
+	detail := widget.NewLabel(v.font, v.px*0.85, path, 0)
 	detail.SetWrap(true)
+	detail.AddClass("alert-description")
 	v.confirm.Append(detail, false)
 	buttons := widget.NewBox(widget.Row, 8, 0)
 	buttons.Append(widget.NewSpacer(0, 0), true)
-	cancel := widget.NewLabel(v.font, v.px, i18n.T("dropdown-treeman-confirm-cancel"), v.ctx.Style.fg)
-	buttons.Append(dropdownButton(cancel, "treeman-confirm-cancel", v.endConfirm), false)
-	accept := widget.NewLabel(v.font, v.px, i18n.T("dropdown-treeman-confirm-reset-accept"),
-		tokenColor(v.ctx.Style.palette, config.TokenStatusError))
-	buttons.Append(dropdownButton(accept, "treeman-confirm-accept", func() {
+	cancel := widget.NewLabel(v.font, v.px, i18n.T("dropdown-treeman-confirm-cancel"), 0)
+	buttons.Append(dropdownButton(cancel, "ghost", v.endConfirm), false)
+	accept := widget.NewLabel(v.font, v.px, i18n.T("dropdown-treeman-confirm-reset-accept"), 0)
+	buttons.Append(dropdownButton(accept, "danger", func() {
 		v.endConfirm()
 		v.run(treeman.ActionReset, path)
 	}), false)

@@ -148,10 +148,17 @@ type weatherView struct {
 func weatherDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	if ctx.Weather == nil {
-		// Not in the popover tree — no stylesheet rule reaches a bare box,
-		// so the muted ink stays programmatic.
-		col := widget.NewBox(widget.Column, 6, 14)
-		col.Append(widget.NewLabel(font, px, i18n.T("dropdown-weather-error-unknown"), mutedFg(ctx.Style.palette)), false)
+		// No service: the error page's classes paint it, like every
+		// other page — the fallback returns as the popover content, so
+		// the theme sheet reaches it.
+		col := widget.NewBox(widget.Column, 8, 24)
+		col.AddClass("dropdown", "weather-dropdown", "error-weather")
+		glyph := widget.NewThemeIcon("ld-info-symbolic", int(px*2.5))
+		glyph.AddClass("error-icon")
+		col.Append(glyph, false)
+		title := widget.NewLabel(font, px*1.1, i18n.T("dropdown-weather-error-unknown"), 0)
+		title.AddClass("error-title")
+		col.Append(title, false)
 		return col
 	}
 	v := &weatherView{ctx: ctx, svc: ctx.Weather, font: font, px: px, stop: make(chan struct{})}

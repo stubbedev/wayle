@@ -117,14 +117,21 @@ press-away notice); the Rust combobox just closes.
       secret cards, VPN list and form) first, then battery,
       brightness, calendar, weather, treeman, mail, media, dashboard,
       notification, recorder, and bluetooth (list and pairing).
-      `TestDropdownPanelsPaintFromTheStylesheet` and per-panel paint
-      tests pin it. Kept, where no node can carry the rule: the
-      battery gauge fill (gelms's progressbar tree cannot match the
-      Rust levelbar selectors), the recorder webcam preview and the
-      bluetooth row hover (custom painters), the dashboard's canvas
-      rings, the treeman reset-confirm page (Rust uses a native
-      AlertDialog the stylesheet has no rules for), and the weather
-      nil-service fallback (outside the popover tree). Live
+      Nothing is hand-painted anymore — the last holdouts went over
+      too: the battery gauge is gelm's LevelBar (levelbar > trough >
+      block.filled, the node tree the gauge rules select), the
+      dashboard rings read their ink and stroke from the cascade
+      (CascadeColor/CascadeBorder; the success/warning/error class
+      recolors), the bluetooth row is the styled box itself (the
+      :hover rule, SetOnClickWithin and SetOnHoverWithin instead of
+      the wrapper's custom paint), the webcam preview is two classed
+      boxes (recorder-position-preview > recorder-position-cam), the
+      treeman confirm page sits on the alert primitive (warning
+      variant, danger accept), the weather nil-service fallback is the
+      error-weather page, and the password peek is the entry's own
+      trailing icon (entry > image, what the fg-subtle rule colors).
+      `TestDropdownPanelsPaintFromTheStylesheet`, the per-panel paint
+      tests, and the levelbar/ring paint tests pin it. Live
       comparison against the Rust shell per panel is the remaining
       visual pass.
 - [x] Settings: the slider value label is fixed-width (gelm Label

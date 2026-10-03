@@ -56,10 +56,10 @@ func TestDashboardSpeedAndThresholds(t *testing.T) {
 	if v, mega := dashboardSpeed(1536 * 1024); v != "1.5" || !mega {
 		t.Errorf("1.5 MiB/s = %q %v", v, mega)
 	}
-	if dashboardThresholdColor(95, 70, 90) != config.TokenStatusError ||
-		dashboardThresholdColor(70, 70, 90) != config.TokenStatusWarning ||
-		dashboardThresholdColor(69.9, 70, 90) != config.TokenStatusSuccess {
-		t.Error("threshold colors")
+	if dashboardThresholdClass(95, 70, 90) != "error" ||
+		dashboardThresholdClass(70, 70, 90) != "warning" ||
+		dashboardThresholdClass(69.9, 70, 90) != "success" {
+		t.Error("threshold classes")
 	}
 }
 

@@ -26,7 +26,4 @@ func TestTokenColorResolvesTheToken(t *testing.T) {
 	if mutedFg(p) != p.FgMuted {
 		t.Errorf("mutedFg = %08x, want fg-muted %08x", uint32(mutedFg(p)), uint32(p.FgMuted))
 	}
-	if bt := newBtPalette(ModuleContext{}); bt.muted != p.FgMuted || bt.fg != p.Fg {
-		t.Errorf("bluetooth palette muted %08x fg %08x", uint32(bt.muted), uint32(bt.fg))
-	}
 }

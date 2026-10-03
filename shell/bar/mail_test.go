@@ -141,8 +141,8 @@ func TestMailDropdownPaintsFromTheStylesheet(t *testing.T) {
 	if got := count.Color(); got != 0 || !count.HasClass("dim") {
 		t.Errorf("the zero count = color %#08x dim %v; want uncolored and dim", uint32(count.Color()), count.HasClass("dim"))
 	}
-	if icon.Tint() == 0 {
-		t.Error("the provider icon lost its tint although no rule covers it")
+	if icon.Tint() != 0 {
+		t.Error("the provider icon carries a programmatic tint; the cascade inks it")
 	}
 
 	// The empty text is uncolored; .mail-dropdown-empty inks it muted.
