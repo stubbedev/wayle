@@ -37,6 +37,15 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ## Status
 
+State pins for picking the work back up (2026-10-03): wayle
+`go-rewrite` @ `1a74c5b1`, gelm `main` @ `f215943`, both clean and
+pushed, both gates green (`nix develop .#go -c just go-check` here;
+`nix develop -c just go-check` in ~/git/private/gelm). The next work
+is the dropdown-parity list under "Remaining for feature parity →
+Dropdown parity — still open", starting with the live visual pass.
+Every behavior lands with revert-provable tests (CLAUDE.md); when a
+fix needs a capability gelm lacks, extend gelm first — nothing is on
+the workaround list.
 - [x] config: every root section of the Rust schema at its keys and
       defaults (oracle-tested), YAML and imports, the runtime layer
       (runtime.toml), hot reload (bars rebuild, OSD and popups take
@@ -106,6 +115,23 @@ naming it.
 its animated exit on a click anywhere outside it (the router's
 press-away notice); the Rust combobox just closes.
 
+**gelm f215943 (2026-10-03): the dropdown-parity toolkit batch** —
+every capability the structural sweep found missing, each its own
+commit with positive+negative tests: the hover pointer cursor on the
+clickable primitives (Button, Switch, CheckButton, Slider carry
+`cursorName "pointer"`, the way wayle-widgets sets it per control);
+`widget.CenterBox` (gtk::CenterBox); `PopoverConfig.MaxHeight` (the
+registry's monitor-100 ceiling); `Box.SetHomogeneous`;
+`Entry.SetLeadingIcon` (GtkEntry's primary icon);
+`KeyInterceptor` (an ancestor's key controller consulted before the
+focused widget — the passkey row's handle\_pin\_key);
+`Scroll.PropagateNaturalHeight`; `RichLabel` word wrap, max lines,
+max-width-chars, and drag selection (the notification bodies'
+wrapped styled markup, the VPN readout users copy); CSS
+`background-image: url()` painted cover-fit inside the rounded
+border (the dashboard avatar's inline url()); and
+`app.FontVariantsOf`. wayle `7d7d4167` consumes all of it.
+
 **wayle: stylesheet parity**
 
 - [x] The bar dropdown panels' hand-matched colors moved onto the
@@ -160,27 +186,52 @@ spacing model, and cursors against the Rust code, and the toolkit gaps
 that blocked it closed in gelm (wrapping markup labels, selectable
 labels, `background-image: url()`, the entry's primary icon,
 homogeneous boxes, ancestor key interceptors, natural-height
-propagation). What remains:
+propagation). The sweep's fixes landed as wayle `22eec8ef` (all 15
+dropdowns, container, bar buttons) and `7d7d4167` (the primitives
+wired in); both gates green. What remains, in the order to work it:
 
-- [ ] Live visual comparison per panel against the Rust shell — the
-      code-level parity is test-pinned; the eyeball pass is not done.
-- [ ] Dropdown instance caching: the Rust registry keeps one instance
-      per dropdown name (stack page, scroll position, and form state
-      persist across open/close, and every instance is warmed at
-      startup); the Go registry rebuilds the content each open.
-- [ ] Animated dismissal on a transparent-area click: the Rust
-      registry plays the configured exit before popdown; the Go panel
-      closes instantly there (only the programmatic close animates).
-- [ ] Modal dialogs: the Rust network VPN delete and treeman reset use
-      `gtk::AlertDialog`; the Go side confirms inside the form/panel.
-- [ ] Icon-theme reload reaching open dropdowns: the Rust watchers
-      rebuild groups when `icon-source` changes; the Go context would
-      need a config-watch hook to do the same.
-- [ ] Registry behaviors not yet ported: `dropdown-freeze-label`
-      (locking the anchor button's size while its dropdown is open),
-      `dropdown-autohide` (the no-grab dismissal mode), and the
-      card-height tween on stack page switches (only the network
-      stack opts in today).
+1. **Live visual comparison** — the only check no test covers. Run
+   both shells side by side, panel by panel, and file every
+   difference as a fix:
+
+   ```sh
+   systemctl --user stop wayle.service
+   cd ~/git/private/wayle && nix develop .#go -c go run ./cmd/wayle shell
+   ```
+
+   then per panel open each dropdown in both shells and compare.
+   When done, restore `systemctl --user start wayle.service` and
+   tick this item off.
+2. **Dropdown instance caching** — `crates/wayle-shell-core/src/bar/
+   dropdown_registry.rs` keeps one `DropdownInstance` per name
+   (state, stack page, scroll, form state persist across open/close;
+   instances warmed at startup). Go: `shell/bar/dropdown.go` rebuilds
+   via the builders each open; the registry would hold built content
+   per name per connector instead, with the builders becoming
+   construct-once.
+3. **Registry behaviors** — same Rust file: `dropdown-freeze-label`
+   (FreezeSize/ThawSize on the anchor), `dropdown-autohide`
+   (set_autohide's no-grab mode: only surface-empty click or re-click
+   dismisses), animated dismissal on the transparent-area click (the
+   Go panel's `ClickAt` pops instantly; play the exit first), and the
+   card-height tween on stack page switches (dropdown\_resize.rs;
+   only the network stack opts in today via interpolate-size).
+4. **Modal AlertDialog** for network VPN delete and treeman reset —
+   needs a gelm/app modal; until then the in-form confirm panes
+   stand in (kept deliberately, classed per the CSS that exists).
+5. **Icon-theme reload reaching open dropdowns** — the Rust watchers
+   rebuild on `icon-source` change; wayle's ModuleContext would need
+   a config-watch hook (config.Watch), not a gelm change.
+
+Sweep methodology, for re-checking any panel: read the Rust tree
+(`crates/wayle-bar-*/src/dropdowns/<name>/`, the shared templates in
+`crates/wayle-widgets/src/primitives/`) against the Go file
+(`shell/bar/<name>dropdown.go`) and assert structure, classes,
+spacing-0 (gelm box gap ADDS the stylesheet's border-spacing —
+gtkboxlayout.c `css_spacing + self->spacing` — so any box Rust
+builds spacing-0 is spacing-0 here), valign sites (AppendAligned),
+cursors, and i18n keys; every fix lands with a test that fails when
+reverted.
 
 ### Bar
 
@@ -358,7 +409,15 @@ arrow, notebook > header > tabs > tab, progressbar > trough >
 progress, paned > separator, popover.menu with modelbutton rows, one
 shared style-only part type), background-color transitions (the
 timing-function solver in anim), Label width-chars, the wheel's
-page^(2/3) step, and the Super+Tab exclusion from the Tab trap.
+page^(2/3) step, and the Super+Tab exclusion from the Tab trap. The
+2026-10-03 dropdown batch (gelm f215943): the hover pointer cursor
+on Button/Switch/CheckButton/Slider, CenterBox,
+PopoverConfig.MaxHeight, Box.SetHomogeneous, Entry.SetLeadingIcon,
+KeyInterceptor (an ancestor's key controller before the focused
+widget), Scroll.PropagateNaturalHeight, RichLabel wrap / max-lines /
+max-width-chars / selectable, CSS background-image url() (cover-fit
+in the rounded border), and app.FontVariantsOf. Nothing is on the
+workaround list anymore; new toolkit needs go straight into gelm.
 
 ## Decisions
 
