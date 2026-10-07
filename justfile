@@ -1,9 +1,9 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# Run cargo inside the flake devShell so the GTK/clang build env is always
-# present — no need to `nix develop` first. The Rust toolchain still comes from
-# your PATH (rustup); the flake only supplies the native libraries + pkg-config.
-cargo := "nix develop --command cargo"
+# Run cargo directly — the devenv shell (devenv.nix) provides the GTK/clang
+# build env and the rust-toolchain.toml nightly on PATH, no `nix develop`
+# needed. The flake devShells stay for CI and one-off `nix develop .#go`.
+cargo := "cargo"
 
 # Default — list recipes.
 default:
