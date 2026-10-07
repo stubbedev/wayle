@@ -37,12 +37,16 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ## Status
 
-State pins for picking the work back up (2026-10-03): wayle
-`go-rewrite` @ `1a74c5b1`, gelm `main` @ `f215943`, both clean and
+State pins for picking the work back up (2026-10-07): wayle
+`go-rewrite` @ `a4afb665`, gelm `main` @ `b96e236`, both clean and
 pushed, both gates green (`nix develop .#go -c just go-check` here;
-`nix develop -c just go-check` in ~/git/private/gelm). The next work
-is the dropdown-parity list under "Remaining for feature parity →
-Dropdown parity — still open", starting with the live visual pass.
+`nix develop -c just go-check` in ~/git/private/gelm; the atspi-tagged
+builds are compile-gated by `go build -tags atspi ./...`, their tests
+by `go test -tags atspi ./internal/atspi/ ./app/` in gelm and
+`go test -tags atspi ./shell/bar/ -run TestServeA11y` here). The next
+work is the dropdown-parity list under "Remaining for feature parity →
+Dropdown parity — still open", item 1 (the live pass; the tooling for
+it now exists — see the pinned harness note there).
 Every behavior lands with revert-provable tests (CLAUDE.md); when a
 fix needs a capability gelm lacks, extend gelm first — nothing is on
 the workaround list.
@@ -114,6 +118,20 @@ naming it.
 **The one sanctioned deviation**: gelm's widget Dropdown closes with
 its animated exit on a click anywhere outside it (the router's
 press-away notice); the Rust combobox just closes.
+
+**gelm b96e236 (2026-10-07): the bridge meets a real accessibility
+bus** — putting gelm's AT-SPI bridge on at-spi2-core (not the test
+fake) surfaced four bugs, each fixed with the fake upgraded to pin
+it: the default bus name `org.a11y.atspi.gelm.<pid>` is invalid D-Bus
+(an element may not lead with a digit) so Serve died on every real
+desktop (`gelm.p<pid>` now); Socket.Embed was called at
+/org/a11y/atspi/registry where the daemon only serves the Registry
+interface instead of the desktop root where GTK calls it, so no app
+ever entered the desktop tree; DoAction went straight to ClickAt, so
+controls that act on the press (the bar toggle opens its dropdown in
+SetPressed) did nothing when activated; and A11YOptions is now
+exported beside the bridge so consumers outside gelm can name it
+(wayle's tagged build passes the zero value).
 
 **gelm f215943 (2026-10-03): the dropdown-parity toolkit batch** —
 every capability the structural sweep found missing, each its own
@@ -202,6 +220,56 @@ wired in); both gates green. What remains, in the order to work it:
    then per panel open each dropdown in both shells and compare.
    When done, restore `systemctl --user start wayle.service` and
    tick this item off.
+
+   **The 2026-10-07 pass set up the comparison rig** (nothing of the
+   item itself is ticked yet):
+
+   - Both shells run in a private kiosk — headless sway at
+     2560x1440 in /tmp/parity-kiosk with its own D-Bus session bus
+     and a11y stack (dbus-daemon at a11y/bus, an org.a11y.Bus
+     stand-in at /tmp/parity/a11ybusd, at-spi2-registryd) — never on
+     the live session. Config is a copy of the user's at
+     /tmp/parity/xdg (layout extended to every panel module,
+     `[modules.screenshot] notify=false` so captures don't cover the
+     panels with their own toasts). PULSE_SERVER points at the real
+     user server for both.
+   - The shells' trees are read over AT-SPI: the Rust shell under
+     `GTK_A11Y=atspi NO_AT_BRIDGE=0` (the devshell defaults them
+     off), the Go shell built with `-tags atspi gelmdebug`
+     (wayle a4afb665 starts gelm's bridge). /tmp/parity/a11ydump
+     walks the registry's desktop and `a11ydump click #N` activates
+     the Nth bar button through Action.DoAction (works on both:
+     gelm b96e236 drives the router's press-release, GTK's menu
+     buttons need the harness below instead).
+   - The Rust reference is driven by a LOCAL, never-committed
+     harness (GtkMenuButton ignores programmatic activation, so
+     synthetic input was the only other route and the kiosk rejects
+     it): /tmp/parity/rust-parity-harness.patch plus
+     /tmp/parity/parity.rs (helpers/parity.rs) — set_active(true)
+     per MenuButton with a marker/ack handshake in
+     /tmp/parity/kiosk. /tmp/parity/drive.sh consumes it into
+     /tmp/parity/shots/rust; /tmp/parity/drive-go.sh does the Go
+     side through DoAction.
+   - Captured so far (in /tmp/parity/shots, gone at reboot): 14
+     Rust panels + 15 Go panels, each a PNG plus the bar's tree.
+   - **Findings already on file from the trees** (fix with tests,
+     then re-capture): Go bar buttons expose empty accessible names
+     (Rust names them by their label text — gelm A11y name never set
+     on the bar toggle); Go's keyboard-input module refuses any
+     non-Hyprland compositor while the Rust one appears under sway;
+     Go's pulse client needs PULSE_SERVER where the Rust one
+     discovers the user server itself; bar geometry differs broadly
+     (Rust center group 229px — clock 167 + 58 — against Go's 176 —
+     123 + 53; the right group 542px against ~640), which needs the
+     per-button/per-panel diff pass to split into font resolution,
+     padding, and label-width causes.
+   - Remaining for the item: pair panels by module (the Go trees
+     carry no panel content — gelm popovers are not window roots —
+     so the pairing is anchor-x from the bar trees plus the PNG
+     crops), pixel-diff each pair's cropped panel region, and file
+     every difference as a fix; then launcher/OSD/popups (CLI-driven:
+     `wayle launcher`, volume/brightness changes, `wayle notify`/
+     `toast`).
 2. **Dropdown instance caching** — `crates/wayle-shell-core/src/bar/
    dropdown_registry.rs` keeps one `DropdownInstance` per name
    (state, stack page, scroll, form state persist across open/close;
