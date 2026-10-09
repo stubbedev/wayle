@@ -144,6 +144,14 @@ func (r *dropdownRegistry) instance(name string, build func(ModuleContext) widge
 	if content == nil {
 		return nil
 	}
+	// The card tweens its height when a page of another size shows
+	// (watch_pages, dropdown_resize::animate_height): every stack
+	// sized to its visible page interpolates.
+	walkStacks(content, func(st *widget.Stack) {
+		if !st.Homogeneous() {
+			st.SetInterpolateSize(true)
+		}
+	})
 	if w, h, ok := dropdownDims(name, r.cfg); ok {
 		content = newPanelBox(w, h, content)
 	}
@@ -263,15 +271,7 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if panel != nil && monH > 0 {
 		panel.maxH = monH - 180
 	}
-	cfg := app.PopoverConfig{
-		Anchor:  bound,
-		Gravity: dropdownGravity(r.cfg.Bar.Location),
-		Content: content,
-		Serial:  r.app.LastPressSerial(host),
-	}
-	if monH > 0 {
-		cfg.MaxHeight = monH - 100
-	}
+	cfg := dropdownPopover(r.cfg, bound, content, r.app.LastPressSerial(host), monH)
 	// The button's label holds still while its dropdown is open
 	// (dropdown-freeze-label), so the popover stays anchored.
 	if f, ok := anchor.(labelFreezer); ok && r.cfg.Bar.DropdownFreezeLabel {
@@ -341,6 +341,24 @@ func (r *dropdownRegistry) closeAll() {
 	for _, o := range closing {
 		dismissAnimated(o.pop, o.rev, r.cfg.Animations)
 	}
+}
+
+// dropdownPopover declares a dropdown's popover (apply_style,
+// clamp_height): opening away from the bar's edge, clamped to the
+// monitor less 100, and with dropdown-autohide off a no-grab popover
+// that a click elsewhere leaves open.
+func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.Widget, serial uint32, monH int) app.PopoverConfig {
+	pc := app.PopoverConfig{
+		Anchor:     anchor,
+		Gravity:    dropdownGravity(cfg.Bar.Location),
+		Content:    content,
+		Serial:     serial,
+		NoAutohide: !cfg.Bar.DropdownAutohide,
+	}
+	if monH > 0 {
+		pc.MaxHeight = monH - 100
+	}
+	return pc
 }
 
 // dismissAnimated is animate_out: the card plays its exit, then the

@@ -279,3 +279,41 @@ func TestDropdownPanelRestClickPlaysTheExit(t *testing.T) {
 		t.Error("without an exit the rest click did not close")
 	}
 }
+
+// Stacks sized to their visible page tween the card through a switch;
+// homogeneous ones have nothing to tween.
+func TestDropdownInstanceStacksInterpolate(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := newTestContext(t, cfg)
+	r := newDropdownRegistry(nil, cfg, ctx.Font, ctx.Style, ctx)
+	t.Cleanup(r.release)
+	sized, fixed := widget.NewStack(), widget.NewStack()
+	sized.SetHomogeneous(false)
+	r.instance("custom", func(ModuleContext) widget.Widget {
+		return widget.NewBox(widget.Column, 0, 0).Append(sized, false).Append(fixed, false)
+	})
+	if !sized.InterpolateSize() {
+		t.Error("a page-sized stack does not tween the card")
+	}
+	if fixed.InterpolateSize() {
+		t.Error("a homogeneous stack was set to interpolate")
+	}
+	// The network editor's stack is one of them.
+	v := r.instance("network", func(c ModuleContext) widget.Widget { return newNetworkView(c, netDeps{}) })
+	if panel, ok := v.(*panelBox); !ok || !panel.child.(*networkView).body.InterpolateSize() {
+		t.Error("the network pages do not tween")
+	}
+}
+
+// dropdown-autohide off opens a popover a click elsewhere leaves open.
+func TestDropdownPopoverFollowsAutohide(t *testing.T) {
+	cfg := config.Defaults()
+	anchor := widget.NewBox(widget.Row, 0, 0)
+	if pc := dropdownPopover(cfg, anchor, anchor, 7, 1000); pc.NoAutohide || pc.MaxHeight != 900 || pc.Serial != 7 {
+		t.Errorf("autohide on: %+v, want a grabbing popover capped at 900", pc)
+	}
+	cfg.Bar.DropdownAutohide = false
+	if pc := dropdownPopover(cfg, anchor, anchor, 7, 0); !pc.NoAutohide || pc.MaxHeight != 0 {
+		t.Errorf("autohide off: %+v, want a no-grab popover", pc)
+	}
+}

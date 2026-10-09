@@ -280,17 +280,16 @@ wired in); both gates green. What remains, in the order to work it:
    behavior difference); `dropdownOpened` carries the per-open work
    (the network list's scan-if-empty). A config change or a bars
    rebuild releases the instances.
-3. **Registry behaviors** — same Rust file:
+3. [x] **Registry behaviors** — same Rust file:
    - [x] `dropdown-freeze-label`: the anchor's label holds still
      while open (a stand-in copy; the module's updates land on thaw).
    - [x] animated dismissal on the transparent-area click (the panel
      plays the exit, as the re-click does).
-   - [ ] `dropdown-autohide = false` (set_autohide's no-grab mode:
-     only surface-empty click or re-click dismisses) — needs a gelm
-     no-grab popover whose keys still reach it.
-   - [ ] the card-height tween on stack page switches
-     (dropdown\_resize.rs; only the network stack opts in today via
-     interpolate-size).
+   - [x] `dropdown-autohide = false`: gelm's NoAutohide popover (no
+     seat grab; the bar holds the keyboard on demand), closed only by
+     the re-click or the empty-area click.
+   - [x] the card-height tween on page switches: every stack sized to
+     its visible page interpolates its size (watch_pages).
 4. [x] **Modal AlertDialog** for network VPN delete and treeman
    reset: gelm's modal Dialog (shell/bar/alertdialog.go), cancel the
    default and the Esc answer; the open dropdown closes first, as
