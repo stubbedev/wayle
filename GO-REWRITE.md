@@ -37,16 +37,15 @@ repointed), wired into the justfile as `go-lint` / `go-check`.
 
 ## Status
 
-State pins for picking the work back up (2026-10-07): wayle
-`go-rewrite` @ `a4afb665`, gelm `main` @ `b96e236`, both clean and
-pushed, both gates green (`nix develop .#go -c just go-check` here;
-`nix develop -c just go-check` in ~/git/private/gelm; the atspi-tagged
-builds are compile-gated by `go build -tags atspi ./...`, their tests
-by `go test -tags atspi ./internal/atspi/ ./app/` in gelm and
-`go test -tags atspi ./shell/bar/ -run TestServeA11y` here). The next
-work is the dropdown-parity list under "Remaining for feature parity →
-Dropdown parity — still open", item 1 (the live pass; the tooling for
-it now exists — see the pinned harness note there).
+State pins for picking the work back up (2026-10-09): wayle
+`go-rewrite` on gelm `main` @ `f14e5c6`, both gates green
+(`nix develop .#go -c just go-check` here; `just check` in
+~/git/private/gelm). gelm's AT-SPI bridge ships in every build and
+Run serves it while the desktop asks for assistive technologies
+(`GELM_A11Y=atspi` forces it), so wayle carries no `atspi` tag. The
+next work is the dropdown-parity list under "Remaining for feature
+parity → Dropdown parity — still open", item 1 (the live pass; the
+tooling for it now exists — see the pinned harness note there).
 Every behavior lands with revert-provable tests (CLAUDE.md); when a
 fix needs a capability gelm lacks, extend gelm first — nothing is on
 the workaround list.
@@ -235,8 +234,8 @@ wired in); both gates green. What remains, in the order to work it:
      user server for both.
    - The shells' trees are read over AT-SPI: the Rust shell under
      `GTK_A11Y=atspi NO_AT_BRIDGE=0` (the devshell defaults them
-     off), the Go shell built with `-tags atspi gelmdebug`
-     (wayle a4afb665 starts gelm's bridge). /tmp/parity/a11ydump
+     off), the Go shell under `GELM_A11Y=atspi` (built with
+     `-tags gelmdebug`). /tmp/parity/a11ydump
      walks the registry's desktop and `a11ydump click #N` activates
      the Nth bar button through Action.DoAction (works on both:
      gelm b96e236 drives the router's press-release, GTK's menu

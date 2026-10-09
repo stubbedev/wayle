@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stubbedev/gelm/transfer"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -362,7 +363,7 @@ func (c *layoutChip) DragContent() *widget.DragContent {
 			_, err := io.WriteString(w, c.payload.encode())
 			return err
 		},
-		OnDone: func(bool) { c.RemoveClass("chip-dragging") },
+		OnDone: func(transfer.Action) { c.RemoveClass("chip-dragging") },
 	}
 }
 

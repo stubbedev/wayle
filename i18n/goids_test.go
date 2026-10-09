@@ -29,11 +29,17 @@ func scanGoUsage(t *testing.T) goUsage {
 			return err
 		}
 		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "target", "node_modules", "i18n":
-				if p != root {
-					return filepath.SkipDir
-				}
+			if p == root {
+				return nil
+			}
+			// The go tool's own rule: dot and underscore directories
+			// (.git, the devenv module cache in .devenv, agent
+			// worktrees in .claude) and testdata hold no package code.
+			name := d.Name()
+			switch {
+			case strings.HasPrefix(name, "."), strings.HasPrefix(name, "_"),
+				name == "testdata", name == "target", name == "node_modules", name == "i18n":
+				return filepath.SkipDir
 			}
 			return nil
 		}

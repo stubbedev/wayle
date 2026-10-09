@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/gelm/transfer"
 	"github.com/stubbedev/gelm/widget"
 	"golang.org/x/image/font/gofont/goregular"
 
@@ -1750,9 +1751,14 @@ func TestLayoutEditorDragAndDrop(t *testing.T) {
 	if buf.String() != "0:right:1" || !chip.HasClass("chip-dragging") {
 		t.Errorf("payload %q, dragging %v", buf.String(), chip.HasClass("chip-dragging"))
 	}
-	content.OnDone(true)
+	content.OnDone(transfer.ActionMove)
 	if chip.HasClass("chip-dragging") {
 		t.Error("the mark outlived the drag")
+	}
+	// A cancelled drag clears the mark too.
+	chip.DragContent().OnDone(transfer.ActionNone)
+	if chip.HasClass("chip-dragging") {
+		t.Error("the mark outlived a cancelled drag")
 	}
 	// Lay the zone out to aim drops by position.
 	zone.Measure(widget.Constraints{Max: widget.Size{W: 400, H: 100}})

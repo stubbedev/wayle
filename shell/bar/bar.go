@@ -71,10 +71,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 	defer sess.Close()
 
 	application := app.NewApplication(sess)
-	// With the `atspi` build tag the shell serves its tree on the
-	// accessibility bus (screen readers, the parity tooling); default
-	// builds carry none of it.
-	serveA11y(application)
+	// gelm's Run serves the tree on the accessibility bus while the
+	// desktop asks for assistive technologies (GELM_A11Y=atspi forces it,
+	// as GTK_A11Y does for the Rust shell).
 	// Surfaces animate their content through [animations] (shell/reveal),
 	// as the Rust shell's revealers do; gelm's own surface fades would
 	// stack on top of them.
