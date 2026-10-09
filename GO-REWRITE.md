@@ -272,27 +272,33 @@ wired in); both gates green. What remains, in the order to work it:
      every difference as a fix; then launcher/OSD/popups (CLI-driven:
      `wayle launcher`, volume/brightness changes, `wayle notify`/
      `toast`).
-2. **Dropdown instance caching** — `crates/wayle-shell-core/src/bar/
-   dropdown_registry.rs` keeps one `DropdownInstance` per name
-   (state, stack page, scroll, form state persist across open/close;
-   instances warmed at startup). Go: `shell/bar/dropdown.go` rebuilds
-   via the builders each open; the registry would hold built content
-   per name per connector instead, with the builders becoming
-   construct-once.
-3. **Registry behaviors** — same Rust file: `dropdown-freeze-label`
-   (FreezeSize/ThawSize on the anchor), `dropdown-autohide`
-   (set_autohide's no-grab mode: only surface-empty click or re-click
-   dismisses), animated dismissal on the transparent-area click (the
-   Go panel's `ClickAt` pops instantly; play the exit first), and the
-   card-height tween on stack page switches (dropdown\_resize.rs;
-   only the network stack opts in today via interpolate-size).
+2. [x] **Dropdown instance caching** — the registry keeps one built
+   instance per name (`dropdownRegistry.instance`): page, scroll,
+   form state, and subscriptions persist across open and close, and
+   the instance moves to whichever output opens it. Built on first
+   open rather than warmed at startup (a first-open cost, no
+   behavior difference); `dropdownOpened` carries the per-open work
+   (the network list's scan-if-empty). A config change or a bars
+   rebuild releases the instances.
+3. **Registry behaviors** — same Rust file:
+   - [x] `dropdown-freeze-label`: the anchor's label holds still
+     while open (a stand-in copy; the module's updates land on thaw).
+   - [x] animated dismissal on the transparent-area click (the panel
+     plays the exit, as the re-click does).
+   - [ ] `dropdown-autohide = false` (set_autohide's no-grab mode:
+     only surface-empty click or re-click dismisses) — needs a gelm
+     no-grab popover whose keys still reach it.
+   - [ ] the card-height tween on stack page switches
+     (dropdown\_resize.rs; only the network stack opts in today via
+     interpolate-size).
 4. [x] **Modal AlertDialog** for network VPN delete and treeman
    reset: gelm's modal Dialog (shell/bar/alertdialog.go), cancel the
    default and the Esc answer; the open dropdown closes first, as
    GTK's popover loses its grab to the dialog.
-5. **Icon-theme reload reaching open dropdowns** — the Rust watchers
-   rebuild on `icon-source` change; wayle's ModuleContext would need
-   a config-watch hook (config.Watch), not a gelm change.
+5. [x] **Icon-theme reload reaching dropdowns** — a config change
+   releases the cached instances (an open one closes), so the next
+   open builds with the new `icon-source`; Rust rebuilds an open
+   dropdown in place.
 
 Sweep methodology, for re-checking any panel: read the Rust tree
 (`crates/wayle-bar-*/src/dropdowns/<name>/`, the shared templates in

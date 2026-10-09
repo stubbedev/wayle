@@ -468,6 +468,10 @@ func (v *networkView) fail(message string) {
 	v.progress = netProgress{err: message}
 }
 
+// dropdownOpened is NetworkDropdownMsg::Opened: every open of the
+// cached instance scans an empty list.
+func (v *networkView) dropdownOpened() { v.scanIfEmpty() }
+
 // scanIfEmpty is scan_if_empty: an empty list is never the first thing
 // seen.
 func (v *networkView) scanIfEmpty() {

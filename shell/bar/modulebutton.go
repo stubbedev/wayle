@@ -33,6 +33,10 @@ type barButton struct {
 	labelBox *widget.Box
 	icon     *widget.Icon
 	label    *widget.Label
+	// font is the face the module's label renders in; frozen is the
+	// stand-in shown while a dropdown holds the label still.
+	font   render.Font
+	frozen *widget.Label
 
 	cfg        *config.Config
 	button     config.ButtonConfig
@@ -60,6 +64,7 @@ type barToggle struct {
 // otherwise outrank the per-button --bar-btn-label-color.
 func newBarButton(ctx ModuleContext, icon *widget.Icon, label *widget.Label) *barButton {
 	b := newBarButtonShell(ctx)
+	b.font = ctx.Font
 	b.iconBox = widget.NewBox(widget.Row, 0, 0)
 	b.iconBox.AddClass("icon-container")
 	if icon != nil {
@@ -81,6 +86,36 @@ func newBarButton(ctx ModuleContext, icon *widget.Icon, label *widget.Label) *ba
 	}
 	b.placeContainers()
 	return b
+}
+
+// freezeLabel is FreezeSize: while the button's dropdown is open the
+// shown label stops following the module, so the button keeps its
+// width and the popover its anchor. A copy of the label stands in;
+// the module keeps updating its own, hidden one.
+func (b *barButton) freezeLabel() {
+	if b.label == nil || b.frozen != nil || b.font == nil {
+		return
+	}
+	f := widget.NewLabel(b.font, b.label.SizePx(), b.label.Text(), b.label.Color())
+	f.AddClass(b.label.Classes()...)
+	f.SetAlignment(b.label.Alignment())
+	f.SetEllipsize(b.label.Ellipsize())
+	f.SetMaxWidthChars(b.label.MaxWidthChars())
+	f.SetVisible(b.label.Visible())
+	b.frozen = f
+	b.labelBox.Clear()
+	b.labelBox.Append(f, true)
+}
+
+// thawLabel is ThawSize: the live label returns, carrying whatever the
+// module set meanwhile (pending_label).
+func (b *barButton) thawLabel() {
+	if b.frozen == nil {
+		return
+	}
+	b.frozen = nil
+	b.labelBox.Clear()
+	b.labelBox.Append(b.label, true)
 }
 
 // newBarButtonAround wraps arbitrary module content (a canvas, a row of

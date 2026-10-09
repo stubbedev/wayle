@@ -329,3 +329,29 @@ func TestBarToggleAccessibleNameIsItsLabel(t *testing.T) {
 		t.Errorf("label-less toggle name = %q, want none", got)
 	}
 }
+
+// While its dropdown is open the button's label holds still
+// (FreezeSize); the module's updates land on thaw (pending_label).
+func TestBarButtonLabelFreezesUntilThaw(t *testing.T) {
+	cfg := config.Defaults()
+	label := widget.NewLabel(testFont(t), 12, "12:30", 0)
+	b := newBarButton(newTestContext(t, cfg), nil, label)
+	b.freezeLabel()
+	label.SetText("12:31")
+	shown := b.labelBox.Children()
+	if len(shown) != 1 || shown[0] == widget.Widget(label) || shown[0].(*widget.Label).Text() != "12:30" {
+		t.Fatalf("frozen: shows %v, want the held 12:30", shown)
+	}
+	if !shown[0].(*widget.Label).HasClass("bar-button-label") {
+		t.Error("the held label lost its class")
+	}
+	b.thawLabel()
+	if shown = b.labelBox.Children(); len(shown) != 1 || shown[0] != widget.Widget(label) || label.Text() != "12:31" {
+		t.Errorf("thawed: shows %v, want the live label at 12:31", shown)
+	}
+	// Thaw without a freeze changes nothing.
+	b.thawLabel()
+	if shown = b.labelBox.Children(); len(shown) != 1 || shown[0] != widget.Widget(label) {
+		t.Error("a stray thaw moved the label")
+	}
+}

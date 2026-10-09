@@ -731,6 +731,10 @@ func (r *barRuntime) mount(application *app.Application, cfg *config.Config) {
 	r.ctx.Font = r.font
 	r.ctx.Style = &r.moduleStyle
 	r.ctx.gen = newMountGen()
+	if r.ctx.Dropdowns != nil {
+		// The old bars' dropdown instances go with them.
+		r.ctx.Dropdowns.release()
+	}
 	r.ctx.Dropdowns = newDropdownRegistry(application, cfg, r.font, &r.style, r.ctx)
 }
 

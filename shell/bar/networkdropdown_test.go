@@ -204,6 +204,12 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 	if _, _, _, scans, _ := wifi.calls(); scans != 0 {
 		t.Error("a populated list scanned on open")
 	}
+	// Reopening the cached instance still scans nothing while the list
+	// has networks (NetworkDropdownMsg::Opened).
+	v.dropdownOpened()
+	if _, _, _, scans, _ := wifi.calls(); scans != 0 {
+		t.Error("a populated list scanned on reopen")
+	}
 	if v.active.wifiName.Text() != "mine" || v.active.wifiDetail.Text() != "192.168.1.9 - 5 GHz" || !v.active.wifiStatus.Visible() {
 		t.Errorf("wifi card = %q / %q", v.active.wifiName.Text(), v.active.wifiDetail.Text())
 	}

@@ -206,3 +206,76 @@ func TestPageSlideFollowsInteractionDuration(t *testing.T) {
 		t.Error("animations off: the switch still slid")
 	}
 }
+
+// countingContent is dropdown content that counts its builds and its
+// releases.
+type countingContent struct {
+	*widget.Box
+	closed, opened int
+}
+
+func (c *countingContent) dropdownClosed() { c.closed++ }
+func (c *countingContent) dropdownOpened() { c.opened++ }
+
+// Instances are built once and reused (the DropdownInstance cache):
+// state survives a close; a config change releases them, stopping what
+// they follow, and the next open builds afresh.
+func TestDropdownInstancesAreCachedUntilReleased(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := newTestContext(t, cfg)
+	r := newDropdownRegistry(nil, cfg, ctx.Font, ctx.Style, ctx)
+	var built []*countingContent
+	build := func(ModuleContext) widget.Widget {
+		c := &countingContent{Box: widget.NewBox(widget.Column, 0, 0)}
+		built = append(built, c)
+		return c
+	}
+	first := r.instance("custom", build)
+	if again := r.instance("custom", build); again != first || len(built) != 1 {
+		t.Fatalf("second open built %d instances, want the first reused", len(built))
+	}
+	if built[0].closed != 0 {
+		t.Error("a cached instance was released while cached")
+	}
+	r.setConfig(config.Defaults())
+	if built[0].closed != 1 {
+		t.Errorf("released %d times on a config change, want once", built[0].closed)
+	}
+	if fresh := r.instance("custom", build); fresh == first || len(built) != 2 {
+		t.Error("after the release the old instance came back")
+	}
+	// A sized dropdown caches its panel, which forwards both hooks.
+	panel := r.instance("calendar", calendarDropdown)
+	if _, ok := panel.(*panelBox); !ok {
+		t.Fatalf("calendar instance = %T, want the sized panel", panel)
+	}
+	if r.instance("calendar", calendarDropdown) != panel {
+		t.Error("the calendar panel was rebuilt")
+	}
+	inner := &countingContent{Box: widget.NewBox(widget.Column, 0, 0)}
+	p := newPanelBox(100, 100, inner)
+	p.dropdownOpened()
+	p.dropdownClosed()
+	if inner.opened != 1 || inner.closed != 1 {
+		t.Errorf("panel forwarded opened %d closed %d, want 1 each", inner.opened, inner.closed)
+	}
+}
+
+// A click on the panel's empty rest plays the exit when the registry
+// gave it one (dismiss_on_spacer_click), else closes at once.
+func TestDropdownPanelRestClickPlaysTheExit(t *testing.T) {
+	p := newPanelBox(100, 100, widget.NewBox(widget.Column, 0, 0))
+	pop := &fakePopover{}
+	p.attachPopover(pop)
+	animated := 0
+	p.dismiss = func() { animated++ }
+	p.ClickAt(widget.Point{})
+	if animated != 1 || pop.dismissed != 0 {
+		t.Errorf("animated %d, instant %d; want the exit played", animated, pop.dismissed)
+	}
+	p.dismiss = nil
+	p.ClickAt(widget.Point{})
+	if pop.dismissed != 1 {
+		t.Error("without an exit the rest click did not close")
+	}
+}

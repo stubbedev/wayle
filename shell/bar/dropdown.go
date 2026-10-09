@@ -36,6 +36,25 @@ type dropdownRegistry struct {
 	// monH is each connector's monitor height in logical pixels, the
 	// popover ceiling's input (GTK keeps a popover on its output).
 	monH map[string]int
+	// instances is each dropdown's built content, the Rust registry's
+	// DropdownInstance cache: built on the first open and reused by
+	// every later one on any output, so its state (the visible page,
+	// the scroll, a half-filled form) and its service subscriptions
+	// persist across open and close. A config change or a rebuild of
+	// the bars releases them.
+	instances map[string]widget.Widget
+}
+
+// dropdownOpener is content that acts each time its popover opens
+// (the Rust dropdowns' connect_map: the network list scanning when
+// empty), not only when it is built.
+type dropdownOpener interface{ dropdownOpened() }
+
+// labelFreezer is an anchor whose label holds still while its dropdown
+// is open (BarButtonInput::FreezeSize/ThawSize).
+type labelFreezer interface {
+	freezeLabel()
+	thawLabel()
 }
 
 // dropdownCloser is live dropdown content (a service subscription) that
@@ -106,6 +125,49 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 		openRev:  make(map[string]*widget.Revealer),
 		openName: make(map[string]string),
 		monH:     make(map[string]int),
+
+		instances: make(map[string]widget.Widget),
+	}
+}
+
+// instance is name's content, built on first use with the registry's
+// context (get_or_create).
+func (r *dropdownRegistry) instance(name string, build func(ModuleContext) widget.Widget) widget.Widget {
+	r.mu.Lock()
+	content, ok := r.instances[name]
+	ctx := r.ctx
+	r.mu.Unlock()
+	if ok {
+		return content
+	}
+	content = build(ctx)
+	if content == nil {
+		return nil
+	}
+	if w, h, ok := dropdownDims(name, r.cfg); ok {
+		content = newPanelBox(w, h, content)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if prev, raced := r.instances[name]; raced {
+		return prev
+	}
+	r.instances[name] = content
+	return content
+}
+
+// release closes every open dropdown and drops the cached instances,
+// stopping what each follows; the next open builds afresh.
+func (r *dropdownRegistry) release() {
+	r.closeAll()
+	r.mu.Lock()
+	instances := r.instances
+	r.instances = make(map[string]widget.Widget)
+	r.mu.Unlock()
+	for _, content := range instances {
+		if c, ok := content.(dropdownCloser); ok {
+			c.dropdownClosed()
+		}
 	}
 }
 
@@ -175,7 +237,21 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if !ok {
 		return fmt.Errorf("dropdown %q anchor cannot be measured", name)
 	}
-	content := build(r.ctx)
+	// The instance is shown in one popover at a time: open on another
+	// output, it moves here (reparent_and_show).
+	r.mu.Lock()
+	for other, shown := range r.openName {
+		if shown == name && other != connector {
+			if pop := r.openPop[other]; pop != nil && !pop.Closed() {
+				defer pop.Dismiss()
+			}
+			delete(r.openPop, other)
+			delete(r.openRev, other)
+			delete(r.openName, other)
+		}
+	}
+	r.mu.Unlock()
+	content := r.instance(name, build)
 	if content == nil {
 		return fmt.Errorf("dropdown %q has no content", name)
 	}
@@ -183,12 +259,9 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	// at the global scale), its content clamped to the monitor less the
 	// Rust registry's scrolled-content margin, the popover surface to
 	// the monitor less its own.
-	if w, h, ok := dropdownDims(name, r.cfg); ok {
-		panel := newPanelBox(w, h, content)
-		if monH > 0 {
-			panel.maxH = monH - 180
-		}
-		content = panel
+	panel, _ := content.(*panelBox)
+	if panel != nil && monH > 0 {
+		panel.maxH = monH - 180
 	}
 	cfg := app.PopoverConfig{
 		Anchor:  bound,
@@ -199,8 +272,11 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if monH > 0 {
 		cfg.MaxHeight = monH - 100
 	}
-	if closer, ok := content.(dropdownCloser); ok {
-		cfg.OnClosed = closer.dropdownClosed
+	// The button's label holds still while its dropdown is open
+	// (dropdown-freeze-label), so the popover stays anchored.
+	if f, ok := anchor.(labelFreezer); ok && r.cfg.Bar.DropdownFreezeLabel {
+		f.freezeLabel()
+		cfg.OnClosed = f.thawLabel
 	}
 	// The card enters through the dropdown transition (animate_in).
 	rev := widget.NewRevealer(content)
@@ -227,6 +303,14 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	}
 	if d, ok := content.(dropdownAttacher); ok {
 		d.attachPopover(pop)
+	}
+	if panel != nil {
+		// A click on the surface's empty rest plays the exit, as the
+		// re-click does (dismiss_on_spacer_click).
+		panel.dismiss = func() { dismissAnimated(pop, rev, r.cfg.Animations) }
+	}
+	if o, ok := content.(dropdownOpener); ok {
+		o.dropdownOpened()
 	}
 	reveal.Show(rev, r.cfg.Animations, config.AnimDropdown)
 	r.mu.Lock()
@@ -284,8 +368,10 @@ func dropdownGenieEdge(location config.Location) widget.Edge {
 }
 
 // setConfig hands dropdowns opened from now on a new snapshot, for a
-// reload that leaves the bars standing.
+// reload that leaves the bars standing: the instances built from the
+// old one are released.
 func (r *dropdownRegistry) setConfig(cfg *config.Config) {
+	r.release()
 	r.cfg = cfg
 	r.ctx.Config = cfg
 }

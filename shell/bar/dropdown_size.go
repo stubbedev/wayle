@@ -97,6 +97,9 @@ type panelBox struct {
 	// scrolled-content margin); <= 0 takes the measure constraints.
 	maxH int
 	pop  popoverHandle
+	// dismiss closes with the exit animation; the registry sets it per
+	// open. Without it the popover just goes.
+	dismiss func()
 }
 
 func newPanelBox(w, h int, child widget.Widget) *panelBox {
@@ -183,18 +186,29 @@ func (p *panelBox) HitTest(pt widget.Point) widget.Widget {
 	return p.HitLeaf(p, pt)
 }
 
-// ClickAt on the transparent rest closes the dropdown.
+// ClickAt on the transparent rest closes the dropdown, playing its
+// exit (dismiss_on_spacer_click).
 func (p *panelBox) ClickAt(widget.Point) {
-	if p.pop != nil {
+	switch {
+	case p.dismiss != nil:
+		p.dismiss()
+	case p.pop != nil:
 		p.pop.Dismiss()
 	}
 }
 
 // dropdownCloser forwards to the content, so a sized dropdown still
-// stops following its service when the popover closes.
+// stops following its service when its instance is released.
 func (p *panelBox) dropdownClosed() {
 	if c, ok := p.child.(dropdownCloser); ok {
 		c.dropdownClosed()
+	}
+}
+
+// dropdownOpened forwards each open to the content.
+func (p *panelBox) dropdownOpened() {
+	if o, ok := p.child.(dropdownOpener); ok {
+		o.dropdownOpened()
 	}
 }
 
