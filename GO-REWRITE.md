@@ -251,13 +251,16 @@ wired in); both gates green. What remains, in the order to work it:
      side through DoAction.
    - Captured so far (in /tmp/parity/shots, gone at reboot): 14
      Rust panels + 15 Go panels, each a PNG plus the bar's tree.
+   - Closed since: keyboard-input follows sway, niri, and mango as
+     the Rust sources do; the pulse "needs PULSE_SERVER" finding was
+     the kiosk's private XDG_RUNTIME_DIR — libpulse (pactl) fails
+     there identically — and the native client now tries libpulse's
+     whole default list (PULSE_RUNTIME_PATH, the per-user socket,
+     the system socket).
    - **Findings already on file from the trees** (fix with tests,
      then re-capture): Go bar buttons expose empty accessible names
      (Rust names them by their label text — gelm A11y name never set
-     on the bar toggle); Go's keyboard-input module refuses any
-     non-Hyprland compositor while the Rust one appears under sway;
-     Go's pulse client needs PULSE_SERVER where the Rust one
-     discovers the user server itself; bar geometry differs broadly
+     on the bar toggle); bar geometry differs broadly
      (Rust center group 229px — clock 167 + 58 — against Go's 176 —
      123 + 53; the right group 542px against ~640), which needs the
      per-button/per-panel diff pass to split into font resolution,

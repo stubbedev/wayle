@@ -415,20 +415,28 @@ type address struct {
 
 func (a address) String() string { return a.network + ":" + a.address }
 
+// systemSocket is libpulse's PA_SYSTEM_RUNTIME_PATH native socket,
+// the system-wide instance.
+const systemSocket = "/var/run/pulse/native"
+
 // serverAddresses resolves a server string the way libpulse does:
-// the explicit string, else $PULSE_SERVER, else the per-user socket.
-// An entry prefixed "{id}" applies only on the machine whose
-// machine-id or host name is id.
+// the explicit string, else $PULSE_SERVER, else context.c's default
+// list - the per-user socket (pa_runtime_path: $PULSE_RUNTIME_PATH,
+// else $XDG_RUNTIME_DIR/pulse), then the system-wide one. An entry
+// prefixed "{id}" applies only on the machine whose machine-id or
+// host name is id.
 func serverAddresses(server string) ([]address, error) {
 	if server == "" {
 		server = os.Getenv("PULSE_SERVER")
 	}
 	if server == "" {
-		runtime := os.Getenv("XDG_RUNTIME_DIR")
-		if runtime == "" {
-			return nil, errors.New("pulse: no server: PULSE_SERVER and XDG_RUNTIME_DIR are unset")
+		var out []address
+		if dir := os.Getenv("PULSE_RUNTIME_PATH"); dir != "" {
+			out = append(out, address{network: "unix", address: filepath.Join(dir, "native")})
+		} else if runtime := os.Getenv("XDG_RUNTIME_DIR"); runtime != "" {
+			out = append(out, address{network: "unix", address: filepath.Join(runtime, "pulse", "native")})
 		}
-		return []address{{network: "unix", address: filepath.Join(runtime, "pulse", "native")}}, nil
+		return append(out, address{network: "unix", address: systemSocket}), nil
 	}
 	var out []address
 	for entry := range strings.FieldsSeq(server) {

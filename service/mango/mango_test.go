@@ -147,3 +147,40 @@ func TestWatchAppliesFramesAndSkipsGarbage(t *testing.T) {
 		}
 	}
 }
+
+func TestKeyboardLayoutIsTheActiveMonitors(t *testing.T) {
+	monitors := []Monitor{
+		{Name: "DP-1", KeyboardLayout: "German"},
+		{Name: "eDP-1", IsActive: true, KeyboardLayout: "English (US)"},
+	}
+	if got := KeyboardLayout(monitors); got != "English (US)" {
+		t.Errorf("layout = %q, want the active monitor's", got)
+	}
+	// No active monitor: no layout, even if others report one.
+	if got := KeyboardLayout(monitors[:1]); got != "" {
+		t.Errorf("layout = %q, want empty", got)
+	}
+}
+
+func TestWatchDecodesTheKeyboardLayout(t *testing.T) {
+	newFakeMango(t)
+	w, err := Watch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	deadline := time.After(2 * time.Second)
+	for {
+		if monitors, _ := w.State(); len(monitors) == 1 {
+			if got := KeyboardLayout(monitors); got != "English (US)" {
+				t.Fatalf("layout = %q, want English (US)", got)
+			}
+			return
+		}
+		select {
+		case <-w.Ticks():
+		case <-deadline:
+			t.Fatal("frames never applied")
+		}
+	}
+}

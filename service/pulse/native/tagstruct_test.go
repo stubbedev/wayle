@@ -208,11 +208,28 @@ func TestSubscribeEventDecoding(t *testing.T) {
 
 func TestServerAddresses(t *testing.T) {
 	t.Setenv("PULSE_SERVER", "")
+	t.Setenv("PULSE_RUNTIME_PATH", "")
 	t.Setenv("XDG_RUNTIME_DIR", "/run/user/7")
 	addrs, err := serverAddresses("")
-	if err != nil || len(addrs) != 1 || addrs[0].String() != "unix:/run/user/7/pulse/native" {
-		t.Errorf("default = %v, %v", addrs, err)
+	if err != nil || len(addrs) != 2 || addrs[0].String() != "unix:/run/user/7/pulse/native" ||
+		addrs[1].String() != "unix:/var/run/pulse/native" {
+		t.Errorf("default = %v, %v; want the user socket, then the system one", addrs, err)
 	}
+	// PULSE_RUNTIME_PATH replaces the per-user directory.
+	t.Setenv("PULSE_RUNTIME_PATH", "/tmp/pa")
+	addrs, err = serverAddresses("")
+	if err != nil || len(addrs) != 2 || addrs[0].String() != "unix:/tmp/pa/native" {
+		t.Errorf("runtime path = %v, %v", addrs, err)
+	}
+	t.Setenv("PULSE_RUNTIME_PATH", "")
+	// No per-user directory at all: the system socket alone, not an
+	// error (libpulse still tries it).
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	addrs, err = serverAddresses("")
+	if err != nil || len(addrs) != 1 || addrs[0].String() != "unix:/var/run/pulse/native" {
+		t.Errorf("no runtime dir = %v, %v; want the system socket", addrs, err)
+	}
+	t.Setenv("XDG_RUNTIME_DIR", "/run/user/7")
 	t.Setenv("PULSE_SERVER", "unix:/tmp/a /tmp/b tcp:host tcp6:[::1]:99 {not-this-machine}unix:/skip")
 	addrs, err = serverAddresses("")
 	if err != nil {
@@ -230,11 +247,6 @@ func TestServerAddresses(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("address %d = %s, want %s", i, got[i], want[i])
 		}
-	}
-	t.Setenv("XDG_RUNTIME_DIR", "")
-	t.Setenv("PULSE_SERVER", "")
-	if _, err := serverAddresses(""); err == nil {
-		t.Error("no PULSE_SERVER and no XDG_RUNTIME_DIR resolved a server")
 	}
 	if _, err := serverAddresses("{unterminated"); err == nil {
 		t.Error("an unterminated {id} prefix parsed")

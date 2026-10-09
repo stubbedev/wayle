@@ -170,6 +170,37 @@ func (c *Conn) Windows() ([]Window, error) {
 	return *out.Windows, nil
 }
 
+// KeyboardLayouts is niri_ipc::KeyboardLayouts: the configured layout
+// names and the active one's index.
+type KeyboardLayouts struct {
+	Names      []string `json:"names"`
+	CurrentIdx uint8    `json:"current_idx"`
+}
+
+// Current is the active layout's name; false when the index points
+// past the names.
+func (k KeyboardLayouts) Current() (string, bool) {
+	if int(k.CurrentIdx) >= len(k.Names) {
+		return "", false
+	}
+	return k.Names[k.CurrentIdx], true
+}
+
+// KeyboardLayouts is Request::KeyboardLayouts.
+func (c *Conn) KeyboardLayouts() (KeyboardLayouts, error) {
+	resp, err := c.request("KeyboardLayouts")
+	if err != nil {
+		return KeyboardLayouts{}, err
+	}
+	var out struct {
+		KeyboardLayouts *KeyboardLayouts `json:"KeyboardLayouts"`
+	}
+	if err := json.Unmarshal(resp, &out); err != nil || out.KeyboardLayouts == nil {
+		return KeyboardLayouts{}, errors.New("niri: unexpected response to keyboard layouts")
+	}
+	return *out.KeyboardLayouts, nil
+}
+
 // Action dispatches one niri_ipc::Action, given as its serde form:
 // the variant name and its (struct) payload.
 func (c *Conn) Action(ctx context.Context, name string, payload any) error {

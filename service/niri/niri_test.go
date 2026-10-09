@@ -78,6 +78,8 @@ func (f *fakeNiri) serve(conn net.Conn) {
 				_, _ = conn.Write([]byte(`{"Ok":{"Workspaces":` + f.workspaces + "}}\n"))
 			case "Windows":
 				_, _ = conn.Write([]byte(`{"Ok":{"Windows":` + f.windows + "}}\n"))
+			case "KeyboardLayouts":
+				_, _ = conn.Write([]byte(`{"Ok":{"KeyboardLayouts":{"names":["English (US)","German"],"current_idx":1}}}` + "\n"))
 			case "EventStream":
 				_, _ = conn.Write([]byte("{\"Ok\":\"Handled\"}\n"))
 				time.Sleep(20 * time.Millisecond)
@@ -240,5 +242,25 @@ func TestDecodeReplyRejectsShapeless(t *testing.T) {
 	}
 	if err := expectHandled(json.RawMessage(`{"Version":"25.11"}`), "action"); err == nil {
 		t.Error("non-Handled response accepted")
+	}
+}
+
+func TestKeyboardLayoutsDecodeAndPickTheCurrent(t *testing.T) {
+	newFakeNiri(t, "[]", "[]")
+	conn, err := Connect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	layouts, err := conn.KeyboardLayouts()
+	if err != nil {
+		t.Fatalf("KeyboardLayouts: %v", err)
+	}
+	if got, ok := layouts.Current(); !ok || got != "German" {
+		t.Errorf("current = %q, %v; want German", got, ok)
+	}
+	// An index past the names is no layout, not a panic.
+	if got, ok := (KeyboardLayouts{Names: []string{"us"}, CurrentIdx: 1}).Current(); ok || got != "" {
+		t.Errorf("out of range = %q, %v; want none", got, ok)
 	}
 }

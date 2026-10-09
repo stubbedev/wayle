@@ -50,6 +50,20 @@ type Monitor struct {
 	IsActive   bool     `json:"active"`
 	Tags       []Tag    `json:"tags"`
 	ActiveTags []uint32 `json:"active_tags"`
+	// KeyboardLayout is the active XKB layout; mango reports it on
+	// every monitor, empty when unknown.
+	KeyboardLayout string `json:"keyboardlayout"`
+}
+
+// KeyboardLayout is refresh_globals' keyboard_layout: the active
+// monitor's layout; "" when no monitor is active or it reports none.
+func KeyboardLayout(monitors []Monitor) string {
+	for _, m := range monitors {
+		if m.IsActive {
+			return m.KeyboardLayout
+		}
+	}
+	return ""
 }
 
 // Client is core/client.rs's Client; empty title/app id read as

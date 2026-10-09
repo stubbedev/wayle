@@ -214,17 +214,21 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 		t.Fatalf("state %d form %v focus %v", v.state, v.password.Visible(), pop.focused)
 	}
 	// Step reported, then a refused password asks again, saying so.
-	stepped := make(chan struct{})
+	stepped, refuse := make(chan struct{}), make(chan struct{})
 	wifi.connectFn = func(progress func(network.DeviceState)) error {
 		progress(network.DeviceConfig)
 		close(stepped)
+		// Hold the refusal until the connecting state was checked: the
+		// attempt runs off the loop and would race the assertion.
+		<-refuse
 		return &network.ConnectError{Failure: network.FailureAuth}
 	}
 	v.password.secret.entry.SetText("hunter2")
 	v.password.connect()
-	if v.state != netConnecting || v.active.wifiName.Text() == "" {
+	if onHeadlessLoop(func() bool { return v.state != netConnecting || v.active.wifiName.Text() == "" }) {
 		t.Error("connecting state not shown")
 	}
+	close(refuse)
 	waitHeadless(t, "the re-prompt", func() bool { return v.state == netPasswordEntry && v.password.errLabel.Visible() })
 	<-stepped
 	if v.password.errLabel.Text() != i18n.T("dropdown-network-error-wrong-password") {
@@ -485,10 +489,15 @@ func TestNetworkDropdownContentOnTheRootWrapper(t *testing.T) {
 // (network/mod.rs:97-109).
 func TestNetworkScanButtonGhostIconOnly(t *testing.T) {
 	v, _, _ := newNetTestView(t, network.Snapshot{WifiEnabled: true}, netDeps{wifiCtl: &fakeWifiCtl{}})
-	if !widget.HasClass(v.scanBtn, "ghost-icon") || !widget.HasClass(v.scanBtn, "network-scan-btn") {
+	// The empty list scans on open; its completion restyles the button
+	// off the test goroutine, so read on the loop.
+	ghostIcon, ghost := onHeadlessLoop(func() bool {
+		return widget.HasClass(v.scanBtn, "ghost-icon") && widget.HasClass(v.scanBtn, "network-scan-btn")
+	}), onHeadlessLoop(func() bool { return widget.HasClass(v.scanBtn, "ghost") })
+	if !ghostIcon {
 		t.Error("the scan button is not ghost-icon + network-scan-btn")
 	}
-	if widget.HasClass(v.scanBtn, "ghost") {
+	if ghost {
 		t.Error("the scan button carries the ghost class")
 	}
 }

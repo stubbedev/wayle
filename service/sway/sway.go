@@ -26,6 +26,7 @@ const (
 	msgGetWorkspaces = 1
 	msgSubscribe     = 2
 	msgGetTree       = 4
+	msgGetInputs     = 100
 )
 
 // eventBit marks a message as an event rather than a reply.
@@ -135,6 +136,37 @@ func (c *Conn) Workspaces() ([]Workspace, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+// Input is one GET_INPUTS entry (types.rs's InputReply), the fields
+// the keyboard layout reads.
+type Input struct {
+	Type                string  `json:"type"`
+	XkbActiveLayoutName *string `json:"xkb_active_layout_name"`
+}
+
+// Inputs is GET_INPUTS.
+func (c *Conn) Inputs() ([]Input, error) {
+	body, err := c.request(msgGetInputs, nil)
+	if err != nil {
+		return nil, err
+	}
+	var out []Input
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// KeyboardLayout is refresh_keyboard_layout: the active layout of the
+// first keyboard reporting one; "" when none does.
+func KeyboardLayout(inputs []Input) string {
+	for _, in := range inputs {
+		if in.Type == "keyboard" && in.XkbActiveLayoutName != nil {
+			return *in.XkbActiveLayoutName
+		}
+	}
+	return ""
 }
 
 // RunCommand executes one sway command; the first error in the reply
@@ -289,6 +321,11 @@ func (c *Conn) Windows() ([]Window, error) {
 // re-query. The channel closes when the stream ends; stop closes the
 // socket.
 func Subscribe() (<-chan struct{}, func(), error) {
+	return SubscribeTo("workspace", "window")
+}
+
+// SubscribeTo is Subscribe over the named event streams.
+func SubscribeTo(events ...string) (<-chan struct{}, func(), error) {
 	path := SocketPath()
 	if path == "" {
 		return nil, nil, errors.New("sway: SWAYSOCK is not set")
@@ -297,7 +334,12 @@ func Subscribe() (<-chan struct{}, func(), error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("sway: %w", err)
 	}
-	if werr := writeFrame(conn, msgSubscribe, []byte(`["workspace","window"]`)); werr != nil {
+	payload, err := json.Marshal(events)
+	if err != nil {
+		_ = conn.Close()
+		return nil, nil, err
+	}
+	if werr := writeFrame(conn, msgSubscribe, payload); werr != nil {
 		_ = conn.Close()
 		return nil, nil, werr
 	}

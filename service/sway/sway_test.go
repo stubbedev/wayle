@@ -18,6 +18,7 @@ type fakeSway struct {
 	ln         net.Listener
 	workspaces []Workspace
 	tree       string
+	inputs     string
 	failWith   string
 
 	mu        sync.Mutex
@@ -69,6 +70,8 @@ func (f *fakeSway) serve(conn net.Conn) {
 			_ = writeFrame(conn, msgType, body)
 		case msgGetTree:
 			_ = writeFrame(conn, msgType, []byte(f.tree))
+		case msgGetInputs:
+			_ = writeFrame(conn, msgType, []byte(f.inputs))
 		case msgRunCommand:
 			f.mu.Lock()
 			f.commands = append(f.commands, string(payload))
@@ -246,5 +249,48 @@ func TestSubscribeSkipsEarlyEventAndTicks(t *testing.T) {
 		case <-deadline:
 			t.Fatal("ticks not closed after stop")
 		}
+	}
+}
+
+func TestKeyboardLayoutIsTheFirstKeyboardWithALayout(t *testing.T) {
+	f := newFakeSway(t, nil, "{}")
+	// A pointer never counts, nor a keyboard without xkb state; the
+	// first keyboard that reports a layout wins over later ones.
+	f.inputs = `[
+	 {"identifier":"1:1:mouse","type":"pointer","xkb_active_layout_name":"ignored"},
+	 {"identifier":"0:0:power","type":"keyboard"},
+	 {"identifier":"1:1:at","type":"keyboard","xkb_active_layout_name":"German"},
+	 {"identifier":"2:2:usb","type":"keyboard","xkb_active_layout_name":"English (US)"}
+	]`
+	conn, err := Connect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	inputs, err := conn.Inputs()
+	if err != nil {
+		t.Fatalf("Inputs: %v", err)
+	}
+	if got := KeyboardLayout(inputs); got != "German" {
+		t.Errorf("layout = %q, want German", got)
+	}
+	// No keyboard with a layout: none at all.
+	if got := KeyboardLayout(inputs[:2]); got != "" {
+		t.Errorf("layout = %q, want empty", got)
+	}
+}
+
+func TestSubscribeToNamesItsStreams(t *testing.T) {
+	f := newFakeSway(t, nil, "{}")
+	_, stop, err := SubscribeTo("input")
+	if err != nil {
+		t.Fatalf("SubscribeTo: %v", err)
+	}
+	defer stop()
+	f.mu.Lock()
+	sub := f.subscribe
+	f.mu.Unlock()
+	if sub != `["input"]` {
+		t.Errorf("subscribed to %s, want input only", sub)
 	}
 }
