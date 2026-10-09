@@ -1,0 +1,16 @@
+# cargo-audit configuration (read by `cargo audit` locally and in the
+# security workflow). Every ignore must name the advisory, the path it reaches
+# us through, and why wayle is not affected. Revisit when the parent crate
+# drops the dependency.
+
+[advisories]
+ignore = [
+    # users 0.8.1 — "`root` appended to group listings". No fixed version
+    # exists (the crate is unmaintained). It reaches us only through `pam`
+    # (0.7.0, and still in the latest 0.8.0), which calls
+    # `users::get_user_by_name` solely from `Authenticator::open_session`.
+    # wayle-auth only ever calls `Authenticator::authenticate` (lock screen
+    # password check) and never opens a PAM session or lists groups, so the
+    # affected group-listing code is unreachable.
+    "RUSTSEC-2025-0040",
+]
