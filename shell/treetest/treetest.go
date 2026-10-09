@@ -47,13 +47,24 @@ func First[T widget.Widget](t *testing.T, root widget.Widget) T {
 // Button is the first button whose accessible name is name.
 func Button(t *testing.T, root widget.Widget, name string) *widget.Button {
 	t.Helper()
-	for _, b := range All[*widget.Button](root) {
-		if widget.Describe(b).Name == name {
-			return b
+	// The first in walk order; a toggle button clicks through its
+	// embedded button.
+	var found *widget.Button
+	Walk(root, func(w widget.Widget) {
+		if found != nil || widget.Describe(w).Name != name {
+			return
 		}
+		switch b := w.(type) {
+		case *widget.Button:
+			found = b
+		case *widget.ToggleButton:
+			found = &b.Button
+		}
+	})
+	if found == nil {
+		t.Fatalf("no %q button", name)
 	}
-	t.Fatalf("no %q button", name)
-	return nil
+	return found
 }
 
 // WithClass is every widget under root carrying class.

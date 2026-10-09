@@ -388,9 +388,10 @@ func (v *dashboardView) media() widget.Widget {
 	artPx := int(math.Round(v.px * 3.5))
 	art := newFixedBox(artPx, artPx, nil)
 	art.AddClass("dashboard-media-art")
-	// The per-instance class the Rust stylesheet hangs the section's
-	// cover rule on (gelm cannot paint a background-image url, so the
-	// art stays a rasterized child).
+	// The per-instance class the Rust section hangs its cover rule on.
+	// The art itself is a cover-scaled image child rather than that
+	// rule: Rust's rule names the file wayle-media downloaded, and here
+	// the image loads remote art itself.
 	art.AddClass("dashboard-media-art-instance-" + strconv.FormatUint(dashboardArtInstances.Add(1), 10))
 	artURL := "\x00"
 	title := v.label("", 1)

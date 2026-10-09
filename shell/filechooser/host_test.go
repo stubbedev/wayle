@@ -389,6 +389,13 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 	if got := hs.shown(); !slices.Contains(got, ".dot.txt") {
 		t.Errorf("hidden shown = %v", got)
 	}
+	// The header toggles are gtk::ToggleButtons: pressed while on.
+	if st := widget.Describe(hs.c.ui.hiddenTg); st.Role != widget.RoleToggleButton || !st.Pressed {
+		t.Errorf("hidden toggle reads %s pressed %v, want a pressed toggle button", st.Role, st.Pressed)
+	}
+	if widget.Describe(hs.c.ui.recursiveToggle).Pressed {
+		t.Error("the untouched subfolder toggle reads pressed")
+	}
 	hs.click(t, "Name ↑")
 	if got := hs.shown(); !slices.Equal(got[:2], []string{"pics", "docs"}) {
 		t.Errorf("name descending = %v", got)
@@ -407,7 +414,7 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 	}
 	// And the hidden toggle sticks to the next request.
 	got := hs.open(t, OpenRequest{})
-	if !slices.Contains(hs.shown(), ".dot.txt") {
+	if !slices.Contains(hs.shown(), ".dot.txt") || !hs.c.ui.hiddenTg.Active() {
 		t.Error("the hidden toggle did not stick")
 	}
 	hs.click(t, "Cancel")

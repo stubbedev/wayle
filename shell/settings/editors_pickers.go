@@ -85,7 +85,7 @@ func (c *fontEditor) open() {
 	}
 	c.picker = openSearchPicker(c.k, c.btn, families, pickerSpec{
 		class: "font-picker-popover", listClass: "font-picker-list", scrollClass: "font-picker-scroll",
-		placeholder: "settings-font-search", maxH: int(math.Round(fontPickerListPx)),
+		placeholder: "settings-font-search", maxH: int(math.Round(fontPickerListPx)), searchEntry: true,
 		row: func(k *kit, name string) widget.Widget {
 			l := k.label(name, "font-picker-item")
 			l.SetEllipsize(widget.EllipsizeEnd)
@@ -107,6 +107,11 @@ type pickerSpec struct {
 	trailing func(k *kit, pick func(string)) widget.Widget
 	// pickTyped makes Enter in the search entry pick the typed text.
 	pickTyped bool
+	// searchEntry makes the search a gtk::SearchEntry (the font and
+	// module pickers): the search icon, the clear button, Esc clearing,
+	// and the filter on search-changed after GTK's default delay. The
+	// others are plain gtk::Entry filtering per keystroke.
+	searchEntry bool
 }
 
 // searchPicker is the popovers' shared tree (FontPicker, the icon
@@ -143,9 +148,20 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 	p.root.AddClass(spec.class)
 	contents := widget.NewBox(widget.Column, 8, 0)
 	contents.SetElement("contents")
-	p.search = k.entry()
-	p.search.SetPlaceholder(i18n.Settings().Get(spec.placeholder))
-	p.search.OnChanged = p.filter
+	var searchField widget.Widget
+	if spec.searchEntry {
+		se := widget.NewSearchEntry(k.face, 14, i18n.Settings().Get(spec.placeholder))
+		// The stylesheet inks it, as k.entry's.
+		se.SetColor(0)
+		se.SetTextWidth(widget.GTKTextWidth)
+		se.OnSearchChanged = p.filter
+		p.search, searchField = se.Entry, se
+	} else {
+		p.search = k.entry()
+		p.search.SetPlaceholder(i18n.Settings().Get(spec.placeholder))
+		p.search.OnChanged = p.filter
+		searchField = p.search
+	}
 	if spec.pickTyped {
 		p.search.OnActivate = func(text string) {
 			if text != "" {
@@ -154,7 +170,7 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 		}
 	}
 	searchRow := widget.NewBox(widget.Row, 4, 0)
-	searchRow.Append(p.search, true)
+	searchRow.Append(searchField, true)
 	if spec.trailing != nil {
 		searchRow.AppendAligned(spec.trailing(k, p.pick), false, widget.AlignCenter)
 	}

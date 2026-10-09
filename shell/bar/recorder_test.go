@@ -68,6 +68,8 @@ func TestLoadFileAppliesRecorder(t *testing.T) {
 
 func TestRecorderModuleFollowsState(t *testing.T) {
 	cfg := config.Defaults()
+	// A recording lands in a temp dir, never the user's ~/Videos.
+	cfg.Recorder.OutputDirectory = t.TempDir()
 	ctx := newTestContext(t, cfg)
 	ctx.Recorder = recorder.NewState(&recordertest.Engine{}, func() config.RecorderConfig { return cfg.Recorder }, recorder.Hooks{})
 

@@ -7,7 +7,7 @@ require (
 	github.com/ebitengine/purego v0.11.1
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/gelm v0.0.0-20261009044520-ec53dc6b297e
+	github.com/stubbedev/gelm v0.0.0-20261009045501-c1dd80947c6a
 	github.com/unxed/xkb-go v0.1.8
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0

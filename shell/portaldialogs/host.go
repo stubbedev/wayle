@@ -274,10 +274,12 @@ func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, co
 	}
 	// The rows pack at the top; the spacer takes the viewport's slack.
 	list.Append(widget.NewSpacer(0, 0), true)
-	search := widget.NewEntry(h.d.Font, 13, h.d.Ink)
+	// gtk::SearchEntry: the list filters on search-changed, after the
+	// default delay.
+	search := widget.NewSearchEntry(h.d.Font, 13, "Search applications…")
+	search.SetColor(h.d.Ink)
 	search.AddClass("portal-dialog-search")
-	search.SetPlaceholder("Search applications…")
-	search.OnChanged = func(q string) {
+	search.OnSearchChanged = func(q string) {
 		q = strings.ToLower(q)
 		for _, r := range rows {
 			r.button.SetVisible(q == "" || strings.Contains(r.name, q))

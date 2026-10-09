@@ -16,10 +16,12 @@ import (
 // hyprctl setcursor, niri's cursor block, sway's seat xcursor_theme),
 // then GTK settings.ini and ~/.icons/default/index.theme.
 //
-// gelm draws xcursor themes client-side from XCURSOR_THEME and
+// Like GTK 4.22, gelm asks the compositor to draw the cursor
+// (cursor-shape-v1) when it can; on a host without the protocol (cage)
+// it draws xcursor themes client-side from XCURSOR_THEME and
 // XCURSOR_SIZE, so the resolved cursor is applied by exporting those
-// before connecting; the GTK named-cursor fallback the Rust greeter
-// works around (hosts without cursor-shape-v1) does not exist here.
+// before connecting. The bundled-PNG fallback the Rust greeter works
+// around does not exist here.
 
 // recordedRel is where a running wayle session records its live cursor
 // (RecordCursor), relative to the user's home.

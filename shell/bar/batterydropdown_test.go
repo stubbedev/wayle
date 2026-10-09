@@ -512,7 +512,8 @@ func TestBatteryDropdownProfiles(t *testing.T) {
 			!v.profileButtons[powerprofiles.ProfileBalanced].HasState(widget.StateChecked)
 	})
 
-	// A daemon-side change follows while open.
+	// A daemon-side change follows while open - and marking the
+	// toggles writes nothing back (the blocked signal).
 	pp.mu.Lock()
 	pp.snap.Active = powerprofiles.ProfileBalanced
 	pp.mu.Unlock()
@@ -520,4 +521,27 @@ func TestBatteryDropdownProfiles(t *testing.T) {
 	waitHeadless(t, "the followed profile", func() bool {
 		return v.profileButtons[powerprofiles.ProfileBalanced].HasState(widget.StateChecked)
 	})
+	if got := pp.sets(); len(got) != 1 {
+		t.Errorf("the followed change wrote %v back", got)
+	}
+
+	// The segments are grouped toggle buttons: a click selects through
+	// the toggle, releasing the other segment; a click on the active
+	// one keeps it and writes nothing.
+	saver := v.profileButtons[powerprofiles.ProfilePowerSaver]
+	if st := widget.Describe(saver); st.Role != widget.RoleToggleButton {
+		t.Errorf("segment role %s, want a toggle button", st.Role)
+	}
+	onHeadlessLoop(func() bool { saver.ClickAt(widget.Point{}); return true })
+	waitHeadless(t, "the clicked write", func() bool { return len(pp.sets()) == 2 })
+	if !onHeadlessLoop(func() bool {
+		return saver.Active() && !v.profileButtons[powerprofiles.ProfileBalanced].Active()
+	}) {
+		t.Error("the click did not move the toggle")
+	}
+	onHeadlessLoop(func() bool { saver.ClickAt(widget.Point{}); return true })
+	time.Sleep(20 * time.Millisecond)
+	if got := pp.sets(); len(got) != 2 {
+		t.Errorf("a click on the active segment wrote: %v", got)
+	}
 }

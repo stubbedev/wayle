@@ -200,11 +200,14 @@ func TestAppChooserFiltersAndPicks(t *testing.T) {
 	got := make(chan string, 1)
 	go func() { got <- hs.h.ChooseApplication(nil, "image/png", "") }()
 	c := hs.open(t)
-	var search *widget.Entry
+	// The search is a gtk::SearchEntry; its search-changed delay runs
+	// instantly here.
+	defer widget.SetAnimationsInstant(true)()
+	var search *widget.SearchEntry
 	var remember *widget.CheckButton
 	treetest.Walk(c.Root, func(w widget.Widget) {
 		switch v := w.(type) {
-		case *widget.Entry:
+		case *widget.SearchEntry:
 			search = v
 		case *widget.CheckButton:
 			remember = v

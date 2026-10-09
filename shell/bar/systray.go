@@ -584,7 +584,7 @@ func (m *systrayModule) binder() accelBinder {
 // bindAccels is register_accelerators: every visible, enabled leaf with
 // a shortcut fires its clicked event on that key while the menu is
 // open. A rebuilt menu drops the previous bindings first; a key already
-// taken (or one gelm cannot express, a Super binding) is skipped.
+// taken is skipped.
 func (m *systrayModule) bindAccels(it sni.Item, nodes []sni.MenuItem) {
 	m.unbindAccels()
 	b := m.binder()

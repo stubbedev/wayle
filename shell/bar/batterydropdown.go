@@ -164,7 +164,10 @@ type batteryView struct {
 	// syncing marks programmatic switch moves (block_signal).
 	syncing bool
 
-	profileButtons      map[string]*widget.Button
+	profileButtons map[string]*widget.ToggleButton
+	// marking blocks the toggles' handler while the view sets them
+	// (block_signal): only a user's toggle selects a profile.
+	marking             bool
 	profilesUnavailable *widget.Box
 	activeProfile       string
 
@@ -337,7 +340,8 @@ func (v *batteryView) profileSection() widget.Widget {
 	// set_homogeneous (power_profile/mod.rs:49): the segments equalize
 	// to the widest.
 	seg.SetHomogeneous(true)
-	v.profileButtons = make(map[string]*widget.Button, len(batteryProfiles))
+	v.profileButtons = make(map[string]*widget.ToggleButton, len(batteryProfiles))
+	var first *widget.ToggleButton
 	for _, p := range batteryProfiles {
 		content := widget.NewBox(widget.Row, 0, 0)
 		content.AddClass("profile-seg-btn-content")
@@ -348,7 +352,20 @@ func (v *batteryView) profileSection() widget.Widget {
 		content.Append(widget.NewLabel(v.font, v.px*0.9, i18n.T(p.label), 0), false)
 		content.Append(widget.NewSpacer(0, 0), true)
 		name := p.name
-		b := dropdownButton(content, "profile-seg-btn", func() { v.selectProfile(name) })
+		// Grouped gtk::ToggleButtons: activating one releases the
+		// others, and the toggled handler selects on activation only.
+		b := widget.NewToggleButton(content, 6, 8)
+		b.AddClass("toggle", "profile-seg-btn")
+		b.OnToggled = func(active bool) {
+			if active && !v.marking {
+				v.selectProfile(name)
+			}
+		}
+		if first == nil {
+			first = b
+		} else {
+			b.SetGroup(first)
+		}
 		v.profileButtons[name] = b
 		seg.Append(b, true)
 	}
@@ -471,10 +488,13 @@ func (v *batteryView) applyProfiles(snap *powerprofiles.Snapshot) {
 	v.profilesUnavailable.SetVisible(len(available) == 0)
 }
 
-// markProfile styles a segment as the toggled one: :checked selects
-// the sheet's accent rule.
+// markProfile sets a segment's toggle without selecting anything (the
+// #[block_signal] set_active); :checked selects the sheet's accent
+// rule.
 func (v *batteryView) markProfile(name string, active bool) {
-	v.profileButtons[name].SetState(widget.StateChecked, active)
+	v.marking = true
+	v.profileButtons[name].SetActive(active)
+	v.marking = false
 }
 
 // selectProfile is select_profile: the segment toggles at once, the

@@ -187,7 +187,8 @@ type ui struct {
 	root                    *widget.Box
 	sheet                   *sheet
 	crumbs                  *widget.Box
-	search, name            *widget.Entry
+	search                  *widget.SearchEntry
+	name                    *widget.Entry
 	list, grid              *widget.List
 	colHeader               *widget.Box
 	sortButtons             [4]*widget.Button
@@ -200,13 +201,13 @@ type ui struct {
 	preview                 *credential.Fixed
 	pvIcon                  *widget.Box
 	pvName, pvInfo          *widget.Label
-	filterButton            *widget.Button
+	filterButton            *widget.ToggleButton
 	filterLabel             *widget.Label
 	filterPopup             *widget.Box
 	viewToggle              *widget.Button
 	viewIcon                *widget.Box
-	previewToggle, hiddenTg *widget.Button
-	recursiveToggle         *widget.Button
+	previewToggle, hiddenTg *widget.ToggleButton
+	recursiveToggle         *widget.ToggleButton
 }
 
 func (c *Chooser) label(text, class string) *widget.Label {
@@ -224,6 +225,19 @@ func (c *Chooser) textButton(text, class string, onClick func()) (*widget.Button
 	b.AddClass(class)
 	b.OnClick = onClick
 	return b, l
+}
+
+// iconToggle is a gtk::ToggleButton with an icon: on starts it
+// active, and onToggled hears every later change.
+func (c *Chooser) iconToggle(icon, tooltip string, on bool, onToggled func(bool)) *widget.ToggleButton {
+	holder := widget.NewBox(widget.Row, 0, 0)
+	setIcon(holder, icon)
+	b := widget.NewToggleButton(credential.Center(holder), 0, 0)
+	b.AddClass("toggle", "file-chooser-nav", "flat")
+	b.SetTooltip(tooltip)
+	b.SetActive(on)
+	b.OnToggled = onToggled
+	return b
 }
 
 func (c *Chooser) iconButton(icon, tooltip string, onClick func()) *widget.Button {
@@ -257,12 +271,11 @@ func (c *Chooser) build(title, name string) {
 	headerRow.Append(c.iconButton("go-up-symbolic", "Up", c.goUp), false)
 	headerRow.Append(widget.NewSpacer(0, 0), true)
 	u.viewToggle, u.viewIcon = c.swappableIconButton(viewIcon(c.view.grid), "Toggle grid view", c.toggleView)
-	u.previewToggle = c.iconButton("view-paged-symbolic", "Preview pane", c.togglePreview)
-	u.hiddenTg = c.iconButton("view-reveal-symbolic", "Show hidden files", c.toggleHidden)
-	u.recursiveToggle = c.iconButton("folder-saved-search-symbolic", "Search subfolders", c.toggleRecursive)
-	u.hiddenTg.SetState(widget.StateChecked, c.hidden)
-	u.recursiveToggle.SetState(widget.StateChecked, c.recursive)
-	for _, b := range []*widget.Button{u.viewToggle, u.previewToggle, u.hiddenTg, u.recursiveToggle} {
+	u.previewToggle = c.iconToggle("view-paged-symbolic", "Preview pane", false, c.togglePreview)
+	u.hiddenTg = c.iconToggle("view-reveal-symbolic", "Show hidden files", c.hidden, c.toggleHidden)
+	u.recursiveToggle = c.iconToggle("folder-saved-search-symbolic", "Search subfolders", c.recursive, c.toggleRecursive)
+	headerRow.Append(u.viewToggle, false)
+	for _, b := range []*widget.ToggleButton{u.previewToggle, u.hiddenTg, u.recursiveToggle} {
 		headerRow.Append(b, false)
 	}
 	headerStack := widget.NewOverlay()
@@ -278,10 +291,14 @@ func (c *Chooser) build(title, name string) {
 	u.crumbs = widget.NewBox(widget.Row, 2, 0)
 	u.crumbs.AddClass("file-chooser-crumbs")
 	crumbBar.Append(u.crumbs, true)
-	u.search = widget.NewEntry(c.d.Font, 13, c.d.Ink)
+	// gtk::SearchEntry with no debounce: filtering the cached listing
+	// is an in-memory scan, and a recursive walk is cancelled by its
+	// generation instead.
+	u.search = widget.NewSearchEntry(c.d.Font, 13, "Filter this folder")
+	u.search.SetColor(c.d.Ink)
 	u.search.AddClass("file-chooser-search")
-	u.search.SetPlaceholder("Filter this folder")
-	u.search.OnChanged = c.setSearch
+	u.search.SetDelay(0)
+	u.search.OnSearchChanged = c.setSearch
 	crumbBar.Append(credential.NewFixed(u.search, searchW, 0), false)
 
 	// Body: sidebar, the file views, the preview pane.
@@ -307,7 +324,11 @@ func (c *Chooser) build(title, name string) {
 	// Footer: the type filter, cancel, confirm.
 	footer := widget.NewBox(widget.Row, 8, 0)
 	footer.AddClass("file-chooser-footer")
-	u.filterButton, u.filterLabel = c.textButton("", "file-chooser-filter", c.toggleFilterPopup)
+	u.filterLabel = c.label("", "file-chooser-filter-label")
+	u.filterLabel.SetAlignment(render.AlignCenter)
+	u.filterButton = widget.NewToggleButton(u.filterLabel, 0, 0)
+	u.filterButton.AddClass("toggle", "file-chooser-filter")
+	u.filterButton.OnToggled = c.setFilterPopup
 	u.filterLabel.SetAlignment(render.AlignStart)
 	u.filterLabel.SetEllipsize(widget.EllipsizeEnd)
 	u.filterLabel.SetMaxWidthChars(28)
@@ -663,7 +684,10 @@ func (c *Chooser) key(r *widget.Router, keycode uint32) {
 	case keyEscape:
 		c.escape()
 	case keySpace:
-		if _, typing := r.Focused().(*widget.Entry); !typing {
+		switch r.Focused().(type) {
+		case *widget.Entry, *widget.SearchEntry:
+			// Space types into a text field.
+		default:
 			c.toggleQuicklook()
 		}
 	}
@@ -816,10 +840,9 @@ func (c *Chooser) setSearch(query string) {
 // subfolder toggles.
 func (c *Chooser) restartSearch() { c.setSearch(c.s.search) }
 
-func (c *Chooser) toggleHidden() {
-	c.hidden = !c.hidden
-	c.s.hidden = c.hidden
-	c.ui.hiddenTg.SetState(widget.StateChecked, c.hidden)
+func (c *Chooser) toggleHidden(on bool) {
+	c.hidden = on
+	c.s.hidden = on
 	if c.s.searching() {
 		c.restartSearch()
 		return
@@ -828,10 +851,9 @@ func (c *Chooser) toggleHidden() {
 	c.relist()
 }
 
-func (c *Chooser) toggleRecursive() {
-	c.recursive = !c.recursive
-	c.s.recursive = c.recursive
-	c.ui.recursiveToggle.SetState(widget.StateChecked, c.recursive)
+func (c *Chooser) toggleRecursive(on bool) {
+	c.recursive = on
+	c.s.recursive = on
 	c.restartSearch()
 }
 
@@ -842,10 +864,8 @@ func (c *Chooser) toggleView() {
 	c.relist()
 }
 
-func (c *Chooser) togglePreview() {
-	on := !c.ui.preview.Visible()
+func (c *Chooser) togglePreview(on bool) {
 	c.ui.preview.SetVisible(on)
-	c.ui.previewToggle.SetState(widget.StateChecked, on)
 	c.refreshPreview()
 }
 
@@ -883,11 +903,11 @@ func (c *Chooser) updateSortLabels() {
 	}
 }
 
-func (c *Chooser) toggleFilterPopup() { c.setFilterPopup(!c.ui.filterPopup.Visible()) }
-
+// setFilterPopup shows or hides the filter list with the filter
+// toggle's state (set_active), from the toggle or a choice.
 func (c *Chooser) setFilterPopup(on bool) {
 	c.ui.filterPopup.SetVisible(on)
-	c.ui.filterButton.SetState(widget.StateChecked, on)
+	c.ui.filterButton.SetActive(on)
 }
 
 func (c *Chooser) selectFilter(i int) {

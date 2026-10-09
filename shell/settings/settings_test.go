@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/recorder"
+	"github.com/stubbedev/wayle/shell/treetest"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -575,6 +576,9 @@ func (f *fakePickers) color(initial render.Color, fn func(render.Color)) {
 func (f *fakePickers) openFile(fn func(string)) { f.fileFn = fn }
 
 func TestFontEditorPicksAFamily(t *testing.T) {
+	// The search is a gtk::SearchEntry; its search-changed delay runs
+	// instantly here.
+	defer widget.SetAnimationsInstant(true)()
 	k := testKit(t, "")
 	f := &fakePickers{}
 	k.pickers = f
@@ -594,6 +598,11 @@ func TestFontEditorPicksAFamily(t *testing.T) {
 	p := c.picker
 	if p == nil || p.root != picker {
 		t.Fatal("the picker tree is not the popover content")
+	}
+	// The font picker searches through a gtk::SearchEntry, the icon
+	// picker through a plain entry (font/picker.rs, icon/mod.rs).
+	if !p.spec.searchEntry || len(treetest.All[*widget.SearchEntry](picker)) != 1 {
+		t.Error("the font picker's search is not a search entry")
 	}
 	// A new filter resets the list (rows, scroll and selection).
 	p.list.Select(2)
