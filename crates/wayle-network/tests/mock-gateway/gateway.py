@@ -353,6 +353,7 @@ class Gateway(BaseHTTPRequestHandler):
 def main() -> None:
     port = int(os.environ.get("PORT", "8443"))
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(
         os.path.join(HERE, "gateway.crt"), os.path.join(HERE, "gateway.key")
     )
