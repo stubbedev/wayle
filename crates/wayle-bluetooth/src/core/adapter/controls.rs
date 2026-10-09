@@ -22,7 +22,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "set alias",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -38,7 +38,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "set connectable",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -54,7 +54,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "set powered",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -70,7 +70,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "set discoverable",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -86,7 +86,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "set discoverable timeout",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -102,7 +102,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "set pairable",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -118,7 +118,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "set pairable timeout",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -134,7 +134,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "set discovery filter",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -149,7 +149,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "start discovery",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -164,7 +164,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "stop discovery",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -180,7 +180,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "remove device",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -195,7 +195,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "get discovery filters",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -211,7 +211,7 @@ impl AdapterControls {
             .await
             .map_err(|source| Error::AdapterOperation {
                 operation: "connect device",
-                source,
+                source: Box::new(source),
             })
     }
 }

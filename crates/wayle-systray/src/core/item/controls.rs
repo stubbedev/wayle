@@ -28,7 +28,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "provide_xdg_activation_token",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -51,7 +51,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "context_menu",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -80,7 +80,7 @@ impl TrayItemController {
             }
             Error::Operation {
                 operation: "activate",
-                source,
+                source: Box::new(source),
             }
         })
     }
@@ -104,7 +104,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "secondary_activate",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -131,7 +131,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "scroll",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -152,7 +152,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "menu_about_to_show",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -177,7 +177,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "menu_event",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -199,7 +199,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "menu_about_to_show_group",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -221,7 +221,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "menu_event_group",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -244,7 +244,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "menu_get_property",
-                source,
+                source: Box::new(source),
             })
     }
 
@@ -272,7 +272,7 @@ impl TrayItemController {
             .await
             .map_err(|source| Error::Operation {
                 operation: "menu_get_group_properties",
-                source,
+                source: Box::new(source),
             })
     }
 }
