@@ -27,7 +27,7 @@ pub enum Error {
         service: String,
         /// Underlying D-Bus error.
         #[source]
-        source: zbus::Error,
+        source: Box<zbus::Error>,
     },
 
     /// Menu operation failed.
@@ -37,7 +37,7 @@ pub enum Error {
         service: String,
         /// Underlying D-Bus error.
         #[source]
-        source: zbus::Error,
+        source: Box<zbus::Error>,
     },
 
     /// Icon data parsing failed.
@@ -67,7 +67,7 @@ pub enum Error {
         operation: &'static str,
         /// Underlying D-Bus error.
         #[source]
-        source: zbus::Error,
+        source: Box<zbus::Error>,
     },
 
     /// Tray item does not support the requested activation method.
@@ -84,4 +84,45 @@ pub enum Error {
     /// ZVariant conversion error.
     #[error("zvariant conversion failed")]
     ZVariant(#[from] zbus::zvariant::Error),
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error as _;
+
+    use super::*;
+
+    #[test]
+    fn boxed_zbus_source_keeps_display_and_source_chain() {
+        let err = Error::Operation {
+            operation: "activate",
+            source: Box::new(zbus::Error::Failure("bus gone".into())),
+        };
+        assert_eq!(err.to_string(), "cannot perform tray operation 'activate'");
+        let source = err.source().expect("the zbus error stays the source");
+        assert!(source.to_string().contains("bus gone"), "{source}");
+    }
+
+    #[test]
+    fn plain_variant_has_no_source() {
+        assert!(
+            Error::OperationNotSupported {
+                operation: "activate"
+            }
+            .source()
+            .is_none()
+        );
+    }
+
+    /// zbus >= 5.14 grew `zbus::Error`; carried unboxed next to context
+    /// fields it pushed `Error` past clippy's `result_large_err` threshold
+    /// (128 bytes), which every `Result<_, Error>` in the crate tripped.
+    #[test]
+    fn error_stays_within_result_large_err_threshold() {
+        assert!(
+            std::mem::size_of::<Error>() <= 128,
+            "{}",
+            std::mem::size_of::<Error>()
+        );
+    }
 }

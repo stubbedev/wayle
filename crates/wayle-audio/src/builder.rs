@@ -102,7 +102,7 @@ impl AudioServiceBuilder {
                 .await
                 .map_err(|source| Error::DbusObjectRegistrationFailed {
                     path: SERVICE_PATH,
-                    source,
+                    source: Box::new(source),
                 })?;
 
             connection
@@ -110,7 +110,7 @@ impl AudioServiceBuilder {
                 .await
                 .map_err(|source| Error::DbusNameAcquisitionFailed {
                     name: SERVICE_NAME,
-                    source,
+                    source: Box::new(source),
                 })?;
 
             info!("Audio service registered at {SERVICE_NAME}");
