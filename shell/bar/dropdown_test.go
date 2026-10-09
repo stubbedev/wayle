@@ -3,9 +3,9 @@ package bar
 import (
 	"testing"
 
-	"github.com/neurlang/wayland/wl"
 	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/gelm/third_party/neurlang-wayland/wl"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"

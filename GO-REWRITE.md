@@ -251,16 +251,16 @@ wired in); both gates green. What remains, in the order to work it:
      side through DoAction.
    - Captured so far (in /tmp/parity/shots, gone at reboot): 14
      Rust panels + 15 Go panels, each a PNG plus the bar's tree.
-   - Closed since: keyboard-input follows sway, niri, and mango as
+   - Closed since: bar buttons carry their label as the accessible
+     name (gelm 7634ef3: embedded controls keep the derived name);
+     keyboard-input follows sway, niri, and mango as
      the Rust sources do; the pulse "needs PULSE_SERVER" finding was
      the kiosk's private XDG_RUNTIME_DIR — libpulse (pactl) fails
      there identically — and the native client now tries libpulse's
      whole default list (PULSE_RUNTIME_PATH, the per-user socket,
      the system socket).
    - **Findings already on file from the trees** (fix with tests,
-     then re-capture): Go bar buttons expose empty accessible names
-     (Rust names them by their label text — gelm A11y name never set
-     on the bar toggle); bar geometry differs broadly
+     then re-capture): bar geometry differs broadly
      (Rust center group 229px — clock 167 + 58 — against Go's 176 —
      123 + 53; the right group 542px against ~640), which needs the
      per-button/per-panel diff pass to split into font resolution,
@@ -286,9 +286,10 @@ wired in); both gates green. What remains, in the order to work it:
    Go panel's `ClickAt` pops instantly; play the exit first), and the
    card-height tween on stack page switches (dropdown\_resize.rs;
    only the network stack opts in today via interpolate-size).
-4. **Modal AlertDialog** for network VPN delete and treeman reset —
-   needs a gelm/app modal; until then the in-form confirm panes
-   stand in (kept deliberately, classed per the CSS that exists).
+4. [x] **Modal AlertDialog** for network VPN delete and treeman
+   reset: gelm's modal Dialog (shell/bar/alertdialog.go), cancel the
+   default and the Esc answer; the open dropdown closes first, as
+   GTK's popover loses its grab to the dialog.
 5. **Icon-theme reload reaching open dropdowns** — the Rust watchers
    rebuild on `icon-source` change; wayle's ModuleContext would need
    a config-watch hook (config.Watch), not a gelm change.
@@ -510,8 +511,6 @@ workaround list anymore; new toolkit needs go straight into gelm.
 
 ## Known deviations from the Rust shell
 
-- The launcher's message line shows its markup's text, wrapped (gelm's
-  wrapping label is plain).
 - Workspace modules re-query the compositor on each relevant event
   instead of folding events into a local state; the rendered result is
   the same.

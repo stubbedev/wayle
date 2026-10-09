@@ -20,8 +20,6 @@ github.com/mattn/go-isatty v0.0.24 h1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsRe
 github.com/mattn/go-isatty v0.0.24/go.mod h1:nMCL3Zebbrt45jsMDgnfIwz6ydEQApk5oEI3HqDio6A=
 github.com/ncruces/go-strftime v1.0.0 h1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=
 github.com/ncruces/go-strftime v1.0.0/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
-github.com/neurlang/wayland v0.4.4 h1:OilGHhlFTi1eP2WMbR4lF6QAVrimHcAhO2g/Gt/c+hs=
-github.com/neurlang/wayland v0.4.4/go.mod h1:ZPUsmrcHQDH9q26qvwrrlCJpo4HjfNiAZvbbWrLMMBo=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
@@ -30,8 +28,8 @@ github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c h1:km8GpoQut05eY3GiY
 github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c/go.mod h1:cNQ3dwVJtS5Hmnjxy6AgTPd0Inb3pW05ftPSX7NZO7Q=
 github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef h1:Ch6Q+AZUxDBCVqdkI8FSpFyZDtCVBc2VmejdNrm5rRQ=
 github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef/go.mod h1:nXTWP6+gD5+LUJ8krVhhoeHjvHTutPxMYl5SvkcnJNE=
-github.com/stubbedev/gelm v0.0.0-20261008043552-f14e5c6fd256 h1:4i/acrKtjivDfTUZdUHXgR40aeYYGn1AAlyiusXN5pI=
-github.com/stubbedev/gelm v0.0.0-20261008043552-f14e5c6fd256/go.mod h1:BmxqgHPelsodxgt3W2LA/LL5s1yIuSWbF4ezAcIOjeo=
+github.com/stubbedev/gelm v0.0.0-20261009044520-ec53dc6b297e h1:5XF7aJXNb+6TnkeJ/4eMaWjvwg9qHurd4OgvkX+CV+I=
+github.com/stubbedev/gelm v0.0.0-20261009044520-ec53dc6b297e/go.mod h1:S25GMcxwM4AmcAhW35cPzRC7mAye5EsZTnbgHi4s7d8=
 github.com/unxed/xkb-go v0.1.8 h1:hqPI2wJw2LQ7YOqghNYat/TJF3pFamCCPjhxI5I3lhU=
 github.com/unxed/xkb-go v0.1.8/go.mod h1:V3LaLLiIMPBQCGnPfTYN8gER39XW26AZBYeXkkZ/GWQ=
 github.com/yalue/native_endian v1.0.2 h1:e4SxBbaCoOOO4E3axd7FSriUhzc1bIzqZGG5jl6Evbg=

@@ -237,6 +237,28 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	return nil
 }
 
+// closeAll dismisses every open dropdown, each playing its exit.
+func (r *dropdownRegistry) closeAll() {
+	r.mu.Lock()
+	type open struct {
+		pop *app.Popover
+		rev *widget.Revealer
+	}
+	var closing []open
+	for connector, pop := range r.openPop {
+		if pop != nil && !pop.Closed() {
+			closing = append(closing, open{pop, r.openRev[connector]})
+		}
+		delete(r.openPop, connector)
+		delete(r.openRev, connector)
+		delete(r.openName, connector)
+	}
+	r.mu.Unlock()
+	for _, o := range closing {
+		dismissAnimated(o.pop, o.rev, r.cfg.Animations)
+	}
+}
+
 // dismissAnimated is animate_out: the card plays its exit, then the
 // popover goes. Only this programmatic close animates; a click-away or
 // Esc closes at once, the compositor's grab having no exit hook.

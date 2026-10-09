@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -26,6 +27,19 @@ const appID = "com.wayle.settings"
 // (main.rs). A config that cannot load is an error: the window edits
 // it, so there is nothing to show without it.
 func Run() error {
+	// raise is set once the window exists; forwarded launches buffer
+	// until Bind, after it.
+	var raise func()
+	ins, primary, err := claimInstance(app.OSInvocation(os.Args[1:]), func() { raise() })
+	switch {
+	case err != nil:
+		// No socket for the guard: run anyway, as GApplication does
+		// without a bus.
+		log.Printf("settings: single instance: %v", err)
+	case !primary:
+		// The running window was raised in this launch's stead.
+		return nil
+	}
 	svc, err := config.Open()
 	if err != nil {
 		return fmt.Errorf("cannot load config: %w", err)
@@ -72,6 +86,13 @@ func Run() error {
 		return fmt.Errorf("settings: window: %w", err)
 	}
 	w.onClose = win.Close
+	if ins != nil {
+		// A second launch raises this window (connect_activate's
+		// present): its activation token focuses it when the launcher
+		// gave one, else the window asks for attention.
+		raise = win.RequestAttention
+		ins.Bind(application)
+	}
 	k.pickers = windowPickers{app: application, win: win, theme: theme}
 	w.onResetAll = func() { confirmResetAll(application, win, k, theme) }
 
@@ -98,18 +119,38 @@ func confirmResetAll(application *app.Application, parent *app.Window, k *kit, t
 	}
 	content := confirmContent(k, resetAllConfirm(), respond)
 	theme.Attach(content)
-	d, err := application.NewDialog(parent, app.DialogConfig{
-		Title: resetAllConfirm().title, Content: content, Bare: true, Background: theme.RenderPalette().Surface,
+	d, err := application.NewDialog(parent, resetAllDialog(k, content, theme.RenderPalette().Surface))
+	if err != nil {
+		log.Printf("settings: reset-all dialog: %v", err)
+	}
+}
+
+// resetAllDialog declares the reset-all confirm: modal like
+// ConfirmModal (set_modal), Esc cancelling, only the confirm response
+// resetting.
+func resetAllDialog(k *kit, content widget.Widget, background render.Color) app.DialogConfig {
+	return app.DialogConfig{
+		Title: resetAllConfirm().title, Content: content, Bare: true, Background: background,
+		Modal:          true,
 		CancelResponse: responseCancel,
 		OnResponse: func(r string) {
 			if r == responseConfirm {
 				k.store.resetAll()
 			}
 		},
-	})
-	if err != nil {
-		log.Printf("settings: reset-all dialog: %v", err)
 	}
+}
+
+// claimInstance is the com.wayle.settings single-instance guard
+// (set_application_id): the first launch is the primary, a later one
+// forwards its invocation and exits.
+// onRelaunch runs on the loop for each later launch.
+func claimInstance(inv app.Invocation, onRelaunch func()) (*app.Instance, bool, error) {
+	return app.ClaimInstance(app.InstanceConfig{
+		AppID:         appID,
+		OnCommandLine: func([]string, string) { onRelaunch() },
+		OnOpen:        func([]string, string) { onRelaunch() },
+	}, inv)
 }
 
 // windowPickers opens the editors' popovers and dialogs over the

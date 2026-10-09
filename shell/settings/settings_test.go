@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/transfer"
 	"github.com/stubbedev/gelm/widget"
@@ -420,7 +421,17 @@ func TestResetAllConfirmation(t *testing.T) {
 	if len(got) != 2 || got[0] != responseCancel || got[1] != responseConfirm {
 		t.Errorf("responses %v", got)
 	}
-	k.store.resetAll()
+	// The dialog is modal (ConfirmModal's set_modal) and Esc cancels;
+	// cancelling keeps the overrides, only confirming drops them.
+	cfg := resetAllDialog(k, content, 0)
+	if !cfg.Modal || cfg.CancelResponse != responseCancel || !cfg.Bare {
+		t.Errorf("dialog modal %v cancel %q bare %v, want a modal bare dialog Esc cancels", cfg.Modal, cfg.CancelResponse, cfg.Bare)
+	}
+	cfg.OnResponse(responseCancel)
+	if k.store.svc.Source("osd.enabled") == config.SourceDefault {
+		t.Error("cancelling reset the overrides")
+	}
+	cfg.OnResponse(responseConfirm)
 	if k.store.svc.Source("osd.enabled") != config.SourceDefault {
 		t.Error("reset-all kept an override")
 	}
@@ -1858,4 +1869,24 @@ func TestLayoutEditorRefresh(t *testing.T) {
 	if len(c.list.Children()) != 2 || c.layouts[1].Monitor != "HDMI-1" {
 		t.Errorf("an outside change: %d cards", len(c.list.Children()))
 	}
+}
+
+// A second launch finds the first window's guard and forwards to it
+// instead of opening another window; once the first is gone, a launch
+// is the primary again.
+func TestSettingsIsSingleInstance(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	first, primary, err := claimInstance(app.Invocation{}, func() {})
+	if err != nil || !primary {
+		t.Fatalf("first launch: primary %v, %v", primary, err)
+	}
+	if _, primary, err := claimInstance(app.Invocation{}, func() {}); err != nil || primary {
+		t.Fatalf("second launch: primary %v, %v; want it to forward", primary, err)
+	}
+	first.Close()
+	again, primary, err := claimInstance(app.Invocation{}, func() {})
+	if err != nil || !primary {
+		t.Fatalf("after the first closed: primary %v, %v", primary, err)
+	}
+	again.Close()
 }

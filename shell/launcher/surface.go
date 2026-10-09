@@ -766,12 +766,12 @@ func (s *Surface) rebuildTabs(names []string, activeMode int) {
 	}
 }
 
-// messageText is the message line's text: the markup's text, since the
-// line wraps and gelm's wrapping label is plain (a known deviation: the
-// Rust line renders the markup's weights and colors).
-func messageText(markup string) string {
-	if text, ok := pango.PlainText(markup); ok {
-		return text
+// messageMarkup is the message line's markup in gelm's dialect: the
+// Pango markup translated, its weights and colors kept; markup that
+// does not parse shows as the literal text, like a row's.
+func messageMarkup(markup string) string {
+	if translated, ok := pango.Translate(markup); ok {
+		return translated
 	}
-	return markup
+	return pango.Escape(markup)
 }

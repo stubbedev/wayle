@@ -313,3 +313,19 @@ func TestBarButtonKeepsTheModulesClasses(t *testing.T) {
 		t.Error("the refresh dropped the module's class")
 	}
 }
+
+// The bar toggle is named by its label for assistive technology, as
+// GTK names the Rust shell's menu button; a button with no label has
+// no name to give.
+func TestBarToggleAccessibleNameIsItsLabel(t *testing.T) {
+	cfg := config.Defaults()
+	b := newBarButton(newTestContext(t, cfg), widget.NewThemeIcon("x", 16), widget.NewLabel(testFont(t), 12, "12:30", 0))
+	st := widget.Describe(b.toggle)
+	if st.Role != widget.RoleButton || st.Name != "12:30" {
+		t.Errorf("toggle = %s %q, want a button named by its label", st.Role, st.Name)
+	}
+	bare := newBarButtonAround(newTestContext(t, cfg), widget.NewBox(widget.Row, 0, 0))
+	if got := widget.Describe(bare.toggle).Name; got != "" {
+		t.Errorf("label-less toggle name = %q, want none", got)
+	}
+}

@@ -422,7 +422,7 @@ type vpnPicker struct {
 // WireGuard, imports a wg-quick file; the scrolled body holds the name,
 // the type picker (creating only: another type is another profile),
 // the kind's fields, and the raw editor; the footer holds the error and
-// Delete (inline-confirmed), Cancel, Save.
+// Delete (confirmed in a modal alert), Cancel, Save.
 type netVPNForm struct {
 	*widget.Box
 	v          *networkView
@@ -447,8 +447,9 @@ type netVPNForm struct {
 	errLabel   *widget.Label
 	actions    *widget.Box
 	deleteBtn  *widget.Button
-	confirm    *widget.Box
-	confirmMsg *widget.Label
+	// confirming is confirming_delete: the alert is up, a second
+	// Delete click asks nothing more.
+	confirming bool
 }
 
 func newNetVPNForm(v *networkView) *netVPNForm {
@@ -513,28 +514,6 @@ func newNetVPNForm(v *networkView) *netVPNForm {
 	f.actions.Append(v.primaryText(i18n.T("dropdown-network-vpn-save"), "network-password-connect", f.save), false)
 	f.Append(f.actions, false)
 
-	// A profile is recoverable from nowhere else (a WireGuard private key
-	// lives only in NM), so Delete asks first, in place of the buttons.
-	f.confirm = widget.NewBox(widget.Column, 0, 0)
-	f.confirm.AddClass("network-vpn-delete-confirm")
-	f.confirmMsg = widget.NewLabel(v.font, v.px*0.9, "", 0)
-	f.confirmMsg.SetWrap(true)
-	f.confirmMsg.AddClass("network-password-name")
-	f.confirm.Append(f.confirmMsg, false)
-	detail := widget.NewLabel(v.font, v.px*0.8, i18n.T("dropdown-network-vpn-delete-confirm-detail"), 0)
-	detail.SetWrap(true)
-	detail.AddClass("network-secret-message")
-	f.confirm.Append(detail, false)
-	buttons := widget.NewBox(widget.Row, 0, 0)
-	buttons.Append(widget.NewSpacer(0, 0), true)
-	buttons.Append(v.ghostText(i18n.T("dropdown-network-cancel"), "network-vpn-delete-dismiss", f.dismissDelete), false)
-	really := v.ghostText(i18n.T("dropdown-network-vpn-delete"), "network-vpn-delete-confirmed", f.confirmDelete)
-	really.RemoveClass("ghost")
-	really.AddClass("danger")
-	buttons.Append(really, false)
-	f.confirm.Append(buttons, false)
-	f.Append(f.confirm, false)
-	f.setConfirming(false)
 	return f
 }
 
@@ -574,7 +553,6 @@ func (f *netVPNForm) open(uuid, name, kind string, values map[string]string) {
 	f.kinds = kindsWith(kinds, kind)
 	f.selected = max(0, slices.IndexFunc(f.kinds, func(k network.VPNKind) bool { return k.ID == kind }))
 	f.editing = uuid
-	f.setConfirming(false)
 	f.setError("")
 	f.name.SetText(name)
 	labels := make([]string, len(f.kinds))
@@ -803,34 +781,30 @@ func (f *netVPNForm) setError(reason string) {
 }
 
 func (f *netVPNForm) cancel() {
-	f.setConfirming(false)
 	f.v.vpnCloseForm()
 }
 
-func (f *netVPNForm) setConfirming(on bool) {
-	f.confirm.SetVisible(on)
-	f.actions.SetVisible(!on)
-}
-
-func (f *netVPNForm) confirming() bool { return f.confirm.Visible() }
-
-// askDelete is DeleteClicked: nothing goes until it is confirmed.
+// askDelete is confirm_delete: a profile is recoverable from nowhere
+// else (a WireGuard private key lives only in NM), so Delete asks in a
+// modal alert - Cancel the default - and nothing goes until it is
+// accepted.
 func (f *netVPNForm) askDelete() {
-	if f.editing == "" {
+	if f.editing == "" || f.confirming {
 		return
 	}
-	f.confirmMsg.SetText(i18n.T("dropdown-network-vpn-delete-confirm", i18n.Str("name", f.name.Text())))
-	f.setConfirming(true)
-}
-
-func (f *netVPNForm) dismissDelete() { f.setConfirming(false) }
-
-func (f *netVPNForm) confirmDelete() {
-	if !f.confirming() || f.editing == "" {
-		return
-	}
-	f.setConfirming(false)
-	f.v.vpnDelete(f.editing)
+	f.confirming = true
+	uuid := f.editing
+	f.v.ctx.showAlert(alertSpec{
+		message: i18n.T("dropdown-network-vpn-delete-confirm", i18n.Str("name", f.name.Text())),
+		detail:  i18n.T("dropdown-network-vpn-delete-confirm-detail"),
+		cancel:  i18n.T("dropdown-network-cancel"),
+		accept:  i18n.T("dropdown-network-vpn-delete"),
+	}, func(accepted bool) {
+		f.confirming = false
+		if accepted {
+			f.v.vpnDelete(uuid)
+		}
+	})
 }
 
 // importFile is ImportClicked: a wg-quick file through the portal's

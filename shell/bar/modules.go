@@ -94,6 +94,9 @@ type ModuleContext struct {
 	// Theme is the bar stylesheet every bar root attaches; nil in
 	// headless construction, where the tree builds unstyled.
 	Theme *apptheme.Theme
+	// Alert replaces showAlert's modal dialog (tests answer it); nil
+	// asks through the application.
+	Alert func(spec alertSpec, answer func(accepted bool))
 }
 
 // headlessLoop stands in for the loop goroutine of a headless context

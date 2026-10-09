@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -288,6 +289,10 @@ func TestErrorDialogClosesOnAnyBinding(t *testing.T) {
 	if v.inputRow.Visible() || v.frame.Visible() || !v.message.Visible() || v.message.Text() != "no network" {
 		t.Errorf("dialog: input %v list %v message %q", v.inputRow.Visible(), v.frame.Visible(), v.message.Text())
 	}
+	// The line renders the markup (its weight kept), not its text.
+	if !strings.Contains(v.message.Markup(), "<b>") {
+		t.Errorf("message markup = %q, want the bold kept", v.message.Markup())
+	}
 	if h.s.cur.act != nil {
 		t.Error("a dialog started an engine")
 	}
@@ -548,5 +553,16 @@ func TestSuperKeyBindingsParse(t *testing.T) {
 	plain, _ := app.ParseAccel("Return")
 	if _, ok := lookupKey(table, plain); ok {
 		t.Error("plain Return matched the Super binding")
+	}
+}
+
+// Markup that does not parse shows literally, not as an empty line.
+func TestMessageMarkupFallsBackToTheLiteral(t *testing.T) {
+	if got := messageMarkup(`<span color="#ff0000">late</span>`); !strings.Contains(got, "late") || !strings.Contains(got, "<span") {
+		t.Errorf("valid markup = %q, want it translated", got)
+	}
+	got := messageMarkup("<b>broken")
+	if strings.Contains(got, "<b>") || !strings.Contains(got, "broken") {
+		t.Errorf("broken markup = %q, want the escaped literal", got)
 	}
 }

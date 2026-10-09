@@ -45,8 +45,7 @@ func treemanVariant(b treeman.Bucket) string {
 
 // treemanView is the treeman dropdown: the repo list (bucket summary
 // chips over accordion repo cards of worktree rows) and a worktree's
-// detail page, plus the reset confirmation; the header's back button
-// returns to the list.
+// detail page; the header's back button returns to the list.
 type treemanView struct {
 	ctx  ModuleContext
 	font render.Font
@@ -58,13 +57,10 @@ type treemanView struct {
 	pages   *widget.Stack
 	list    *widget.Box
 	details *widget.Box
-	confirm *widget.Box
 
 	status    *treeman.Status
 	detail    string
 	collapsed map[string]bool
-	// returnTo is the page the confirmation goes back to.
-	returnTo string
 
 	once   sync.Once
 	cancel context.CancelFunc
@@ -86,17 +82,10 @@ func treemanDropdown(ctx ModuleContext) widget.Widget {
 	v.list.AddClass("treeman-list")
 	v.details = widget.NewBox(widget.Column, 0, 0)
 	v.details.AddClass("treeman-list", "treeman-detail")
-	// The reset confirmation: the stylesheet's alert primitive (the
-	// warning variant, its title and description classes) instead of an
-	// invented class. Rust shows a native modal AlertDialog; gelm has
-	// no dialog, so the dropdown keeps an in-place page.
-	v.confirm = widget.NewBox(widget.Column, 10, 4)
-	v.confirm.AddClass("alert", "warning")
 	v.pages = widget.NewStack()
 	pageSlide(v.pages, ctx.Config)
 	v.pages.Add("list", v.list)
 	v.pages.Add("detail", v.details)
-	v.pages.Add("confirm", v.confirm)
 	scroll := dropdownScroll(v.pages, "treeman-scroll")
 	// DropdownContent: the content box the stylesheet's .dropdown-content
 	// rules hang off (default ink, the section-label family).
@@ -138,9 +127,6 @@ func (v *treemanView) openDetail(path string) {
 // syncPage is sync_page: the detail page while its worktree exists,
 // else back to the list (a teardown finishing under the open page).
 func (v *treemanView) syncPage() {
-	if v.pages.Visible() == "confirm" {
-		return
-	}
 	if v.detail != "" && v.status != nil {
 		if repo, wt, ok := v.status.FindWorktree(v.detail); ok {
 			v.title.SetText(wt.Branch)
@@ -350,38 +336,20 @@ func (v *treemanView) run(action treeman.Action, path string) {
 	}()
 }
 
-// confirmReset is confirm_then_run for reset: the confirmation page
-// (the Go stand-in for the Rust AlertDialog) built on the stylesheet's
-// alert primitive the view was built with — the warning variant, its
-// title and description classes, and a danger accept button — with
-// the worktree path, Cancel and Reset.
+// confirmReset is confirm_then_run for reset: a modal alert with the
+// reset title and the worktree path, Cancel the default, and the
+// action runs only when the accept button answers.
 func (v *treemanView) confirmReset(path string) {
-	v.returnTo = v.pages.Visible()
-	v.confirm.Clear()
-	title := widget.NewLabel(v.font, v.px*1.05, i18n.T("dropdown-treeman-confirm-reset-title"), 0)
-	title.SetWrap(true)
-	title.AddClass("alert-title")
-	v.confirm.Append(title, false)
-	detail := widget.NewLabel(v.font, v.px*0.85, path, 0)
-	detail.SetWrap(true)
-	detail.AddClass("alert-description")
-	v.confirm.Append(detail, false)
-	buttons := widget.NewBox(widget.Row, 8, 0)
-	buttons.Append(widget.NewSpacer(0, 0), true)
-	cancel := widget.NewLabel(v.font, v.px, i18n.T("dropdown-treeman-confirm-cancel"), 0)
-	buttons.Append(dropdownButton(cancel, "ghost", v.endConfirm), false)
-	accept := widget.NewLabel(v.font, v.px, i18n.T("dropdown-treeman-confirm-reset-accept"), 0)
-	buttons.Append(dropdownButton(accept, "danger", func() {
-		v.endConfirm()
-		v.run(treeman.ActionReset, path)
-	}), false)
-	v.confirm.Append(buttons, false)
-	v.pages.Show("confirm")
-}
-
-func (v *treemanView) endConfirm() {
-	v.pages.Show(v.returnTo)
-	v.syncPage()
+	v.ctx.showAlert(alertSpec{
+		message: i18n.T("dropdown-treeman-confirm-reset-title"),
+		detail:  path,
+		cancel:  i18n.T("dropdown-treeman-confirm-cancel"),
+		accept:  i18n.T("dropdown-treeman-confirm-reset-accept"),
+	}, func(accepted bool) {
+		if accepted {
+			v.run(treeman.ActionReset, path)
+		}
+	})
 }
 
 // renderDetail is detail_page.

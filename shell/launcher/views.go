@@ -25,7 +25,7 @@ type views struct {
 	inputRow *widget.Box
 	prompt   *widget.Label
 	entry    *widget.Entry
-	message  *widget.Label
+	message  *widget.RichLabel
 	frame    *widget.Box
 	list     *resultList
 	tabs     *widget.Box
@@ -71,7 +71,7 @@ func (s *Surface) buildViews(a *active) *views {
 	v.inputRow.Append(v.entry, true)
 	v.surface.Append(v.inputRow, false)
 
-	v.message = widget.NewLabel(s.d.Font, fontPx, "", s.d.Ink)
+	v.message = widget.NewRichLabel(s.d.Font, fontPx, "", s.d.Ink)
 	v.message.AddClass("launcher-message")
 	v.message.SetWrap(true)
 	v.surface.Append(v.message, false)
@@ -140,7 +140,7 @@ func (v *views) setMessage(markup *string) {
 		v.message.SetVisible(false)
 		return
 	}
-	v.message.SetText(messageText(*markup))
+	v.message.SetMarkup(messageMarkup(*markup))
 	v.message.SetVisible(true)
 }
 

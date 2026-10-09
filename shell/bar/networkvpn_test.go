@@ -472,21 +472,22 @@ func TestVPNFormEditsAndDeletes(t *testing.T) {
 		t.Errorf("updated %+v: an edit must keep its UUID, kind and raw keys", u)
 	}
 
-	// Delete asks first; dismissing removes nothing.
+	// Delete asks first, in a modal alert; declining removes nothing,
+	// and a second click while it is up asks nothing more.
+	alerts := &fakeAlert{}
+	v.ctx.Alert = alerts.ask
 	f.askDelete()
-	if !f.confirm.Visible() || f.actions.Visible() || !strings.Contains(f.confirmMsg.Text(), "Corp") {
-		t.Error("delete did not ask")
+	f.askDelete()
+	if len(alerts.specs) != 1 || !strings.Contains(alerts.specs[0].message, "Corp") ||
+		alerts.specs[0].accept != i18n.T("dropdown-network-vpn-delete") {
+		t.Fatalf("alerts = %+v, want one delete question", alerts.specs)
 	}
-	f.dismissDelete()
-	if f.confirm.Visible() || !f.actions.Visible() {
-		t.Error("dismiss kept the question")
-	}
-	f.confirmDelete()
+	alerts.answers[0](false)
 	if _, _, r, _ := vpn.writes(); len(r) != 0 || v.body.Visible() != netPageEdit {
-		t.Fatal("an unconfirmed delete removed the profile")
+		t.Fatal("a declined delete removed the profile")
 	}
 	f.askDelete()
-	f.confirmDelete()
+	alerts.answers[1](true)
 	waitHeadless(t, "the remove", func() bool { _, _, r, _ := vpn.writes(); return slices.Equal(r, []string{"u1"}) })
 	if v.body.Visible() != netPageBrowse {
 		t.Error("delete did not go back")

@@ -52,11 +52,6 @@ func TestTreemanDropdownEmpty(t *testing.T) {
 	if _, ok := v.list.Children()[0].(*widget.Box); !ok || len(v.list.Children()) != 1 {
 		t.Error("no repos: want only the empty state")
 	}
-	// The reset confirmation carries the stylesheet's alert primitive,
-	// no invented class.
-	if !v.confirm.HasClass("alert") || !v.confirm.HasClass("warning") || v.confirm.HasClass("treeman-confirm") {
-		t.Errorf("confirm classes %v", v.confirm.Classes())
-	}
 }
 
 func TestTreemanDropdownListAndCollapse(t *testing.T) {
@@ -115,6 +110,8 @@ func TestTreemanDropdownDetailAndActions(t *testing.T) {
 	src := &fakeTreeman{status: treemanFixture(), ticks: make(chan struct{}, 1)}
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Treeman = src
+	alerts := &fakeAlert{}
+	ctx.Alert = alerts.ask
 	var toastMu sync.Mutex
 	var toasts []string
 	ctx.Toast = func(label, _ string) {
@@ -134,21 +131,23 @@ func TestTreemanDropdownDetailAndActions(t *testing.T) {
 		t.Errorf("fields = %d, want repo, bucket, slug, path", len(fields))
 	}
 
-	// Prepare and teardown run at once; reset asks first.
+	// Prepare and teardown run at once; reset asks first, in a modal
+	// alert naming the worktree.
 	v.run(treeman.ActionPrepare, "/w/feat")
 	v.confirmReset("/w/feat")
-	if v.pages.Visible() != "confirm" {
-		t.Fatal("reset did not ask")
+	if len(alerts.specs) != 1 || alerts.specs[0].detail != "/w/feat" ||
+		alerts.specs[0].accept != i18n.T("dropdown-treeman-confirm-reset-accept") {
+		t.Fatalf("alerts = %+v, want the reset question", alerts.specs)
 	}
-	buttons := v.confirm.Children()[2].(*widget.Box).Children()
-	buttons[1].(*widget.Button).OnClick() // cancel
+	alerts.answers[0](false) // cancel
 	if v.pages.Visible() != "detail" {
-		t.Errorf("cancel returned to %q", v.pages.Visible())
+		t.Errorf("cancel left the page at %q", v.pages.Visible())
 	}
 	v.confirmReset("/w/feat")
-	v.confirm.Children()[2].(*widget.Box).Children()[2].(*widget.Button).OnClick() // accept
+	alerts.answers[1](true) // accept
 	waitHeadless(t, "the actions", func() bool { return len(src.ran()) == 2 })
-	if got := src.ran(); !slices.Equal(got, []string{"prepare --worktree /w/feat", "db reset /w/feat"}) {
+	// Each action runs on its own goroutine: the order is not theirs.
+	if got := slices.Sorted(slices.Values(src.ran())); !slices.Equal(got, []string{"db reset /w/feat", "prepare --worktree /w/feat"}) {
 		t.Errorf("ran = %q", got)
 	}
 
