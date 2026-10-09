@@ -115,9 +115,11 @@ notify = "8"
 # Launcher fuzzy matching: Helix's matcher — multithreaded, incremental,
 # streaming injector, fzf pattern syntax (tokenize/negation/prefix built in).
 nucleo = "0.5"
-# pam 0.7 pins pam-sys 0.5 which ships prebuilt bindings (no bindgen/libclang
-# at build time, unlike 0.8's pam-sys 1.0-alpha).
-pam = "0.7"
+# PAM wrapper. nonstick sits on libpam-sys, which ships pre-generated
+# bindings (no bindgen/libclang at build time), and unlike the `pam` crate
+# it does not pull in the unmaintained `users` crate — that carries two
+# RustSec advisories with no patched release.
+nonstick = "0.1"
 palette = "0.7"
 png = "0.18"
 rand = "0.9.2"

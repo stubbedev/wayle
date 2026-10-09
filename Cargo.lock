@@ -1208,7 +1208,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1765,7 +1765,7 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps 9.0.0",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2904,6 +2904,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
+name = "libpam-sys"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "114545207fdd55a59a967d9d974960007fce62f6f075f2414bea2589091253f6"
+dependencies = [
+ "libc",
+ "libpam-sys-helpers",
+ "libpam-sys-impls",
+]
+
+[[package]]
+name = "libpam-sys-helpers"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8790428ad4abc1112412a63c780337b5cd050fc90d497bdea96e8e2e029323a9"
+dependencies = [
+ "libpam-sys-impls",
+]
+
+[[package]]
+name = "libpam-sys-impls"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa3007a9936a126c31a182569b6e9a6203f0ac79313a42c136a2421685fd81cb"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "libpulse-binding"
 version = "2.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3260,6 +3289,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nonstick"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de28bc5222f0f8495fdf5134dd91b7dc880bfdc1fa0646499d80c13d7ebbbd46"
+dependencies = [
+ "bitflags 2.13.2",
+ "libc",
+ "libpam-sys",
+ "libpam-sys-helpers",
+ "libpam-sys-impls",
+]
+
+[[package]]
 name = "noop_proc_macro"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3307,7 +3349,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3475,26 +3517,6 @@ name = "palette_math"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e6eb142958d64335fb0e345c5b9ead2ecd6fc438c307e9d7d3c4fd428dbaf12"
-
-[[package]]
-name = "pam"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa2bdc959c201c047004a1420a92aaa1dd1a6b64d5ef333aa3a4ac764fb93097"
-dependencies = [
- "libc",
- "pam-sys",
- "users",
-]
-
-[[package]]
-name = "pam-sys"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd4858311a097f01a0006ef7d0cd50bca81ec430c949d7bf95cbefd202282434"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "pango"
@@ -3929,7 +3951,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4416,7 +4438,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4473,7 +4495,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5154,7 +5176,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5721,15 +5743,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "users"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fed7d0912567d35f88010c23dbaf865e9da8b5227295e8dc0f2fdd109155ab7"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "usvg"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6120,7 +6133,7 @@ dependencies = [
 name = "wayle-auth"
 version = "0.8.53"
 dependencies = [
- "pam",
+ "nonstick",
  "serde",
  "serde_json",
  "tracing",
@@ -7082,7 +7095,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

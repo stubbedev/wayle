@@ -8,7 +8,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-pam.workspace = true
+nonstick.workspace = true
 zeroize.workspace = true
 tracing.workspace = true
 serde.workspace = true

@@ -7,15 +7,18 @@
 
 use std::{
     cell::RefCell,
-    ffi::{CStr, CString},
+    ffi::{OsStr, OsString},
     io::{Read, Write},
     os::unix::net::UnixStream,
     time::Duration,
 };
 
-use pam::Converse;
+use nonstick::{
+    AuthnFlags, ConversationAdapter, ErrorCode, Result as PamResult, Transaction,
+    TransactionBuilder,
+};
 use tracing::warn;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 use crate::{AuthConversation, AuthPrompt};
 
@@ -135,20 +138,29 @@ impl AuthConversation for PamAuth {
         let captured: RefCell<Option<Zeroizing<String>>> = RefCell::new(None);
         let converse = PamConverse {
             username,
-            ask,
+            ask: RefCell::new(ask),
             captured: &captured,
         };
 
-        let mut authenticator = pam::Authenticator::with_handler(&self.service, converse)
+        let mut transaction = TransactionBuilder::new_with_service(&self.service)
+            .build(converse.into_conversation())
             .map_err(|err| {
                 warn!(service = %self.service, error = %err, "auth: could not start PAM transaction");
                 format!("could not start PAM transaction: {err}")
             })?;
 
-        authenticator.authenticate().map_err(|err| {
-            warn!(service = %self.service, error = %err, "auth: PAM authentication failed");
-            format!("authentication failed: {err}")
-        })?;
+        transaction
+            .authenticate(AuthnFlags::empty())
+            .map_err(|err| {
+                warn!(service = %self.service, error = %err, "auth: PAM authentication failed");
+                format!("authentication failed: {err}")
+            })?;
+        transaction
+            .account_management(AuthnFlags::empty())
+            .map_err(|err| {
+                warn!(service = %self.service, error = %err, "auth: PAM account check failed");
+                format!("account check failed: {err}")
+            })?;
 
         // Authenticated: unlock the gnome-keyring login collection with the
         // same password (best-effort; never fails the unlock). Needed because
@@ -160,44 +172,45 @@ impl AuthConversation for PamAuth {
     }
 }
 
-/// Bridges PAM's [`Converse`] callbacks to an [`AuthConversation`] `ask`
-/// closure. Holds the conversation only for the duration of a single
+/// Bridges PAM's [`ConversationAdapter`] callbacks to an [`AuthConversation`]
+/// `ask` closure. Holds the conversation only for the duration of a single
 /// [`PamAuth::run`].
 struct PamConverse<'a> {
     username: String,
-    ask: &'a mut dyn FnMut(AuthPrompt) -> Option<String>,
+    ask: RefCell<&'a mut dyn FnMut(AuthPrompt) -> Option<String>>,
     /// Last secret handed to PAM, kept so a successful auth can reuse it to
     /// unlock the login keyring. Zeroized when the `RefCell` in `run` drops.
     captured: &'a RefCell<Option<Zeroizing<String>>>,
 }
 
-impl Converse for PamConverse<'_> {
-    fn prompt_echo(&mut self, _msg: &CStr) -> Result<CString, ()> {
+impl ConversationAdapter for PamConverse<'_> {
+    fn prompt(&self, _request: impl AsRef<OsStr>) -> PamResult<OsString> {
         // Echoed prompts are the username request; answer from the known user.
-        CString::new(self.username.clone()).map_err(|_| ())
+        Ok(OsString::from(self.username.clone()))
     }
 
-    fn prompt_blind(&mut self, msg: &CStr) -> Result<CString, ()> {
-        let label = msg.to_string_lossy().into_owned();
-        let mut response = (self.ask)(AuthPrompt::Secret(label)).ok_or(())?;
-        let secret = CString::new(response.as_str()).map_err(|_| ());
+    fn masked_prompt(&self, request: impl AsRef<OsStr>) -> PamResult<OsString> {
+        let label = request.as_ref().to_string_lossy().into_owned();
+        let response = Zeroizing::new(
+            (*self.ask.borrow_mut())(AuthPrompt::Secret(label))
+                .ok_or(ErrorCode::ConversationError)?,
+        );
         // Keep a copy for the post-auth keyring unlock (Zeroizing clears it on
         // drop). Only the most recent secret is retained.
-        *self.captured.borrow_mut() = Some(Zeroizing::new(response.clone()));
-        response.zeroize();
-        secret
+        *self.captured.borrow_mut() = Some(response.clone());
+        Ok(OsString::from(response.as_str()))
     }
 
-    fn info(&mut self, msg: &CStr) {
-        let _ = (self.ask)(AuthPrompt::Info(msg.to_string_lossy().into_owned()));
+    fn info_msg(&self, message: impl AsRef<OsStr>) {
+        let _ = (*self.ask.borrow_mut())(AuthPrompt::Info(
+            message.as_ref().to_string_lossy().into_owned(),
+        ));
     }
 
-    fn error(&mut self, msg: &CStr) {
-        let _ = (self.ask)(AuthPrompt::Error(msg.to_string_lossy().into_owned()));
-    }
-
-    fn username(&self) -> &str {
-        &self.username
+    fn error_msg(&self, message: impl AsRef<OsStr>) {
+        let _ = (*self.ask.borrow_mut())(AuthPrompt::Error(
+            message.as_ref().to_string_lossy().into_owned(),
+        ));
     }
 }
 
