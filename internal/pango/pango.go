@@ -18,7 +18,7 @@ type frame struct {
 	close string
 }
 
-// Translate converts Pango markup into gelm markup (b, i, span
+// Translate converts Pango markup into gelm markup (b, i, u, s, span
 // color). It reports false for markup Pango itself would reject: a
 // stray or mismatched tag, an unknown element, a broken entity.
 func Translate(markup string) (string, bool) {
@@ -173,11 +173,16 @@ func translateTag(name, attrs string) (string, string, bool) {
 		return "<b>", "</b>", true
 	case "i":
 		return "<i>", "</i>", true
+	case "u", "s":
+		if strings.TrimSpace(attrs) != "" {
+			return "", "", false
+		}
+		return "<" + name + ">", "</" + name + ">", true
 	case "span":
 		return spanTag(attrs)
 	}
-	// markup, big, small, s, sub, sup, tt, u: the text stays, the
-	// styling has no gelm counterpart.
+	// markup, big, small, sub, sup, tt: the text stays, the styling has
+	// no gelm counterpart.
 	return "", "", strings.TrimSpace(attrs) == ""
 }
 
@@ -201,6 +206,14 @@ func spanTag(attrs string) (string, string, bool) {
 	if s, ok := firstOf(values, "style", "font_style", "font-style"); ok && (s == "italic" || s == "oblique") {
 		open += "<i>"
 		closing = "</i>" + closing
+	}
+	if u, ok := firstOf(values, "underline"); ok && u != "none" {
+		open += "<u>"
+		closing = "</u>" + closing
+	}
+	if st, ok := firstOf(values, "strikethrough"); ok && st == "true" {
+		open += "<s>"
+		closing = "</s>" + closing
 	}
 	return open, closing, true
 }

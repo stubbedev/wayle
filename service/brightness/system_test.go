@@ -145,7 +145,13 @@ func TestDRMHotplugRescansAndTicks(t *testing.T) {
 	}
 	defer stop()
 	waitFor(t, "the initial DDC scan", func() bool { return len(ddcNames(t, sys)) == 1 })
-	<-ticks
+	// The detached initial scan ticks only when it finished after the
+	// subscription; consume that tick if it came, never wait on one
+	// that cannot (a fast scan under -race hung here).
+	select {
+	case <-ticks:
+	case <-time.After(200 * time.Millisecond):
+	}
 
 	fake.plug(t, 8, &fakeMonitor{current: 70, max: 100})
 	// A non-hotplug DRM change must not rescan.

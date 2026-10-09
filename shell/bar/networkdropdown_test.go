@@ -20,17 +20,21 @@ import (
 
 // clickAt presses and releases through a Router on target, arranged
 // under root — the real input path for a row's SetOnClickWithin and
-// its buttons.
+// its buttons. It runs on the headless loop, as input does, so a
+// refresher applying a re-read never races the layout or the click.
 func clickAt(t *testing.T, root, target widget.Widget) {
 	t.Helper()
-	root.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 400}})
-	root.Arrange(render.Rect{X: 0, Y: 0, W: 500, H: 400})
-	b := target.(widget.Boundser).Bounds()
-	p := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
-	router := &widget.Router{Root: root}
-	router.Move(p)
-	router.Press(widget.BTNLeft, p)
-	router.Release(widget.BTNLeft, p)
+	onHeadlessLoop(func() bool {
+		root.Measure(widget.Constraints{Max: widget.Size{W: 500, H: 400}})
+		root.Arrange(render.Rect{X: 0, Y: 0, W: 500, H: 400})
+		b := target.(widget.Boundser).Bounds()
+		p := widget.Point{X: b.X + b.W/2, Y: b.Y + b.H/2}
+		router := &widget.Router{Root: root}
+		router.Move(p)
+		router.Press(widget.BTNLeft, p)
+		router.Release(widget.BTNLeft, p)
+		return true
+	})
 }
 
 // fakeWifiCtl is a scripted wifiControl.
