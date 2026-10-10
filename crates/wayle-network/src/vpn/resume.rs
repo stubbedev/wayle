@@ -312,7 +312,7 @@ fn carried_over(unfinished: Vec<String>, up: Vec<String>) -> Vec<String> {
 }
 
 /// Waits for the network, then brings each recorded tunnel back.
-async fn restore(
+pub(super) async fn restore(
     connection: Connection,
     entries: Property<Vec<Arc<Vpn>>>,
     tunnels: Vec<String>,

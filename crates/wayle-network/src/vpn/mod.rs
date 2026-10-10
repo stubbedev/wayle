@@ -25,6 +25,7 @@ mod nm;
 pub(crate) mod openconnect;
 pub mod profile;
 mod resume;
+mod underlay;
 pub mod wg_keys;
 pub mod wg_quick;
 
@@ -100,6 +101,9 @@ pub struct Vpn {
     /// A restart of NetworkManager takes the tunnels down just before it goes
     /// away; this is what finds those afterwards. See [`resume`].
     went_down_at: Property<Option<Instant>>,
+    /// Whether the network under the tunnel has lost its address while the
+    /// tunnel was up: shown as reconnecting until it is back. See [`underlay`].
+    stalled: Property<bool>,
     /// Whether the tunnel is down because someone turned it off — from the
     /// dropdown, or any other NM client — rather than because something took
     /// it down. Such a tunnel is never brought back on its own.
@@ -265,6 +269,12 @@ impl VpnService {
             service.cancellation_token.child_token(),
         );
         resume::spawn_nm_restart(
+            connection.clone(),
+            service.entries.clone(),
+            service.aggregate.clone(),
+            service.cancellation_token.child_token(),
+        );
+        underlay::spawn(
             connection.clone(),
             service.entries.clone(),
             service.aggregate.clone(),
@@ -532,6 +542,7 @@ fn build_entries(
                     .map_or_else(|| Property::new(None), |vpn| vpn.went_down_at.clone()),
                 turned_off: carried
                     .map_or_else(|| Property::new(false), |vpn| vpn.turned_off.clone()),
+                stalled: carried.map_or_else(|| Property::new(false), |vpn| vpn.stalled.clone()),
                 uuid,
                 path: profile.object_path.clone(),
                 connection: connection.clone(),
