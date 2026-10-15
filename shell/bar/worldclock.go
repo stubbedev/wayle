@@ -47,6 +47,7 @@ func worldClockRender(format string, now time.Time) string {
 type worldClockModule struct {
 	ctx   ModuleContext
 	label *widget.Label
+	root  widget.Widget
 	stop  func()
 }
 
@@ -56,6 +57,7 @@ func newWorldClock(ctx ModuleContext) (Module, error) {
 	}
 	cfg := ctx.Config.WorldClock
 	m := &worldClockModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m.root = assembleModule(ctx, moduleIcon(ctx, cfg.Icon()), m.label)
 	m.apply(cfg.Format)
 	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.stop = cancel
@@ -84,9 +86,7 @@ func (m *worldClockModule) apply(format string) {
 	m.label.SetText(text)
 }
 
-func (m *worldClockModule) Root() widget.Widget {
-	return assembleModule(m.ctx, moduleIcon(m.ctx, m.ctx.Config.WorldClock.Icon()), m.label)
-}
+func (m *worldClockModule) Root() widget.Widget { return m.root }
 
 // Stop ends the render ticker.
 func (m *worldClockModule) Stop() { m.stop() }
