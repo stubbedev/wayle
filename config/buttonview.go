@@ -64,7 +64,7 @@ func (c CustomModuleDefinition) Button() ButtonConfig {
 
 // buttonView reads the key set from a section and its defaults.
 func buttonView(cur, def reflect.Value, module string) ButtonConfig {
-	return ButtonConfig{
+	b := ButtonConfig{
 		BorderShow:     keyBool(cur, "border-show", false),
 		IconShow:       keyBool(cur, "icon-show", true),
 		LabelShow:      keyBool(cur, "label-show", true),
@@ -73,7 +73,19 @@ func buttonView(cur, def reflect.Value, module string) ButtonConfig {
 		Defaults:       buttonColorsOf(def),
 		AutoIconColor:  autoIconColor(module),
 	}
+	if iconOnlyModules[module] {
+		b.IconShow, b.LabelShow = true, false
+		for _, c := range []*ButtonColors{&b.Colors, &b.Defaults} {
+			c.Label, c.ButtonBg = mustColor("fg-default"), mustColor("bg-surface-elevated")
+		}
+	}
+	return b
 }
+
+// iconOnlyModules build their BarButton without the label keys: the
+// icon always shown, the label never, on the elevated surface with the
+// default ink (the power and dashboard crates' BarButtonInit).
+var iconOnlyModules = map[string]bool{"power": true, "dashboard": true}
 
 // ModuleContainer is the bar_container view of a module section.
 func (m *ModulesConfig) ModuleContainer(name string) (ContainerConfig, bool) {

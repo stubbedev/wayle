@@ -179,3 +179,19 @@ func TestClockTableWithoutFormatKeepsTheDefault(t *testing.T) {
 		t.Error("an unknown module has a button view")
 	}
 }
+
+// power and dashboard are icon-only on the elevated surface with the
+// default ink, as their crates build the BarButton; a module with the
+// label keys keeps its own.
+func TestIconOnlyModuleButtons(t *testing.T) {
+	cfg := Defaults()
+	for _, name := range []string{"power", "dashboard"} {
+		b, ok := cfg.ModuleButton(name)
+		if !ok || b.LabelShow || !b.IconShow || b.Colors.Label != mustColor("fg-default") || b.Colors.ButtonBg != mustColor("bg-surface-elevated") {
+			t.Errorf("%s button view = %+v, want icon-only on bg-surface-elevated with fg-default", name, b)
+		}
+	}
+	if b, _ := cfg.ModuleButton("clock"); !b.LabelShow {
+		t.Error("the clock lost its label")
+	}
+}
