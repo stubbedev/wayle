@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -102,8 +103,20 @@ func TestConfirmDialogsAnswer(t *testing.T) {
 		if l := treetest.Labels(c.Root); !slices.Contains(l, "Camera") || !slices.Contains(l, "Sub\nBody") {
 			t.Errorf("labels = %q", l)
 		}
-		if c.Layer != app.LayerOverlay || c.Namespace != "wayle-portal-dialog" || c.Keyboard != app.KeyboardOnDemand {
+		// Unanchored and unsized: the compositor centers the
+		// content-sized dialog, as the GTK window is.
+		if c.Layer != app.LayerOverlay || c.Namespace != "wayle-portal-dialog" || c.Keyboard != app.KeyboardOnDemand ||
+			c.Anchor != 0 || c.Width != 0 || c.Height != 0 {
 			t.Errorf("surface = %+v", c)
+		}
+		if root, ok := c.Root.(*widget.Box); !ok || root.Element() != "window" || !widget.HasClass(root, "portal-dialog-window") {
+			t.Errorf("root %T, want window.portal-dialog-window", c.Root)
+		}
+		if !widget.HasClass(treetest.Button(t, c.Root, "Allow"), "suggested-action") || widget.HasClass(treetest.Button(t, c.Root, "Deny"), "suggested-action") {
+			t.Error("the confirm button is not the suggested action alone")
+		}
+		if icons := treetest.WithClass(c.Root, "portal-dialog-image"); len(icons) != 1 {
+			t.Errorf("%d .portal-dialog-image headers, want the permission icon", len(icons))
 		}
 		hs.do(func() { treetest.Button(t, c.Root, tc.click).OnClick() })
 		if r := <-got; r != tc.want {
@@ -215,17 +228,24 @@ func TestAppChooserFiltersAndPicks(t *testing.T) {
 	if l, ok := remember.Child().(*widget.Label); !ok || l.Text() != "Always use for this file type" || !widget.HasClass(remember, "portal-dialog-remember") {
 		t.Errorf("remember %v, want the labeled .portal-dialog-remember checkbutton", remember.Child())
 	}
-	viewer, editor := treetest.Button(t, c.Root, "Image Viewer"), treetest.Button(t, c.Root, "Text Editor")
+	list := treetest.First[*widget.ListBox](t, c.Root)
+	if !widget.HasClass(list, "portal-dialog-app-list") || list.Len() != 2 {
+		t.Fatalf("app list %v with %d rows, want the two apps in .portal-dialog-app-list", list.Classes(), list.Len())
+	}
+	if icons := treetest.WithClass(list, "portal-dialog-app-icon"); len(icons) != 2 {
+		t.Errorf("%d .portal-dialog-app-icon, want one per row", len(icons))
+	}
+	viewer, editor := list.RowAt(0), list.RowAt(1)
 	hs.do(func() { search.SetText("text") })
-	if viewer.Visible() || !editor.Visible() {
-		t.Errorf("filter: viewer %v editor %v", viewer.Visible(), editor.Visible())
+	if viewer.ChildVisible() || !editor.ChildVisible() {
+		t.Errorf("filter: viewer %v editor %v", viewer.ChildVisible(), editor.ChildVisible())
 	}
 	hs.do(func() { search.SetText("") })
-	if !viewer.Visible() {
+	if !viewer.ChildVisible() {
 		t.Error("clearing the search kept a row hidden")
 	}
 	hs.do(func() { remember.SetChecked(true) })
-	hs.do(func() { editor.OnClick() })
+	hs.do(func() { list.OnActivate(1) })
 	if id := <-got; id != "editor.desktop" {
 		t.Errorf("picked %q", id)
 	}
@@ -263,11 +283,36 @@ func TestAppChooserShortListPacksAtTheTop(t *testing.T) {
 	hs.do(func() {
 		c.Root.Measure(widget.Constraints{Max: widget.Size{W: 1280, H: 720}})
 		c.Root.Arrange(render.Rect{W: 1280, H: 720})
-		rowY = treetest.Button(t, c.Root, "Image Viewer").Bounds().Y
+		rowY = treetest.First[*widget.ListBox](t, c.Root).RowAt(0).Bounds().Y
 		scrollY = treetest.First[*widget.Scroll](t, c.Root).Bounds().Y
 	})
 	if rowY-scrollY > 8 {
 		t.Errorf("the only row sits %dpx into the list, want it at the top", rowY-scrollY)
+	}
+	hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
+	<-got
+}
+
+// A long app description ellipsizes inside the dialog instead of
+// widening it past its 420px request.
+func TestAppChooserLongDescriptionKeepsTheWidth(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "writer.desktop")
+	entry := "[Desktop Entry]\nType=Application\nName=Writer\nExec=sh\nComment=" + strings.Repeat("Create and edit text and graphics ", 6) + "\n"
+	if err := os.WriteFile(path, []byte(entry), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	long, ok := desktopentry.LoadApp("writer.desktop", path)
+	if !ok {
+		t.Fatal("entry did not load")
+	}
+	hs := newHarness(t, []desktopentry.App{long})
+	got := make(chan string, 1)
+	go func() { got <- hs.h.ChooseApplication(nil, "", "") }()
+	c := hs.open(t)
+	var w int
+	hs.do(func() { w = c.Root.Measure(widget.Constraints{Max: widget.Size{W: 2000, H: 2000}}).W })
+	if w > surfaceWidth+80 {
+		t.Errorf("dialog %dpx wide, want about its %dpx request", w, surfaceWidth)
 	}
 	hs.do(func() { treetest.Button(t, c.Root, "Cancel").OnClick() })
 	<-got

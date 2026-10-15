@@ -102,7 +102,7 @@ func (h *Dialogs) finish(ok bool, choice string) {
 func (h *Dialogs) Access(r AccessRequest) bool {
 	ok, _ := h.ask(func(answer func(bool, string)) widget.Widget {
 		detail := strings.Join(nonEmpty(r.Subtitle, r.Body), "\n")
-		return h.confirm(answer, h.icon(r.Icon, headerPx), r.Title, detail, r.DenyLabel, r.GrantLabel)
+		return h.confirm(answer, h.headerIcon(r.Icon), r.Title, detail, r.DenyLabel, r.GrantLabel)
 	})
 	return ok
 }
@@ -113,7 +113,7 @@ func (h *Dialogs) Account(reason string) bool {
 		if reason == "" {
 			reason = "An application is requesting your name and avatar."
 		}
-		return h.confirm(answer, h.file(h.d.Avatar(), headerPx), "Share account information?", reason, "Cancel", "Share")
+		return h.confirm(answer, h.headerFile(h.d.Avatar(), headerPx), "Share account information?", reason, "Cancel", "Share")
 	})
 	return ok
 }
@@ -122,7 +122,7 @@ func (h *Dialogs) Account(reason string) bool {
 func (h *Dialogs) ConfirmWallpaper(uri string) bool {
 	ok, _ := h.ask(func(answer func(bool, string)) widget.Widget {
 		path, _ := fileuri.Path(uri)
-		return h.confirm(answer, h.file(path, wallpaperPx), "Set as wallpaper?", "", "Cancel", "Set wallpaper")
+		return h.confirm(answer, h.headerFile(path, wallpaperPx), "Set as wallpaper?", "", "Cancel", "Set wallpaper")
 	})
 	return ok
 }
@@ -130,7 +130,7 @@ func (h *Dialogs) ConfirmWallpaper(uri string) bool {
 // ConfirmInstall confirms a dynamic launcher.
 func (h *Dialogs) ConfirmInstall(name, iconName string) bool {
 	ok, _ := h.ask(func(answer func(bool, string)) widget.Widget {
-		return h.confirm(answer, h.icon(iconName, headerPx), "Install “"+name+"”?", "", "Cancel", "Install")
+		return h.confirm(answer, h.headerIcon(iconName), "Install “"+name+"”?", "", "Cancel", "Install")
 	})
 	return ok
 }
@@ -172,7 +172,7 @@ func (h *Dialogs) button(text, class string, onClick func()) *widget.Button {
 }
 
 // icon is a themed icon (or an icon file), nil for none.
-func (h *Dialogs) icon(name string, px int) widget.Widget {
+func (h *Dialogs) icon(name string, px int) *widget.Icon {
 	if name == "" {
 		return nil
 	}
@@ -182,8 +182,19 @@ func (h *Dialogs) icon(name string, px int) widget.Widget {
 	return widget.NewThemeIcon(name, px)
 }
 
-// file is an image file fitted into a px square, nil for none.
-func (h *Dialogs) file(path string, px int) widget.Widget {
+// headerIcon is the header image slot showing a themed icon.
+func (h *Dialogs) headerIcon(name string) widget.Widget {
+	icon := h.icon(name, headerPx)
+	if icon == nil {
+		return nil
+	}
+	icon.AddClass("portal-dialog-image")
+	return icon
+}
+
+// headerFile is the header image slot showing an image file fitted
+// into a px square, nil for none.
+func (h *Dialogs) headerFile(path string, px int) widget.Widget {
 	if path == "" {
 		return nil
 	}
@@ -225,73 +236,54 @@ func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title
 	if body != "" {
 		rows = append(rows, h.label(body, "portal-dialog-body"))
 	}
+	confirmButton := h.button(confirm, "portal-dialog-confirm", func() { answer(true, "") })
+	confirmButton.AddClass("suggested-action")
 	rows = append(rows, h.actions(
 		h.button(cancel, "portal-dialog-cancel", func() { answer(false, "") }),
-		h.button(confirm, "portal-dialog-confirm", func() { answer(true, "") }),
+		confirmButton,
 	))
 	return h.surface(rows...)
 }
 
-// chooser lists the apps; picking one answers its id.
+// chooser lists the apps in a ListBox of icon + name rows; activating
+// one answers its id. The search hides the rows whose name lacks the
+// query (the list's filter, as set_filter_func does).
 func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, contentType string) widget.Widget {
-	list := widget.NewBox(widget.Column, 2, 0)
+	list := widget.NewListBox()
 	list.AddClass("portal-dialog-app-list")
-	type row struct {
-		name   string
-		button *widget.Button
+	names := make([]string, len(apps))
+	for i, a := range apps {
+		names[i] = strings.ToLower(a.DisplayName())
+		list.Append(h.appRow(a))
 	}
-	var rows []row
 	remember := widget.NewCheckButton(false)
 	remember.AddClass("portal-dialog-remember")
 	remember.SetChild(widget.NewLabel(h.d.Font, 13, "Always use for this file type", 0))
-	for _, a := range apps {
-		id, name := a.ID, a.DisplayName()
-		content := widget.NewBox(widget.Row, 10, 0)
-		icon := h.icon(a.Icon(), appIconPx)
-		if icon == nil {
-			icon = widget.NewThemeIcon("application-x-executable-symbolic", appIconPx)
-		}
-		content.Append(icon, false)
-		text := widget.NewBox(widget.Column, 0, 0)
-		text.Append(h.label(name, "portal-dialog-app-name"), false)
-		if desc := a.Comment(); desc != "" {
-			d := h.label(desc, "portal-dialog-app-desc")
-			d.SetWrap(false)
-			d.SetEllipsize(widget.EllipsizeEnd)
-			text.Append(d, false)
-		}
-		content.Append(text, true)
-		b := widget.NewButton(content, 6, 0)
-		b.AddClass("portal-dialog-app-row")
-		b.OnClick = func() {
-			if remember.Checked() && contentType != "" {
-				if err := h.d.SetDefault(id, contentType); err != nil {
-					log.Printf("appchooser: set-default %s for %s: %v", id, contentType, err)
-				}
+	list.OnActivate = func(i int) {
+		id := apps[i].ID
+		if remember.Checked() && contentType != "" {
+			if err := h.d.SetDefault(id, contentType); err != nil {
+				log.Printf("appchooser: set-default %s for %s: %v", id, contentType, err)
 			}
-			answer(true, id)
 		}
-		list.Append(b, false)
-		rows = append(rows, row{strings.ToLower(name), b})
+		answer(true, id)
 	}
-	// The rows pack at the top; the spacer takes the viewport's slack.
-	list.Append(widget.NewSpacer(0, 0), true)
+	query := ""
+	list.SetFilterFunc(func(r *widget.ListBoxRow) bool {
+		return query == "" || strings.Contains(names[r.Index()], query)
+	})
 	// gtk::SearchEntry: the list filters on search-changed, after the
 	// default delay.
 	search := widget.NewSearchEntry(h.d.Font, 13, "Search applications…")
 	search.AddClass("portal-dialog-search")
 	search.OnSearchChanged = func(q string) {
-		q = strings.ToLower(q)
-		for _, r := range rows {
-			r.button.SetVisible(q == "" || strings.Contains(r.name, q))
-		}
+		query = strings.ToLower(q)
+		list.InvalidateFilter()
 	}
-	// Filled, so a short list packs at the top instead of floating mid-view.
-	view := widget.NewScroll(list)
-	view.FillX, view.FillY = true, true
-	view.SetSizeRequest(0, appListHeight)
-	view.SetMaxContentHeight(appListHeight)
-	scroll := view
+	scroll := widget.NewScroll(list)
+	scroll.FillX, scroll.FillY = true, true
+	scroll.SetSizeRequest(0, appListHeight)
+	scroll.SetMaxContentHeight(appListHeight)
 	var rememberRow widget.Widget
 	if contentType != "" {
 		rememberRow = remember
@@ -305,6 +297,35 @@ func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, co
 	)
 }
 
+// appRow is app_row: the app icon and its name over the ellipsized
+// description, inset 6px by 10px.
+func (h *Dialogs) appRow(a desktopentry.App) widget.Widget {
+	row := widget.NewBox(widget.Row, 10, 0)
+	row.SetMargin(render.Insets{Top: 6, Right: 10, Bottom: 6, Left: 10})
+	icon := h.icon(a.Icon(), appIconPx)
+	if icon == nil {
+		icon = widget.NewThemeIcon("application-x-executable-symbolic", appIconPx)
+	}
+	icon.AddClass("portal-dialog-app-icon")
+	row.Append(icon, false)
+	text := widget.NewBox(widget.Column, 0, 0)
+	text.SetVAlign(widget.AlignCenter)
+	name := h.label(a.DisplayName(), "portal-dialog-app-name")
+	name.SetWrap(false)
+	text.Append(name, false)
+	if desc := a.Comment(); desc != "" {
+		// The GTK scrolled window keeps a long description from
+		// widening the dialog: it ellipsizes at the width it is given.
+		d := h.label(desc, "portal-dialog-app-desc")
+		d.SetWrap(false)
+		d.SetEllipsize(widget.EllipsizeEnd)
+		d.SetMaxWidthChars(1)
+		text.Append(d, false)
+	}
+	row.Append(text, true)
+	return row
+}
+
 // show maps the overlay with tree and plays the entry.
 func (h *Dialogs) show(tree widget.Widget) {
 	if h.win != nil {
@@ -312,8 +333,11 @@ func (h *Dialogs) show(tree widget.Widget) {
 		h.win, h.closing = nil, false
 	}
 	cfg := h.d.Config()
-	h.rev = widget.NewRevealer(widgets.Center(tree))
+	// window.portal-dialog-window > revealer > the surface, on an
+	// unanchored layer the compositor centers, sized to its content.
+	h.rev = widget.NewRevealer(tree)
 	root := widget.NewBox(widget.Column, 0, 0)
+	root.SetElement("window")
 	root.AddClass("portal-dialog-window")
 	if h.d.Sheet != nil {
 		root.AttachStylesheet(h.d.Sheet)
@@ -321,7 +345,6 @@ func (h *Dialogs) show(tree widget.Widget) {
 	root.Append(h.rev, true)
 	win, err := h.d.Open(app.LayerConfig{
 		Layer:         app.LayerOverlay,
-		Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardOnDemand,
 		Namespace:     "wayle-portal-dialog",
