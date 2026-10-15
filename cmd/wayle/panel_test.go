@@ -14,12 +14,14 @@ import (
 func fakeShell(t *testing.T) {
 	t.Helper()
 	conn := dbustest.SessionConn(t)
-	var release func()
-	var err error
-	release, err = shellipc.ServeApplication(conn, func() { go release() })
+	// The quit lands on a D-Bus goroutine; the channel hands it the
+	// release with an ordering the race detector sees.
+	released := make(chan func(), 1)
+	release, err := shellipc.ServeApplication(conn, func() { go (<-released)() })
 	if err != nil {
 		t.Fatal(err)
 	}
+	released <- release
 }
 
 func TestPanelLifecycleCommands(t *testing.T) {
