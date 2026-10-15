@@ -164,18 +164,26 @@ wayle surfaces:
       width or offset. Dynamic per-widget CSS (the user-session avatar,
       settings swatches) now uses apptheme.ComponentPriority, Rust's
       COMPONENT_CSS_PRIORITY.
-- [ ] share picker: not on the stylesheet at all (no sheet attached, a
-      palette-painted background, hand paddings, no enter/exit
-      animation, sizes at scale 1); rebuild it as views.rs (FlowBox of
-      cards, the Fixed monitor map, spinners, the revealer). gelm's
-      Notebook paints a fixed 96x26 tab strip with no tab-label widgets,
-      so the .share-picker-tab-label styling needs a gelm extension.
+- [x] share picker rebuilt as the Rust tree on the stylesheet:
+      window.share-picker-window > revealer > .share-picker-surface with
+      the notebook, card flowboxes with spinners, the output map, the
+      labeled restore checkbutton and confirm button; config snapshotted
+      per request (hot reload applies), content-sized and unanchored like
+      the GTK window, revealed/dismissed through the share-picker
+      animation. Verified live (Windows and Outputs pages, tab switch).
+      gelm fixes: compositor-placed layers fit within the largest output
+      (the picker asked for 16384x16384 and was refused, 0acb6a7);
+      notebook tab label widgets in CSS-boxed tabs, and structural
+      selectors (:first-child, :last-child) on style-only parts
+      (06609bd); CheckButton.SetChild, the labeled check button
+      (aca3f5b), also used by the app chooser's remember toggle. A race
+      (preview captures reading the re-snapshotted config) is fixed.
 - [ ] remaining surfaces to audit against Rust: wallpaper, the launcher's
       structure, the file chooser, print dialog, and portal dialogs
       beyond their inks.
 - [ ] bar modules and dropdowns: re-audit against the Rust module set.
-- [ ] the gelm layout properties replace wayle's size/margin wrappers
-      (credential.Fixed/Inset in the portal surfaces).
+- [x] the gelm layout properties replace wayle's size/margin wrappers
+      (credential.Fixed/Inset are gone; see "sizing" above).
 - [ ] the live visual comparison (item 1 of "Dropdown parity").
 
 ## Remaining for feature parity
