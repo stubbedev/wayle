@@ -192,8 +192,20 @@ wayle surfaces:
       -markup-rows rows render bold/italic (they had no font variants).
 - [x] lock: the failure messages come from _lock.ftl (hard-coded
       English before). Every other shell-domain key Rust uses is read.
-- [ ] file chooser, print dialog, portal dialogs: CSS class sets match
-      Rust's except unstyled helper classes; deeper behavior audit open.
+- [x] portal dialogs, print dialog, file chooser: each mapped a
+      full-screen overlay that swallowed clicks outside the panel. The
+      portal and print windows are now unanchored and content-sized
+      (the compositor centers them, as the GTK windows); the file
+      chooser is anchored top left, placed by its margins and sized to
+      its sheet, the header drag moving the margins (setup_surface_move)
+      and the place sticking across requests. Portal dialogs: the app
+      chooser is the Rust ListBox (row styling, the search as the
+      list's filter; gelm ListBoxRow.ChildVisible), the confirm is the
+      suggested-action, header images carry .portal-dialog-image, a
+      long description ellipsizes instead of widening the dialog. The
+      print list fills its scroll. Verified live except the file
+      chooser's drag and resize, which the harness clicker cannot
+      drive (covered by unit tests).
 - [ ] bar modules and dropdowns: per-module logic re-audit against the
       Rust helpers. Done so far:
   - network: the service counted unmanaged/unavailable/disconnected
