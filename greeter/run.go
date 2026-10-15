@@ -25,6 +25,12 @@ func Run(init Init) error {
 	// the resolved one before connecting.
 	ApplyCursor(ResolveCursor(init.Config.Greeter, DetectCursor(cursorHome(init.Users, init.LastUser), init.LastSession)))
 
+	// The stylesheet's font families and weights resolve through the
+	// system store, as in the shell (the clock's 700 weight).
+	widget.SetFaceResolver(apptheme.FontResolver)
+	if err := installIcons(); err != nil {
+		log.Printf("greeter: %v", err)
+	}
 	sess, err := app.Connect()
 	if err != nil {
 		return fmt.Errorf("greeter: connect: %w", err)

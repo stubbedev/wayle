@@ -1,8 +1,6 @@
 package greeter
 
 import (
-	_ "embed" // the power-button glyphs
-	"fmt"
 	"image"
 	"log"
 	"strings"
@@ -32,15 +30,6 @@ const revealFade = 300 * time.Millisecond
 // maxListedUsers caps the avatar row; beyond it the username entry
 // carries the load.
 const maxListedUsers = 8
-
-// The power glyphs, embedded: pre-login there is no icon theme to rely
-// on.
-var (
-	//go:embed assets/ld-power-symbolic.svg
-	powerSVG []byte
-	//go:embed assets/ld-rotate-ccw-symbolic.svg
-	restartSVG []byte
-)
 
 // The greeter's fixed metrics: GTK widget properties, not styling.
 const (
@@ -138,6 +127,7 @@ func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *s
 	s.drop.SetVisible(len(init.Sessions) > 1)
 	s.caps = widget.NewLabel(font, textPx, t("greeter-caps-lock"), 0)
 	s.caps.AddClass("lock-caps")
+	s.caps.SetAlignment(render.AlignCenter)
 	s.caps.SetVisible(false)
 	below := widget.NewBox(widget.Column, 0, 0)
 	below.Append(s.caps, false).Append(s.drop, false)
@@ -235,13 +225,12 @@ func (s *screen) pickUser(picked *userButton) {
 // the initial letter (.lock-avatar-fallback) when there is no readable
 // image, at the 64px size request.
 func (s *screen) avatar(u User, font render.Font) widget.Widget {
-	sized := fmt.Sprintf("min-width: %dpx; min-height: %dpx;", avatarPx, avatarPx)
 	if u.Icon != "" {
 		if img, err := s.d.loadAvatar(u.Icon); err == nil {
 			pic := widget.NewImage(img)
 			pic.SetScale(widget.ImageCover)
 			pic.AddClass("lock-avatar")
-			pic.SetInlineStyle(sized)
+			pic.SetSizeRequest(avatarPx, avatarPx)
 			return pic
 		}
 	}
@@ -253,7 +242,7 @@ func (s *screen) avatar(u User, font render.Font) widget.Widget {
 	letter := widget.NewLabel(font, textPx, initial, 0)
 	letter.AddClass("lock-avatar", "lock-avatar-fallback")
 	letter.SetAlignment(render.AlignCenter)
-	letter.SetInlineStyle(sized)
+	letter.SetSizeRequest(avatarPx, avatarPx)
 	return letter
 }
 
@@ -265,11 +254,11 @@ func (s *screen) powerRow() widget.Widget {
 	row.SetHAlign(widget.AlignCenter)
 	row.SetVAlign(widget.AlignEnd)
 	for _, b := range []struct {
-		svg     []byte
+		icon    string
 		tooltip string
 		verb    string
-	}{{powerSVG, t("greeter-shutdown"), "poweroff"}, {restartSVG, t("greeter-restart"), "reboot"}} {
-		btn := widget.NewButton(widget.NewSVGIcon(b.svg, powerIconPx), 0, 0)
+	}{{"ld-power-symbolic", t("greeter-shutdown"), "poweroff"}, {"ld-rotate-ccw-symbolic", t("greeter-restart"), "reboot"}} {
+		btn := widget.NewButton(widget.NewThemeIcon(b.icon, powerIconPx), 0, 0)
 		btn.AddClass("lock-power-button", "flat")
 		btn.SetTooltip(b.tooltip)
 		verb := b.verb

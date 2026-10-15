@@ -391,3 +391,17 @@ func TestRunApplyConfigUsage(t *testing.T) {
 		t.Errorf("apply: %d %q", code, out.String())
 	}
 }
+
+// The embedded glyphs land in the icon directory under their theme
+// names, so the widgets load them by name.
+func TestWriteIcons(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "icons")
+	if err := writeIcons(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"ld-power-symbolic.svg", "ld-rotate-ccw-symbolic.svg", "ld-chevron-down-symbolic.svg", "object-select-symbolic.svg"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}

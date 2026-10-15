@@ -112,9 +112,12 @@ func Build(o Options, onSubmit func(string)) *Prompt {
 	return p
 }
 
+// label is a GtkLabel in the column: it fills the row, its text
+// centered (GTK's default xalign 0.5).
 func label(font render.Font, class string) *widget.Label {
 	l := widget.NewLabel(font, textPx, "", 0)
 	l.AddClass(class)
+	l.SetAlignment(render.AlignCenter)
 	return l
 }
 
