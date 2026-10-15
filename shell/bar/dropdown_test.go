@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/wayle/shell/treetest"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -313,5 +314,28 @@ func TestDropdownPopoverFollowsAutohide(t *testing.T) {
 	cfg.Bar.DropdownAutohide = false
 	if pc := dropdownPopover(cfg, anchor, anchor, 0); !pc.NoAutohide || pc.MaxHeight != 0 {
 		t.Errorf("autohide off: %+v, want a no-grab popover", pc)
+	}
+}
+
+// The popover tree carries the theme at its root, where :root matches,
+// so a panel's labels resolve their ink through the theme's variables;
+// with the sheet lower in the tree they resolved nothing and painted
+// transparent.
+func TestDropdownTreeStylesThePanelText(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
+	full := computeStyle(cfg, ctx.Style.palette)
+	ctx.Style = &full
+	root, _ := dropdownTree(calendarDropdown(ctx), cfg, ctx.Theme)
+	root.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 900}})
+	root.Arrange(render.Rect{W: 600, H: 900})
+	labels := treetest.All[*widget.Label](root)
+	if len(labels) == 0 {
+		t.Fatal("no labels in the panel")
+	}
+	for _, l := range labels {
+		if widget.CascadeColor(l) == 0 {
+			t.Errorf("label %q has no ink from the theme", l.Text())
+		}
 	}
 }

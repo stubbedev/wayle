@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/shell/reveal"
 )
 
@@ -278,22 +279,8 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 		f.freezeLabel()
 		cfg.OnClosed = f.thawLabel
 	}
-	// The card enters through the dropdown transition (animate_in).
-	rev := widget.NewRevealer(content)
-	rev.SetGenieEdge(dropdownGenieEdge(r.cfg.Bar.Location))
-	// The popover carries the GTK class chain the stylesheet styles
-	// through: popover.dropdown > contents .dropdown gets the surface,
-	// and the shadow/position classes pick the shadow's direction. The
-	// popover is its own tree, so the theme sheet attaches here — the
-	// panels paint from the same CSS the Rust shell loads.
-	card := popoverCard(rev, dropdownGravity(r.cfg.Bar.Location), r.cfg.Bar.DropdownShadow)
-	// The Rust registry's surface margins: a narrow gap toward the bar,
-	// the wide one everywhere else, scaled.
-	framed := withDropdownMargins(card, r.cfg)
-	cfg.Content = framed
-	if r.ctx.Theme != nil {
-		r.ctx.Theme.Attach(card)
-	}
+	var rev *widget.Revealer
+	cfg.Content, rev = dropdownTree(content, r.cfg, r.ctx.Theme)
 	pop, err := r.app.OpenPopover(host, cfg)
 	if err != nil {
 		if cfg.OnClosed != nil {
@@ -428,7 +415,25 @@ func roundMarginRem(rem, scale float64) int {
 // withDropdownMargins wraps the popover card in the margins box: the
 // Rust registry sets them on the popover child at every show, so the
 // card floats inside the surface away from its edges.
-func withDropdownMargins(card widget.Widget, cfg *config.Config) widget.Widget {
+// dropdownTree is the popover's tree around content: the revealer the
+// card enters through (animate_in), the card carrying the GTK class
+// chain (popover.dropdown > contents .dropdown gets the surface, the
+// shadow and position classes the shadow's direction), and the Rust
+// registry's surface margins around it. The popover is its own tree,
+// so the theme attaches at its root: :root, where the theme declares
+// its variables, matches only there.
+func dropdownTree(content widget.Widget, cfg *config.Config, theme *apptheme.Theme) (*widget.Box, *widget.Revealer) {
+	rev := widget.NewRevealer(content)
+	rev.SetGenieEdge(dropdownGenieEdge(cfg.Bar.Location))
+	card := popoverCard(rev, dropdownGravity(cfg.Bar.Location), cfg.Bar.DropdownShadow)
+	root := withDropdownMargins(card, cfg)
+	if theme != nil {
+		theme.Attach(root)
+	}
+	return root, rev
+}
+
+func withDropdownMargins(card widget.Widget, cfg *config.Config) *widget.Box {
 	m := newDropdownMargins(float64(cfg.Styling.Scale), cfg.Bar.Location)
 	box := widget.NewBox(widget.Column, 0, 0)
 	box.SetPadding(render.Insets{Top: m.top, Bottom: m.bottom, Left: m.start, Right: m.end})
