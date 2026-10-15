@@ -254,16 +254,17 @@ var factories = map[string]Factory{
 }
 
 // Create builds the module named by a layout entry. Custom modules
-// (custom-*) resolve through the [modules.custom] definitions; names
-// outside both are errors: a layout naming a module the Go shell
-// cannot build fails loudly instead of silently shortening the bar.
+// (custom-*) resolve through the [modules.custom] definitions; a name
+// outside both is an error, logged by the caller while the rest of the
+// bar builds - as the Rust factory warns "module not implemented" for a
+// schema module without one (updates).
 func Create(name string, ctx ModuleContext) (Module, error) {
 	if def, ok := customDefinition(name, ctx.Config); ok {
 		return newCustomByID(ctx, def.Id)
 	}
 	factory, ok := factories[name]
 	if !ok {
-		return nil, fmt.Errorf("bar: module %q not ported to the Go shell yet", name)
+		return nil, fmt.Errorf("bar: module %q not implemented", name)
 	}
 	return factory(ctx)
 }

@@ -2,6 +2,7 @@ package bar
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/gelm/widget"
@@ -47,5 +48,19 @@ func TestCreateAllSkipsUnknownModule(t *testing.T) {
 	row := CreateAll([]config.BarItem{{Module: "no-such-module"}}, ctx)
 	if got := len(row.Children()[0].(*widget.Box).Children()); got != 0 {
 		t.Fatalf("unknown module's bar-item children = %d, want 0", got)
+	}
+}
+
+// updates is in the schema without a module in either shell: its slot
+// is skipped as "not implemented" (the Rust factory's warning) and the
+// rest of the section builds.
+func TestUnimplementedSchemaModuleIsSkipped(t *testing.T) {
+	ctx := newTestContext(t, config.Defaults())
+	if _, err := Create("updates", ctx); err == nil || !strings.Contains(err.Error(), "not implemented") {
+		t.Fatalf("updates: %v, want a not-implemented error", err)
+	}
+	items := CreateAll([]config.BarItem{{Module: "updates"}, {Module: "clock"}}, ctx).Children()
+	if len(items[0].(*widget.Box).Children()) != 0 || len(items[1].(*widget.Box).Children()) != 1 {
+		t.Error("want the updates item empty and the clock built")
 	}
 }
