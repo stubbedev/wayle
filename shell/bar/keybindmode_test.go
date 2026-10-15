@@ -102,6 +102,37 @@ func TestKeybindModeModuleFollowsSubmaps(t *testing.T) {
 	waitForText(t, label, "resize")
 }
 
+// Under auto-hide the module root starts hidden on the default submap,
+// shows in a named one, and hides again on leaving it; without
+// auto-hide it always shows.
+func TestKeybindModeHidesTheModuleRoot(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.KeybindMode.AutoHide = true
+	ctx := newTestContext(t, cfg)
+	f, conn := startFakeHypr(t, map[string]string{})
+	ctx.Hyprland = conn
+	module, err := Create("keybind-mode", ctx)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	m := module.(*keybindModeModule)
+	chrome := widget.NewBox(widget.Row, 0, 0)
+	onHeadlessLoop(func() bool { m.setChrome(chrome); return true })
+	visible := func() bool { return onHeadlessLoop(func() bool { return chrome.Visible() }) }
+	if visible() {
+		t.Fatal("default submap under auto-hide is shown")
+	}
+	f.emit(t, "submap>>resize")
+	waitHeadless(t, "shown in resize", chrome.Visible)
+	f.emit(t, "submap>>")
+	waitHeadless(t, "hidden on leaving", func() bool { return !chrome.Visible() })
+	cfg.KeybindMode.AutoHide = false
+	onHeadlessLoop(func() bool { m.render(); return true })
+	if !visible() {
+		t.Error("auto-hide off hid the module")
+	}
+}
+
 // findLabel walks a module root for its first label.
 func findLabel(w widget.Widget) *widget.Label {
 	if label, ok := w.(*widget.Label); ok {

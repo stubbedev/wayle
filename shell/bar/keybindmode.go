@@ -32,6 +32,7 @@ type keybindModeModule struct {
 	root   widget.Widget
 	label  *widget.Label
 	icon   *widget.Icon
+	chrome moduleChrome
 	submap string
 }
 
@@ -42,6 +43,7 @@ func newKeybindMode(ctx ModuleContext) (Module, error) {
 	m := &keybindModeModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.icon = moduleIcon(ctx, ctx.Config.KeybindMode.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
+	m.render()
 	events, err := ctx.Hyprland.Events(ctx.Life())
 	if err != nil {
 		return nil, err
@@ -57,7 +59,7 @@ func newKeybindMode(ctx ModuleContext) (Module, error) {
 }
 
 // render applies the current submap to the label and, under auto-hide,
-// the whole module's visibility.
+// the module root's visibility.
 func (m *keybindModeModule) render() {
 	cfg := m.ctx.Config.KeybindMode
 	text := ""
@@ -65,11 +67,14 @@ func (m *keybindModeModule) render() {
 		text = keybindModeLabel(cfg.Format, m.submap)
 	}
 	m.label.SetText(text)
-	visible := keybindModeVisible(m.submap, cfg.AutoHide)
-	m.label.SetVisible(visible)
-	if setter := m.icon; setter != nil {
-		setter.SetVisible(visible)
+	if m.chrome != nil {
+		m.chrome.SetVisible(keybindModeVisible(m.submap, cfg.AutoHide))
 	}
+}
+
+func (m *keybindModeModule) setChrome(c moduleChrome) {
+	m.chrome = c
+	m.render()
 }
 
 func (m *keybindModeModule) Root() widget.Widget { return m.root }
