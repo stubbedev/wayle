@@ -157,6 +157,7 @@ type keyboardLayout struct {
 	ctx    ModuleContext
 	source layoutSource
 	label  *widget.Label
+	root   widget.Widget
 }
 
 func newKeyboardLayout(ctx ModuleContext) (Module, error) {
@@ -166,6 +167,7 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 	}
 	m := &keyboardLayout{ctx: ctx, source: source}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
+	m.root = assembleModule(ctx, moduleIcon(ctx, ctx.Config.KeyboardInput.Icon()), m.label)
 	if err := m.refresh(); err != nil {
 		source.close()
 		return nil, err
@@ -203,4 +205,4 @@ func (m *keyboardLayout) refresh() error {
 	return nil
 }
 
-func (m *keyboardLayout) Root() widget.Widget { return m.label }
+func (m *keyboardLayout) Root() widget.Widget { return m.root }

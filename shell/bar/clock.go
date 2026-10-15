@@ -9,9 +9,9 @@ import (
 )
 
 // clock renders the time through the configured strftime format and
-// keeps itself current once a second.
+// keeps itself current once a second, beside the clock icon.
 type clock struct {
-	label *widget.Label
+	root widget.Widget
 }
 
 func newClock(ctx ModuleContext) (Module, error) {
@@ -23,7 +23,7 @@ func newClock(ctx ModuleContext) (Module, error) {
 	ctx.Every(time.Second, func() {
 		label.SetText(layout.Format(time.Now()))
 	})
-	return &clock{label: label}, nil
+	return &clock{root: assembleModule(ctx, moduleIcon(ctx, ctx.Config.Clock.Icon()), label)}, nil
 }
 
-func (c *clock) Root() widget.Widget { return c.label }
+func (c *clock) Root() widget.Widget { return c.root }

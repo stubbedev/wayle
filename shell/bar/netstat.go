@@ -27,6 +27,7 @@ func netstatLabel(format string, rate sysinfo.Rate) string {
 type netstatModule struct {
 	ctx     ModuleContext
 	label   *widget.Label
+	root    widget.Widget
 	cancel  context.CancelFunc
 	prev    map[string]sysinfo.NetTotals
 	current sysinfo.Rate
@@ -38,6 +39,7 @@ func newNetstat(ctx ModuleContext) (Module, error) {
 	}
 	cfg := ctx.Config.Netstat
 	m := &netstatModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m.root = assembleModule(ctx, moduleIcon(ctx, cfg.Icon()), m.label)
 	runCtx, cancel := context.WithCancel(ctx.Life())
 	m.cancel = cancel
 	if int(cfg.PollIntervalMs) > 0 {
@@ -92,7 +94,7 @@ func (m *netstatModule) sample(elapsed time.Duration) {
 	})
 }
 
-func (m *netstatModule) Root() widget.Widget { return m.label }
+func (m *netstatModule) Root() widget.Widget { return m.root }
 
 // Stop ends the sampling loop.
 func (m *netstatModule) Stop() { m.cancel() }
