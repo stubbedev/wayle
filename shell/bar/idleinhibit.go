@@ -4,14 +4,12 @@ import (
 	"strconv"
 
 	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/idleinhibit"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // idleInhibitLabel is helpers.rs's build_label: On/Off state, the
@@ -36,16 +34,6 @@ func idleInhibitLabel(format string, active bool, durationMins uint32, remaining
 		duration = strconv.FormatUint(uint64(durationMins), 10)
 	}
 	return jinja.RenderOr(format, map[string]any{"state": state, "remaining": remaining, "duration": duration})
-}
-
-// idleInhibitColor resolves the state's configured color, the bar fg
-// otherwise.
-func idleInhibitColor(cfg config.IdleInhibitConfig, active bool, palette *styling.Palette, fallback render.Color) render.Color {
-	_ = active
-	if resolved, ok := styling.ResolveColor(cfg.LabelColor, palette); ok && !cfg.LabelColor.IsAuto() {
-		return resolved
-	}
-	return fallback
 }
 
 // idleInhibit is the module: the shared inhibit state rendered into
@@ -115,16 +103,12 @@ func (m *idleInhibitModule) render() {
 		text = idleInhibitLabel(cfg.Format, snap.Active, snap.DurationMins, snap.RemainingS)
 	}
 	m.label.SetText(text)
-	m.label.SetColor(idleInhibitColor(cfg, snap.Active, m.ctx.Style.palette, m.ctx.Style.fg))
 	if setter := m.icon; setter != nil {
 		icon := cfg.Icons()[config.IdleInhibitInactive]
 		if snap.Active {
 			icon = cfg.Icons()[config.IdleInhibitActive]
 		}
 		setter.SetThemeName(icon.Name)
-	}
-	if setter := m.icon; setter != nil {
-		setter.SetTint(idleInhibitColor(cfg, snap.Active, m.ctx.Style.palette, m.ctx.Style.fg))
 	}
 }
 

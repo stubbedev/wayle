@@ -3,14 +3,12 @@ package bar
 import (
 	"errors"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/jinja"
 	"github.com/stubbedev/wayle/service/recorder"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // recorderLabel is helpers.rs's build_label: Idle/Paused/Recording
@@ -33,23 +31,13 @@ func recorderLabel(format string, active, paused bool, elapsedSecs uint32) strin
 
 // recorderIconName is helpers.rs's select_icon over the state trio.
 func recorderIconName(cfg config.RecorderConfig, snap recorder.Change) string {
-	if snap.Active || snap.Preparing {
-		if snap.Paused {
-			return cfg.Icons()[config.RecorderPaused].Name
-		}
+	switch {
+	case snap.Active && snap.Paused:
+		return cfg.Icons()[config.RecorderPaused].Name
+	case snap.Active, snap.Preparing:
 		return cfg.Icons()[config.RecorderRecording].Name
 	}
 	return cfg.Icons()[config.RecorderIdle].Name
-}
-
-// recorderColor resolves the state's configured color, the bar fg
-// otherwise.
-func recorderColor(cfg config.RecorderConfig, snap recorder.Change, palette *styling.Palette, fallback render.Color) render.Color {
-	_ = snap
-	if resolved, ok := styling.ResolveColor(cfg.LabelColor, palette); ok && !cfg.LabelColor.IsAuto() {
-		return resolved
-	}
-	return fallback
 }
 
 // recorderModule is the screen-recorder bell: state and elapsed clock
@@ -60,6 +48,8 @@ type recorderModule struct {
 	label *widget.Label
 	icon  *widget.Icon
 	root  widget.Widget
+	// chrome is the module root the preparing class goes on.
+	chrome moduleChrome
 }
 
 func newRecorder(ctx ModuleContext) (Module, error) {
@@ -85,10 +75,17 @@ func (m *recorderModule) refresh() {
 		text = recorderLabel(cfg.Format, snap.Active, snap.Paused, snap.ElapsedSecs)
 	}
 	m.label.SetText(text)
-	m.label.SetColor(recorderColor(cfg, snap, m.ctx.Style.palette, m.ctx.Style.fg))
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(recorderIconName(cfg, snap))
 	}
+	// The pre-capture delay pulses the icon through the module root's
+	// recorder-preparing class.
+	setClass(m.chrome, "recorder-preparing", snap.Preparing)
+}
+
+func (m *recorderModule) setChrome(c moduleChrome) {
+	m.chrome = c
+	m.refresh()
 }
 
 func (m *recorderModule) Root() widget.Widget { return m.root }

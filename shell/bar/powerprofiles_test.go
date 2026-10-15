@@ -131,3 +131,33 @@ func TestNewPowerProfilesRequiresSource(t *testing.T) {
 		t.Fatal("no daemon: want an error, got a module")
 	}
 }
+
+// The active profile's color-* rides the button's threshold colors (icon
+// and label), and an unknown profile reads as balanced, icon and color.
+func TestPowerProfilesColorsAndUnknown(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := newTestContext(t, cfg)
+	src := &fakePPSource{snap: powerprofiles.Snapshot{Available: true, Active: powerprofiles.ProfilePerformance}}
+	ctx.PowerProfiles = src
+	module, err := Create("power-profiles", ctx)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	pp := module.(*powerProfilesModule)
+	check := func(profile string, color config.ColorValue, icon string) {
+		t.Helper()
+		th := pp.btn.thresholds
+		if th.IconColor == nil || th.LabelColor == nil || *th.IconColor != color || *th.LabelColor != color {
+			t.Errorf("%s: thresholds %+v, want icon and label %v", profile, th, color)
+		}
+		if pp.icon.Name() != icon || pp.label.Color() != 0 {
+			t.Errorf("%s: icon %q ink %#08x, want %q in the stylesheet's ink", profile, pp.icon.Name(), pp.label.Color(), icon)
+		}
+	}
+	check("performance", cfg.PowerProfiles.ColorPerformance, cfg.PowerProfiles.Icons()[config.ProfilePerformance].Name)
+	src.snap = powerprofiles.Snapshot{Available: true, Active: "mystery"}
+	if err := pp.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	check("unknown", cfg.PowerProfiles.ColorBalanced, cfg.PowerProfiles.Icons()[config.ProfileBalanced].Name)
+}

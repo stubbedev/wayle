@@ -6,12 +6,10 @@ import (
 	"log"
 	"strings"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/powerprofiles"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // powerProfilesLabel is helpers.rs's format_label: the only variable
@@ -28,9 +26,11 @@ type powerProfilesModule struct {
 	src   powerprofiles.Source
 	label *widget.Label
 	icon  *widget.Icon
-	root  widget.Widget
-	snap  powerprofiles.Snapshot
-	stop  func()
+	// btn takes the active profile's color as threshold colors.
+	btn  *barButton
+	root widget.Widget
+	snap powerprofiles.Snapshot
+	stop func()
 }
 
 func newPowerProfiles(ctx ModuleContext) (Module, error) {
@@ -39,7 +39,8 @@ func newPowerProfiles(ctx ModuleContext) (Module, error) {
 	}
 	m := &powerProfilesModule{ctx: ctx, src: ctx.PowerProfiles, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
 	m.icon = moduleIcon(ctx, ctx.Config.PowerProfiles.Icons()[config.ProfileBalanced])
-	m.root = assembleModule(ctx, m.icon, m.label)
+	m.btn = newBarButton(ctx, m.icon, m.label)
+	m.root = m.btn
 	if err := m.refresh(); err != nil {
 		return nil, err
 	}
@@ -70,25 +71,23 @@ func (m *powerProfilesModule) refresh() error {
 		text = powerProfilesLabel(cfg.Format, snap.Active)
 	}
 	m.label.SetText(text)
-	m.label.SetColor(m.profileColor(snap.Active))
+	profile := profileOf(snap.Active)
 	if setter := m.icon; setter != nil {
-		setter.SetTint(m.profileColor(snap.Active))
-		setter.SetThemeName(cfg.Icons()[snap.Active].Name)
+		setter.SetThemeName(cfg.Icons()[profile].Name)
 	}
+	color := cfg.Colors()[profile]
+	m.btn.SetThresholds(config.ThresholdColors{IconColor: &color, LabelColor: &color})
 	return nil
 }
 
-// profileColor resolves the active profile's configured color, the
-// bar fg otherwise.
-func (m *powerProfilesModule) profileColor(profile string) render.Color {
-	color, ok := m.ctx.Config.PowerProfiles.Colors()[profile]
-	if !ok {
-		return m.ctx.Style.fg
+// profileOf is select_icon/select_colors' profile: power-saver and
+// performance as they are, balanced for anything else (Unknown).
+func profileOf(active string) string {
+	switch active {
+	case config.ProfilePowerSaver, config.ProfilePerformance:
+		return active
 	}
-	if resolved, ok := styling.ResolveColor(color, m.ctx.Style.palette); ok {
-		return resolved
-	}
-	return m.ctx.Style.fg
+	return config.ProfileBalanced
 }
 
 // RunAction handles the module's own bindings: `:cycle` moves to the

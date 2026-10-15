@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stubbedev/gelm/render"
+
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/idleinhibit"
@@ -89,4 +91,33 @@ func TestIdleInhibitModuleFollowsState(t *testing.T) {
 	if label := findLabel(standalone.Root()); label.Text() != i18n.T("bar-idle-inhibit-off") {
 		t.Errorf("standalone label = %q", label.Text())
 	}
+}
+
+// A configured label-color reaches the label and icon through the
+// button's variables only: neither pins an ink, on or off.
+func TestIdleInhibitKeepsTheStylesheetInk(t *testing.T) {
+	cfg := config.Defaults()
+	red, err := config.ParseColorValue("red")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.IdleInhibit.LabelColor = red
+	ctx := newTestContext(t, cfg)
+	state := idleinhibit.NewState(60)
+	ctx.IdleInhibit = state
+	module, err := Create("idle-inhibit", ctx)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	m := module.(*idleInhibitModule)
+	for _, on := range []bool{false, true} {
+		if on {
+			state.Enable(true)
+			waitForText(t, m.label, i18n.T("bar-idle-inhibit-on"))
+		}
+		if ink, tint := onHeadlessLoop(func() render.Color { return m.label.Color() }), onHeadlessLoop(func() render.Color { return m.icon.Tint() }); ink != 0 || tint != 0 {
+			t.Errorf("active %v: label ink %#08x icon tint %#08x, want the stylesheet's", on, ink, tint)
+		}
+	}
+	state.Disable()
 }
