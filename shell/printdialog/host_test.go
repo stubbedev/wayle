@@ -122,19 +122,17 @@ func TestPrepareListsQueuesAndAnswersTheForm(t *testing.T) {
 		t.Errorf("surface = %+v", c)
 	}
 	labels := treetest.Labels(c.Root)
-	for _, q := range hs.h.queues() {
-		labels = append(labels, treetest.Labels(queueRows{hs.h, []queue{q}}.Row(0))...)
-	}
 	for _, want := range []string{"office", "Hall · Ready", fileQueue, "Copies", "Paper size"} {
 		if !slices.Contains(labels, want) {
 			t.Errorf("no %q in %q", want, labels)
 		}
 	}
 	dropdowns := treetest.All[*widget.Dropdown](c.Root)
-	entries := treetest.All[*widget.Entry](c.Root)
+	pages := treetest.All[*widget.Entry](c.Root)[0]
+	copies := treetest.All[*widget.SpinButton](c.Root)[0]
 	hs.do(func() {
-		treetest.Button(t, c.Root, "+").OnClick()
-		entries[1].SetText("2-3")
+		copies.SetValue(2)
+		pages.SetText("2-3")
 		dropdowns[0].SetSelected(1) // landscape
 		dropdowns[2].SetSelected(1) // grayscale
 		treetest.Button(t, c.Root, "Print").OnClick()
@@ -168,27 +166,41 @@ func TestPrepareListsQueuesAndAnswersTheForm(t *testing.T) {
 	}
 }
 
+// The copies spin button keeps the count within 1..999.
 func TestCopiesStayInBounds(t *testing.T) {
 	hs := newHarness(t)
 	got, c := hs.prepare(t)
-	copies := treetest.All[*widget.Entry](c.Root)[0]
+	copies := treetest.All[*widget.SpinButton](c.Root)[0]
 	hs.do(func() {
-		treetest.Button(t, c.Root, "−").OnClick()
-		if copies.Text() != "1" {
-			t.Errorf("one copy minus one = %s, want 1", copies.Text())
+		copies.SetValue(0)
+		if copies.Value() != 1 {
+			t.Errorf("zero copies = %v, want 1", copies.Value())
 		}
-		copies.SetText("998")
-		treetest.Button(t, c.Root, "+").OnClick()
-		treetest.Button(t, c.Root, "+").OnClick()
-		if copies.Text() != "999" {
-			t.Errorf("past the top = %s, want 999", copies.Text())
-		}
-		copies.SetText("lots")
+		copies.SetValue(5000)
 		treetest.Button(t, c.Root, "Print").OnClick()
 	})
 	r := <-got
-	if !slices.Contains(r.settings, Setting{"n-copies", "1"}) {
-		t.Errorf("garbage copies = %v, want 1", r.settings)
+	if !slices.Contains(r.settings, Setting{"n-copies", "999"}) {
+		t.Errorf("past the top = %v, want 999", r.settings)
+	}
+}
+
+// The sheet is the print view!: the .print-form grid with a label
+// column, and the printer list in a scroll at least 64px tall that
+// grows with its rows to 240.
+func TestSheetIsTheRustLayout(t *testing.T) {
+	hs := newHarness(t)
+	_, c := hs.prepare(t)
+	grids := treetest.All[*widget.Grid](c.Root)
+	if len(grids) != 1 || !slices.Contains(grids[0].Classes(), "print-form") {
+		t.Fatalf("grids %v, want the one .print-form", grids)
+	}
+	scrolls := treetest.All[*widget.Scroll](c.Root)
+	if len(scrolls) == 0 || scrolls[0].SizeRequest().H != listMinHeight || !scrolls[0].PropagateNaturalHeight {
+		t.Errorf("printer scroll %+v, want a propagating scroll requesting %d", scrolls, listMinHeight)
+	}
+	if len(treetest.All[*widget.ListBox](c.Root)) != 1 {
+		t.Error("no printer ListBox")
 	}
 }
 
@@ -263,7 +275,7 @@ func TestPrintFailures(t *testing.T) {
 	}
 	got, c = hs.prepare(t)
 	hs.do(func() {
-		treetest.First[*widget.List](t, c.Root).Select(1) // Print to File
+		treetest.First[*widget.ListBox](t, c.Root).Select(1) // Print to File
 		treetest.Button(t, c.Root, "Print").OnClick()
 	})
 	r = <-got

@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"strconv"
 	"sync"
 
 	"github.com/stubbedev/gelm/app"
@@ -14,19 +13,18 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/ipp"
-	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/shell/reveal"
 	"github.com/stubbedev/wayle/shell/widgets"
 )
 
-// The sheet's geometry (shell/print: the surface's width request and
-// the printer list's content heights).
+// The sheet's geometry (shell/print: the surface's width request, the
+// printer list's content heights, the form grid's spacing).
 const (
 	surfaceWidth  = 460
-	labelWidth    = 110
-	printerRowH   = 44
 	listMinHeight = 64
 	listMaxHeight = 240
+	formColGap    = 12
+	formRowGap    = 8
 	escapeKeycode = 1
 )
 
@@ -208,65 +206,52 @@ func (h *Dialog) dropdown(items []string) *widget.Dropdown {
 	return widget.NewDropdown(h.d.Font, 13, items, 0)
 }
 
-// formRow is a label column and its control.
-func (h *Dialog) formRow(label string, control widget.Widget) widget.Widget {
-	row := widget.NewBox(widget.Row, 12, 0)
-	l := h.label(label, "print-form-label")
-	row.Append(credential.NewFixed(l, labelWidth, 0), false)
-	row.Append(control, true)
-	return row
-}
-
-// queueRows is the printer list's model.
-type queueRows struct {
-	h      *Dialog
-	queues []queue
-}
-
-func (m queueRows) Len() int { return len(m.queues) }
-
-func (m queueRows) Row(i int) widget.Widget {
-	q := m.queues[i]
-	content := widget.NewBox(widget.Column, 0, 0)
-	content.Append(m.h.label(q.name, "print-printer-name"), false)
-	if q.detail != "" {
-		content.Append(m.h.label(q.detail, "print-printer-detail"), false)
-	}
-	// shell/print's printer_row margins.
+// printerRow is printer_row: the name over the location and status,
+// inside the row's 6px/10px margins.
+func (h *Dialog) printerRow(q queue) widget.Widget {
 	row := widget.NewBox(widget.Column, 0, 0)
-	row.Append(credential.NewInset(content, render.Insets{Top: 6, Right: 10, Bottom: 6, Left: 10}), false)
+	row.SetMargin(render.Insets{Top: 6, Right: 10, Bottom: 6, Left: 10})
+	row.Append(h.label(q.name, "print-printer-name"), false)
+	if q.detail != "" {
+		row.Append(h.label(q.detail, "print-printer-detail"), false)
+	}
 	return row
 }
 
-// build is the sheet: the printer list over the settings form.
+// build is the sheet (the print view!): the title, the printer list in
+// a scroll that grows with it from 64 to 240px, the .print-form grid of
+// labels and controls, and the actions.
 func (h *Dialog) build(queues []queue) widget.Widget {
-	list := widget.NewList[widget.Widget](queueRows{h, queues}, printerRowH)
-	list.AddClass("print-printer-list")
-	list.Select(0)
-	listH := min(max(len(queues)*printerRowH, listMinHeight), listMaxHeight)
-
-	copies := widget.NewEntry(h.d.Font, 13, 0)
-	copies.SetText("1")
-	step := func(by int) func() {
-		return func() { copies.SetText(strconv.Itoa(clampCopies(parseCopies(copies.Text()) + by))) }
+	list := widget.NewListBox()
+	list.SetClasses("print-printer-list")
+	for _, q := range queues {
+		list.Append(h.printerRow(q))
 	}
-	copiesRow := widget.NewBox(widget.Row, 4, 0)
-	copiesRow.Append(h.button("−", "print-copies-step", step(-1)), false)
-	copiesRow.Append(copies, true)
-	copiesRow.Append(h.button("+", "print-copies-step", step(1)), false)
+	if len(queues) > 0 {
+		list.Select(0)
+	}
+	printers := widget.NewScroll(list)
+	printers.PropagateNaturalHeight = true
+	printers.SetMaxContentHeight(listMaxHeight)
+	printers.SetSizeRequest(0, listMinHeight)
 
+	copies := widget.NewSpinButton(h.d.Font, 13, 0, minCopies, maxCopies, 1, 0)
+	copies.SetValue(minCopies)
 	pages := widget.NewEntry(h.d.Font, 13, 0)
 	pages.SetPlaceholder("All pages — or e.g. 1-5, 8")
 	orientation, paperDrop := h.dropdown(orientations), h.dropdown(paperLabels())
 	color, duplex, quality := h.dropdown(colors), h.dropdown(duplexes), h.dropdown(qualities)
 
-	formBox := widget.NewBox(widget.Column, 8, 0)
-	formBox.AddClass("print-form")
-	for _, r := range []struct {
+	grid := widget.NewGrid(formColGap, formRowGap)
+	grid.AddClass("print-form")
+	for i, r := range []struct {
 		label   string
-		control widget.Widget
+		control interface {
+			widget.Widget
+			SetHExpand(bool)
+		}
 	}{
-		{"Copies", copiesRow},
+		{"Copies", copies},
 		{"Pages", pages},
 		{"Orientation", orientation},
 		{"Paper size", paperDrop},
@@ -274,7 +259,9 @@ func (h *Dialog) build(queues []queue) widget.Widget {
 		{"Two-sided", duplex},
 		{"Quality", quality},
 	} {
-		formBox.Append(h.formRow(r.label, r.control), false)
+		grid.Attach(h.label(r.label, "print-form-label"), 0, i, 1, 1)
+		r.control.SetHExpand(true)
+		grid.Attach(r.control, 1, i, 1, 1)
 	}
 
 	confirm := func() {
@@ -284,7 +271,7 @@ func (h *Dialog) build(queues []queue) widget.Widget {
 			return
 		}
 		h.finish(prepared{printer: queues[sel].name, form: form{
-			copies:    clampCopies(parseCopies(copies.Text())),
+			copies:    int(copies.Value()),
 			pages:     pages.Text(),
 			landscape: orientation.Selected() == 1,
 			paper:     paperDrop.Selected(),
@@ -302,12 +289,12 @@ func (h *Dialog) build(queues []queue) widget.Widget {
 
 	surface := widget.NewBox(widget.Column, 12, 0)
 	surface.AddClass("print-surface")
-	title := h.label("Print", "print-title")
-	surface.Append(title, false)
-	surface.Append(credential.NewFixed(list, 0, listH), false)
-	surface.Append(formBox, false)
+	surface.SetSizeRequest(surfaceWidth, 0)
+	surface.Append(h.label("Print", "print-title"), false)
+	surface.Append(printers, false)
+	surface.Append(grid, false)
 	surface.Append(actions, false)
-	return credential.NewFixed(surface, surfaceWidth, 0)
+	return surface
 }
 
 func paperLabels() []string {
@@ -317,17 +304,6 @@ func paperLabels() []string {
 	}
 	return out
 }
-
-// parseCopies reads the copies field; garbage is one copy.
-func parseCopies(s string) int {
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		return minCopies
-	}
-	return n
-}
-
-func clampCopies(n int) int { return min(max(n, minCopies), maxCopies) }
 
 // show maps the overlay with tree and plays the entry.
 func (h *Dialog) show(tree widget.Widget) {
