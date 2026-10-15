@@ -6,24 +6,15 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/wayle/shell/treetest"
 )
-
-func testFonts(t *testing.T) Fonts {
-	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return Fonts{Text: face, Clock: face}
-}
 
 // TestBuildShape pins the prompt: the secret entry masks and submits
 // on Enter, the clock follows ShowClock, the error line starts hidden,
@@ -32,7 +23,7 @@ func TestBuildShape(t *testing.T) {
 	var submitted []string
 	var focused []widget.Widget
 	p := Build(Options{
-		Fonts: testFonts(t), Palette: styling.Default(), ShowClock: true, WithUsername: true,
+		Font: treetest.Font(t), ShowClock: true, WithUsername: true,
 		Focus: func(w widget.Widget) { focused = append(focused, w) },
 	}, func(s string) { submitted = append(submitted, s) })
 	if p.Entry.Echo() != widget.EchoPassword {
@@ -62,7 +53,7 @@ func TestBuildShape(t *testing.T) {
 		t.Error("an empty message hides the line")
 	}
 
-	lock := Build(Options{Fonts: testFonts(t), Palette: styling.Default()}, func(string) {})
+	lock := Build(Options{Font: treetest.Font(t)}, func(string) {})
 	if lock.Username != nil || lock.Clock.Visible() {
 		t.Error("the lock-screen prompt has no username entry, and ShowClock false hides the clock")
 	}
@@ -113,24 +104,38 @@ func TestLoadImage(t *testing.T) {
 	}
 }
 
-func TestBackgroundAndFill(t *testing.T) {
+func TestBackground(t *testing.T) {
 	c, _ := config.ParseHexColor("#102030")
 	if got := HexFill(c); got != render.RGB(0x10, 0x20, 0x30) {
 		t.Errorf("HexFill = %#x", uint32(got))
 	}
-	if _, ok := Background(nil, HexFill(c)).(*Fill); !ok {
-		t.Error("no image: a solid fill")
+	fill, ok := Background(nil, HexFill(c)).(*widget.DrawingArea)
+	if !ok || !slices.Contains(fill.Classes(), "lock-bg") {
+		t.Error("no image: the .lock-bg color fill")
 	}
-	if _, ok := Background(image.NewRGBA(image.Rect(0, 0, 1, 1)), 0).(*widget.Overlay); !ok {
-		t.Error("an image: picture plus scrim")
+	over, ok := Background(image.NewRGBA(image.Rect(0, 0, 1, 1)), 0).(*widget.Overlay)
+	if !ok || len(treetest.WithClass(over, "lock-bg-scrim")) != 1 {
+		t.Error("an image: picture under the .lock-bg-scrim")
 	}
-	f := NewFill(render.RGB(0, 0, 0))
-	f.Arrange(render.Rect{W: 10, H: 10})
-	if f.HitTest(widget.Point{X: 1, Y: 1}) == nil {
-		t.Error("a shown blackout swallows the pointer")
+}
+
+// The peek icon reveals the masked secret and masks it again.
+func TestPeekTogglesTheEcho(t *testing.T) {
+	p := Build(Options{Font: treetest.Font(t)}, func(string) {})
+	p.togglePeek()
+	if !p.peeked {
+		t.Fatal("the peek did not reveal")
 	}
-	f.SetOn(false)
-	if f.HitTest(widget.Point{X: 1, Y: 1}) != nil {
-		t.Error("a hidden blackout lets input through")
+	p.togglePeek()
+	if p.peeked {
+		t.Error("a second peek left the secret shown")
+	}
+}
+
+// The scrim starts hidden and is the .lock-scrim node.
+func TestScrim(t *testing.T) {
+	s := Scrim()
+	if s.Visible() || !slices.Contains(s.Classes(), "lock-scrim") {
+		t.Error("the scrim starts hidden as .lock-scrim")
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/wayle/internal/mime"
 	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/wayle/shell/widgets"
 )
 
 // The sheet's geometry (shell/file_chooser: the surface's size
@@ -232,7 +233,7 @@ func (c *Chooser) textButton(text, class string, onClick func()) (*widget.Button
 func (c *Chooser) iconToggle(icon, tooltip string, on bool, onToggled func(bool)) *widget.ToggleButton {
 	holder := widget.NewBox(widget.Row, 0, 0)
 	setIcon(holder, icon)
-	b := widget.NewToggleButton(credential.Center(holder), 0, 0)
+	b := widget.NewToggleButton(widgets.Center(holder), 0, 0)
 	b.AddClass("toggle", "file-chooser-nav", "flat")
 	b.SetTooltip(tooltip)
 	b.SetActive(on)
@@ -249,7 +250,7 @@ func (c *Chooser) iconButton(icon, tooltip string, onClick func()) *widget.Butto
 func (c *Chooser) swappableIconButton(icon, tooltip string, onClick func()) (*widget.Button, *widget.Box) {
 	holder := widget.NewBox(widget.Row, 0, 0)
 	setIcon(holder, icon)
-	b := widget.NewButton(credential.Center(holder), 0, 0)
+	b := widget.NewButton(widgets.Center(holder), 0, 0)
 	b.AddClass("file-chooser-nav", "flat")
 	b.SetTooltip(tooltip)
 	b.OnClick = onClick
@@ -507,7 +508,7 @@ func (c *Chooser) previewCard(class string, nameChars int) (card, icon *widget.B
 	info = c.label("", class+"-info")
 	info.SetAlignment(render.AlignCenter)
 	info.SetWrap(true)
-	card.Append(credential.Center(icon), false)
+	card.Append(widgets.Center(icon), false)
 	card.Append(name, false)
 	card.Append(info, false)
 	return card, icon, name, info
@@ -563,7 +564,7 @@ func (c *Chooser) fileRow(e Entry) widget.Widget {
 func (c *Chooser) gridCell(e Entry) widget.Widget {
 	cell := widget.NewBox(widget.Column, 6, 0)
 	cell.AddClass("file-chooser-grid-cell")
-	cell.Append(credential.Center(c.entryIcon(e, gridIconPx)), false)
+	cell.Append(widgets.Center(c.entryIcon(e, gridIconPx)), false)
 	name := c.label(c.s.displayName(e), "")
 	name.SetAlignment(render.AlignCenter)
 	name.SetWrap(true)

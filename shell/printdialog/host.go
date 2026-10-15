@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/wayle/internal/ipp"
 	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/wayle/shell/widgets"
 )
 
 // The sheet's geometry (shell/print: the surface's width request and
@@ -335,7 +336,7 @@ func (h *Dialog) show(tree widget.Widget) {
 		h.win.Close()
 		h.win, h.closing = nil, false
 	}
-	h.rev = widget.NewRevealer(credential.Center(tree))
+	h.rev = widget.NewRevealer(widgets.Center(tree))
 	root := widget.NewBox(widget.Column, 0, 0)
 	root.AddClass("print-window")
 	if h.d.Sheet != nil {

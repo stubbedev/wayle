@@ -8,14 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/auth"
-	"github.com/stubbedev/wayle/shell/credential"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/wayle/shell/treetest"
 )
 
 // fakeHandle is one greetd conversation the screen spawned.
@@ -43,10 +40,7 @@ type rig struct {
 
 func newRig(t *testing.T, edit func(*Init)) *rig {
 	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
+	face := treetest.Font(t)
 	state := filepath.Join(t.TempDir(), "last-session")
 	init := Init{
 		Config: config.Defaults(),
@@ -64,7 +58,7 @@ func newRig(t *testing.T, edit func(*Init)) *rig {
 		edit(&init)
 	}
 	r := &rig{}
-	r.s = newScreen(init, credential.Fonts{Text: face, Clock: face}, styling.Default(), deps{
+	r.s = newScreen(init, face, Stylesheet(init.Config), deps{
 		connect: func(cmd func() []string, env []string) (auth.Conversation, error) {
 			if r.connectErr != nil {
 				return nil, r.connectErr
@@ -225,7 +219,7 @@ func TestGreeterUserRowAndPower(t *testing.T) {
 		t.Fatalf("user buttons = %d", len(r.s.users))
 	}
 	r.s.users[1].button.OnClick()
-	if r.s.prompt.Username.Text() != "bob" || r.focused != r.s.prompt.Entry || r.s.users[1].button.Bg != userSelected || r.s.users[0].button.Bg != 0 {
+	if r.s.prompt.Username.Text() != "bob" || r.focused != r.s.prompt.Entry || !slices.Contains(r.s.users[1].button.Classes(), "selected") || slices.Contains(r.s.users[0].button.Classes(), "selected") {
 		t.Error("a user click fills the name, marks it and focuses the password")
 	}
 	many := make([]User, maxListedUsers+1)

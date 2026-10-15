@@ -1,46 +1,35 @@
 // Package credential is the credential prompt the lock screen and the
 // greeter share (wayle-widgets' credential_box.rs): clock, date, an
-// optional username entry, the secret entry, and the error line, on a
-// translucent card centered over the background. Both screens build it
-// the same way, so they render identically; the styling is the
-// _lock.scss rules resolved against the palette.
+// optional username entry, the secret entry, and the error line in the
+// centered .lock-center card. Both screens build it the same way and
+// style it with the same _lock.scss rules, so they render identically.
 package credential
 
 import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-
-	"github.com/stubbedev/wayle/styling"
 )
 
-// The _lock.scss metrics, in logical pixels (1rem = 16px).
+// The prompt's fixed metrics: GTK's defaults the stylesheet starts
+// from, not styling.
 const (
-	cardPadding   = 32 // .lock-center padding: 2rem
-	cardRadius    = 12 // .lock-center border-radius
 	columnSpacing = 12 // the credential column's spacing
-	clockPx       = 64 // .lock-clock font-size: 4rem
-	datePx        = 20 // .lock-date font-size: 1.25rem
-	entryPx       = 16
-	entryWidth    = 24 * 10 // width-chars 24 at the entry size
-	entryGap      = 16      // .lock-entry / .lock-user margin-top: 1rem
-	errorGap      = 8       // .lock-error margin-top: 0.5rem
+	entryChars    = 24 // the entries' width-chars
+	textPx        = 16 // the labels' size before the stylesheet's
 )
 
-// cardColor is .lock-center's background: rgba(0, 0, 0, 0.35).
-var cardColor = render.RGBA(0, 0, 0, 89)
-
-// Fonts are the faces the prompt paints with.
-type Fonts struct {
-	// Text is the regular face (date, entries, messages).
-	Text render.Font
-	// Clock is the bold face of the clock (.lock-clock weight 700).
-	Clock render.Font
-}
+// The PasswordEntry peek icons (GtkPasswordEntry show-peek-icon): the
+// eye reveals masked text, the crossed eye masks it again.
+const (
+	peekReveal  = "view-reveal-symbolic"
+	peekConceal = "view-conceal-symbolic"
+)
 
 // Options configure one prompt.
 type Options struct {
-	Fonts   Fonts
-	Palette *styling.Palette
+	// Font is the face the labels and entries shape with; the
+	// stylesheet sets their sizes and weights.
+	Font render.Font
 	// ShowClock shows the clock and date.
 	ShowClock bool
 	// WithUsername adds a visible username entry above the secret one
@@ -58,9 +47,7 @@ type Options struct {
 // Prompt is a built credential prompt and the handles its screen
 // drives.
 type Prompt struct {
-	// Root is the full-surface layer holding the centered card.
-	Root widget.Widget
-	// Reveal is Root as a revealer: the card's reveal animation, hidden
+	// Reveal is the root: the centered card's reveal animation, hidden
 	// until the screen shows it (CredentialBox::reveal).
 	Reveal *widget.Revealer
 	// Username is the visible username entry; nil without
@@ -71,52 +58,76 @@ type Prompt struct {
 	// Clock and Date are hidden without ShowClock.
 	Clock, Date *widget.Label
 	// Error is the error and info line, hidden until it has text.
-	Error *widget.Label
+	Error  *widget.Label
+	peeked bool
 }
 
-// Build assembles a prompt; onSubmit fires with the secret entry's text
-// each time the user presses Enter in it.
+// Build assembles a prompt (CredentialBox::build); onSubmit fires with
+// the secret entry's text each time the user presses Enter in it.
 func Build(o Options, onSubmit func(string)) *Prompt {
-	pal := o.Palette
 	p := &Prompt{
-		Clock: widget.NewLabel(o.Fonts.Clock, clockPx, "", pal.Fg),
-		Date:  widget.NewLabel(o.Fonts.Text, datePx, "", pal.FgMuted),
-		Entry: widget.NewEntry(o.Fonts.Text, entryPx, pal.Fg),
-		Error: widget.NewLabel(o.Fonts.Text, entryPx, "", pal.Red),
-	}
-	for _, l := range []*widget.Label{p.Clock, p.Date, p.Error} {
-		l.SetAlignment(render.AlignCenter)
+		Clock: label(o.Font, "lock-clock"),
+		Date:  label(o.Font, "lock-date"),
+		Entry: widget.NewEntry(o.Font, textPx, 0),
+		Error: label(o.Font, "lock-error"),
 	}
 	p.Clock.SetVisible(o.ShowClock)
 	p.Date.SetVisible(o.ShowClock)
+	p.Entry.AddClass("lock-entry")
 	p.Entry.SetEcho(widget.EchoPassword)
+	p.Entry.SetWidthChars(entryChars, 0)
+	p.Entry.SetTrailingIcon(peekReveal, textPx, p.togglePeek)
 	p.Entry.OnActivate = onSubmit
 	p.Error.SetVisible(false)
 
-	column := widget.NewBox(widget.Column, columnSpacing, 0)
-	column.Append(p.Clock, false).Append(p.Date, false)
+	center := widget.NewBox(widget.Column, columnSpacing, 0)
+	center.AddClass("lock-center")
+	center.SetHAlign(widget.AlignCenter)
+	center.SetVAlign(widget.AlignCenter)
+	center.Append(p.Clock, false).Append(p.Date, false)
 	if o.Header != nil {
-		column.Append(o.Header, false)
+		center.Append(o.Header, false)
 	}
 	if o.WithUsername {
-		p.Username = widget.NewEntry(o.Fonts.Text, entryPx, pal.Fg)
-
+		p.Username = widget.NewEntry(o.Font, textPx, 0)
+		p.Username.AddClass("lock-user")
+		p.Username.SetPlaceholder("Username")
+		p.Username.SetWidthChars(entryChars, 0)
 		p.Username.OnActivate = func(string) {
 			if o.Focus != nil {
 				o.Focus(p.Entry)
 			}
 		}
-		column.Append(withGap(p.Username, entryGap), false)
+		center.Append(p.Username, false)
 	}
-	column.Append(withGap(p.Entry, entryGap), false)
+	center.Append(p.Entry, false)
 	if o.Extra != nil {
-		column.Append(o.Extra, false)
+		center.Append(o.Extra, false)
 	}
-	column.Append(withGap(p.Error, errorGap), false)
+	center.Append(p.Error, false)
 
-	p.Reveal = widget.NewRevealer(Center(NewPanel(column, cardPadding, cardRadius, cardColor)))
-	p.Root = p.Reveal
+	p.Reveal = widget.NewRevealer(center)
+	p.Reveal.SetHAlign(widget.AlignCenter)
+	p.Reveal.SetVAlign(widget.AlignCenter)
 	return p
+}
+
+func label(font render.Font, class string) *widget.Label {
+	l := widget.NewLabel(font, textPx, "", 0)
+	l.AddClass(class)
+	return l
+}
+
+// togglePeek is the peek icon's click: the masked text shows, or hides
+// again.
+func (p *Prompt) togglePeek() {
+	p.peeked = !p.peeked
+	p.Entry.EchoReveal(p.peeked)
+	icon := peekReveal
+	if p.peeked {
+		icon = peekConceal
+	}
+	p.Entry.SetTrailingIcon(icon, 0, p.togglePeek)
 }
 
 // SetMessage shows text on the error line, or hides it when empty.
@@ -125,22 +136,29 @@ func (p *Prompt) SetMessage(text string) {
 	p.Error.SetVisible(text != "")
 }
 
-// withGap puts a fixed gap above w (a CSS margin-top) and pins the
-// entries to their width-chars width.
-func withGap(w widget.Widget, gap int) widget.Widget {
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.Append(NewSpacer(0, gap), false)
-	if _, isEntry := w.(*widget.Entry); isEntry {
-		w = NewFixed(w, entryWidth, 0)
+// Window is a lock or greeter surface's root (the GTK window node the
+// .lock-window rules select), styled by sheet, holding the layers
+// bottom to top.
+func Window(sheet *widget.Stylesheet, layers ...widget.Widget) widget.Widget {
+	overlay := widget.NewOverlay()
+	for _, l := range layers {
+		overlay.Append(l)
 	}
-	col.Append(w, false)
-	return col
+	root := widget.NewBox(widget.Column, 0, 0)
+	root.SetElement("window")
+	root.AddClass("background", "lock-window")
+	if sheet != nil {
+		root.AttachStylesheet(sheet)
+	}
+	root.Append(overlay, true)
+	return root
 }
 
-// Center places w at its natural size in the middle of the surface.
-func Center(w widget.Widget) widget.Widget {
-	g := widget.NewGrid(0, 0)
-	g.Attach(w, 0, 0, 1, 1)
-	g.SetAlign(w, widget.AlignCenter, widget.AlignCenter)
-	return g
+// Scrim is the blank-screen blackout (.lock-scrim), hidden until the
+// blank timer shows it.
+func Scrim() *widget.Box {
+	s := widget.NewBox(widget.Column, 0, 0)
+	s.AddClass("lock-scrim")
+	s.SetVisible(false)
+	return s
 }

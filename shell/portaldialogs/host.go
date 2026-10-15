@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/wayle/internal/fileuri"
 	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/wayle/shell/widgets"
 )
 
 // The surface's sizes (shell/portal_dialogs: set_width_request,
@@ -219,7 +220,7 @@ func (h *Dialogs) actions(buttons ...*widget.Button) widget.Widget {
 func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title, body, cancel, confirm string) widget.Widget {
 	rows := []widget.Widget{}
 	if header != nil {
-		rows = append(rows, credential.Center(header))
+		rows = append(rows, widgets.Center(header))
 	}
 	rows = append(rows, h.label(title, "portal-dialog-title"))
 	if body != "" {
@@ -313,7 +314,7 @@ func (h *Dialogs) show(tree widget.Widget) {
 		h.win, h.closing = nil, false
 	}
 	cfg := h.d.Config()
-	h.rev = widget.NewRevealer(credential.Center(tree))
+	h.rev = widget.NewRevealer(widgets.Center(tree))
 	root := widget.NewBox(widget.Column, 0, 0)
 	root.AddClass("portal-dialog-window")
 	if h.d.Sheet != nil {

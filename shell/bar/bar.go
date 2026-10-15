@@ -401,7 +401,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	go osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness)
 	// The ext-session-lock screen and its triggers (logind, and `wayle
 	// lock` through Shell1).
-	lockScreen, stopLock := lock.Start(application, current.Load(), lock.Fonts(cfg.General.FontSans, font), palette)
+	lockScreen, stopLock := lock.Start(application, current.Load(), font, theme.Sheet)
 	defer stopLock()
 	defer serveShellIPC(application, bars, func() bool {
 		application.Invoke(lockScreen.Lock)

@@ -25,7 +25,6 @@ import (
 	"github.com/stubbedev/wayle/service/auth"
 	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/shell/reveal"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // The lock-screen strings (wayle-shell-core's _lock.ftl, en-US).
@@ -38,7 +37,8 @@ func msgFailedAttempts(n uint32) string {
 	return "Incorrect password — " + strconv.FormatUint(uint64(n), 10) + " failed attempts"
 }
 
-// blackout is .lock-scrim: the opaque blank-screen layer.
+// blackout is the surface's clear color under the background, opaque
+// from the first frame.
 var blackout = render.RGB(0, 0, 0)
 
 // locker is the session-lock surface the screen drives; appLocker
@@ -91,7 +91,7 @@ type authHandle interface {
 // face is one output's lock surface: the prompt and the blank scrim.
 type face struct {
 	prompt *credential.Prompt
-	scrim  *credential.Fill
+	scrim  *widget.Box
 }
 
 // Screen is the lock screen component. Every method runs on the event
@@ -100,8 +100,8 @@ type Screen struct {
 	cfg       config.LockConfig
 	anims     config.AnimationsConfig
 	wallpaper string
-	fonts     credential.Fonts
-	pal       *styling.Palette
+	font      render.Font
+	sheet     *widget.Stylesheet
 	d         Deps
 
 	faces []*face
@@ -134,8 +134,10 @@ type Screen struct {
 }
 
 // New builds the screen over its collaborators.
-func New(cfg *config.Config, fonts credential.Fonts, pal *styling.Palette, d Deps) *Screen {
-	return &Screen{cfg: cfg.Lock, anims: cfg.Animations, wallpaper: cfg.Wallpaper.Wallpaper, fonts: fonts, pal: pal, d: d}
+// The prompt shapes text with font; sheet (the shell's stylesheet)
+// styles the surfaces through the _lock.scss rules.
+func New(cfg *config.Config, font render.Font, sheet *widget.Stylesheet, d Deps) *Screen {
+	return &Screen{cfg: cfg.Lock, anims: cfg.Animations, wallpaper: cfg.Wallpaper.Wallpaper, font: font, sheet: sheet, d: d}
 }
 
 // SetConfig applies a reloaded config, as the Rust lock reads its keys
@@ -206,24 +208,23 @@ func (s *Screen) loadBackground() image.Image {
 // output at lock time and again for each output plugged in while
 // locked. A new face picks up the current state.
 func (s *Screen) buildFace(*app.Output) app.LockSurface {
-	f := &face{scrim: credential.NewFill(blackout)}
+	f := &face{scrim: credential.Scrim()}
 	f.prompt = credential.Build(credential.Options{
-		Fonts:     s.fonts,
-		Palette:   s.pal,
+		Font:      s.font,
 		ShowClock: s.cfg.ShowClock,
 	}, s.Submit)
 	f.prompt.Clock.SetText(s.clockText)
 	f.prompt.Date.SetText(s.dateText)
 	f.prompt.SetMessage(s.message)
 	f.prompt.Entry.SetEnabled(s.inputOn)
-	f.scrim.SetOn(s.blanked)
+	f.scrim.SetVisible(s.blanked)
 	// The background is opaque at once; the card reveals over it.
 	reveal.Show(f.prompt.Reveal, s.anims, config.AnimLock)
 	s.faces = append(s.faces, f)
-	root := widget.NewOverlay().
-		Append(credential.Background(s.bg, credential.HexFill(s.cfg.Background.Color))).
-		Append(f.prompt.Root).
-		Append(f.scrim)
+	root := credential.Window(s.sheet,
+		credential.Background(s.bg, credential.HexFill(s.cfg.Background.Color)),
+		f.prompt.Reveal,
+		f.scrim)
 	return app.LockSurface{
 		Root:       root,
 		Background: blackout,
@@ -444,7 +445,7 @@ func (s *Screen) armBlank() {
 func (s *Screen) setBlanked(on bool) {
 	s.blanked = on
 	for _, f := range s.faces {
-		f.scrim.SetOn(on)
+		f.scrim.SetVisible(on)
 	}
 }
 

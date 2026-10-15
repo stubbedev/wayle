@@ -16,7 +16,6 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/auth"
 	"github.com/stubbedev/wayle/shell/credential"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // appLocker adapts gelm's session lock to the screen.
@@ -47,23 +46,11 @@ func (l appLocker) Focus(w widget.Widget) {
 	}
 }
 
-// Fonts resolves the prompt's faces from the configured family: the
-// regular chain, and the bold clock (.lock-clock font-weight 700).
-func Fonts(family string, text render.Font) credential.Fonts {
-	fonts := credential.Fonts{Text: text, Clock: text}
-	if bold, err := app.FontWeighted(family, clockFontPx, 700, false); err == nil {
-		fonts.Clock = app.FontFallback(bold)
-	}
-	return fonts
-}
-
-const clockFontPx = 64
-
 // Start wires the lock screen into the running shell: the logind
 // triggers, lock-on-start, and the LockedHint restart recovery. The
 // shell serves `wayle lock` by handing Screen.Lock to its
 // com.wayle.Shell1 hooks. The returned stop ends the logind listener.
-func Start(a *app.Application, cfg *config.Config, fonts credential.Fonts, pal *styling.Palette) (*Screen, func()) {
+func Start(a *app.Application, cfg *config.Config, font render.Font, sheet *widget.Stylesheet) (*Screen, func()) {
 	ld := systemLogind()
 	deps := Deps{
 		Locker: appLocker{a: a},
@@ -87,7 +74,7 @@ func Start(a *app.Application, cfg *config.Config, fonts credential.Fonts, pal *
 			}()
 		}
 	}
-	s := New(cfg, fonts, pal, deps)
+	s := New(cfg, font, sheet, deps)
 
 	var stops []func()
 	if ld != nil {

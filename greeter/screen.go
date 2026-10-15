@@ -2,6 +2,7 @@ package greeter
 
 import (
 	_ "embed" // the power-button glyphs
+	"fmt"
 	"image"
 	"log"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/auth"
 	"github.com/stubbedev/wayle/shell/credential"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // t is the greeter's t! (wayle-greeter.ftl, the desktop locale).
@@ -42,22 +42,15 @@ var (
 	restartSVG []byte
 )
 
-// The _lock.scss greeter rules.
-var (
-	userHover    = render.RGBA(0, 0, 0, 89)  // .lock-user-button:hover
-	userSelected = render.RGBA(0, 0, 0, 128) // .lock-user-button.selected
-	avatarFill   = render.RGBA(0, 0, 0, 115) // .lock-avatar-fallback
-	powerHover   = render.RGBA(0, 0, 0, 89)  // .lock-power-button:hover
-)
-
+// The greeter's fixed metrics: GTK widget properties, not styling.
 const (
-	avatarPx     = 64
-	userRowGap   = 12
-	powerMargin  = 32 // .lock-power margin-bottom: 2rem
-	powerIconPx  = 16
-	capsPx       = 14.4 // .lock-caps font-size: 0.9rem
-	userNamePx   = 14.4 // .lock-user-name font-size: 0.9rem
-	avatarTextPx = 28   // .lock-avatar-fallback font-size: 1.75rem
+	avatarPx    = 64 // the avatar's size request
+	userRowGap  = 12 // the user row's spacing
+	userColGap  = 6  // the avatar column's spacing
+	powerGap    = 12 // the power row's spacing
+	powerIconPx = 16
+	nameChars   = 14 // the user name's max-width-chars
+	textPx      = 16 // the labels' size before the stylesheet's
 )
 
 // Init is what the greeter starts from (app.rs GreeterInit).
@@ -119,7 +112,10 @@ type userButton struct {
 	button *widget.Button
 }
 
-func newScreen(init Init, fonts credential.Fonts, pal *styling.Palette, d deps) *screen {
+// newScreen builds the greeter view (app.rs init): font shapes the
+// text and sheet styles the window through the _lock.scss rules the
+// greeter shares with the lock screen.
+func newScreen(init Init, font render.Font, sheet *widget.Stylesheet, d deps) *screen {
 	s := &screen{init: init, d: d}
 	g := init.Config.Greeter
 
@@ -130,38 +126,46 @@ func newScreen(init Init, fonts credential.Fonts, pal *styling.Palette, d deps) 
 			s.selected = i
 		}
 	}
-	s.drop = widget.NewDropdown(fonts.Text, 16, names, s.selected)
+	s.drop = widget.NewDropdown(font, textPx, names, s.selected)
+	s.drop.AddClass("lock-session")
+	s.drop.SetCursorName("pointer")
+	s.drop.SetHAlign(widget.AlignCenter)
 	s.drop.OnSelect = func(i int) {
 		s.mu.Lock()
 		s.selected = i
 		s.mu.Unlock()
 	}
 	s.drop.SetVisible(len(init.Sessions) > 1)
-	s.caps = widget.NewLabel(fonts.Text, capsPx, t("greeter-caps-lock"), pal.Yellow)
-	s.caps.SetAlignment(render.AlignCenter)
+	s.caps = widget.NewLabel(font, textPx, t("greeter-caps-lock"), 0)
+	s.caps.AddClass("lock-caps")
 	s.caps.SetVisible(false)
 	below := widget.NewBox(widget.Column, 0, 0)
-	below.Append(s.caps, false).Append(credential.NewSpacer(0, 16), false).Append(credential.Center(s.drop), false)
+	below.Append(s.caps, false).Append(s.drop, false)
 
-	var header widget.Widget
+	users := widget.NewBox(widget.Row, userRowGap, 0)
+	users.AddClass("lock-users")
+	users.SetHAlign(widget.AlignCenter)
 	if g.ShowUserList && len(init.Users) > 0 && len(init.Users) <= maxListedUsers {
-		header = credential.Center(s.userRow(fonts, pal))
+		s.populateUsers(users, font)
+	} else {
+		users.SetVisible(false)
 	}
 	s.prompt = credential.Build(credential.Options{
-		Fonts: fonts, Palette: pal, ShowClock: g.ShowClock, WithUsername: true,
-		Header: header, Extra: below, Focus: d.focus,
+		Font: font, ShowClock: g.ShowClock, WithUsername: true,
+		Header: users, Extra: below, Focus: d.focus,
 	}, s.submit)
 	s.prompt.Username.SetPlaceholder(t("greeter-username"))
 	s.prompt.Reveal.SetTransition(widget.RevealFade)
 	s.prompt.Reveal.SetDuration(revealFade)
 
-	layers := widget.NewOverlay().
-		Append(credential.Background(s.background(), credential.HexFill(g.Background.Color))).
-		Append(s.prompt.Root)
-	if g.ShowPowerButtons {
-		layers.Append(s.powerRow(pal))
+	layers := []widget.Widget{
+		credential.Background(s.background(), credential.HexFill(g.Background.Color)),
+		s.prompt.Reveal,
 	}
-	s.root = layers
+	if g.ShowPowerButtons {
+		layers = append(layers, s.powerRow())
+	}
+	s.root = credential.Window(sheet, layers...)
 	s.refreshClock()
 	return s
 }
@@ -194,47 +198,51 @@ func (s *screen) background() image.Image {
 	return img
 }
 
-// userRow is one avatar button per login user; a click fills the
-// username, marks the button selected, and focuses the password.
-func (s *screen) userRow(fonts credential.Fonts, pal *styling.Palette) widget.Widget {
-	row := widget.NewBox(widget.Row, userRowGap, 0)
+// populateUsers is populate_user_row: one avatar button per login user
+// in the .lock-users row; a click fills the username, marks the button
+// selected, and focuses the password.
+func (s *screen) populateUsers(row *widget.Box, font render.Font) {
 	for _, u := range s.init.Users {
 		ub := &userButton{user: u}
-		name := widget.NewLabel(fonts.Text, userNamePx, u.DisplayName, pal.FgMuted)
-		name.SetAlignment(render.AlignCenter)
+		name := widget.NewLabel(font, textPx, u.DisplayName, 0)
+		name.AddClass("lock-user-name")
 		name.SetEllipsize(widget.EllipsizeEnd)
-		col := widget.NewBox(widget.Column, 6, 0)
-		col.Append(credential.Center(s.avatar(u, fonts, pal)), false).Append(credential.NewFixed(name, 14*9, 0), false)
-		ub.button = widget.NewButton(col, 8, 12)
-		ub.button.BgExplicit = true
-		ub.button.BgHover = userHover
-		ub.button.BgPressed = userSelected
+		name.SetMaxWidthChars(nameChars)
+		col := widget.NewBox(widget.Column, userColGap, 0)
+		col.SetHAlign(widget.AlignCenter)
+		col.Append(s.avatar(u, font), false).Append(name, false)
+		ub.button = widget.NewButton(col, 0, 0)
+		ub.button.AddClass("lock-user-button", "flat")
 		if u.Name == s.init.LastUser {
-			ub.button.Bg = userSelected
+			ub.button.AddClass("selected")
 		}
 		ub.button.OnClick = func() { s.pickUser(ub) }
 		s.users = append(s.users, ub)
 		row.Append(ub.button, false)
 	}
-	return row
 }
 
 func (s *screen) pickUser(picked *userButton) {
 	for _, ub := range s.users {
-		ub.button.Bg = 0
-		ub.button.Invalidate()
+		ub.button.RemoveClass("selected")
 	}
-	picked.button.Bg = userSelected
+	picked.button.AddClass("selected")
 	s.prompt.Username.SetText(picked.user.Name)
 	s.d.focus(s.prompt.Entry)
 }
 
-// avatar is the round avatar image, or the initial letter on a dark
-// disc when there is no readable image.
-func (s *screen) avatar(u User, fonts credential.Fonts, pal *styling.Palette) widget.Widget {
+// avatar is build_user_button's avatar: the image scaled to cover, or
+// the initial letter (.lock-avatar-fallback) when there is no readable
+// image, at the 64px size request.
+func (s *screen) avatar(u User, font render.Font) widget.Widget {
+	sized := fmt.Sprintf("min-width: %dpx; min-height: %dpx;", avatarPx, avatarPx)
 	if u.Icon != "" {
 		if img, err := s.d.loadAvatar(u.Icon); err == nil {
-			return credential.NewFixed(widget.NewImage(roundAvatar(img, avatarPx)), avatarPx, avatarPx)
+			pic := widget.NewImage(img)
+			pic.SetScale(widget.ImageCover)
+			pic.AddClass("lock-avatar")
+			pic.SetInlineStyle(sized)
+			return pic
 		}
 	}
 	initial := ""
@@ -242,60 +250,33 @@ func (s *screen) avatar(u User, fonts credential.Fonts, pal *styling.Palette) wi
 		initial = string(unicode.ToUpper(r))
 		break
 	}
-	letter := widget.NewLabel(fonts.Clock, avatarTextPx, initial, pal.Fg)
+	letter := widget.NewLabel(font, textPx, initial, 0)
+	letter.AddClass("lock-avatar", "lock-avatar-fallback")
 	letter.SetAlignment(render.AlignCenter)
-	return credential.NewFixed(credential.NewPanel(credential.Center(letter), 0, avatarPx/2, avatarFill), avatarPx, avatarPx)
+	letter.SetInlineStyle(sized)
+	return letter
 }
 
-// roundAvatar scales img to cover a size x size square and masks it to
-// a disc (.lock-avatar border-radius: 50%).
-func roundAvatar(img image.Image, size int) *image.RGBA {
-	out := image.NewRGBA(image.Rect(0, 0, size, size))
-	b := img.Bounds()
-	side := min(b.Dx(), b.Dy())
-	if side == 0 {
-		return out
-	}
-	x0 := b.Min.X + (b.Dx()-side)/2
-	y0 := b.Min.Y + (b.Dy()-side)/2
-	r := float64(size) / 2
-	for y := range size {
-		for x := range size {
-			dx, dy := float64(x)+0.5-r, float64(y)+0.5-r
-			if dx*dx+dy*dy > r*r {
-				continue
-			}
-			c := img.At(x0+x*side/size, y0+y*side/size)
-			out.Set(x, y, c)
-		}
-	}
-	return out
-}
-
-// powerRow is shutdown and reboot at the bottom center.
-func (s *screen) powerRow(pal *styling.Palette) widget.Widget {
-	row := widget.NewBox(widget.Row, 12, 0)
+// powerRow is build_power_box: shutdown and reboot in the .lock-power
+// row at the bottom center.
+func (s *screen) powerRow() widget.Widget {
+	row := widget.NewBox(widget.Row, powerGap, 0)
+	row.AddClass("lock-power")
+	row.SetHAlign(widget.AlignCenter)
+	row.SetVAlign(widget.AlignEnd)
 	for _, b := range []struct {
 		svg     []byte
 		tooltip string
 		verb    string
 	}{{powerSVG, t("greeter-shutdown"), "poweroff"}, {restartSVG, t("greeter-restart"), "reboot"}} {
-		icon := widget.NewSVGIcon(b.svg, powerIconPx)
-		icon.SetTint(pal.FgMuted)
-		btn := widget.NewButton(icon, 12, 12)
-		btn.BgExplicit = true
-		btn.BgHover = powerHover
+		btn := widget.NewButton(widget.NewSVGIcon(b.svg, powerIconPx), 0, 0)
+		btn.AddClass("lock-power-button", "flat")
 		btn.SetTooltip(b.tooltip)
 		verb := b.verb
 		btn.OnClick = func() { s.d.power(verb) }
 		row.Append(btn, false)
 	}
-	g := widget.NewGrid(0, 0)
-	col := widget.NewBox(widget.Column, 0, 0)
-	col.Append(row, false).Append(credential.NewSpacer(0, powerMargin), false)
-	g.Attach(col, 0, 0, 1, 1)
-	g.SetAlign(col, widget.AlignCenter, widget.AlignEnd)
-	return g
+	return row
 }
 
 // selectedSession is the session the picker shows.

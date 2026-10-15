@@ -12,8 +12,9 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
+	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/auth"
-	"github.com/stubbedev/wayle/shell/credential"
+	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -36,19 +37,10 @@ func Run(init Init) error {
 	if err != nil {
 		return fmt.Errorf("greeter: font %q: %w", family, err)
 	}
-	fonts := credential.Fonts{Text: app.FontFallback(base), Clock: app.FontFallback(base)}
-	if bold, err := app.FontWeighted(family, 64, 700, false); err == nil {
-		fonts.Clock = app.FontFallback(bold)
-	}
+	font := app.FontFallback(base)
 
 	var win *app.Window
-	// The theme the desktop and the lock use (install_css: the configured
-	// palette).
-	pal, err := styling.ConfigPalette(init.Config.Styling)
-	if err != nil {
-		log.Printf("greeter: palette: %v", err)
-	}
-	s := newScreen(init, fonts, pal, deps{
+	s := newScreen(init, font, Stylesheet(init.Config), deps{
 		connect: func(cmd func() []string, env []string) (auth.Conversation, error) {
 			return auth.NewGreetdFromEnv(cmd, env)
 		},
@@ -137,4 +129,12 @@ func (s *screen) applyDebugOps(spec string, after func(time.Duration, func())) {
 			s.submit(pass)
 		})
 	}
+}
+
+// Stylesheet is install_css: the compiled stylesheet and the configured
+// palette's theme, at the bundle's priority. The greeter carries no
+// user styles: pre-login there is no user.
+func Stylesheet(cfg *config.Config) *widget.Stylesheet {
+	theme := styling.ThemeCSS(cfg.Styling.ActivePalette(), cfg.General, cfg.Bar, cfg.Styling)
+	return widget.NewStylesheet(styling.StaticCSS+"\n"+theme, apptheme.Priority)
 }

@@ -5,19 +5,18 @@ import (
 	"image"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/auth"
-	"github.com/stubbedev/wayle/shell/credential"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/wayle/shell/apptheme"
+	"github.com/stubbedev/wayle/shell/treetest"
 )
 
 // fakeLocker plays gelm's session lock: Lock builds one surface per
@@ -105,10 +104,7 @@ type timer struct {
 
 func newHarness(t *testing.T, edit func(*config.LockConfig)) *harness {
 	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
+	face := treetest.Font(t)
 	cfg := config.Defaults()
 	if edit != nil {
 		edit(&cfg.Lock)
@@ -118,7 +114,7 @@ func newHarness(t *testing.T, edit func(*config.LockConfig)) *harness {
 		loop:   &fakeLoop{},
 		now:    time.Date(2026, 3, 5, 9, 7, 0, 0, time.Local),
 	}
-	h.s = New(cfg, credential.Fonts{Text: face, Clock: face}, styling.Default(), Deps{
+	h.s = New(cfg, face, apptheme.New(cfg).Sheet, Deps{
 		Locker: h.locker,
 		Loop:   h.loop,
 		Now:    func() time.Time { return h.now },
@@ -177,7 +173,7 @@ func TestLockCoversOutputsAndReportsTheHint(t *testing.T) {
 		if f.prompt.Clock.Text() != "09:07" || f.prompt.Date.Text() != "Thursday, March 5" {
 			t.Errorf("clock = %q / %q", f.prompt.Clock.Text(), f.prompt.Date.Text())
 		}
-		if !f.prompt.Entry.Enabled() || f.prompt.Error.Visible() || f.scrim.On() {
+		if !f.prompt.Entry.Enabled() || f.prompt.Error.Visible() || f.scrim.Visible() {
 			t.Error("a fresh surface must take input with no message and no blackout")
 		}
 		if !f.prompt.Reveal.Revealed() || f.prompt.Reveal.Transition() != widget.RevealFade {
@@ -361,13 +357,13 @@ func TestBlankTimer(t *testing.T) {
 	}
 	h.timers[0].fn()
 	h.eachFace(t, func(f *face) {
-		if !f.scrim.On() {
+		if !f.scrim.Visible() {
 			t.Error("the blank timer did not black out the surfaces")
 		}
 	})
 	h.s.Activity()
 	h.eachFace(t, func(f *face) {
-		if f.scrim.On() {
+		if f.scrim.Visible() {
 			t.Error("activity did not unblank")
 		}
 	})
@@ -375,7 +371,7 @@ func TestBlankTimer(t *testing.T) {
 		t.Error("activity did not re-arm the blank timer")
 	}
 	h.timers[0].fn() // a stale timer must not blank
-	if h.s.faces[0].scrim.On() {
+	if h.s.faces[0].scrim.Visible() {
 		t.Error("a superseded blank timer blanked the screen")
 	}
 
@@ -533,5 +529,32 @@ func TestSetConfigAppliesAReload(t *testing.T) {
 	h.s.Submit("pw")
 	if c := h.conv(t); c.service != "wayle-reloaded" {
 		t.Errorf("PAM service = %q, want the reloaded one", c.service)
+	}
+}
+
+// The surface is the Rust lock window's tree, styled by _lock.scss:
+// window.lock-window over the background, the .lock-center card with
+// its lock-* nodes, and the .lock-scrim; nothing pins an ink the
+// stylesheet should set.
+func TestSurfaceIsTheStyledLockTree(t *testing.T) {
+	h := newHarness(t, nil)
+	h.lock(t)
+	root := h.locker.surfaces[0].Root
+	win, ok := root.(*widget.Box)
+	if !ok || !slices.Contains(win.Classes(), "lock-window") {
+		t.Fatalf("surface root %T, want the .lock-window node", root)
+	}
+	for _, class := range []string{"lock-bg", "lock-center", "lock-clock", "lock-date", "lock-entry", "lock-error", "lock-scrim"} {
+		if len(treetest.WithClass(root, class)) != 1 {
+			t.Errorf("want one .%s node", class)
+		}
+	}
+	for _, l := range treetest.All[*widget.Label](root) {
+		if l.Color() != 0 {
+			t.Errorf("label %v pins ink %#08x over the stylesheet", l.Classes(), uint32(l.Color()))
+		}
+	}
+	if e := h.s.faces[0].prompt.Entry; e.Color() != 0 {
+		t.Errorf("the entry pins ink %#08x", uint32(e.Color()))
 	}
 }

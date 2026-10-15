@@ -15,8 +15,8 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/wayle/shell/widgets"
 )
 
 // iconPx is the button icon size (--icon-lg).
@@ -86,7 +86,7 @@ func (m *Menu) Show() {
 		}
 		row.Append(m.button(a), true)
 	}
-	m.rev = widget.NewRevealer(credential.Center(row))
+	m.rev = widget.NewRevealer(widgets.Center(row))
 	root := widget.NewBox(widget.Column, 0, 0)
 	root.AddClass("power-menu-window")
 	if m.d.Sheet != nil {
@@ -126,7 +126,7 @@ func (m *Menu) button(a action) widget.Widget {
 	content := widget.NewBox(widget.Column, 6, 0)
 	content.Append(icon, false)
 	content.Append(label, false)
-	b := widget.NewButton(credential.Center(content), 0, 0)
+	b := widget.NewButton(widgets.Center(content), 0, 0)
 	b.AddClass("power-menu-button")
 	b.OnClick = func() { m.Run(a.command(m.d.Config().Power)) }
 	return b

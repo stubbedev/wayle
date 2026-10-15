@@ -8,7 +8,7 @@ import (
 )
 
 func TestFixedSetSizeRepinsAndInvalidates(t *testing.T) {
-	f := NewFixed(NewSpacer(10, 10), 90, 0)
+	f := NewFixed(widget.NewSpacer(10, 10), 90, 0)
 	con := widget.Constraints{Max: widget.Size{W: 500, H: 500}}
 	if got := f.Measure(con); got.W != 90 || got.H != 10 {
 		t.Fatalf("pinned width = %+v, want 90 x natural 10", got)
@@ -53,7 +53,6 @@ func TestContainersReportTheirChildToTheFocusRing(t *testing.T) {
 	for name, wrap := range map[string]func(widget.Widget) widget.Widget{
 		"Fixed": func(c widget.Widget) widget.Widget { return NewFixed(c, 10, 10) },
 		"Inset": func(c widget.Widget) widget.Widget { return NewInset(c, render.Insets{Top: 1}) },
-		"Panel": func(c widget.Widget) widget.Widget { return NewPanel(c, 1, 0, 0) },
 	} {
 		child := widget.NewSpacer(10, 10)
 		w := wrap(child)

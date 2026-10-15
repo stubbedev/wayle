@@ -19,26 +19,28 @@ import (
 	"github.com/stubbedev/wayle/config"
 )
 
-// imageScrim is .lock-bg-scrim over image backgrounds:
-// rgba(0, 0, 0, 0.45), for legibility.
-var imageScrim = render.RGBA(0, 0, 0, 115)
-
 // HexFill converts a config color to a premultiplied fill.
 func HexFill(c config.HexColor) render.Color {
 	r, g, b, a := c.RGBA()
 	return render.RGBA(r, g, b, a)
 }
 
-// Background builds the surface background: the decoded image scaled
-// to cover with the legibility scrim, or the solid color when there is
-// no image.
+// Background builds the surface background (build_background): the
+// decoded image scaled to cover under the .lock-bg-scrim legibility
+// layer, or the configured color painted by a .lock-bg area when there
+// is no image.
 func Background(img image.Image, color render.Color) widget.Widget {
 	if img == nil {
-		return NewFill(color)
+		fill := widget.NewDrawingArea(0, 0)
+		fill.AddClass("lock-bg")
+		fill.OnDraw = func(cv *render.Canvas, r render.Rect) { cv.FillRect(r, color) }
+		return fill
 	}
 	pic := widget.NewImage(img)
 	pic.SetScale(widget.ImageCover)
-	return widget.NewOverlay().Append(pic).Append(NewFill(imageScrim))
+	scrim := widget.NewBox(widget.Column, 0, 0)
+	scrim.AddClass("lock-bg-scrim")
+	return widget.NewOverlay().Append(pic).Append(scrim)
 }
 
 // LoadImage decodes a background file and applies a gaussian blur of
