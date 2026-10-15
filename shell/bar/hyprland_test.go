@@ -228,6 +228,7 @@ type fakeHypr struct {
 	replies  map[string]string
 	dispatch []string
 	events   chan net.Conn
+	sub      net.Conn
 }
 
 func startFakeHypr(t *testing.T, replies map[string]string) (*fakeHypr, *hyprland.Connection) {
@@ -277,6 +278,24 @@ func (f *fakeHypr) set(req, reply string) {
 	f.mu.Lock()
 	f.replies[req] = reply
 	f.mu.Unlock()
+}
+
+// emit writes event lines to the subscriber, waiting for it to
+// connect.
+func (f *fakeHypr) emit(t *testing.T, lines ...string) {
+	t.Helper()
+	if f.sub == nil {
+		select {
+		case f.sub = <-f.events:
+		case <-time.After(2 * time.Second):
+			t.Fatal("no event subscriber connected")
+		}
+	}
+	for _, line := range lines {
+		if _, err := f.sub.Write([]byte(line + "\n")); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func (f *fakeHypr) dispatched() []string {

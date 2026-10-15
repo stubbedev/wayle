@@ -181,9 +181,13 @@ var MediaBuiltinIcons = []IconMapping{
 
 // PlayerIconMappings is player-icons in pattern order, the BTreeMap
 // order the Rust lookup walks.
-func (c MediaConfig) PlayerIconMappings() []IconMapping {
-	out := make([]IconMapping, 0, len(c.PlayerIcons))
-	for pattern, icon := range c.PlayerIcons {
+func (c MediaConfig) PlayerIconMappings() []IconMapping { return sortedIconMappings(c.PlayerIcons) }
+
+// sortedIconMappings is a pattern -> icon map in pattern order: the
+// BTreeMap the Rust schema holds it in.
+func sortedIconMappings(m map[string]string) []IconMapping {
+	out := make([]IconMapping, 0, len(m))
+	for pattern, icon := range m {
 		out = append(out, IconMapping{Pattern: pattern, Icon: icon})
 	}
 	slices.SortFunc(out, func(a, b IconMapping) int { return strings.Compare(a.Pattern, b.Pattern) })

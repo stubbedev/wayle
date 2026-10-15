@@ -183,6 +183,21 @@ func (c *Connection) ActiveWorkspace() (Workspace, error) {
 	return decodeJSON[Workspace](reply)
 }
 
+// ActiveWindow is j/activewindow: the focused window, false when none
+// is (Hyprland answers {} while a layer surface or nothing has focus).
+func (c *Connection) ActiveWindow() (Client, bool, error) {
+	reply, err := c.Command("j/activewindow")
+	if err != nil {
+		return Client{}, false, err
+	}
+	client, err := decodeJSON[Client](reply)
+	if err != nil {
+		return Client{}, false, err
+	}
+	client.Address = NormalizeAddress(client.Address)
+	return client, client.Class != "" || client.Title != "", nil
+}
+
 // Dispatch runs a dispatcher command ("workspace 3") and returns the
 // compositor's ack.
 func (c *Connection) Dispatch(command string) (string, error) {
