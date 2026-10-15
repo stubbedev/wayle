@@ -309,11 +309,11 @@ func TestDropdownInstanceStacksInterpolate(t *testing.T) {
 func TestDropdownPopoverFollowsAutohide(t *testing.T) {
 	cfg := config.Defaults()
 	anchor := widget.NewBox(widget.Row, 0, 0)
-	if pc := dropdownPopover(cfg, anchor, anchor, 7, 1000); pc.NoAutohide || pc.MaxHeight != 900 || pc.Serial != 7 {
+	if pc := dropdownPopover(cfg, anchor, anchor, 1000); pc.NoAutohide || pc.MaxHeight != 900 {
 		t.Errorf("autohide on: %+v, want a grabbing popover capped at 900", pc)
 	}
 	cfg.Bar.DropdownAutohide = false
-	if pc := dropdownPopover(cfg, anchor, anchor, 7, 0); !pc.NoAutohide || pc.MaxHeight != 0 {
+	if pc := dropdownPopover(cfg, anchor, anchor, 0); !pc.NoAutohide || pc.MaxHeight != 0 {
 		t.Errorf("autohide off: %+v, want a no-grab popover", pc)
 	}
 }

@@ -31,30 +31,30 @@ func prepare(img image.Image, fit wallpaper.FitMode, box target) image.Image {
 		return img
 	}
 	var (
-		src    image.Rectangle
-		dw, dh int
+		src image.Rectangle
+		dst render.Rect
 	)
 	switch fit {
 	case wallpaper.FitFit:
-		src, dw, dh = render.ScaleRect(sw, sh, box.w, box.h, render.ImageFit)
+		src, dst = render.PlaceImage(sw, sh, box.w, box.h, render.ImageFit, render.ImageCentered)
 	case wallpaper.FitStretch:
-		src, dw, dh = render.ScaleRect(sw, sh, box.w, box.h, render.ImageStretch)
+		src, dst = render.PlaceImage(sw, sh, box.w, box.h, render.ImageStretch, render.ImageCentered)
 	case wallpaper.FitCenter:
 		nw := int(math.Round(float64(sw) * box.scale))
 		nh := int(math.Round(float64(sh) * box.scale))
 		if nw <= box.w && nh <= box.h {
-			src, dw, dh = image.Rect(0, 0, sw, sh), nw, nh
+			src, dst = image.Rect(0, 0, sw, sh), render.Rect{W: nw, H: nh}
 		} else {
-			src, dw, dh = render.ScaleRect(sw, sh, box.w, box.h, render.ImageFit)
+			src, dst = render.PlaceImage(sw, sh, box.w, box.h, render.ImageFit, render.ImageCentered)
 		}
 	default: // FitFill
-		src, dw, dh = render.ScaleRect(sw, sh, box.w, box.h, render.ImageCover)
+		src, dst = render.PlaceImage(sw, sh, box.w, box.h, render.ImageCover, render.ImageCentered)
 	}
 	src = src.Add(b.Min)
-	if src == b && dw == sw && dh == sh {
+	if src == b && dst.W == sw && dst.H == sh {
 		return img
 	}
-	return render.Resample(img, src, dw, dh)
+	return render.Resample(img, src, dst.W, dst.H)
 }
 
 // widgetScale is the gelm policy for an image that could not be

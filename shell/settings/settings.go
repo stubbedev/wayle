@@ -172,7 +172,7 @@ func (p windowPickers) popover(anchor, content widget.Widget) (closePopover func
 		p.theme.Attach(root)
 	}
 	pop, err := p.app.OpenPopover(p.win, app.PopoverConfig{
-		Anchor: bound, Content: content, Serial: p.app.LastPressSerial(p.win),
+		Anchor: bound, Content: content,
 	})
 	if err != nil {
 		log.Printf("settings: popover: %v", err)

@@ -271,7 +271,7 @@ func (r *dropdownRegistry) open(connector, name string, anchor widget.Widget) er
 	if panel != nil && monH > 0 {
 		panel.maxH = monH - 180
 	}
-	cfg := dropdownPopover(r.cfg, bound, content, r.app.LastPressSerial(host), monH)
+	cfg := dropdownPopover(r.cfg, bound, content, monH)
 	// The button's label holds still while its dropdown is open
 	// (dropdown-freeze-label), so the popover stays anchored.
 	if f, ok := anchor.(labelFreezer); ok && r.cfg.Bar.DropdownFreezeLabel {
@@ -347,12 +347,11 @@ func (r *dropdownRegistry) closeAll() {
 // clamp_height): opening away from the bar's edge, clamped to the
 // monitor less 100, and with dropdown-autohide off a no-grab popover
 // that a click elsewhere leaves open.
-func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.Widget, serial uint32, monH int) app.PopoverConfig {
+func dropdownPopover(cfg *config.Config, anchor widget.Boundser, content widget.Widget, monH int) app.PopoverConfig {
 	pc := app.PopoverConfig{
 		Anchor:     anchor,
 		Gravity:    dropdownGravity(cfg.Bar.Location),
 		Content:    content,
-		Serial:     serial,
 		NoAutohide: !cfg.Bar.DropdownAutohide,
 	}
 	if monH > 0 {

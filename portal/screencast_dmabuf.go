@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/stubbedev/gelm/capture"
+	"github.com/stubbedev/gelm/dmabuf"
 
 	"github.com/stubbedev/wayle/internal/gbm"
 	"github.com/stubbedev/wayle/internal/pipewire"
@@ -25,7 +26,7 @@ type gpuAllocator interface {
 
 // gpuCapturer is the capture connection the source copies with.
 type gpuCapturer interface {
-	Import(capture.Dmabuf) (importedBuffer, error)
+	Import(dmabuf.Buffer) (importedBuffer, error)
 	CopyInto(o capture.Output, cursor bool, buf importedBuffer) error
 }
 
@@ -35,7 +36,7 @@ type importedBuffer interface{ Destroy() }
 // screencopy is the gpuCapturer over a capture client.
 type screencopy struct{ c *capture.Client }
 
-func (s screencopy) Import(d capture.Dmabuf) (importedBuffer, error) { return s.c.ImportDmabuf(d) }
+func (s screencopy) Import(d dmabuf.Buffer) (importedBuffer, error) { return s.c.ImportDmabuf(d) }
 
 // CopyInto takes the next frame without waiting for damage: the stream
 // fills at its own rate, and an idle output must not stall the loop.
@@ -97,9 +98,9 @@ func (s *gpuSource) alloc(modifiers []uint64) (*gpuBuffer, error) {
 		return nil, fmt.Errorf("screencast: a %d-plane buffer", len(bo.Planes))
 	}
 	p := bo.Planes[0]
-	imported, err := s.cap.Import(capture.Dmabuf{
-		Width: int(s.width), Height: int(s.height), Fourcc: s.fourcc, Modifier: bo.Modifier,
-		Planes: []capture.DmabufPlane{{Fd: uintptr(p.Fd), Offset: p.Offset, Stride: p.Stride}},
+	imported, err := s.cap.Import(dmabuf.Buffer{
+		Width: int(s.width), Height: int(s.height), Format: s.fourcc, Modifier: bo.Modifier,
+		Planes: []dmabuf.Plane{{FD: p.Fd, Offset: p.Offset, Stride: p.Stride}},
 	})
 	if err != nil {
 		bo.Release()

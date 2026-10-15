@@ -177,8 +177,9 @@ func (v *view) Paint(cv *render.Canvas) {
 	// The incoming letterbox is the black backdrop fading in too.
 	prevAlpha := cv.PushAlpha(v.progress)
 	box := cv.MapRect(v.cur.Bounds())
-	_, dw, dh := render.ScaleRect(v.curSize.X, v.curSize.Y, box.W, box.H, v.cur.Scale())
-	inner := render.Rect{X: box.X + (box.W-dw)/2, Y: box.Y + (box.H-dh)/2, W: dw, H: dh}
+	_, inner := render.PlaceImage(v.curSize.X, v.curSize.Y, box.W, box.H, v.cur.Scale(), render.ImageCentered)
+	inner.X += box.X
+	inner.Y += box.Y
 	fillOutside(cv, box, inner, backdrop)
 	widget.PaintChild(cv, v.cur)
 	cv.PopAlpha(prevAlpha)

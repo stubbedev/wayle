@@ -644,7 +644,7 @@ func (c *Chooser) show() {
 		Namespace:     "wayle-file-chooser",
 		Root:          u.root,
 		OnKey:         func(r *widget.Router, keycode uint32, _ app.Mods) { c.key(r, keycode) },
-		OnPress:       func(button, _ uint32, _ widget.Widget) { c.press(button) },
+		OnPress:       func(button uint32, _ widget.Widget) { c.press(button) },
 	})
 	if err != nil {
 		log.Printf("file chooser: cannot map the overlay: %v", err)

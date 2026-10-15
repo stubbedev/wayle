@@ -286,19 +286,16 @@ func TestLoadFileAppliesSystray(t *testing.T) {
 
 // fakeAccels is an application accelerator table.
 type fakeAccels struct {
-	actions map[string]func()
-	bound   map[string]string // keys -> action
-	taken   map[string]bool
+	bound map[string]widget.Activatable
+	taken map[string]bool
 }
 
 func newFakeAccels() *fakeAccels {
-	return &fakeAccels{actions: map[string]func(){}, bound: map[string]string{}, taken: map[string]bool{}}
+	return &fakeAccels{bound: map[string]widget.Activatable{}, taken: map[string]bool{}}
 }
 
-func (f *fakeAccels) AddAction(name string, fn func()) { f.actions[name] = fn }
-
-func (f *fakeAccels) AddAccel(keys, action string) error {
-	if f.taken[keys] || f.bound[keys] != "" {
+func (f *fakeAccels) AddAccel(keys string, action widget.Activatable) error {
+	if f.taken[keys] || f.bound[keys] != nil {
 		return errors.New("taken")
 	}
 	f.bound[keys] = action
@@ -306,7 +303,7 @@ func (f *fakeAccels) AddAccel(keys, action string) error {
 }
 
 func (f *fakeAccels) RemoveAccel(keys string) error {
-	if f.bound[keys] == "" {
+	if f.bound[keys] == nil {
 		return errors.New("not bound")
 	}
 	delete(f.bound, keys)
@@ -316,7 +313,7 @@ func (f *fakeAccels) RemoveAccel(keys string) error {
 func (f *fakeAccels) press(keys string) bool {
 	a, ok := f.bound[keys]
 	if ok {
-		f.actions[a]()
+		a.Activate()
 	}
 	return ok
 }
@@ -353,13 +350,13 @@ func TestSystrayMenuShortcutsFire(t *testing.T) {
 			t.Errorf("%s bound: a disabled or hidden row took a shortcut", keys)
 		}
 	}
-	if accels.bound["<Control>o"] == "" {
+	if accels.bound["<Control>o"] == nil {
 		t.Error("a taken key cost the other bindings")
 	}
 
 	// A rebuilt menu drops what it no longer has.
 	m.bindAccels(*it, menu.Children[:1])
-	if accels.bound["<Control><Shift>q"] != "" || accels.bound["<Control>o"] == "" {
+	if accels.bound["<Control><Shift>q"] != nil || accels.bound["<Control>o"] == nil {
 		t.Errorf("after the rebuild: %v", accels.bound)
 	}
 	m.unbindAccels()

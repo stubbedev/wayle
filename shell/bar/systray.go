@@ -277,8 +277,7 @@ type systrayModule struct {
 // accelBinder is the application accelerator table the tray menu's
 // shortcuts go into (app.Application).
 type accelBinder interface {
-	AddAction(name string, fn func())
-	AddAccel(keys, action string) error
+	AddAccel(keys string, action widget.Activatable) error
 	RemoveAccel(keys string) error
 }
 
@@ -477,7 +476,6 @@ func (m *systrayModule) showMenu(key string, menu sni.MenuItem, err error) {
 		Face:   font,
 		SizePx: px,
 		Items:  rows,
-		Serial: m.ctx.App.LastPressSerial(m.host),
 		OnClosed: func() {
 			stop()
 			m.unbindAccels()
@@ -606,8 +604,7 @@ func (m *systrayModule) bindAccels(it sni.Item, nodes []sni.MenuItem) {
 				continue
 			}
 			action := fmt.Sprintf("systray.%s.%d", it.Key(), n.ID)
-			b.AddAction(action, m.clicker(it, n.ID))
-			if err := b.AddAccel(spec, action); err != nil {
+			if err := b.AddAccel(spec, widget.NewAction(action, m.clicker(it, n.ID))); err != nil {
 				log.Printf("systray: %s shortcut %s: %v", it.ID, spec, err)
 				continue
 			}

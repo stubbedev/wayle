@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/gelm/capture"
+	"github.com/stubbedev/gelm/dmabuf"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/wayle/internal/gbm"
@@ -53,10 +54,10 @@ func (f fakeImport) Destroy() { *f.destroyed++ }
 type fakeCopy struct {
 	rejectImport, failCapture bool
 	imported, destroyed       int
-	got                       []capture.Dmabuf
+	got                       []dmabuf.Buffer
 }
 
-func (f *fakeCopy) Import(d capture.Dmabuf) (importedBuffer, error) {
+func (f *fakeCopy) Import(d dmabuf.Buffer) (importedBuffer, error) {
 	f.got = append(f.got, d)
 	if f.rejectImport {
 		return nil, capture.ErrDmabufRejected
@@ -90,7 +91,7 @@ func TestProbeTakesTheModifierAndReleasesTheProbe(t *testing.T) {
 	if open(dev.fds[0]) || cp.destroyed != 1 {
 		t.Errorf("the probe buffer leaked: fd open %v, imports destroyed %d", open(dev.fds[0]), cp.destroyed)
 	}
-	if d := cp.got[0]; d.Fourcc != gbm.FormatXRGB8888 || d.Width != 64 || d.Modifier != 7 || len(d.Planes) != 1 || d.Planes[0].Stride != 256 {
+	if d := cp.got[0]; d.Format != gbm.FormatXRGB8888 || d.Width != 64 || d.Modifier != 7 || len(d.Planes) != 1 || d.Planes[0].Stride != 256 {
 		t.Errorf("imported %+v", d)
 	}
 }

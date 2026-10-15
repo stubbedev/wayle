@@ -261,15 +261,15 @@ func TestHistoryButtonsAndUp(t *testing.T) {
 	hs := newHarness(t, "")
 	hs.open(t, OpenRequest{})
 	hs.do(func() { hs.c.goTo(filepath.Join(hs.root, "docs")) })
-	hs.do(func() { hs.cfg.OnPress(btnBack, 0, nil) })
+	hs.do(func() { hs.cfg.OnPress(btnBack, nil) })
 	if dir := hs.c.s.dir; dir != hs.root {
 		t.Errorf("back = %s", dir)
 	}
-	hs.do(func() { hs.cfg.OnPress(btnForward, 0, nil) })
+	hs.do(func() { hs.cfg.OnPress(btnForward, nil) })
 	if dir := hs.c.s.dir; dir != filepath.Join(hs.root, "docs") {
 		t.Errorf("forward = %s", dir)
 	}
-	hs.do(func() { hs.cfg.OnPress(widget.BTNRight, 0, nil) })
+	hs.do(func() { hs.cfg.OnPress(widget.BTNRight, nil) })
 	if dir := hs.c.s.dir; dir != filepath.Join(hs.root, "docs") {
 		t.Errorf("another button moved to %s", dir)
 	}
