@@ -85,6 +85,81 @@ the workaround list.
       recorder, screenshot, systray, toast, vpn, wallpaper, widget,
       shell; daily log files
 
+## Parity audit (2026-10-15) — progress log
+
+The 2026-10-15 run re-audited every surface against its Rust source
+after gelm moved 109 commits (e86f8a2 → c4eb5db: components, typed
+builders, per-widget layout properties, CSS flex/grid layout, typed
+actions, …). The "done" ticks below this section overstated parity:
+several surfaces were stand-ins or hand-painted. This log is the
+authoritative state; each item lands gated, committed, and pushed.
+
+gelm fixes this run found (all on gelm main, each with tests that fail
+without it):
+
+- [x] `wl`: no process-wide user data — two Wayland connections in one
+      process (the shell plus a screenshot capture client) cross-wired
+      their registries; a hotplugged output killed the first connection
+      and wedged the second (37e5fcc).
+- [x] `capture`: a one-shot output copy no longer waits for damage, so a
+      screenshot of a static screen returns (d708810).
+- [x] the viewport destination follows every resize (a grown surface
+      was shown squeezed into its first size); a zero configure returns
+      to the unconstrained size (860b3af).
+- [x] layer surfaces size an unanchored zero axis to their content, as
+      gtk4-layer-shell does (86d9281) — the notification popups had
+      never mapped (height 0 under a corner anchor was refused, and the
+      error was swallowed).
+- [x] `RichLabel`: max-width-chars caps the natural width (it was a
+      floor) and an uncolored label paints the cascade's color (it
+      painted nothing — notification bodies were invisible in the popups
+      and the bar's notification dropdown) (c1884df).
+
+wayle surfaces:
+
+- [x] gelm bump to c4eb5db, then c1884df (API: typed accelerator
+      actions, derived input serials, dmabuf.Buffer, PlaceImage).
+- [x] OSD rewritten to osd/: one content-sized surface on
+      `osd.monitor`, the stylesheet's `.osd` tree (slider and toggle
+      headers, progress bar, muted/toggle-off/bordered/toast classes,
+      text-align), caps/num/scroll-lock toggles through evdev
+      (service/keytoggles), device descriptions, the brightness
+      average, toast duration and class, the 500ms start-up quiet
+      period, re-anchoring on config change. Verified live.
+- [x] notification popups: map at all (see above), monitor resolved at
+      map time and on unplug, the card/mod.rs tree (spacing-0 boxes,
+      layout properties, homogeneous action rows), inks from the
+      stylesheet, content-sized width. Verified live.
+- [x] lock screen and greeter on the _lock.scss rules: the shared
+      credential box (window.lock-window, .lock-center, lock-* nodes,
+      the PasswordEntry peek icon), .lock-bg/.lock-bg-scrim
+      backgrounds, the .lock-scrim blackout; the greeter's user row,
+      session picker, caps warning, and power row as styled nodes. No
+      hand-painted colors remain in either.
+- [x] launcher, file chooser, print dialog, portal dialogs, power menu:
+      every label and entry pinned the palette's fg, which outranks the
+      cascade in gelm, so no themed text color applied (a selected
+      launcher row never took --fg-on-accent); they take the
+      stylesheet's ink now. The power menu row is homogeneous like
+      power_menu/mod.rs.
+- [x] audited, matching Rust: region overlay and color picker (both
+      cairo-painted in Rust too: wash, hole, border, label; loupe,
+      readout, persisted history), screenshot (the capture/composite/
+      crop/save/clipboard/notify set).
+- [ ] share picker: not on the stylesheet at all (no sheet attached, a
+      palette-painted background, hand paddings, no enter/exit
+      animation, sizes at scale 1); rebuild it as views.rs (FlowBox of
+      cards, the Fixed monitor map, spinners, the revealer). gelm's
+      Notebook paints a fixed 96x26 tab strip with no tab-label widgets,
+      so the .share-picker-tab-label styling needs a gelm extension.
+- [ ] remaining surfaces to audit against Rust: wallpaper, the launcher's
+      structure, the file chooser, print dialog, and portal dialogs
+      beyond their inks.
+- [ ] bar modules and dropdowns: re-audit against the Rust module set.
+- [ ] the gelm layout properties replace wayle's size/margin wrappers
+      (credential.Fixed/Inset in the portal surfaces).
+- [ ] the live visual comparison (item 1 of "Dropdown parity").
+
 ## Remaining for feature parity
 
 ### Open (as of 2026-10-03)
