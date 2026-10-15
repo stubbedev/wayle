@@ -59,24 +59,6 @@ func (c PowerProfilesConfig) Colors() map[string]ColorValue {
 	}
 }
 
-// Treeman health buckets.
-const (
-	TreemanBucketStable = "stable"
-	TreemanBucketUp     = "up"
-	TreemanBucketDown   = "down"
-	TreemanBucketFailed = "failed"
-)
-
-// Icons maps each treeman bucket to its icon.
-func (c TreemanConfig) Icons() map[string]IconConfig {
-	return map[string]IconConfig{
-		TreemanBucketStable: IconWith(c.IconShow, c.IconName, c.IconColor),
-		TreemanBucketUp:     IconWith(c.IconShow, c.IconPreparing, c.IconColor),
-		TreemanBucketDown:   IconWith(c.IconShow, c.IconTearingDown, c.IconColor),
-		TreemanBucketFailed: IconWith(c.IconShow, c.IconFailed, c.IconColor),
-	}
-}
-
 // IconOnView is the hyprsunset icon while the filter runs.
 func (c HyprsunsetConfig) IconOnView() IconConfig { return IconWith(c.IconShow, c.IconOn, c.IconColor) }
 

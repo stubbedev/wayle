@@ -5,12 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/treeman"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // treemanLabel is helpers.rs's format_label: plain replacements of
@@ -25,8 +23,33 @@ func treemanLabel(format string, status *treeman.Status) string {
 
 func treemanCount(v uint32) string { return strconv.FormatUint(uint64(v), 10) }
 
-// treeman is the module: the worktree health aggregate, with the icon
-// following the worst bucket.
+// treemanButton is the watcher's update: the label ("--" without a
+// status), the icon following the worst bucket, the severity class on
+// the module root, and whether hide-if-empty collapses it.
+type treemanButton struct {
+	label, icon, severity string
+	visible               bool
+}
+
+func treemanDisplay(cfg config.TreemanConfig, status *treeman.Status) treemanButton {
+	v := treemanButton{label: "--", icon: cfg.IconName, visible: !cfg.HideIfEmpty}
+	if status == nil {
+		return v
+	}
+	v.label = treemanLabel(cfg.Format, status)
+	v.visible = !cfg.HideIfEmpty || status.Total > 0
+	switch status.WorstBucket() {
+	case treeman.BucketFailed:
+		v.icon, v.severity = cfg.IconFailed, "failed"
+	case treeman.BucketDown:
+		v.icon, v.severity = cfg.IconTearingDown, "tearing-down"
+	case treeman.BucketUp:
+		v.icon, v.severity = cfg.IconPreparing, "preparing"
+	}
+	return v
+}
+
+// treeman is the module: the worktree health aggregate.
 type treemanModule struct {
 	ctx   ModuleContext
 	src   treeman.Source
@@ -34,6 +57,10 @@ type treemanModule struct {
 	icon  *widget.Icon
 	root  widget.Widget
 	stop  func()
+	// chrome is the module root the severity class and visibility go
+	// on; view is what was last shown, applied when the chrome arrives.
+	chrome moduleChrome
+	view   treemanButton
 }
 
 func newTreeman(ctx ModuleContext) (Module, error) {
@@ -48,9 +75,6 @@ func newTreeman(ctx ModuleContext) (Module, error) {
 		// follow events on.
 		return m, nil
 	}
-	if err := m.refresh(); err != nil {
-		return nil, err
-	}
 	ticks, stop, err := ctx.Treeman.Subscribe(ctx.Life())
 	if err != nil {
 		return nil, err
@@ -64,58 +88,50 @@ func newTreeman(ctx ModuleContext) (Module, error) {
 	return m, nil
 }
 
-// refresh re-reads treeman status and restyles label and icon.
+// refresh re-reads the treeman status and shows it.
 func (m *treemanModule) refresh() error {
 	cfg := m.ctx.Config.Treeman
 	status, err := m.src.Read(context.Background())
 	if err != nil {
 		return err
 	}
-	if status == nil {
-		m.label.SetText("")
-		return nil
-	}
-	text := ""
-	if cfg.LabelShow {
-		text = treemanLabel(cfg.Format, status)
-	}
-	if cfg.HideIfEmpty && status.Total == 0 {
+	v := treemanDisplay(cfg, status)
+	text := v.label
+	if !cfg.LabelShow {
 		text = ""
 	}
 	m.label.SetText(text)
-	m.label.SetColor(treemanColor(cfg, status.WorstBucket(), m.ctx.Style.palette, m.ctx.Style.fg))
-	if setter := m.icon; setter != nil {
-		name := cfg.Icons()[config.TreemanBucketStable].Name
-		switch status.WorstBucket() {
-		case treeman.BucketFailed:
-			name = cfg.Icons()[config.TreemanBucketFailed].Name
-		case treeman.BucketDown:
-			name = cfg.Icons()[config.TreemanBucketDown].Name
-		case treeman.BucketUp:
-			name = cfg.Icons()[config.TreemanBucketUp].Name
-		}
-		setter.SetThemeName(name)
+	if m.icon != nil {
+		m.icon.SetThemeName(v.icon)
 	}
+	m.show(v)
 	return nil
 }
 
-// treemanColor resolves the bucket's configured color, the bar fg
-// otherwise.
-func treemanColor(cfg config.TreemanConfig, bucket treeman.Bucket, palette *styling.Palette, fallback render.Color) render.Color {
-	name := config.TreemanBucketStable
-	switch bucket {
-	case treeman.BucketFailed:
-		name = config.TreemanBucketFailed
-	case treeman.BucketDown:
-		name = config.TreemanBucketDown
-	case treeman.BucketUp:
-		name = config.TreemanBucketUp
+// show moves the severity class and visibility on the module root.
+func (m *treemanModule) show(v treemanButton) {
+	prev := m.view.severity
+	m.view = v
+	if m.chrome == nil {
+		return
 	}
-	_ = name
-	if resolved, ok := styling.ResolveColor(cfg.LabelColor, palette); ok && !cfg.LabelColor.IsAuto() {
-		return resolved
+	m.chrome.SetVisible(v.visible)
+	if prev == v.severity {
+		return
 	}
-	return fallback
+	if prev != "" {
+		m.chrome.RemoveClass(prev)
+	}
+	if v.severity != "" {
+		m.chrome.AddClass(v.severity)
+	}
+}
+
+func (m *treemanModule) setChrome(c moduleChrome) {
+	m.chrome = c
+	v := m.view
+	m.view.severity = ""
+	m.show(v)
 }
 
 func (m *treemanModule) Root() widget.Widget { return m.root }

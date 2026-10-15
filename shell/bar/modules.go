@@ -335,7 +335,7 @@ func appendModule(row *widget.Box, item config.BarItem, ctx ModuleContext) error
 	if item.Class != "" {
 		wrap.AddClass(item.Class)
 	}
-	if c, ok := module.(interface{ setChrome(classer) }); ok {
+	if c, ok := module.(interface{ setChrome(moduleChrome) }); ok {
 		c.setChrome(wrap)
 	}
 	var handler interface {

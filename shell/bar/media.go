@@ -163,7 +163,7 @@ func (m *mediaModule) typeClass() string { return "media" }
 
 // setChrome takes the module box appendModule wraps the button in;
 // the disc classes re-apply now that the ancestor exists.
-func (m *mediaModule) setChrome(c classer) {
+func (m *mediaModule) setChrome(c moduleChrome) {
 	m.chrome = c
 	m.refresh()
 }
@@ -192,6 +192,13 @@ func (m *mediaModule) refresh() {
 type classer interface {
 	AddClass(names ...string)
 	RemoveClass(names ...string)
+}
+
+// moduleChrome is a module's wrapper box, the Rust module root: its
+// classes and its visibility.
+type moduleChrome interface {
+	classer
+	SetVisible(on bool)
 }
 
 // setClass toggles one style class; a nil classer is a no-op.

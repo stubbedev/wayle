@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stubbedev/gelm/widget"
+
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/treeman"
 )
@@ -80,10 +82,10 @@ func TestLoadFileAppliesTreeman(t *testing.T) {
 	if c.Treeman.Format != "[{{ total }}]" || !c.Treeman.HideIfEmpty {
 		t.Errorf("config = %+v", c.Treeman)
 	}
-	if got := c.Treeman.Icons()[config.TreemanBucketFailed].Name; got != "tb-x-symbolic" {
+	if got := c.Treeman.IconFailed; got != "tb-x-symbolic" {
 		t.Errorf("icon-failed = %q", got)
 	}
-	if got := c.Treeman.Icons()[config.TreemanBucketUp].Name; got != "tb-loader-2-symbolic" {
+	if got := c.Treeman.IconPreparing; got != "tb-loader-2-symbolic" {
 		t.Errorf("icon-preparing default changed: %q", got)
 	}
 
@@ -96,49 +98,68 @@ func TestLoadFileAppliesTreeman(t *testing.T) {
 	}
 }
 
+// The watcher's update: the icon and severity class follow the worst
+// bucket, hide-if-empty collapses the module root on an empty daemon
+// and only then, and a missing treeman reads "--".
 func TestTreemanModuleFollowsBuckets(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	src := &fakeTreeman{status: &treeman.Status{Total: 1, Stable: 1}}
 	ctx.Treeman = src
-	// The module needs the loop for its subscription; construct through
-	// the factory with a headless context and drive refresh by hand.
 	module, err := Create("treeman", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 	tm := module.(*treemanModule)
+	chrome := widget.NewBox(widget.Row, 0, 0)
+	tm.setChrome(chrome)
 	label := findLabel(module.Root())
-	if got := label.Text(); got != "1" {
-		t.Fatalf("label = %q, want 1", got)
+	if got := label.Text(); got != "1" || tm.icon.Name() != cfg.Treeman.IconName || !chrome.Visible() {
+		t.Fatalf("resting: label %q icon %q visible %v", got, tm.icon.Name(), chrome.Visible())
+	}
+	for _, tc := range []struct {
+		status      treeman.Status
+		icon, class string
+	}{
+		{treeman.Status{Total: 2, Stable: 1, Up: 1}, cfg.Treeman.IconPreparing, "preparing"},
+		{treeman.Status{Total: 2, Up: 1, Down: 1}, cfg.Treeman.IconTearingDown, "tearing-down"},
+		{treeman.Status{Total: 2, Stable: 1, Failed: 1}, cfg.Treeman.IconFailed, "failed"},
+	} {
+		src.status = &tc.status
+		if err := tm.refresh(); err != nil {
+			t.Fatal(err)
+		}
+		if tm.icon.Name() != tc.icon || !widget.HasClass(chrome, tc.class) {
+			t.Errorf("%+v: icon %q classes %v, want %q and .%s", tc.status, tm.icon.Name(), chrome.Classes(), tc.icon, tc.class)
+		}
+		for _, other := range []string{"preparing", "tearing-down", "failed"} {
+			if other != tc.class && widget.HasClass(chrome, other) {
+				t.Errorf("%+v kept .%s", tc.status, other)
+			}
+		}
 	}
 
-	// A failure in the buckets flips the icon.
-	icon := tm.icon
-	src.status = &treeman.Status{Total: 2, Stable: 1, Failed: 1}
-	if err := tm.refresh(); err != nil {
-		t.Fatal(err)
-	}
-	if got := icon.Name(); got != cfg.Treeman.Icons()[config.TreemanBucketFailed].Name {
-		t.Errorf("failed icon = %q", got)
-	}
-
-	// hide-if-empty collapses the label on an empty daemon.
-	cfg.Treeman.HideIfEmpty = true
 	src.status = &treeman.Status{}
 	if err := tm.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := label.Text(); got != "" {
-		t.Errorf("hidden label = %q", got)
+	if !chrome.Visible() || widget.HasClass(chrome, "failed") {
+		t.Errorf("empty without hide-if-empty: visible %v classes %v", chrome.Visible(), chrome.Classes())
+	}
+	cfg.Treeman.HideIfEmpty = true
+	if err := tm.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if chrome.Visible() {
+		t.Error("hide-if-empty left the empty module shown")
 	}
 
-	// A missing treeman reads as unavailable: an empty label, no error.
+	cfg.Treeman.HideIfEmpty = false
 	src.status = nil
 	if err := tm.refresh(); err != nil {
 		t.Fatalf("missing binary refresh: %v", err)
 	}
-	if got := label.Text(); got != "" {
-		t.Errorf("unavailable label = %q", got)
+	if got := label.Text(); got != "--" || tm.icon.Name() != cfg.Treeman.IconName {
+		t.Errorf("unavailable: label %q icon %q, want -- and the resting icon", got, tm.icon.Name())
 	}
 }
