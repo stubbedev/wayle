@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -199,8 +200,28 @@ func TestSheetIsTheRustLayout(t *testing.T) {
 	if len(scrolls) == 0 || scrolls[0].SizeRequest().H != listMinHeight || !scrolls[0].PropagateNaturalHeight {
 		t.Errorf("printer scroll %+v, want a propagating scroll requesting %d", scrolls, listMinHeight)
 	}
+	// The rows span the sheet, as the GTK viewport gives its child the
+	// whole width.
+	var listW, scrollW int
+	hs.do(func() {
+		c.Root.Measure(widget.Constraints{Max: widget.Size{W: 1280, H: 800}})
+		c.Root.Arrange(render.Rect{W: 1280, H: 800})
+		listW = treetest.All[*widget.ListBox](c.Root)[0].Bounds().W
+		scrollW = scrolls[0].Bounds().W
+	})
+	if listW < scrollW-20 {
+		t.Errorf("printer list %dpx in a %dpx scroll, want it filling the width", listW, scrollW)
+	}
 	if len(treetest.All[*widget.ListBox](c.Root)) != 1 {
 		t.Error("no printer ListBox")
+	}
+	// An unanchored, unsized layer: the compositor centers the
+	// content-sized sheet, as the GTK window is.
+	if c.Anchor != 0 || c.Width != 0 || c.Height != 0 {
+		t.Errorf("layer anchor %v size %dx%d, want unanchored and content-sized", c.Anchor, c.Width, c.Height)
+	}
+	if root, ok := c.Root.(*widget.Box); !ok || root.Element() != "window" || !widget.HasClass(root, "print-window") {
+		t.Errorf("root %T, want window.print-window", c.Root)
 	}
 }
 

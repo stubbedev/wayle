@@ -14,7 +14,6 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/ipp"
 	"github.com/stubbedev/wayle/shell/reveal"
-	"github.com/stubbedev/wayle/shell/widgets"
 )
 
 // The sheet's geometry (shell/print: the surface's width request, the
@@ -231,6 +230,7 @@ func (h *Dialog) build(queues []queue) widget.Widget {
 		list.Select(0)
 	}
 	printers := widget.NewScroll(list)
+	printers.FillX = true
 	printers.PropagateNaturalHeight = true
 	printers.SetMaxContentHeight(listMaxHeight)
 	printers.SetSizeRequest(0, listMinHeight)
@@ -311,8 +311,11 @@ func (h *Dialog) show(tree widget.Widget) {
 		h.win.Close()
 		h.win, h.closing = nil, false
 	}
-	h.rev = widget.NewRevealer(widgets.Center(tree))
+	// window.print-window > revealer > the sheet, on an unanchored
+	// layer the compositor centers, sized to its content.
+	h.rev = widget.NewRevealer(tree)
 	root := widget.NewBox(widget.Column, 0, 0)
+	root.SetElement("window")
 	root.AddClass("print-window")
 	if h.d.Sheet != nil {
 		root.AttachStylesheet(h.d.Sheet)
@@ -320,7 +323,6 @@ func (h *Dialog) show(tree widget.Widget) {
 	root.Append(h.rev, true)
 	win, err := h.d.Open(app.LayerConfig{
 		Layer:         app.LayerOverlay,
-		Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardOnDemand,
 		Namespace:     "wayle-print",
