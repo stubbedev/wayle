@@ -13,22 +13,14 @@ import (
 	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/notifications"
-	"github.com/stubbedev/wayle/styling"
+	"github.com/stubbedev/wayle/shell/treetest"
 )
 
-func testFont(t *testing.T) render.Font {
-	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return face
-}
+func testFont(t *testing.T) render.Font { return treetest.Font(t) }
 
 func newTestPopups(t *testing.T, ncfg config.NotificationConfig) (*Popups, *notifications.Service) {
 	t.Helper()
@@ -36,7 +28,7 @@ func newTestPopups(t *testing.T, ncfg config.NotificationConfig) (*Popups, *noti
 	svc := notifications.NewService()
 	cfg := config.Defaults()
 	cfg.Notification = ncfg
-	return New(nil, svc, cfg, testFont(t), styling.Default(), nil, nil), svc
+	return New(nil, svc, cfg, testFont(t), nil, nil), svc
 }
 
 func TestSyncTracksPopupSet(t *testing.T) {
@@ -176,8 +168,8 @@ func cardOf(t *testing.T, p *Popups, id uint32) *card {
 	if !ok {
 		t.Fatalf("no card for %d", id)
 	}
-	c.root.Measure(widget.Constraints{Max: widget.Size{W: cardWidthPx, H: 600}})
-	c.root.Arrange(render.Rect{W: cardWidthPx, H: 600})
+	c.root.Measure(widget.Constraints{Max: widget.Size{W: testCardWidth, H: 600}})
+	c.root.Arrange(render.Rect{W: testCardWidth, H: 600})
 	return c
 }
 
@@ -402,23 +394,6 @@ func TestPopupMargins(t *testing.T) {
 	}
 }
 
-func TestOutputPicksTheMonitor(t *testing.T) {
-	dp, hdmi := &app.Output{Name: "DP-1"}, &app.Output{Name: "HDMI-A-1"}
-	outs := []*app.Output{dp, hdmi}
-	if got := Output(outs, config.PopupMonitor{}); got != dp {
-		t.Errorf("primary = %v, want the first output", got)
-	}
-	if got := Output(outs, config.PopupOnConnector("HDMI-A-1")); got != hdmi {
-		t.Errorf("connector = %v, want HDMI-A-1", got)
-	}
-	if got := Output(outs, config.PopupOnConnector("DP-9")); got != dp {
-		t.Errorf("missing connector = %v, want the primary fallback", got)
-	}
-	if got := Output(nil, config.PopupMonitor{}); got != nil {
-		t.Errorf("no outputs = %v, want nil", got)
-	}
-}
-
 func TestZeroPopupDurationSticks(t *testing.T) {
 	cfg := config.DefaultsNotification()
 	cfg.PopupDuration = 0
@@ -466,5 +441,47 @@ func TestSetConfigRebuildsTheStackWithTheNewLimits(t *testing.T) {
 	p.SetConfig(next)
 	if got := p.Visible(); got != 1 {
 		t.Errorf("after a reload with popup-max-visible = 1: visible = %d", got)
+	}
+}
+
+// testCardWidth is the width the card tests lay a card out at.
+const testCardWidth = 380
+
+// The card is card/mod.rs's tree: spacing-0 boxes the stylesheet
+// spaces, the GTK classes, homogeneous action rows, and the pointer
+// over a card with a default action only.
+func TestCardMatchesTheRustTree(t *testing.T) {
+	p, svc := newTestPopups(t, config.DefaultsNotification())
+	plain := svc.Notify("app", 0, "", "Plain", "", nil, 0)
+	acting := svc.Notify("app", 0, "", "Acting", "body", []string{"default", "Open", "a", "A", "b", "B"}, 0)
+	p.sync()
+	c := cardOf(t, p, acting)
+	for _, l := range treetest.All[*widget.Label](c.root) {
+		if l.Color() != 0 {
+			t.Errorf("label %q pins ink %#08x over the stylesheet", l.Text(), uint32(l.Color()))
+		}
+	}
+	for _, b := range treetest.All[*widget.Box](c.root) {
+		if b.Spacing() != 0 {
+			t.Errorf("box %v has spacing %d, want 0", b.Classes(), b.Spacing())
+		}
+	}
+	rows := treetest.WithClass(c.root, "notification-popup-action-row")
+	if len(rows) != 1 || !rows[0].(*widget.Box).Homogeneous() {
+		t.Errorf("action rows %v, want one homogeneous row", rows)
+	}
+	if got := len(treetest.WithClass(c.root, "notification-popup-action-btn")); got != 2 {
+		t.Errorf("%d action buttons, want the two non-default actions", got)
+	}
+	if widget.CursorNameOf(c.root) != "pointer" {
+		t.Error("a card with a default action shows the pointer")
+	}
+	if widget.CursorNameOf(cardOf(t, p, plain).root) != "" {
+		t.Error("a card without a default action shows the pointer")
+	}
+	for _, class := range []string{"notification-popup-content", "notification-popup-icon", "notification-popup-text", "notification-popup-header", "notification-popup-close"} {
+		if len(treetest.WithClass(c.root, class)) != 1 {
+			t.Errorf("no %s node", class)
+		}
 	}
 }

@@ -294,6 +294,12 @@ func run(cfg *config.Config, svc *config.Service) error {
 			a.Attach(layer)
 		}
 		rt.ctx.Dropdowns.attachHost(output.Name, layer, logicalSize(output).H)
+	// Notification popups render on one monitor, bar or not.
+	var popupHost *popups.Popups
+	if notifSvc != nil {
+		popupHost = popups.New(application, notifSvc, cfg, font, theme.Sheet, sess.Outputs)
+		go popupHost.Run()
+	}
 		return barWindow{layer, ctx.gen}, nil
 	}
 	bars := newBarSet(openBar)
@@ -313,18 +319,13 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	defer sess.WatchOutputIdentity(plugOutput)()
 	defer sess.WatchOutputs(nil, func(output *app.Output) {
+		if popupHost != nil {
+			popupHost.DetachOutput(output.Name)
+		}
 		bars.unplug(output)
 		osdSrv.DetachOutput(output.Name)
 		rt.ctx.Dropdowns.detachHost(output.Name)
 	})()
-	// Notification popups render on one monitor, bar or not.
-	var popupHost *popups.Popups
-	if notifSvc != nil {
-		if output := popups.Output(outputs, cfg.Notification.PopupMonitor); output != nil {
-			popupHost = popups.New(application, notifSvc, cfg, font, palette, theme.Sheet, output)
-			go popupHost.Run()
-		}
-	}
 	// restyle re-derives the palette, styles, and font from cfg and
 	// rebuilds the bars from them (the Rust modules re-render from their
 	// property watches, and the CSS watcher recompiles the bundle).

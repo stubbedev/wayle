@@ -4,7 +4,7 @@
 package popups
 
 import (
-	"math"
+	"log"
 	"slices"
 	"sync"
 	"time"
@@ -19,7 +19,6 @@ import (
 	"github.com/stubbedev/wayle/shell/layering"
 	"github.com/stubbedev/wayle/shell/notifyui"
 	"github.com/stubbedev/wayle/shell/reveal"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // Card geometry (templates.rs, card/methods.rs).
@@ -27,7 +26,6 @@ const (
 	cardMaxWidthChars = 40
 	cardBodyLines     = 3
 	cardIconPx        = 32
-	cardWidthPx       = 380
 	// popupGapBasePx and popupMarginBasePx are the bases the popup-gap
 	// and popup-margin-x/y multipliers scale (POPUP_GAP_BASE_REM 0.5,
 	// POPUP_MARGIN_BASE_REM 0.75, at 16px a rem).
@@ -41,13 +39,16 @@ type Popups struct {
 	svc   *notifications.Service
 	cfg   *config.Config
 	font  render.Font
-	pal   *styling.Palette
 	sheet *widget.Stylesheet
-	out   *app.Output
-	now   func() time.Time
-	mu    sync.Mutex
-	win   *app.LayerWindow
-	root  *widget.Box
+	// outputs lists the connected outputs, the primary first; the
+	// surface maps on popup-monitor among them.
+	outputs func() []*app.Output
+	now     func() time.Time
+	mu      sync.Mutex
+	win     *app.LayerWindow
+	// winOut is the output win is on.
+	winOut *app.Output
+	root   *widget.Box
 	// cards are the live popups by id; stack is every card on screen
 	// top to bottom, those still playing their exit included.
 	cards map[uint32]*card
@@ -71,22 +72,37 @@ type card struct {
 	actions *widget.Box
 }
 
-// New builds the popup host over one output. The service's popup
-// countdowns take the configured popup-duration; sheet is the shell's
-// stylesheet, which styles the cards (nil leaves them unstyled).
-func New(application *app.Application, svc *notifications.Service, cfg *config.Config, font render.Font, pal *styling.Palette, sheet *widget.Stylesheet, out *app.Output) *Popups {
+// New builds the popup host; it maps on popup-monitor among outputs
+// when the first popup arrives. The service's popup countdowns take the
+// configured popup-duration; sheet is the shell's stylesheet, which
+// styles the cards (nil leaves them unstyled).
+func New(application *app.Application, svc *notifications.Service, cfg *config.Config, font render.Font, sheet *widget.Stylesheet, outputs func() []*app.Output) *Popups {
 	svc.SetPopupDuration(time.Duration(cfg.Notification.PopupDuration) * time.Millisecond)
 	return &Popups{
-		app:   application,
-		svc:   svc,
-		cfg:   cfg,
-		font:  font,
-		pal:   pal,
-		sheet: sheet,
-		out:   out,
-		now:   time.Now,
-		cards: make(map[uint32]*card),
+		app:     application,
+		svc:     svc,
+		cfg:     cfg,
+		font:    font,
+		sheet:   sheet,
+		outputs: outputs,
+		now:     time.Now,
+		cards:   make(map[uint32]*card),
 	}
+}
+
+// DetachOutput closes the surface when its output went away; the stack
+// remaps on the configured monitor (the primary fallback) at once.
+func (p *Popups) DetachOutput(name string) {
+	p.mu.Lock()
+	if p.win == nil || p.winOut == nil || p.winOut.Name != name {
+		p.mu.Unlock()
+		return
+	}
+	win := p.win
+	p.win, p.winOut, p.root = nil, nil, nil
+	p.layoutLocked()
+	p.mu.Unlock()
+	win.Close()
 }
 
 // SetConfig applies a reloaded config on the loop goroutine: the
@@ -97,7 +113,7 @@ func (p *Popups) SetConfig(cfg *config.Config) {
 	p.mu.Lock()
 	p.cfg = cfg
 	win := p.win
-	p.win, p.root = nil, nil
+	p.win, p.winOut, p.root = nil, nil, nil
 	p.cards = make(map[uint32]*card)
 	p.stack = nil
 	p.mu.Unlock()
@@ -185,13 +201,23 @@ func (p *Popups) dropCard(c *card) {
 	p.layoutLocked()
 }
 
-// newCard builds one card (the view! of card/mod.rs and its init).
+// newCard builds one card, the view! of card/mod.rs and its init:
+//
+//	box.notification-popup-card.<urgency>[.shadow][.urgency-bar]
+//	├ box.notification-popup-content
+//	│ ├ box.notification-popup-icon[.file-icon] > image.notification-popup-icon-img
+//	│ ├ box.notification-popup-text (hexpand)
+//	│ │ ├ box.notification-popup-header > label.notification-popup-app, label.notification-popup-time
+//	│ │ ├ label.notification-popup-title
+//	│ │ └ label.notification-popup-body
+//	│ └ button.notification-popup-close > image
+//	└ box.notification-popup-actions > box.notification-popup-action-row > button.notification-popup-action-btn
+//
+// Every box is spacing 0: the stylesheet spaces them.
 func (p *Popups) newCard(n *notifications.Notification) *card {
 	cfg := p.cfg.Notification
-	fg, _ := p.pal.Token(config.TokenFgDefault)
-	muted, _ := p.pal.Token(config.TokenFgMuted)
 	c := &card{id: n.ID}
-	c.root = widget.NewBox(widget.Column, 8, 12)
+	c.root = widget.NewBox(widget.Column, 0, 0)
 	c.root.AddClass("notification-popup-card", notifyui.UrgencyClass(n.Urgency))
 	if cfg.PopupShadow {
 		c.root.AddClass("shadow")
@@ -200,55 +226,65 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 		c.root.AddClass("urgency-bar")
 	}
 
-	row := widget.NewBox(widget.Row, 10, 0)
+	row := widget.NewBox(widget.Row, 0, 0)
 	row.AddClass("notification-popup-content")
 	icon := notifyui.ResolveIcon(cfg.IconSource, n)
 	c.iconBox = widget.NewBox(widget.Row, 0, 0)
 	c.iconBox.AddClass("notification-popup-icon")
+	c.iconBox.SetHAlign(widget.AlignCenter)
+	c.iconBox.SetVAlign(widget.AlignStart)
 	if notifyui.IsFileIcon(icon) {
 		c.iconBox.AddClass("file-icon")
 	}
-	glyph := notifyui.NewIcon(icon, cardIconPx, fg)
+	glyph := notifyui.NewIcon(icon, cardIconPx, 0)
 	glyph.AddClass("notification-popup-icon-img")
+	glyph.SetHAlign(widget.AlignCenter)
+	glyph.SetVAlign(widget.AlignCenter)
 	c.iconBox.Append(glyph, false)
 	row.Append(c.iconBox, false)
 
-	text := widget.NewBox(widget.Column, 2, 0)
+	text := widget.NewBox(widget.Column, 0, 0)
 	text.AddClass("notification-popup-text")
-	header := widget.NewBox(widget.Row, 6, 0)
+	text.SetHExpand(true)
+	header := widget.NewBox(widget.Row, 0, 0)
 	header.AddClass("notification-popup-header")
 	appName := n.AppName
 	if appName == "" {
 		appName = i18n.T("notification-popup-unknown-app")
 	}
-	c.app = widget.NewLabel(p.font, 11, appName, muted)
+	c.app = widget.NewLabel(p.font, 11, appName, 0)
 	c.app.AddClass("notification-popup-app")
+	c.app.SetHAlign(widget.AlignStart)
+	c.app.SetHExpand(true)
 	c.app.SetEllipsize(widget.EllipsizeEnd)
-	header.Append(c.app, true)
-	c.time = widget.NewLabel(p.font, 11, notifyui.TimeLabel(notifyui.RelativeTime(p.now(), n.Added), "notification-popup"), muted)
+	header.Append(c.app, false)
+	c.time = widget.NewLabel(p.font, 11, notifyui.TimeLabel(notifyui.RelativeTime(p.now(), n.Added), "notification-popup"), 0)
 	c.time.AddClass("notification-popup-time")
+	c.time.SetHAlign(widget.AlignEnd)
 	header.Append(c.time, false)
 	text.Append(header, false)
-	c.title = widget.NewLabel(p.font, 14, n.Summary, fg)
+	c.title = widget.NewLabel(p.font, 14, n.Summary, 0)
 	c.title.AddClass("notification-popup-title")
+	c.title.SetHAlign(widget.AlignStart)
 	c.title.SetEllipsize(widget.EllipsizeEnd)
 	c.title.SetMaxWidthChars(cardMaxWidthChars)
 	text.Append(c.title, false)
-	c.body = widget.NewRichLabel(p.font, 12, notifyui.BodyMarkup(n.Body), muted)
+	c.body = widget.NewRichLabel(p.font, 12, notifyui.BodyMarkup(n.Body), 0)
 	c.body.SetVariants(app.FontVariantsOf(p.font))
 	c.body.AddClass("notification-popup-body")
+	c.body.SetHAlign(widget.AlignStart)
 	c.body.SetWrap(true)
 	c.body.SetMaxWidthChars(cardMaxWidthChars)
 	c.body.SetMaxLines(cardBodyLines)
 	c.body.SetEllipsize(widget.EllipsizeEnd)
 	c.body.SetVisible(n.Body != "")
 	text.Append(c.body, false)
-	row.Append(text, true)
+	row.Append(text, false)
 
-	x := widget.NewThemeIcon("window-close-symbolic", 14)
-	x.SetTint(muted)
-	c.close = widget.NewButton(x, 4, 6)
+	x := widget.NewThemeIcon("window-close-symbolic", 16)
+	c.close = widget.NewButton(x, 0, 0)
 	c.close.AddClass("notification-popup-close")
+	c.close.SetVAlign(widget.AlignStart)
 	id := n.ID
 	c.close.OnClick = func() { p.closeCard(id) }
 	row.Append(c.close, false)
@@ -260,6 +296,7 @@ func (p *Popups) newCard(n *notifications.Notification) *card {
 	// A default action opens the card on a click anywhere its buttons
 	// do not take (setup_default_action's gesture on the root).
 	if _, ok := n.DefaultAction(); ok {
+		c.root.SetCursorName("pointer")
 		c.root.SetOnClickWithin(func() { p.invokeDefault(id) })
 	}
 	if cfg.PopupHoverPause {
@@ -289,20 +326,21 @@ func popupAtTop(position config.PopupPosition) bool {
 }
 
 // actionRows is setup_action_buttons: the non-default actions, three
-// to a row, each row's buttons sharing its width; hidden without any.
+// to a row, each row homogeneous so its buttons split its width evenly
+// (GTK's homogeneous box divides the allocation); hidden without any.
 func (p *Popups) actionRows(n *notifications.Notification) *widget.Box {
-	fg, _ := p.pal.Token(config.TokenFgDefault)
-	box := widget.NewBox(widget.Column, 4, 0)
+	box := widget.NewBox(widget.Column, 0, 0)
 	box.AddClass("notification-popup-actions")
 	actions := notifyui.VisibleActions(n)
 	box.SetVisible(len(actions) > 0)
 	for start := 0; start < len(actions); start += notifyui.ActionsPerRow {
-		row := widget.NewBox(widget.Row, 4, 0)
+		row := widget.NewBox(widget.Row, 0, 0)
 		row.AddClass("notification-popup-action-row")
+		row.SetHomogeneous(true)
 		for _, a := range actions[start:min(start+notifyui.ActionsPerRow, len(actions))] {
-			label := widget.NewLabel(p.font, 12, a.Label, fg)
+			label := widget.NewLabel(p.font, 12, a.Label, 0)
 			label.SetAlignment(render.AlignCenter)
-			b := widget.NewButton(label, 6, 6)
+			b := widget.NewButton(label, 0, 0)
 			b.AddClass("notification-popup-action-btn")
 			id, key := n.ID, a.ID
 			b.OnClick = func() { p.invokeAction(id, key) }
@@ -347,19 +385,22 @@ func (p *Popups) layoutLocked() {
 	if len(p.stack) == 0 {
 		if p.win != nil {
 			win := p.win
-			p.win = nil
-			p.root = nil
+			p.win, p.winOut, p.root = nil, nil, nil
 			win.Close()
 		}
 		return
 	}
 	if p.win == nil && p.app != nil {
-		win, root, err := p.ensureWindow()
-		if err != nil {
+		out := layering.Output(p.outputs(), p.cfg.Notification.PopupMonitor)
+		if out == nil {
 			return
 		}
-		p.win = win
-		p.root = root
+		win, root, err := p.ensureWindow(out)
+		if err != nil {
+			log.Printf("notification popups: cannot map on %s: %v", out.Name, err)
+			return
+		}
+		p.win, p.winOut, p.root = win, out, root
 	}
 	if p.root == nil {
 		// Headless (or window creation failed): the card set tracks the
@@ -372,35 +413,40 @@ func (p *Popups) layoutLocked() {
 	}
 }
 
-// ensureWindow maps the popup surface at the configured position,
-// margins, and layer. The host is transparent: each card draws its own
-// plate from the stylesheet.
-func (p *Popups) ensureWindow() (*app.LayerWindow, *widget.Box, error) {
+// ensureWindow maps the popup surface on out at the configured
+// position, margins, and layer, sized by its cards. The host window is
+// transparent (.notification-popup-host); the list spaces the cards by
+// popup-gap and each card draws its own plate from the stylesheet. It
+// returns the list the cards go into.
+func (p *Popups) ensureWindow(out *app.Output) (*app.LayerWindow, *widget.Box, error) {
 	cfg := p.cfg.Notification
 	scale := float64(p.cfg.Styling.Scale)
-	root := widget.NewBox(widget.Column, int(math.Round(cfg.PopupGap.ResolvePx(popupGapBasePx, scale))), 8)
-	root.AddClass("notification-popup-list")
+	list := widget.NewBox(widget.Column, int(cfg.PopupGap.ResolvePx(popupGapBasePx, scale)), 0)
+	list.AddClass("notification-popup-list")
+	host := widget.NewBox(widget.Column, 0, 0)
+	host.SetElement("window")
+	host.AddClass("background", "notification-popup-host")
 	if p.sheet != nil {
-		root.AttachStylesheet(p.sheet)
+		host.AttachStylesheet(p.sheet)
 	}
+	host.Append(list, false)
 	win, err := p.app.NewLayer(app.LayerConfig{
-		Output:        p.out,
-		Layer:         layering.For(p.cfg.General, cfg.PopupLayer),
-		Anchor:        popupAnchors(cfg.PopupPosition),
-		Margin:        popupMargins(cfg, scale),
-		Width:         cardWidthPx,
-		ExclusiveZone: -1,
-		Namespace:     "wayle-notification-popup",
-		Root:          root,
+		Output:    out,
+		Layer:     layering.For(p.cfg.General, cfg.PopupLayer),
+		Anchor:    popupAnchors(cfg.PopupPosition),
+		Margin:    popupMargins(cfg, scale),
+		Namespace: "wayle-notification-popup",
+		Root:      host,
 	})
-	return win, root, err
+	return win, list, err
 }
 
 // popupMargins is apply_position's margins: popup-margin-y on the
-// anchored top or bottom edge, popup-margin-x on the anchored side.
+// anchored top or bottom edge, popup-margin-x on the anchored side,
+// truncated as the Rust `as i32`.
 func popupMargins(cfg config.NotificationConfig, scale float64) app.Margins {
-	mx := int32(math.Round(cfg.PopupMarginX.ResolvePx(popupMarginBasePx, scale)))
-	my := int32(math.Round(cfg.PopupMarginY.ResolvePx(popupMarginBasePx, scale)))
+	mx := int32(cfg.PopupMarginX.ResolvePx(popupMarginBasePx, scale))
+	my := int32(cfg.PopupMarginY.ResolvePx(popupMarginBasePx, scale))
 	var m app.Margins
 	anchors := popupAnchors(cfg.PopupPosition)
 	if anchors&app.AnchorTop != 0 {
@@ -416,24 +462,6 @@ func popupMargins(cfg config.NotificationConfig, scale float64) app.Margins {
 		m.Right = mx
 	}
 	return m
-}
-
-// Output picks the popup monitor: "primary" is the first output, a
-// connector name its output, falling back to the first when the
-// connector is not connected (layer_shell.rs apply_monitor_by_connector).
-// Nil only when there are no outputs.
-func Output(outputs []*app.Output, monitor config.PopupMonitor) *app.Output {
-	if len(outputs) == 0 {
-		return nil
-	}
-	if !monitor.IsPrimary() {
-		for _, out := range outputs {
-			if out.Name == monitor.Connector() {
-				return out
-			}
-		}
-	}
-	return outputs[0]
 }
 
 // popupAnchors maps the position onto layer-shell anchors
