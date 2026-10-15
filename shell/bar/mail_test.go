@@ -46,9 +46,43 @@ func TestMailModuleShowsTheServiceTotal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer m.(*mailModule).Stop()
-	if got := m.(*mailModule).label.Text(); got != "7" {
+	mm := m.(*mailModule)
+	defer mm.Stop()
+	if got := mm.label.Text(); got != "7" {
 		t.Errorf("label = %q, want the service's 7", got)
+	}
+	// A bar button with the mail icon, as the Rust BarButton is.
+	if _, ok := mm.Root().(*barButton); !ok || mm.icon == nil || mm.icon.Name() != cfg.Mail.IconName {
+		t.Errorf("root %T icon %v, want a bar button with %q", mm.Root(), mm.icon, cfg.Mail.IconName)
+	}
+}
+
+// hide-when-zero collapses the module root at zero and only then; the
+// label keeps the count.
+func TestMailHidesWhenZero(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Mail.HideWhenZero = true
+	ctx := newTestContext(t, cfg)
+	ctx.Mail = seededMail(t, cfg.Mail, 0)
+	m, err := newMail(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mm := m.(*mailModule)
+	defer mm.Stop()
+	chrome := widget.NewBox(widget.Row, 0, 0)
+	onHeadlessLoop(func() bool { mm.setChrome(chrome); return true })
+	if onHeadlessLoop(func() bool { return chrome.Visible() }) {
+		t.Error("zero unread under hide-when-zero is shown")
+	}
+	onHeadlessLoop(func() bool { mm.apply(2); return true })
+	if !onHeadlessLoop(func() bool { return chrome.Visible() }) || mm.label.Text() != "2" {
+		t.Errorf("two unread: visible %v label %q", chrome.Visible(), mm.label.Text())
+	}
+	cfg.Mail.HideWhenZero = false
+	onHeadlessLoop(func() bool { mm.apply(0); return true })
+	if !onHeadlessLoop(func() bool { return chrome.Visible() }) || mm.label.Text() != "0" {
+		t.Errorf("zero without hide-when-zero: visible %v label %q", chrome.Visible(), mm.label.Text())
 	}
 }
 
@@ -60,17 +94,13 @@ func TestMailModuleWithoutTheServiceErrors(t *testing.T) {
 
 func TestMailLabel(t *testing.T) {
 	cfg := config.DefaultsMail()
-	if got := mailLabel(cfg.Format, 3, cfg.HideWhenZero); got != "3" {
+	if got := mailLabel(cfg.Format, 3); got != "3" {
 		t.Errorf("= %q, want 3", got)
 	}
-	// hide-when-zero blanks the label at zero.
-	if got := mailLabel(cfg.Format, 0, cfg.HideWhenZero); got != "" {
-		t.Errorf("zero = %q, want empty", got)
+	if got := mailLabel(cfg.Format, 0); got != "0" {
+		t.Errorf("zero = %q, want 0", got)
 	}
-	if got := mailLabel(cfg.Format, 0, false); got != "0" {
-		t.Errorf("zero shown = %q, want 0", got)
-	}
-	if got := mailLabel("Unread: {{ count }}", 12, false); got != "Unread: 12" {
+	if got := mailLabel("Unread: {{ count }}", 12); got != "Unread: 12" {
 		t.Errorf("format = %q", got)
 	}
 }

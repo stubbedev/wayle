@@ -34,20 +34,21 @@ func startMail(ctx *ModuleContext) func() {
 	return cancel
 }
 
-// mailLabel renders {{ count }}; hide-when-zero blanks at zero.
-func mailLabel(format string, count uint32, hideWhenZero bool) string {
-	if hideWhenZero && count == 0 {
-		return ""
-	}
-	// A plain replacement, not a template (helpers.rs).
+// mailLabel is format_label: {{ count }} replaced, not a template.
+func mailLabel(format string, count uint32) string {
 	return strings.ReplaceAll(format, "{{ count }}", strconv.FormatUint(uint64(count), 10))
 }
 
-// mailModule is the module: the shared service's unread total.
+// mailModule is the module: the shared service's unread total on a bar
+// button, the module root hidden at zero under hide-when-zero.
 type mailModule struct {
-	ctx   ModuleContext
-	label *widget.Label
-	stop  func()
+	ctx    ModuleContext
+	label  *widget.Label
+	icon   *widget.Icon
+	root   widget.Widget
+	chrome moduleChrome
+	count  uint32
+	stop   func()
 }
 
 var errMailNoService = errors.New("mail: requires the shared mail service")
@@ -57,6 +58,8 @@ func newMail(ctx ModuleContext) (Module, error) {
 		return nil, errMailNoService
 	}
 	m := &mailModule{ctx: ctx, label: widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)}
+	m.icon = moduleIcon(ctx, ctx.Config.Mail.Icon())
+	m.root = assembleModule(ctx, m.icon, m.label)
 	m.apply(ctx.Mail.State().Total)
 	ticks, unsubscribe := ctx.Mail.Subscribe()
 	done := make(chan struct{})
@@ -78,17 +81,31 @@ func newMail(ctx ModuleContext) (Module, error) {
 	return m, nil
 }
 
-// apply renders one count.
+// apply is update_display for one count.
 func (m *mailModule) apply(count uint32) {
 	cfg := m.ctx.Config.Mail
+	m.count = count
 	text := ""
 	if cfg.LabelShow {
-		text = mailLabel(cfg.Format, count, cfg.HideWhenZero)
+		text = mailLabel(cfg.Format, count)
 	}
 	m.label.SetText(text)
+	m.showChrome()
 }
 
-func (m *mailModule) Root() widget.Widget { return m.label }
+// showChrome hides the module root at zero under hide-when-zero.
+func (m *mailModule) showChrome() {
+	if m.chrome != nil {
+		m.chrome.SetVisible(m.count > 0 || !m.ctx.Config.Mail.HideWhenZero)
+	}
+}
+
+func (m *mailModule) setChrome(c moduleChrome) {
+	m.chrome = c
+	m.showChrome()
+}
+
+func (m *mailModule) Root() widget.Widget { return m.root }
 
 // Stop unsubscribes from the service.
 func (m *mailModule) Stop() {
