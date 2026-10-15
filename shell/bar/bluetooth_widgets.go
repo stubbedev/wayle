@@ -44,8 +44,13 @@ func (s *btSurface) Measure(con widget.Constraints) widget.Size {
 }
 
 // Arrange gives the child the whole rect.
+// Arrange measures the child at the rect before arranging it there:
+// containers lay out from their last measure, which may have been taken
+// under other constraints (the popover's ceiling probe).
 func (s *btSurface) Arrange(r render.Rect) {
 	s.Base.Arrange(r)
+	size := widget.Size{W: r.W, H: r.H}
+	s.child.Measure(widget.Constraints{Min: size, Max: size})
 	s.child.Arrange(r)
 	widget.SetParents(s, s.child)
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/desktopnotify"
 	"github.com/stubbedev/wayle/service/bluetooth"
+	"github.com/stubbedev/wayle/shell/treetest"
 )
 
 const (
@@ -880,5 +881,24 @@ func TestBtPairingPinBackspaceSteps(t *testing.T) {
 	router.KeyAction(widget.KeyDelete, 0)
 	if c.pinDigits[1].Text() != "5" {
 		t.Errorf("the delete deleted backward: %q", c.pinDigits[1].Text())
+	}
+}
+
+// The device rows live in the panel: each list sits in its card, so the
+// rows are laid out and painted, not just built.
+func TestBluetoothRowsAreInThePanel(t *testing.T) {
+	d, _ := newTestBtDropdown(t, btWorld())
+	d.root.Measure(widget.Constraints{Max: widget.Size{W: 420, H: 900}})
+	d.root.Arrange(render.Rect{W: 420, H: 900})
+	inTree := map[widget.Widget]bool{}
+	treetest.Walk(d.root, func(w widget.Widget) { inTree[w] = true })
+	mine, avail := rows(d.myList), rows(d.availList)
+	if len(mine) == 0 || len(avail) == 0 {
+		t.Fatalf("rows: %d mine, %d available", len(mine), len(avail))
+	}
+	for _, r := range append(mine, avail...) {
+		if !inTree[r] || r.Bounds().W == 0 || r.Bounds().H == 0 {
+			t.Errorf("row at %+v, in the panel %v: want it laid out inside the panel", r.Bounds(), inTree[r])
+		}
 	}
 }
