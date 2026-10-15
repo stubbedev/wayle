@@ -146,6 +146,24 @@ wayle surfaces:
       cairo-painted in Rust too: wash, hole, border, label; loupe,
       readout, persisted history), screenshot (the capture/composite/
       crop/save/clipboard/notify set).
+- [x] greeter live-verified on the harness: it had never mapped on sway
+      (gelm fix: a toplevel without a size defaults to its content's
+      natural size); the power glyphs are installed as an icon dir like
+      install_icons (they drew black on black as raw SVGs); the stylesheet
+      font resolver is installed (the clock's 700 weight); credential
+      labels center like GTK's xalign 0.5.
+- [x] print dialog is the Rust view: a ListBox of printer rows in a scroll
+      growing 64..240px, the .print-form Grid, a SpinButton for copies
+      (gelm ListBox now reports its rows as Children).
+- [x] sizing: gelm SetSizeRequest (set_size_request) and squeezes that
+      respect it; credential.Fixed/Inset are gone - min sizes use the
+      size request, exact boxes (file chooser columns and thumbnails, the
+      portal header image) widgets.Pinned. Inline CSS sizes were wiped by
+      the bundle's `* { all: unset }` (the bundle sits above a widget's
+      inline style, as in GTK): the weather dropdown's daily bars had no
+      width or offset. Dynamic per-widget CSS (the user-session avatar,
+      settings swatches) now uses apptheme.ComponentPriority, Rust's
+      COMPONENT_CSS_PRIORITY.
 - [ ] share picker: not on the stylesheet at all (no sheet attached, a
       palette-painted background, hand paddings, no enter/exit
       animation, sizes at scale 1); rebuild it as views.rs (FlowBox of
