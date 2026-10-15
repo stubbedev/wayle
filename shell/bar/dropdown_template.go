@@ -287,6 +287,10 @@ func iconTile(icon *widget.Icon, boxClass, imgClass string) *widget.Box {
 func dropdownScroll(child widget.Widget, class string) *widget.Scroll {
 	s := widget.NewScroll(child)
 	s.VerticalOnly = true
+	// A GTK viewport gives its child at least its own size: short
+	// content packs at the top (and an expanding empty state centers
+	// in the whole panel) instead of floating mid-view.
+	s.FillX, s.FillY = true, true
 	if class != "" {
 		s.AddClass(class)
 	}

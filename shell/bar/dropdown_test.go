@@ -339,3 +339,17 @@ func TestDropdownTreeStylesThePanelText(t *testing.T) {
 		}
 	}
 }
+
+// A dropdown's scroll packs short content at its top, as the GTK
+// viewport does; the bluetooth sections sat mid-panel before.
+func TestDropdownScrollPacksShortContentAtTheTop(t *testing.T) {
+	col := widget.NewBox(widget.Column, 0, 0)
+	first := widget.NewSpacer(10, 20)
+	col.Append(first, false)
+	s := dropdownScroll(col, "")
+	s.Measure(widget.Constraints{Max: widget.Size{W: 300, H: 400}})
+	s.Arrange(render.Rect{W: 300, H: 400})
+	if y := first.Bounds().Y; y > 2 {
+		t.Errorf("the first child sits at y=%d, want the top", y)
+	}
+}
