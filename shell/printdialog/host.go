@@ -44,10 +44,9 @@ type Deps struct {
 	// Open maps the overlay; Invoke runs on the UI loop.
 	Open   func(cfg app.LayerConfig) (Window, error)
 	Invoke func(func())
-	// Font labels the sheet in Ink until Sheet (the print-* classes)
-	// restyles it.
+	// Font shapes the text; Sheet styles the surface, the labels'
+	// and entries' ink included.
 	Font  render.Font
-	Ink   render.Color
 	Sheet *widget.Stylesheet
 	// Printers lists the CUPS queues and Spool sends a job to one.
 	Printers func(context.Context) ([]ipp.Printer, error)
@@ -191,7 +190,7 @@ func (h *Dialog) finish(p prepared, ok bool) {
 }
 
 func (h *Dialog) label(text, class string) *widget.Label {
-	l := widget.NewLabel(h.d.Font, 13, text, h.d.Ink)
+	l := widget.NewLabel(h.d.Font, 13, text, 0)
 	l.AddClass(class)
 	return l
 }
@@ -246,7 +245,7 @@ func (h *Dialog) build(queues []queue) widget.Widget {
 	list.Select(0)
 	listH := min(max(len(queues)*printerRowH, listMinHeight), listMaxHeight)
 
-	copies := widget.NewEntry(h.d.Font, 13, h.d.Ink)
+	copies := widget.NewEntry(h.d.Font, 13, 0)
 	copies.SetText("1")
 	step := func(by int) func() {
 		return func() { copies.SetText(strconv.Itoa(clampCopies(parseCopies(copies.Text()) + by))) }
@@ -256,7 +255,7 @@ func (h *Dialog) build(queues []queue) widget.Widget {
 	copiesRow.Append(copies, true)
 	copiesRow.Append(h.button("+", "print-copies-step", step(1)), false)
 
-	pages := widget.NewEntry(h.d.Font, 13, h.d.Ink)
+	pages := widget.NewEntry(h.d.Font, 13, 0)
 	pages.SetPlaceholder("All pages — or e.g. 1-5, 8")
 	orientation, paperDrop := h.dropdown(orientations), h.dropdown(paperLabels())
 	color, duplex, quality := h.dropdown(colors), h.dropdown(duplexes), h.dropdown(qualities)

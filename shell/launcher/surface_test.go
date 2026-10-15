@@ -7,13 +7,12 @@ import (
 	"time"
 
 	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/launcheripc"
 	engine "github.com/stubbedev/wayle/service/launcher"
+	"github.com/stubbedev/wayle/shell/treetest"
 )
 
 // fakeLoop is the UI loop: Invoke queues, pump runs on the test
@@ -81,10 +80,7 @@ type harness struct {
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
+	face := treetest.Font(t)
 	h := &harness{t: t, loop: &fakeLoop{}, cfg: config.Defaults()}
 	h.cfg.Launcher.History.Enable = false
 	// Surfaces close at once here; TestSurfacePlaysItsExit animates.
@@ -103,7 +99,6 @@ func newHarness(t *testing.T) *harness {
 			return w, nil
 		},
 		Font:         face,
-		Ink:          render.RGB(255, 255, 255),
 		MonitorWidth: func() int { return 2000 },
 		Copy:         func(text string) { h.copied = append(h.copied, text) },
 		HeldMods:     func() engine.MouseModifiers { return h.mods },
@@ -564,5 +559,28 @@ func TestMessageMarkupFallsBackToTheLiteral(t *testing.T) {
 	got := messageMarkup("<b>broken")
 	if strings.Contains(got, "<b>") || !strings.Contains(got, "broken") {
 		t.Errorf("broken markup = %q, want the escaped literal", got)
+	}
+}
+
+// Every label takes its ink from the stylesheet, so a selected row
+// reads --fg-on-accent and urgent and active rows their colors
+// (_launcher.scss): nothing in the open surface pins one.
+func TestLabelsTakeTheStylesheetInk(t *testing.T) {
+	h := newHarness(t)
+	h.open(dmenu(), false, "alpha", "beta")
+	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == 2 })
+	h.loop.pump()
+	root := h.windows[0].cfg.Root
+	labels := treetest.All[*widget.Label](root)
+	if len(labels) == 0 {
+		t.Fatal("no labels in the surface")
+	}
+	for _, l := range labels {
+		if l.Color() != 0 {
+			t.Errorf("label %q pins ink %#08x", l.Text(), uint32(l.Color()))
+		}
+	}
+	if c := h.s.cur.views.entry.Color(); c != 0 {
+		t.Errorf("the entry pins ink %#08x", uint32(c))
 	}
 }

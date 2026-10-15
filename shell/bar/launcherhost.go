@@ -12,7 +12,6 @@ import (
 	engine "github.com/stubbedev/wayle/service/launcher"
 	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/shell/launcher"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // startLauncher serves the launcher socket from the shell, as the Rust
@@ -20,8 +19,7 @@ import (
 // surface on the UI loop, which reads the live config on every session
 // (so a reload reaches the next one). The returned stop closes the
 // socket.
-func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, ctx ModuleContext, theme *apptheme.Theme, font render.Font, palette *styling.Palette) func() {
-	ink, _ := palette.Token(config.TokenFgDefault)
+func startLauncher(application *app.Application, outputs func() []*app.Output, current func() *config.Config, ctx ModuleContext, theme *apptheme.Theme, font render.Font) func() {
 	deps := launcher.Deps{
 		Invoke: application.Invoke,
 		After: func(d time.Duration, fn func()) func() {
@@ -37,7 +35,6 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 			return w, nil
 		},
 		Font:          font,
-		Ink:           ink,
 		Sheet:         theme.Sheet,
 		SheetPriority: apptheme.Priority,
 		MonitorWidth: func() int {

@@ -71,10 +71,9 @@ type Deps struct {
 	// Open maps the overlay; Invoke runs on the UI loop.
 	Open   func(cfg app.LayerConfig) (Window, error)
 	Invoke func(func())
-	// Font labels the sheet in Ink until Sheet (the file-chooser-*
-	// classes) restyles it.
+	// Font shapes the text; Sheet styles the surface, the labels'
+	// and entries' ink included.
 	Font  render.Font
-	Ink   render.Color
 	Sheet *widget.Stylesheet
 	// MIME guesses types for filters and icons.
 	MIME *mime.Database
@@ -212,7 +211,7 @@ type ui struct {
 }
 
 func (c *Chooser) label(text, class string) *widget.Label {
-	l := widget.NewLabel(c.d.Font, 13, text, c.d.Ink)
+	l := widget.NewLabel(c.d.Font, 13, text, 0)
 	if class != "" {
 		l.AddClass(class)
 	}
@@ -296,7 +295,6 @@ func (c *Chooser) build(title, name string) {
 	// is an in-memory scan, and a recursive walk is cancelled by its
 	// generation instead.
 	u.search = widget.NewSearchEntry(c.d.Font, 13, "Filter this folder")
-	u.search.SetColor(c.d.Ink)
 	u.search.AddClass("file-chooser-search")
 	u.search.SetDelay(0)
 	u.search.OnSearchChanged = c.setSearch
@@ -315,7 +313,7 @@ func (c *Chooser) build(title, name string) {
 	u.preview.SetVisible(false)
 	body.Append(u.preview, false)
 
-	u.name = widget.NewEntry(c.d.Font, 13, c.d.Ink)
+	u.name = widget.NewEntry(c.d.Font, 13, 0)
 	u.name.AddClass("file-chooser-name")
 	u.name.SetPlaceholder("File name")
 	u.name.SetText(name)

@@ -52,10 +52,9 @@ type Deps struct {
 	Open func(cfg app.LayerConfig) (Window, error)
 	// Run runs a command (spawn.Quiet).
 	Run func(cmd string) error
-	// Font labels the buttons in Ink until Sheet (the power-menu-*
-	// classes) restyles them.
+	// Font shapes the labels; Sheet (the power-menu-* rules) styles
+	// the overlay.
 	Font  render.Font
-	Ink   render.Color
 	Sheet *widget.Stylesheet
 }
 
@@ -80,11 +79,12 @@ func (m *Menu) Show() {
 	cfg := m.d.Config()
 	row := widget.NewBox(widget.Row, 12, 0)
 	row.AddClass("power-menu-surface")
+	row.SetHomogeneous(true)
 	for _, a := range actions {
 		if !a.visible(cfg.Power) {
 			continue
 		}
-		row.Append(m.button(a), true)
+		row.Append(m.button(a), false)
 	}
 	m.rev = widget.NewRevealer(widgets.Center(row))
 	root := widget.NewBox(widget.Column, 0, 0)
@@ -120,10 +120,11 @@ func (m *Menu) Show() {
 func (m *Menu) button(a action) widget.Widget {
 	icon := widget.NewThemeIcon(a.icon, iconPx)
 	icon.AddClass("power-menu-icon")
-	label := widget.NewLabel(m.d.Font, 13, a.label, m.d.Ink)
+	label := widget.NewLabel(m.d.Font, 13, a.label, 0)
 	label.AddClass("power-menu-label")
 	label.SetAlignment(render.AlignCenter)
 	content := widget.NewBox(widget.Column, 6, 0)
+	content.SetVExpand(true)
 	content.Append(icon, false)
 	content.Append(label, false)
 	b := widget.NewButton(widgets.Center(content), 0, 0)

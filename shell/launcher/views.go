@@ -52,10 +52,10 @@ func (s *Surface) buildViews(a *active) *views {
 
 	v.inputRow = widget.NewBox(widget.Row, 0, 0)
 	v.inputRow.AddClass("launcher-input")
-	v.prompt = widget.NewLabel(s.d.Font, fontPx, "", s.d.Ink)
+	v.prompt = widget.NewLabel(s.d.Font, fontPx, "", 0)
 	v.prompt.AddClass("launcher-prompt")
 	v.inputRow.Append(v.prompt, false)
-	v.entry = widget.NewEntry(s.d.Font, fontPx, s.d.Ink)
+	v.entry = widget.NewEntry(s.d.Font, fontPx, 0)
 	v.entry.AddClass("launcher-entry")
 	if ui.filter != nil {
 		v.entry.SetText(*ui.filter)
@@ -71,13 +71,13 @@ func (s *Surface) buildViews(a *active) *views {
 	v.inputRow.Append(v.entry, true)
 	v.surface.Append(v.inputRow, false)
 
-	v.message = widget.NewRichLabel(s.d.Font, fontPx, "", s.d.Ink)
+	v.message = widget.NewRichLabel(s.d.Font, fontPx, "", 0)
 	v.message.AddClass("launcher-message")
 	v.message.SetWrap(true)
 	v.surface.Append(v.message, false)
 
 	st := rowStyle{
-		font: s.d.Font, px: fontPx, ink: s.d.Ink, iconPx: iconPx(s.d), showIcons: ui.showIcons,
+		font: s.d.Font, px: fontPx, iconPx: iconPx(s.d), showIcons: ui.showIcons,
 		display: rowDisplay{columns: ui.displayColumns, separator: ui.columnSeparator, ellipsize: ui.ellipsize},
 	}
 	v.list = newResultList(func(pos int) widget.Widget { return s.makeRow(a, pos, st) })

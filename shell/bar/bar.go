@@ -108,7 +108,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 			o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon})
 		}
 	}
-	ink, _ := palette.Token(config.TokenFgDefault)
 	baseCtx.PowerMenu = powermenu.New(powermenu.Deps{
 		Config: current.Load,
 		Open: func(cfg app.LayerConfig) (powermenu.Window, error) {
@@ -120,7 +119,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 		},
 		Run:   spawn.Quiet,
 		Font:  font,
-		Ink:   ink,
 		Sheet: theme.Sheet,
 	})
 	// The clipboard history starts with the shell rather than when the
@@ -269,7 +267,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}, cfg)
 	osdRef.Store(osdSrv)
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
-	servePortalHosts(application, current.Load, font, ink, theme.Sheet)
+	servePortalHosts(application, current.Load, font, theme.Sheet)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
 	rt.ctx = baseCtx
@@ -294,13 +292,13 @@ func run(cfg *config.Config, svc *config.Service) error {
 			a.Attach(layer)
 		}
 		rt.ctx.Dropdowns.attachHost(output.Name, layer, logicalSize(output).H)
+		return barWindow{layer, ctx.gen}, nil
+	}
 	// Notification popups render on one monitor, bar or not.
 	var popupHost *popups.Popups
 	if notifSvc != nil {
 		popupHost = popups.New(application, notifSvc, cfg, font, theme.Sheet, sess.Outputs)
 		go popupHost.Run()
-	}
-		return barWindow{layer, ctx.gen}, nil
 	}
 	bars := newBarSet(openBar)
 	// plugOutput gives a named output its bar; startup
@@ -319,11 +317,11 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	defer sess.WatchOutputIdentity(plugOutput)()
 	defer sess.WatchOutputs(nil, func(output *app.Output) {
+		bars.unplug(output)
+		osdSrv.DetachOutput(output.Name)
 		if popupHost != nil {
 			popupHost.DetachOutput(output.Name)
 		}
-		bars.unplug(output)
-		osdSrv.DetachOutput(output.Name)
 		rt.ctx.Dropdowns.detachHost(output.Name)
 	})()
 	// restyle re-derives the palette, styles, and font from cfg and
@@ -408,7 +406,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		return true
 	})()
 	// The launcher surface serves `wayle launcher` sessions.
-	defer startLauncher(application, sess.Outputs, current.Load, rt.ctx, theme, font, palette)()
+	defer startLauncher(application, sess.Outputs, current.Load, rt.ctx, theme, font)()
 	// The widget socket carries out-of-process pushes (`wayle toast`).
 	widgetSrv := widgetipc.NewServer()
 	if stop, err := widgetSrv.Listen(); err == nil {

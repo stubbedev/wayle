@@ -40,10 +40,9 @@ type Deps struct {
 	// Open maps the overlay; Invoke runs on the UI loop.
 	Open   func(cfg app.LayerConfig) (Window, error)
 	Invoke func(func())
-	// Font labels the dialog in Ink until Sheet (the portal-dialog-*
-	// classes) restyles it.
+	// Font shapes the text; Sheet styles the surface, the labels'
+	// and entries' ink included.
 	Font  render.Font
-	Ink   render.Color
 	Sheet *widget.Stylesheet
 	// Candidates are the apps offered for a type (desktopentry's
 	// RecommendedFor, else every app); SetDefault records the
@@ -157,7 +156,7 @@ func nonEmpty(parts ...string) []string {
 }
 
 func (h *Dialogs) label(text, class string) *widget.Label {
-	l := widget.NewLabel(h.d.Font, 13, text, h.d.Ink)
+	l := widget.NewLabel(h.d.Font, 13, text, 0)
 	l.AddClass(class)
 	l.SetWrap(true)
 	return l
@@ -278,7 +277,6 @@ func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, co
 	// gtk::SearchEntry: the list filters on search-changed, after the
 	// default delay.
 	search := widget.NewSearchEntry(h.d.Font, 13, "Search applications…")
-	search.SetColor(h.d.Ink)
 	search.AddClass("portal-dialog-search")
 	search.OnSearchChanged = func(q string) {
 		q = strings.ToLower(q)

@@ -14,9 +14,9 @@ import (
 	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/shell/treetest"
 )
 
@@ -47,10 +47,7 @@ type harness struct {
 
 func newHarness(t *testing.T, viewFile string) *harness {
 	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
+	face := treetest.Font(t)
 	conf := config.Defaults()
 	conf.Animations.Enabled = false
 	hs := &harness{t: t, root: tree(t), opened: make(chan app.LayerConfig, 4)}
@@ -81,7 +78,7 @@ func newHarness(t *testing.T, viewFile string) *harness {
 		},
 		Invoke:    hs.invoke,
 		Font:      face,
-		Ink:       render.RGBA(0, 0, 0, 255),
+		Sheet:     apptheme.New(conf).Sheet,
 		MIME:      testDB(t),
 		Home:      hs.root,
 		Places:    func() []Place { return []Place{{"Home", hs.root, "user-home-symbolic"}} },
@@ -538,10 +535,15 @@ func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 	if col == nil {
 		t.Fatal("no column grip")
 	}
-	// paint renders the list's rows as they are cached.
+	// paint renders the list's rows as they are cached, after laying
+	// out the whole surface as its window does, so the rows inherit
+	// the stylesheet's ink through their ancestors.
 	paint := func() []uint8 {
 		var px []uint8
 		hs.do(func() {
+			root := hs.c.ui.root
+			root.Measure(widget.Constraints{Max: widget.Size{W: 1200, H: 800}})
+			root.Arrange(render.Rect{W: 1200, H: 800})
 			l := hs.c.ui.list
 			l.Measure(widget.Constraints{Max: widget.Size{W: 600, H: 200}})
 			l.Arrange(render.Rect{W: 600, H: 200})

@@ -41,8 +41,6 @@ type Deps struct {
 	Open func(cfg app.LayerConfig) (Window, error)
 	// Font paints every label.
 	Font render.Font
-	// Ink is the default label color before the stylesheet applies.
-	Ink render.Color
 	// Sheet is the shell's stylesheet (the .launcher-* rules), and
 	// SheetPriority its priority, which a session's -font/-style CSS
 	// sits above.
@@ -755,7 +753,7 @@ func (s *Surface) rebuildTabs(names []string, activeMode int) {
 		if shown, ok := s.cur.ui.displayNames[name]; ok {
 			label = shown
 		}
-		b := widget.NewButton(widget.NewLabel(s.d.Font, fontPx, label, s.d.Ink), 4, 6)
+		b := widget.NewButton(widget.NewLabel(s.d.Font, fontPx, label, 0), 4, 6)
 		b.AddClass("launcher-tab")
 		if i == activeMode {
 			b.AddClass("active")

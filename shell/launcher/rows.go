@@ -59,7 +59,6 @@ type multiSelect struct {
 type rowStyle struct {
 	font      render.Font
 	px        float64
-	ink       render.Color
 	iconPx    int
 	showIcons bool
 	display   rowDisplay
@@ -111,7 +110,7 @@ func buildRow(pos int, it engine.Item, selected bool, st rowStyle, multi *multiS
 		if multi.picked[itemIndex] {
 			ballot = multi.ballotSelected
 		}
-		b := widget.NewLabel(st.font, st.px, ballot, st.ink)
+		b := widget.NewLabel(st.font, st.px, ballot, 0)
 		b.AddClass("launcher-row-ballot")
 		content.Append(b, false)
 	}
@@ -129,11 +128,11 @@ func buildRow(pos int, it engine.Item, selected bool, st rowStyle, multi *multiS
 		if !ok {
 			markup = pango.Escape(shown)
 		}
-		rl := widget.NewRichLabel(st.font, st.px, markup, st.ink)
+		rl := widget.NewRichLabel(st.font, st.px, markup, 0)
 		rl.SetEllipsize(st.display.mode())
 		label = rl
 	} else {
-		l := widget.NewLabel(st.font, st.px, shown, st.ink)
+		l := widget.NewLabel(st.font, st.px, shown, 0)
 		l.SetEllipsize(st.display.mode())
 		label = l
 	}

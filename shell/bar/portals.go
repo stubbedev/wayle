@@ -29,7 +29,7 @@ import (
 // file_chooser) and com.wayle.Print1 (services/print, spooling over
 // CUPS' IPP). A bus failure leaves the portal answering those requests
 // "other".
-func servePortalHosts(application *app.Application, current func() *config.Config, font render.Font, ink render.Color, sheet *widget.Stylesheet) {
+func servePortalHosts(application *app.Application, current func() *config.Config, font render.Font, sheet *widget.Stylesheet) {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		log.Printf("portal hosts: session bus: %v", err)
@@ -40,7 +40,6 @@ func servePortalHosts(application *app.Application, current func() *config.Confi
 		Open:       layerOpener[portaldialogs.Window](application),
 		Invoke:     application.Invoke,
 		Font:       font,
-		Ink:        ink,
 		Sheet:      sheet,
 		Candidates: portaldialogs.CandidateApps,
 		SetDefault: desktopentry.SetDefault,
@@ -63,7 +62,6 @@ func servePortalHosts(application *app.Application, current func() *config.Confi
 		Open:      layerOpener[filechooser.Window](application),
 		Invoke:    application.Invoke,
 		Font:      font,
-		Ink:       ink,
 		Sheet:     sheet,
 		MIME:      mime.System(),
 		Home:      home,
@@ -82,7 +80,6 @@ func servePortalHosts(application *app.Application, current func() *config.Confi
 		Open:       layerOpener[printdialog.Window](application),
 		Invoke:     application.Invoke,
 		Font:       font,
-		Ink:        ink,
 		Sheet:      sheet,
 		Printers:   cups.Printers,
 		Spool:      func(ctx context.Context, j ipp.Job) error { _, err := cups.Print(ctx, j); return err },

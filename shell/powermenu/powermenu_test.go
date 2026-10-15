@@ -5,11 +5,10 @@ import (
 	"testing"
 
 	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/shell/treetest"
 )
 
 type fakeWindow struct{ closed bool }
@@ -27,10 +26,7 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
+	face := treetest.Font(t)
 	h := &harness{cfg: config.Defaults()}
 	h.m = New(Deps{
 		Config: func() *config.Config { return h.cfg },
@@ -155,4 +151,22 @@ func TestShowWhenTheOverlayCannotMap(t *testing.T) {
 		t.Error("an unmapped menu reports open")
 	}
 	h.m.Cancel() // nothing to close
+}
+
+// The row is shell/power_menu's: homogeneous, so every button takes
+// the widest's width without stretching the row, and the labels take
+// their ink from the stylesheet.
+func TestRowIsHomogeneousAndUnpinned(t *testing.T) {
+	h := newHarness(t)
+	h.m.Show()
+	root := h.opened[0].Root
+	rows := treetest.WithClass(root, "power-menu-surface")
+	if len(rows) != 1 || !rows[0].(*widget.Box).Homogeneous() {
+		t.Fatalf("surface %v, want one homogeneous .power-menu-surface", rows)
+	}
+	for _, l := range treetest.All[*widget.Label](root) {
+		if l.Color() != 0 {
+			t.Errorf("label %q pins ink %#08x", l.Text(), uint32(l.Color()))
+		}
+	}
 }
