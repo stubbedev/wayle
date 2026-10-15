@@ -114,7 +114,14 @@ func TestSetConfigUpdatesThemingAndTheHotplugSnapshot(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Styling.ColorExtractor.ThemingMonitor = "DP-1"
 	cfg.Wallpaper.FitMode = wallpaper.FitFit
+	cfg.Animations.Transition = config.AnimationSlideDown
+	if transitionOf(s.anims).Kind == TransitionSlideDown {
+		t.Fatal("the transition moved before the reload")
+	}
 	s.SetConfig(cfg)
+	if got := transitionOf(s.anims).Kind; got != TransitionSlideDown {
+		t.Errorf("transition after the reload = %v, want the new slide-down", got)
+	}
 	if got := svc.ThemingMonitor(); got != "DP-1" {
 		t.Errorf("theming monitor = %q, want DP-1", got)
 	}

@@ -13,10 +13,11 @@ import (
 // SetConfig applies a reloaded config: the extraction settings
 // (color_extractor.rs) and the [wallpaper] changes (watchers/
 // wallpaper.rs). Monitors that appear later take their state from the
-// new snapshot. Call it on the loop goroutine.
+// new snapshot, and the next swap plays the new [animations]
+// transition. Call it on the loop goroutine.
 func (s *Shell) SetConfig(cfg *config.Config) {
 	old := s.cfg
-	s.cfg = cfg.Wallpaper
+	s.cfg, s.anims = cfg.Wallpaper, cfg.Animations
 	applyStyling(s.svc, cfg.Styling.ColorExtractor)
 	applyWallpaperChange(s.svc, old, cfg.Wallpaper)
 }

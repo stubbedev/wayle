@@ -1,13 +1,14 @@
 package wallpaper
 
 import (
-	"fmt"
 	"image"
 	"math"
 	"time"
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
+
+	"github.com/stubbedev/wayle/config"
 )
 
 // TransitionKind is how one wallpaper replaces the previous one: the
@@ -33,32 +34,34 @@ type Transition struct {
 	Duration time.Duration
 }
 
-// DefaultTransition is [animations]' default for the wallpaper surface:
-// a 200ms fade.
-func DefaultTransition() Transition {
-	return Transition{Kind: TransitionCrossfade, Duration: 200 * time.Millisecond}
+// transitionOf is the wallpaper surface's resolved [animations] entry
+// as the stack transition it can play (stack_transition).
+func transitionOf(a config.AnimationsConfig) Transition {
+	return Transition{
+		Kind:     stackTransition(a.TransitionFor(config.AnimWallpaper, false)),
+		Duration: time.Duration(a.DurationFor(config.AnimWallpaper, false)) * time.Millisecond,
+	}
 }
 
-// TransitionFor maps an [animations] AnimationType name to the stack
-// transition the wallpaper can play.
-func TransitionFor(animationType string, d time.Duration) (Transition, error) {
-	kind := TransitionCrossfade
-	switch animationType {
-	case "none":
-		kind = TransitionNone
-	case "slide-up":
-		kind = TransitionSlideUp
-	case "slide-down":
-		kind = TransitionSlideDown
-	case "slide-left":
-		kind = TransitionSlideLeft
-	case "slide-right":
-		kind = TransitionSlideRight
-	case "fade", "swing-up", "swing-down", "swing-left", "swing-right", "bounce", "genie", "zoom", "rotate", "flip":
-	default:
-		return Transition{}, fmt.Errorf("unknown animation type %q", animationType)
+// stackTransition maps an animation type onto a stack transition.
+func stackTransition(t config.AnimationType) TransitionKind {
+	switch t {
+	case config.AnimationNone:
+		return TransitionNone
+	case config.AnimationSlideUp:
+		return TransitionSlideUp
+	case config.AnimationSlideDown:
+		return TransitionSlideDown
+	case config.AnimationSlideLeft:
+		return TransitionSlideLeft
+	case config.AnimationSlideRight:
+		return TransitionSlideRight
+	case config.AnimationFade, config.AnimationSwingUp, config.AnimationSwingDown, config.AnimationSwingLeft,
+		config.AnimationSwingRight, config.AnimationBounce, config.AnimationGenie, config.AnimationZoom,
+		config.AnimationRotate, config.AnimationFlip:
+		return TransitionCrossfade
 	}
-	return Transition{Kind: kind, Duration: d}, nil
+	panic("wallpaper: unknown animation type " + string(t))
 }
 
 // easeOutCubic is GtkStack's progress curve.

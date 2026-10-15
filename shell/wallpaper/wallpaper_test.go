@@ -89,23 +89,39 @@ func TestOutputTarget(t *testing.T) {
 	}
 }
 
-func TestTransitionFor(t *testing.T) {
-	for in, want := range map[string]TransitionKind{
-		"none": TransitionNone, "fade": TransitionCrossfade, "slide-up": TransitionSlideUp,
-		"slide-down": TransitionSlideDown, "slide-left": TransitionSlideLeft, "slide-right": TransitionSlideRight,
-		"genie": TransitionCrossfade, "swing-up": TransitionCrossfade, "flip": TransitionCrossfade,
+// The wallpaper plays [animations]' resolved entry for its surface:
+// the default 200ms fade, a wallpaper override, nothing when disabled;
+// the types a stack cannot play fall back to the crossfade.
+func TestTransitionOf(t *testing.T) {
+	a := config.Defaults().Animations
+	if got := transitionOf(a); got != (Transition{Kind: TransitionCrossfade, Duration: 200 * time.Millisecond}) {
+		t.Errorf("default = %+v", got)
+	}
+	slide, ms := config.AnimationSlideLeft, uint32(900)
+	a.Wallpaper.Enter, a.Wallpaper.EnterDuration = &slide, &ms
+	if got := transitionOf(a); got != (Transition{Kind: TransitionSlideLeft, Duration: 900 * time.Millisecond}) {
+		t.Errorf("wallpaper override = %+v", got)
+	}
+	a.Enabled = false
+	if got := transitionOf(a); got != (Transition{}) {
+		t.Errorf("disabled = %+v, want none in no time", got)
+	}
+	for in, want := range map[config.AnimationType]TransitionKind{
+		config.AnimationNone: TransitionNone, config.AnimationFade: TransitionCrossfade,
+		config.AnimationSlideUp: TransitionSlideUp, config.AnimationSlideDown: TransitionSlideDown,
+		config.AnimationSlideRight: TransitionSlideRight, config.AnimationGenie: TransitionCrossfade,
+		config.AnimationSwingUp: TransitionCrossfade, config.AnimationFlip: TransitionCrossfade,
 	} {
-		got, err := TransitionFor(in, time.Second)
-		if err != nil || got.Kind != want || got.Duration != time.Second {
-			t.Errorf("%s = %+v %v, want %v", in, got, err, want)
+		if got := stackTransition(in); got != want {
+			t.Errorf("%s = %v, want %v", in, got, want)
 		}
 	}
-	if _, err := TransitionFor("slide_up", time.Second); err == nil {
-		t.Error("an unknown animation type mapped")
-	}
-	if d := DefaultTransition(); d.Kind != TransitionCrossfade || d.Duration != 200*time.Millisecond {
-		t.Errorf("default = %+v", d)
-	}
+	defer func() {
+		if recover() == nil {
+			t.Error("an unknown animation type mapped")
+		}
+	}()
+	stackTransition("slide_up")
 }
 
 func paintView(v *view, w, h int) ([]byte, int) {

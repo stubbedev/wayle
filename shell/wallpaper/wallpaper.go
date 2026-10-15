@@ -31,7 +31,7 @@ type Shell struct {
 	app      *app.Application
 	svc      *wallpaper.Service
 	cfg      config.WallpaperConfig
-	trans    Transition
+	anims    config.AnimationsConfig
 	outputs  map[string]*app.Output
 	surfaces map[string]*surface
 }
@@ -43,7 +43,7 @@ type Shell struct {
 // the D-Bus name is taken (another shell is running): no wallpaper is
 // drawn then. The returned stop function ends the loops and releases
 // the name.
-func Start(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn, trans Transition) (*Shell, func(), error) {
+func Start(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn) (*Shell, func(), error) {
 	svc := wallpaper.New(wallpaper.Options{
 		Extractor:      extract.FromConfig(cfg.Styling.ColorExtractor),
 		ThemingMonitor: cfg.Styling.ColorExtractor.ThemingMonitor,
@@ -54,7 +54,7 @@ func Start(application *app.Application, outputs []*app.Output, cfg *config.Conf
 		return nil, nil, err
 	}
 	s := &Shell{
-		app: application, svc: svc, cfg: cfg.Wallpaper, trans: trans,
+		app: application, svc: svc, cfg: cfg.Wallpaper, anims: cfg.Animations,
 		outputs: map[string]*app.Output{}, surfaces: map[string]*surface{},
 	}
 	for _, out := range outputs {
@@ -102,7 +102,7 @@ func Launch(application *app.Application, outputs []*app.Output, cfg *config.Con
 		log.Printf("wallpaper: cannot initialize wallpaper service: D-Bus connection failed: %v", err)
 		return nil, func() {}
 	}
-	s, stop, err := Start(application, outputs, cfg, conn, DefaultTransition())
+	s, stop, err := Start(application, outputs, cfg, conn)
 	if err != nil {
 		log.Printf("wallpaper: cannot initialize wallpaper service: %v", err)
 		return nil, func() {}
@@ -363,7 +363,7 @@ func (surf *surface) swap(img image.Image, scale widget.ImageScale, animate bool
 	}
 	im := widget.NewImage(img)
 	im.SetScale(scale)
-	trans := surf.shell.trans
+	trans := transitionOf(surf.shell.anims)
 	kind := trans.Kind
 	if !animate || trans.Duration <= 0 {
 		kind = TransitionNone
