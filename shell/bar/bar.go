@@ -484,8 +484,7 @@ func layerConfigFor(ctx ModuleContext, layout config.BarLayout, connector string
 //
 // The window's CSS margins carry the insets and the shadow margin, its
 // border and background the bar chrome; the sections' margins carry the
-// padding (bar/_container.scss). Expanding fillers stand in for
-// GtkCenterBox's centering.
+// padding (bar/_container.scss).
 func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) widget.Widget {
 	cfg := ctx.Config
 	axis := widget.Row
@@ -499,22 +498,14 @@ func buildRoot(ctx ModuleContext, layout config.BarLayout, connector string) wid
 	if ctx.Theme != nil {
 		ctx.Theme.Attach(root)
 	}
-	center := widget.NewBox(axis, 0, 0)
-	for i, part := range []struct {
-		class string
-		items []config.BarItem
-	}{
-		{"bar-left", layout.Left},
-		{"bar-center", layout.Center},
-		{"bar-right", layout.Right},
-	} {
-		section := CreateAll(part.items, ctx)
-		section.AddClass("bar-section", part.class)
-		center.Append(section, false)
-		if i < 2 {
-			center.Append(widget.NewBox(axis, 0, 0), true)
-		}
+	section := func(class string, items []config.BarItem) widget.Widget {
+		s := CreateAll(items, ctx)
+		s.AddClass("bar-section", class)
+		return s
 	}
+	center := widget.NewCenterBox(section("bar-left", layout.Left), section("bar-center", layout.Center), section("bar-right", layout.Right))
+	center.SetElement("centerbox")
+	center.SetOrientation(axis)
 	root.Append(center, true)
 	return root
 }

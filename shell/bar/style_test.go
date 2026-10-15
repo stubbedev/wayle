@@ -92,6 +92,30 @@ func pixelAt(data []byte, w, x, y int) render.Color {
 	return render.ColorFromBytes(data[o : o+4])
 }
 
+// The center section sits at the bar's middle however unequal the
+// sides, as GtkCenterBox keeps it.
+func TestBarCenterSectionIsCentered(t *testing.T) {
+	cfg := config.Defaults()
+	layout := config.BarLayout{
+		Monitor: "*",
+		Left:    []config.BarItem{{Module: "clock"}, {Module: "clock"}, {Module: "clock"}},
+		Center:  []config.BarItem{{Module: "clock"}},
+	}
+	root := buildRoot(newTestContext(t, cfg), layout, "DP-1")
+	root.Measure(widget.Constraints{Max: widget.Size{W: 1600, H: 60}})
+	root.Arrange(render.Rect{W: 1600, H: 60})
+	var center *widget.Box
+	treetest.Walk(root, func(w widget.Widget) {
+		if widget.HasClass(w, "bar-center") {
+			center = w.(*widget.Box)
+		}
+	})
+	b := center.Bounds()
+	if mid := b.X + b.W/2; mid < 795 || mid > 805 {
+		t.Errorf("center section %+v, midpoint %d, want the bar's 800", b, mid)
+	}
+}
+
 func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	cfg := config.Defaults()
 	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock", Class: "mine"}}}
@@ -112,7 +136,10 @@ func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	if !strings.Contains(box.InlineStyle(), "--bar-padding-px: 6") {
 		t.Errorf("root inline vars = %q, want the build_css block", box.InlineStyle())
 	}
-	center := box.Children()[0].(*widget.Box)
+	center, ok := box.Children()[0].(*widget.CenterBox)
+	if !ok || center.Element() != "centerbox" {
+		t.Fatalf("window child %T, want the centerbox", box.Children()[0])
+	}
 	var sections []*widget.Box
 	for _, k := range center.Children() {
 		if widget.HasClass(k, "bar-section") {
@@ -161,7 +188,7 @@ func TestGroupsAreBarItemsWithModules(t *testing.T) {
 		Name: "g1", Modules: []config.BarItem{{Module: "clock"}, {Module: "clock"}},
 	}}}}
 	root := buildRoot(newTestContext(t, cfg), layout, "DP-1")
-	left := root.(*widget.Box).Children()[0].(*widget.Box).Children()[0].(*widget.Box)
+	left := root.(*widget.Box).Children()[0].(*widget.CenterBox).Children()[0].(*widget.Box)
 	group := left.Children()[0].(*widget.Box)
 	if !group.HasClass("bar-item") || !group.HasClass("bar-group") || group.ID() != "g1" {
 		t.Errorf("group box classes %v id %q", group.Classes(), group.ID())
