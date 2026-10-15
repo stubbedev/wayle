@@ -35,6 +35,7 @@ func startLauncher(application *app.Application, outputs func() []*app.Output, c
 			return w, nil
 		},
 		Font:          font,
+		Variants:      app.FontVariantsOf(font),
 		Sheet:         theme.Sheet,
 		SheetPriority: apptheme.Priority,
 		MonitorWidth: func() int {

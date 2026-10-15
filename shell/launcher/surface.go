@@ -39,8 +39,10 @@ type Deps struct {
 	Config func() *config.Config
 	// Open maps the layer surface for one session.
 	Open func(cfg app.LayerConfig) (Window, error)
-	// Font paints every label.
-	Font render.Font
+	// Font paints every label; Variants gives the message line and
+	// markup rows their bold and italic faces.
+	Font     render.Font
+	Variants widget.VariantFunc
 	// Sheet is the shell's stylesheet (the .launcher-* rules), and
 	// SheetPriority its priority, which a session's -font/-style CSS
 	// sits above.

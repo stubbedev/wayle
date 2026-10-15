@@ -1,12 +1,14 @@
 package launcher
 
 import (
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stubbedev/gelm/app"
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
@@ -75,6 +77,8 @@ type harness struct {
 	copied  []string
 	mods    engine.MouseModifiers
 	nextID  uint64
+	// styled records the variant faces asked for: "b", "i", "bi".
+	styled []string
 }
 
 func newHarness(t *testing.T) *harness {
@@ -98,7 +102,18 @@ func newHarness(t *testing.T) *harness {
 			h.windows = append(h.windows, w)
 			return w, nil
 		},
-		Font:         face,
+		Font: face,
+		Variants: func(bold, italic bool) *render.Typeface {
+			key := ""
+			if bold {
+				key += "b"
+			}
+			if italic {
+				key += "i"
+			}
+			h.styled = append(h.styled, key)
+			return face.(*render.Typeface)
+		},
 		MonitorWidth: func() int { return 2000 },
 		Copy:         func(text string) { h.copied = append(h.copied, text) },
 		HeldMods:     func() engine.MouseModifiers { return h.mods },
@@ -552,6 +567,38 @@ func TestSuperKeyBindingsParse(t *testing.T) {
 }
 
 // Markup that does not parse shows literally, not as an empty line.
+// The message line and markup rows shape their styled runs with the
+// font's variants; a plain row asks for none.
+func TestMarkupShapesWithTheVariants(t *testing.T) {
+	h := newHarness(t)
+	mesg := "a <b>bold</b> note"
+	opts := dmenu()
+	opts.Mesg = &mesg
+	h.open(opts, false, "<i>slanted</i>")
+	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == 1 })
+	h.loop.pump()
+	layout(h.s.cur.views.root, 600, 400)
+	if !slices.Contains(h.styled, "b") || slices.Contains(h.styled, "i") {
+		t.Errorf("styled faces %v, want the message's bold and no italic for a plain row", h.styled)
+	}
+	h = newHarness(t)
+	opts = dmenu()
+	opts.MarkupRows = true
+	h.open(opts, false, "<i>slanted</i>")
+	h.until("the rows", func() bool { return h.s.cur != nil && h.s.model.len() == 1 })
+	h.loop.pump()
+	layout(h.s.cur.views.root, 600, 400)
+	if !slices.Contains(h.styled, "i") {
+		t.Errorf("styled faces %v, want the markup row's italic", h.styled)
+	}
+}
+
+// layout measures and arranges root at w x h, building the visible rows.
+func layout(root widget.Widget, w, h int) {
+	root.Measure(widget.Constraints{Max: widget.Size{W: w, H: h}})
+	root.Arrange(render.Rect{W: w, H: h})
+}
+
 func TestMessageMarkupFallsBackToTheLiteral(t *testing.T) {
 	if got := messageMarkup(`<span color="#ff0000">late</span>`); !strings.Contains(got, "late") || !strings.Contains(got, "<span") {
 		t.Errorf("valid markup = %q, want it translated", got)
@@ -583,7 +630,6 @@ func TestLabelsTakeTheStylesheetInk(t *testing.T) {
 	if c := h.s.cur.views.entry.Color(); c != 0 {
 		t.Errorf("the entry pins ink %#08x", uint32(c))
 	}
-}
 	win, ok := root.(*widget.Box)
 	if !ok || win.Element() != "window" || !widget.HasClass(win, "launcher-window") {
 		t.Fatalf("root %T, want window.launcher-window", root)
@@ -598,3 +644,4 @@ func TestLabelsTakeTheStylesheetInk(t *testing.T) {
 	if len(lists) != 1 || lists[0].(*resultList).Element() != "listview" {
 		t.Errorf("%d .launcher-listview nodes, want the one listview", len(lists))
 	}
+}

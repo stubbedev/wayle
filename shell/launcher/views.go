@@ -76,11 +76,12 @@ func (s *Surface) buildViews(a *active) *views {
 
 	v.message = widget.NewRichLabel(s.d.Font, fontPx, "", 0)
 	v.message.AddClass("launcher-message")
+	v.message.SetVariants(s.d.Variants)
 	v.message.SetWrap(true)
 	v.surface.Append(v.message, false)
 
 	st := rowStyle{
-		font: s.d.Font, px: fontPx, iconPx: iconPx(s.d), showIcons: ui.showIcons,
+		font: s.d.Font, variants: s.d.Variants, px: fontPx, iconPx: iconPx(s.d), showIcons: ui.showIcons,
 		display: rowDisplay{columns: ui.displayColumns, separator: ui.columnSeparator, ellipsize: ui.ellipsize},
 	}
 	v.list = newResultList(func(pos int) widget.Widget { return s.makeRow(a, pos, st) })
@@ -94,8 +95,8 @@ func (s *Surface) buildViews(a *active) *views {
 
 	v.tabs = widget.NewBox(widget.Row, 0, 0)
 	v.tabs.AddClass("launcher-tabs")
-	v.tabs.SetVisible(ui.sidebar)
 	v.tabs.SetHomogeneous(true)
+	v.tabs.SetVisible(ui.sidebar)
 	v.surface.Append(v.tabs, false)
 
 	v.setPrompt(deref(ui.prompt, ""))

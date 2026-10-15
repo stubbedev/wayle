@@ -58,6 +58,7 @@ type multiSelect struct {
 // rowStyle is what every row in a session is built with.
 type rowStyle struct {
 	font      render.Font
+	variants  widget.VariantFunc
 	px        float64
 	iconPx    int
 	showIcons bool
@@ -129,6 +130,7 @@ func buildRow(pos int, it engine.Item, selected bool, st rowStyle, multi *multiS
 			markup = pango.Escape(shown)
 		}
 		rl := widget.NewRichLabel(st.font, st.px, markup, 0)
+		rl.SetVariants(st.variants)
 		rl.SetEllipsize(st.display.mode())
 		label = rl
 	} else {
