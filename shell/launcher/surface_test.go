@@ -511,23 +511,23 @@ func TestSurfacePlaysItsExit(t *testing.T) {
 	zoom := config.AnimationZoom
 	h.cfg.Animations.Launcher.Exit = &zoom
 	_, _ = h.open(dmenu(), false, "a")
-	h.until("the first session", func() bool { return h.s.cur != nil && h.s.cur.rev != nil })
+	h.until("the first session", func() bool { return h.s.cur != nil && h.s.cur.win != nil })
 	first := h.s.cur
-	if !first.rev.Revealed() || first.rev.Transition() != widget.RevealFade {
-		t.Errorf("entering: revealed %v, transition %v", first.rev.Revealed(), first.rev.Transition())
+	if !first.views.rev.Revealed() || first.views.rev.Transition() != widget.RevealFade {
+		t.Errorf("entering: revealed %v, transition %v", first.views.rev.Revealed(), first.views.rev.Transition())
 	}
 	_, _ = h.open(dmenu(), true, "b")
 	h.loop.pump()
 	if h.windows[0].closed {
 		t.Fatal("the replaced surface closed before its exit played")
 	}
-	if first.rev.Revealed() || first.rev.Transition() != widget.RevealZoom {
-		t.Errorf("exiting: revealed %v, transition %v; want the launcher's zoom exit", first.rev.Revealed(), first.rev.Transition())
+	if first.views.rev.Revealed() || first.views.rev.Transition() != widget.RevealZoom {
+		t.Errorf("exiting: revealed %v, transition %v; want the launcher's zoom exit", first.views.rev.Revealed(), first.views.rev.Transition())
 	}
 	if len(h.windows) != 2 {
 		t.Fatalf("windows = %d, want the replacement mapped meanwhile", len(h.windows))
 	}
-	first.rev.Finish()
+	first.views.rev.Finish()
 	if !h.windows[0].closed || h.windows[1].closed {
 		t.Errorf("after the exit: first closed %v, second closed %v", h.windows[0].closed, h.windows[1].closed)
 	}
@@ -584,3 +584,17 @@ func TestLabelsTakeTheStylesheetInk(t *testing.T) {
 		t.Errorf("the entry pins ink %#08x", uint32(c))
 	}
 }
+	win, ok := root.(*widget.Box)
+	if !ok || win.Element() != "window" || !widget.HasClass(win, "launcher-window") {
+		t.Fatalf("root %T, want window.launcher-window", root)
+	}
+	if rev, ok := win.Children()[0].(*widget.Revealer); !ok || rev != h.s.cur.views.rev || !widget.HasClass(rev.Child(), "launcher-surface") {
+		t.Errorf("window child %T, want the revealer around .launcher-surface", win.Children()[0])
+	}
+	if !h.s.cur.views.tabs.Homogeneous() {
+		t.Error("the mode tabs are not homogeneous")
+	}
+	lists := treetest.WithClass(root, "launcher-listview")
+	if len(lists) != 1 || lists[0].(*resultList).Element() != "listview" {
+		t.Errorf("%d .launcher-listview nodes, want the one listview", len(lists))
+	}

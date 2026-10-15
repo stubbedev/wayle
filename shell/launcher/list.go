@@ -34,8 +34,9 @@ type resultList struct {
 func newResultList(factory func(i int) widget.Widget) *resultList {
 	l := &resultList{factory: factory, rows: map[int]widget.Widget{}, visibleRows: 10, selected: -1}
 	// GTK's ListView element, so the stylesheet's listview > row rules
-	// reach the rows.
+	// reach the rows, with mod.rs's class.
 	l.SetElement("listview")
+	l.AddClass("launcher-listview")
 	return l
 }
 

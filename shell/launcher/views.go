@@ -21,6 +21,7 @@ const sessionCSSPriority = 100
 // views is one session's widget tree (the view! of mod.rs).
 type views struct {
 	root     *widget.Box
+	rev      *widget.Revealer
 	surface  *widget.Box
 	inputRow *widget.Box
 	prompt   *widget.Label
@@ -39,6 +40,7 @@ func (s *Surface) buildViews(a *active) *views {
 	ui := a.ui
 	v := &views{}
 	v.root = widget.NewBox(widget.Column, 0, 0)
+	v.root.SetElement("window")
 	v.root.AddClass("launcher-window")
 	if s.d.Sheet != nil {
 		v.root.AttachStylesheet(s.d.Sheet)
@@ -48,7 +50,8 @@ func (s *Surface) buildViews(a *active) *views {
 	}
 	v.surface = widget.NewBox(widget.Column, 0, 0)
 	v.surface.AddClass("launcher-surface")
-	v.root.Append(v.surface, true)
+	v.rev = widget.NewRevealer(v.surface)
+	v.root.Append(v.rev, true)
 
 	v.inputRow = widget.NewBox(widget.Row, 0, 0)
 	v.inputRow.AddClass("launcher-input")
@@ -92,6 +95,7 @@ func (s *Surface) buildViews(a *active) *views {
 	v.tabs = widget.NewBox(widget.Row, 0, 0)
 	v.tabs.AddClass("launcher-tabs")
 	v.tabs.SetVisible(ui.sidebar)
+	v.tabs.SetHomogeneous(true)
 	v.surface.Append(v.tabs, false)
 
 	v.setPrompt(deref(ui.prompt, ""))
@@ -146,7 +150,7 @@ func (v *views) setMessage(markup *string) {
 
 // height is the tree's natural height at width.
 func (v *views) height(width int) int {
-	return v.root.Measure(widget.Constraints{Max: widget.Size{W: width, H: math.MaxInt32}}).H
+	return v.surface.Measure(widget.Constraints{Max: widget.Size{W: width, H: math.MaxInt32}}).H
 }
 
 // iconPx is -gtk-icon-size: 1.5rem at the styling scale.
