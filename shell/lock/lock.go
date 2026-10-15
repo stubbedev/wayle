@@ -22,20 +22,11 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/auth"
 	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/shell/reveal"
 )
-
-// The lock-screen strings (wayle-shell-core's _lock.ftl, en-US).
-const (
-	msgIncorrect = "Incorrect password"
-	msgLockedOut = "Too many failed attempts"
-)
-
-func msgFailedAttempts(n uint32) string {
-	return "Incorrect password — " + strconv.FormatUint(uint64(n), 10) + " failed attempts"
-}
 
 // blackout is the surface's clear color under the background, opaque
 // from the first frame.
@@ -370,14 +361,19 @@ func (s *Screen) onFailure(reason string) {
 	}
 }
 
+// failureText is show_error's message, from _lock.ftl.
 func (s *Screen) failureText() string {
 	switch {
 	case s.exhausted():
-		return msgLockedOut
+		return i18n.T("lock-locked-out")
 	case s.cfg.ShowFailedAttempts:
-		return msgFailedAttempts(s.attempts)
+		return failedAttempts(s.attempts)
 	}
-	return msgIncorrect
+	return i18n.T("lock-incorrect")
+}
+
+func failedAttempts(n uint32) string {
+	return i18n.T("lock-failed-attempts", i18n.Str("count", strconv.FormatUint(uint64(n), 10)))
 }
 
 // exhausted reports the configured attempt cap reached (0 is no cap).

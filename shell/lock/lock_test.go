@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
+	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/auth"
 	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/shell/treetest"
@@ -274,7 +275,7 @@ func TestFailedAttempts(t *testing.T) {
 	}
 	fail()
 	h.eachFace(t, func(f *face) {
-		if f.prompt.Error.Text() != "Incorrect password — 1 failed attempts" || !f.prompt.Error.Visible() {
+		if f.prompt.Error.Text() != failedAttempts(1) || !f.prompt.Error.Visible() {
 			t.Errorf("message = %q", f.prompt.Error.Text())
 		}
 		if !f.prompt.Entry.Enabled() || f.prompt.Entry.Text() != "" {
@@ -286,7 +287,7 @@ func TestFailedAttempts(t *testing.T) {
 	}
 	fail()
 	h.eachFace(t, func(f *face) {
-		if f.prompt.Error.Text() != "Too many failed attempts" || f.prompt.Entry.Enabled() {
+		if f.prompt.Error.Text() != i18n.T("lock-locked-out") || f.prompt.Entry.Enabled() {
 			t.Errorf("at the cap: message %q, entry enabled %v", f.prompt.Error.Text(), f.prompt.Entry.Enabled())
 		}
 	})
@@ -302,7 +303,7 @@ func TestFailedAttempts(t *testing.T) {
 	quiet.lock(t)
 	quiet.s.Submit("wrong")
 	quiet.conv(t).onEvent(auth.Event{Kind: auth.EventFailure})
-	if got := quiet.s.faces[0].prompt.Error.Text(); got != "Incorrect password" {
+	if got := quiet.s.faces[0].prompt.Error.Text(); got != i18n.T("lock-incorrect") {
 		t.Errorf("show-failed-attempts = false: %q", got)
 	}
 }
@@ -392,7 +393,7 @@ func TestHotplugInheritsState(t *testing.T) {
 	h.s.Submit("again")
 	h.locker.plug()
 	late := h.s.faces[len(h.s.faces)-1]
-	if late.prompt.Error.Text() != "Incorrect password — 1 failed attempts" {
+	if late.prompt.Error.Text() != failedAttempts(1) {
 		t.Errorf("hotplugged message = %q", late.prompt.Error.Text())
 	}
 	if late.prompt.Entry.Enabled() {
@@ -503,9 +504,15 @@ func TestShouldRelock(t *testing.T) {
 	}
 }
 
-func TestFailureTextCount(t *testing.T) {
-	if got := msgFailedAttempts(3); !strings.Contains(got, "3 failed attempts") {
-		t.Errorf("%q", got)
+// The messages are _lock.ftl's, the count interpolated.
+func TestFailureTextIsLocalized(t *testing.T) {
+	if got := failedAttempts(3); !strings.Contains(got, "3") || strings.HasPrefix(got, "No localization") {
+		t.Errorf("failed attempts = %q, want the message with the count", got)
+	}
+	for _, id := range []string{"lock-incorrect", "lock-locked-out", "lock-failed-attempts"} {
+		if got := i18n.T(id); strings.HasPrefix(got, "No localization") {
+			t.Errorf("%s has no message: %q", id, got)
+		}
 	}
 }
 
