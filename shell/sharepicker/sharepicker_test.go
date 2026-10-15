@@ -9,9 +9,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/capture"
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/sharepreview"
@@ -24,10 +22,7 @@ import (
 // no-op and the compositor queries are canned.
 func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple bool) (*Picker, chan string) {
 	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
+	face := treetest.Font(t)
 	p := &Picker{
 		cfg:    cfg,
 		style:  Style{Font: face, LabelPx: 12, Palette: styling.Default()},

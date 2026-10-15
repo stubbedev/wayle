@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/gelm/render"
-	"golang.org/x/image/font/gofont/goregular"
+
+	"github.com/stubbedev/wayle/shell/treetest"
 )
 
 // testLoop stands in for the application loop: Invoke queues, and the
@@ -43,14 +44,7 @@ func (l *testLoop) wait(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-func testFont(t *testing.T) render.Font {
-	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return face
-}
+func testFont(t *testing.T) render.Font { return treetest.Font(t) }
 
 func newTestSlider(t *testing.T) (*DebouncedSlider, *[]float64, *time.Time) {
 	t.Helper()

@@ -5,7 +5,9 @@ package treetest
 import (
 	"testing"
 
+	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
+	"golang.org/x/image/font/gofont/goregular"
 )
 
 // Walk visits w and every descendant, depth first.
@@ -85,4 +87,15 @@ func Labels(root widget.Widget) []string {
 		out = append(out, l.Text())
 	}
 	return out
+}
+
+// Font is the Go Regular face the widget tests measure and paint text
+// with.
+func Font(t *testing.T) render.Font {
+	t.Helper()
+	face, err := render.LoadFont(goregular.TTF)
+	if err != nil {
+		t.Fatalf("test font: %v", err)
+	}
+	return face
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/desktopentry"
@@ -38,10 +37,7 @@ type harness struct {
 
 func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
+	face := treetest.Font(t)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	hs := &harness{cfg: cfg, opened: make(chan app.LayerConfig, 4)}

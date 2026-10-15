@@ -12,11 +12,11 @@ import (
 
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/upower"
+	"github.com/stubbedev/wayle/shell/treetest"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -316,14 +316,7 @@ func TestStateFromUint32(t *testing.T) {
 	}
 }
 
-func testFont(t *testing.T) render.Font {
-	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return face
-}
+func testFont(t *testing.T) render.Font { return treetest.Font(t) }
 
 // The dropdown hero follows methods.rs's state_label and time_display.
 func TestBatteryDropdownStateAndTime(t *testing.T) {

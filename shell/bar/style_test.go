@@ -8,10 +8,10 @@ import (
 	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/shell/apptheme"
+	"github.com/stubbedev/wayle/shell/treetest"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -57,10 +57,7 @@ func isolateConfigDir(t *testing.T) string {
 func newTestContext(t *testing.T, cfg *config.Config) ModuleContext {
 	t.Helper()
 	style := computeStyle(cfg, styling.Default())
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatalf("test font: %v", err)
-	}
+	face := treetest.Font(t)
 	return ModuleContext{Config: cfg, Font: face, Style: &style}
 }
 

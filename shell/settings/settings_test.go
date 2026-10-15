@@ -14,7 +14,6 @@ import (
 	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/transfer"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
@@ -33,10 +32,7 @@ func testKit(t *testing.T, configTOML string) *kit {
 			t.Fatal(err)
 		}
 	}
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
+	face := treetest.Font(t)
 	svc := config.Load(dir, config.DiscardDiagnostics)
 	t.Cleanup(svc.Close)
 	// The device lists never reach the session's audio daemon or the
