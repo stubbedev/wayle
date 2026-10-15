@@ -39,8 +39,9 @@ const (
 // goroutine (a D-Bus handler); the overlays marshal onto the gelm loop
 // themselves.
 type Host struct {
-	// Config is the [modules.screenshot] section in effect.
-	Config config.ScreenshotConfig
+	// Config is the [modules.screenshot] section in effect, read at
+	// each save so a reload applies to the next capture.
+	Config func() config.ScreenshotConfig
 	// Monitors lists the outputs' logical geometry, for scaling
 	// selections and compositing the whole screen.
 	Monitors func() []regionoverlay.Monitor
@@ -103,7 +104,7 @@ func (h *Host) grab(mode, target string) (*image.RGBA, bool, error) {
 
 // save writes the PNG, then applies the clipboard and notify options.
 func (h *Host) save(img *image.RGBA) (string, error) {
-	cfg := h.Config
+	cfg := h.Config()
 	dir := resolveDir(cfg.OutputDirectory)
 	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // the user's pictures directory
 		return "", fmt.Errorf("cannot create %s: %w", dir, err)

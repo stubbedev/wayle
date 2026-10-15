@@ -74,13 +74,19 @@ func TestLabelOrigin(t *testing.T) {
 
 // harness drives one area headlessly: the overlay has no application
 // and no surfaces, only the reply channel a request would carry.
+// accentCSS gives the area its accent the way _region_overlay.scss
+// does.
+const accentCSS = `.region-overlay-window .region-overlay-area { color: #b4befe; }`
+
 func harness(frame *image.RGBA) (*Overlay, *area, chan result) {
-	o := &Overlay{monitors: mons[:1]}
+	o := &Overlay{monitors: mons[:1], sheet: widget.NewStylesheet(accentCSS, 0)}
 	ch := make(chan result, 1)
 	o.reply = ch
 	a := &area{o: o, mon: mons[0], frame: frame}
 	o.areas = []*area{a}
-	a.Arrange(render.Rect{W: 40, H: 30})
+	root := o.surfaceRoot(a)
+	root.Measure(widget.Constraints{Max: widget.Size{W: 40, H: 30}})
+	root.Arrange(render.Rect{W: 40, H: 30})
 	return o, a, ch
 }
 
@@ -131,7 +137,6 @@ func px(data []byte, x, y int) render.Color {
 
 func TestPaintLive(t *testing.T) {
 	o, a, _ := harness(nil)
-	o.style.Accent = render.RGB(0xb4, 0xbe, 0xfe)
 	data := paint(a)
 	if got := px(data, 20, 20); got != render.Color(dimAlpha<<24) {
 		t.Fatalf("idle wash = %#x", uint32(got))
@@ -144,8 +149,25 @@ func TestPaintLive(t *testing.T) {
 	if got := px(data, 2, 2); got != render.Color(dimAlpha<<24) {
 		t.Fatalf("outside the hole %#x, want the wash", uint32(got))
 	}
-	if got := px(data, 10, 18); got != o.style.Accent {
-		t.Fatalf("border %#x, want the accent", uint32(got))
+	if got := px(data, 10, 18); got != render.RGB(0xb4, 0xbe, 0xfe) {
+		t.Fatalf("border %#x, want the area's color", uint32(got))
+	}
+}
+
+// The accent is the stylesheet's, read at paint time: outside the
+// overlay window, or with the rule gone, the area has no color.
+func TestAccentIsTheAreaColor(t *testing.T) {
+	_, a, _ := harness(nil)
+	if got := widget.CascadeColor(a); got != render.RGB(0xb4, 0xbe, 0xfe) {
+		t.Errorf("area color %#x, want the .region-overlay-area rule", uint32(got))
+	}
+	bare := &area{}
+	bare.AddClass("region-overlay-area")
+	host := widget.NewBox(widget.Column, 0, 0)
+	host.AttachStylesheet(widget.NewStylesheet(accentCSS, 0))
+	host.Append(bare, true)
+	if got := widget.CascadeColor(bare); got == render.RGB(0xb4, 0xbe, 0xfe) {
+		t.Error("an area outside the overlay window took the accent")
 	}
 }
 

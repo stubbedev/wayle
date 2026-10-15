@@ -82,14 +82,6 @@ func finalize(r dragRect, mons []Monitor) (Selection, bool) {
 	return Selection{Output: mon.Connector, X: x - mon.X, Y: y - mon.Y, Width: w, Height: h}, true
 }
 
-// Style carries the overlay's themed pieces: the accent (the
-// .region-overlay-area color, --palette-primary) and the monospace bold
-// face of the size label.
-type Style struct {
-	Accent render.Color
-	Font   render.Font
-}
-
 // Paint constants of region_overlay/mod.rs's draw func.
 const (
 	// dimAlpha is the wash: rgba(0, 0, 0, 0.35).
@@ -117,7 +109,10 @@ type result struct {
 type Overlay struct {
 	app     *app.Application
 	outputs func() []*app.Output
-	style   Style
+	// font is the size label's monospace bold face; sheet styles the
+	// surfaces, the area's color (--palette-primary) being the accent.
+	font  render.Font
+	sheet *widget.Stylesheet
 
 	reply    chan result
 	surfaces []*app.LayerWindow
@@ -133,8 +128,22 @@ type Overlay struct {
 
 // New builds the overlay on the application; outputs lists the
 // monitors to cover at each request.
-func New(a *app.Application, outputs func() []*app.Output, style Style) *Overlay {
-	return &Overlay{app: a, outputs: outputs, style: style}
+func New(a *app.Application, outputs func() []*app.Output, font render.Font, sheet *widget.Stylesheet) *Overlay {
+	return &Overlay{app: a, outputs: outputs, font: font, sheet: sheet}
+}
+
+// surfaceRoot is one surface's tree, window.region-overlay-window >
+// .region-overlay-area, on the stylesheet.
+func (o *Overlay) surfaceRoot(a *area) widget.Widget {
+	a.AddClass("region-overlay-area")
+	root := widget.NewBox(widget.Column, 0, 0)
+	root.SetElement("window")
+	root.AddClass("region-overlay-window")
+	if o.sheet != nil {
+		root.AttachStylesheet(o.sheet)
+	}
+	root.Append(a, true)
+	return root
 }
 
 // Request opens the overlay and blocks until the user drags a region
@@ -172,7 +181,6 @@ func (o *Overlay) open(frames map[string]*image.RGBA) {
 	for i, out := range outs {
 		mon := o.monitors[i]
 		a := &area{o: o, mon: mon, frame: frames[mon.Connector]}
-		a.AddClass("region-overlay-area")
 		layer, err := o.app.NewLayer(app.LayerConfig{
 			Output:        out,
 			Layer:         app.LayerOverlay,
@@ -180,7 +188,7 @@ func (o *Overlay) open(frames map[string]*image.RGBA) {
 			ExclusiveZone: -1,
 			Keyboard:      app.KeyboardExclusive,
 			Namespace:     "wayle-region-overlay",
-			Root:          a,
+			Root:          o.surfaceRoot(a),
 			OnKey: func(_ *widget.Router, keycode uint32, _ app.Mods) {
 				if keycode == escapeKeycode {
 					o.finish(Selection{}, false)
@@ -358,21 +366,22 @@ func wash(img *image.RGBA) *image.RGBA {
 // paintBorderAndLabel strokes the accent border (2px, centered on the
 // selection edge like cairo's stroke) and draws the "W × H" label on
 // its dark backing box, above the selection when it fits, else just
-// inside it.
+// inside it. The accent is the area's color, as the draw func reads
+// it, so it follows the palette.
 func (a *area) paintBorderAndLabel(cv *render.Canvas, sel render.Rect) {
-	accent := a.o.style.Accent
+	accent := widget.CascadeColor(a)
 	cv.BorderRect(render.Rect{X: sel.X - borderWidth/2, Y: sel.Y - borderWidth/2, W: sel.W + borderWidth, H: sel.H + borderWidth}, borderWidth, accent)
-	if a.o.style.Font == nil {
+	if a.o.font == nil {
 		return
 	}
 	text := labelText(sel.W, sel.H)
-	shaped := a.o.style.Font.Shape(text, labelPx)
+	shaped := a.o.font.Shape(text, labelPx)
 	boxW := int(math.Ceil(shaped.Advance())) + labelPad*2
 	ascent := int(math.Ceil(shaped.Ascent()))
 	boxH := ascent + labelPad*2
 	bx, by := labelOrigin(sel, boxH)
 	cv.FillRect(render.Rect{X: bx, Y: by, W: boxW, H: boxH}, labelBacking)
-	a.o.style.Font.Draw(cv, shaped, bx+labelPad, by+labelPad+ascent, accent)
+	a.o.font.Draw(cv, shaped, bx+labelPad, by+labelPad+ascent, accent)
 }
 
 // labelText is the size label in logical pixels.

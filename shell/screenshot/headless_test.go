@@ -57,7 +57,7 @@ func TestHeadlessHostRegionSavesTheCrop(t *testing.T) {
 	cfg := config.DefaultsScreenshot()
 	cfg.OutputDirectory = t.TempDir()
 	h := &Host{
-		Config: cfg,
+		Config: fixed(cfg),
 		Monitors: func() []regionoverlay.Monitor {
 			return []regionoverlay.Monitor{{Connector: frozen[0].connector, Width: b.Dx(), Height: b.Dy()}}
 		},

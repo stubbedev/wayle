@@ -16,7 +16,6 @@ import (
 	"github.com/stubbedev/wayle/shell/regionoverlay"
 	"github.com/stubbedev/wayle/shell/screenshot"
 	"github.com/stubbedev/wayle/shell/sharepicker"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // overlayLabelPx is the region overlay's size-label face size; the
@@ -35,7 +34,7 @@ type captureServices struct {
 // startCapture builds the overlays and the host on the application and
 // serves the host on the session bus. A bus failure leaves the
 // in-process builtin working.
-func startCapture(application *app.Application, outputs func() []*app.Output, current func() *config.Config, palette *styling.Palette, hypr *hyprland.Connection, sans render.Font, sheet *widget.Stylesheet) *captureServices {
+func startCapture(application *app.Application, outputs func() []*app.Output, current func() *config.Config, hypr *hyprland.Connection, sans render.Font, sheet *widget.Stylesheet) *captureServices {
 	cfg := current()
 	var font render.Font
 	if face, err := app.FontWeighted(cfg.General.FontMono, overlayLabelPx, 700, false); err == nil {
@@ -43,7 +42,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 	} else {
 		log.Printf("screenshot: overlay font %q: %v", cfg.General.FontMono, err)
 	}
-	region := regionoverlay.New(application, outputs, regionoverlay.Style{Accent: palette.Primary, Font: font})
+	region := regionoverlay.New(application, outputs, font, sheet)
 	monitors := func() []regionoverlay.Monitor {
 		outs := outputs()
 		mons := make([]regionoverlay.Monitor, len(outs))
@@ -53,7 +52,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cu
 		return mons
 	}
 	s := &captureServices{host: &screenshot.Host{
-		Config:   cfg.Screenshot,
+		Config:   func() config.ScreenshotConfig { return current().Screenshot },
 		Monitors: monitors,
 		Region:   region,
 		Picker:   colorpicker.New(application, outputs, font, colorpicker.HistoryPath()),

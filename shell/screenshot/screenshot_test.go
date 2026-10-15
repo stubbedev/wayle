@@ -179,6 +179,11 @@ type fakePicker struct {
 
 func (f fakePicker) Request(map[string]*image.RGBA) (colorpicker.RGB, bool) { return f.c, f.ok }
 
+// fixed is a Config that never reloads.
+func fixed(cfg config.ScreenshotConfig) func() config.ScreenshotConfig {
+	return func() config.ScreenshotConfig { return cfg }
+}
+
 func testHost(t *testing.T, region *fakeRegion) (*Host, *[]string, *int) {
 	t.Helper()
 	cfg := config.DefaultsScreenshot()
@@ -186,7 +191,7 @@ func testHost(t *testing.T, region *fakeRegion) (*Host, *[]string, *int) {
 	var notified []string
 	copies := 0
 	h := &Host{
-		Config: cfg,
+		Config: fixed(cfg),
 		Monitors: func() []regionoverlay.Monitor {
 			return []regionoverlay.Monitor{{Connector: "DP-1", Width: 100, Height: 50}, {Connector: "DP-2", X: 100, Width: 100, Height: 50}}
 		},
@@ -209,7 +214,7 @@ func TestHostRegionCapture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(h.Config.OutputDirectory, "Screenshot_2026-09-30_12-34-56.png")
+	want := filepath.Join(h.Config().OutputDirectory, "Screenshot_2026-09-30_12-34-56.png")
 	if path != want {
 		t.Fatalf("path %q, want %q", path, want)
 	}
@@ -233,13 +238,33 @@ func TestHostRegionCapture(t *testing.T) {
 	}
 }
 
+// Each capture saves under the section in effect then: a reload between
+// two captures moves the second, not the first.
+func TestHostReadsTheReloadedConfig(t *testing.T) {
+	h, _, _ := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-1", Width: 5, Height: 5}, ok: true})
+	cfg := h.Config()
+	h.Config = func() config.ScreenshotConfig { return cfg }
+	first, err := h.Capture(ModeRegion, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.OutputDirectory = filepath.Join(t.TempDir(), "reloaded")
+	second, err := h.Capture(ModeRegion, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Dir(first) == cfg.OutputDirectory || filepath.Dir(second) != cfg.OutputDirectory {
+		t.Errorf("first %q, second %q; want only the second in %q", first, second, cfg.OutputDirectory)
+	}
+}
+
 func TestHostRegionCancel(t *testing.T) {
 	h, notified, copies := testHost(t, &fakeRegion{ok: false})
 	path, err := h.Capture(ModeRegion, "")
 	if err != nil || path != "" {
 		t.Fatalf("cancel = %q, %v; want an empty path and no error", path, err)
 	}
-	if _, err := os.Stat(h.Config.OutputDirectory); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(h.Config().OutputDirectory); !errors.Is(err, os.ErrNotExist) {
 		t.Error("a cancelled capture created the output directory")
 	}
 	if *copies != 0 || len(*notified) != 0 {
@@ -256,7 +281,9 @@ func TestHostRegionOnAVanishedOutput(t *testing.T) {
 
 func TestHostOptionsOff(t *testing.T) {
 	h, notified, copies := testHost(t, &fakeRegion{sel: regionoverlay.Selection{Output: "DP-2", Width: 5, Height: 5}, ok: true})
-	h.Config.CopyToClipboard, h.Config.Notify = false, false
+	cfg := h.Config()
+	cfg.CopyToClipboard, cfg.Notify = false, false
+	h.Config = fixed(cfg)
 	if _, err := h.Capture(ModeRegion, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +329,9 @@ func TestHostSaveFailure(t *testing.T) {
 	if err := os.WriteFile(file, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	h.Config.OutputDirectory = filepath.Join(file, "sub")
+	cfg := h.Config()
+	cfg.OutputDirectory = filepath.Join(file, "sub")
+	h.Config = fixed(cfg)
 	if _, err := h.Capture(ModeRegion, ""); err == nil || !strings.HasPrefix(err.Error(), "cannot create") {
 		t.Fatalf("err = %v", err)
 	}

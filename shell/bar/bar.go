@@ -98,7 +98,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	if err := rt.derive(cfg); err != nil {
 		return err
 	}
-	palette, font := rt.palette, rt.font
+	font := rt.font
 	baseCtx := ModuleContext{Config: cfg, App: application, Font: font, Style: &rt.moduleStyle, Theme: theme}
 	if svc != nil {
 		baseCtx.SetConfig = configSetter(svc)
@@ -266,7 +266,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		Font:    font,
 	}, cfg)
 	osdRef.Store(osdSrv)
-	captureSvc := startCapture(application, sess.Outputs, current.Load, palette, baseCtx.Hyprland, font, theme.Sheet)
+	captureSvc := startCapture(application, sess.Outputs, current.Load, baseCtx.Hyprland, font, theme.Sheet)
 	servePortalHosts(application, current.Load, font, theme.Sheet)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
