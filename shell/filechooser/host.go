@@ -61,6 +61,7 @@ const uriListMime = "text/uri-list"
 type Window interface {
 	Close()
 	SetFocus(widget.Widget)
+	SetMargin(app.Margins) error
 }
 
 // Deps are the chooser's collaborators.
@@ -83,6 +84,9 @@ type Deps struct {
 	Places, Locations func() []Place
 	// ViewFile persists the sort and layout; "" keeps them in memory.
 	ViewFile string
+	// Screen is the first output's logical size, which the sheet is
+	// first centred on; false while none is known.
+	Screen func() (w, h int, ok bool)
 }
 
 // Chooser is the com.wayle.FileChooser1 host: one overlay showing the
@@ -109,8 +113,13 @@ type Chooser struct {
 	// applied: after the first descended, the rest index a listing
 	// that is gone.
 	navigating bool
-	// drag is the sheet geometry a move or resize started from.
-	drag struct{ x, y, w, h int }
+	// drag is the sheet size a resize started from.
+	drag struct{ w, h int }
+	// margin places the sheet: the window is anchored top left. It
+	// sticks across requests, as the Rust window does; placed is false
+	// until the first request centres it.
+	margin app.Margins
+	placed bool
 
 	thumbs  map[thumbKey]image.Image
 	waiting map[thumbKey][]*widget.Image
@@ -282,7 +291,7 @@ func (c *Chooser) build(title, name string) {
 	headerStack.Append(newPlace(c.label(title, "file-chooser-title"), alignCenter, alignCenter))
 	header := widget.NewBox(widget.Column, 0, 0)
 	header.AddClass("file-chooser-header")
-	header.Append(&dragArea{child: headerStack, cursor: "grab", onStart: c.startMove, onDrag: c.move}, false)
+	header.Append(&dragArea{child: headerStack, cursor: "grab", onDrag: c.move}, false)
 
 	// Path bar: breadcrumbs and the search box.
 	crumbBar := widget.NewBox(widget.Row, 8, 0)
@@ -633,14 +642,21 @@ func (c *Chooser) show() {
 	u := c.ui
 	c.rev = widget.NewRevealer(u.sheet)
 	u.root = widget.NewBox(widget.Column, 0, 0)
+	u.root.SetElement("window")
 	u.root.AddClass("file-chooser-window")
 	if c.d.Sheet != nil {
 		u.root.AttachStylesheet(c.d.Sheet)
 	}
 	u.root.Append(c.rev, true)
+	if !c.placed {
+		c.margin, c.placed = centerMargins(c.d.Screen, sheetW, sheetH), true
+	}
+	// Anchored top left and placed by the margins, sized to the sheet,
+	// so the header drag moves the window and the grip resizes it.
 	win, err := c.d.Open(app.LayerConfig{
 		Layer:         app.LayerOverlay,
-		Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
+		Anchor:        app.AnchorTop | app.AnchorLeft,
+		Margin:        c.margin,
 		ExclusiveZone: -1,
 		Keyboard:      app.KeyboardExclusive,
 		Namespace:     "wayle-file-chooser",
@@ -719,11 +735,30 @@ func (c *Chooser) press(button uint32) {
 	}
 }
 
-func (c *Chooser) startMove() {
-	c.drag.x, c.drag.y = c.ui.sheet.x, c.ui.sheet.y
+// move is setup_surface_move: each drag event's offset adds to the
+// live margins. The compositor reports the pointer against the moved
+// surface, so the offset settles toward zero instead of compounding.
+func (c *Chooser) move(dx, dy int) {
+	c.margin.Left = max(0, c.margin.Left+int32(dx))
+	c.margin.Top = max(0, c.margin.Top+int32(dy))
+	if c.win == nil {
+		return
+	}
+	if err := c.win.SetMargin(c.margin); err != nil {
+		log.Printf("file chooser: move: %v", err)
+	}
 }
 
-func (c *Chooser) move(dx, dy int) { c.ui.sheet.moveTo(c.drag.x+dx, c.drag.y+dy) }
+// centerMargins is center_margins: the margins that centre a w x h
+// sheet on the first output, a fixed offset without one.
+func centerMargins(screen func() (int, int, bool), w, h int) app.Margins {
+	if screen != nil {
+		if sw, sh, ok := screen(); ok {
+			return app.Margins{Left: int32(max((sw-w)/2, 0)), Top: int32(max((sh-h)/2, 0))}
+		}
+	}
+	return app.Margins{Left: 200, Top: 150}
+}
 
 func (c *Chooser) startResize() {
 	c.drag.w, c.drag.h = c.ui.sheet.w, c.ui.sheet.h

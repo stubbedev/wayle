@@ -267,7 +267,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}, cfg)
 	osdRef.Store(osdSrv)
 	captureSvc := startCapture(application, sess.Outputs, current.Load, baseCtx.Hyprland, font, theme.Sheet)
-	servePortalHosts(application, current.Load, font, theme.Sheet)
+	servePortalHosts(application, sess.Outputs, current.Load, font, theme.Sheet)
 	defer captureSvc.close()
 	baseCtx.Screenshot = captureSvc.trigger
 	rt.ctx = baseCtx

@@ -29,7 +29,7 @@ import (
 // file_chooser) and com.wayle.Print1 (services/print, spooling over
 // CUPS' IPP). A bus failure leaves the portal answering those requests
 // "other".
-func servePortalHosts(application *app.Application, current func() *config.Config, font render.Font, sheet *widget.Stylesheet) {
+func servePortalHosts(application *app.Application, outputs func() []*app.Output, current func() *config.Config, font render.Font, sheet *widget.Stylesheet) {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		log.Printf("portal hosts: session bus: %v", err)
@@ -68,6 +68,13 @@ func servePortalHosts(application *app.Application, current func() *config.Confi
 		Places:    func() []filechooser.Place { return filechooser.UserPlaces(home) },
 		Locations: filechooser.SystemLocations(home),
 		ViewFile:  viewFile,
+		Screen: func() (int, int, bool) {
+			outs := outputs()
+			if len(outs) == 0 || outs[0].LogicalW <= 0 || outs[0].LogicalH <= 0 {
+				return 0, 0, false
+			}
+			return int(outs[0].LogicalW), int(outs[0].LogicalH), true
+		},
 	})
 	if _, err := filechooser.NewDaemon(chooser).Export(conn); err != nil {
 		log.Printf("file chooser: daemon: %v", err)

@@ -189,31 +189,30 @@ const (
 // left corner stays put while the corner grip resizes it.
 type sheet struct {
 	widget.Base
-	child  widget.Widget
-	w, h   int
-	x, y   int
-	placed bool
+	child widget.Widget
+	w, h  int
 	// onDrop receives the first path of a file dropped on the sheet.
 	onDrop func(path string)
 }
 
-func newSheet(child widget.Widget, w, h int) *sheet { return &sheet{child: child, w: w, h: h} }
+func newSheet(child widget.Widget, w, h int) *sheet {
+	s := &sheet{child: child}
+	s.resize(w, h)
+	return s
+}
 
-func (s *sheet) Measure(con widget.Constraints) widget.Size { return con.Max }
+// Measure is the sheet's own size: the window, anchored top left and
+// placed by its margins, sizes itself to it.
+func (s *sheet) Measure(con widget.Constraints) widget.Size {
+	return clamp(widget.Size{W: s.w, H: s.h}, con)
+}
 
 func (s *sheet) Arrange(r render.Rect) {
 	s.ArrangeSelf(r)
-	s.w = min(max(s.w, sheetMinW), sheetMaxW, max(r.W, 1))
-	s.h = min(max(s.h, sheetMinH), sheetMaxH, max(r.H, 1))
-	if !s.placed {
-		s.x, s.y, s.placed = (r.W-s.w)/2, (r.H-s.h)/2, true
-	}
-	s.x = min(max(s.x, 0), max(r.W-s.w, 0))
-	s.y = min(max(s.y, 0), max(r.H-s.h, 0))
 	// Containers arrange from what they measured; nothing above
 	// measures the child at the sheet's size.
-	s.child.Measure(widget.Constraints{Min: widget.Size{W: s.w, H: s.h}, Max: widget.Size{W: s.w, H: s.h}})
-	s.child.Arrange(render.Rect{X: r.X + s.x, Y: r.Y + s.y, W: s.w, H: s.h})
+	s.child.Measure(widget.Constraints{Min: widget.Size{W: r.W, H: r.H}, Max: widget.Size{W: r.W, H: r.H}})
+	s.child.Arrange(r)
 	widget.SetParents(s, s.child)
 }
 
@@ -225,14 +224,8 @@ func (s *sheet) HitTest(p widget.Point) widget.Widget { return s.child.HitTest(p
 
 func (s *sheet) Children() []widget.Widget { return []widget.Widget{s.child} }
 
-// moveTo places the top left corner (clamped on the next arrange).
-func (s *sheet) moveTo(x, y int) {
-	s.x, s.y, s.placed = x, y, true
-	s.InvalidateLayout()
-}
-
-// resize sets the size (clamped on the next arrange).
+// resize sets the size within the sheet's floor and ceiling.
 func (s *sheet) resize(w, h int) {
-	s.w, s.h = w, h
+	s.w, s.h = min(max(w, sheetMinW), sheetMaxW), min(max(h, sheetMinH), sheetMaxH)
 	s.InvalidateLayout()
 }

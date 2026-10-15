@@ -21,12 +21,17 @@ import (
 )
 
 type fakeWindow struct {
-	closed bool
-	focus  widget.Widget
+	closed  bool
+	focus   widget.Widget
+	margins []app.Margins
 }
 
 func (w *fakeWindow) Close()                   { w.closed = true }
 func (w *fakeWindow) SetFocus(f widget.Widget) { w.focus = f }
+func (w *fakeWindow) SetMargin(m app.Margins) error {
+	w.margins = append(w.margins, m)
+	return nil
+}
 
 // harness runs the chooser with a lock-step loop: Invoke and the
 // test's gestures take turns, as on the one UI goroutine.
@@ -579,25 +584,48 @@ func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 	}
 }
 
-func TestSheetMovesResizesAndStaysOnTheOutput(t *testing.T) {
+// The sheet measures to its own size within its floor and ceiling, so
+// the window sizes to it.
+func TestSheetSizesItself(t *testing.T) {
 	s := newSheet(widget.NewSpacer(0, 0), 760, 520)
-	area := render.Rect{W: 1920, H: 1080}
-	s.Arrange(area)
-	if s.x != (1920-760)/2 || s.y != (1080-520)/2 {
-		t.Errorf("first placement = %d,%d, want centred", s.x, s.y)
-	}
-	s.moveTo(-50, 5000)
-	s.Arrange(area)
-	if s.x != 0 || s.y != 1080-520 {
-		t.Errorf("moved off the output = %d,%d, want clamped", s.x, s.y)
+	if got := s.Measure(widget.Constraints{Max: widget.Size{W: 4000, H: 4000}}); got != (widget.Size{W: 760, H: 520}) {
+		t.Errorf("measured %v, want its 760x520", got)
 	}
 	s.resize(10, 99999)
-	s.Arrange(area)
-	if s.w != sheetMinW || s.h != 1080 {
-		t.Errorf("resized = %dx%d, want the floor and the output height", s.w, s.h)
+	if got := s.Measure(widget.Constraints{Max: widget.Size{W: 4000, H: 4000}}); got != (widget.Size{W: sheetMinW, H: sheetMaxH}) {
+		t.Errorf("resized to %v, want the floor and the ceiling", got)
 	}
-	if s.y+s.h > 1080 {
-		t.Errorf("the sheet runs off the bottom: y %d h %d", s.y, s.h)
+}
+
+// The window is anchored top left, first centred on the output by its
+// margins; a header drag moves the margins (never below zero), and the
+// place sticks across requests.
+func TestSheetWindowIsPlacedByItsMargins(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.c.d.Screen = func() (int, int, bool) { return 1920, 1080, true }
+	got := hs.open(t, OpenRequest{})
+	c := hs.cfg
+	want := app.Margins{Left: (1920 - sheetW) / 2, Top: (1080 - sheetH) / 2}
+	if c.Anchor != app.AnchorTop|app.AnchorLeft || c.Margin != want || c.Width != 0 || c.Height != 0 {
+		t.Errorf("layer anchor %v margin %+v size %dx%d, want top-left at %+v sized to the sheet", c.Anchor, c.Margin, c.Width, c.Height, want)
+	}
+	if root, ok := c.Root.(*widget.Box); !ok || root.Element() != "window" {
+		t.Errorf("root %T, want the window node", c.Root)
+	}
+	hs.do(func() { hs.c.move(40, -30) })
+	hs.do(func() { hs.c.move(-5000, 0) })
+	hs.mu.Lock()
+	win := hs.windows[len(hs.windows)-1]
+	hs.mu.Unlock()
+	moved := app.Margins{Left: want.Left + 40, Top: want.Top - 30}
+	if len(win.margins) != 2 || win.margins[0] != moved || win.margins[1] != (app.Margins{Top: moved.Top}) {
+		t.Errorf("margins %+v, want %+v then clamped at the left edge", win.margins, moved)
+	}
+	hs.do(func() { hs.c.finish(nil) })
+	answer(t, got)
+	hs.open(t, OpenRequest{})
+	if hs.cfg.Margin != win.margins[1] {
+		t.Errorf("the next request opened at %+v, want the dragged %+v", hs.cfg.Margin, win.margins[1])
 	}
 }
 
@@ -653,10 +681,10 @@ func TestSheetMeasuresItsChild(t *testing.T) {
 	box.Append(fixed, false)
 	box.Append(widget.NewSpacer(0, 0), true)
 	s := newSheet(box, 600, 400)
-	s.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 800}})
-	s.Arrange(render.Rect{W: 1000, H: 800})
-	if b := fixed.Bounds(); b.W != 30 || b.X != 200 || b.Y != 200 {
-		t.Errorf("the child's first cell = %+v, want 30px at the sheet's 200,200", b)
+	sz := s.Measure(widget.Constraints{Max: widget.Size{W: 1000, H: 800}})
+	s.Arrange(render.Rect{X: 7, Y: 9, W: sz.W, H: sz.H})
+	if b := fixed.Bounds(); b.W != 30 || b.X != 7 || b.Y != 9 {
+		t.Errorf("the child's first cell = %+v, want 30px at the sheet's corner", b)
 	}
 	if b := box.Bounds(); b.W != 600 || b.H != 400 {
 		t.Errorf("the child = %+v, want the sheet's 600x400", b)
