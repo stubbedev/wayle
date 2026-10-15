@@ -103,6 +103,7 @@ type Recording struct {
 	mu       sync.Mutex
 	paused   []bool
 	stops    int
+	hold     chan struct{}
 	term     func(string)
 	write    bool
 	PauseErr error
@@ -124,10 +125,24 @@ func (r *Recording) Stop() {
 	r.mu.Lock()
 	r.stops++
 	write := r.write && r.stops == 1
+	hold := r.hold
 	r.mu.Unlock()
+	if hold != nil {
+		<-hold
+	}
 	if write {
 		_ = os.WriteFile(r.Opts.OutputPath, []byte("video"), 0o600)
 	}
+}
+
+// HoldStop makes Stop block until release runs, so a test can see
+// what the service shows while a recording finalizes.
+func (r *Recording) HoldStop() (release func()) {
+	gate := make(chan struct{})
+	r.mu.Lock()
+	r.hold = gate
+	r.mu.Unlock()
+	return sync.OnceFunc(func() { close(gate) })
 }
 
 // Paused lists the SetPaused arguments.

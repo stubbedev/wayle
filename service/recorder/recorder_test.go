@@ -100,10 +100,12 @@ func TestRecordPauseStopSaves(t *testing.T) {
 	}
 	s.SetPaused(false)
 
+	release := rec.HoldStop()
 	s.Stop()
 	if snap := s.Snapshot(); snap.Active || snap.Status != recorder.StatusStopping {
 		t.Errorf("right after Stop = %+v, want inactive and stopping", snap)
 	}
+	release()
 	waitFor(t, "idle", func() bool { return s.Snapshot().Status == recorder.StatusIdle })
 	if rec.Stops() != 1 || engine.Sessions()[0].Closed() != 1 {
 		t.Errorf("stops %d, session closes %d", rec.Stops(), engine.Sessions()[0].Closed())
