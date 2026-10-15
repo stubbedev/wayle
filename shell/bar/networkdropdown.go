@@ -274,7 +274,7 @@ func (v *networkView) apply(s netState) {
 	} else {
 		v.scanBtn.RemoveClass("scanning")
 	}
-	if s.snap.WifiConnected {
+	if s.snap.Wifi == network.StatusConnected {
 		v.progress = netProgress{}
 	}
 	v.active.apply(s.snap, v.progress)
@@ -290,7 +290,7 @@ func (v *networkView) apply(s netState) {
 func (v *networkView) rebuildList() {
 	wifiAvail := v.wifi() != nil
 	connected := ""
-	if v.cur.snap.WifiConnected {
+	if v.cur.snap.Wifi == network.StatusConnected {
 		connected = v.cur.snap.WifiSSID
 	}
 	live := sortedUniqueAccessPoints(v.cur.aps, connected, v.cur.known)
@@ -695,18 +695,18 @@ func (v *networkView) errorLabel() *widget.Label {
 
 // apply is the cards' #[watch]es over the snapshot and the progress.
 func (a *netActive) apply(s network.Snapshot, p netProgress) {
-	connecting := p.ssid != "" || s.WifiConnecting
-	a.connected = s.WifiConnected
-	a.wifiErr = p.err != "" && !s.WifiConnected
+	connecting := p.ssid != "" || s.Wifi == network.StatusConnecting
+	a.connected = s.Wifi == network.StatusConnected
+	a.wifiErr = p.err != "" && s.Wifi != network.StatusConnected
 	a.ssid = s.WifiSSID
-	a.SetVisible(s.WifiConnected || s.WiredConnected || connecting || p.err != "")
-	if s.WiredConnected && s.WifiConnected {
+	a.SetVisible(s.Wifi == network.StatusConnected || s.Wired == network.StatusConnected || connecting || p.err != "")
+	if s.Wired == network.StatusConnected && s.Wifi == network.StatusConnected {
 		a.label.SetText(i18n.T("dropdown-network-active-connections"))
 	} else {
 		a.label.SetText(i18n.T("dropdown-network-active-connection"))
 	}
 
-	a.wired.SetVisible(s.WiredConnected)
+	a.wired.SetVisible(s.Wired == network.StatusConnected)
 	speed := formatWiredSpeed(s.WiredSpeed)
 	if s.WiredIP4 != "" {
 		speed = s.WiredIP4 + " - " + speed
@@ -714,7 +714,7 @@ func (a *netActive) apply(s network.Snapshot, p netProgress) {
 	a.wiredDetail.SetText(speed)
 	a.wiredDetail.SetVisible(s.WiredSpeed > 0)
 
-	a.wifiCard.SetVisible(s.WifiConnected || connecting || p.err != "")
+	a.wifiCard.SetVisible(s.Wifi == network.StatusConnected || connecting || p.err != "")
 	if a.wifiErr {
 		// The tile swaps wifi for error, it never wears both
 		// (active_connections/methods.rs:100-110).
@@ -760,7 +760,7 @@ func (a *netActive) apply(s network.Snapshot, p netProgress) {
 		a.wifiDetail.RemoveClass("error")
 	}
 
-	a.wifiStatus.SetVisible(s.WifiConnected && !connecting && p.err == "")
+	a.wifiStatus.SetVisible(s.Wifi == network.StatusConnected && !connecting && p.err == "")
 	a.badge.RemoveClass("error", "warning")
 	switch {
 	case p.err != "":

@@ -608,8 +608,7 @@ func (r *barRuntime) derive(cfg *config.Config) error {
 	*r.palette = *r.theme.RenderPalette()
 	applyPalette(r.palette)
 	r.style = computeStyle(cfg, r.palette)
-	r.moduleStyle = r.style
-	r.moduleStyle.fg = 0
+	r.moduleStyle = r.style.forModules()
 	face, err := app.Font(cfg.General.FontSans, r.style.labelPx)
 	if err != nil {
 		return fmt.Errorf("bar: font %q: %w", cfg.General.FontSans, err)

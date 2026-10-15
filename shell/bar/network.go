@@ -4,87 +4,136 @@ import (
 	"context"
 	"errors"
 
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/service/network"
-	"github.com/stubbedev/wayle/styling"
 )
 
-// networkLabel follows helpers.rs's wifi_label/wired_label: the SSID
-// when connected (the _bar.ftl fallback when hidden), then the
-// connecting/disconnected vocabulary, with wifi preferred while
-// enabled.
-func networkLabel(snap network.Snapshot) string {
-	if snap.WifiEnabled {
-		switch {
-		case snap.WifiConnected:
-			if snap.WifiSSID != "" {
-				return snap.WifiSSID
-			}
-			return i18n.T("bar-network-wifi-fallback")
-		case snap.WifiConnecting:
-			return i18n.T("bar-network-connecting")
-		case snap.WiredConnected:
-			return i18n.T("bar-network-wired")
+// vpnView is what the module shows of the VPNs: whether NM holds any
+// profile, and their aggregate state.
+type vpnView struct {
+	configured bool
+	state      network.VPNState
+}
+
+// networkDisplay is compute_display: the link's icon and label, the VPN
+// icon taking the icon over while the VPN is shown.
+func networkDisplay(cfg config.NetworkConfig, snap network.Snapshot, vpn vpnView) (icon, label string) {
+	icon, label = linkDisplay(cfg, snap)
+	if v, ok := vpnIcon(cfg, vpn); ok {
+		icon = v
+	}
+	return icon, label
+}
+
+// vpnIcon is the VPN overlay icon; false when vpn-show hides it (auto
+// waits for a profile).
+func vpnIcon(cfg config.NetworkConfig, vpn vpnView) (string, bool) {
+	if cfg.VpnShow == config.VpnShowNever || cfg.VpnShow == config.VpnShowAuto && !vpn.configured {
+		return "", false
+	}
+	switch vpn.state {
+	case network.VPNConnected:
+		return cfg.VpnConnectedIcon, true
+	case network.VPNConnecting:
+		return cfg.VpnConnectingIcon, true
+	}
+	return cfg.VpnDisconnectedIcon, true
+}
+
+// linkDisplay is compute_link_display: the primary connection's device,
+// "No Wi-Fi"/"No Ethernet" when it has none, offline without a primary
+// connection, and otherwise wifi before wired.
+func linkDisplay(cfg config.NetworkConfig, snap network.Snapshot) (icon, label string) {
+	switch snap.Primary {
+	case network.ConnectionWifi:
+		if !snap.HasWifi {
+			return cfg.WifiOfflineIcon, i18n.T("bar-network-no-wifi")
 		}
-		return i18n.T("bar-network-disconnected")
+		return wifiIcon(cfg, snap), wifiLabel(snap)
+	case network.ConnectionWired:
+		if !snap.HasWired {
+			return cfg.WiredDisconnectedIcon, i18n.T("bar-network-no-ethernet")
+		}
+		return wiredIcon(cfg, snap.Wired), wiredLabel(snap.Wired)
+	case network.ConnectionNone:
+		return cfg.WifiOfflineIcon, i18n.T("bar-network-offline")
 	}
 	switch {
-	case snap.WiredConnected:
-		return i18n.T("bar-network-wired")
-	case snap.WiredConnecting:
+	case snap.HasWifi:
+		return wifiIcon(cfg, snap), wifiLabel(snap)
+	case snap.HasWired:
+		return wiredIcon(cfg, snap.Wired), wiredLabel(snap.Wired)
+	}
+	return cfg.WifiOfflineIcon, i18n.T("bar-network-offline")
+}
+
+// wifiIcon is helpers.rs's wifi_icon: disabled, acquiring, offline, or
+// the signal list bucketed over the strength.
+func wifiIcon(cfg config.NetworkConfig, snap network.Snapshot) string {
+	if !snap.WifiEnabled {
+		return cfg.WifiDisabledIcon
+	}
+	switch snap.Wifi {
+	case network.StatusConnecting:
+		return cfg.WifiAcquiringIcon
+	case network.StatusDisconnected:
+		return cfg.WifiOfflineIcon
+	}
+	if len(cfg.WifiSignalIcons) == 0 {
+		return cfg.WifiConnectedIcon
+	}
+	return cfg.WifiSignalIcons[network.SignalIndex(snap.WifiStrength, len(cfg.WifiSignalIcons))]
+}
+
+// wifiLabel is wifi_label: the SSID (the _bar.ftl fallback when
+// hidden), connecting, or disconnected.
+func wifiLabel(snap network.Snapshot) string {
+	switch snap.Wifi {
+	case network.StatusConnected:
+		if snap.WifiSSID != "" {
+			return snap.WifiSSID
+		}
+		return i18n.T("bar-network-wifi-fallback")
+	case network.StatusConnecting:
 		return i18n.T("bar-network-connecting")
 	}
 	return i18n.T("bar-network-disconnected")
 }
 
-// networkColor dims the label when nothing is connected.
-func networkColor(snap network.Snapshot, palette *styling.Palette, fallback render.Color) render.Color {
-	connected := snap.WifiConnected || snap.WiredConnected
-	if !connected {
-		return mutedFg(palette)
-	}
-	return fallback
-}
-
-// networkIconName follows helpers.rs's wifi_icon/wired_icon: the wifi
-// states win while the radio is on (acquiring, offline, or the signal
-// list bucketed over the strength, connected as the fallback), then
-// the wired states. VPN state does not change the glyph.
-func networkIconName(cfg config.NetworkConfig, snap network.Snapshot) string {
-	if snap.WifiEnabled {
-		switch {
-		case snap.WifiConnecting:
-			return cfg.WifiAcquiringIcon
-		case snap.WifiConnected:
-			if len(cfg.WifiSignalIcons) > 0 {
-				return cfg.WifiSignalIcons[network.SignalIndex(snap.WifiStrength, len(cfg.WifiSignalIcons))]
-			}
-			return cfg.WifiConnectedIcon
-		case snap.WifiSSID != "" || snap.WifiStrength > 0:
-			return cfg.WifiConnectedIcon
-		}
-		return cfg.WifiOfflineIcon
-	}
-	switch {
-	case snap.WiredConnected:
+// wiredIcon is wired_icon.
+func wiredIcon(cfg config.NetworkConfig, s network.Status) string {
+	switch s {
+	case network.StatusConnected:
 		return cfg.WiredConnectedIcon
-	case snap.WiredConnecting:
+	case network.StatusConnecting:
 		return cfg.WiredAcquiringIcon
 	}
 	return cfg.WiredDisconnectedIcon
+}
+
+// wiredLabel is wired_label.
+func wiredLabel(s network.Status) string {
+	switch s {
+	case network.StatusConnected:
+		return i18n.T("bar-network-wired")
+	case network.StatusConnecting:
+		return i18n.T("bar-network-connecting")
+	}
+	return i18n.T("bar-network-disconnected")
 }
 
 // network is the module: the wifi/wired label.
 type networkModule struct {
 	ctx    ModuleContext
 	source network.Source
-	label  *widget.Label
-	icon   *widget.Icon
-	root   widget.Widget
+	// vpn is the VPN service the icon overlays; nil without NM.
+	vpn   *network.VPNService
+	label *widget.Label
+	icon  *widget.Icon
+	root  widget.Widget
 }
 
 func newNetwork(ctx ModuleContext) (Module, error) {
@@ -95,6 +144,9 @@ func newNetwork(ctx ModuleContext) (Module, error) {
 		return nil, errors.New("network: no NetworkManager source available")
 	}
 	m := &networkModule{ctx: ctx, source: ctx.Network}
+	if ctx.Networking != nil {
+		m.vpn = ctx.Networking.VPN
+	}
 	m.label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, "", ctx.Style.fg)
 	m.icon = moduleIcon(ctx, ctx.Config.Network.Icon())
 	m.root = assembleModule(ctx, m.icon, m.label)
@@ -111,6 +163,14 @@ func newNetwork(ctx ModuleContext) (Module, error) {
 		}
 		stop()
 	}()
+	if m.vpn != nil {
+		changes := m.vpn.Changes(ctx.Life())
+		go func() {
+			for range changes {
+				m.ctx.Invoke(func() { _ = m.refresh() })
+			}
+		}()
+	}
 	return m, nil
 }
 
@@ -121,14 +181,17 @@ func (m *networkModule) refresh() error {
 		return err
 	}
 	cfg := m.ctx.Config.Network
-	label := ""
-	if cfg.LabelShow {
-		label = networkLabel(snap)
+	var vpn vpnView
+	if m.vpn != nil {
+		vpn = vpnView{configured: !m.vpn.IsEmpty(), state: m.vpn.Aggregate()}
+	}
+	icon, label := networkDisplay(cfg, snap, vpn)
+	if !cfg.LabelShow {
+		label = ""
 	}
 	m.label.SetText(label)
-	m.label.SetColor(networkColor(snap, m.ctx.Style.palette, m.ctx.Style.fg))
-	if setter := m.icon; setter != nil {
-		setter.SetThemeName(networkIconName(cfg, snap))
+	if m.icon != nil {
+		m.icon.SetThemeName(icon)
 	}
 	return nil
 }

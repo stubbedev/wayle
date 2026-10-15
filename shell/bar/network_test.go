@@ -64,7 +64,7 @@ func (f *fakeNetworkSource) Subscribe(context.Context) (<-chan struct{}, func(),
 
 func newTestNetworkModule(t *testing.T, cfg *config.Config, snap network.Snapshot) *networkModule {
 	t.Helper()
-	style := computeStyle(cfg, styling.Default())
+	style := computeStyle(cfg, styling.Default()).forModules()
 	m := &networkModule{
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
 		source: &fakeNetworkSource{snap: snap, ticks: make(chan struct{}, 2)},
@@ -73,57 +73,108 @@ func newTestNetworkModule(t *testing.T, cfg *config.Config, snap network.Snapsho
 	return m
 }
 
-func TestNetworkLabelPicksWifiThenWired(t *testing.T) {
-	wifi := network.Snapshot{WifiEnabled: true, WifiConnected: true, WifiSSID: "homewifi"}
-	if got := networkLabel(wifi); got != "homewifi" {
-		t.Errorf("wifi ssid = %q", got)
-	}
-	hidden := wifi
-	hidden.WifiSSID = ""
-	if got := networkLabel(hidden); got != i18n.T("bar-network-wifi-fallback") {
-		t.Errorf("hidden ssid = %q, want the WiFi fallback", got)
-	}
-	connecting := network.Snapshot{WifiEnabled: true, WifiConnecting: true}
-	if got := networkLabel(connecting); got != i18n.T("bar-network-connecting") {
-		t.Errorf("connecting = %q", got)
-	}
-	wired := network.Snapshot{WifiEnabled: false, WiredConnected: true}
-	if got := networkLabel(wired); got != i18n.T("bar-network-wired") {
-		t.Errorf("wired = %q", got)
-	}
-	off := network.Snapshot{}
-	if got := networkLabel(off); got != i18n.T("bar-network-disconnected") {
-		t.Errorf("offline = %q", got)
-	}
-	// Wifi preferred over wired while enabled.
-	both := network.Snapshot{WifiEnabled: true, WifiConnected: true, WifiSSID: "a", WiredConnected: true}
-	if got := networkLabel(both); got != "a" {
-		t.Errorf("both = %q, want the wifi ssid", got)
+// compute_link_display: the primary connection's device decides, a
+// missing device says so, no primary connection is offline, and other
+// primaries prefer wifi to wired.
+func TestLinkDisplayFollowsThePrimaryConnection(t *testing.T) {
+	cfg := config.Defaults().Network
+	wifiUp := network.Snapshot{WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected, WifiSSID: "home", WifiStrength: 90}
+	wiredUp := network.Snapshot{HasWired: true, Wired: network.StatusConnected}
+	both := wifiUp
+	both.HasWired, both.Wired = true, network.StatusConnected
+	strongest := cfg.WifiSignalIcons[len(cfg.WifiSignalIcons)-1]
+	for _, tc := range []struct {
+		name        string
+		primary     network.ConnectionType
+		snap        network.Snapshot
+		icon, label string
+	}{
+		{"wifi primary", network.ConnectionWifi, both, strongest, "home"},
+		{"wired primary over a live wifi", network.ConnectionWired, both, cfg.WiredConnectedIcon, i18n.T("bar-network-wired")},
+		{"wifi primary without a card", network.ConnectionWifi, wiredUp, cfg.WifiOfflineIcon, i18n.T("bar-network-no-wifi")},
+		{"wired primary without a port", network.ConnectionWired, wifiUp, cfg.WiredDisconnectedIcon, i18n.T("bar-network-no-ethernet")},
+		{"no primary", network.ConnectionNone, both, cfg.WifiOfflineIcon, i18n.T("bar-network-offline")},
+		{"vpn primary prefers wifi", network.ConnectionVPN, both, strongest, "home"},
+		{"vpn primary on wired only", network.ConnectionVPN, wiredUp, cfg.WiredConnectedIcon, i18n.T("bar-network-wired")},
+		{"other primary, no devices", network.ConnectionOther, network.Snapshot{}, cfg.WifiOfflineIcon, i18n.T("bar-network-offline")},
+	} {
+		tc.snap.Primary = tc.primary
+		icon, label := linkDisplay(cfg, tc.snap)
+		if icon != tc.icon || label != tc.label {
+			t.Errorf("%s: %q %q, want %q %q", tc.name, icon, label, tc.icon, tc.label)
+		}
 	}
 }
 
-func TestNetworkModuleDimsWhenOffline(t *testing.T) {
-	cfg := config.Defaults()
-	style := computeStyle(cfg, styling.Default())
+// wifi_icon and wifi_label over the radio and device states; a
+// disconnected card reads disconnected, never connecting.
+func TestWifiStates(t *testing.T) {
+	cfg := config.Defaults().Network
+	for _, tc := range []struct {
+		name        string
+		snap        network.Snapshot
+		icon, label string
+	}{
+		{"radio off", network.Snapshot{HasWifi: true}, cfg.WifiDisabledIcon, i18n.T("bar-network-disconnected")},
+		{"disconnected", network.Snapshot{WifiEnabled: true, HasWifi: true}, cfg.WifiOfflineIcon, i18n.T("bar-network-disconnected")},
+		{"connecting", network.Snapshot{WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnecting}, cfg.WifiAcquiringIcon, i18n.T("bar-network-connecting")},
+		{"hidden ssid", network.Snapshot{WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected}, cfg.WifiSignalIcons[0], i18n.T("bar-network-wifi-fallback")},
+	} {
+		tc.snap.Primary = network.ConnectionWifi
+		icon, label := linkDisplay(cfg, tc.snap)
+		if icon != tc.icon || label != tc.label {
+			t.Errorf("%s: %q %q, want %q %q", tc.name, icon, label, tc.icon, tc.label)
+		}
+	}
+	cfg.WifiSignalIcons = nil
+	if got := wifiIcon(cfg, network.Snapshot{WifiEnabled: true, Wifi: network.StatusConnected}); got != cfg.WifiConnectedIcon {
+		t.Errorf("no signal icons: %q, want the connected icon", got)
+	}
+}
 
+// The VPN icon takes the icon over per vpn-show (auto waits for a
+// profile); the label stays the link's.
+func TestVPNOverlaysTheIcon(t *testing.T) {
+	cfg := config.Defaults().Network
+	snap := network.Snapshot{Primary: network.ConnectionWired, HasWired: true, Wired: network.StatusConnected}
+	for _, tc := range []struct {
+		show config.VpnShow
+		vpn  vpnView
+		icon string
+	}{
+		{config.VpnShowAuto, vpnView{}, cfg.WiredConnectedIcon},
+		{config.VpnShowAuto, vpnView{configured: true, state: network.VPNConnected}, cfg.VpnConnectedIcon},
+		{config.VpnShowAuto, vpnView{configured: true, state: network.VPNConnecting}, cfg.VpnConnectingIcon},
+		{config.VpnShowAuto, vpnView{configured: true, state: network.VPNFailed}, cfg.VpnDisconnectedIcon},
+		{config.VpnShowAlways, vpnView{}, cfg.VpnDisconnectedIcon},
+		{config.VpnShowNever, vpnView{configured: true, state: network.VPNConnected}, cfg.WiredConnectedIcon},
+	} {
+		cfg.VpnShow = tc.show
+		icon, label := networkDisplay(cfg, snap, tc.vpn)
+		if icon != tc.icon || label != i18n.T("bar-network-wired") {
+			t.Errorf("%s %+v: %q %q, want %q and the wired label", tc.show, tc.vpn, icon, label, tc.icon)
+		}
+	}
+}
+
+// The label takes the stylesheet's ink (label-color), connected or
+// not, and label-show off empties it.
+func TestNetworkModuleLabel(t *testing.T) {
+	cfg := config.Defaults()
 	offline := newTestNetworkModule(t, cfg, network.Snapshot{})
 	if err := offline.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if got := offline.label.Text(); got != i18n.T("bar-network-disconnected") {
-		t.Errorf("label = %q", got)
+	if got := offline.label.Text(); got != i18n.T("bar-network-offline") || offline.label.Color() != 0 {
+		t.Errorf("offline label %q ink %#08x, want the offline text in the stylesheet's ink", got, offline.label.Color())
 	}
-	muted, _ := styling.Default().Token(config.TokenFgMuted)
-	if offline.label.Color() != muted {
-		t.Errorf("offline color = %#08x, want fg-muted", offline.label.Color())
-	}
-
-	online := newTestNetworkModule(t, cfg, network.Snapshot{WifiEnabled: true, WifiConnected: true, WifiSSID: "x"})
-	if err := online.refresh(); err != nil {
+	cfg.Network.LabelShow = false
+	hidden := newTestNetworkModule(t, cfg, network.Snapshot{Primary: network.ConnectionWifi, WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected, WifiSSID: "x"})
+	if err := hidden.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	if online.label.Color() != style.fg {
-		t.Errorf("online color = %#08x, want the default fg", online.label.Color())
+	if got := hidden.label.Text(); got != "" {
+		t.Errorf("label-show off: %q", got)
 	}
 }
 

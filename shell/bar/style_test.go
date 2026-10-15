@@ -56,7 +56,7 @@ func isolateConfigDir(t *testing.T) string {
 
 func newTestContext(t *testing.T, cfg *config.Config) ModuleContext {
 	t.Helper()
-	style := computeStyle(cfg, styling.Default())
+	style := computeStyle(cfg, styling.Default()).forModules()
 	face := treetest.Font(t)
 	return ModuleContext{Config: cfg, Font: face, Style: &style}
 }

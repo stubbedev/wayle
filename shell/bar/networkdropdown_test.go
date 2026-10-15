@@ -172,7 +172,7 @@ func newNetTestView(t *testing.T, snap network.Snapshot, deps netDeps) (*network
 }
 
 func TestNetworkDropdownWithoutWifi(t *testing.T) {
-	v, _, _ := newNetTestView(t, network.Snapshot{WiredConnected: true, WiredSpeed: 1000, WiredIP4: "10.0.0.5"}, netDeps{})
+	v, _, _ := newNetTestView(t, network.Snapshot{HasWired: true, Wired: network.StatusConnected, WiredSpeed: 1000, WiredIP4: "10.0.0.5"}, netDeps{})
 	if v.headerIcon.Name() != "cm-wired-symbolic" || v.wifiSwitch.Visible() || v.scanBtn.Visible() {
 		t.Error("no wifi: want the wired icon, no switch, no scan")
 	}
@@ -196,7 +196,7 @@ func TestNetworkDropdownListsAndConnects(t *testing.T) {
 		},
 		known: map[string]bool{"saved": true},
 	}
-	snap := network.Snapshot{WifiEnabled: true, WifiConnected: true, WifiSSID: "mine", WifiStrength: 90, WifiFrequency: 5180, WifiIP4: "192.168.1.9"}
+	snap := network.Snapshot{WifiEnabled: true, HasWifi: true, Wifi: network.StatusConnected, WifiSSID: "mine", WifiStrength: 90, WifiFrequency: 5180, WifiIP4: "192.168.1.9"}
 	v, src, pop := newNetTestView(t, snap, netDeps{wifiCtl: wifi})
 
 	if v.headerIcon.Name() != "tb-wifi-symbolic" || !v.wifiSwitch.On() || !v.scanBtn.Visible() {

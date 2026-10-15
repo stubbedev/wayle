@@ -64,6 +64,13 @@ type barStyle struct {
 // computeStyle resolves the Go-painted surfaces' parameters: sizes
 // through Size::resolve_px (rem base times bar scale, pixels literal)
 // and colors through the token table.
+// forModules is the modules' copy: their ink is left to the
+// stylesheet (--bar-btn-label-color, the label-color option).
+func (s barStyle) forModules() barStyle {
+	s.fg = 0
+	return s
+}
+
 func computeStyle(cfg *config.Config, palette *styling.Palette) barStyle {
 	bar := cfg.Bar
 	scale := float64(bar.Scale)

@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/spawn"
 	"github.com/stubbedev/wayle/service/mpris"
+	"github.com/stubbedev/wayle/service/network"
 	"github.com/stubbedev/wayle/service/powerprofiles"
 	"github.com/stubbedev/wayle/service/sysinfo"
 	"github.com/stubbedev/wayle/service/upower"
@@ -732,7 +733,7 @@ func (v *dashboardView) network() widget.Widget {
 		connected = false
 		if v.ctx.Network != nil {
 			if snap, err := v.ctx.Network.Read(context.Background()); err == nil {
-				connected = snap.WiredConnected || snap.WifiEnabled && snap.WifiSSID != ""
+				connected = dashboardConnected(snap)
 			}
 		}
 		show(0, 0)
@@ -935,4 +936,22 @@ func (v *dashboardView) dropdownClosed() {
 			stop()
 		}
 	})
+}
+
+// dashboardConnected is the network section's resolve_connected: the
+// primary connection's device, nothing without one, and either device
+// for other primary types. Wifi counts as connected while enabled with
+// an SSID.
+func dashboardConnected(snap network.Snapshot) bool {
+	wired := snap.Wired == network.StatusConnected
+	wifi := snap.HasWifi && snap.WifiEnabled && snap.WifiSSID != ""
+	switch snap.Primary {
+	case network.ConnectionWired:
+		return wired
+	case network.ConnectionWifi:
+		return wifi
+	case network.ConnectionNone:
+		return false
+	}
+	return wired || wifi
 }

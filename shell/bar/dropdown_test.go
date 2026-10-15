@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/shell/reveal"
+	"github.com/stubbedev/wayle/styling"
 )
 
 var _ = render.Color(0)
@@ -91,10 +92,7 @@ func (fakeHost) HostSurface() *wl.Surface { return nil }
 func TestDropdownBuildersGetTheFullStyle(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	full := *ctx.Style
-	module := full
-	module.fg = 0
-	ctx.Style = &module
+	full := computeStyle(cfg, styling.Default())
 	r := newDropdownRegistry(nil, cfg, ctx.Font, &full, ctx)
 	if r.ctx.Style.fg == 0 || r.ctx.Style != &full {
 		t.Fatalf("builders see fg %08x, want the full style's %08x", uint32(r.ctx.Style.fg), uint32(full.fg))

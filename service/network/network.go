@@ -30,38 +30,87 @@ const (
 const (
 	deviceEthernet = 1
 	deviceWifi     = 2
-	// deviceStateActivated is NM_DEVICE_STATE_ACTIVATED.
-	deviceStateActivated = 100
 )
 
-// Status is the module-level network status.
+// Status is a device's connectivity (NetworkStatus), ordered so the
+// better of two is the greater.
 type Status int
 
-// Statuses (NetworkStatus in the Rust types).
+// Statuses.
 const (
 	StatusDisconnected Status = iota
 	StatusConnecting
 	StatusConnected
 )
 
+// statusOf is NetworkStatus::from_device_state: activated is
+// connected, prepare through secondaries is connecting, and every
+// other state (unmanaged, unavailable, disconnected, deactivating,
+// failed) is disconnected.
+func statusOf(s DeviceState) Status {
+	switch s {
+	case DeviceActivated:
+		return StatusConnected
+	case DevicePrepare, DeviceConfig, DeviceNeedAuth, DeviceIPConfig, DeviceIPCheck, DeviceSecondaries:
+		return StatusConnecting
+	}
+	return StatusDisconnected
+}
+
+// ConnectionType is NM's PrimaryConnectionType
+// (ConnectionType::from_nm_type).
+type ConnectionType int
+
+// Connection types; ConnectionOther is any type without its own.
+const (
+	ConnectionNone ConnectionType = iota
+	ConnectionWifi
+	ConnectionWired
+	ConnectionVPN
+	ConnectionWireGuard
+	ConnectionBluetooth
+	ConnectionOther
+)
+
+// connectionTypeOf parses a PrimaryConnectionType; "" is no primary
+// connection.
+func connectionTypeOf(nm string) ConnectionType {
+	switch nm {
+	case "":
+		return ConnectionNone
+	case "802-11-wireless":
+		return ConnectionWifi
+	case "802-3-ethernet":
+		return ConnectionWired
+	case "vpn":
+		return ConnectionVPN
+	case "wireguard":
+		return ConnectionWireGuard
+	case "bluetooth":
+		return ConnectionBluetooth
+	}
+	return ConnectionOther
+}
+
 // Snapshot is one network state read.
 type Snapshot struct {
 	// WifiEnabled is NM's WirelessEnabled.
 	WifiEnabled bool
-	// Wifi is populated when a wifi device is activated.
-	WifiSSID       string
-	WifiStrength   uint8
-	WifiConnected  bool
-	WifiConnecting bool
-	// WifiFrequency is the active access point's frequency in MHz and
-	// WifiIP4 the device's first IPv4 address, when connected.
+	// Primary is the type of NM's primary connection.
+	Primary ConnectionType
+	// HasWifi and HasWired report a wireless and an ethernet device;
+	// Wifi and Wired are their connectivity, the best device's when
+	// there are several.
+	HasWifi, HasWired bool
+	Wifi, Wired       Status
+	// The active access point's SSID, strength, and frequency (MHz),
+	// and the device's first IPv4 address, when wifi is connected.
+	WifiSSID      string
+	WifiStrength  uint8
 	WifiFrequency uint32
 	WifiIP4       string
-	// WiredConnected reports an activated ethernet device.
-	WiredConnected  bool
-	WiredConnecting bool
-	// WiredSpeed is the link speed in Mb/s and WiredIP4 the first IPv4
-	// address, when connected.
+	// The link speed in Mb/s and first IPv4 address, when wired is
+	// connected.
 	WiredSpeed uint32
 	WiredIP4   string
 }
@@ -106,6 +155,11 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 	// WirelessEnabled is best-effort: a missing property means wifi is
 	// absent, not fatal.
 	_ = s.prop(ctx, nmIface, "WirelessEnabled", &snap.WifiEnabled)
+	var primary string
+	if err := s.prop(ctx, nmIface, "PrimaryConnectionType", &primary); err != nil {
+		return snap, fmt.Errorf("network: PrimaryConnectionType: %w", err)
+	}
+	snap.Primary = connectionTypeOf(primary)
 
 	var devices []dbus.ObjectPath
 	obj := s.conn.Object(nmName, dbus.ObjectPath(nmPath))
@@ -122,23 +176,22 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 		if err := dev.CallWithContext(ctx, properties+".Get", 0, deviceIface, "State").Store(&state); err != nil {
 			continue
 		}
+		status := statusOf(DeviceState(state))
 		switch deviceType {
 		case deviceEthernet:
-			switch {
-			case state == deviceStateActivated:
-				snap.WiredConnected = true
+			snap.HasWired = true
+			if status == StatusConnected && snap.Wired != StatusConnected {
 				_ = dev.CallWithContext(ctx, properties+".Get", 0, wiredIface, "Speed").Store(&snap.WiredSpeed)
 				snap.WiredIP4 = s.ip4(ctx, dev)
-			case state >= 10 && state < 100: // preparing..configuring
-				snap.WiredConnecting = true
 			}
+			snap.Wired = max(snap.Wired, status)
 		case deviceWifi:
-			if state != deviceStateActivated {
-				if state >= 10 && state < 100 {
-					snap.WifiConnecting = true
-				}
+			snap.HasWifi = true
+			if status != StatusConnected || snap.Wifi == StatusConnected {
+				snap.Wifi = max(snap.Wifi, status)
 				continue
 			}
+			snap.Wifi = StatusConnected
 			var ap dbus.ObjectPath
 			// ActiveAccessPoint is a Device.Wireless property, not a
 			// Device one.
@@ -154,7 +207,6 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 			_ = apObj.CallWithContext(ctx, properties+".Get", 0, apIface, "Strength").Store(&strength)
 			_ = apObj.CallWithContext(ctx, properties+".Get", 0, apIface, "Frequency").Store(&snap.WifiFrequency)
 			snap.WifiIP4 = s.ip4(ctx, dev)
-			snap.WifiConnected = true
 			snap.WifiSSID = strings.TrimRight(string(ssidBytes), "\x00")
 			snap.WifiStrength = strength
 		}

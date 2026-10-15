@@ -81,9 +81,10 @@ func (f *fakeNM) own() {
 		must(f.t, f.conn.Export(fakeConnection{f: f, path: path}, path, connectionIface))
 	}
 	props, err := prop.Export(f.conn, nmPath, prop.Map{nmIface: {
-		"ActiveConnections": {Value: []dbus.ObjectPath{}, Emit: prop.EmitTrue},
-		"State":             {Value: uint32(StateConnectedGlobal), Emit: prop.EmitTrue},
-		"WirelessEnabled":   {Value: true, Writable: true, Emit: prop.EmitTrue},
+		"ActiveConnections":     {Value: []dbus.ObjectPath{}, Emit: prop.EmitTrue},
+		"State":                 {Value: uint32(StateConnectedGlobal), Emit: prop.EmitTrue},
+		"WirelessEnabled":       {Value: true, Writable: true, Emit: prop.EmitTrue},
+		"PrimaryConnectionType": {Value: "", Emit: prop.EmitTrue},
 	}})
 	must(f.t, err)
 	f.manager = props
@@ -202,6 +203,11 @@ func (f *fakeNM) publishActive() {
 }
 
 func (f *fakeNM) setState(state State) { f.manager.SetMust(nmIface, "State", uint32(state)) }
+
+// setPrimary sets the primary connection's NM type ("" for none).
+func (f *fakeNM) setPrimary(nmType string) {
+	f.manager.SetMust(nmIface, "PrimaryConnectionType", nmType)
+}
 
 // registered waits for an agent registration.
 func (f *fakeNM) registered(t *testing.T) registration {

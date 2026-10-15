@@ -118,7 +118,7 @@ func (f *fakeNM) exportWired(speed uint32, addr string) {
 	_, err := prop.Export(f.conn, fakeWiredPath, prop.Map{
 		deviceIface: {
 			"DeviceType": {Value: uint32(deviceEthernet)},
-			"State":      {Value: uint32(deviceStateActivated)},
+			"State":      {Value: uint32(DeviceActivated)},
 			"Ip4Config":  {Value: cfg},
 		},
 		wiredIface: {"Speed": {Value: speed}},
@@ -135,5 +135,5 @@ func (w *fakeWifi) associate(ap dbus.ObjectPath, addr string) {
 	w.f.exportIP4(cfg, addr)
 	w.props.SetMust(wirelessIface, "ActiveAccessPoint", ap)
 	w.props.SetMust(deviceIface, "Ip4Config", cfg)
-	w.deviceState(DeviceState(deviceStateActivated), 0)
+	w.deviceState(DeviceActivated, 0)
 }
