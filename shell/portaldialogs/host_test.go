@@ -212,6 +212,9 @@ func TestAppChooserFiltersAndPicks(t *testing.T) {
 	if search == nil || remember == nil {
 		t.Fatal("no search entry or remember box")
 	}
+	if l, ok := remember.Child().(*widget.Label); !ok || l.Text() != "Always use for this file type" || !widget.HasClass(remember, "portal-dialog-remember") {
+		t.Errorf("remember %v, want the labeled .portal-dialog-remember checkbutton", remember.Child())
+	}
 	viewer, editor := treetest.Button(t, c.Root, "Image Viewer"), treetest.Button(t, c.Root, "Text Editor")
 	hs.do(func() { search.SetText("text") })
 	if viewer.Visible() || !editor.Visible() {

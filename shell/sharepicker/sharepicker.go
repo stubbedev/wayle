@@ -259,15 +259,15 @@ func regionPayload(sel regionoverlay.Selection) string {
 //	└ revealer
 //	  └ box.share-picker-surface (vertical, the configured size request)
 //	    ├ notebook.share-picker-notebook (Windows, Outputs, Region)
-//	    ├ the .share-picker-restore-button check and label
+//	    ├ checkbutton.share-picker-restore-button > label
 //	    └ button.share-picker-confirm-button (multi-select only)
 func (p *Picker) build(toplevels []sharepreview.Toplevel) widget.Widget {
 	nb := widget.NewNotebook(p.d.Font)
 	nb.AddClass("share-picker-notebook")
 	nb.SetVExpand(true)
-	nb.AppendTab(pageWindows, p.windowsPage(toplevels))
-	nb.AppendTab(pageOutputs, p.outputsPage())
-	nb.AppendTab(pageRegion, p.regionPage())
+	p.appendPage(nb, pageWindows, p.windowsPage(toplevels))
+	p.appendPage(nb, pageOutputs, p.outputsPage())
+	p.appendPage(nb, pageRegion, p.regionPage())
 	switch p.cfg.DefaultPage {
 	case config.SharePickerOutputs:
 		nb.SelectTab(pageOutputs)
@@ -282,13 +282,10 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel) widget.Widget {
 	surface.Append(nb, true)
 	if !p.cfg.HideTokenRestore {
 		check := widget.NewCheckButton(p.allowToken)
-		check.SetCursorName("pointer")
+		check.AddClass("share-picker-restore-button")
+		check.SetChild(p.label("Allow a restore token"))
 		check.OnChanged = func(on bool) { p.allowToken = on }
-		row := widget.NewBox(widget.Row, 0, 0)
-		row.AddClass("share-picker-restore-button")
-		row.Append(check, false)
-		row.Append(p.label("Allow a restore token"), false)
-		surface.Append(row, false)
+		surface.Append(check, false)
 	}
 	p.confirm, p.confirmLbl = nil, nil
 	if p.multiple {
@@ -331,6 +328,18 @@ func (p *Picker) placeholder(text string) widget.Widget {
 	l.SetHExpand(true)
 	l.SetVExpand(true)
 	return page(widgets.Center(l))
+}
+
+// appendPage adds a page under its page_label: a centered
+// .share-picker-tab-label filling the tab, the pointer over all of it.
+func (p *Picker) appendPage(nb *widget.Notebook, name string, page widget.Widget) {
+	l := p.label(name)
+	l.AddClass("share-picker-tab-label")
+	l.SetHExpand(true)
+	l.SetAlignment(render.AlignCenter)
+	l.SetCursorName("pointer")
+	nb.AppendTab(name, page)
+	nb.SetTabLabel(name, l)
 }
 
 // cardLabel is a card's one-line caption (max-width-chars 1: it takes

@@ -122,8 +122,8 @@ func TestBuildPagesAndOptions(t *testing.T) {
 	if nb.SelectedTab() != pageOutputs {
 		t.Fatalf("notebook %v", nb)
 	}
-	if len(treetest.WithClass(p.root, "share-picker-restore-button")) != 1 {
-		t.Error("the restore-token box is missing")
+	if r := treetest.WithClass(p.root, "share-picker-restore-button"); len(r) != 1 || !isLabeledCheck(r[0], "Allow a restore token") {
+		t.Error("the restore-token checkbutton is missing")
 	}
 	if p.confirm != nil {
 		t.Error("single-select built a Share button")
@@ -276,6 +276,16 @@ func TestSurfaceIsTheRustTree(t *testing.T) {
 	if got := surfaces[0].(*widget.Box).SizeRequest(); got != (widget.Size{W: p.width(), H: p.height()}) {
 		t.Errorf("surface request %v, want %dx%d", got, p.width(), p.height())
 	}
+	nbs := treetest.All[*widget.Notebook](p.root)
+	if len(nbs) != 1 {
+		t.Fatalf("%d notebooks, want the one", len(nbs))
+	}
+	for _, name := range []string{pageWindows, pageOutputs, pageRegion} {
+		l, ok := nbs[0].TabLabel(name).(*widget.Label)
+		if !ok || l.Text() != name || !widget.HasClass(l, "share-picker-tab-label") || widget.CursorNameOf(l) != "pointer" || l.Color() != 0 {
+			t.Errorf("tab %q label %v, want page_label's pointer .share-picker-tab-label", name, nbs[0].TabLabel(name))
+		}
+	}
 	if len(treetest.All[*widget.Revealer](p.root)) != 1 {
 		t.Error("the surface is not behind the reveal")
 	}
@@ -294,4 +304,14 @@ func TestSurfaceIsTheRustTree(t *testing.T) {
 	if want := int(full.SharePicker.Width.ResolvePx(config.SharePickerWidthBaseRem*styling.RemBase, 2)); p.width() != want {
 		t.Errorf("width %d at scale 2, want %d", p.width(), want)
 	}
+}
+
+// isLabeledCheck reports a checkbutton carrying text as its label.
+func isLabeledCheck(w widget.Widget, text string) bool {
+	c, ok := w.(*widget.CheckButton)
+	if !ok {
+		return false
+	}
+	l, ok := c.Child().(*widget.Label)
+	return ok && l.Text() == text
 }

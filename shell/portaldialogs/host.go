@@ -242,6 +242,8 @@ func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, co
 	}
 	var rows []row
 	remember := widget.NewCheckButton(false)
+	remember.AddClass("portal-dialog-remember")
+	remember.SetChild(widget.NewLabel(h.d.Font, 13, "Always use for this file type", 0))
 	for _, a := range apps {
 		id, name := a.ID, a.DisplayName()
 		content := widget.NewBox(widget.Row, 10, 0)
@@ -292,11 +294,7 @@ func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, co
 	scroll := view
 	var rememberRow widget.Widget
 	if contentType != "" {
-		r := widget.NewBox(widget.Row, 8, 0)
-		r.AddClass("portal-dialog-remember")
-		r.Append(remember, false)
-		r.Append(h.label("Always use for this file type", "portal-dialog-remember-label"), true)
-		rememberRow = r
+		rememberRow = remember
 	}
 	return h.surface(
 		h.label("Open With", "portal-dialog-title"),
