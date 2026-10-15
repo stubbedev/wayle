@@ -209,6 +209,21 @@ wayle surfaces:
     root, hide-if-empty collapses the module; recorder:
     recorder-preparing class, select_icon's preparing/paused order;
     power profiles: color-* as threshold colors, unknown = balanced.
+  - icons: clock, netstat, keyboard-input returned bare labels (no icon
+    though icon-show defaults on); power/dashboard icons lacked the
+    icon-container; mail was a bare label (no icon, no button) and
+    hide-when-zero blanked instead of hiding.
+  - window-title: Hyprland only and blank until the first event; now
+    every compositor (Hyprland, niri, mango, sway), the start snapshot,
+    and resolve_icon with the ported built-in table (oracle-tested
+    against icons.rs, with the media table).
+  - keybind-mode: auto-hide hides the module root and applies at start;
+    microphone: threshold colors; world-clock: one stable root.
+  - verified live on the sway harness (every module with its icon; the
+    network label reads Wired instead of Connecting...).
+  - matching Rust after review: battery, bluetooth, notification, cpu,
+    ram, storage, weather, world-clock helpers, hyprsunset (service
+    port), systray visibility, custom, tooltips.
 - [x] the gelm layout properties replace wayle's size/margin wrappers
       (credential.Fixed/Inset are gone; see "sizing" above).
 - [ ] the live visual comparison (item 1 of "Dropdown parity").
