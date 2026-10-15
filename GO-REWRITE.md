@@ -178,10 +178,37 @@ wayle surfaces:
       (06609bd); CheckButton.SetChild, the labeled check button
       (aca3f5b), also used by the app chooser's remember toggle. A race
       (preview captures reading the re-snapshotted config) is fixed.
-- [ ] remaining surfaces to audit against Rust: wallpaper, the launcher's
-      structure, the file chooser, print dialog, and portal dialogs
-      beyond their inks.
-- [ ] bar modules and dropdowns: re-audit against the Rust module set.
+- [x] wallpaper: structure matched Rust; the transition was a fixed
+      200ms fade (the [animations] mapping had no caller) - it is the
+      wallpaper surface's resolved entry now, and reloads.
+- [x] capture surfaces follow reloads: the screenshot host reads
+      [modules.screenshot] per capture (it kept the startup section); the
+      region overlay is window.region-overlay-window >
+      .region-overlay-area on the bundle and paints the area's color
+      (--palette-primary) instead of a palette copy from startup.
+- [x] launcher: Rust's nesting (window.launcher-window > revealer >
+      .launcher-surface; the revealer was outside), homogeneous mode
+      tabs, the launcher-listview class; the message line and
+      -markup-rows rows render bold/italic (they had no font variants).
+- [x] lock: the failure messages come from _lock.ftl (hard-coded
+      English before). Every other shell-domain key Rust uses is read.
+- [ ] file chooser, print dialog, portal dialogs: CSS class sets match
+      Rust's except unstyled helper classes; deeper behavior audit open.
+- [ ] bar modules and dropdowns: per-module logic re-audit against the
+      Rust helpers. Done so far:
+  - network: the service counted unmanaged/unavailable/disconnected
+    devices as connecting (a disconnected card read "Connecting...");
+    the module now ports compute_display (primary connection type,
+    "No Wi-Fi"/"No Ethernet"/"Offline", the wifi-disabled icon, the VPN
+    icon per vpn-show) and the dashboard's resolve_connected.
+  - Go-only inks removed: network/bluetooth/microphone dimmed their
+    labels to fg-muted; idle-inhibit, recorder, treeman pinned
+    label-color in code (idle-inhibit tinted its icon with it). Rust
+    leaves all of it to the BarButton variables.
+  - treeman: "--" without treeman, the severity class on the module
+    root, hide-if-empty collapses the module; recorder:
+    recorder-preparing class, select_icon's preparing/paused order;
+    power profiles: color-* as threshold colors, unknown = balanced.
 - [x] the gelm layout properties replace wayle's size/margin wrappers
       (credential.Fixed/Inset are gone; see "sizing" above).
 - [ ] the live visual comparison (item 1 of "Dropdown parity").
