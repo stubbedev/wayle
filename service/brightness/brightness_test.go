@@ -145,3 +145,16 @@ func TestSubscribeTicksOnWrites(t *testing.T) {
 		t.Fatal("no tick within 3s of a brightness write")
 	}
 }
+
+func TestAveragePercentage(t *testing.T) {
+	if _, ok := AveragePercentage(nil); ok {
+		t.Error("no devices: want present=false")
+	}
+	got, ok := AveragePercentage([]Device{
+		{Brightness: 2500, Max: 10000},
+		{Brightness: 7500, Max: 10000},
+	})
+	if !ok || got < 49.9 || got > 50.1 {
+		t.Errorf("average = %v/%v, want 50", got, ok)
+	}
+}

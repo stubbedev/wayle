@@ -1,232 +1,350 @@
 package osd
 
 import (
+	"context"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/gelm/app"
-	"github.com/stubbedev/gelm/render"
 	"github.com/stubbedev/gelm/widget"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/widgetipc"
+	"github.com/stubbedev/wayle/service/brightness"
+	"github.com/stubbedev/wayle/service/keytoggles"
+	"github.com/stubbedev/wayle/service/pulse"
+	"github.com/stubbedev/wayle/shell/treetest"
 )
 
-func testFont(t *testing.T) render.Font {
+// fakeWindow records what the OSD asks of its surface.
+type fakeWindow struct {
+	cfg     app.LayerConfig
+	anchors []app.Anchor
+	margins []app.Margins
+	layers  []app.Layer
+	closed  bool
+}
+
+func (w *fakeWindow) Close()                        { w.closed = true }
+func (w *fakeWindow) SetAnchor(a app.Anchor) error  { w.anchors = append(w.anchors, a); return nil }
+func (w *fakeWindow) SetMargin(m app.Margins) error { w.margins = append(w.margins, m); return nil }
+func (w *fakeWindow) SetLayer(l app.Layer) error    { w.layers = append(w.layers, l); return nil }
+
+// timer is one pending After.
+type timer struct {
+	d  time.Duration
+	fn func()
+}
+
+// harness runs the OSD synchronously: Invoke is a call, After queues.
+type harness struct {
+	osd     *Osd
+	outputs []*app.Output
+	opened  []*fakeWindow
+	timers  []timer
+}
+
+func newHarness(t *testing.T, cfg *config.Config) *harness {
 	t.Helper()
-	face, err := render.LoadFont(goregular.TTF)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return face
+	h := &harness{outputs: []*app.Output{{Name: "DP-1"}, {Name: "HDMI-A-1"}}}
+	h.osd = New(Deps{
+		Open: func(lc app.LayerConfig) (Window, error) {
+			w := &fakeWindow{cfg: lc}
+			h.opened = append(h.opened, w)
+			return w, nil
+		},
+		Outputs: func() []*app.Output { return h.outputs },
+		Invoke:  func(fn func()) { fn() },
+		After:   func(d time.Duration, fn func()) { h.timers = append(h.timers, timer{d, fn}) },
+		Font:    treetest.Font(t),
+	}, cfg)
+	return h
 }
 
-func TestAnchors(t *testing.T) {
-	// Corners anchor two edges, edges three.
-	for _, tc := range []struct {
-		position config.OsdPosition
-		ok       bool
-	}{
-		{config.OsdTopLeft, true},
-		{config.OsdTop, true},
-		{config.OsdTopRight, true},
-		{config.OsdRight, true},
-		{config.OsdBottomRight, true},
-		{config.OsdBottom, true},
-		{config.OsdBottomLeft, true},
-		{config.OsdLeft, true},
-		{"middle", false},
-		{"", false},
-	} {
-		_, ok := anchors(tc.position)
-		if ok != tc.ok {
-			t.Errorf("anchors(%q) ok = %v, want %v", tc.position, ok, tc.ok)
-		}
+// fire runs the queued timer of duration d (the first one).
+func (h *harness) fire(t *testing.T, d time.Duration) {
+	t.Helper()
+	i := slices.IndexFunc(h.timers, func(tm timer) bool { return tm.d == d })
+	if i < 0 {
+		t.Fatalf("no %v timer queued (have %v)", d, h.timers)
 	}
+	tm := h.timers[i]
+	h.timers = slices.Delete(h.timers, i, i+1)
+	tm.fn()
 }
 
-func TestMarginsFor(t *testing.T) {
-	cfg := config.DefaultsOsd()
-	cfg.Margin = config.Px(16)
-	// The bottom position insets the bottom edge only.
-	m := marginsFor(cfg)
-	if m.Bottom != 16 || m.Top != 0 || m.Left != 0 || m.Right != 0 {
-		t.Errorf("bottom margins = %+v", m)
-	}
-	// A corner insets both of its edges.
-	cfg.Position = config.OsdTopRight
-	m = marginsFor(cfg)
-	if m.Top != 16 || m.Right != 16 || m.Bottom != 0 || m.Left != 0 {
-		t.Errorf("top-right margins = %+v", m)
-	}
-	// A side insets its edge; the ends of the other axis stay free so
-	// the centered window can shrink to its fixed size.
-	cfg.Position = config.OsdLeft
-	m = marginsFor(cfg)
-	if m.Left != 16 || m.Top != 0 || m.Bottom != 0 {
-		t.Errorf("left margins = %+v", m)
-	}
+func quietConfig() *config.Config {
+	cfg := config.Defaults()
+	cfg.Animations.Enabled = false
+	return cfg
 }
 
-func TestClamp01(t *testing.T) {
-	for _, tc := range []struct {
-		in, want float64
-	}{{0, 0}, {0.5, 0.5}, {1, 1}, {-1, 0}, {2, 1}} {
-		if got := clamp01(tc.in); got != tc.want {
-			t.Errorf("clamp01(%v) = %v, want %v", tc.in, got, tc.want)
-		}
-	}
+func readyHarness(t *testing.T, cfg *config.Config) *harness {
+	t.Helper()
+	h := newHarness(t, cfg)
+	h.fire(t, readyDelay)
+	return h
 }
 
-func TestSetEvent(t *testing.T) {
-	// setEvent drives the face widgets; without a window the widget
-	// half still runs (headless construction).
-	font := testFont(t)
-	f := &face{
-		icon:   widget.NewThemeIcon("", 24),
-		label:  widget.NewLabel(font, 14, "", 0),
-		slider: widget.NewSlider(0, 1, 0.01, 0),
-		value:  widget.NewLabel(font, 14, "", 0),
+// The start-up levels are not events: nothing maps inside the quiet
+// period, and the first event after it does.
+func TestQuietPeriodDropsEvents(t *testing.T) {
+	h := newHarness(t, quietConfig())
+	h.osd.Show(Slider("Speakers", VolumeIcon(40, false), 40, false))
+	if len(h.opened) != 0 {
+		t.Fatal("an event inside the quiet period mapped the OSD")
 	}
-	f.setEvent(Event{Kind: "volume", Icon: "ld-volume-2-symbolic", Label: "Output", Value: 40})
-	if got := f.value.Text(); got != "40%" {
-		t.Errorf("value = %q, want 40%%", got)
+	h.fire(t, readyDelay)
+	h.osd.Show(Slider("Speakers", VolumeIcon(40, false), 40, false))
+	if len(h.opened) != 1 {
+		t.Fatalf("%d surfaces after the quiet period, want 1", len(h.opened))
 	}
-	if got := f.slider.Value(); got != 0.4 {
-		t.Errorf("slider = %v, want 0.4", got)
+	lc := h.opened[0].cfg
+	if lc.Namespace != "wayle-osd" || lc.Keyboard != app.KeyboardNone || lc.Output != h.outputs[0] {
+		t.Errorf("surface %+v, want wayle-osd on the primary without keyboard", lc)
 	}
-	f.setEvent(Event{Kind: "volume", Icon: "ld-volume-x-symbolic", Label: "Output", Value: 0, Muted: true})
-	if got := f.value.Text(); got != "Muted" {
-		t.Errorf("muted value = %q, want Muted", got)
+	if lc.Width != 0 || lc.Height != 0 {
+		t.Errorf("surface sized %dx%d, want content-sized", lc.Width, lc.Height)
 	}
 }
 
 func TestDisabledOsdNeverShows(t *testing.T) {
-	cfg := config.DefaultsOsd()
-	cfg.Enabled = false
-	o := New(nil, cfg, config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
-	o.Show(Event{Kind: "volume"})
-	if got := o.Current(); got.Kind != "" {
-		t.Errorf("disabled OSD recorded %q", got.Kind)
+	cfg := quietConfig()
+	cfg.Osd.Enabled = false
+	h := readyHarness(t, cfg)
+	h.osd.Show(Slider("Speakers", "", 40, false))
+	h.osd.ShowToast(widgetipc.ToastRequest{Label: new("hi")})
+	if len(h.opened) != 0 {
+		t.Error("a disabled OSD mapped")
 	}
 }
 
-func TestApplyToast(t *testing.T) {
-	cfg := config.DefaultsOsd()
-	cfg.Presets = []config.ToastPreset{{ID: "screenshot", Label: new("Captured"), Icon: new("ld-camera-symbolic")}}
-	o := New(nil, cfg, config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
-
-	// A plain label toast without a percentage shows no progress bar.
-	ev, err := o.applyToast(widgetipc.ToastRequest{Label: new("hello")})
-	if err != nil {
-		t.Fatalf("applyToast: %v", err)
+// The surface goes to osd.monitor, falling back to the primary when the
+// connector is gone, and moves when the monitor changes.
+func TestOsdFollowsTheConfiguredMonitor(t *testing.T) {
+	cfg := quietConfig()
+	cfg.Osd.Monitor = config.OsdOnConnector("HDMI-A-1")
+	h := readyHarness(t, cfg)
+	h.osd.Show(Slider("x", "", 1, false))
+	if h.opened[0].cfg.Output != h.outputs[1] {
+		t.Fatalf("opened on %s, want HDMI-A-1", h.opened[0].cfg.Output.Name)
 	}
-	if ev.Label != "hello" || ev.Kind != "toast" {
-		t.Errorf("event = %+v", ev)
-	}
-	if ev.Value != -1 {
-		t.Errorf("no-percentage toast got value %v", ev.Value)
-	}
-
-	// The preset supplies the defaults; explicit fields override.
-	ev, err = o.applyToast(widgetipc.ToastRequest{Preset: new("screenshot")})
-	if err != nil {
-		t.Fatalf("preset toast: %v", err)
-	}
-	if ev.Label != "Captured" || ev.Icon != "ld-camera-symbolic" {
-		t.Errorf("preset event = %+v", ev)
-	}
-	ev, err = o.applyToast(widgetipc.ToastRequest{Preset: new("screenshot"), Label: new("custom")})
-	if err != nil {
-		t.Fatalf("override toast: %v", err)
-	}
-	if ev.Label != "custom" {
-		t.Errorf("override label = %q", ev.Label)
-	}
-
-	// Neither label nor preset is an error; an unknown preset too.
-	if _, err := o.applyToast(widgetipc.ToastRequest{}); err == nil {
-		t.Error("no label: want an error")
-	}
-	if _, err := o.applyToast(widgetipc.ToastRequest{Preset: new("nope")}); err == nil {
-		t.Error("unknown preset: want an error")
-	}
-	// A percentage clamps into the slider range.
-	pct := 140.0
-	ev, _ = o.applyToast(widgetipc.ToastRequest{Label: new("x"), Percentage: &pct})
-	if ev.Value != 100 {
-		t.Errorf("clamped value = %v", ev.Value)
+	next := quietConfig()
+	next.Osd.Monitor = config.OsdOnConnector("DP-9")
+	h.osd.SetConfig(next)
+	if !h.opened[0].closed || len(h.opened) != 2 || h.opened[1].cfg.Output != h.outputs[0] {
+		t.Errorf("a missing connector must move the open OSD to the primary")
 	}
 }
 
-func TestOsdLayerFollowsConfigAndTearingMode(t *testing.T) {
-	cfg := config.DefaultsOsd()
-	o := New(nil, cfg, config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
-	if o.layer() != app.LayerOverlay {
-		t.Errorf("default layer = %d, want overlay", o.layer())
+// A second event reuses the mapped surface and re-applies its anchor,
+// margin, and layer (apply_position per event); a config change
+// re-anchors it.
+func TestOneSurfaceReanchored(t *testing.T) {
+	h := readyHarness(t, quietConfig())
+	h.osd.Show(Slider("a", "", 1, false))
+	h.osd.Show(Slider("b", "", 2, false))
+	if len(h.opened) != 1 {
+		t.Fatalf("%d surfaces, want one reused", len(h.opened))
 	}
-	cfg.Layer = config.LayerBottom
-	o.SetConfig(cfg, config.GeneralConfig{}, config.DefaultsAnimations())
-	if o.layer() != app.LayerBottom {
-		t.Errorf("osd.layer = bottom gave %d", o.layer())
+	next := quietConfig()
+	next.Osd.Position = config.OsdTopRight
+	next.Styling.Scale = 2
+	h.osd.SetConfig(next)
+	w := h.opened[0]
+	if got := w.anchors[len(w.anchors)-1]; got != app.AnchorTop|app.AnchorRight {
+		t.Errorf("re-anchored to %v, want top|right", got)
 	}
-	cfg.Layer = config.LayerOverlay
-	o.SetConfig(cfg, config.GeneralConfig{TearingMode: true}, config.DefaultsAnimations())
-	if o.layer() != app.LayerTop {
-		t.Errorf("overlay under tearing mode = %d, want top", o.layer())
+	if got := w.margins[len(w.margins)-1]; got != (app.Margins{Top: 300, Right: 300}) {
+		t.Errorf("margins %+v, want 150px x scale 2 on the anchored edges", got)
 	}
 }
 
-func TestGenieEdgeFollowsPosition(t *testing.T) {
-	for pos, want := range map[config.OsdPosition]widget.Edge{
-		config.OsdTop: widget.EdgeTop, config.OsdTopLeft: widget.EdgeTop, config.OsdTopRight: widget.EdgeTop,
-		config.OsdBottom: widget.EdgeBottom, config.OsdBottomLeft: widget.EdgeBottom, config.OsdBottomRight: widget.EdgeBottom,
-		config.OsdLeft: widget.EdgeLeft, config.OsdRight: widget.EdgeRight,
+func TestAnchorsAndMargins(t *testing.T) {
+	for pos, want := range map[config.OsdPosition]app.Anchor{
+		config.OsdTopLeft:     app.AnchorTop | app.AnchorLeft,
+		config.OsdTop:         app.AnchorTop,
+		config.OsdTopRight:    app.AnchorTop | app.AnchorRight,
+		config.OsdRight:       app.AnchorRight,
+		config.OsdBottomRight: app.AnchorBottom | app.AnchorRight,
+		config.OsdBottom:      app.AnchorBottom,
+		config.OsdBottomLeft:  app.AnchorBottom | app.AnchorLeft,
+		config.OsdLeft:        app.AnchorLeft,
 	} {
-		if got := genieEdge(pos); got != want {
-			t.Errorf("%s: %v, want %v", pos, got, want)
+		if got := anchors(pos); got != want {
+			t.Errorf("%s anchors %v, want %v", pos, got, want)
 		}
 	}
-}
-
-// TestDismissPlaysTheExit pins begin_dismiss/finish_hide: a face stays
-// up through its exit and closes once it lands; a face replaced
-// meanwhile is not closed by the old exit.
-func TestDismissPlaysTheExit(t *testing.T) {
-	o := New(nil, config.DefaultsOsd(), config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
-	f := &face{rev: widget.NewRevealer(newPlate(widget.NewBox(widget.Row, 0, 0), render.RGB(1, 2, 3)))}
-	f.rev.SetRevealed(true)
-	f.rev.Finish()
-	o.faces["DP-1"] = f
-	o.beginDismiss()
-	if o.faces["DP-1"] != f || f.rev.Revealed() {
-		t.Fatal("dismiss did not start the exit with the face kept up")
-	}
-	f.rev.Finish()
-	if _, ok := o.faces["DP-1"]; ok {
-		t.Error("the face outlived its exit")
-	}
-
-	g := &face{rev: widget.NewRevealer(widget.NewBox(widget.Row, 0, 0))}
-	g.rev.SetRevealed(true)
-	g.rev.Finish()
-	o.faces["DP-1"] = g
-	o.beginDismiss()
-	replacement := &face{rev: widget.NewRevealer(widget.NewBox(widget.Row, 0, 0))}
-	o.faces["DP-1"] = replacement
-	g.rev.Finish()
-	if o.faces["DP-1"] != replacement {
-		t.Error("an old exit closed the face that replaced it")
+	cfg := config.Defaults()
+	cfg.Osd.Position = config.OsdBottomLeft
+	cfg.Osd.Margin = config.Size{Value: 10.7, Unit: config.SizePixels}
+	if got := margins(cfg); got != (app.Margins{Bottom: 10, Left: 10}) {
+		t.Errorf("margins %+v, want 10.7px truncated on bottom and left only", got)
 	}
 }
 
-func TestPlatePaintsUnderItsContent(t *testing.T) {
-	p := newPlate(widget.NewBox(widget.Row, 0, 0), render.RGB(10, 20, 30))
-	p.Measure(widget.Constraints{Max: widget.Size{W: 4, H: 4}})
-	p.Arrange(render.Rect{W: 4, H: 4})
-	data := make([]byte, render.Stride(4)*4)
-	p.Paint(render.New(data, render.Stride(4), 4, 4))
-	if data[2] != 10 || data[1] != 20 || data[0] != 30 {
-		t.Errorf("plate pixel = %v, want the background", data[:4])
+// A toast's duration overrides osd.duration; only the latest event's
+// timer dismisses, and the dismissal unmaps after the exit.
+func TestDismissFollowsTheLatestEvent(t *testing.T) {
+	h := readyHarness(t, quietConfig())
+	h.osd.ShowToast(widgetipc.ToastRequest{Label: new("saved"), DurationMS: new(uint32(900))})
+	h.osd.Show(Slider("a", "", 1, false))
+	h.fire(t, 900*time.Millisecond)
+	if h.opened[0].closed {
+		t.Fatal("a superseded event's timer dismissed the OSD")
+	}
+	h.fire(t, time.Duration(config.DefaultsOsd().Duration)*time.Millisecond)
+	if !h.opened[0].closed {
+		t.Error("the latest event's timer did not dismiss the OSD")
+	}
+	h.osd.Show(Slider("b", "", 1, false))
+	if len(h.opened) != 2 {
+		t.Error("an event after the dismissal did not map a fresh surface")
+	}
+}
+
+// The view shows the slider header and the bar for a level, the toggle
+// header placed by text-align for everything else, with the classes
+// the stylesheet keys on.
+func TestViewFollowsTheEvent(t *testing.T) {
+	cfg := quietConfig()
+	cfg.Osd.TextAlign = config.OsdTextAlignEnd
+	h := readyHarness(t, cfg)
+	h.osd.Show(Slider("Speakers", VolumeIcon(0, true), 42.6, true))
+	f := h.osd.face
+	for _, l := range []*widget.Label{f.sliderLabel, f.value, f.toggleLabel} {
+		if l.Color() != 0 {
+			t.Errorf("label %v pins ink %#08x over the stylesheet", l.Classes(), uint32(l.Color()))
+		}
+	}
+	if !slices.Equal(f.container.Classes(), []string{"osd", "muted", "bordered"}) {
+		t.Errorf("slider classes %v", f.container.Classes())
+	}
+	if !f.sliderHeader.Visible() || !f.bar.Visible() || f.toggleHeader.Visible() {
+		t.Error("a level shows the slider header and the bar only")
+	}
+	if f.sliderLabel.Text() != "Speakers" || f.value.Text() != "43%" || f.bar.Value() != 0.426 {
+		t.Errorf("slider reads %q %q %v", f.sliderLabel.Text(), f.value.Text(), f.bar.Value())
+	}
+
+	h.osd.Show(toggleEvent(keytoggles.Event{Key: keytoggles.CapsLock}))
+	if !slices.Equal(f.container.Classes(), []string{"osd", "toggle-off", "bordered"}) {
+		t.Errorf("toggle classes %v", f.container.Classes())
+	}
+	if f.sliderHeader.Visible() || f.bar.Visible() || !f.toggleHeader.Visible() {
+		t.Error("a toggle shows the toggle header only")
+	}
+	if f.toggleLabel.Text() != "\u2068Caps Lock\u2069 Off" || f.toggleHeader.HAlign() != widget.AlignEnd {
+		t.Errorf("toggle reads %q aligned %v", f.toggleLabel.Text(), f.toggleHeader.HAlign())
+	}
+
+	h.osd.ShowToast(widgetipc.ToastRequest{Label: new("Done"), Class: new("success")})
+	if !slices.Equal(f.container.Classes(), []string{"osd", "bordered", "success"}) {
+		t.Errorf("toast classes %v", f.container.Classes())
+	}
+	if f.toggleIcon.Visible() || f.toggleLabel.Text() != "Done" {
+		t.Error("a toast without an icon shows its label only")
+	}
+}
+
+// Presets supply the label and icon; request fields override them; an
+// unknown preset still shows the request's fields.
+func TestToastEvent(t *testing.T) {
+	osd := config.DefaultsOsd()
+	osd.Presets = []config.ToastPreset{{ID: "saved", Label: new("Saved"), Icon: new("ld-check-symbolic")}}
+	ev := toastEvent(widgetipc.ToastRequest{Preset: new("saved")}, osd)
+	if ev.label != "Saved" || ev.icon != "ld-check-symbolic" || ev.bar {
+		t.Errorf("preset toast %+v", ev)
+	}
+	ev = toastEvent(widgetipc.ToastRequest{Preset: new("saved"), Label: new("Stored"), Percentage: new(30.0)}, osd)
+	if ev.label != "Stored" || ev.icon != "ld-check-symbolic" || !ev.bar || ev.percent != 30 {
+		t.Errorf("overridden toast %+v", ev)
+	}
+	ev = toastEvent(widgetipc.ToastRequest{Preset: new("nope"), Label: new("x")}, osd)
+	if ev.label != "x" || ev.icon != "" {
+		t.Errorf("unknown preset toast %+v", ev)
+	}
+}
+
+func TestIcons(t *testing.T) {
+	for _, tc := range []struct {
+		pct   float64
+		muted bool
+		want  string
+	}{
+		{50, true, "ld-volume-x-symbolic"},
+		{0, false, "ld-volume-x-symbolic"},
+		{33, false, "ld-volume-symbolic"},
+		{34, false, "ld-volume-1-symbolic"},
+		{66, false, "ld-volume-1-symbolic"},
+		{67, false, "ld-volume-2-symbolic"},
+	} {
+		if got := VolumeIcon(tc.pct, tc.muted); got != tc.want {
+			t.Errorf("VolumeIcon(%v, %v) = %s, want %s", tc.pct, tc.muted, got, tc.want)
+		}
+	}
+	if MicrophoneIcon(true) != "ld-mic-off-symbolic" || MicrophoneIcon(false) != "ld-mic-symbolic" {
+		t.Error("microphone icons")
+	}
+}
+
+// fakeAudio scripts the default devices.
+type fakeAudio struct {
+	pulse.Source
+	sink, source pulse.Device
+}
+
+func (f *fakeAudio) DefaultSink(context.Context) (pulse.OutputDevice, error) {
+	return pulse.OutputDevice{Device: f.sink}, nil
+}
+
+func (f *fakeAudio) DefaultSource(context.Context) (pulse.InputDevice, error) {
+	return pulse.InputDevice{Device: f.source}, nil
+}
+
+// A level flashes only when its rounded value or mute state moved, and
+// carries the device's description.
+func TestAudioEventsDedupe(t *testing.T) {
+	src := &fakeAudio{
+		sink:   pulse.Device{Description: "Speakers", Volume: pulse.VolumeFromPercentage(40, 2)},
+		source: pulse.Device{Description: "Mic", Volume: pulse.VolumeFromPercentage(70, 1)},
+	}
+	var a audioEvents
+	if evs := a.next(context.Background(), src); len(evs) != 2 {
+		t.Fatalf("seed produced %d events, want both devices", len(evs))
+	}
+	src.sink.Volume = pulse.VolumeFromPercentage(40.2, 2)
+	if evs := a.next(context.Background(), src); len(evs) != 0 {
+		t.Errorf("a sub-percent move flashed %+v", evs)
+	}
+	src.source.Muted = true
+	evs := a.next(context.Background(), src)
+	if len(evs) != 1 || evs[0].label != "Mic" || evs[0].icon != "ld-mic-off-symbolic" || !evs[0].muted {
+		t.Errorf("muting the mic flashed %+v, want one muted Mic slider", evs)
+	}
+}
+
+// fakeLight scripts the backlights.
+type fakeLight struct {
+	brightness.Source
+	devices []brightness.Device
+}
+
+func (f *fakeLight) Devices(context.Context) ([]brightness.Device, error) { return f.devices, nil }
+
+func TestBrightnessEventsAverageAndDedupe(t *testing.T) {
+	src := &fakeLight{devices: []brightness.Device{{Brightness: 20, Max: 100}, {Brightness: 60, Max: 100}}}
+	var b brightnessEvents
+	ev, ok := b.next(context.Background(), src)
+	if !ok || ev.percent != 40 || ev.icon != BrightnessIcon || ev.label != "Brightness" {
+		t.Fatalf("first level %+v %v, want the 40%% average", ev, ok)
+	}
+	if _, ok := b.next(context.Background(), src); ok {
+		t.Error("an unchanged average flashed")
+	}
+	src.devices = nil
+	if _, ok := b.next(context.Background(), src); ok {
+		t.Error("no backlights flashed")
 	}
 }

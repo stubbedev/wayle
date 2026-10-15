@@ -14,7 +14,6 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/desktopnotify"
 	"github.com/stubbedev/wayle/internal/spawn"
 	"github.com/stubbedev/wayle/internal/widgetipc"
@@ -106,7 +105,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	baseCtx.Toast = func(label, icon string) {
 		if o := osdRef.Load(); o != nil {
-			_ = o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon})
+			o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon})
 		}
 	}
 	ink, _ := palette.Token(config.TokenFgDefault)
@@ -206,7 +205,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 			func() config.RecorderConfig { return current.Load().Recorder },
 			recorder.Hooks{Toast: func(label, icon string, ms uint32) {
 				if o := osdRef.Load(); o != nil {
-					_ = o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon, DurationMS: &ms})
+					o.ShowToast(widgetipc.ToastRequest{Label: &label, Icon: &icon, DurationMS: &ms})
 				}
 			}, Notify: desktopnotify.Notify})
 		baseCtx.Recorder = recState
@@ -254,7 +253,20 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// outputs join once their connector name is known.
 	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, sess)
 	defer stopWallpaper()
-	osdSrv := osd.New(application, cfg.Osd, cfg.General, cfg.Animations, font, palette)
+	osdSrv := osd.New(osd.Deps{
+		Open: func(lc app.LayerConfig) (osd.Window, error) {
+			w, err := application.NewLayer(lc)
+			if err != nil {
+				return nil, err
+			}
+			return w, nil
+		},
+		Outputs: sess.Outputs,
+		Invoke:  application.Invoke,
+		After:   func(d time.Duration, fn func()) { time.AfterFunc(d, fn) },
+		Sheet:   theme.Sheet,
+		Font:    font,
+	}, cfg)
 	osdRef.Store(osdSrv)
 	captureSvc := startCapture(application, sess.Outputs, cfg, palette, baseCtx.Hyprland, font, style.labelPx)
 	servePortalHosts(application, current.Load, font, ink, theme.Sheet)
@@ -285,7 +297,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 		return barWindow{layer, ctx.gen}, nil
 	}
 	bars := newBarSet(openBar)
-	// plugOutput gives a named output its bar and OSD face; startup
+	// plugOutput gives a named output its bar; startup
 	// outputs and hotplugged ones (once their connector name is known)
 	// take the same path, the Rust SyncMonitors. A bar that cannot open
 	// is logged, not fatal.
@@ -295,7 +307,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 		}
 		layout, show := barLayoutFor(current.Load(), output.Name)
 		bars.plug(output, layout, show)
-		osdSrv.AttachOutput(output.Name, output)
 	}
 	for _, output := range outputs {
 		plugOutput(output)
@@ -342,7 +353,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 					rt.ctx.Config = next
 					rt.ctx.Dropdowns.setConfig(next)
 				}
-				osdSrv.SetConfig(next.Osd, next.General, next.Animations)
+				osdSrv.SetConfig(next)
 				applyNotificationConfig(notifSvc, next.Notification)
 				weatherSvc.Configure(weatherSettings(next.Weather))
 				if wall != nil {
@@ -384,7 +395,9 @@ func run(cfg *config.Config, svc *config.Service) error {
 	// The OSD watcher runs whether or not the OSD is enabled: the OSD
 	// drops events while disabled, so a reload can turn it on or off
 	// (the Rust OsdEnabledChanged).
-	go watchOsd(current.Load, baseCtx, osdSrv)
+	osdCtx, stopOsd := context.WithCancel(context.Background())
+	defer stopOsd()
+	go osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness)
 	// The ext-session-lock screen and its triggers (logind, and `wayle
 	// lock` through Shell1).
 	lockScreen, stopLock := lock.Start(application, current.Load(), lock.Fonts(cfg.General.FontSans, font), palette)
@@ -404,9 +417,7 @@ func run(cfg *config.Config, svc *config.Service) error {
 	}
 	go func() {
 		for req := range widgetSrv.Toasts() {
-			if err := osdSrv.ShowToast(req); err != nil {
-				log.Printf("toast: %v", err)
-			}
+			osdSrv.ShowToast(req)
 		}
 	}()
 	go func() {
@@ -415,18 +426,6 @@ func run(cfg *config.Config, svc *config.Service) error {
 		}
 	}()
 	return application.Run()
-}
-
-// brightnessOsdIcon picks the brightness flash's glyph from the
-// percentage.
-func brightnessOsdIcon(percent float64) string {
-	switch {
-	case percent <= 0:
-		return "ld-sun-off-symbolic"
-	case percent < 50:
-		return "ld-sun-dim-symbolic"
-	}
-	return "ld-sun-symbolic"
 }
 
 // connectAudio starts the audio service (the Rust bootstrap's
@@ -441,103 +440,6 @@ func connectAudio() *pulse.Service {
 		return nil
 	}
 	return audio
-}
-
-// microphoneOsdIcon resolves the input flash's glyph.
-func microphoneOsdIcon(cfg config.MicrophoneConfig, dev pulse.Device) string {
-	if dev.Muted {
-		return cfg.IconMuted
-	}
-	return cfg.Icon().Name
-}
-
-// watchOsd follows the pulse and brightness subscriptions and flashes
-// the OSD on their changes, deduplicating repeats like osd/watchers.rs's
-// last_volume/last_brightness tracking.
-func watchOsd(current func() *config.Config, ctx ModuleContext, server *osd.Osd) {
-	bctx := context.Background()
-	var lastVolume, lastInput float64
-	var lastMuted, lastInputMuted bool
-	var lastBrightness float64
-	handlePulse := func() {
-		if ctx.Pulse == nil {
-			return
-		}
-		// Repeats dedupe on the rounded level and mute, the Rust
-		// last_volume snapshot.
-		if out, err := ctx.Pulse.DefaultSink(bctx); err == nil {
-			sink := out.Device
-			if level := volumePercent(sink); level != lastVolume || sink.Muted != lastMuted {
-				lastVolume, lastMuted = level, sink.Muted
-				server.Show(osd.Event{
-					Kind:  "volume",
-					Icon:  volumeIconName(current().Volume, sink),
-					Label: "Output",
-					Value: sink.Volume.AveragePercentage(),
-					Muted: sink.Muted,
-				})
-			}
-		}
-		if in, err := ctx.Pulse.DefaultSource(bctx); err == nil {
-			source := in.Device
-			if level := volumePercent(source); level != lastInput || source.Muted != lastInputMuted {
-				lastInput, lastInputMuted = level, source.Muted
-				server.Show(osd.Event{
-					Kind:  "input-volume",
-					Icon:  microphoneOsdIcon(current().Microphone, source),
-					Label: "Input",
-					Value: source.Volume.AveragePercentage(),
-					Muted: source.Muted,
-				})
-			}
-		}
-	}
-	handleBrightness := func() {
-		if ctx.Brightness == nil {
-			return
-		}
-		devices, err := ctx.Brightness.Devices(bctx)
-		if err != nil || len(devices) == 0 {
-			return
-		}
-		percent := devices[0].Percentage()
-		if percent != lastBrightness {
-			lastBrightness = percent
-			server.Show(osd.Event{
-				Kind:  "brightness",
-				Icon:  brightnessOsdIcon(percent),
-				Label: i18n.T("osd-brightness"),
-				Value: percent,
-			})
-		}
-	}
-	stops := make([]func(), 0, 2)
-	if ctx.Pulse != nil {
-		if ticks, stop, err := ctx.Pulse.Subscribe(bctx); err == nil {
-			stops = append(stops, stop)
-			go func() {
-				for range ticks {
-					handlePulse()
-				}
-			}()
-		}
-	}
-	if ctx.Brightness != nil {
-		if ticks, stop, err := ctx.Brightness.Subscribe(bctx); err == nil {
-			stops = append(stops, stop)
-			go func() {
-				for range ticks {
-					handleBrightness()
-				}
-			}()
-		}
-	}
-	defer func() {
-		for _, stop := range stops {
-			stop()
-		}
-	}()
-	select {}
 }
 
 // layerConfigFor measures the tree for one output (its logical size)

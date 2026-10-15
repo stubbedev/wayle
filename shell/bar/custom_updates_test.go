@@ -6,8 +6,6 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/internal/widgetipc"
-	"github.com/stubbedev/wayle/shell/osd"
 )
 
 func TestCustomUpdatesDispatch(t *testing.T) {
@@ -46,17 +44,6 @@ func TestCustomUpdatesDispatch(t *testing.T) {
 	upd.dispatch("pushed", `{"text":"after-stop"}`)
 	if got := m.label.Text(); got != "pushed-payload" {
 		t.Errorf("a stopped module still received pushes: %q", got)
-	}
-}
-
-func TestToastApplyViaWidgetSocket(t *testing.T) {
-	// applyToast rides the OSD tests; here the wiring shape: a ToastRequest
-	// with neither label nor preset errors, which RunWith logs.
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	cfg := config.DefaultsOsd()
-	o := osd.New(nil, cfg, config.GeneralConfig{}, config.DefaultsAnimations(), testFont(t), nil)
-	if err := o.ShowToast(widgetipc.ToastRequest{}); err == nil {
-		t.Fatal("empty toast: want an error")
 	}
 }
 

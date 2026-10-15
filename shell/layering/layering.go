@@ -5,6 +5,8 @@
 package layering
 
 import (
+	"log"
+
 	"github.com/stubbedev/gelm/app"
 
 	"github.com/stubbedev/wayle/config"
@@ -25,4 +27,30 @@ func For(general config.GeneralConfig, layer config.Layer) app.Layer {
 		return app.LayerOverlay
 	}
 	return app.LayerTop
+}
+
+// Monitor is a surface's configured target: "primary" or a connector
+// (config.OsdMonitor, config.PopupMonitor).
+type Monitor interface {
+	IsPrimary() bool
+	Connector() string
+}
+
+// Output picks a surface's monitor (layer_shell.rs
+// apply_primary_monitor, apply_monitor_by_connector): "primary" is the
+// first output, a connector its output, falling back to the first when
+// that connector is not connected. Nil only when there are no outputs.
+func Output(outputs []*app.Output, monitor Monitor) *app.Output {
+	if len(outputs) == 0 {
+		return nil
+	}
+	if !monitor.IsPrimary() {
+		for _, out := range outputs {
+			if out.Name == monitor.Connector() {
+				return out
+			}
+		}
+		log.Printf("configured monitor %q not found, falling back to primary", monitor.Connector())
+	}
+	return outputs[0]
 }

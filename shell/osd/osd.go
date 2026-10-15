@@ -1,15 +1,12 @@
-// Package osd is the on-screen display: a transient overlay window
-// per output showing volume, microphone, and brightness events, with
-// the auto-dismiss timer the config's duration drives.
+// Package osd is the on-screen display (wayle-shell osd/): one layer
+// surface on the configured monitor flashing volume, microphone,
+// brightness, and lock-key events and the toasts `wayle toast` pushes,
+// styled by the stylesheet's .osd rules and dismissed after
+// osd.duration.
 package osd
 
 import (
-	"errors"
-	"fmt"
-	"maps"
-	"math"
-	"strconv"
-	"sync"
+	"log"
 	"time"
 
 	"github.com/stubbedev/gelm/app"
@@ -23,334 +20,228 @@ import (
 	"github.com/stubbedev/wayle/styling"
 )
 
-// Event is one OSD flash.
-type Event struct {
-	// Kind names the source ("volume", "input-volume", "brightness");
-	// it doubles as the CSS class.
-	Kind string
-	// Icon is the theme icon name.
-	Icon string
-	// Label names the controlled device.
-	Label string
-	// Value is the 0-100 percentage; Muted shows "Muted" instead of
-	// the number.
-	Value float64
-	Muted bool
+// readyDelay is the start-up quiet period: the services report their
+// initial state then, which is not an event to flash.
+const readyDelay = 500 * time.Millisecond
+
+// Window is the part of a layer window the OSD drives
+// (app.LayerWindow).
+type Window interface {
+	Close()
+	SetAnchor(app.Anchor) error
+	SetMargin(app.Margins) error
+	SetLayer(app.Layer) error
 }
 
-// anchors maps the schema's position onto layer-shell anchors.
-func anchors(position config.OsdPosition) (app.Anchor, bool) {
-	switch position {
-	case config.OsdTopLeft:
-		return app.AnchorTop | app.AnchorLeft, true
-	case config.OsdTop:
-		return app.AnchorTop | app.AnchorLeft | app.AnchorRight, true
-	case config.OsdTopRight:
-		return app.AnchorTop | app.AnchorRight, true
-	case config.OsdRight:
-		return app.AnchorRight | app.AnchorTop | app.AnchorBottom, true
-	case config.OsdBottomRight:
-		return app.AnchorBottom | app.AnchorRight, true
-	case config.OsdBottom:
-		return app.AnchorBottom | app.AnchorLeft | app.AnchorRight, true
-	case config.OsdBottomLeft:
-		return app.AnchorBottom | app.AnchorLeft, true
-	case config.OsdLeft:
-		return app.AnchorLeft | app.AnchorTop | app.AnchorBottom, true
+// Deps are the OSD's collaborators.
+type Deps struct {
+	// Open maps a layer surface.
+	Open func(app.LayerConfig) (Window, error)
+	// Outputs lists the connected outputs, the primary first.
+	Outputs func() []*app.Output
+	// Invoke runs fn on the UI loop.
+	Invoke func(fn func())
+	// After runs fn once d has passed, off the loop.
+	After func(d time.Duration, fn func())
+	// Sheet styles the surface: the labels and icons take their ink
+	// from its cascade. Font is the labels' face.
+	Sheet *widget.Stylesheet
+	Font  render.Font
+}
+
+// face is the mapped surface and the widgets an event updates.
+type face struct {
+	win          Window
+	output       *app.Output
+	rev          *widget.Revealer
+	container    *widget.Box
+	sliderHeader *widget.Box
+	sliderIcon   *widget.Icon
+	sliderLabel  *widget.Label
+	value        *widget.Label
+	toggleHeader *widget.Box
+	toggleIcon   *widget.Icon
+	toggleLabel  *widget.Label
+	bar          *widget.ProgressBar
+}
+
+// Osd is the display. Its exported methods may be called from any
+// goroutine; its state lives on the UI loop.
+type Osd struct {
+	d         Deps
+	cfg       *config.Config
+	ready     bool
+	dismissID uint32
+	face      *face
+}
+
+// New builds the OSD; nothing maps until the first event after the
+// start-up quiet period.
+func New(d Deps, cfg *config.Config) *Osd {
+	o := &Osd{d: d, cfg: cfg}
+	d.After(readyDelay, func() { d.Invoke(func() { o.ready = true }) })
+	return o
+}
+
+// Show flashes ev (show_event).
+func (o *Osd) Show(ev Event) { o.d.Invoke(func() { o.show(ev) }) }
+
+// ShowToast flashes a `wayle toast` request (handle_show_toast).
+func (o *Osd) ShowToast(req widgetipc.ToastRequest) {
+	o.d.Invoke(func() { o.show(toastEvent(req, o.cfg.Osd)) })
+}
+
+// SetConfig takes a reloaded config; a mapped OSD re-anchors to it
+// (OsdCmd::ConfigChanged).
+func (o *Osd) SetConfig(cfg *config.Config) {
+	o.d.Invoke(func() {
+		o.cfg = cfg
+		if o.face != nil {
+			o.place()
+		}
+	})
+}
+
+// DetachOutput drops the surface on an unplugged output; the next
+// event maps it on the configured monitor again.
+func (o *Osd) DetachOutput(name string) {
+	o.d.Invoke(func() {
+		if o.face != nil && o.face.output.Name == name {
+			o.closeFace()
+		}
+	})
+}
+
+func (o *Osd) show(ev Event) {
+	if !o.ready || !o.cfg.Osd.Enabled {
+		return
 	}
-	return 0, false
+	o.dismissID++
+	if !o.place() {
+		return
+	}
+	o.face.apply(ev, o.cfg.Osd)
+	reveal.Show(o.face.rev, o.cfg.Animations, config.AnimOsd)
+	ms := ev.durationMS
+	if ms == 0 {
+		ms = o.cfg.Osd.Duration
+	}
+	id := o.dismissID
+	o.d.After(time.Duration(ms)*time.Millisecond, func() { o.d.Invoke(func() { o.beginDismiss(id) }) })
 }
 
-// marginsFor converts the rem margin into edge insets for the
-// position.
-func marginsFor(cfg config.OsdConfig) app.Margins {
-	m := int32(math.Round(cfg.Margin.ResolvePx(config.OsdMarginBaseRem*16, 1)))
+// beginDismiss plays the exit for the latest event, then unmaps.
+func (o *Osd) beginDismiss(id uint32) {
+	if id != o.dismissID || o.face == nil {
+		return
+	}
+	reveal.Hide(o.face.rev, o.cfg.Animations, config.AnimOsd, func() {
+		if id == o.dismissID {
+			o.closeFace()
+		}
+	})
+}
+
+func (o *Osd) closeFace() {
+	if o.face == nil {
+		return
+	}
+	o.face.win.Close()
+	o.face = nil
+}
+
+// place is apply_position and apply_layer: the surface sits on the
+// configured monitor, anchored and inset per osd.position, on its
+// layer. A surface on another output is replaced. It reports whether
+// a surface is mapped.
+func (o *Osd) place() bool {
+	output := layering.Output(o.d.Outputs(), o.cfg.Osd.Monitor)
+	if output == nil {
+		return false
+	}
+	anchor, margin, layer := anchors(o.cfg.Osd.Position), margins(o.cfg), layering.For(o.cfg.General, o.cfg.Osd.Layer)
+	if o.face != nil && o.face.output == output {
+		for _, err := range []error{o.face.win.SetAnchor(anchor), o.face.win.SetMargin(margin), o.face.win.SetLayer(layer)} {
+			if err != nil {
+				log.Printf("osd: re-anchor: %v", err)
+			}
+		}
+		o.face.rev.SetGenieEdge(genieEdge(o.cfg.Osd.Position))
+		return true
+	}
+	o.closeFace()
+	f := o.build()
+	win, err := o.d.Open(app.LayerConfig{
+		Output:    output,
+		Layer:     layer,
+		Anchor:    anchor,
+		Margin:    margin,
+		Keyboard:  app.KeyboardNone,
+		Namespace: "wayle-osd",
+		Root:      f.root(o.d.Sheet),
+	})
+	if err != nil {
+		log.Printf("osd: cannot map on %s: %v", output.Name, err)
+		return false
+	}
+	f.win, f.output = win, output
+	f.rev.SetGenieEdge(genieEdge(o.cfg.Osd.Position))
+	o.face = f
+	return true
+}
+
+// anchors is apply_position's edges: corners take both, the centered
+// positions only their own edge (the surface centers along the other).
+func anchors(p config.OsdPosition) app.Anchor {
+	switch p {
+	case config.OsdTopLeft:
+		return app.AnchorTop | app.AnchorLeft
+	case config.OsdTop:
+		return app.AnchorTop
+	case config.OsdTopRight:
+		return app.AnchorTop | app.AnchorRight
+	case config.OsdRight:
+		return app.AnchorRight
+	case config.OsdBottomRight:
+		return app.AnchorBottom | app.AnchorRight
+	case config.OsdBottomLeft:
+		return app.AnchorBottom | app.AnchorLeft
+	case config.OsdLeft:
+		return app.AnchorLeft
+	}
+	return app.AnchorBottom
+}
+
+// margins is apply_position's insets: osd.margin (rem base 150px at the
+// styling scale, truncated as the Rust `as i32`) on each anchored edge.
+func margins(cfg *config.Config) app.Margins {
+	m := int32(cfg.Osd.Margin.ResolvePx(config.OsdMarginBaseRem*styling.RemBase, float64(cfg.Styling.Scale)))
+	a := anchors(cfg.Osd.Position)
 	var out app.Margins
-	switch cfg.Position {
-	case config.OsdTopLeft, config.OsdTop, config.OsdTopRight:
+	if a&app.AnchorTop != 0 {
 		out.Top = m
-	case config.OsdBottomLeft, config.OsdBottom, config.OsdBottomRight:
+	}
+	if a&app.AnchorBottom != 0 {
 		out.Bottom = m
 	}
-	switch cfg.Position {
-	case config.OsdTopLeft, config.OsdBottomLeft, config.OsdLeft:
+	if a&app.AnchorLeft != 0 {
 		out.Left = m
-	case config.OsdTopRight, config.OsdBottomRight, config.OsdRight:
+	}
+	if a&app.AnchorRight != 0 {
 		out.Right = m
 	}
 	return out
 }
 
-// face is one output's OSD window: the layer surface and its widget
-// tree.
-type face struct {
-	win *app.LayerWindow
-	// rev plays the OSD's enter and exit; the plate inside it carries
-	// the background, so a fade takes the whole OSD.
-	rev    *widget.Revealer
-	icon   *widget.Icon
-	label  *widget.Label
-	slider *widget.Slider
-	value  *widget.Label
+// genieEdge is the edge a genie collapses toward (genie_edge).
+func genieEdge(p config.OsdPosition) widget.Edge {
+	switch p {
+	case config.OsdTop, config.OsdTopLeft, config.OsdTopRight:
+		return widget.EdgeTop
+	case config.OsdLeft:
+		return widget.EdgeLeft
+	case config.OsdRight:
+		return widget.EdgeRight
+	}
+	return widget.EdgeBottom
 }
-
-// setEvent applies an event to the face's widgets.
-func (f *face) setEvent(ev Event) {
-	f.icon.SetThemeName(ev.Icon)
-	f.label.SetText(ev.Label)
-	f.slider.SetValue(clamp01(ev.Value / 100))
-	text := ""
-	if ev.Value >= 0 {
-		text = strconv.FormatFloat(ev.Value, 'f', 0, 64) + "%"
-	}
-	if ev.Muted {
-		text = "Muted"
-	}
-	f.value.SetText(text)
-}
-
-func clamp01(v float64) float64 {
-	switch {
-	case v < 0:
-		return 0
-	case v > 1:
-		return 1
-	}
-	return v
-}
-
-// Osd manages one face per output and the shared dismiss timer.
-// Windows are created on the first Show and closed on dismiss, so a
-// quiet session maps nothing.
-type Osd struct {
-	app     *app.Application
-	cfg     config.OsdConfig
-	general config.GeneralConfig // tearing mode, for the layer
-	anims   config.AnimationsConfig
-	font    render.Font
-	pal     *styling.Palette
-
-	mu      sync.Mutex
-	outputs map[string]*app.Output
-	faces   map[string]*face
-	timer   *time.Timer
-	current Event
-}
-
-// New builds the OSD; general carries the tearing mode its layer
-// honors, anims its enter and exit.
-func New(application *app.Application, cfg config.OsdConfig, general config.GeneralConfig, anims config.AnimationsConfig, font render.Font, pal *styling.Palette) *Osd {
-	return &Osd{app: application, cfg: cfg, general: general, anims: anims, font: font, pal: pal, outputs: make(map[string]*app.Output), faces: make(map[string]*face)}
-}
-
-// Show flashes the event on every attached face for the dismiss
-// duration, creating missing faces. Calling Show again re-arms the
-// timer (the Rust reset behavior).
-func (o *Osd) Show(ev Event) {
-	if o.app == nil {
-		return
-	}
-	o.mu.Lock()
-	if !o.cfg.Enabled {
-		o.mu.Unlock()
-		return
-	}
-	o.current = ev
-	var shown []*face
-	for name, out := range o.outputs {
-		if f, err := o.ensure(name, out); err == nil {
-			f.setEvent(ev)
-			shown = append(shown, f)
-		}
-	}
-	if o.timer != nil {
-		o.timer.Stop()
-	}
-	o.timer = time.AfterFunc(time.Duration(o.cfg.Duration)*time.Millisecond, func() { o.app.Invoke(o.beginDismiss) })
-	anims := o.anims
-	o.mu.Unlock()
-	// A face mid-exit turns back; a new one enters.
-	o.app.Invoke(func() {
-		for _, f := range shown {
-			reveal.Show(f.rev, anims, config.AnimOsd)
-		}
-	})
-}
-
-// AttachOutput adds an output to the fan-out: each output at startup
-// and each hotplugged one once its name is known.
-func (o *Osd) AttachOutput(name string, output *app.Output) {
-	o.mu.Lock()
-	o.outputs[name] = output
-	o.mu.Unlock()
-}
-
-// DetachOutput drops an unplugged output and closes its face.
-func (o *Osd) DetachOutput(name string) {
-	o.mu.Lock()
-	delete(o.outputs, name)
-	f := o.faces[name]
-	delete(o.faces, name)
-	o.mu.Unlock()
-	if f != nil {
-		f.win.Close()
-	}
-}
-
-// SetConfig applies a reloaded [osd] section: the next Show uses it,
-// and faces on screen close so they reopen at the new position and
-// margin (the Rust OSD re-anchors on its config watchers).
-func (o *Osd) SetConfig(cfg config.OsdConfig, general config.GeneralConfig, anims config.AnimationsConfig) {
-	o.mu.Lock()
-	o.cfg, o.general, o.anims = cfg, general, anims
-	o.mu.Unlock()
-	o.dismiss()
-}
-
-// beginDismiss plays each face's exit, then closes it (begin_dismiss,
-// finish_hide); a Show during the exit turns the face back instead.
-// It runs on the loop.
-func (o *Osd) beginDismiss() {
-	o.mu.Lock()
-	faces := maps.Clone(o.faces)
-	o.timer = nil
-	anims := o.anims
-	o.mu.Unlock()
-	for name, f := range faces {
-		reveal.Hide(f.rev, anims, config.AnimOsd, func() { o.closeFace(name, f) })
-	}
-}
-
-// closeFace closes a face whose exit has played, unless it was replaced.
-func (o *Osd) closeFace(name string, f *face) {
-	o.mu.Lock()
-	if o.faces[name] != f {
-		o.mu.Unlock()
-		return
-	}
-	delete(o.faces, name)
-	o.mu.Unlock()
-	if f.win != nil { // a headless face (tests) has none
-		f.win.Close()
-	}
-}
-
-// dismiss closes the windows at once; the next Show recreates them.
-func (o *Osd) dismiss() {
-	o.mu.Lock()
-	faces := o.faces
-	o.faces = make(map[string]*face)
-	o.timer = nil
-	o.mu.Unlock()
-	for _, f := range faces {
-		f.win.Close()
-	}
-}
-
-// ensure creates the face for one output when missing.
-func (o *Osd) ensure(outputName string, output *app.Output) (*face, error) {
-	if f, ok := o.faces[outputName]; ok {
-		return f, nil
-	}
-	anchor, ok := anchors(o.cfg.Position)
-	if !ok {
-		return nil, fmt.Errorf("unknown position %q", o.cfg.Position)
-	}
-	bg, _ := o.pal.Token(config.TokenBgOverlay)
-	fg, _ := o.pal.Token(config.TokenFgDefault)
-	icon := widget.NewThemeIcon("", 24)
-	label := widget.NewLabel(o.font, 14, "", fg)
-	slider := widget.NewSlider(0, 1, 0.01, 0)
-	value := widget.NewLabel(o.font, 14, "", fg)
-	row := widget.NewBox(widget.Row, 10, 0)
-	row.Append(icon, false)
-	row.Append(label, true)
-	row.Append(slider, false)
-	row.Append(value, false)
-	pad := widget.NewBox(widget.Row, 0, 14)
-	pad.Append(row, false)
-	rev := widget.NewRevealer(newPlate(pad, bg))
-	rev.SetGenieEdge(genieEdge(o.cfg.Position))
-
-	win, err := o.app.NewLayer(app.LayerConfig{
-		Output:        output,
-		Layer:         o.layer(),
-		Anchor:        anchor,
-		Margin:        marginsFor(o.cfg),
-		Width:         360,
-		Height:        72,
-		ExclusiveZone: -1,
-		Namespace:     "wayle-osd",
-		Root:          rev,
-	})
-	if err != nil {
-		return nil, err
-	}
-	f := &face{win: win, rev: rev, icon: icon, label: label, slider: slider, value: value}
-	o.faces[outputName] = f
-	return f, nil
-}
-
-// applyToast resolves a toast request against the presets: explicit
-// fields win, and the preset supplies the defaults (osd/methods.rs's
-// handle_show_toast). An absent label everywhere is an error.
-func (o *Osd) applyToast(req widgetipc.ToastRequest) (Event, error) {
-	var preset config.ToastPreset
-	if req.Preset != nil {
-		p, ok := o.cfg.Preset(*req.Preset)
-		if !ok {
-			return Event{}, fmt.Errorf("unknown toast preset %q", *req.Preset)
-		}
-		preset = p
-	}
-	label := deref(preset.Label)
-	if req.Label != nil {
-		label = *req.Label
-	}
-	if label == "" {
-		return Event{}, errors.New("a toast needs a label or preset")
-	}
-	icon := deref(preset.Icon)
-	if req.Icon != nil {
-		icon = *req.Icon
-	}
-	ev := Event{
-		Kind:  "toast",
-		Icon:  icon,
-		Label: label,
-	}
-	if req.Percentage != nil {
-		ev.Value = clamp01(*req.Percentage) * 100
-	} else {
-		ev.Value = -1 // no progress bar
-	}
-	return ev, nil
-}
-
-// ShowToast flashes a toast request.
-func (o *Osd) ShowToast(req widgetipc.ToastRequest) error {
-	ev, err := o.applyToast(req)
-	if err != nil {
-		return err
-	}
-	o.Show(ev)
-	return nil
-}
-
-// Current reads the event on display (tests).
-func (o *Osd) Current() Event {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.current
-}
-
-// deref reads an optional preset string; unset is empty.
-func deref(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-// layer is the configured osd.layer through tearing mode (apply_layer).
-func (o *Osd) layer() app.Layer { return layering.For(o.general, o.cfg.Layer) }

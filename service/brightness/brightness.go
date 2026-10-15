@@ -148,6 +148,20 @@ var sessionBus = func() (*dbus.Conn, error) {
 	return dbus.ConnectSystemBus()
 }
 
+// AveragePercentage is the mean level across devices (helpers.rs): what
+// the bar label and the OSD show, since a brightness action drives every
+// device at once. False when there is none.
+func AveragePercentage(devices []Device) (float64, bool) {
+	if len(devices) == 0 {
+		return 0, false
+	}
+	var sum float64
+	for _, d := range devices {
+		sum += d.Percentage()
+	}
+	return sum / float64(len(devices)), true
+}
+
 // Source is the module's seam: enumerate, watch, and set.
 type Source interface {
 	// Devices returns the current snapshots.

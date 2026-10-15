@@ -40,19 +40,6 @@ func TestBrightnessIconBands(t *testing.T) {
 	}
 }
 
-func TestAveragePercentage(t *testing.T) {
-	if _, ok := averagePercentage(nil); ok {
-		t.Error("no devices: want present=false")
-	}
-	got, ok := averagePercentage([]brightness.Device{
-		{Brightness: 2500, Max: 10000},
-		{Brightness: 7500, Max: 10000},
-	})
-	if !ok || got < 49.9 || got > 50.1 {
-		t.Errorf("average = %v/%v, want 50", got, ok)
-	}
-}
-
 // fakeBrightnessSource is a scripted brightness.Source, safe across
 // the follow goroutine and the test.
 type fakeBrightnessSource struct {

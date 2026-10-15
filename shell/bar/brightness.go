@@ -31,19 +31,6 @@ func brightnessIcon(levels []string, percent float64) string {
 	return levels[max(0, min(i, len(levels)-1))]
 }
 
-// averagePercentage is helpers.rs's average across devices; false when
-// there is none.
-func averagePercentage(devices []brightness.Device) (float64, bool) {
-	if len(devices) == 0 {
-		return 0, false
-	}
-	var sum float64
-	for _, d := range devices {
-		sum += d.Percentage()
-	}
-	return sum / float64(len(devices)), true
-}
-
 // brightnessModule is the bar button: the mean percentage across
 // backlights with its level icon, refreshed on sysfs changes.
 type brightnessModule struct {
@@ -86,7 +73,7 @@ func (m *brightnessModule) refresh() error {
 		return err
 	}
 	cfg := m.ctx.Config.Brightness
-	percent, ok := averagePercentage(devices)
+	percent, ok := brightness.AveragePercentage(devices)
 	if !ok {
 		m.label.SetText(brightnessNoDevice)
 		m.setIcon(brightnessIcon(cfg.LevelIcons, 0))
