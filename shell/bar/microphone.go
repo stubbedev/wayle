@@ -19,6 +19,7 @@ func microphoneLabel(percent float64) string {
 
 // microphone is the module: the default input's level.
 type microphoneModule struct {
+	buttonRef
 	ctx    ModuleContext
 	source pulse.Source
 	label  *widget.Label
@@ -64,6 +65,9 @@ func (m *microphoneModule) refresh() error {
 	if cfg.LabelShow {
 		label = microphoneLabel(volumePercent(dev.Device))
 	}
+	// The thresholds read the unrounded average, as the Rust watcher
+	// does (the volume module rounds first).
+	m.thresholds(dev.Volume.AveragePercentage(), cfg.Thresholds)
 	m.label.SetText(label)
 	if setter := m.icon; setter != nil {
 		name := cfg.IconActive

@@ -77,3 +77,32 @@ func TestLoadFileAppliesMicrophone(t *testing.T) {
 		t.Errorf("config = %+v", c.Microphone)
 	}
 }
+
+// The thresholds color the button by input volume (evaluate_thresholds,
+// last match wins) and clear below them.
+func TestMicrophoneThresholds(t *testing.T) {
+	cfg := config.Defaults()
+	warn, err := config.ParseColorValue("status-warning")
+	if err != nil {
+		t.Fatal(err)
+	}
+	above := 60.0
+	cfg.Microphone.Thresholds = []config.ThresholdEntry{{Above: &above, LabelColor: &warn, IconColor: &warn}}
+	style := computeStyle(cfg, styling.Default()).forModules()
+	source := &fakePulseSource{dev: pulse.Device{Name: "mic", Volume: pct(65)}, ticks: make(chan struct{}, 2)}
+	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
+	m.label = widget.NewLabel(m.ctx.Font, style.labelPx, "", style.fg)
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if m.pending.LabelColor == nil || *m.pending.LabelColor != warn || m.pending.IconColor == nil {
+		t.Errorf("at 65%%: thresholds %+v, want the warning colors", m.pending)
+	}
+	source.dev.Volume = pct(30)
+	if err := m.refresh(); err != nil {
+		t.Fatal(err)
+	}
+	if !m.pending.IsEmpty() {
+		t.Errorf("at 30%%: thresholds %+v, want none", m.pending)
+	}
+}
