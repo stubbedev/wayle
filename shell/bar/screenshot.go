@@ -7,7 +7,6 @@ import (
 	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
-	"github.com/stubbedev/wayle/styling"
 )
 
 // screenshotModule is the screenshot capture button
@@ -22,11 +21,7 @@ func newScreenshot(ctx ModuleContext) (Module, error) {
 	cfg := ctx.Config.Screenshot
 	var label *widget.Label
 	if cfg.LabelShow && cfg.Label != "" {
-		color := ctx.Style.fg
-		if resolved, ok := styling.ResolveColor(cfg.LabelColor, ctx.Style.palette); ok {
-			color = resolved
-		}
-		label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, cfg.Label, color)
+		label = widget.NewLabel(ctx.Font, ctx.Style.labelPx, cfg.Label, ctx.Style.fg)
 	}
 	icon := moduleIcon(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor))
 	switch {
