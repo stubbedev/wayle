@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,6 +34,27 @@ func waitHeadless(t *testing.T, what string, cond func() bool) {
 func waitForText(t *testing.T, label *widget.Label, want string) {
 	t.Helper()
 	waitHeadless(t, "label "+want, func() bool { return label.Text() == want })
+}
+
+// Work waiting for the loop when its generation retires is dropped:
+// the retirement is read under the loop lock, as the application loop
+// reads it inside the loop.
+func TestHeadlessInvokeDropsWorkRetiredWhileQueued(t *testing.T) {
+	ctx := ModuleContext{gen: newMountGen()}
+	var ran atomic.Bool
+	done := make(chan struct{})
+	headlessLoop.Lock()
+	go func() {
+		ctx.Invoke(func() { ran.Store(true) })
+		close(done)
+	}()
+	time.Sleep(20 * time.Millisecond) // let the call queue on the lock
+	ctx.gen.retire()
+	headlessLoop.Unlock()
+	<-done
+	if ran.Load() {
+		t.Fatal("work queued before the retirement ran after it")
+	}
 }
 
 // Headless Invoke runs the work inline and serialized; a retired

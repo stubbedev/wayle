@@ -109,12 +109,11 @@ var headlessLoop sync.Mutex
 // dropped either way.
 func (c ModuleContext) Invoke(fn func()) {
 	if c.App == nil {
-		if c.gen.retiredNow() {
-			return
-		}
 		headlessLoop.Lock()
 		defer headlessLoop.Unlock()
-		fn()
+		if !c.gen.retiredNow() {
+			fn()
+		}
 		return
 	}
 	c.App.Invoke(func() {
