@@ -64,12 +64,7 @@ func (m *microphoneModule) refresh() error {
 	if cfg.LabelShow {
 		label = microphoneLabel(volumePercent(dev.Device))
 	}
-	color := m.ctx.Style.fg
-	if dev.Muted {
-		color = mutedFg(m.ctx.Style.palette)
-	}
 	m.label.SetText(label)
-	m.label.SetColor(color)
 	if setter := m.icon; setter != nil {
 		name := cfg.IconActive
 		if dev.Muted {

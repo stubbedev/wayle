@@ -45,9 +45,11 @@ func btState(connected ...string) bluetooth.State {
 	return st
 }
 
-func TestBluetoothModuleDimsWhenIdle(t *testing.T) {
+// The label reads the alias or disconnected in label-color, idle or
+// not: Rust dims nothing.
+func TestBluetoothModuleLabel(t *testing.T) {
 	cfg := config.Defaults()
-	style := computeStyle(cfg, styling.Default())
+	style := computeStyle(cfg, styling.Default()).forModules()
 	source := newFakeBluetooth(btState("Headset"))
 	m := &bluetoothModule{
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
@@ -58,8 +60,8 @@ func TestBluetoothModuleDimsWhenIdle(t *testing.T) {
 	if got := m.label.Text(); got != "Headset" {
 		t.Errorf("label = %q, want the alias", got)
 	}
-	if m.label.Color() != style.fg {
-		t.Errorf("connected color = %#08x, want the default fg", m.label.Color())
+	if m.label.Color() != 0 {
+		t.Errorf("connected ink = %#08x, want the stylesheet's", m.label.Color())
 	}
 
 	source.setState(btState())
@@ -67,8 +69,8 @@ func TestBluetoothModuleDimsWhenIdle(t *testing.T) {
 	if got := m.label.Text(); got != i18n.T("bar-bluetooth-disconnected") {
 		t.Errorf("idle label = %q", got)
 	}
-	if m.label.Color() != mutedFg(style.palette) {
-		t.Errorf("idle color = %#08x, want fg-muted", m.label.Color())
+	if m.label.Color() != 0 {
+		t.Errorf("idle ink = %#08x, want the stylesheet's", m.label.Color())
 	}
 }
 

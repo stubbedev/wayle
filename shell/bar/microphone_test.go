@@ -27,7 +27,7 @@ func TestMicrophoneLabel(t *testing.T) {
 
 func TestMicrophoneModuleDimsWhenMuted(t *testing.T) {
 	cfg := config.Defaults()
-	style := computeStyle(cfg, styling.Default())
+	style := computeStyle(cfg, styling.Default()).forModules()
 	source := &fakePulseSource{dev: pulse.Device{Name: "mic", Volume: pct(65)}, ticks: make(chan struct{}, 2)}
 	m := &microphoneModule{
 		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
@@ -40,17 +40,17 @@ func TestMicrophoneModuleDimsWhenMuted(t *testing.T) {
 	if got := m.label.Text(); got != "65%" {
 		t.Errorf("label = %q, want 65%%", got)
 	}
-	if m.label.Color() != style.fg {
-		t.Errorf("active color = %#08x, want the default fg", m.label.Color())
+	if m.label.Color() != 0 {
+		t.Errorf("active ink = %#08x, want the stylesheet's", m.label.Color())
 	}
 
+	// Muted changes the icon only; the label keeps label-color.
 	source.dev.Muted = true
 	if err := m.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	muted, _ := styling.Default().Token(config.TokenFgMuted)
-	if m.label.Color() != muted {
-		t.Errorf("muted color = %#08x, want fg-muted", m.label.Color())
+	if m.label.Color() != 0 {
+		t.Errorf("muted ink = %#08x, want the stylesheet's", m.label.Color())
 	}
 }
 

@@ -79,12 +79,7 @@ func (m *bluetoothModule) refresh() {
 	if cfg.LabelShow {
 		label = bluetoothLabel(snap)
 	}
-	color := m.ctx.Style.fg
-	if !snap.Available || !snap.Enabled || len(snap.Connected) == 0 {
-		color = mutedFg(m.ctx.Style.palette)
-	}
 	m.label.SetText(label)
-	m.label.SetColor(color)
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(bluetoothIconName(cfg, snap))
 	}
