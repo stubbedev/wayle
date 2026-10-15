@@ -22,10 +22,11 @@ import (
 // no-op and the compositor queries are canned.
 func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple bool) (*Picker, chan string) {
 	t.Helper()
-	face := treetest.Font(t)
+	full := config.Defaults()
+	full.SharePicker = cfg
+	full.Animations.Enabled = false
 	p := &Picker{
-		cfg:    cfg,
-		style:  Style{Font: face, LabelPx: 12, Palette: styling.Default()},
+		d:      Deps{Config: func() *config.Config { return full }, Font: treetest.Font(t)},
 		invoke: func(func()) {},
 		windows: func() []sharepreview.Toplevel {
 			return []sharepreview.Toplevel{{ID: 0, Class: "foot", Title: "a", Identifier: "id-a"}, {ID: 1, Class: "kitty", Title: " "}}
@@ -35,6 +36,7 @@ func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple
 		},
 	}
 	ch := make(chan string, 1)
+	p.snapshot()
 	p.reply, p.allowToken, p.multiple = ch, allowToken, multiple
 	p.root = p.build(nil)
 	return p, ch
@@ -131,8 +133,11 @@ func TestBuildPagesAndOptions(t *testing.T) {
 	if len(treetest.WithClass(p.root, "share-picker-restore-button")) != 0 {
 		t.Error("hide-token-restore kept the box")
 	}
-	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-card-button")) + len(treetest.WithClass(p.outputsPage(), "share-picker-card-button")); n != 4 {
-		t.Errorf("%d cards, want 2 windows + 2 outputs", n)
+	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-card")); n != 2 {
+		t.Errorf("%d window cards, want 2", n)
+	}
+	if n := len(treetest.All[*widget.Button](p.outputsPage())); n != 2 {
+		t.Errorf("%d output buttons, want 2", n)
 	}
 }
 
@@ -140,7 +145,7 @@ func TestWindowCardsRunInReverseWithTheirTitles(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	var titles []string
 	treetest.Walk(p.windowsPage(nil), func(w widget.Widget) {
-		if b, ok := w.(*widget.Button); ok && widget.HasClass(b, "share-picker-card-button") {
+		if b, ok := w.(*widget.Box); ok && b.Element() == "flowboxchild" {
 			titles = append(titles, b.TooltipText())
 		}
 	})
@@ -251,5 +256,42 @@ func TestDaemonOverTheBus(t *testing.T) {
 	}
 	if _, err := (&Daemon{picker: fakePicker{}}).Export(client); err == nil {
 		t.Fatal("a second daemon claimed the owned name")
+	}
+}
+
+// The surface is the view!: window.share-picker-window over the reveal
+// over the .share-picker-surface at the configured size (scaled by
+// [styling] scale), spinners on the window cards until the captures
+// land, and every label's ink left to the stylesheet.
+func TestSurfaceIsTheRustTree(t *testing.T) {
+	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
+	root, ok := p.root.(*widget.Box)
+	if !ok || root.Element() != "window" || !widget.HasClass(root, "share-picker-window") {
+		t.Fatalf("root %T, want the .share-picker-window node", p.root)
+	}
+	surfaces := treetest.WithClass(p.root, "share-picker-surface")
+	if len(surfaces) != 1 {
+		t.Fatal("no .share-picker-surface")
+	}
+	if got := surfaces[0].(*widget.Box).SizeRequest(); got != (widget.Size{W: p.width(), H: p.height()}) {
+		t.Errorf("surface request %v, want %dx%d", got, p.width(), p.height())
+	}
+	if len(treetest.All[*widget.Revealer](p.root)) != 1 {
+		t.Error("the surface is not behind the reveal")
+	}
+	if len(treetest.All[*widget.Spinner](p.windowsPage(nil))) != 2 {
+		t.Error("the window cards carry no loading spinners")
+	}
+	for _, l := range treetest.All[*widget.Label](p.root) {
+		if l.Color() != 0 {
+			t.Errorf("label %q pins ink %#08x", l.Text(), uint32(l.Color()))
+		}
+	}
+	full := config.Defaults()
+	full.Styling.Scale = 2
+	p.d.Config = func() *config.Config { return full }
+	p.snapshot()
+	if want := int(full.SharePicker.Width.ResolvePx(config.SharePickerWidthBaseRem*styling.RemBase, 2)); p.width() != want {
+		t.Errorf("width %d at scale 2, want %d", p.width(), want)
 	}
 }

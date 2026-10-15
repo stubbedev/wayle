@@ -8,6 +8,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/stubbedev/gelm/app"
 	"github.com/stubbedev/gelm/render"
+	"github.com/stubbedev/gelm/widget"
 
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/service/hyprland"
@@ -34,7 +35,8 @@ type captureServices struct {
 // startCapture builds the overlays and the host on the application and
 // serves the host on the session bus. A bus failure leaves the
 // in-process builtin working.
-func startCapture(application *app.Application, outputs func() []*app.Output, cfg *config.Config, palette *styling.Palette, hypr *hyprland.Connection, sans render.Font, labelPx float64) *captureServices {
+func startCapture(application *app.Application, outputs func() []*app.Output, current func() *config.Config, palette *styling.Palette, hypr *hyprland.Connection, sans render.Font, sheet *widget.Stylesheet) *captureServices {
+	cfg := current()
 	var font render.Font
 	if face, err := app.FontWeighted(cfg.General.FontMono, overlayLabelPx, 700, false); err == nil {
 		font = app.FontFallback(face)
@@ -69,7 +71,7 @@ func startCapture(application *app.Application, outputs func() []*app.Output, cf
 	} else {
 		log.Printf("screenshot: daemon: %v", err)
 	}
-	picker := sharepicker.New(application, cfg.SharePicker, sharepicker.Style{Font: sans, LabelPx: labelPx, Palette: palette}, region)
+	picker := sharepicker.New(application, sharepicker.Deps{Config: current, Font: sans, Sheet: sheet}, region)
 	if release, err := sharepicker.NewDaemon(picker).Export(conn); err == nil {
 		s.release = append(s.release, release)
 	} else {

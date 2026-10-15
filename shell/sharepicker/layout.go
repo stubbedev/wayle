@@ -5,38 +5,6 @@ import (
 	"github.com/stubbedev/gelm/widget"
 )
 
-// sized pins its child to a fixed size on either axis (0 leaves that
-// axis to the constraints): the picker surface's size request and the
-// card previews' height.
-type sized struct {
-	widget.Base
-	child widget.Widget
-	w, h  int
-}
-
-func (s *sized) Measure(con widget.Constraints) widget.Size {
-	sz := s.child.Measure(con)
-	if s.w > 0 {
-		sz.W = min(s.w, con.Max.W)
-	}
-	if s.h > 0 {
-		sz.H = min(s.h, con.Max.H)
-	}
-	return sz
-}
-
-func (s *sized) Arrange(r render.Rect) {
-	s.ArrangeSelf(r)
-	s.child.Arrange(r)
-	widget.SetParents(s, s.child)
-}
-
-func (s *sized) Paint(cv *render.Canvas) { widget.PaintChild(cv, s.child) }
-
-func (s *sized) HitTest(p widget.Point) widget.Widget { return s.child.HitTest(p) }
-
-func (s *sized) Children() []widget.Widget { return []widget.Widget{s.child} }
-
 // outputSlot is one output card's place in the monitor map, in layout
 // pixels (after the optional scaling).
 type outputSlot struct {
@@ -120,7 +88,9 @@ type outputMap struct {
 	spacing int
 }
 
-func (m *outputMap) Measure(con widget.Constraints) widget.Size { return con.Max }
+// Measure asks for nothing of its own (the Rust Fixed fills its
+// scrolled page): the map takes whatever the page gives it.
+func (m *outputMap) Measure(con widget.Constraints) widget.Size { return con.Min }
 
 func (m *outputMap) Arrange(r render.Rect) {
 	m.ArrangeSelf(r)
