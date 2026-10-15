@@ -14,7 +14,6 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/desktopentry"
 	"github.com/stubbedev/wayle/internal/fileuri"
-	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/shell/reveal"
 	"github.com/stubbedev/wayle/shell/widgets"
 )
@@ -190,7 +189,7 @@ func (h *Dialogs) file(path string, px int) widget.Widget {
 	}
 	img := widget.NewFileImage(path)
 	img.AddClass("portal-dialog-image")
-	return credential.NewFixed(img, px, px)
+	return widgets.NewPinned(img, px, px)
 }
 
 // surface wraps the dialog's rows in the styled panel.
@@ -202,7 +201,8 @@ func (h *Dialogs) surface(rows ...widget.Widget) widget.Widget {
 			box.Append(r, false)
 		}
 	}
-	return credential.NewFixed(box, surfaceWidth, 0)
+	box.SetSizeRequest(surfaceWidth, 0)
+	return box
 }
 
 // actions is the right-aligned button row.
@@ -287,7 +287,9 @@ func (h *Dialogs) chooser(answer func(bool, string), apps []desktopentry.App, co
 	// Filled, so a short list packs at the top instead of floating mid-view.
 	view := widget.NewScroll(list)
 	view.FillX, view.FillY = true, true
-	scroll := credential.NewFixed(view, 0, appListHeight)
+	view.SetSizeRequest(0, appListHeight)
+	view.SetMaxContentHeight(appListHeight)
+	scroll := view
 	var rememberRow widget.Widget
 	if contentType != "" {
 		r := widget.NewBox(widget.Row, 8, 0)

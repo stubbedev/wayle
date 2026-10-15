@@ -17,7 +17,6 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/internal/fileuri"
 	"github.com/stubbedev/wayle/internal/mime"
-	"github.com/stubbedev/wayle/shell/credential"
 	"github.com/stubbedev/wayle/shell/reveal"
 	"github.com/stubbedev/wayle/shell/widgets"
 )
@@ -193,12 +192,12 @@ type ui struct {
 	colHeader               *widget.Box
 	sortButtons             [4]*widget.Button
 	sortLabels              [4]*widget.Label
-	columns                 [3]*credential.Fixed
+	columns                 [3]*widgets.Pinned
 	empty                   *widget.Label
 	quicklook               *widget.Box
 	qlIcon                  *widget.Box
 	qlName, qlInfo          *widget.Label
-	preview                 *credential.Fixed
+	preview                 *widget.Box
 	pvIcon                  *widget.Box
 	pvName, pvInfo          *widget.Label
 	filterButton            *widget.ToggleButton
@@ -298,7 +297,9 @@ func (c *Chooser) build(title, name string) {
 	u.search.AddClass("file-chooser-search")
 	u.search.SetDelay(0)
 	u.search.OnSearchChanged = c.setSearch
-	crumbBar.Append(credential.NewFixed(u.search, searchW, 0), false)
+	u.search.SetSizeRequest(searchW, 0)
+	u.search.SetVAlign(widget.AlignCenter)
+	crumbBar.Append(u.search, false)
 
 	// Body: sidebar, the file views, the preview pane.
 	body := widget.NewBox(widget.Row, 0, 0)
@@ -309,7 +310,8 @@ func (c *Chooser) build(title, name string) {
 	card, u.pvIcon, u.pvName, u.pvInfo = c.previewCard("file-chooser-preview", 22)
 	// The pane, not just its card, hides: a hidden card would still
 	// hold its width in the row.
-	u.preview = credential.NewFixed(card, previewW, 0)
+	card.SetSizeRequest(previewW, 0)
+	u.preview = card
 	u.preview.SetVisible(false)
 	body.Append(u.preview, false)
 
@@ -424,7 +426,8 @@ func (c *Chooser) sidebar() widget.Widget {
 	// Filled, so the sections pack at the top instead of floating mid-view.
 	scroll.FillX, scroll.FillY = true, true
 	scroll.AddClass("file-chooser-sidebar-scroll")
-	return credential.NewFixed(scroll, sidebarW, 0)
+	scroll.SetSizeRequest(sidebarW, 0)
+	return scroll
 }
 
 // views is the column header over the list and grid, with the empty
@@ -442,7 +445,7 @@ func (c *Chooser) views(u *ui) widget.Widget {
 			continue
 		}
 		u.colHeader.Append(c.columnGrip(col-1), false)
-		u.columns[col-1] = credential.NewFixed(b, c.columns[col-1], 0)
+		u.columns[col-1] = widgets.NewPinned(b, c.columns[col-1], 0)
 		u.colHeader.Append(u.columns[col-1], false)
 	}
 
@@ -553,7 +556,7 @@ func (c *Chooser) fileRow(e Entry) widget.Widget {
 		if i < 2 {
 			cell.SetAlignment(render.AlignEnd)
 		}
-		row.Append(credential.NewFixed(cell, c.columns[i], 0), false)
+		row.Append(widgets.NewPinned(cell, c.columns[i], 0), false)
 	}
 	return row
 }
@@ -617,7 +620,7 @@ func (c *Chooser) thumb(path string, px int) widget.Widget {
 		}
 		c.waiting[key] = append(c.waiting[key], img)
 	}
-	return credential.NewFixed(img, px, px)
+	return widgets.NewPinned(img, px, px)
 }
 
 // --- surface --------------------------------------------------------

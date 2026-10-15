@@ -1,7 +1,6 @@
 package settings
 
 import (
-	"fmt"
 	"log"
 	"math"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/icons"
+	"github.com/stubbedev/wayle/shell/apptheme"
 	"github.com/stubbedev/wayle/styling"
 )
 
@@ -194,7 +194,7 @@ func newSearchPicker(k *kit, names []string, spec pickerSpec, pick func(string))
 		scroll.AddClass(spec.scrollClass)
 	}
 	if spec.minW > 0 {
-		scroll.SetInlineStyle(fmt.Sprintf("min-width: %dpx;", spec.minW))
+		scroll.SetSizeRequest(spec.minW, 0)
 	}
 	scroll.Append(p.list, true)
 	contents.Append(scroll, true)
@@ -253,7 +253,7 @@ func (c *colorEditor) refresh() {
 		return
 	}
 	c.value = col
-	c.swatch.SetInlineStyle("background-color: " + s + ";")
+	c.swatch.SetInlineStylePriority("background-color: "+s+";", apptheme.ComponentPriority)
 }
 
 func (c *colorEditor) open() {
@@ -482,7 +482,7 @@ func (c *themeSelector) row(name string) widget.Widget {
 		for _, hex := range []string{p.Bg, p.Primary, p.Red, p.Yellow, p.Green, p.Blue} {
 			sw := widget.NewBox(widget.Row, 0, 0)
 			sw.AddClass("theme-preset-swatch")
-			sw.SetInlineStyle("background-color: " + hex + "; background-image: none;")
+			sw.SetInlineStylePriority("background-color: "+hex+"; background-image: none;", apptheme.ComponentPriority)
 			swatches.AppendAligned(sw, false, widget.AlignCenter)
 		}
 	}

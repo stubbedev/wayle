@@ -25,6 +25,14 @@ import (
 // providers (STYLE_PROVIDER_PRIORITY_USER).
 const Priority = widget.StylePriorityUser + 100
 
+// ComponentPriority is a widget's own dynamic CSS - an album art or
+// avatar background, a color swatch - above the bundle, so the bundle's
+// `* { all: unset }` reset never clears it (wayle-styling's
+// COMPONENT_CSS_PRIORITY, GTK priority 1000). A widget's plain inline
+// style sits at user priority, under the bundle, as a GTK per-widget
+// provider does.
+const ComponentPriority = widget.StylePriorityUser + 200
+
 // Theme owns the stylesheet: the Rust bundle — the compiled SCSS, the
 // theme's :root variables, and the user's styles/index.scss — attached
 // to the roots that take it (the Go-painted surfaces keep their

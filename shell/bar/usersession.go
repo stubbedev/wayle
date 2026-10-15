@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/wayle/config"
 	"github.com/stubbedev/wayle/i18n"
 	"github.com/stubbedev/wayle/internal/spawn"
+	"github.com/stubbedev/wayle/shell/apptheme"
 )
 
 // avatarPx is the user avatar's logical box in the session row.
@@ -67,7 +68,7 @@ func setAvatar(tile *widget.Box) {
 	if _, err := os.Stat(path); err != nil {
 		return
 	}
-	tile.SetInlineStyle("background-image: url('" + path + "');")
+	tile.SetInlineStylePriority("background-image: url('"+path+"');", apptheme.ComponentPriority)
 }
 
 // userSessionSection is the dashboard's user-session card

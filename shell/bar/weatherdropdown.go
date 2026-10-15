@@ -355,9 +355,8 @@ func (v *weatherView) hourly(w *weather.Weather, imperial bool, format config.Ti
 // daily is daily_forecast: five days in the .daily-forecast list, each
 // with its span on the week's temperature range. The span is a
 // .daily-bar track with a .daily-bar-fill the stylesheet paints; the
-// fill's offset and width are per-day geometry, so they go inline —
-// gelm has no widget-level min-width/margin-start to carry the Rust
-// set_width_request/set_margin_start pair.
+// fill's offset and width are per-day geometry, the Rust
+// set_margin_start/set_width_request pair.
 func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 	col := widget.NewBox(widget.Column, 0, 0)
 	col.AddClass("weather-section")
@@ -391,10 +390,11 @@ func (v *weatherView) daily(w *weather.Weather, imperial bool) widget.Widget {
 		fillPx := min(int(max(width/100*float32(barPx), 3)), barPx-leftPx)
 		bar := widget.NewBox(widget.Row, 0, 0)
 		bar.AddClass("daily-bar")
-		bar.SetInlineStyle(fmt.Sprintf("min-width: %dpx;", barPx))
+		bar.SetSizeRequest(barPx, 0)
 		fill := widget.NewBox(widget.Row, 0, 0)
 		fill.AddClass("daily-bar-fill")
-		fill.SetInlineStyle(fmt.Sprintf("margin-left: %dpx; min-width: %dpx;", leftPx, fillPx))
+		fill.SetMargin(render.Insets{Left: leftPx})
+		fill.SetSizeRequest(fillPx, 0)
 		bar.Append(fill, false)
 		row.AppendAligned(bar, false, widget.AlignCenter)
 		temps := widget.NewBox(widget.Row, 0, 0)
